@@ -41,9 +41,9 @@ export default function BrokerBindingRequestPage() {
     let cancelled = false;
     (async () => {
       try {
-        const r = await axios.get(`${API_BASE}/api/brokers/${broker_id}`);
+        const r = await axios.get(`${API_BASE}/brokers/${broker_id}`);
         if (!cancelled) setBroker(r.data);
-        const r2 = await axios.post(`${API_BASE}/api/brokers/${broker_id}/fee-preview`, {
+        const r2 = await axios.post(`${API_BASE}/brokers/${broker_id}/fee-preview`, {
           hammer_price: 15000, buyer_province: 'ON',
         });
         if (!cancelled) setFee(r2.data);
@@ -59,7 +59,7 @@ export default function BrokerBindingRequestPage() {
     try {
       const token = localStorage.getItem('access_token') || localStorage.getItem('token');
       const r = await axios.post(
-        `${API_BASE}/api/broker-relationships/request`,
+        `${API_BASE}/broker-relationships/request`,
         { broker_id },
         { headers: { Authorization: `Bearer ${token}` } },
       );

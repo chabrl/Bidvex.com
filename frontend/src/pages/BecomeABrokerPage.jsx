@@ -1,17 +1,20 @@
 /**
- * iter217 Phase 5 Hotfix v5b — Broker application form.
+ * iter217 Phase 5 Hotfix v6.5 — Broker application form.
  *
  * Public route: /become-a-broker (EN) | /devenir-courtier (FR)
  *
  * 4-step wizard:
  *   1. Business information (legal name, province, registration, license)
- *   2. Document upload (placeholder — Phase v6 wires S3 multipart)
+ *   2. Document upload — Broker License, Corporate Registration, Government ID
+ *      (PDF/JPG/PNG, max 10 MB each, OPTIONAL — can be added later from dashboard)
  *   3. Fee structure (fixed | percentage + min/max clamps)
- *   4. Legal confirmation + submit
+ *   4. Pricing + Legal confirmation + submit
+ *      Displays the BidVex Broker Annual Plan: $200 CAD/yr regular,
+ *      $100 CAD/yr current (Launch Offer — 50% OFF).
  *
- * Submitting POSTs to /api/brokers/apply. Successful response navigates
- * to the broker dashboard (which shows "Pending Review" state until an
- * admin approves the application).
+ * Submitting POSTs to /api/brokers/apply. Documents (if attached) are
+ * uploaded via /api/brokers/upload-documents BEFORE the apply call so
+ * the document URLs are persisted onto the broker doc.
  */
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -24,7 +27,10 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../components/ui/select';
 import { Alert, AlertDescription } from '../components/ui/alert';
-import { CheckCircle2, ChevronRight, ChevronLeft, AlertTriangle } from 'lucide-react';
+import {
+  CheckCircle2, ChevronRight, ChevronLeft, AlertTriangle,
+  Upload, FileText, FileImage, X, Loader2, Sparkles,
+} from 'lucide-react';
 
 const PROVINCES = [
   { code: 'ON', name_en: 'Ontario',            name_fr: 'Ontario',            regulator: 'OMVIC' },
@@ -39,16 +45,82 @@ const PROVINCES = [
   { code: 'PE', name_en: 'PEI',                name_fr: 'Î.-P.-É.',           regulator: 'PEI Highway Safety' },
 ];
 
+const MAX_FILE_BYTES = 10 * 1024 * 1024;          // 10 MB
+const ACCEPTED_MIME = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+const ACCEPT_ATTR = '.pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp';
+
 const _fmt = (n) =>
   new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD' }).format(Number(n || 0));
 
+// ── Reusable single-file upload zone (mirrors partner-registration UX) ──
+function BrokerDocUploadZone({ id, file, onPick, onClear, label, hint, lang, testId }) {
+  const isImage = file && file.type?.startsWith('image/');
+  const previewUrl = isImage ? URL.createObjectURL(file) : null;
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-slate-700 dark:text-slate-300 text-xs font-medium">
+        {label} <span className="text-slate-400">{hint}</span>
+      </Label>
+      <input
+        type="file"
+        id={id}
+        accept={ACCEPT_ATTR}
+        onChange={(e) => onPick(e.target.files?.[0] || null)}
+        className="hidden"
+        data-testid={testId}
+      />
+      {!file ? (
+        <label
+          htmlFor={id}
+          className="flex items-center gap-2 px-4 py-3 rounded-lg border border-dashed border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800/40 text-slate-500 hover:border-blue-400 hover:text-blue-600 cursor-pointer transition-colors text-sm"
+        >
+          <Upload className="w-4 h-4 flex-shrink-0" />
+          {lang === 'fr' ? 'Choisir un fichier (PDF, JPG, PNG · max 10 Mo)' : 'Choose a file (PDF, JPG, PNG · max 10MB)'}
+        </label>
+      ) : (
+        <div
+          className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-emerald-200 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/30"
+          data-testid={`${testId}-preview`}
+        >
+          {previewUrl ? (
+            <img
+              src={previewUrl}
+              alt={file.name}
+              className="w-12 h-12 rounded object-cover flex-shrink-0"
+              onLoad={() => URL.revokeObjectURL(previewUrl)}
+            />
+          ) : (
+            <div className="w-12 h-12 rounded bg-rose-100 dark:bg-rose-900/40 flex items-center justify-center flex-shrink-0">
+              <FileText className="w-6 h-6 text-rose-600 dark:text-rose-300" />
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-slate-900 dark:text-white truncate">{file.name}</p>
+            <p className="text-xs text-slate-500">{(file.size / 1024 / 1024).toFixed(2)} MB · {file.type || 'unknown'}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClear}
+            className="p-1.5 rounded-md hover:bg-rose-100 dark:hover:bg-rose-900/30 text-rose-500"
+            data-testid={`${testId}-remove`}
+            aria-label="Remove file"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function BecomeABrokerPage() {
-  const { t, i18n } = useTranslation();
+  const { i18n } = useTranslation();
   const navigate = useNavigate();
   const lang = i18n.language?.startsWith('fr') ? 'fr' : 'en';
 
   const [step, setStep]         = useState(1);
   const [submitting, setSubmit] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError]       = useState(null);
   const [success, setSuccess]   = useState(false);
 
@@ -69,9 +141,36 @@ export default function BecomeABrokerPage() {
     legal_confirmed:     false,
   });
 
+  // Step 2 — document upload state
+  const [licenseFile,      setLicenseFile]      = useState(null);
+  const [registrationFile, setRegistrationFile] = useState(null);
+  const [idFile,           setIdFile]           = useState(null);
+
   const province = PROVINCES.find(p => p.code === form.operating_province) || PROVINCES[0];
 
   const set = (k, v) => setForm(prev => ({ ...prev, [k]: v }));
+
+  const validateFile = (f) => {
+    if (!f) return null;
+    if (f.size > MAX_FILE_BYTES) {
+      return lang === 'fr'
+        ? `Le fichier "${f.name}" dépasse 10 Mo.`
+        : `File "${f.name}" exceeds 10MB.`;
+    }
+    if (!ACCEPTED_MIME.includes(f.type)) {
+      return lang === 'fr'
+        ? `Type de fichier non supporté pour "${f.name}". Utilisez PDF, JPG, PNG ou WebP.`
+        : `Unsupported file type for "${f.name}". Use PDF, JPG, PNG or WebP.`;
+    }
+    return null;
+  };
+
+  const pickFile = (setter) => (f) => {
+    const e = validateFile(f);
+    if (e) { setError(e); return; }
+    setError(null);
+    setter(f);
+  };
 
   // ── Live fee preview on a $15,000 sample ─────────────────────────
   const sampleFee = (() => {
@@ -91,7 +190,7 @@ export default function BecomeABrokerPage() {
 
   const canAdvance = () => {
     if (step === 1) return form.legal_business_name && form.corporate_registration_number && form.broker_license_number;
-    if (step === 2) return true;  // Docs are optional in MVP; v6 wires S3
+    if (step === 2) return true;  // Docs always optional
     if (step === 3) {
       if (form.fee_type === 'fixed') return Number(form.fixed_amount_cad) > 0;
       return Number(form.percentage_rate) > 0;
@@ -100,10 +199,40 @@ export default function BecomeABrokerPage() {
     return true;
   };
 
+  const uploadDocsIfAny = async (token) => {
+    if (!licenseFile && !registrationFile && !idFile) return {};
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      if (licenseFile)      fd.append('license_document', licenseFile);
+      if (registrationFile) fd.append('registration_document', registrationFile);
+      if (idFile)           fd.append('additional_documents', idFile);
+      const r = await axios.post(`${API_BASE}/brokers/upload-documents`, fd, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' },
+      });
+      return r.data || {};
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleSubmit = async () => {
     setSubmit(true); setError(null);
     try {
       const token = localStorage.getItem('access_token') || localStorage.getItem('token');
+
+      // 1) Upload documents first (if any) so they get attached on apply
+      let docUrls = {};
+      try {
+        docUrls = await uploadDocsIfAny(token);
+      } catch (e) {
+        // Surface but don't block — user can re-upload later
+        const msg = e?.response?.data?.detail?.message || e?.response?.data?.detail || e?.message || 'Document upload failed.';
+        setError(lang === 'fr'
+          ? `Téléversement des documents échoué (vous pourrez les ajouter plus tard) : ${msg}`
+          : `Document upload failed (you can add them later from your dashboard): ${msg}`);
+      }
+
       const payload = {
         legal_business_name:           form.legal_business_name.trim(),
         operating_province:            form.operating_province,
@@ -111,6 +240,9 @@ export default function BecomeABrokerPage() {
         broker_license_number:         form.broker_license_number.trim(),
         regulatory_body:               province.regulator,
         permit_type:                   form.permit_type,
+        license_document_url:          docUrls.license_document_url || null,
+        registration_document_url:     docUrls.registration_document_url || null,
+        additional_documents:          docUrls.additional_documents || [],
         fee_structure: {
           type:              form.fee_type,
           fixed_amount_cad:  Number(form.fixed_amount_cad) || 0,
@@ -120,19 +252,19 @@ export default function BecomeABrokerPage() {
         },
         default_deposit_amount_cad: Number(form.default_deposit_amount_cad) || 500,
       };
-      const r = await axios.post(`${API_BASE}/api/brokers/apply`, payload, {
+      const r = await axios.post(`${API_BASE}/brokers/apply`, payload, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (r.data?.success) {
         setSuccess(true);
-        setTimeout(() => navigate('/broker/dashboard'), 1500);
+        setTimeout(() => navigate('/broker/dashboard'), 1800);
       }
     } catch (e) {
       setError(
         e?.response?.data?.detail?.[lang === 'fr' ? 'message_fr' : 'message_en']
         || e?.response?.data?.detail?.error
-        || e?.response?.data?.detail
-        || 'Submission failed.'
+        || (typeof e?.response?.data?.detail === 'string' ? e.response.data.detail : null)
+        || (lang === 'fr' ? 'Échec de la soumission.' : 'Submission failed.')
       );
     } finally {
       setSubmit(false);
@@ -245,22 +377,49 @@ export default function BecomeABrokerPage() {
             </div>
           )}
 
-          {/* Step 2 — Documents */}
+          {/* Step 2 — Document Upload (functional, partner-style) */}
           {step === 2 && (
             <div className="space-y-4" data-testid="broker-step-2">
               <h2 className="text-xl font-semibold">{lang === 'fr' ? '2. Téléversement des documents' : '2. Document Upload'}</h2>
               <Alert>
+                <FileImage className="h-4 w-4" />
                 <AlertDescription>
                   {lang === 'fr'
-                    ? 'Téléversement des documents en cours d\'intégration. Vous pourrez les fournir après la soumission via votre tableau de bord de courtier.'
-                    : 'Document upload coming soon. You can attach license + corporate registration + photo ID after submission from your broker dashboard.'}
+                    ? 'Vous pouvez également téléverser ces documents après l\'inscription depuis votre tableau de bord de courtier. Chaque fichier : PDF, JPG ou PNG, maximum 10 Mo.'
+                    : 'You may also upload these documents after registration from your Broker Dashboard. Each file: PDF, JPG or PNG, max 10MB.'}
                 </AlertDescription>
               </Alert>
-              <ul className="list-disc pl-5 text-sm text-slate-600 dark:text-slate-300 space-y-1">
-                <li>{lang === 'fr' ? 'Permis de courtier / concessionnaire (PDF, JPG, PNG)' : 'Broker / Dealer License (PDF, JPG, PNG)'}</li>
-                <li>{lang === 'fr' ? 'Certificat d\'immatriculation' : 'Corporate Registration Certificate'}</li>
-                <li>{lang === 'fr' ? 'Pièce d\'identité du contact principal' : 'Government-Issued ID of Primary Contact'}</li>
-              </ul>
+
+              <BrokerDocUploadZone
+                id="broker-license-upload"
+                file={licenseFile}
+                onPick={pickFile(setLicenseFile)}
+                onClear={() => setLicenseFile(null)}
+                label={lang === 'fr' ? 'Permis de courtier / concessionnaire' : 'Broker / Dealer License'}
+                hint={lang === 'fr' ? '(optionnel)' : '(optional)'}
+                lang={lang}
+                testId="broker-doc-license"
+              />
+              <BrokerDocUploadZone
+                id="broker-reg-upload"
+                file={registrationFile}
+                onPick={pickFile(setRegistrationFile)}
+                onClear={() => setRegistrationFile(null)}
+                label={lang === 'fr' ? 'Certificat d\'immatriculation' : 'Corporate Registration Certificate'}
+                hint={lang === 'fr' ? '(optionnel)' : '(optional)'}
+                lang={lang}
+                testId="broker-doc-registration"
+              />
+              <BrokerDocUploadZone
+                id="broker-id-upload"
+                file={idFile}
+                onPick={pickFile(setIdFile)}
+                onClear={() => setIdFile(null)}
+                label={lang === 'fr' ? 'Pièce d\'identité du contact principal' : 'Government-Issued ID of Primary Contact'}
+                hint={lang === 'fr' ? '(optionnel)' : '(optional)'}
+                lang={lang}
+                testId="broker-doc-id"
+              />
             </div>
           )}
 
@@ -319,10 +478,46 @@ export default function BecomeABrokerPage() {
             </div>
           )}
 
-          {/* Step 4 — Legal */}
+          {/* Step 4 — Subscription pricing + Legal */}
           {step === 4 && (
             <div className="space-y-4" data-testid="broker-step-4">
-              <h2 className="text-xl font-semibold">{lang === 'fr' ? '4. Confirmation légale' : '4. Legal Confirmation'}</h2>
+              <h2 className="text-xl font-semibold">{lang === 'fr' ? '4. Tarification & Confirmation légale' : '4. Pricing & Legal Confirmation'}</h2>
+
+              {/* BidVex Broker Annual Plan — pricing card */}
+              <div
+                className="relative overflow-hidden rounded-xl border-2 border-blue-300 dark:border-blue-700 bg-gradient-to-br from-blue-50 via-white to-cyan-50 dark:from-blue-950/50 dark:via-slate-900 dark:to-cyan-950/50 p-5 shadow-sm"
+                data-testid="broker-pricing-card"
+              >
+                <div className="absolute top-3 right-3">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500 text-white text-[11px] font-bold tracking-wide shadow">
+                    <Sparkles className="w-3 h-3" />
+                    {lang === 'fr' ? 'Offre de lancement — 50 % DE RABAIS' : 'Launch Offer — 50% OFF'}
+                  </span>
+                </div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-blue-700 dark:text-blue-300 mb-1">
+                  {lang === 'fr' ? 'Forfait annuel BidVex Broker' : 'BidVex Broker Annual Plan'}
+                </p>
+                <div className="flex items-end gap-3 mt-2 flex-wrap">
+                  <span className="text-3xl font-bold text-slate-900 dark:text-white" data-testid="broker-price-current">
+                    $100.00 CAD
+                  </span>
+                  <span className="text-sm text-slate-500 line-through" data-testid="broker-price-original">
+                    $200.00 CAD
+                  </span>
+                  <span className="text-xs text-slate-500">{lang === 'fr' ? '/ an' : '/ year'}</span>
+                </div>
+                <p className="text-xs text-slate-600 dark:text-slate-400 mt-3 leading-relaxed">
+                  {lang === 'fr'
+                    ? 'Tarification de lancement à durée limitée. Le tarif régulier s\'applique au renouvellement, sauf indication contraire de BidVex. Renouvellement automatique avec avis par courriel 30 jours avant la date de renouvellement.'
+                    : 'Limited-time launch pricing. Regular price applies upon renewal unless otherwise updated by BidVex. Auto-renews yearly with an email notification 30 days before renewal.'}
+                </p>
+                <p className="text-[11px] text-slate-500 mt-2">
+                  {lang === 'fr'
+                    ? 'Aucun paiement requis aujourd\'hui — la facturation commence après l\'approbation par l\'équipe BidVex.'
+                    : 'No payment required today — billing begins after BidVex approves your application.'}
+                </p>
+              </div>
+
               <Alert>
                 <AlertDescription>
                   {lang === 'fr'
@@ -335,7 +530,9 @@ export default function BecomeABrokerPage() {
                        onChange={(e) => set('legal_confirmed', e.target.checked)}
                        data-testid="legal-confirm" className="mt-1 h-5 w-5" />
                 <span className="text-sm">
-                  {lang === 'fr' ? 'J\'accepte et je confirme.' : 'I agree and confirm.'}
+                  {lang === 'fr'
+                    ? 'J\'accepte les Conditions d\'utilisation, la Politique de confidentialité et la tarification de lancement ci-dessus.'
+                    : 'I agree to the Terms of Service, Privacy Policy, and the launch pricing above.'}
                 </span>
               </label>
             </div>
@@ -343,19 +540,24 @@ export default function BecomeABrokerPage() {
 
           {/* Nav */}
           <div className="flex justify-between pt-4 border-t">
-            <Button variant="outline" onClick={goBack} disabled={step === 1 || submitting} data-testid="broker-back">
+            <Button variant="outline" onClick={goBack} disabled={step === 1 || submitting || uploading} data-testid="broker-back">
               <ChevronLeft className="h-4 w-4 mr-1" />{lang === 'fr' ? 'Retour' : 'Back'}
             </Button>
             {step < 4 ? (
-              <Button onClick={goNext} disabled={!canAdvance() || submitting} data-testid="broker-next">
+              <Button onClick={goNext} disabled={!canAdvance() || submitting || uploading} data-testid="broker-next">
                 {lang === 'fr' ? 'Continuer' : 'Continue'}
                 <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
             ) : (
-              <Button onClick={handleSubmit} disabled={!canAdvance() || submitting}
+              <Button onClick={handleSubmit} disabled={!canAdvance() || submitting || uploading}
                 className="bg-gradient-to-r from-[#1E3A8A] to-[#06B6D4] text-white"
                 data-testid="broker-submit">
-                {submitting ? (lang === 'fr' ? 'Envoi...' : 'Submitting...') : (lang === 'fr' ? 'Soumettre la demande' : 'Submit Application')}
+                {(submitting || uploading) ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                {uploading
+                  ? (lang === 'fr' ? 'Téléversement…' : 'Uploading…')
+                  : submitting
+                    ? (lang === 'fr' ? 'Envoi…' : 'Submitting…')
+                    : (lang === 'fr' ? 'Soumettre la demande' : 'Submit Application')}
               </Button>
             )}
           </div>

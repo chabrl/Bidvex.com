@@ -49,7 +49,7 @@ export default function BrokerDirectoryPage() {
     setLoading(true);
     try {
       const qs = (province && province !== 'ALL') ? `?province=${province}` : '';
-      const r = await axios.get(`${API_BASE}/api/brokers${qs}`);
+      const r = await axios.get(`${API_BASE}/brokers${qs}`);
       setBrokers(r.data?.data || []);
     } catch {
       setBrokers([]);

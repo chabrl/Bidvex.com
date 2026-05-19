@@ -1,6 +1,72 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: iter217 Phase 5 Hotfix v6 — Broker Ecosystem Full Surface + Nav Wiring (Feb 16, 2026) ✅
+## Latest: iter217 Phase 5 Hotfix v6.5 — Broker Subscription Management + Legal Compliance Pass (Feb 19, 2026) ✅
+
+### Status: All 6 directive tasks completed and verified.
+- Backend: 54 / 54 broker tests pass (40 original + 14 new subscription tests).
+- Frontend: Find-a-Broker, Become-a-Broker (Step 2 docs + Step 4 pricing), Admin Subscriptions Page (4 tabs), Privacy Policy, Terms of Service all verified via Playwright with **0 runtime errors** and **0 Select.Item warnings**.
+
+### Critical pre-existing bug fixed
+- `${API_BASE}/api/...` (double `/api/api/`) found in **15 broker page calls** across `BrokerDirectoryPage`, `AdminBrokersPage`, `BrokerDashboardPage`, `BrokerBindingRequestPage`, `BecomeABrokerPage`, and `AdminPaymentChargesPage`. These were silently returning 404 in production. All fixed to `${API_BASE}/...` (single `/api`).
+
+### Backend additions (`/api/...`)
+- `GET  /admin/subscriptions/settings`                 — read effective global subscription settings.
+- `PATCH /admin/subscriptions/settings`                — upsert (base price, discount type/value/label, dates, period, auto-renew).
+- `GET  /admin/subscriptions/list?status=&search=`    — table feed with hydrated user info + computed pricing per row.
+- `GET  /admin/subscriptions/revenue`                  — ARR / MRR / discounted vs full / revenue lost summary.
+- `GET  /admin/subscriptions/audit/{broker_id}`       — audit log of all overrides applied to a broker.
+- `PATCH /admin/brokers/{id}/subscription` extended:
+  - `base_cad`, `discount_pct`, `discount_fixed_cad`
+  - `status` now accepts `unpaid|active|expired|comp|suspended|free`
+  - `expires_at`, **`extend_days`** (pushes expiry by N days)
+  - **`free_access: true`** shortcut (100% off + status=`free`, admin note required)
+  - All changes recorded in `broker_subscription_audit` collection.
+
+### Frontend additions
+
+**`pages/BecomeABrokerPage.jsx`** (rewritten):
+- **Step 2** — 3 functional drag-and-drop upload zones (Broker/Dealer License, Corporate Registration Certificate, Government-Issued ID). Each: PDF/JPG/PNG/WebP, max 10 MB, client-side validation, preview thumbnails for images / PDF icon for PDFs, remove button, marked optional with "upload later from your Broker Dashboard" hint. Continue button always active.
+- **Step 4** — BidVex Broker Annual Plan pricing card: `$100.00 CAD` current with strikethrough `$200.00 CAD`, "Launch Offer — 50% OFF" amber badge, regulatory text about renewal pricing, "No payment required today — billing begins after BidVex approves your application."
+- Documents are uploaded via `POST /brokers/upload-documents` BEFORE `POST /brokers/apply` so URLs persist on the broker doc.
+
+**`pages/admin/AdminSubscriptionsPage.jsx`** (new — 4-tab page mounted at `/admin/subscriptions` AND inside the `AdminDashboard` tab system):
+- **Global Settings tab** — plan name, base $, currency, period days, auto-renew toggle, discount enabled/type/value/label, optional effective-from/expires-on dates, **live preview card** showing final price.
+- **Per-User Override tab** — debounced search by broker name/email, click to open modal with: base price, discount %, status select, expires_at picker, extend-by-days, free-access checkbox (with admin-note guard), internal admin note.
+- **Subscription List tab** — table with all brokers + status badges, filter dropdown (all/active/expired/free/suspended/unpaid/comp), **CSV export** button.
+- **Revenue Summary tab** — 4 KPI cards (Active Subscribers, ARR, MRR, Revenue Lost to Discounts) + breakdown grid (full price, discounted, free, comp, suspended, expired, unpaid, total brokers, potential ARR).
+
+**`pages/admin/AdminBrokersPage.jsx`** — added a `Manage Subscriptions` button in the header that navigates to `/admin/subscriptions`.
+
+**`pages/BrokerDashboardPage.jsx`** — Overview tab now shows an `Annual Subscription` card pulling from `GET /brokers/me/subscription`. Brokers granted free/comp access see the purple `Complimentary Access — BidVex Partner` badge.
+
+**`pages/AdminDashboard.js`** — new `Broker Subscriptions` tab in the admin sidebar.
+
+### Privacy Policy (`pages/PrivacyPolicyPage.js`)
+- Last Updated bumped to February 2026 (EN+FR).
+- **Section 2A — Brokers and Individual Users**: explicit copy for individuals (name, email, billing, payment via Stripe, bidding history, comms prefs) and brokers (corporate name, business address, license #, registration docs, ID of primary contact, banking for commissions). Notes regulator-disclosure clause (OMVIC, AMVIC, VSA, SAAQ, OPC, etc.).
+- **Section 9 — Data Retention**: 7-year baseline retention for personal info + business documents, with email-based deletion request flow (privacy@bidvex.com).
+- **Section 15 — Pricing & Fee Changes**: 30-day email notice for active subscriptions per Quebec Consumer Protection Act (L.R.Q., c. P-40.1). No-notice changes allowed for new transactions/registrations.
+- **Section 16 — Your Rights Under Quebec Law 25 and PIPEDA**: access / correction / withdraw consent / portability / complaint to CAI (cai.gouv.qc.ca) or OPC (priv.gc.ca). 30-day response commitment.
+
+### Terms of Service (`pages/TermsOfServicePage.js`)
+- Last Updated bumped to February 2026 (EN+FR).
+- **Section 12 — Governing Law & Dispute Resolution**: Quebec + federal Canada law, exclusive jurisdiction in District of Saint-François (Sherbrooke).
+- **Section 15 — Broker & Dealer Accounts**: registration & eligibility (provincial/federal license required); broker responsibilities (Competition Act + Consumer Protection Act); broker subscription fees (annual, non-refundable, access continues to end of period after cancellation).
+- **Section 16 — Individual User Accounts**: registration, seller commissions (30-day notice for changes), buyer's premium (disclosed per listing, BidVex may adjust at any time).
+- **Section 17 — Fees, Pricing, and Right to Modify**: full right-to-change clause with 30-day written notice for existing subscriptions and immediate effect for new transactions/registrations. References Quebec Consumer Protection Act (L.R.Q., c. P-40.1).
+- **Section 18 — No-Refund Policy**: all subscription fees non-refundable; 72-hour technical-failure exception at BidVex's sole discretion.
+
+### Tests
+- `/app/backend/tests/test_broker_subscriptions.py` (new, 14 tests): default settings, non-admin guard, settings update + persistence, base/percentage validation, default 50% off pricing, 100% discount, free-access-requires-note, extend-days, suspend/reactivate, list search, revenue keys, audit log, apply-with-document-URLs.
+- `/app/backend/tests/test_broker_ecosystem.py` (40 tests) + `test_broker_v6.py` — still all green.
+- Total broker suite: **54/54 passing in 96s.**
+
+### Task 1 — Select.Item value="" audit
+Codebase-wide grep across `/app/frontend/src` returned **0 occurrences** of `<SelectItem value="">` or `<Select.Item>` without a `value` prop. All existing Selects already use semantically meaningful non-empty values (`"all"`, `"ALL"`, `"ON"`, etc.). The "Find a Broker" page (`/brokers`) loads with **0 console errors** and **0 Select.Item warnings**.
+
+---
+
+## Earlier: iter217 Phase 5 Hotfix v6 — Broker Ecosystem Full Surface + Nav Wiring (Feb 16, 2026) ✅
 
 ### Status: User reported v5b changes "not visible on preview" — INVESTIGATION found all 6 broker routes already returned HTTP 200 and the legal pages already served the broker section. The actual gap was **navigation discoverability** — no entry points existed. v6 ships the nav + 4 remaining dashboard tabs + invoices + PDF + invitations + 4 admin sub-endpoints.
 

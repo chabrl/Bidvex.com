@@ -57,7 +57,7 @@ export default function BrokerDashboardPage() {
 
   const loadBroker = useCallback(async () => {
     try {
-      const r = await axios.get(`${API_BASE}/api/brokers/me`, {
+      const r = await axios.get(`${API_BASE}/brokers/me`, {
         headers: { Authorization: `Bearer ${_token()}` },
       });
       setBroker(r.data);
@@ -74,7 +74,7 @@ export default function BrokerDashboardPage() {
 
   const loadBuyers = useCallback(async () => {
     try {
-      const r = await axios.get(`${API_BASE}/api/broker-relationships/my-buyers`, {
+      const r = await axios.get(`${API_BASE}/broker-relationships/my-buyers`, {
         headers: { Authorization: `Bearer ${_token()}` },
       });
       setBuyers(r.data?.data || []);
@@ -85,6 +85,17 @@ export default function BrokerDashboardPage() {
 
   useEffect(() => { loadBroker(); }, [loadBroker]);
   useEffect(() => { if (broker) loadBuyers(); }, [broker, loadBuyers]);
+  useEffect(() => {
+    if (!broker) return;
+    (async () => {
+      try {
+        const r = await axios.get(`${API_BASE}/brokers/me/subscription`, {
+          headers: { Authorization: `Bearer ${_token()}` },
+        });
+        setSubscription(r.data);
+      } catch { /* noop */ }
+    })();
+  }, [broker]);
 
   const handleBuyerAction = async (relId, action) => {
     try {
@@ -187,6 +198,43 @@ export default function BrokerDashboardPage() {
                     : (lang === 'fr' ? `Pourcentage : ${(broker.fee_structure?.percentage_rate * 100).toFixed(2)} % du prix final` : `Percentage: ${(broker.fee_structure?.percentage_rate * 100).toFixed(2)}% of hammer price`)}
                 </p>
               </CardContent></Card>
+
+              {subscription && (
+                <Card data-testid="broker-subscription-card"><CardContent className="p-5">
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div>
+                      <h3 className="font-semibold mb-1">
+                        {lang === 'fr' ? 'Abonnement annuel' : 'Annual Subscription'}
+                      </h3>
+                      <p className="text-xs text-slate-500">{subscription.plan_name}</p>
+                    </div>
+                    {(subscription.status === 'free' || subscription.status === 'comp') ? (
+                      <Badge className="bg-purple-100 text-purple-800" data-testid="broker-comp-badge">
+                        <ShieldCheck className="h-3 w-3 mr-1" />
+                        {lang === 'fr' ? 'Accès complimentaire — Partenaire BidVex' : 'Complimentary Access — BidVex Partner'}
+                      </Badge>
+                    ) : (
+                      <Badge className="bg-emerald-100 text-emerald-800">{subscription.status}</Badge>
+                    )}
+                  </div>
+                  <div className="mt-3 flex items-end gap-3 flex-wrap">
+                    <span className="text-2xl font-bold" data-testid="broker-sub-final">{_fmt(subscription.final_cad)}</span>
+                    {subscription.discount_pct > 0 && (
+                      <span className="text-sm text-slate-400 line-through" data-testid="broker-sub-base">{_fmt(subscription.base_cad)}</span>
+                    )}
+                    <span className="text-xs text-slate-500">{lang === 'fr' ? '/ an' : '/ year'}</span>
+                  </div>
+                  {subscription.discount_label && subscription.discount_pct > 0 && (
+                    <p className="text-xs text-amber-600 mt-1">{subscription.discount_label}</p>
+                  )}
+                  {subscription.expires_at && (
+                    <p className="text-xs text-slate-500 mt-2">
+                      {lang === 'fr' ? 'Renouvellement : ' : 'Renews: '}
+                      {new Date(subscription.expires_at).toLocaleDateString(lang === 'fr' ? 'fr-CA' : 'en-CA')}
+                    </p>
+                  )}
+                </CardContent></Card>
+              )}
             </section>
           )}
 
@@ -274,7 +322,7 @@ function BrokerActiveDealsTab({ lang }) {
   const load = React.useCallback(async () => {
     try {
       const t = localStorage.getItem('access_token') || localStorage.getItem('token');
-      const r = await axios.get(`${API_BASE}/api/broker-relationships/active-deals`, {
+      const r = await axios.get(`${API_BASE}/broker-relationships/active-deals`, {
         headers: { Authorization: `Bearer ${t}` },
       });
       setDeals(r.data?.data || []);
@@ -339,7 +387,7 @@ function BrokerPipelineTab({ lang }) {
 
   const load = React.useCallback(async () => {
     try {
-      const r = await axios.get(`${API_BASE}/api/broker-invoices`, { headers: { Authorization: `Bearer ${_token()}` } });
+      const r = await axios.get(`${API_BASE}/broker-invoices`, { headers: { Authorization: `Bearer ${_token()}` } });
       setInvoices(r.data?.data || []);
     } catch { setInvoices([]); }
     finally { setLoading(false); }
@@ -365,7 +413,7 @@ function BrokerPipelineTab({ lang }) {
   };
 
   const downloadPdf = async (id) => {
-    const r = await fetch(`${API_BASE}/api/broker-invoices/${id}/pdf`, {
+    const r = await fetch(`${API_BASE}/broker-invoices/${id}/pdf`, {
       headers: { Authorization: `Bearer ${_token()}` },
     });
     const blob = await r.blob();
@@ -374,11 +422,11 @@ function BrokerPipelineTab({ lang }) {
     setTimeout(() => URL.revokeObjectURL(url), 500);
   };
   const markPaid = async (id) => {
-    await axios.patch(`${API_BASE}/api/broker-invoices/${id}/mark-paid`, {}, { headers: { Authorization: `Bearer ${_token()}` } });
+    await axios.patch(`${API_BASE}/broker-invoices/${id}/mark-paid`, {}, { headers: { Authorization: `Bearer ${_token()}` } });
     load();
   };
   const release  = async (id) => {
-    await axios.post(`${API_BASE}/api/broker-invoices/${id}/release-vehicle`, {}, { headers: { Authorization: `Bearer ${_token()}` } });
+    await axios.post(`${API_BASE}/broker-invoices/${id}/release-vehicle`, {}, { headers: { Authorization: `Bearer ${_token()}` } });
     load();
   };
 
@@ -447,7 +495,7 @@ function BrokerRevenueTab({ lang, broker }) {
   const [invoices, setInvoices] = React.useState([]);
   React.useEffect(() => {
     const t = localStorage.getItem('access_token') || localStorage.getItem('token');
-    axios.get(`${API_BASE}/api/broker-invoices`, { headers: { Authorization: `Bearer ${t}` } })
+    axios.get(`${API_BASE}/broker-invoices`, { headers: { Authorization: `Bearer ${t}` } })
       .then(r => setInvoices(r.data?.data || [])).catch(() => {});
   }, []);
   const totals = invoices.reduce((acc, i) => ({
@@ -518,7 +566,7 @@ function BrokerSettingsTab({ lang, broker, onSaved }) {
     setSaving(true); setMsg(null);
     try {
       const t = localStorage.getItem('access_token') || localStorage.getItem('token');
-      await axios.patch(`${API_BASE}/api/brokers/settings`, {
+      await axios.patch(`${API_BASE}/brokers/settings`, {
         fee_structure: {
           type: feeType,
           fixed_amount_cad: Number(fixed) || 0,

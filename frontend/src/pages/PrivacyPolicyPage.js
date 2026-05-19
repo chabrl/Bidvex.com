@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom';
 const tocEN = [
   { id: 'intro', label: '1. Introduction' },
   { id: 'info-collect', label: '2. Information We Collect' },
+  { id: 'broker-info', label: '2A. Brokers & Individual Users' },
   { id: 'purpose', label: '3. Purpose of Processing' },
   { id: 'sharing', label: '4. Information Sharing' },
   { id: 'cookies', label: '5. Cookies & Tracking' },
@@ -17,11 +18,15 @@ const tocEN = [
   { id: 'stripe-data', label: '11. Stripe Payment Data' },
   { id: 'ai-disclosure', label: '12. AI Disclosure' },
   { id: 'vehicle-opc', label: '13. Vehicle Auctions & OPC' },
+  { id: 'broker-ecosystem', label: '14. Broker Ecosystem' },
+  { id: 'pricing-rights', label: '15. Pricing & Fee Changes' },
+  { id: 'law25-pipeda', label: '16. Your Rights — Law 25 & PIPEDA' },
 ];
 
 const tocFR = [
   { id: 'intro', label: '1. Introduction' },
   { id: 'info-collect', label: '2. Renseignements collectés' },
+  { id: 'broker-info', label: '2A. Courtiers et particuliers' },
   { id: 'purpose', label: '3. Finalités du traitement' },
   { id: 'sharing', label: '4. Partage des informations' },
   { id: 'cookies', label: '5. Cookies et suivi' },
@@ -33,6 +38,9 @@ const tocFR = [
   { id: 'stripe-data', label: '11. Données Stripe' },
   { id: 'ai-disclosure', label: '12. Divulgation IA' },
   { id: 'vehicle-opc', label: '13. Véhicules et OPC' },
+  { id: 'broker-ecosystem', label: '14. Écosystème de courtiers' },
+  { id: 'pricing-rights', label: '15. Modifications de prix' },
+  { id: 'law25-pipeda', label: '16. Vos droits — Loi 25 et LPRPDE' },
 ];
 
 const Badge = ({ n }) => (
@@ -129,7 +137,7 @@ const PrivacyPolicyPage = () => {
             <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg"><Shield className="h-6 w-6 text-green-600" /></div>
             <h1 className="text-3xl font-bold" style={{ color: '#0B2545' }}>{fr ? 'Politique de confidentialité de BidVex' : 'BidVex Privacy Policy'}</h1>
           </div>
-          <p className="text-sm text-slate-500">{fr ? 'Dernière mise à jour : Mars 2026' : 'Last Updated: March 2026'}</p>
+          <p className="text-sm text-slate-500">{fr ? 'Dernière mise à jour : Février 2026' : 'Last Updated: February 2026'}</p>
         </div>
       </div>
 
@@ -167,6 +175,15 @@ const PrivacyPolicyPage = () => {
               <DataCard color="blue" title="2.2 Buyers" desc="Identity data, contact data, payment data (processed via Stripe — we never store full card numbers), transaction data (bidding history, watchlisted items, records of won auctions)." />
               <DataCard color="slate" title="2.3 Technical Data (All Users)" desc="IP address, browser type, time zone setting, device identifiers, and operating system information for security monitoring and platform optimization." />
             </div>
+
+            <SH id="broker-info" n="2A">Information We Collect from Brokers and Individual Users</SH>
+            <h3 className="text-base font-semibold mt-4">For Individual Buyers and Sellers</h3>
+            <p>BidVex collects your name, email address, billing address, payment information (processed securely via Stripe), bidding history, and communication preferences. This information is used to facilitate auction transactions, verify identity, prevent fraud, and comply with applicable Canadian law.</p>
+            <h3 className="text-base font-semibold mt-4">For Registered Brokers and Dealers</h3>
+            <p>In addition to the above, BidVex collects your corporate name, business address, dealer or broker license number, corporate registration documents, government-issued identification of the primary contact, and banking / payment details for commission disbursements. These documents are stored securely (encrypted at rest on AWS S3) and used solely for identity verification, regulatory compliance, and platform eligibility assessment.</p>
+            <BlueBox>
+              <p><strong>Document handling:</strong> Broker license documents, corporate registration certificates, and government-issued ID are accessible only to authorized BidVex compliance reviewers and may be disclosed to provincial regulatory authorities (OMVIC, AMVIC, VSA, SAAQ, OPC, and equivalents) upon lawful request.</p>
+            </BlueBox>
 
             <SH id="purpose" n="3">Purpose of Processing</SH>
             <p>We process your personal data on the following legal grounds:</p>
@@ -232,6 +249,9 @@ const PrivacyPolicyPage = () => {
               <RetentionItem years="7" color="green" title="Transaction Records" desc="Retained 7 years to comply with Canadian and Quebec tax and legal obligations." />
               <RetentionItem years="∞" color="red" title="Identification Documents" desc="Retained until permanently compliant, unless offline and unrelated to ongoing fraud investigation." />
             </div>
+            <BlueBox>
+              <p>Personal information and business documents submitted during broker or user registration are retained for the duration of the account relationship and for a minimum of seven (7) years thereafter, as required by Quebec and Canadian tax and commercial law. Users may request deletion of non-mandatory data by contacting <a href="mailto:privacy@bidvex.com" className="underline">privacy@bidvex.com</a>. Mandatory data retained for legal compliance purposes cannot be deleted upon request.</p>
+            </BlueBox>
 
             <SH id="contact" n="10">Contact Us</SH>
             <GreenBox>
@@ -266,8 +286,23 @@ const PrivacyPolicyPage = () => {
 
             <SH id="pricing-rights" n="15">Pricing &amp; Fee Changes</SH>
             <RedBox>
-              <p><strong>BidVex reserves the right to change the price of any subscription, platform fee, commission, broker subscription fee, or buyer's premium rate at any time</strong>, with reasonable notice posted on our Platform. Continued use of the Platform after such a change constitutes acceptance of the new pricing. Active subscriptions are honored at the rate in effect at the time of purchase until they expire, unless otherwise required by law.</p>
+              <p><strong>BidVex Inc. reserves the right to modify platform fees, subscription prices, transaction commissions, buyer's premiums, and any other charges at any time, at its sole discretion.</strong></p>
+              <p className="mt-2">Changes to fees applicable to active subscriptions will be communicated to affected users by email at least thirty (30) days prior to the effective date of the change, in accordance with the Quebec Consumer Protection Act (L.R.Q., c. P-40.1). Continued use of the Platform following the effective date constitutes acceptance of the revised fee schedule. Users who do not accept revised fees may cancel their subscription prior to the effective date in accordance with our cancellation policy.</p>
+              <p className="mt-2">For new transactions or new registrations, BidVex may change fees without prior notice. Active subscriptions are honored at the rate in effect at the time of purchase until they expire, unless otherwise required by law.</p>
             </RedBox>
+
+            <SH id="law25-pipeda" n="16">Your Rights Under Quebec Law 25 and PIPEDA</SH>
+            <p>In addition to the rights described in Section 8, residents of Quebec and Canada have specific rights under provincial and federal data protection law. You have the right to:</p>
+            <ul className="list-disc pl-5 space-y-1 text-sm mt-3">
+              <li><strong>Access</strong> the personal information we hold about you;</li>
+              <li><strong>Request correction</strong> of inaccurate, incomplete, or out-of-date information;</li>
+              <li><strong>Withdraw consent</strong> for non-essential data processing (e.g., marketing communications, AI-powered recommendations);</li>
+              <li><strong>Request portability</strong> of your data in a structured, commonly used, machine-readable format;</li>
+              <li><strong>Lodge a complaint</strong> with the Commission d'accès à l'information du Québec (CAI) at <a href="https://www.cai.gouv.qc.ca/" target="_blank" rel="noopener noreferrer" className="underline">cai.gouv.qc.ca</a>, or the Office of the Privacy Commissioner of Canada at <a href="https://www.priv.gc.ca/" target="_blank" rel="noopener noreferrer" className="underline">priv.gc.ca</a>.</li>
+            </ul>
+            <BlueBox>
+              <p>To exercise these rights, contact our Data Protection Officer: <a href="mailto:privacy@bidvex.com" className="underline">privacy@bidvex.com</a>. We will respond within thirty (30) days as required by Quebec Law 25.</p>
+            </BlueBox>
 
             <p className="text-xs text-slate-400 mt-10">&copy; 2026 BidVex Inc. All rights reserved.</p>
           </>) : (<>
@@ -372,8 +407,23 @@ const PrivacyPolicyPage = () => {
 
             <SH id="pricing-rights" n="15">Modifications de prix et de frais</SH>
             <RedBox>
-              <p><strong>BidVex se réserve le droit de modifier le prix de tout abonnement, frais de plateforme, commission, frais d'abonnement de courtier ou prime d'acheteur à tout moment</strong>, moyennant un préavis raisonnable affiché sur notre Plateforme. L'utilisation continue de la Plateforme après une telle modification constitue l'acceptation des nouveaux tarifs. Les abonnements actifs sont honorés au tarif en vigueur au moment de l'achat jusqu'à leur expiration, sauf disposition légale contraire.</p>
+              <p><strong>BidVex Inc. se réserve le droit de modifier les frais de plateforme, les prix d'abonnement, les commissions de transaction, les primes d'acheteur et tous autres frais à tout moment, à sa seule discrétion.</strong></p>
+              <p className="mt-2">Les modifications de frais applicables aux abonnements actifs seront communiquées aux utilisateurs concernés par courriel au moins trente (30) jours avant la date d'entrée en vigueur, conformément à la Loi sur la protection du consommateur du Québec (L.R.Q., c. P-40.1). L'utilisation continue de la Plateforme après la date d'entrée en vigueur constitue l'acceptation du barème de frais révisé. Les utilisateurs qui n'acceptent pas les frais révisés peuvent annuler leur abonnement avant la date d'entrée en vigueur conformément à notre politique d'annulation.</p>
+              <p className="mt-2">Pour les nouvelles transactions ou les nouvelles inscriptions, BidVex peut modifier les frais sans préavis. Les abonnements actifs sont honorés au tarif en vigueur au moment de l'achat jusqu'à leur expiration, sauf disposition légale contraire.</p>
             </RedBox>
+
+            <SH id="law25-pipeda" n="16">Vos droits en vertu de la Loi 25 du Québec et de la LPRPDE</SH>
+            <p>En plus des droits décrits à la section 8, les résidents du Québec et du Canada disposent de droits spécifiques en vertu des lois provinciales et fédérales sur la protection des données. Vous avez le droit :</p>
+            <ul className="list-disc pl-5 space-y-1 text-sm mt-3">
+              <li>D'<strong>accéder</strong> aux renseignements personnels que nous détenons à votre sujet ;</li>
+              <li>De <strong>demander la correction</strong> de renseignements inexacts, incomplets ou périmés ;</li>
+              <li>De <strong>retirer votre consentement</strong> au traitement non essentiel de vos données (p. ex. communications marketing, recommandations IA) ;</li>
+              <li>De <strong>demander la portabilité</strong> de vos données dans un format structuré, couramment utilisé et lisible par machine ;</li>
+              <li>De <strong>déposer une plainte</strong> auprès de la Commission d'accès à l'information du Québec (CAI) à <a href="https://www.cai.gouv.qc.ca/" target="_blank" rel="noopener noreferrer" className="underline">cai.gouv.qc.ca</a>, ou auprès du Commissariat à la protection de la vie privée du Canada à <a href="https://www.priv.gc.ca/" target="_blank" rel="noopener noreferrer" className="underline">priv.gc.ca</a>.</li>
+            </ul>
+            <BlueBox>
+              <p>Pour exercer ces droits, contactez notre responsable de la protection des données : <a href="mailto:privacy@bidvex.com" className="underline">privacy@bidvex.com</a>. Nous répondrons dans les trente (30) jours, comme l'exige la Loi 25 du Québec.</p>
+            </BlueBox>
 
             <p className="text-xs text-slate-400 mt-10">&copy; 2026 BidVex Inc. Tous droits réservés.</p>
           </>)}

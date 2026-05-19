@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import EnhancedUserManager from './admin/EnhancedUserManager';
 import AdminFeedsPage from './admin/AdminFeedsPage';
 import AdminBrokersPage from './admin/AdminBrokersPage';
+import AdminSubscriptionsPage from './admin/AdminSubscriptionsPage';
 import LotsModeration from './admin/LotsModeration';
 import ListingsModeration from './admin/ListingsModeration';
 import DisputedSettlements from './admin/DisputedSettlements';
@@ -121,6 +122,7 @@ const SECONDARY_TABS = {
     { id: 'branding-layout', label: 'Branding & Layout', icon: '🎨', lucideIcon: Settings },
     { id: 'marketplace-settings', label: 'Marketplace Settings', icon: '⚙️', lucideIcon: Sliders },
     { id: 'subscriptions', label: 'Subscriptions', icon: '💎', lucideIcon: CreditCard },
+    { id: 'broker-subscriptions', label: 'Broker Subscriptions', icon: '🤝💎', lucideIcon: CreditCard },
     { id: 'subscription-analytics', label: 'Subscription Analytics', icon: '📊', lucideIcon: BarChart3 },
     { id: 'pricing-engine', label: 'Pricing Engine (Tiers)', icon: '💰', lucideIcon: DollarSign },
     { id: 'pricing-engine-v2', label: 'Pricing Engine (Subs)', icon: '💵', lucideIcon: DollarSign },

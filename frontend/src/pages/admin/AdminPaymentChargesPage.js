@@ -54,7 +54,7 @@ export default function AdminPaymentChargesPage() {
         .filter(([, v]) => v)
         .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
         .join('&');
-      const res = await axios.get(`${API}/api/admin/payment-charges${params ? '?' + params : ''}`, { headers });
+      const res = await axios.get(`${API}/admin/payment-charges${params ? '?' + params : ''}`, { headers });
       setRows(res.data?.rows || []);
       setSummary(res.data?.summary || {});
     } catch (e) {
@@ -66,7 +66,7 @@ export default function AdminPaymentChargesPage() {
 
   const loadEvents = async () => {
     try {
-      const res = await axios.get(`${API}/api/admin/payment-charges/events`, { headers });
+      const res = await axios.get(`${API}/admin/payment-charges/events`, { headers });
       setEvents(res.data?.events || []);
     } catch (e) {
       console.error('events load failed', e);
@@ -75,7 +75,7 @@ export default function AdminPaymentChargesPage() {
 
   const loadQueue = async () => {
     try {
-      const res = await axios.get(`${API}/api/admin/payment-charges/refund-queue`, { headers });
+      const res = await axios.get(`${API}/admin/payment-charges/refund-queue`, { headers });
       setQueueStats(res.data || { by_status: {}, failed_jobs: [] });
     } catch (e) {
       console.error('queue load failed', e);

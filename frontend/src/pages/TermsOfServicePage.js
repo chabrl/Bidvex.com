@@ -18,9 +18,13 @@ const tocEN = [
   { id: 'prohibited', label: '9. Prohibited Conduct' },
   { id: 'liability', label: '10. Limitation of Liability' },
   { id: 'modifications', label: '11. Modifications' },
-  { id: 'governing', label: '12. Governing Law' },
+  { id: 'governing', label: '12. Governing Law & Dispute Resolution' },
   { id: 'contact', label: '13. Contact Information' },
   { id: 'vehicle-opc', label: '14. Vehicle Auctions & Provincial Dealer Compliance' },
+  { id: 'broker-accounts', label: '15. Broker & Dealer Accounts' },
+  { id: 'individual-accounts', label: '16. Individual User Accounts' },
+  { id: 'pricing-modify', label: '17. Right to Modify Fees & Pricing' },
+  { id: 'no-refund', label: '18. No-Refund Policy' },
 ];
 
 const tocFR = [
@@ -38,9 +42,13 @@ const tocFR = [
   { id: 'prohibited', label: '9. Conduite interdite' },
   { id: 'liability', label: '10. Limitation de responsabilité' },
   { id: 'modifications', label: '11. Modifications' },
-  { id: 'governing', label: '12. Loi applicable' },
+  { id: 'governing', label: '12. Loi applicable et résolution des litiges' },
   { id: 'contact', label: '13. Contact' },
   { id: 'vehicle-opc', label: '14. Véhicules et conformité concessionnaires provinciaux' },
+  { id: 'broker-accounts', label: '15. Comptes courtiers et concessionnaires' },
+  { id: 'individual-accounts', label: '16. Comptes utilisateurs individuels' },
+  { id: 'pricing-modify', label: '17. Droit de modifier les frais et la tarification' },
+  { id: 'no-refund', label: '18. Politique de non-remboursement' },
 ];
 
 const Badge = ({ n }) => (
@@ -100,7 +108,7 @@ const TermsOfServicePage = () => {
             <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg"><ScrollText className="h-6 w-6 text-blue-600" /></div>
             <h1 className="text-3xl font-bold" style={{ color: '#0B2545' }}>{fr ? 'Conditions d\'utilisation de BidVex' : 'BidVex Terms & Conditions'}</h1>
           </div>
-          <p className="text-sm text-slate-500">{fr ? 'Dernière mise à jour : Mars 2026' : 'Last Updated: March 2026'}</p>
+          <p className="text-sm text-slate-500">{fr ? 'Dernière mise à jour : Février 2026' : 'Last Updated: February 2026'}</p>
         </div>
       </div>
 
@@ -237,8 +245,12 @@ const TermsOfServicePage = () => {
             <SH id="modifications" n="11">Modifications to Terms</SH>
             <p>BidVex reserves the right to modify these Terms at any time. Material changes will be communicated by email or platform notification at least 30 days before taking effect.</p>
 
-            <SH id="governing" n="12">Governing Law</SH>
-            <p>These Terms are governed by the laws of the Province of Quebec and the federal laws of Canada. Any disputes shall be resolved in the courts of Quebec.</p>
+            <SH id="governing" n="12">Governing Law &amp; Dispute Resolution</SH>
+            <p>These Terms &amp; Conditions are governed by the laws of the Province of Quebec and the federal laws of Canada applicable therein.</p>
+            <p>Any dispute arising from the use of BidVex that cannot be resolved informally shall be submitted to the exclusive jurisdiction of the courts of the District of Saint-François (Sherbrooke), Quebec, Canada.</p>
+            <BlueBox>
+              <p>For users in other Canadian provinces, BidVex complies with applicable provincial consumer protection legislation. U.S.-based users acknowledge that BidVex is a Canadian platform subject to Canadian law.</p>
+            </BlueBox>
 
             <SH id="contact" n="13">Contact Information</SH>
             <GreenBox><p><strong>BidVex Legal Department</strong><br />Email: <a href="mailto:support@bidvex.com" className="text-blue-600 underline">support@bidvex.com</a></p></GreenBox>
@@ -246,6 +258,41 @@ const TermsOfServicePage = () => {
             <SH id="vehicle-opc" n="14">Vehicle Auctions — Platform Role &amp; Provincial Dealer Compliance</SH>
             <p>BidVex is a technology platform and auction facilitator only. BidVex is not a vendor, dealer, or party to vehicle sale contracts. Only sellers holding a verified provincial dealer licence (OMVIC, AMVIC, VSA, SAAQ, FCAA, MVSDA or the analogous regulator in their province) may list road vehicles.</p>
             <BlueBox><p>By listing vehicles on BidVex, dealers represent that they hold a valid provincial dealer licence and comply with all applicable federal and provincial consumer-protection and motor-vehicle-dealer laws.</p></BlueBox>
+
+            <SH id="broker-accounts" n="15">Broker &amp; Dealer Accounts</SH>
+            <h3 className="text-base font-semibold mt-4">15.1 Broker Registration and Eligibility</h3>
+            <p>To register as a Broker or Dealer on BidVex, you must hold a valid and current broker or dealer license issued by the applicable provincial or federal authority in Canada or the United States. BidVex reserves the right to verify submitted credentials and to deny, suspend, or revoke broker status at any time if documents are found to be invalid, expired, or fraudulent.</p>
+
+            <h3 className="text-base font-semibold mt-4">15.2 Broker Responsibilities</h3>
+            <p>Brokers are responsible for the accuracy of all listings published through their account. Brokers must ensure all items listed comply with applicable Canadian and provincial law, including but not limited to the Competition Act (R.S.C., 1985, c. C-34) and the Consumer Protection Act (L.R.Q., c. P-40.1). BidVex is a marketplace platform and does not take title to any goods. Brokers bear full legal responsibility for the items they list and the transactions they facilitate.</p>
+
+            <h3 className="text-base font-semibold mt-4">15.3 Broker Subscription Fees</h3>
+            <BlueBox>
+              <p>Brokers are subject to an annual platform subscription fee as published on the BidVex pricing page at the time of registration. BidVex may offer promotional pricing, launch discounts, or individualized pricing at its sole discretion. Subscription fees are non-refundable once the billing period has commenced. Access to broker features will remain active until the end of the current billing period following cancellation.</p>
+            </BlueBox>
+
+            <SH id="individual-accounts" n="16">Individual User Accounts (Buyers and Sellers)</SH>
+            <h3 className="text-base font-semibold mt-4">16.1 Individual Registration</h3>
+            <p>Individual users may register as buyers and/or sellers on BidVex by providing accurate personal information and agreeing to these Terms. Sellers must comply with all listing policies and applicable laws. Buyers acknowledge that all winning bids constitute a binding purchase commitment.</p>
+
+            <h3 className="text-base font-semibold mt-4">16.2 Seller Commissions</h3>
+            <p>Individual sellers may be subject to a commission on completed sales as published in the BidVex fee schedule. BidVex reserves the right to modify commission rates at any time with thirty (30) days written notice to active sellers.</p>
+
+            <h3 className="text-base font-semibold mt-4">16.3 Buyer's Premium</h3>
+            <p>Certain auctions on BidVex may include a buyer's premium, which is an additional percentage charged to the winning bidder on top of the hammer price. The applicable buyer's premium, if any, will be clearly disclosed on each auction listing prior to bidding. BidVex reserves the right to adjust buyer's premium rates at any time.</p>
+
+            <SH id="pricing-modify" n="17">Fees, Pricing, and Right to Modify</SH>
+            <RedBox>
+              <p><strong>BidVex Inc. reserves the right to change, adjust, or discontinue any fee, subscription price, transaction commission, buyer's premium, platform charge, or promotional discount at any time without prior notice for new transactions or registrations.</strong></p>
+              <p className="mt-2">For existing active subscriptions or ongoing agreements, BidVex will provide no less than thirty (30) days advance written notice of material price changes, delivered to the email address on file. If you do not accept the revised fees, you may cancel your subscription or account prior to the effective date. Continued use of BidVex after the effective date constitutes your acceptance of the new fee structure.</p>
+              <p className="mt-2">This provision is made in accordance with the Quebec Consumer Protection Act (L.R.Q., c. P-40.1) and applicable Canadian contract law.</p>
+            </RedBox>
+
+            <SH id="no-refund" n="18">No-Refund Policy</SH>
+            <BlueBox>
+              <p>All subscription fees paid to BidVex are non-refundable. Upon cancellation, your subscription will remain active until the end of the current paid billing period. No partial refunds are issued for unused time. This policy applies to Broker Annual Plans and any other subscription products offered by BidVex Inc.</p>
+              <p className="mt-2"><strong>Exception:</strong> BidVex may issue refunds at its sole discretion in cases of documented technical failure attributable to BidVex that prevents platform access for a continuous period exceeding seventy-two (72) hours.</p>
+            </BlueBox>
 
             <p className="text-xs text-slate-400 mt-10">&copy; 2026 BidVex Inc. All rights reserved.</p>
           </>) : (<>
@@ -347,8 +394,12 @@ const TermsOfServicePage = () => {
             <SH id="modifications" n="11">Modifications</SH>
             <p>BidVex se réserve le droit de modifier ces Conditions. Les changements importants seront communiqués au moins 30 jours avant leur entrée en vigueur.</p>
 
-            <SH id="governing" n="12">Loi applicable</SH>
-            <p>Ces Conditions sont régies par les lois de la province de Québec et les lois fédérales du Canada. Tout litige sera résolu devant les tribunaux du Québec.</p>
+            <SH id="governing" n="12">Loi applicable et résolution des litiges</SH>
+            <p>Les présentes Conditions sont régies par les lois de la province de Québec et les lois fédérales du Canada qui y sont applicables.</p>
+            <p>Tout litige découlant de l'utilisation de BidVex qui ne peut être résolu à l'amiable sera soumis à la compétence exclusive des tribunaux du district de Saint-François (Sherbrooke), Québec, Canada.</p>
+            <BlueBox>
+              <p>Pour les utilisateurs des autres provinces canadiennes, BidVex se conforme à la législation provinciale applicable en matière de protection du consommateur. Les utilisateurs basés aux États-Unis reconnaissent que BidVex est une plateforme canadienne soumise au droit canadien.</p>
+            </BlueBox>
 
             <SH id="contact" n="13">Contact</SH>
             <GreenBox><p><strong>Département juridique BidVex</strong><br />Courriel : <a href="mailto:support@bidvex.com" className="text-blue-600 underline">support@bidvex.com</a></p></GreenBox>
@@ -356,6 +407,41 @@ const TermsOfServicePage = () => {
             <SH id="vehicle-opc" n="14">Enchères de véhicules — Rôle de la plateforme et conformité concessionnaires provinciaux</SH>
             <p>BidVex est une plateforme technologique et un facilitateur d'enchères uniquement. Seuls les vendeurs détenant une licence de concessionnaire provinciale vérifiée (OMVIC, AMVIC, VSA, SAAQ, FCAA, MVSDA ou le régulateur analogue de leur province) peuvent lister des véhicules routiers.</p>
             <BlueBox><p>En listant des véhicules sur BidVex, les concessionnaires déclarent détenir une licence de concessionnaire provinciale valide et se conformer à toutes les lois fédérales et provinciales applicables en matière de protection du consommateur et de concessionnaires de véhicules.</p></BlueBox>
+
+            <SH id="broker-accounts" n="15">Comptes courtiers et concessionnaires</SH>
+            <h3 className="text-base font-semibold mt-4">15.1 Inscription et admissibilité du courtier</h3>
+            <p>Pour vous inscrire en tant que courtier ou concessionnaire sur BidVex, vous devez détenir un permis de courtier ou de concessionnaire valide et en vigueur, délivré par l'autorité provinciale ou fédérale applicable au Canada ou aux États-Unis. BidVex se réserve le droit de vérifier les pièces justificatives soumises et de refuser, suspendre ou révoquer le statut de courtier à tout moment si les documents sont jugés invalides, expirés ou frauduleux.</p>
+
+            <h3 className="text-base font-semibold mt-4">15.2 Responsabilités du courtier</h3>
+            <p>Les courtiers sont responsables de l'exactitude de toutes les annonces publiées via leur compte. Les courtiers doivent s'assurer que tous les articles répertoriés respectent les lois canadiennes et provinciales applicables, y compris, sans s'y limiter, la Loi sur la concurrence (L.R.C., 1985, ch. C-34) et la Loi sur la protection du consommateur (L.R.Q., c. P-40.1). BidVex est une plateforme de marché et ne prend pas titre de propriété sur les biens. Les courtiers assument l'entière responsabilité légale des articles qu'ils listent et des transactions qu'ils facilitent.</p>
+
+            <h3 className="text-base font-semibold mt-4">15.3 Frais d'abonnement de courtier</h3>
+            <BlueBox>
+              <p>Les courtiers sont assujettis à des frais annuels d'abonnement de plateforme tels que publiés sur la page de tarification BidVex au moment de l'inscription. BidVex peut offrir une tarification promotionnelle, des rabais de lancement ou une tarification individualisée à sa seule discrétion. Les frais d'abonnement ne sont pas remboursables une fois la période de facturation commencée. L'accès aux fonctionnalités de courtier restera actif jusqu'à la fin de la période de facturation en cours après annulation.</p>
+            </BlueBox>
+
+            <SH id="individual-accounts" n="16">Comptes utilisateurs individuels (acheteurs et vendeurs)</SH>
+            <h3 className="text-base font-semibold mt-4">16.1 Inscription des particuliers</h3>
+            <p>Les utilisateurs individuels peuvent s'inscrire en tant qu'acheteurs et/ou vendeurs sur BidVex en fournissant des informations personnelles exactes et en acceptant les présentes Conditions. Les vendeurs doivent respecter toutes les politiques d'annonces et les lois applicables. Les acheteurs reconnaissent que toute enchère gagnante constitue un engagement d'achat ferme.</p>
+
+            <h3 className="text-base font-semibold mt-4">16.2 Commissions du vendeur</h3>
+            <p>Les vendeurs individuels peuvent être soumis à une commission sur les ventes complétées, telle que publiée dans le barème de frais de BidVex. BidVex se réserve le droit de modifier les taux de commission à tout moment avec un préavis écrit de trente (30) jours aux vendeurs actifs.</p>
+
+            <h3 className="text-base font-semibold mt-4">16.3 Prime de l'acheteur</h3>
+            <p>Certaines enchères sur BidVex peuvent inclure une prime de l'acheteur, qui est un pourcentage additionnel facturé à l'enchérisseur gagnant en plus du prix marteau. La prime de l'acheteur applicable, le cas échéant, sera clairement divulguée sur chaque annonce d'enchère avant l'enchère. BidVex se réserve le droit d'ajuster les taux de prime de l'acheteur à tout moment.</p>
+
+            <SH id="pricing-modify" n="17">Frais, tarification et droit de modifier</SH>
+            <RedBox>
+              <p><strong>BidVex Inc. se réserve le droit de modifier, ajuster ou interrompre tout frais, prix d'abonnement, commission de transaction, prime d'acheteur, frais de plateforme ou rabais promotionnel à tout moment sans préavis pour les nouvelles transactions ou inscriptions.</strong></p>
+              <p className="mt-2">Pour les abonnements actifs ou les accords en cours, BidVex fournira un préavis écrit d'au moins trente (30) jours des modifications importantes de prix, envoyé à l'adresse courriel au dossier. Si vous n'acceptez pas les frais révisés, vous pouvez annuler votre abonnement ou compte avant la date d'entrée en vigueur. L'utilisation continue de BidVex après la date d'entrée en vigueur constitue votre acceptation de la nouvelle structure de frais.</p>
+              <p className="mt-2">Cette disposition est prise conformément à la Loi sur la protection du consommateur du Québec (L.R.Q., c. P-40.1) et au droit canadien des contrats applicable.</p>
+            </RedBox>
+
+            <SH id="no-refund" n="18">Politique de non-remboursement</SH>
+            <BlueBox>
+              <p>Tous les frais d'abonnement payés à BidVex sont non remboursables. Après annulation, votre abonnement restera actif jusqu'à la fin de la période de facturation payée en cours. Aucun remboursement partiel n'est émis pour le temps non utilisé. Cette politique s'applique aux Forfaits annuels de courtier et à tout autre produit d'abonnement offert par BidVex Inc.</p>
+              <p className="mt-2"><strong>Exception :</strong> BidVex peut émettre des remboursements à sa seule discrétion en cas de défaillance technique documentée attribuable à BidVex qui empêche l'accès à la plateforme pendant une période continue dépassant soixante-douze (72) heures.</p>
+            </BlueBox>
 
             <p className="text-xs text-slate-400 mt-10">&copy; 2026 BidVex Inc. Tous droits réservés.</p>
           </>)}

@@ -9,7 +9,8 @@ import API_BASE from '../../config';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
-import { Handshake, ShieldCheck, Clock, XCircle, AlertTriangle } from 'lucide-react';
+import { Handshake, ShieldCheck, Clock, XCircle, AlertTriangle, CreditCard } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const SUBTABS = [
   { id: 'pending_review', en: 'Pending',   fr: 'En attente',  count_key: 'pending_review', icon: Clock,        color: 'bg-amber-100 text-amber-800' },
@@ -21,6 +22,7 @@ const SUBTABS = [
 export default function AdminBrokersPage() {
   const { i18n } = useTranslation();
   const lang = i18n.language?.startsWith('fr') ? 'fr' : 'en';
+  const navigate = useNavigate();
   const [subtab, setSubtab] = useState('pending_review');
   const [brokers, setBrokers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -30,7 +32,7 @@ export default function AdminBrokersPage() {
   const load = useCallback(async (status) => {
     setLoading(true);
     try {
-      const r = await axios.get(`${API_BASE}/api/admin/brokers?status=${status}`, {
+      const r = await axios.get(`${API_BASE}/admin/brokers?status=${status}`, {
         headers: { Authorization: `Bearer ${_token()}` },
       });
       setBrokers(r.data?.data || []);
@@ -45,7 +47,7 @@ export default function AdminBrokersPage() {
 
   const handleAction = async (brokerId, action, reason) => {
     try {
-      const path = `/api/admin/brokers/${brokerId}/${action}`;
+      const path = `/admin/brokers/${brokerId}/${action}`;
       const body = (action === 'reject' || action === 'suspend') && reason ? { reason } : {};
       await axios.patch(`${API_BASE}${path}`, body, {
         headers: { Authorization: `Bearer ${_token()}` },
@@ -58,16 +60,26 @@ export default function AdminBrokersPage() {
 
   return (
     <div className="container mx-auto max-w-7xl py-6 px-4">
-      <header className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2" data-testid="admin-brokers-title">
-          <Handshake className="h-7 w-7" />
-          {lang === 'fr' ? 'Gestion des courtiers' : 'Broker Management'}
-        </h1>
-        <p className="text-sm text-slate-500 mt-1">
-          {lang === 'fr'
-            ? 'Vérifiez et gérez les demandes de courtiers commerciaux.'
-            : 'Review and manage commercial broker applications.'}
-        </p>
+      <header className="mb-6 flex items-start justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2" data-testid="admin-brokers-title">
+            <Handshake className="h-7 w-7" />
+            {lang === 'fr' ? 'Gestion des courtiers' : 'Broker Management'}
+          </h1>
+          <p className="text-sm text-slate-500 mt-1">
+            {lang === 'fr'
+              ? 'Vérifiez et gérez les demandes de courtiers commerciaux.'
+              : 'Review and manage commercial broker applications.'}
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          onClick={() => navigate('/admin/subscriptions')}
+          data-testid="goto-subscriptions-btn"
+        >
+          <CreditCard className="h-4 w-4 mr-2" />
+          {lang === 'fr' ? 'Gérer les abonnements' : 'Manage Subscriptions'}
+        </Button>
       </header>
 
       <div className="flex gap-2 mb-4 flex-wrap" data-testid="admin-brokers-subtabs">

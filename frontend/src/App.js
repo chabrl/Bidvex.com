@@ -47,6 +47,8 @@ const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const AdminTaxDashboard = lazy(() => import('./pages/AdminTaxDashboard'));
 // iter217 Phase 5 Hotfix v5b — Broker Ecosystem
 const AdminBrokersPage = lazy(() => import('./pages/admin/AdminBrokersPage'));
+// iter217 Phase 5 Hotfix v6.5 — Admin Subscription Management
+const AdminSubscriptionsPage = lazy(() => import('./pages/admin/AdminSubscriptionsPage'));
 const BecomeABrokerPage = lazy(() => import('./pages/BecomeABrokerPage'));
 const BrokerDirectoryPage = lazy(() => import('./pages/BrokerDirectoryPage'));
 const BrokerBindingRequestPage = lazy(() => import('./pages/BrokerBindingRequestPage'));
@@ -446,6 +448,10 @@ const App = () => {
           {/* iter217 Phase 5 Hotfix v5b — Broker Ecosystem */}
           <Route path="/admin/brokers" element={
             <ProtectedRoute><AdminBrokersPage /></ProtectedRoute>
+          } />
+          {/* iter217 Phase 5 Hotfix v6.5 — Subscription Management */}
+          <Route path="/admin/subscriptions" element={
+            <ProtectedRoute><AdminSubscriptionsPage /></ProtectedRoute>
           } />
           <Route path="/become-a-broker" element={
             <ProtectedRoute><BecomeABrokerPage /></ProtectedRoute>

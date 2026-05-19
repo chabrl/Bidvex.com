@@ -195,21 +195,71 @@ def _resolve_subscription_pricing(broker_doc: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+_GLOBAL_SETTINGS_DOC_ID = "broker_subscription_global"
+
+
+async def _get_global_subscription_settings(db) -> Dict[str, Any]:
+    """Effective global broker subscription settings (with built-in defaults)."""
+    doc = await db.platform_settings.find_one({"id": _GLOBAL_SETTINGS_DOC_ID}, {"_id": 0})
+    if not doc:
+        doc = {}
+    return {
+        "id":                  _GLOBAL_SETTINGS_DOC_ID,
+        "plan_name":           doc.get("plan_name", "BidVex Broker Annual Plan"),
+        "base_cad":            float(doc.get("base_cad", BROKER_SUBSCRIPTION_BASE_CAD)),
+        "currency":            doc.get("currency", "CAD"),
+        "discount_active":     bool(doc.get("discount_active", True)),
+        "discount_type":       doc.get("discount_type", "percentage"),         # percentage | fixed
+        "discount_value":      float(doc.get("discount_value", BROKER_SUBSCRIPTION_DISCOUNT_PCT)),
+        "discount_label":      doc.get("discount_label", "Launch Offer — 50% OFF"),
+        "discount_starts_at":  doc.get("discount_starts_at"),
+        "discount_ends_at":    doc.get("discount_ends_at"),
+        "period_days":         int(doc.get("period_days", BROKER_SUBSCRIPTION_PERIOD_DAYS)),
+        "auto_renew":          bool(doc.get("auto_renew", True)),
+        "updated_at":          doc.get("updated_at"),
+        "updated_by":          doc.get("updated_by"),
+    }
+
+
+def _compute_effective_price(base: float, discount_type: str, discount_value: float, discount_active: bool) -> Dict[str, float]:
+    """Apply a global discount (percentage or fixed) to a base price."""
+    base = max(0.0, float(base or 0.0))
+    if not discount_active:
+        return {"final_cad": round(base, 2), "discount_amount_cad": 0.0}
+    val = max(0.0, float(discount_value or 0.0))
+    if discount_type == "fixed":
+        final = max(0.0, base - val)
+        return {"final_cad": round(final, 2), "discount_amount_cad": round(min(base, val), 2)}
+    # percentage (default)
+    pct = max(0.0, min(100.0, val))
+    final = round(base * (1.0 - pct / 100.0), 2)
+    return {"final_cad": final, "discount_amount_cad": round(base - final, 2)}
+
+
 @brokers_router.get("/brokers/me/subscription")
 async def get_my_subscription(current_user: User = Depends(get_current_user)):
     db = get_db()
     broker = await db.brokers.find_one({"user_id": current_user.id}, {"_id": 0})
     if not broker:
         raise HTTPException(status_code=404, detail={"error": "not_a_broker"})
-    return _resolve_subscription_pricing(broker)
+    # Merge per-broker overrides with global settings
+    settings = await _get_global_subscription_settings(db)
+    pricing  = _resolve_subscription_pricing(broker)
+    pricing["plan_name"]      = settings["plan_name"]
+    pricing["discount_label"] = settings["discount_label"]
+    pricing["auto_renew"]     = bool(broker.get("subscription_auto_renew", settings["auto_renew"]))
+    return pricing
 
 
 class _SubscriptionOverrideIn(BaseModel):
     base_cad:        Optional[float] = None    # Override the $200 base
     discount_pct:    Optional[float] = None    # 0..100; 100 = free
-    status:          Optional[Literal["unpaid", "active", "expired", "comp"]] = None
+    discount_fixed_cad: Optional[float] = None # Alt. discount type: fixed $ amount
+    status:          Optional[Literal["unpaid", "active", "expired", "comp", "suspended", "free"]] = None
     expires_at:      Optional[datetime] = None
+    extend_days:     Optional[int] = None      # Push expires_at forward N days from now
     note:            Optional[str] = None
+    free_access:     Optional[bool] = None     # Shortcut: 100% discount + status="free"
 
 
 @brokers_router.patch("/admin/brokers/{broker_id}/subscription")
@@ -223,7 +273,10 @@ async def admin_set_broker_subscription(
     Use cases:
       • Promo accounts: discount_pct=100 → effective free
       • Custom enterprise pricing: base_cad=500
-      • Comp accounts: status="comp" + discount_pct=100
+      • Comp / free access: free_access=true → 100% discount + status="free"
+      • Suspend: status="suspended" (revokes access)
+      • Reactivate: status="active"
+      • Extend N days: extend_days=30 → push expires_at forward
       • Manual activation after wire transfer: status="active", expires_at=now+365d
     """
     db = get_db()
@@ -231,19 +284,53 @@ async def admin_set_broker_subscription(
         raise HTTPException(status_code=422, detail={"error": "negative_base"})
     if payload.discount_pct is not None and not (0.0 <= payload.discount_pct <= 100.0):
         raise HTTPException(status_code=422, detail={"error": "discount_pct_out_of_range_0_100"})
+    if payload.discount_fixed_cad is not None and payload.discount_fixed_cad < 0:
+        raise HTTPException(status_code=422, detail={"error": "negative_discount_fixed"})
+    if payload.free_access and not (payload.note and payload.note.strip()):
+        raise HTTPException(status_code=422, detail={"error": "admin_note_required_for_free_access"})
 
     update: Dict[str, Any] = {"updated_at": _utcnow()}
-    if payload.base_cad     is not None: update["subscription_base_cad"]     = float(payload.base_cad)
-    if payload.discount_pct is not None: update["subscription_discount_pct"] = float(payload.discount_pct)
-    if payload.status       is not None: update["subscription_status"]       = payload.status
-    if payload.expires_at   is not None: update["subscription_expires_at"]   = payload.expires_at
-    if payload.note         is not None: update["subscription_note"]         = payload.note
+    if payload.base_cad           is not None: update["subscription_base_cad"]        = float(payload.base_cad)
+    if payload.discount_pct       is not None: update["subscription_discount_pct"]    = float(payload.discount_pct)
+    if payload.discount_fixed_cad is not None: update["subscription_discount_fixed_cad"] = float(payload.discount_fixed_cad)
+    if payload.status             is not None: update["subscription_status"]          = payload.status
+    if payload.expires_at         is not None: update["subscription_expires_at"]      = payload.expires_at
+    if payload.note               is not None: update["subscription_note"]            = payload.note
+    if payload.free_access is True:
+        update["subscription_discount_pct"] = 100.0
+        update["subscription_status"]       = "free"
+
+    if payload.extend_days and payload.extend_days > 0:
+        existing = await db.brokers.find_one({"id": broker_id}, {"_id": 0, "subscription_expires_at": 1})
+        cur = (existing or {}).get("subscription_expires_at") or _utcnow()
+        if isinstance(cur, str):
+            try:
+                cur = datetime.fromisoformat(cur.replace("Z", "+00:00"))
+            except Exception:
+                cur = _utcnow()
+        from datetime import timedelta
+        update["subscription_expires_at"] = cur + timedelta(days=int(payload.extend_days))
+
     update["subscription_updated_by"] = current_user.email
     update["subscription_updated_at"] = _utcnow()
 
     res = await db.brokers.update_one({"id": broker_id}, {"$set": update})
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail={"error": "broker_not_found"})
+
+    # Audit log
+    try:
+        await db.broker_subscription_audit.insert_one({
+            "id":           str(__import__("uuid").uuid4()),
+            "broker_id":    broker_id,
+            "admin_email":  current_user.email,
+            "changes":      {k: v for k, v in update.items() if not k.startswith("subscription_updated")},
+            "note":         payload.note,
+            "at":           _utcnow(),
+        })
+    except Exception as e:
+        logger.warning("broker_subscription_audit insert failed: %s", e)
+
     fresh = await db.brokers.find_one({"id": broker_id}, {"_id": 0})
     return {"success": True, "pricing": _resolve_subscription_pricing(fresh)}
 
@@ -1067,3 +1154,164 @@ async def admin_broker_revenue(current_user: User = Depends(require_admin)):
         "total_broker_fees_cad":  round(agg.get("total_broker_fees", 0), 2),
         "total_hammer_cad":       round(agg.get("total_hammer", 0), 2),
     }
+
+
+# ── 11. Subscription Management (Admin Panel /admin/subscriptions) ────
+@brokers_router.get("/admin/subscriptions/settings")
+async def admin_get_subscription_settings(current_user: User = Depends(require_admin)):
+    """Effective global broker subscription settings."""
+    db = get_db()
+    return await _get_global_subscription_settings(db)
+
+
+class _GlobalSettingsIn(BaseModel):
+    plan_name:           Optional[str]   = None
+    base_cad:            Optional[float] = None
+    currency:            Optional[str]   = None
+    discount_active:     Optional[bool]  = None
+    discount_type:       Optional[Literal["percentage", "fixed"]] = None
+    discount_value:      Optional[float] = None
+    discount_label:      Optional[str]   = None
+    discount_starts_at:  Optional[datetime] = None
+    discount_ends_at:    Optional[datetime] = None
+    period_days:         Optional[int]   = None
+    auto_renew:          Optional[bool]  = None
+
+
+@brokers_router.patch("/admin/subscriptions/settings")
+async def admin_update_subscription_settings(
+    payload: _GlobalSettingsIn,
+    current_user: User = Depends(require_admin),
+):
+    """Update global broker subscription settings (idempotent upsert)."""
+    db = get_db()
+    if payload.base_cad is not None and payload.base_cad < 0:
+        raise HTTPException(status_code=422, detail={"error": "negative_base"})
+    if payload.discount_value is not None and payload.discount_value < 0:
+        raise HTTPException(status_code=422, detail={"error": "negative_discount"})
+    if payload.discount_type == "percentage" and payload.discount_value is not None and payload.discount_value > 100:
+        raise HTTPException(status_code=422, detail={"error": "percentage_above_100"})
+    if payload.period_days is not None and payload.period_days < 1:
+        raise HTTPException(status_code=422, detail={"error": "period_days_must_be_positive"})
+
+    update: Dict[str, Any] = {
+        "id":         _GLOBAL_SETTINGS_DOC_ID,
+        "updated_at": _utcnow(),
+        "updated_by": current_user.email,
+    }
+    for k in ("plan_name", "base_cad", "currency", "discount_active",
+              "discount_type", "discount_value", "discount_label",
+              "discount_starts_at", "discount_ends_at", "period_days", "auto_renew"):
+        v = getattr(payload, k)
+        if v is not None:
+            update[k] = v
+
+    await db.platform_settings.update_one(
+        {"id": _GLOBAL_SETTINGS_DOC_ID},
+        {"$set": update},
+        upsert=True,
+    )
+    return await _get_global_subscription_settings(db)
+
+
+@brokers_router.get("/admin/subscriptions/list")
+async def admin_list_subscriptions(
+    status_filter: Optional[Literal["active", "expired", "free", "suspended", "unpaid", "comp"]] = Query(None, alias="status"),
+    search: Optional[str] = None,
+    limit:  int = 200,
+    current_user: User = Depends(require_admin),
+):
+    """All broker subscriptions with hydrated user info.
+
+    Filter by `status` (active|expired|free|suspended|unpaid|comp).
+    Search by broker name or user email.
+    """
+    db = get_db()
+    settings = await _get_global_subscription_settings(db)
+    q: Dict[str, Any] = {}
+    if status_filter:
+        q["subscription_status"] = status_filter
+
+    rows: List[Dict[str, Any]] = []
+    async for b in db.brokers.find(q, {"_id": 0}).sort("created_at", -1).limit(limit):
+        u = await db.users.find_one({"id": b["user_id"]}, {"_id": 0, "email": 1, "full_name": 1, "name": 1})
+        email     = (u or {}).get("email") or ""
+        full_name = (u or {}).get("full_name") or (u or {}).get("name") or ""
+
+        # Search filter (case-insensitive substring on email + business name)
+        if search:
+            needle = search.lower()
+            if needle not in email.lower() and needle not in (b.get("legal_business_name") or "").lower():
+                continue
+
+        pricing = _resolve_subscription_pricing(b)
+        rows.append({
+            "broker_id":             b["id"],
+            "user_id":                b.get("user_id"),
+            "user_email":            email,
+            "user_name":             full_name,
+            "legal_business_name":   b.get("legal_business_name"),
+            "operating_province":    b.get("operating_province"),
+            "plan_name":             settings["plan_name"],
+            "subscription_status":   b.get("subscription_status") or "unpaid",
+            "base_cad":              pricing["base_cad"],
+            "discount_pct":          pricing["discount_pct"],
+            "final_cad":             pricing["final_cad"],
+            "subscription_started_at": b.get("subscription_started_at"),
+            "subscription_expires_at": b.get("subscription_expires_at"),
+            "subscription_note":     b.get("subscription_note"),
+            "created_at":            b.get("created_at"),
+        })
+    return {"data": rows, "count": len(rows)}
+
+
+@brokers_router.get("/admin/subscriptions/revenue")
+async def admin_subscription_revenue(current_user: User = Depends(require_admin)):
+    """Subscription revenue summary: MRR, ARR, active counts, lost-to-discount."""
+    db = get_db()
+    settings = await _get_global_subscription_settings(db)
+
+    totals = {
+        "total_brokers":        0,
+        "active":               0,
+        "expired":              0,
+        "free":                 0,
+        "suspended":            0,
+        "unpaid":               0,
+        "comp":                 0,
+        "full_price_count":     0,
+        "discounted_count":     0,
+        "arr_cad":              0.0,   # Sum of final_cad over active subscribers
+        "potential_arr_cad":    0.0,   # Sum of base_cad if no discounts existed
+        "revenue_lost_cad":     0.0,   # potential - actual
+    }
+    async for b in db.brokers.find({}, {"_id": 0}):
+        totals["total_brokers"] += 1
+        status = (b.get("subscription_status") or "unpaid")
+        if status in totals:
+            totals[status] += 1
+        pricing = _resolve_subscription_pricing(b)
+        if status in ("active", "comp", "free"):
+            totals["arr_cad"]           += pricing["final_cad"]
+            totals["potential_arr_cad"] += pricing["base_cad"]
+            if pricing["discount_pct"] > 0 or pricing["final_cad"] < pricing["base_cad"]:
+                totals["discounted_count"] += 1
+            else:
+                totals["full_price_count"] += 1
+
+    totals["arr_cad"]           = round(totals["arr_cad"], 2)
+    totals["potential_arr_cad"] = round(totals["potential_arr_cad"], 2)
+    totals["revenue_lost_cad"]  = round(totals["potential_arr_cad"] - totals["arr_cad"], 2)
+    totals["mrr_cad"]           = round(totals["arr_cad"] / 12.0, 2)
+    totals["currency"]          = settings["currency"]
+    return totals
+
+
+@brokers_router.get("/admin/subscriptions/audit/{broker_id}")
+async def admin_get_subscription_audit(broker_id: str, current_user: User = Depends(require_admin)):
+    """Audit log of admin overrides applied to a specific broker subscription."""
+    db = get_db()
+    rows: List[Dict[str, Any]] = []
+    async for r in db.broker_subscription_audit.find({"broker_id": broker_id}, {"_id": 0}).sort("at", -1).limit(100):
+        rows.append(r)
+    return {"data": rows, "count": len(rows)}
