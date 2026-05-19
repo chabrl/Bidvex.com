@@ -14,7 +14,7 @@ import {
 
 const API = API_BASE;
 
-const MarketplaceSidebar = ({ onFiltersChange, className = '' }) => {
+const MarketplaceSidebar = ({ onFiltersChange, externalFilters = null, className = '' }) => {
   const { t } = useTranslation();
   const { tree: categoryTree, isLoading: catTreeLoading, getName } = useCategoryTree();
   const [filterData, setFilterData] = useState(null);
@@ -39,6 +39,21 @@ const MarketplaceSidebar = ({ onFiltersChange, className = '' }) => {
   }, []);
 
   useEffect(() => { fetchFilters(); }, [fetchFilters]);
+
+  // Phase 5 Hotfix v5 — accept external chip-removal events from the page
+  // so the top-bar "Category × " chip stays in sync with sidebar checkboxes.
+  useEffect(() => {
+    if (externalFilters && Array.isArray(externalFilters.categories)) {
+      // Only sync DOWN if the external list is shorter (a chip was removed).
+      // We never override a user check via this effect.
+      setSelectedCategories(prev => {
+        if (externalFilters.categories.length < prev.length) {
+          return externalFilters.categories;
+        }
+        return prev;
+      });
+    }
+  }, [externalFilters?.categories?.length]);
 
   useEffect(() => {
     if (onFiltersChange) {

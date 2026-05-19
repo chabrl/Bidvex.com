@@ -115,8 +115,8 @@ const BuyNowButton = ({ lot, auctionId, onPurchaseComplete }) => {
       </Button>
 
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-lg max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in duration-200">
+        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4 overscroll-contain" data-testid="buy-now-modal">
+          <div className="bg-white dark:bg-slate-900 sm:rounded-lg rounded-t-2xl max-w-md w-full max-h-[90vh] overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch] p-6 space-y-4 animate-in fade-in zoom-in duration-200" data-testid="buy-now-modal-panel" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
             {/* Header */}
             <div className="flex items-start gap-3">
               <div className="h-12 w-12 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center flex-shrink-0">

@@ -110,8 +110,8 @@ const BidConfirmationDialog = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-md max-w-[calc(100vw-2rem)] flex flex-col gap-3" data-testid="bid-confirmation-dialog">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Receipt className="h-5 w-5 text-[#06B6D4]" />
             Confirm Your Bid
@@ -302,14 +302,15 @@ const BidConfirmationDialog = ({
           </div>
         </div>
 
-        <DialogFooter className="flex gap-2">
-          <Button variant="outline" onClick={onClose} disabled={loading}>
+        <DialogFooter className="flex flex-col sm:flex-row gap-2 sticky bottom-0 -mx-6 -mb-6 px-6 py-3 bg-background border-t z-10" data-testid="bid-confirmation-footer">
+          <Button variant="outline" onClick={onClose} disabled={loading} className="w-full sm:w-auto" data-testid="bid-cancel-btn">
             Cancel
           </Button>
           <Button
             onClick={onConfirm}
             disabled={loading || calculating}
-            className="bg-gradient-to-r from-[#1E3A8A] to-[#06B6D4] hover:from-[#1E3A8A]/90 hover:to-[#06B6D4]/90 text-white"
+            className="w-full sm:w-auto bg-gradient-to-r from-[#1E3A8A] to-[#06B6D4] hover:from-[#1E3A8A]/90 hover:to-[#06B6D4]/90 text-white"
+            data-testid="bid-confirm-btn"
           >
             {loading ? (
               'Placing Bid...'

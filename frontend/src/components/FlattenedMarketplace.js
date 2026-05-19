@@ -67,7 +67,8 @@ const FlattenedMarketplace = ({
   showFilters = true,
   showHeader = true,
   variant = 'full', // 'full', 'compact', 'homepage'
-  externalFilters = {}
+  externalFilters = {},
+  onClearSidebarCategory = null
 }) => {
   const { t, i18n } = useTranslation();
   const isFrench = i18n.language?.startsWith('fr');
@@ -322,6 +323,13 @@ const FlattenedMarketplace = ({
               }));
             }}
             pageContext="marketplace"
+            // Phase 5 Hotfix v5 — when the parent page wires the
+            // MarketplaceSidebar (externalFilters.categories), the top-bar
+            // category dropdown becomes a duplicate. Hide it and surface
+            // the sidebar selection as a removable chip instead.
+            hideCategoryDropdown={!!(externalFilters && externalFilters.categories)}
+            sidebarCategoryChip={externalFilters?.categories || []}
+            onClearSidebarCategory={onClearSidebarCategory}
           />
         </div>
       )}

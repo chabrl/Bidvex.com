@@ -934,7 +934,16 @@ async def get_multi_item_listings(
         query["status"] = {"$in": ["active", "upcoming"]}
 
     if category:
-        query["category"] = category
+        # Phase 5 Hotfix v5 — support comma-separated list + case/whitespace
+        # tolerant matching. Sidebar emits `name_en` values which historically
+        # had stray whitespace (e.g. "Furniture "). Normalize on both sides.
+        from re import escape as _re_escape
+        cat_list = [c.strip() for c in str(category).split(",") if c.strip()]
+        if cat_list:
+            query["category"] = {
+                "$regex": "|".join(f"^\\s*{_re_escape(c)}\\s*$" for c in cat_list),
+                "$options": "i",
+            }
     # iter217 Bug 10 — Case-insensitive region match using a regex (works
     # for cached docs that stored "QC" while the UI sends "Quebec" or vice versa).
     if region:

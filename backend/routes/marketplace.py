@@ -459,11 +459,12 @@ async def get_marketplace_items(
         items = [i for i in items if s_lower in (i.get("title") or "").lower()
                  or s_lower in (i.get("description") or "").lower()]
     if category:
-        items = [i for i in items if i.get("category") == category]
+        c_norm = (category or "").strip().casefold()
+        items = [i for i in items if (i.get("category") or "").strip().casefold() == c_norm]
     if categories:
-        cat_list = [c.strip() for c in categories.split(",") if c.strip()]
+        cat_list = [c.strip().casefold() for c in categories.split(",") if c.strip()]
         if cat_list:
-            items = [i for i in items if i.get("category") in cat_list]
+            items = [i for i in items if (i.get("category") or "").strip().casefold() in cat_list]
     if region or regions:
         region_list = []
         if region:

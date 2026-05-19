@@ -225,20 +225,37 @@ const LotsMarketplacePage = () => {
       <div className="container mx-auto max-w-7xl px-4 py-6">
         <div className="flex gap-6">
           {/* Sidebar handles its own desktop/mobile rendering */}
-          <MarketplaceSidebar onFiltersChange={setSidebarFilters} />
+          <MarketplaceSidebar onFiltersChange={setSidebarFilters} externalFilters={sidebarFilters} />
 
           {/* Main Content */}
           <div className="flex-1 min-w-0">
-            {/* New FilterBar */}
+            {/* New FilterBar — category dropdown hidden because sidebar owns it */}
             <FilterBar
               onFilterChange={(newFilters) => {
+                // Phase 5 Hotfix v5 — do NOT overwrite `categories` from
+                // the top bar. Categories are owned exclusively by the
+                // sidebar. Forward only fields the top bar actually owns.
                 setSidebarFilters(prev => ({
                   ...prev,
                   search: newFilters.search || '',
-                  categories: newFilters.category ? [newFilters.category] : [],
+                  province: newFilters.province || '',
+                  condition: newFilters.condition || '',
+                  sort: newFilters.sort || 'nearby_first',
+                  tax_status: newFilters.tax_status || '',
+                  private_sales_only: !!newFilters.private_sales_only,
+                  zero_fee_only: !!newFilters.zero_fee_only,
+                  no_taxes: !!newFilters.no_taxes,
                 }));
               }}
               pageContext="lots"
+              hideCategoryDropdown={true}
+              sidebarCategoryChip={sidebarFilters?.categories || []}
+              onClearSidebarCategory={(cat) => {
+                setSidebarFilters(prev => ({
+                  ...prev,
+                  categories: (prev.categories || []).filter(c => c !== cat),
+                }));
+              }}
             />
 
             {/* Stats + View Toggle */}

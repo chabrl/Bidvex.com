@@ -19,6 +19,17 @@ const MarketplacePage = () => {
     }
   }, [location.key, location.search, location.state]);
 
+  // Phase 5 Hotfix v5 — chip-driven removal of a single sidebar category.
+  // The sidebar owns `categories`, the chip lives in the top bar — when the
+  // user clicks the chip's ×, we send a partial filter delta back to the
+  // sidebar so it can drop that one category.
+  const handleClearSidebarCategory = (cat) => {
+    setSidebarFilters(prev => ({
+      ...prev,
+      categories: (prev.categories || []).filter(c => c !== cat),
+    }));
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900" data-testid="marketplace-page">
       {/* Hero */}
@@ -65,7 +76,7 @@ const MarketplacePage = () => {
       <div className="container mx-auto max-w-7xl px-4 py-6">
         <div className="flex gap-6">
           {/* Sidebar handles its own desktop/mobile rendering */}
-          <MarketplaceSidebar onFiltersChange={setSidebarFilters} />
+          <MarketplaceSidebar onFiltersChange={setSidebarFilters} externalFilters={sidebarFilters} />
           
           {/* Main Content */}
           <div className="flex-1 min-w-0">
@@ -75,6 +86,7 @@ const MarketplacePage = () => {
               variant="full"
               limit={50}
               externalFilters={sidebarFilters}
+              onClearSidebarCategory={handleClearSidebarCategory}
             />
           </div>
         </div>

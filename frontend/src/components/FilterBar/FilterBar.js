@@ -62,7 +62,7 @@ const TOGGLE_PILLS = [
   { key: "no_taxes", icon: "✅", label_en: "No Taxes", label_fr: "Sans taxes", tooltip_en: "Private sale — no QST/HST", tooltip_fr: "Vente privée — sans TVQ/TVH" },
 ];
 
-const FilterBar = ({ onFilterChange, pageContext = "marketplace" }) => {
+const FilterBar = ({ onFilterChange, pageContext = "marketplace", hideCategoryDropdown = false, sidebarCategoryChip = null, onClearSidebarCategory = null }) => {
   const { i18n } = useTranslation();
   const lang = i18n.language?.startsWith("fr") ? "fr" : "en";
   const t = (item) => item[`label_${lang}`];
@@ -151,9 +151,11 @@ const FilterBar = ({ onFilterChange, pageContext = "marketplace" }) => {
       <select className="filter-bar__select" value={filters.province} onChange={(e) => set("province", e.target.value)} data-testid="filter-province">
         {PROVINCE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{t(o)}</option>)}
       </select>
-      <select className="filter-bar__select" value={filters.category} onChange={(e) => set("category", e.target.value)} data-testid="filter-category">
-        {CATEGORY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{t(o)}</option>)}
-      </select>
+      {!hideCategoryDropdown && (
+        <select className="filter-bar__select" value={filters.category} onChange={(e) => set("category", e.target.value)} data-testid="filter-category">
+          {CATEGORY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{t(o)}</option>)}
+        </select>
+      )}
       <select className="filter-bar__select" value={filters.condition} onChange={(e) => set("condition", e.target.value)} data-testid="filter-condition">
         {CONDITION_OPTIONS.map((o) => <option key={o.value} value={o.value}>{t(o)}</option>)}
       </select>
@@ -166,6 +168,27 @@ const FilterBar = ({ onFilterChange, pageContext = "marketplace" }) => {
     </>
   );
 
+  const renderSidebarCategoryChip = () => {
+    if (!hideCategoryDropdown || !sidebarCategoryChip || sidebarCategoryChip.length === 0) return null;
+    return (
+      <div className="filter-bar__chips" data-testid="filter-sidebar-category-chips">
+        {sidebarCategoryChip.map((cat) => (
+          <span key={cat} className="filter-bar__chip" data-testid={`sidebar-cat-chip-${cat}`}>
+            <span className="filter-bar__chip-label">
+              {lang === "fr" ? "Catégorie" : "Category"}: {cat}
+            </span>
+            <button
+              className="filter-bar__chip-close"
+              onClick={() => onClearSidebarCategory && onClearSidebarCategory(cat)}
+              aria-label={lang === "fr" ? "Retirer le filtre" : "Remove filter"}
+              data-testid={`sidebar-cat-chip-close-${cat}`}
+            >×</button>
+          </span>
+        ))}
+      </div>
+    );
+  };
+
   return (
     <div className="filter-bar-wrapper" data-testid="filter-bar">
       {/* Desktop */}
@@ -175,6 +198,7 @@ const FilterBar = ({ onFilterChange, pageContext = "marketplace" }) => {
         {renderSearch(false)}
         <div className="filter-bar__divider" />
         <div className="filter-bar__dropdowns">{renderSelects()}</div>
+        {renderSidebarCategoryChip()}
         {activeCount > 0 && (
           <button className="filter-bar__clear" onClick={clearAll} data-testid="filter-clear">
             ✕ {lang === "fr" ? "Effacer" : "Clear"} ({activeCount})
@@ -192,6 +216,7 @@ const FilterBar = ({ onFilterChange, pageContext = "marketplace" }) => {
             <span className="filter-bar-mobile__chevron">{mobileExpanded ? "▲" : "▼"}</span>
           </button>
         </div>
+        {renderSidebarCategoryChip()}
         {mobileExpanded && (
           <div className="filter-bar-mobile__panel">
             <div className="filter-bar-mobile__pills">{renderPills()}</div>
