@@ -290,6 +290,16 @@ const Navbar = () => {
                         </DropdownMenuItem>
                       </>
                     )}
+                    {/* iter217 Phase 5 Hotfix v5b — Broker Dashboard for approved brokers */}
+                    {user.account_type === 'broker' && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => navigate('/broker/dashboard')} data-testid="broker-dashboard-link" className="cursor-pointer text-indigo-600 font-semibold">
+                          <Shield className="mr-3 h-4 w-4" />
+                          {t('nav.brokerDashboard', i18n?.language?.startsWith('fr') ? 'Tableau de courtier' : 'Broker Dashboard')}
+                        </DropdownMenuItem>
+                      </>
+                    )}
                     {(user.role === 'admin' || user.role === 'superadmin' || user.account_type === 'admin' || user.email?.endsWith('@admin.bazario.com')) && (
                       <>
                         <DropdownMenuSeparator />

@@ -625,3 +625,312 @@ async def fee_preview(broker_id: str, hammer_price: float = Body(..., embed=True
         buyer_province       = buyer_province,
     )
     return bd.as_dict()
+
+
+# ── 6. Hotfix v6: Active Deals (live bid stream) ──────────────────────
+@brokers_router.get("/broker-relationships/active-deals")
+async def get_active_deals(current_user: User = Depends(get_current_user)):
+    """Returns vehicle auctions every buyer-bound-to-this-broker is touching.
+    Powers the broker dashboard "Active Deals" Kanban view.
+    """
+    db = get_db()
+    broker = await db.brokers.find_one({"user_id": current_user.id}, {"_id": 0, "id": 1})
+    if not broker:
+        raise HTTPException(status_code=404, detail={"error": "not_a_broker"})
+    rows: List[Dict[str, Any]] = []
+    async for bid in db.broker_bids.find({"broker_id": broker["id"]}, {"_id": 0}).sort("placed_at", -1).limit(200):
+        listing = await db.vehicle_listings.find_one(
+            {"id": bid["vehicle_listing_id"]},
+            {"_id": 0, "id": 1, "make": 1, "model": 1, "year": 1, "title": 1,
+             "current_bid": 1, "highest_bidder_id": 1, "auction_end_date": 1, "photos": 1, "status": 1},
+        )
+        buyer = await db.users.find_one({"id": bid["buyer_user_id"]}, {"_id": 0, "email": 1, "full_name": 1, "name": 1})
+        if listing:
+            # Determine column: winning|outbid|bidding|watching
+            our_top = bid.get("status") == "placed" and listing.get("highest_bidder_id") == bid["buyer_user_id"]
+            ended   = listing.get("status") in ("ended", "completed", "won", "sold")
+            column = "won" if ended and our_top else (
+                "winning" if our_top else
+                "outbid"  if bid.get("status") == "outbid" else
+                "bidding"
+            )
+            rows.append({
+                "bid_id":              bid["id"],
+                "vehicle_id":          listing["id"],
+                "vehicle_label":       f"{listing.get('year','')} {listing.get('make','')} {listing.get('model','')}".strip() or listing.get("title", "Vehicle"),
+                "photo":               (listing.get("photos") or [{}])[0].get("url") if listing.get("photos") else None,
+                "buyer_email":         (buyer or {}).get("email"),
+                "buyer_name":          (buyer or {}).get("full_name") or (buyer or {}).get("name"),
+                "buyer_user_id":       bid["buyer_user_id"],
+                "our_bid_amount_cad":  bid["bid_amount_cad"],
+                "current_bid_cad":     listing.get("current_bid"),
+                "auction_end_date":    listing.get("auction_end_date"),
+                "status":              bid.get("status"),
+                "column":              column,
+            })
+    return {"data": rows, "count": len(rows)}
+
+
+# ── 7. Hotfix v6: Post-auction pipeline (invoices) ────────────────────
+class _InvoiceCreateIn(BaseModel):
+    vehicle_listing_id: str
+    buyer_user_id:      str
+    dealer_user_id:     str
+    hammer_price_cad:   float
+    buyer_province:     Optional[str] = "ON"
+
+
+@brokers_router.post("/broker-invoices/generate")
+async def generate_broker_invoice(payload: _InvoiceCreateIn, current_user: User = Depends(get_current_user)):
+    from models.broker_models import make_invoice_doc
+    import secrets
+
+    db = get_db()
+    broker = await db.brokers.find_one({"user_id": current_user.id}, {"_id": 0})
+    if not broker:
+        raise HTTPException(status_code=404, detail={"error": "not_a_broker"})
+    # Idempotency: one invoice per (broker, vehicle, buyer)
+    existing = await db.broker_invoices.find_one(
+        {"broker_id": broker["id"], "vehicle_listing_id": payload.vehicle_listing_id, "buyer_user_id": payload.buyer_user_id},
+        {"_id": 0},
+    )
+    if existing:
+        return existing
+
+    bd = calculate_broker_transaction(
+        hammer_price         = payload.hammer_price_cad,
+        broker_fee_structure = broker["fee_structure"],
+        buyer_province       = payload.buyer_province,
+    )
+    pickup = secrets.token_hex(4).upper()
+    doc = make_invoice_doc(
+        vehicle_listing_id      = payload.vehicle_listing_id,
+        broker_id               = broker["id"],
+        buyer_user_id           = payload.buyer_user_id,
+        dealer_user_id          = payload.dealer_user_id,
+        hammer_price_cad        = bd.hammer_price_cad,
+        bidvex_platform_fee_cad = bd.bidvex_platform_fee_cad,
+        broker_fee_cad          = bd.broker_fee_cad,
+        gst_cad                 = bd.gst_cad,
+        qst_cad                 = bd.qst_cad,
+        total_cad               = bd.total_cad,
+        pickup_code             = pickup,
+    )
+    await db.broker_invoices.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+
+@brokers_router.get("/broker-invoices")
+async def list_broker_invoices(current_user: User = Depends(get_current_user)):
+    db = get_db()
+    broker = await db.brokers.find_one({"user_id": current_user.id}, {"_id": 0, "id": 1})
+    if not broker:
+        raise HTTPException(status_code=404, detail={"error": "not_a_broker"})
+    rows = []
+    async for d in db.broker_invoices.find({"broker_id": broker["id"]}, {"_id": 0}).sort("created_at", -1):
+        rows.append(d)
+    return {"data": rows, "count": len(rows)}
+
+
+@brokers_router.patch("/broker-invoices/{invoice_id}/mark-paid")
+async def mark_invoice_paid(invoice_id: str, current_user: User = Depends(get_current_user)):
+    db = get_db()
+    broker = await db.brokers.find_one({"user_id": current_user.id}, {"_id": 0, "id": 1})
+    inv = await db.broker_invoices.find_one({"id": invoice_id}, {"_id": 0, "broker_id": 1})
+    if not inv or not broker or inv["broker_id"] != broker["id"]:
+        raise HTTPException(status_code=403, detail={"error": "not_authorized"})
+    await db.broker_invoices.update_one(
+        {"id": invoice_id},
+        {"$set": {"buyer_payment_status": "paid", "buyer_paid_at": _utcnow(), "vehicle_release_status": "ready"}},
+    )
+    return {"success": True}
+
+
+@brokers_router.post("/broker-invoices/{invoice_id}/release-vehicle")
+async def release_vehicle(invoice_id: str, current_user: User = Depends(get_current_user)):
+    db = get_db()
+    broker = await db.brokers.find_one({"user_id": current_user.id}, {"_id": 0, "id": 1})
+    inv = await db.broker_invoices.find_one({"id": invoice_id}, {"_id": 0, "broker_id": 1})
+    if not inv or not broker or inv["broker_id"] != broker["id"]:
+        raise HTTPException(status_code=403, detail={"error": "not_authorized"})
+    await db.broker_invoices.update_one(
+        {"id": invoice_id},
+        {"$set": {"vehicle_release_status": "released", "released_at": _utcnow()}},
+    )
+    return {"success": True}
+
+
+# ── 8. Hotfix v6: PDF invoice generator ───────────────────────────────
+@brokers_router.get("/broker-invoices/{invoice_id}/pdf")
+async def get_invoice_pdf(invoice_id: str, current_user: User = Depends(get_current_user)):
+    from fastapi.responses import StreamingResponse
+    import io
+    from reportlab.lib.pagesizes import LETTER
+    from reportlab.pdfgen import canvas
+
+    db = get_db()
+    inv = await db.broker_invoices.find_one({"id": invoice_id}, {"_id": 0})
+    if not inv:
+        raise HTTPException(status_code=404, detail={"error": "invoice_not_found"})
+    broker = await db.brokers.find_one({"id": inv["broker_id"]}, {"_id": 0})
+    if not broker:
+        raise HTTPException(status_code=404, detail={"error": "broker_not_found"})
+    # Authorization: broker owner OR buyer themselves OR admin
+    is_owner = broker.get("user_id") == current_user.id
+    is_buyer = inv.get("buyer_user_id") == current_user.id
+    is_admin = (current_user.role or "") in ("admin", "superadmin")
+    if not (is_owner or is_buyer or is_admin):
+        raise HTTPException(status_code=403, detail={"error": "not_authorized"})
+
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=LETTER)
+    w, h = LETTER
+
+    y = h - 50
+    c.setFont("Helvetica-Bold", 22); c.drawString(50, y, "BidVex × Broker Invoice")
+    y -= 24
+    c.setFont("Helvetica", 10);     c.drawString(50, y, f"Invoice #: {inv.get('invoice_number')}")
+    y -= 14;                         c.drawString(50, y, f"Issued: {inv.get('created_at')}")
+    y -= 28
+    c.setFont("Helvetica-Bold", 12); c.drawString(50, y, "Broker")
+    y -= 14
+    c.setFont("Helvetica", 10);     c.drawString(50, y, broker.get("legal_business_name", ""))
+    y -= 12;                         c.drawString(50, y, f"{broker.get('operating_province','')} · {broker.get('regulatory_body','')}")
+    y -= 12;                         c.drawString(50, y, f"License: {broker.get('broker_license_number','')}")
+    y -= 28
+    c.setFont("Helvetica-Bold", 12); c.drawString(50, y, "Vehicle")
+    y -= 14
+    c.setFont("Helvetica", 10);     c.drawString(50, y, f"Listing ID: {inv.get('vehicle_listing_id')}")
+    y -= 12;                         c.drawString(50, y, f"Pickup Code: {inv.get('pickup_code')}")
+    y -= 28
+    c.setFont("Helvetica-Bold", 12); c.drawString(50, y, "Price Breakdown")
+    y -= 18
+
+    def line(label, amount):
+        nonlocal y
+        c.setFont("Helvetica", 10)
+        c.drawString(50, y, label)
+        c.drawRightString(w - 50, y, f"${float(amount):,.2f} CAD")
+        y -= 14
+
+    line("Hammer Price",                inv.get("hammer_price_cad", 0))
+    line("BidVex Platform Fee (2.5%)",  inv.get("bidvex_platform_fee_cad", 0))
+    line("Broker Fee",                  inv.get("broker_fee_cad", 0))
+    line("GST (5%)",                    inv.get("gst_cad", 0))
+    if (inv.get("qst_cad") or 0) > 0:
+        line("QST (9.975%)", inv.get("qst_cad", 0))
+    y -= 6
+    c.line(50, y, w - 50, y); y -= 14
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(50, y, "TOTAL DUE")
+    c.drawRightString(w - 50, y, f"${float(inv.get('total_cad', 0)):,.2f} CAD")
+
+    y -= 40
+    c.setFont("Helvetica-Oblique", 8)
+    c.drawString(50, y, f"This invoice is issued under {broker.get('regulatory_body','')} licensed broker permit.")
+    c.drawString(50, y - 10, "Records retained for 7 years per Canadian business record law.")
+
+    c.showPage()
+    c.save()
+    buf.seek(0)
+    return StreamingResponse(buf, media_type="application/pdf", headers={
+        "Content-Disposition": f'attachment; filename="invoice-{inv.get("invoice_number")}.pdf"',
+    })
+
+
+# ── 9. Hotfix v6: Buyer invitation flow ───────────────────────────────
+class _InviteBuyerIn(BaseModel):
+    email: str
+
+
+@brokers_router.post("/broker-relationships/invite")
+async def invite_buyer(payload: _InviteBuyerIn, current_user: User = Depends(get_current_user)):
+    db = get_db()
+    broker = await db.brokers.find_one({"user_id": current_user.id, "verification_status": "approved"}, {"_id": 0})
+    if not broker:
+        raise HTTPException(status_code=403, detail={"error": "not_an_approved_broker"})
+    invite_id = str(__import__("uuid").uuid4())
+    doc = {
+        "id":            invite_id,
+        "broker_id":     broker["id"],
+        "buyer_email":   payload.email.lower().strip(),
+        "status":        "sent",
+        "created_at":    _utcnow(),
+        "accepted_at":   None,
+    }
+    await db.broker_invitations.insert_one(doc)
+    # Email sending is best-effort: log it; queue actual email send for v6.5
+    logger.info("BROKER_INVITE issued broker=%s email=%s id=%s", broker["id"], payload.email, invite_id)
+    return {"success": True, "invite_id": invite_id, "join_url": f"/brokers/join?broker_id={broker['id']}&invite={invite_id}"}
+
+
+# ── 10. Hotfix v6: Admin Buyer Deposits + Conflict Alerts + Audit ─────
+@brokers_router.get("/admin/broker-deposits")
+async def admin_list_broker_deposits(current_user: User = Depends(require_admin)):
+    db = get_db()
+    rows = []
+    async for r in db.broker_buyer_relationships.find(
+        {"deposit_status": {"$in": ["held", "captured"]}},
+        {"_id": 0},
+    ).sort("created_at", -1).limit(200):
+        broker = await db.brokers.find_one({"id": r["broker_id"]}, {"_id": 0, "legal_business_name": 1})
+        buyer  = await db.users.find_one({"id": r["buyer_user_id"]}, {"_id": 0, "email": 1, "full_name": 1})
+        r["broker_name"] = (broker or {}).get("legal_business_name")
+        r["buyer_email"] = (buyer or {}).get("email")
+        rows.append(r)
+    return {"data": rows, "count": len(rows)}
+
+
+@brokers_router.get("/admin/broker-conflicts")
+async def admin_list_broker_conflicts(current_user: User = Depends(require_admin), limit: int = 100):
+    """All intra-broker conflict events surfaced as audit rows where a
+    bid was attempted but blocked. We approximate via repeated-listing,
+    same-broker, multiple-distinct-buyer entries.
+    """
+    db = get_db()
+    pipeline = [
+        {"$group": {
+            "_id": {"listing": "$vehicle_listing_id", "broker": "$broker_id"},
+            "buyer_ids": {"$addToSet": "$buyer_user_id"},
+            "bid_count": {"$sum": 1},
+        }},
+        {"$match": {"$expr": {"$gt": [{"$size": "$buyer_ids"}, 1]}}},
+        {"$limit": limit},
+    ]
+    rows = []
+    async for row in db.broker_bids.aggregate(pipeline):
+        rows.append({
+            "vehicle_listing_id": row["_id"]["listing"],
+            "broker_id":          row["_id"]["broker"],
+            "distinct_buyers":    len(row["buyer_ids"]),
+            "total_bids":         row["bid_count"],
+            "buyer_ids":          row["buyer_ids"],
+        })
+    return {"data": rows, "count": len(rows)}
+
+
+@brokers_router.get("/admin/broker-revenue")
+async def admin_broker_revenue(current_user: User = Depends(require_admin)):
+    """Sum platform fees collected from broker-mediated transactions."""
+    db = get_db()
+    pipeline = [
+        {"$group": {
+            "_id":               None,
+            "total_platform":    {"$sum": "$bidvex_platform_fee_cad"},
+            "total_broker_fees": {"$sum": "$broker_fee_cad"},
+            "total_hammer":      {"$sum": "$hammer_price_cad"},
+            "deal_count":        {"$sum": 1},
+        }},
+    ]
+    agg = None
+    async for row in db.broker_invoices.aggregate(pipeline):
+        agg = row
+    if not agg:
+        return {"deal_count": 0, "total_platform_fee_cad": 0, "total_broker_fees_cad": 0, "total_hammer_cad": 0}
+    return {
+        "deal_count":             agg.get("deal_count", 0),
+        "total_platform_fee_cad": round(agg.get("total_platform", 0), 2),
+        "total_broker_fees_cad":  round(agg.get("total_broker_fees", 0), 2),
+        "total_hammer_cad":       round(agg.get("total_hammer", 0), 2),
+    }

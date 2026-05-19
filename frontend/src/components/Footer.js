@@ -161,6 +161,23 @@ const Footer = () => {
           <span className="text-gray-600">|</span>
           {renderLink('support', 'Contact Support', 'mailto:support@bidvex.com')}
           <span className="text-gray-600">|</span>
+          {/* iter217 Phase 5 Hotfix v5b — Broker Ecosystem entry points */}
+          <Link
+            to={language === 'fr' ? '/devenir-courtier' : '/become-a-broker'}
+            className="hover:text-white transition-colors text-sm"
+            data-testid="footer-become-a-broker"
+          >
+            {language === 'fr' ? 'Devenir courtier' : 'Become a Broker'}
+          </Link>
+          <span className="text-gray-600">|</span>
+          <Link
+            to={language === 'fr' ? '/courtiers' : '/brokers'}
+            className="hover:text-white transition-colors text-sm"
+            data-testid="footer-broker-directory"
+          >
+            {language === 'fr' ? 'Répertoire des courtiers' : 'Broker Directory'}
+          </Link>
+          <span className="text-gray-600">|</span>
           <button
             onClick={resetConsent}
             className="hover:text-white transition-colors text-sm"

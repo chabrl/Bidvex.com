@@ -78,7 +78,7 @@ const buildInitialFilters = (sp) => {
 
 const VehicleAuctionsPage = () => {
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Categories (loaded once)
@@ -253,6 +253,13 @@ const VehicleAuctionsPage = () => {
               </button>
               <button onClick={() => navigate('/vehicle-auctions/my-listings')} className="inline-flex items-center gap-1.5 rounded-lg bg-transparent border border-white text-white hover:bg-white/15 font-semibold text-xs sm:text-sm px-3 py-2" data-testid="btn-my-listings">
                 <Building2 className="h-4 w-4" />{t('vehiclePage.myListings', 'My listings')}
+              </button>
+              {/* iter217 Phase 5 Hotfix v5b — Broker discovery + apply CTAs */}
+              <button onClick={() => navigate(i18n?.language?.startsWith('fr') ? '/courtiers' : '/brokers')} className="inline-flex items-center gap-1.5 rounded-lg bg-amber-400 text-emerald-900 hover:bg-amber-300 font-semibold text-xs sm:text-sm px-3 py-2" data-testid="btn-find-broker">
+                🤝 {i18n?.language?.startsWith('fr') ? 'Trouver un courtier' : 'Find a Broker'}
+              </button>
+              <button onClick={() => navigate(i18n?.language?.startsWith('fr') ? '/devenir-courtier' : '/become-a-broker')} className="inline-flex items-center gap-1.5 rounded-lg bg-transparent border border-white text-white hover:bg-white/15 font-semibold text-xs sm:text-sm px-3 py-2" data-testid="btn-become-broker">
+                {i18n?.language?.startsWith('fr') ? 'Devenir courtier →' : 'Become a broker →'}
               </button>
             </div>
           </div>

@@ -1,6 +1,106 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: iter217 Phase 5 Hotfix v5b — Bid Panel Scroll + Category Filter + Broker Ecosystem MVP (Feb 16, 2026) ✅
+## Latest: iter217 Phase 5 Hotfix v6 — Broker Ecosystem Full Surface + Nav Wiring (Feb 16, 2026) ✅
+
+### Status: User reported v5b changes "not visible on preview" — INVESTIGATION found all 6 broker routes already returned HTTP 200 and the legal pages already served the broker section. The actual gap was **navigation discoverability** — no entry points existed. v6 ships the nav + 4 remaining dashboard tabs + invoices + PDF + invitations + 4 admin sub-endpoints.
+
+### Navigation entry points added
+- **Footer** (`components/Footer.js`) — "Become a Broker / Devenir courtier" + "Broker Directory / Répertoire des courtiers" pills wired with `Link` to localized routes.
+- **Navbar** (`components/Navbar.js`) — "Broker Dashboard / Tableau de courtier" item appears in the user dropdown when `user.account_type === 'broker'`.
+- **Vehicle auctions page** (`pages/vehicles/VehicleAuctionsPage.js`) — two new toolbar CTAs visible to all users: amber "🤝 Find a Broker" button + outline "Become a broker →" button.
+- **Vehicle buyer gate** (`components/vehicles/VehicleBuyerGateModal.js`) — option C "I want to bid via a licensed BidVex Broker" already shipped in v5b with bilingual notice + CTA to `/brokers?province=X`.
+
+### Backend — 31 broker routes now registered
+
+**v5b carry-over** (21 routes): apply / public directory / dashboard / settings / fee-preview / buyer-binding (with $500 deposit) / approve / reject / bid-limit / release / terminate / suspend / bid-via-broker / admin approve|reject|suspend / audit.
+
+**v6 additions** (10 routes):
+- `GET  /api/broker-relationships/active-deals` — joins broker_bids + vehicle_listings, computes Kanban column (`watching|bidding|winning|outbid|won`), 30s polling-ready.
+- `POST /api/broker-invoices/generate` — idempotent on `(broker_id, vehicle, buyer)` triple; computes full fee breakdown via `calculate_broker_transaction()`; generates 8-char pickup code.
+- `GET  /api/broker-invoices` — broker's invoice list.
+- `PATCH /api/broker-invoices/{id}/mark-paid` — owner-checked state transition.
+- `POST /api/broker-invoices/{id}/release-vehicle` — owner-checked release.
+- `GET  /api/broker-invoices/{id}/pdf` — **ReportLab-generated PDF** (auth: broker owner / buyer / admin). Returns proper `application/pdf` with `%PDF` magic bytes and `Content-Disposition: attachment`.
+- `POST /api/broker-relationships/invite` — creates `broker_invitations` row with one-shot join URL `/brokers/join?broker_id=X&invite=Y`.
+- `GET  /api/admin/broker-deposits` — all held + captured deposits with hydrated buyer/broker names.
+- `GET  /api/admin/broker-conflicts` — aggregation pipeline surfaces (listing × broker) tuples with >1 distinct buyer (intra-broker bid race log).
+- `GET  /api/admin/broker-revenue` — totals across `broker_invoices`: deal count, platform fee, broker fees, hammer.
+
+### Frontend — Broker dashboard now has all 6 tabs live
+
+**`pages/BrokerDashboardPage.jsx`** — 4 new inline tab components replace the v5b "coming soon" placeholders:
+
+1. **`BrokerActiveDealsTab`** — Kanban with 4 columns (Watching, Winning, Outbid, Won). Cards show vehicle label, buyer, our bid vs current, deterministic column placement. **30-second polling** via `setInterval(load, 30000)`.
+
+2. **`BrokerPipelineTab`** — invoice list with horizontal stepper per deal: `Won → Invoice Sent → Payment Received → Ready → Released → Delivered`. Per-row actions: 📄 PDF download (Blob fetch → object URL → `<a>` click), ✓ Mark Paid, 🚚 Release Vehicle.
+
+3. **`BrokerRevenueTab`** — 3 totals KPIs (hammer / broker fees / BidVex commission) + payout history table + Stripe Connect onboarding banner (placeholder until Stripe Connect API is wired in v6.5).
+
+4. **`BrokerSettingsTab`** — live fee editor. Fixed/percentage toggle, min/max fee inputs, default deposit (min $100 enforced server-side), **live preview on a $15,000 sample**, calls `PATCH /api/brokers/settings`.
+
+### PDF Invoice Layout (ReportLab)
+- BidVex × Broker Invoice header with invoice #
+- Broker block (business name, province, regulator, license #)
+- Vehicle block (listing ID + pickup code)
+- Price breakdown (hammer / 2.5% platform / broker / GST / QST if QC) with right-aligned amounts
+- Total Due line
+- Legal footer: "Issued under {regulator} licensed broker permit. Records retained for 7 years."
+- Verified `r.content[:4] == b"%PDF"` in pytest.
+
+### Tests
+- `tests/test_broker_v6.py` — 13 new tests:
+  - `test_generate_invoice` (math correctness)
+  - `test_generate_invoice_idempotent` (same params → same `id`)
+  - `test_mark_paid_then_release` (state transition + status fields)
+  - `test_pdf_invoice_returns_pdf_bytes` (200 + `application/pdf` + `%PDF` magic)
+  - `test_pdf_unauthorized_returns_403` (auth check)
+  - `test_active_deals_endpoint` (Kanban groupings)
+  - `test_invite_buyer` (invitation row + `join_url`)
+  - `test_admin_deposits_list` / `test_admin_conflicts_endpoint` / `test_admin_revenue_endpoint`
+  - `test_broker_can_update_fee_structure` (live edit)
+  - `test_deposit_below_min_rejected` (422 on < $100)
+  - `TestV6RouteRegistration.test_v6_routes_registered` (all 9 new routes present)
+- **Total broker tests: 40/40 passing** (27 v5b + 13 v6).
+- **Targeted regression**: 368/368 passing across Phase 5 + iter217 Phase1–4 + iter209/210/211/214/215/216 + broker v5b + broker v6.
+- **Zero regressions.**
+
+### Files changed (v6)
+
+**Backend** (2 modified, 1 new):
+- MODIFIED `routes/brokers.py` — appended 10 new endpoints (~330 LOC) — active-deals / 4 invoice endpoints / PDF generator / invite-buyer / 3 admin endpoints.
+- NEW `tests/test_broker_v6.py` — 13 tests.
+
+**Frontend** (5 modified):
+- MODIFIED `pages/BrokerDashboardPage.jsx` — removed `soon: true` flag on 4 tabs, added 4 inline tab components (~310 LOC).
+- MODIFIED `components/Footer.js` — broker discovery links.
+- MODIFIED `components/Navbar.js` — Broker Dashboard menu item for `account_type === 'broker'`.
+- MODIFIED `pages/vehicles/VehicleAuctionsPage.js` — Find Broker / Become Broker toolbar CTAs.
+
+### Live verification on preview
+
+```
+/become-a-broker    → 200
+/devenir-courtier   → 200
+/brokers            → 200
+/courtiers          → 200
+/broker/dashboard   → 200
+/admin/brokers      → 200
+
+GET /api/brokers (public directory) — 13 approved brokers returned
+Legal pages: BROKER ECOSYSTEM present in privacy_policy + terms_of_service in BOTH EN and FR
+31 broker API routes registered
+```
+
+### Scoped for v6.5+ (out of scope for this session)
+- Stripe Connect onboarding flow (broker `/connect/onboard` redirect + payout webhook).
+- Email send wiring (currently `broker_invitations` rows are written but the SendGrid email isn't dispatched — needs `services/email_notifications.py` integration). Acknowledgment / approval / buyer-request / buyer-approved / invitation templates.
+- `/brokers/join?broker_id=X` landing page (the invite URL is generated; the page where the invitee lands and accepts is a thin redirect to the existing `/brokers/:id/request` flow once they're logged in).
+- Broker document upload via S3 multipart (field on the model exists, MVP relies on manual admin upload).
+- Mobile-optimized Kanban (currently 4-column grid → 1-column stack < 768px).
+
+---
+
+## Previous: iter217 Phase 5 Hotfix v5b — Bid Panel Scroll + Category Filter + Broker Ecosystem MVP (Feb 16, 2026) ✅
 
 ### PART 1 — Bid panel scroll + Buy Now investigation (✅ FIXED)
 **Root cause** — `DialogContent` (shadcn) and `BuyNowButton`'s custom modal had no `max-height` / `overflow-y` — content taller than the viewport was clipped, hiding "Place Bid" + "Buy Now" CTAs. Buy Now itself isn't broken; it goes straight to Stripe Checkout, but the button was unreachable due to clipping.
