@@ -699,6 +699,9 @@ try:
     try:
         from routes.brokers import brokers_router
         app.include_router(brokers_router)
+        # iter217 Phase 5 Hotfix v7 — Individual seller, dispute, ratings
+        from routes.broker_compliance import broker_compliance_router
+        app.include_router(broker_compliance_router)
         logger.info("Broker ecosystem router registered")
     except Exception as e:
         logger.error(f"Failed to register broker router: {e}")

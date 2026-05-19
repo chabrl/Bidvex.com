@@ -101,6 +101,24 @@ async def place_bid(request: Request, bid_data: BidCreate, current_user: User = 
     else:
         _auction_type = "marketplace"
 
+    # ===== iter217 Phase 5 Hotfix v7 — Vehicle broker gate (LEGAL) =====
+    # Under OPC / SAAQ / OMVIC / AMVIC / VSA, individual buyers cannot
+    # bid directly on a vehicle auction. They must route through a
+    # licensed broker via POST /api/bid-via-broker.
+    if current_user.role != "admin":
+        from services.category_rules import assert_broker_eligible
+        bidder_account_type = (current_user.account_type or "individual")
+        has_rel = await db.broker_buyer_relationships.count_documents({
+            "buyer_user_id": current_user.id, "status": "active",
+        }) > 0 if hasattr(db, "broker_buyer_relationships") else False
+        ok, err = assert_broker_eligible(
+            category=listing.get("category", ""),
+            bidder_account_type=bidder_account_type,
+            has_active_relationship=has_rel,
+        )
+        if not ok:
+            raise HTTPException(status_code=403, detail=err)
+
     # ========== HIGH-VALUE DEPOSIT CHECK ($1k hold for >$10k auctions) ==========
     from services.pricing_config import DEPOSIT_THRESHOLD_CAD, DEPOSIT_AMOUNT_DOLLARS
     starting_price = listing.get("starting_price", 0)

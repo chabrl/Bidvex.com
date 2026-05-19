@@ -352,6 +352,12 @@ async def list_brokers_public(province: Optional[str] = None, limit: int = 50):
         d.pop("registration_document_url", None)
         d.pop("additional_documents", None)
         d.pop("verification_notes", None)
+        # iter217 Phase 5 Hotfix v7 — Trust score on every public card
+        d["rating_avg"]              = float(d.get("rating_avg") or 0)
+        d["rating_count"]            = int(d.get("rating_count") or 0)
+        d["completed_transactions"]  = await db.broker_invoices.count_documents({
+            "broker_id": d["id"], "released_at": {"$ne": None},
+        })
         rows.append(d)
     return {"data": rows, "count": len(rows)}
 
@@ -844,7 +850,7 @@ async def fee_preview(broker_id: str, hammer_price: float = Body(..., embed=True
         broker_fee_structure = broker["fee_structure"],
         buyer_province       = buyer_province,
     )
-    return bd.as_dict()
+    return bd
 
 
 # ── 6. Hotfix v6: Active Deals (live bid stream) ──────────────────────
@@ -928,13 +934,14 @@ async def generate_broker_invoice(payload: _InvoiceCreateIn, current_user: User 
         broker_id               = broker["id"],
         buyer_user_id           = payload.buyer_user_id,
         dealer_user_id          = payload.dealer_user_id,
-        hammer_price_cad        = bd.hammer_price_cad,
-        bidvex_platform_fee_cad = bd.bidvex_platform_fee_cad,
-        broker_fee_cad          = bd.broker_fee_cad,
-        gst_cad                 = bd.gst_cad,
-        qst_cad                 = bd.qst_cad,
-        total_cad               = bd.total_cad,
+        hammer_price_cad        = bd["hammer_price"],
+        bidvex_platform_fee_cad = bd["platform_fee"],
+        broker_fee_cad          = bd["broker_fee"],
+        gst_cad                 = bd["gst"],
+        qst_cad                 = bd["qst"],
+        total_cad               = bd["stripe_total_charged"],
         pickup_code             = pickup,
+        fee_breakdown           = bd,
     )
     await db.broker_invoices.insert_one(doc)
     doc.pop("_id", None)
@@ -953,17 +960,71 @@ async def list_broker_invoices(current_user: User = Depends(get_current_user)):
     return {"data": rows, "count": len(rows)}
 
 
+class _MarkPaidIn(BaseModel):
+    """Broker manual confirmation that they've received the hammer price
+    DIRECTLY from the buyer (wire / certified cheque / trust account).
+    BidVex Stripe never sees this money."""
+    hammer_received_confirmed: bool
+    payment_method:            Literal["wire", "certified_cheque", "trust_account", "other"] = "wire"
+    proof_url:                 Optional[str] = None       # URL of uploaded proof (PDF/JPG/PNG)
+    note:                      Optional[str] = None
+
+
 @brokers_router.patch("/broker-invoices/{invoice_id}/mark-paid")
-async def mark_invoice_paid(invoice_id: str, current_user: User = Depends(get_current_user)):
+async def mark_invoice_paid(
+    invoice_id:   str,
+    payload:      _MarkPaidIn,
+    current_user: User = Depends(get_current_user),
+):
+    """Broker confirms they've received the direct hammer payment.
+
+    Legal note: this endpoint does NOT charge anything via Stripe — the
+    hammer is settled outside the platform. The Stripe service-fee charge
+    is a separate event (created at invoice generation and auto-confirmed
+    by the webhook from `payment_intent.succeeded`).
+    """
+    if not payload.hammer_received_confirmed:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "hammer_confirmation_required",
+                    "message_en": "You must confirm receipt of the hammer payment before marking the invoice paid.",
+                    "message_fr": "Vous devez confirmer la réception du paiement avant de marquer la facture payée."},
+        )
+
     db = get_db()
     broker = await db.brokers.find_one({"user_id": current_user.id}, {"_id": 0, "id": 1})
-    inv = await db.broker_invoices.find_one({"id": invoice_id}, {"_id": 0, "broker_id": 1})
+    inv = await db.broker_invoices.find_one({"id": invoice_id}, {"_id": 0, "broker_id": 1, "id": 1})
     if not inv or not broker or inv["broker_id"] != broker["id"]:
         raise HTTPException(status_code=403, detail={"error": "not_authorized"})
+
+    now = _utcnow()
     await db.broker_invoices.update_one(
         {"id": invoice_id},
-        {"$set": {"buyer_payment_status": "paid", "buyer_paid_at": _utcnow(), "vehicle_release_status": "ready"}},
+        {"$set": {
+            "hammer_payment_received":     True,
+            "hammer_payment_method":       payload.payment_method,
+            "hammer_payment_confirmed_at": now,
+            "hammer_payment_confirmed_by": current_user.id,
+            "hammer_payment_proof_url":    payload.proof_url,
+            "hammer_payment_note":         payload.note,
+            "buyer_payment_status":        "paid",
+            "buyer_paid_at":               now,
+            "vehicle_release_status":      "ready",
+        }},
     )
+    # Audit trail
+    try:
+        await db.broker_invoice_audit.insert_one({
+            "id":         str(__import__("uuid").uuid4()),
+            "invoice_id": invoice_id,
+            "actor_id":   current_user.id,
+            "actor_email": current_user.email,
+            "action":     "mark_paid",
+            "details":    payload.model_dump() if hasattr(payload, "model_dump") else payload.dict(),
+            "at":         now,
+        })
+    except Exception as e:
+        logger.warning("broker_invoice_audit insert failed: %s", e)
     return {"success": True}
 
 
@@ -981,12 +1042,17 @@ async def release_vehicle(invoice_id: str, current_user: User = Depends(get_curr
     return {"success": True}
 
 
-# ── 8. Hotfix v6: PDF invoice generator ───────────────────────────────
+# ── 8. Hotfix v7: PDF invoice generator (bilingual, two-section legal) ─
 @brokers_router.get("/broker-invoices/{invoice_id}/pdf")
-async def get_invoice_pdf(invoice_id: str, current_user: User = Depends(get_current_user)):
+async def get_invoice_pdf(
+    invoice_id:   str,
+    lang:         Optional[str] = Query("en", regex="^(en|fr)$"),
+    current_user: User = Depends(get_current_user),
+):
     from fastapi.responses import StreamingResponse
     import io
     from reportlab.lib.pagesizes import LETTER
+    from reportlab.lib.colors import HexColor
     from reportlab.pdfgen import canvas
 
     db = get_db()
@@ -996,64 +1062,172 @@ async def get_invoice_pdf(invoice_id: str, current_user: User = Depends(get_curr
     broker = await db.brokers.find_one({"id": inv["broker_id"]}, {"_id": 0})
     if not broker:
         raise HTTPException(status_code=404, detail={"error": "broker_not_found"})
-    # Authorization: broker owner OR buyer themselves OR admin
     is_owner = broker.get("user_id") == current_user.id
     is_buyer = inv.get("buyer_user_id") == current_user.id
     is_admin = (current_user.role or "") in ("admin", "superadmin")
     if not (is_owner or is_buyer or is_admin):
         raise HTTPException(status_code=403, detail={"error": "not_authorized"})
 
+    fr = (lang == "fr")
+    # i18n strings
+    t = {
+        "title":          "FACTURE BIDVEX × COURTIER"          if fr else "BIDVEX × BROKER INVOICE",
+        "invoice_no":     "Facture n°"                          if fr else "Invoice #",
+        "issued":         "Émise le"                            if fr else "Issued",
+        "broker":         "Courtier"                            if fr else "Broker",
+        "license":        "Permis"                              if fr else "License #",
+        "vehicle":        "Véhicule"                            if fr else "Vehicle",
+        "listing_id":     "Identifiant"                         if fr else "Listing ID",
+        "pickup":         "Code de retrait"                     if fr else "Pickup Code",
+        "section_a":      "SECTION A — RÈGLEMENT DU VÉHICULE (Paiement direct)" if fr else "SECTION A — VEHICLE SETTLEMENT (Direct Payment)",
+        "section_b":      "SECTION B — SERVICES DE PLATEFORME BIDVEX (Stripe)" if fr else "SECTION B — BIDVEX PLATFORM SERVICES (Stripe)",
+        "hammer_label":   "Prix marteau de l'enchère"           if fr else "Auction Hammer Price",
+        "hammer_warn":    ("⚠ IMPORTANT : Ce montant est réglé DIRECTEMENT entre l'acheteur et le courtier par "
+                          "virement bancaire, chèque certifié ou compte en fiducie du courtier. "
+                          "BidVex ne traite pas ce paiement.")
+                         if fr else
+                         ("⚠ IMPORTANT: This amount is settled DIRECTLY between the buyer and the broker "
+                          "via bank wire, certified cheque, or the broker's licensed trust account. "
+                          "BidVex does not process this payment."),
+        "title_transfer": ("Le transfert de propriété du véhicule est effectué auprès de la SAAQ ou du registre "
+                          "provincial applicable par le courtier licencié.")
+                         if fr else
+                         ("Vehicle title transfer handled at SAAQ / provincial registry by the licensed broker."),
+        "platform_fee":   "Frais de plateforme BidVex (2,5 %)"  if fr else "BidVex Platform Fee (2.5%)",
+        "broker_fee":     "Frais de service du courtier"        if fr else "Broker Service Fee",
+        "subtotal":       "Sous-total"                          if fr else "Subtotal",
+        "gst":            "TPS (5 %)"                            if fr else "GST (5%)",
+        "qst":            "TVQ (9,975 %) [Québec seulement]"   if fr else "QST (9.975%) [QC only]",
+        "stripe_fee":     "Frais de traitement Stripe"         if fr else "Stripe Processing Fee",
+        "stripe_total":   "TOTAL FACTURÉ VIA STRIPE"            if fr else "TOTAL CHARGED VIA STRIPE",
+        "deposit":        "Caution de sécurité (détenue)"      if fr else "Security Deposit (held)",
+        "deposit_note":   "Libérée à la remise du véhicule"    if fr else "Released upon vehicle handoff",
+        "broker_payout":  "Versement au courtier"              if fr else "Broker's Stripe payout",
+        "bidvex_payout":  "Versement à BidVex (+ taxes remises à l'ARC et RQ)" if fr else "BidVex payout (+ taxes remitted to CRA and RQ)",
+        "gst_reg":        "TPS / GST# 00000 00000 RT0001",
+        "qst_reg":        "TVQ / QST# 0000000000 TQ0001",
+        "footer_legal":   ("BidVex Inc., Sherbrooke, Québec, Canada. "
+                          "BidVex est une plateforme de marché. Elle n'agit pas comme concessionnaire, "
+                          "courtier ou intermédiaire financier dans les transactions de véhicules. "
+                          "Dossiers conservés 7 ans conformément à la législation canadienne.")
+                         if fr else
+                         ("BidVex Inc., Sherbrooke, Quebec, Canada. "
+                          "BidVex is a marketplace platform. It does not act as a dealer, broker, or "
+                          "financial intermediary for vehicle transactions. "
+                          "Records retained 7 years per Canadian business record law."),
+    }
+
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=LETTER)
     w, h = LETTER
+    navy = HexColor("#1E3A8A")
+    grey = HexColor("#6B7280")
 
     y = h - 50
-    c.setFont("Helvetica-Bold", 22); c.drawString(50, y, "BidVex × Broker Invoice")
-    y -= 24
-    c.setFont("Helvetica", 10);     c.drawString(50, y, f"Invoice #: {inv.get('invoice_number')}")
-    y -= 14;                         c.drawString(50, y, f"Issued: {inv.get('created_at')}")
-    y -= 28
-    c.setFont("Helvetica-Bold", 12); c.drawString(50, y, "Broker")
-    y -= 14
-    c.setFont("Helvetica", 10);     c.drawString(50, y, broker.get("legal_business_name", ""))
-    y -= 12;                         c.drawString(50, y, f"{broker.get('operating_province','')} · {broker.get('regulatory_body','')}")
-    y -= 12;                         c.drawString(50, y, f"License: {broker.get('broker_license_number','')}")
-    y -= 28
-    c.setFont("Helvetica-Bold", 12); c.drawString(50, y, "Vehicle")
-    y -= 14
-    c.setFont("Helvetica", 10);     c.drawString(50, y, f"Listing ID: {inv.get('vehicle_listing_id')}")
-    y -= 12;                         c.drawString(50, y, f"Pickup Code: {inv.get('pickup_code')}")
-    y -= 28
-    c.setFont("Helvetica-Bold", 12); c.drawString(50, y, "Price Breakdown")
-    y -= 18
 
-    def line(label, amount):
+    # ── Header
+    c.setFillColor(navy)
+    c.setFont("Helvetica-Bold", 18)
+    c.drawString(50, y, t["title"])
+    y -= 22
+    c.setFillColor(grey)
+    c.setFont("Helvetica", 9)
+    c.drawString(50, y, f'{t["invoice_no"]}: {inv.get("invoice_number","—")}  ·  {t["issued"]}: {str(inv.get("created_at","")).split(".")[0]}')
+    y -= 8
+    c.setStrokeColor(navy)
+    c.setLineWidth(1.5); c.line(50, y, w - 50, y); y -= 16
+
+    # ── Broker + Vehicle block
+    c.setFillColor(navy); c.setFont("Helvetica-Bold", 11); c.drawString(50, y, t["broker"]); y -= 14
+    c.setFillColor(HexColor("#1F2937"))
+    c.setFont("Helvetica", 10)
+    c.drawString(50, y, broker.get("legal_business_name", "")); y -= 12
+    c.drawString(50, y, f'{broker.get("operating_province","")} · {broker.get("regulatory_body","")}'); y -= 12
+    # Mask license # to last 4
+    lic = (broker.get("broker_license_number") or "")
+    lic_mask = ("•" * max(0, len(lic) - 3)) + lic[-3:] if len(lic) > 3 else lic
+    c.drawString(50, y, f'{t["license"]}: {lic_mask}'); y -= 18
+
+    c.setFillColor(navy); c.setFont("Helvetica-Bold", 11); c.drawString(50, y, t["vehicle"]); y -= 14
+    c.setFillColor(HexColor("#1F2937")); c.setFont("Helvetica", 10)
+    c.drawString(50, y, f'{t["listing_id"]}: {inv.get("vehicle_listing_id","—")}'); y -= 12
+    c.drawString(50, y, f'{t["pickup"]}: {inv.get("pickup_code","—")}'); y -= 22
+
+    # Helper for amount lines
+    def amount_line(label, amount, bold=False, size=10):
         nonlocal y
-        c.setFont("Helvetica", 10)
+        c.setFont("Helvetica-Bold" if bold else "Helvetica", size)
+        c.setFillColor(HexColor("#1F2937"))
         c.drawString(50, y, label)
         c.drawRightString(w - 50, y, f"${float(amount):,.2f} CAD")
         y -= 14
 
-    line("Hammer Price",                inv.get("hammer_price_cad", 0))
-    line("BidVex Platform Fee (2.5%)",  inv.get("bidvex_platform_fee_cad", 0))
-    line("Broker Fee",                  inv.get("broker_fee_cad", 0))
-    line("GST (5%)",                    inv.get("gst_cad", 0))
-    if (inv.get("qst_cad") or 0) > 0:
-        line("QST (9.975%)", inv.get("qst_cad", 0))
+    # ── SECTION A — Vehicle Settlement (Direct)
+    c.setFillColor(HexColor("#FEF3C7"))
+    c.rect(48, y - 6, w - 96, 16, fill=1, stroke=0)
+    c.setFillColor(HexColor("#92400E"))
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(54, y, t["section_a"])
+    y -= 18
+    c.setFillColor(HexColor("#1F2937"))
+    amount_line(t["hammer_label"], inv.get("hammer_price_cad", 0), bold=True, size=11)
+    c.setFont("Helvetica-Oblique", 9)
+    c.setFillColor(HexColor("#92400E"))
+    # Wrap hammer_warn
+    from reportlab.lib.utils import simpleSplit
+    for ln in simpleSplit(t["hammer_warn"], "Helvetica-Oblique", 9, w - 110):
+        c.drawString(50, y, ln); y -= 11
+    y -= 4
+    c.setFillColor(grey); c.setFont("Helvetica", 8)
+    for ln in simpleSplit(t["title_transfer"], "Helvetica", 8, w - 110):
+        c.drawString(50, y, ln); y -= 10
+    y -= 10
+
+    # ── SECTION B — BidVex Platform Services (Stripe)
+    c.setFillColor(HexColor("#DBEAFE"))
+    c.rect(48, y - 6, w - 96, 16, fill=1, stroke=0)
+    c.setFillColor(navy); c.setFont("Helvetica-Bold", 11)
+    c.drawString(54, y, t["section_b"]); y -= 18
+
+    amount_line(t["platform_fee"], inv.get("bidvex_platform_fee_cad", 0))
+    amount_line(t["broker_fee"],    inv.get("broker_fee_cad", 0))
+    c.setStrokeColor(grey); c.setLineWidth(0.4); c.line(50, y + 4, w - 50, y + 4)
+    subtotal = float(inv.get("bidvex_platform_fee_cad", 0)) + float(inv.get("broker_fee_cad", 0))
+    amount_line(t["subtotal"], subtotal)
+    amount_line(t["gst"], inv.get("gst_cad", 0))
+    if float(inv.get("qst_cad", 0) or 0) > 0:
+        amount_line(t["qst"], inv.get("qst_cad", 0))
+    stripe_fee = float((inv.get("fee_breakdown") or {}).get("stripe_processing_fee", 0))
+    if stripe_fee > 0:
+        amount_line(t["stripe_fee"], stripe_fee)
+    c.setStrokeColor(navy); c.setLineWidth(1); c.line(50, y + 4, w - 50, y + 4); y -= 2
+    c.setFillColor(navy)
+    amount_line(t["stripe_total"], inv.get("total_cad", 0), bold=True, size=12)
     y -= 6
-    c.line(50, y, w - 50, y); y -= 14
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(50, y, "TOTAL DUE")
-    c.drawRightString(w - 50, y, f"${float(inv.get('total_cad', 0)):,.2f} CAD")
 
-    y -= 40
-    c.setFont("Helvetica-Oblique", 8)
-    c.drawString(50, y, f"This invoice is issued under {broker.get('regulatory_body','')} licensed broker permit.")
-    c.drawString(50, y - 10, "Records retained for 7 years per Canadian business record law.")
+    # ── Deposit
+    c.setFillColor(HexColor("#F3F4F6"))
+    c.rect(48, y - 12, w - 96, 28, fill=1, stroke=0)
+    c.setFillColor(HexColor("#1F2937"))
+    deposit_amount = float((inv.get("fee_breakdown") or {}).get("deposit_held", 500))
+    c.setFont("Helvetica-Bold", 10); c.drawString(54, y, f'{t["deposit"]}: ${deposit_amount:,.2f} CAD')
+    c.setFont("Helvetica", 9);     c.drawString(54, y - 10, t["deposit_note"])
+    y -= 30
 
-    c.showPage()
-    c.save()
-    buf.seek(0)
+    # ── Footer block
+    c.setStrokeColor(grey); c.line(50, y, w - 50, y); y -= 14
+    c.setFillColor(HexColor("#1F2937")); c.setFont("Helvetica", 8)
+    c.drawString(50, y, f'{t["gst_reg"]}   ·   {t["qst_reg"]}'); y -= 12
+    broker_payout = float(inv.get("broker_fee_cad", 0)) + float(inv.get("gst_cad", 0)) + float(inv.get("qst_cad", 0))
+    bidvex_payout = float(inv.get("bidvex_platform_fee_cad", 0))
+    c.drawString(50, y, f'{t["broker_payout"]}: ${broker_payout:,.2f} CAD'); y -= 11
+    c.drawString(50, y, f'{t["bidvex_payout"]}: ${bidvex_payout:,.2f} CAD'); y -= 18
+
+    c.setFillColor(grey); c.setFont("Helvetica-Oblique", 8)
+    for ln in simpleSplit(t["footer_legal"], "Helvetica-Oblique", 8, w - 100):
+        c.drawString(50, y, ln); y -= 10
+
+    c.showPage(); c.save(); buf.seek(0)
     return StreamingResponse(buf, media_type="application/pdf", headers={
         "Content-Disposition": f'attachment; filename="invoice-{inv.get("invoice_number")}.pdf"',
     })

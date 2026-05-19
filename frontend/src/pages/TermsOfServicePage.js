@@ -25,6 +25,8 @@ const tocEN = [
   { id: 'individual-accounts', label: '16. Individual User Accounts' },
   { id: 'pricing-modify', label: '17. Right to Modify Fees & Pricing' },
   { id: 'no-refund', label: '18. No-Refund Policy' },
+  { id: 'buyer-broker-deposit', label: '19. Buyer-Broker Security Deposit' },
+  { id: 'hammer-direct', label: '20. Vehicle Hammer Price — Direct Settlement' },
 ];
 
 const tocFR = [
@@ -49,6 +51,8 @@ const tocFR = [
   { id: 'individual-accounts', label: '16. Comptes utilisateurs individuels' },
   { id: 'pricing-modify', label: '17. Droit de modifier les frais et la tarification' },
   { id: 'no-refund', label: '18. Politique de non-remboursement' },
+  { id: 'buyer-broker-deposit', label: '19. Caution de sécurité acheteur-courtier' },
+  { id: 'hammer-direct', label: '20. Prix marteau du véhicule — Règlement direct' },
 ];
 
 const Badge = ({ n }) => (
@@ -294,6 +298,27 @@ const TermsOfServicePage = () => {
               <p className="mt-2"><strong>Exception:</strong> BidVex may issue refunds at its sole discretion in cases of documented technical failure attributable to BidVex that prevents platform access for a continuous period exceeding seventy-two (72) hours.</p>
             </BlueBox>
 
+            <SH id="buyer-broker-deposit" n="19">Buyer-Broker Security Deposit</SH>
+            <p>When a buyer submits a broker partnership request, BidVex authorizes (holds but does not capture) a security deposit of <strong>$500.00 CAD</strong> on the buyer's payment method via Stripe. This deposit:</p>
+            <ol className="list-[lower-alpha] pl-5 mt-3 space-y-2 text-sm">
+              <li>Is <strong>NEVER captured</strong> if the broker rejects the partnership request. The authorization is cancelled within 5-7 business days.</li>
+              <li>Remains <strong>held (not captured)</strong> throughout the active partnership.</li>
+              <li>Is <strong>FORFEITED</strong> (captured by BidVex) if the buyer: abandons an approved partnership after a bid has been placed on their behalf by the broker; fails to pay the broker's service fees within seventy-two (72) hours of invoice generation; or is found to have submitted fraudulent information.</li>
+              <li>Is <strong>RELEASED</strong> (authorization cancelled, never charged) within 5-7 business days after the broker confirms vehicle release via the platform.</li>
+              <li>May be <strong>held during a dispute period</strong> of up to seven (7) days following vehicle release. After 7 days, the release is final.</li>
+            </ol>
+            <BlueBox>
+              <p>This deposit constitutes a platform security mechanism only and does not represent payment toward the vehicle purchase price. It is compliant with Quebec Consumer Protection Act requirements for advance payment disclosure (L.R.Q., c. P-40.1, s. 13).</p>
+            </BlueBox>
+
+            <SH id="hammer-direct" n="20">Vehicle Hammer Price — Direct Settlement</SH>
+            <RedBox>
+              <p><strong>BidVex is a technology marketplace platform. It does not act as a dealer, broker, financial intermediary, or trust account administrator for any vehicle transaction.</strong></p>
+              <p className="mt-2">The vehicle hammer price (winning bid amount) is settled <strong>DIRECTLY between the buyer and the licensed broker</strong> via methods approved by the broker — bank wire, certified cheque, or broker trust account. BidVex does not process, hold, route, or receive any portion of the vehicle hammer price.</p>
+              <p className="mt-2">BidVex's Stripe infrastructure processes <strong>only platform service fees and broker service fees</strong> as described in Section 17 of these Terms, plus applicable GST and QST on those service fees.</p>
+              <p className="mt-2">All vehicle title transfers are the sole responsibility of the licensed broker, conducted through the appropriate provincial registry (SAAQ in Quebec, ServiceOntario in Ontario, AMVIC in Alberta, ICBC / VSA in British Columbia, etc.).</p>
+            </RedBox>
+
             <p className="text-xs text-slate-400 mt-10">&copy; 2026 BidVex Inc. All rights reserved.</p>
           </>) : (<>
 
@@ -442,6 +467,27 @@ const TermsOfServicePage = () => {
               <p>Tous les frais d'abonnement payés à BidVex sont non remboursables. Après annulation, votre abonnement restera actif jusqu'à la fin de la période de facturation payée en cours. Aucun remboursement partiel n'est émis pour le temps non utilisé. Cette politique s'applique aux Forfaits annuels de courtier et à tout autre produit d'abonnement offert par BidVex Inc.</p>
               <p className="mt-2"><strong>Exception :</strong> BidVex peut émettre des remboursements à sa seule discrétion en cas de défaillance technique documentée attribuable à BidVex qui empêche l'accès à la plateforme pendant une période continue dépassant soixante-douze (72) heures.</p>
             </BlueBox>
+
+            <SH id="buyer-broker-deposit" n="19">Caution de sécurité acheteur-courtier</SH>
+            <p>Lorsqu'un acheteur soumet une demande de partenariat avec un courtier, BidVex autorise (retient sans débiter) une caution de sécurité de <strong>500,00 $ CAD</strong> sur le mode de paiement de l'acheteur via Stripe. Cette caution :</p>
+            <ol className="list-[lower-alpha] pl-5 mt-3 space-y-2 text-sm">
+              <li>N'est <strong>JAMAIS débitée</strong> si le courtier refuse la demande de partenariat. L'autorisation est annulée dans un délai de 5 à 7 jours ouvrables.</li>
+              <li>Demeure <strong>retenue (non débitée)</strong> pendant toute la durée du partenariat actif.</li>
+              <li>Est <strong>CONFISQUÉE</strong> (débitée par BidVex) si l'acheteur : abandonne un partenariat approuvé après qu'une enchère a été placée en son nom; ne paie pas les frais de service du courtier dans les soixante-douze (72) heures suivant la génération de la facture; ou est trouvé avoir soumis des informations frauduleuses.</li>
+              <li>Est <strong>LIBÉRÉE</strong> (autorisation annulée, jamais débitée) dans un délai de 5 à 7 jours ouvrables après que le courtier confirme la remise du véhicule via la plateforme.</li>
+              <li>Peut être <strong>retenue pendant une période de litige</strong> pouvant aller jusqu'à sept (7) jours suivant la remise du véhicule. Après 7 jours, la libération est définitive.</li>
+            </ol>
+            <BlueBox>
+              <p>Cette caution constitue uniquement un mécanisme de sécurité de la plateforme et ne représente pas un paiement pour le prix d'achat du véhicule. Elle est conforme aux exigences de divulgation des paiements anticipés de la Loi sur la protection du consommateur du Québec (L.R.Q., c. P-40.1, art. 13).</p>
+            </BlueBox>
+
+            <SH id="hammer-direct" n="20">Prix marteau du véhicule — Règlement direct</SH>
+            <RedBox>
+              <p><strong>BidVex est une plateforme technologique de marché. Elle n'agit pas en tant que concessionnaire, courtier, intermédiaire financier ou administrateur de compte en fiducie pour toute transaction de véhicule.</strong></p>
+              <p className="mt-2">Le prix marteau du véhicule (montant de l'enchère gagnante) est réglé <strong>DIRECTEMENT entre l'acheteur et le courtier licencié</strong> par des méthodes approuvées par le courtier — virement bancaire, chèque certifié ou compte en fiducie du courtier. BidVex ne traite, ne détient, ne route ni ne reçoit aucune partie du prix marteau du véhicule.</p>
+              <p className="mt-2">L'infrastructure Stripe de BidVex traite <strong>uniquement les frais de service de plateforme et les frais de service du courtier</strong> tels que décrits à la section 17 des présentes Conditions, ainsi que la TPS et la TVQ applicables sur ces frais de service.</p>
+              <p className="mt-2">Tous les transferts de propriété de véhicules sont la seule responsabilité du courtier licencié, effectués via le registre provincial approprié (SAAQ au Québec, ServiceOntario en Ontario, AMVIC en Alberta, ICBC / VSA en Colombie-Britannique, etc.).</p>
+            </RedBox>
 
             <p className="text-xs text-slate-400 mt-10">&copy; 2026 BidVex Inc. Tous droits réservés.</p>
           </>)}

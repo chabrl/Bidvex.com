@@ -1,30 +1,38 @@
 """
-iter217 Phase 5 Hotfix v5b — Broker fee engine.
+iter217 Phase 5 Hotfix v7 — Broker fee engine (LEGAL COMPLIANCE REWRITE).
 
-Computes the post-auction fee breakdown for a broker-mediated vehicle deal.
-Sits ALONGSIDE the platform's `services/fee_calculator.py`; the standard
-BidVex 2.5% platform fee is still calculated here, so a single call to
-`calculate_broker_transaction()` returns the complete buyer-facing
-breakdown without the caller needing to coordinate two services.
+CRITICAL LEGAL RULE
+═══════════════════
+BidVex is a SOFTWARE marketplace, not a vehicle dealer / financial
+intermediary. Under provincial law (Quebec OPC + SAAQ, Ontario OMVIC,
+Alberta AMVIC, BC VSA) only a licensed dealer / broker may handle the
+monetary settlement of a vehicle. Therefore:
 
-Formula reference:
-    bidvex_platform_fee = hammer × 0.025
-    broker_fee          = fixed_amount  OR  hammer × percentage_rate
-                          (then clamped to [min_fee_cad, max_fee_cad])
-    taxable_base        = bidvex_platform_fee + broker_fee
-    gst                 = taxable_base × 0.05
-    qst                 = taxable_base × 0.09975   (QC only)
-    stripe_fee          = gross-up so the final total covers the
-                          standard Stripe 2.9% + $0.30 processing fee
-    total               = hammer + bidvex + broker + gst + qst + stripe
+    ╔═══════════════════════════════════════════════════════════╗
+    ║  BidVex Stripe NEVER processes the vehicle hammer price.  ║
+    ║  The hammer is INFORMATIONAL ONLY — printed on invoices,  ║
+    ║  but settled directly buyer ↔ broker outside the          ║
+    ║  platform (wire / certified cheque / broker trust).       ║
+    ╚═══════════════════════════════════════════════════════════╝
+
+What BidVex Stripe DOES charge:
+    • BidVex platform service fee (2.5% of hammer — taxable service)
+    • Broker service fee (fixed $ or % of hammer — taxable service)
+    • GST 5% on (platform + broker fee)
+    • QST 9.975% on (platform + broker fee) — Quebec only
+    • Stripe processing fee gross-up so we land net-100% whole
+
+What BidVex Stripe NEVER charges:
+    ✗ The vehicle hammer price
+    ✗ Vehicle sales taxes (QST on the vehicle asset, PST, etc.) —
+      those are remitted by the broker at provincial title transfer.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
 
-# Constants — keep in sync with services/fee_calculator.py.
+# Constants — keep in sync with services/fee_calculator.py
 BIDVEX_PLATFORM_FEE_RATE = 0.025
 GST_RATE                 = 0.05
 QST_RATE                 = 0.09975
@@ -32,26 +40,9 @@ STRIPE_PCT               = 0.029
 STRIPE_FIXED_CAD         = 0.30
 
 
-@dataclass
-class BrokerFeeBreakdown:
-    hammer_price_cad:        float
-    bidvex_platform_fee_cad: float
-    broker_fee_cad:          float
-    gst_cad:                 float
-    qst_cad:                 float
-    stripe_fee_cad:          float
-    total_cad:               float
-
-    def as_dict(self) -> Dict[str, float]:
-        return {
-            "hammer_price_cad":        round(self.hammer_price_cad, 2),
-            "bidvex_platform_fee_cad": round(self.bidvex_platform_fee_cad, 2),
-            "broker_fee_cad":          round(self.broker_fee_cad, 2),
-            "gst_cad":                 round(self.gst_cad, 2),
-            "qst_cad":                 round(self.qst_cad, 2),
-            "stripe_fee_cad":          round(self.stripe_fee_cad, 2),
-            "total_cad":               round(self.total_cad, 2),
-        }
+def _r(x: float) -> float:
+    """Round half-up to 2 decimals."""
+    return round(float(x) + 1e-9, 2)
 
 
 def _clamp(v: float, lo: Optional[float], hi: Optional[float]) -> float:
@@ -62,65 +53,177 @@ def _clamp(v: float, lo: Optional[float], hi: Optional[float]) -> float:
     return v
 
 
-def _broker_fee(hammer: float, fee_structure: Dict[str, Any]) -> float:
-    t = (fee_structure or {}).get("type", "fixed")
+def _compute_broker_fee(hammer: float, fs: Dict[str, Any]) -> tuple[float, Dict[str, Any]]:
+    """Returns (broker_fee, details_dict)."""
+    fs = fs or {}
+    t = fs.get("type", "fixed")
     if t == "percentage":
-        rate = float(fee_structure.get("percentage_rate", 0) or 0)
-        fee = hammer * rate
+        rate = float(fs.get("percentage_rate", 0) or 0)
+        fee  = hammer * rate
+        details = {"type": "percentage", "rate_value": rate}
     else:
-        fee = float(fee_structure.get("fixed_amount_cad", 0) or 0)
-    return _clamp(fee, fee_structure.get("min_fee_cad"), fee_structure.get("max_fee_cad"))
+        fee = float(fs.get("fixed_amount_cad", 0) or 0)
+        details = {"type": "fixed", "rate_value": fee}
+    fee = _clamp(fee, fs.get("min_fee_cad"), fs.get("max_fee_cad"))
+    return fee, details
 
 
-def _stripe_gross_up(net_target: float) -> float:
-    """Returns the Stripe processing fee such that after Stripe deducts
-    its (2.9% + $0.30) fee, `net_target` lands cleanly in the merchant
-    account.
-
-    Stripe takes `gross * 0.029 + 0.30`. We solve for `gross`:
-        gross = (net_target + 0.30) / (1 - 0.029)
-    The processing fee charged is `gross - net_target`.
+def _stripe_gross_up(net: float) -> tuple[float, float]:
+    """Stripe takes 2.9% + $0.30 from the GROSS amount.
+    Solve gross = (net + 0.30) / (1 - 0.029) so net lands clean.
+    Returns (gross_total, processing_fee).
     """
-    if net_target <= 0:
-        return 0.0
-    gross = (net_target + STRIPE_FIXED_CAD) / (1 - STRIPE_PCT)
-    return max(0.0, gross - net_target)
+    if net <= 0:
+        return 0.0, 0.0
+    gross = (net + STRIPE_FIXED_CAD) / (1 - STRIPE_PCT)
+    return gross, gross - net
 
 
 def calculate_broker_transaction(
+    *,
+    hammer_price:           float,
+    broker_fee_structure:   Dict[str, Any],
+    buyer_province:         Optional[str] = None,
+    deposit_held_cad:       float = 500.0,
+) -> Dict[str, Any]:
+    """Return the full fee breakdown for a broker-mediated vehicle deal.
+
+    HAMMER PRICE IS DISPLAY-ONLY. It is NEVER added into the Stripe charge.
+
+    Output structure (per Senior Architect Directive v7):
+
+        {
+          "hammer_price":            float,   # display only
+          "hammer_settlement":       "direct",
+          "hammer_settlement_note":  str,
+
+          "platform_fee":            float,   # 2.5% of hammer (BidVex)
+          "broker_fee_details":      {"type": ..., "rate_value": ...},
+          "broker_fee":              float,
+          "subtotal_taxable":        float,   # platform_fee + broker_fee
+
+          "gst":                     float,   # 5% on subtotal_taxable
+          "qst":                     float,   # 9.975% on subtotal_taxable (QC only)
+
+          "stripe_subtotal":         float,   # subtotal_taxable + gst + qst
+          "stripe_processing_fee":   float,
+          "stripe_total_charged":    float,   # → BidVex Stripe charge
+
+          "deposit_held":            float,
+
+          "summary": {
+            "buyer_pays_stripe":     float,   # via BidVex Stripe
+            "buyer_pays_direct":     float,   # hammer, paid to broker direct
+            "buyer_total_cost":      float,
+            "bidvex_earns":          float,   # platform fee net of taxes
+            "broker_earns":          float,   # broker fee net of taxes
+          },
+        }
+    """
+    hammer = max(0.0, float(hammer_price or 0))
+
+    # 1. Platform fee + broker fee
+    platform_fee = hammer * BIDVEX_PLATFORM_FEE_RATE
+    broker_fee, broker_fee_details = _compute_broker_fee(hammer, broker_fee_structure)
+
+    subtotal_taxable = platform_fee + broker_fee
+
+    # 2. Taxes on SERVICE fees only (never on hammer)
+    province = (buyer_province or "").strip().upper()
+    gst = subtotal_taxable * GST_RATE
+    qst = subtotal_taxable * QST_RATE if province == "QC" else 0.0
+
+    # 3. Stripe gross-up — never includes hammer
+    stripe_subtotal = subtotal_taxable + gst + qst
+    stripe_total_charged, stripe_processing_fee = _stripe_gross_up(stripe_subtotal)
+
+    # 4. Round once at the boundary
+    return {
+        # ─── Hammer (informational only) ──────────────────────────
+        "hammer_price":              _r(hammer),
+        "hammer_settlement":         "direct",
+        "hammer_settlement_note":    (
+            "To be settled directly between buyer and broker via bank wire, "
+            "certified cheque, or broker trust account. BidVex does not "
+            "process this amount."
+        ),
+
+        # ─── Service fees (Stripe-charged) ────────────────────────
+        "platform_fee":              _r(platform_fee),
+        "broker_fee_details":        broker_fee_details,
+        "broker_fee":                _r(broker_fee),
+        "subtotal_taxable":          _r(subtotal_taxable),
+
+        "gst":                       _r(gst),
+        "qst":                       _r(qst),
+
+        "stripe_subtotal":           _r(stripe_subtotal),
+        "stripe_processing_fee":     _r(stripe_processing_fee),
+        "stripe_total_charged":      _r(stripe_total_charged),
+
+        # ─── Deposit ──────────────────────────────────────────────
+        "deposit_held":              _r(deposit_held_cad),
+
+        # ─── Buyer-facing summary ─────────────────────────────────
+        "summary": {
+            "buyer_pays_stripe":     _r(stripe_total_charged),
+            "buyer_pays_direct":     _r(hammer),
+            "buyer_total_cost":      _r(stripe_total_charged + hammer),
+            "bidvex_earns":          _r(platform_fee),
+            "broker_earns":          _r(broker_fee),
+        },
+    }
+
+
+# ── Backwards-compat shim ──────────────────────────────────────────────
+# Older call-sites that imported `BrokerFeeBreakdown` or accessed dataclass
+# attributes (`bd.hammer_price_cad`, `bd.total_cad`, `bd.as_dict()`) still
+# work via this thin wrapper. We map the new dict shape onto the legacy
+# field names so the test suite, the invoice model, and dashboards do not
+# break while consumers migrate.
+
+class BrokerFeeBreakdown:
+    """Legacy adapter. New code should consume the dict directly."""
+    __slots__ = ("_d",)
+
+    def __init__(self, d: Dict[str, Any]):
+        self._d = d
+
+    # Legacy attribute access
+    @property
+    def hammer_price_cad(self) -> float:        return self._d["hammer_price"]
+    @property
+    def bidvex_platform_fee_cad(self) -> float: return self._d["platform_fee"]
+    @property
+    def broker_fee_cad(self) -> float:          return self._d["broker_fee"]
+    @property
+    def gst_cad(self) -> float:                 return self._d["gst"]
+    @property
+    def qst_cad(self) -> float:                 return self._d["qst"]
+    @property
+    def stripe_fee_cad(self) -> float:          return self._d["stripe_processing_fee"]
+    @property
+    def total_cad(self) -> float:
+        """Legacy field: total CAD a buyer must pay (Stripe charge ONLY —
+        no longer includes hammer per v7 legal compliance refactor)."""
+        return self._d["stripe_total_charged"]
+
+    def as_dict(self) -> Dict[str, Any]:
+        # New consumers get the rich v7 dict.
+        return self._d
+
+
+def calculate_broker_transaction_legacy(
     *,
     hammer_price:          float,
     broker_fee_structure:  Dict[str, Any],
     buyer_province:        Optional[str] = None,
 ) -> BrokerFeeBreakdown:
-    """Return the full buyer-facing fee breakdown for a broker-mediated
-    vehicle sale.
-
-    Args:
-        hammer_price:         Winning bid amount in CAD.
-        broker_fee_structure: Dict with `type`, `fixed_amount_cad`,
-                              `percentage_rate`, `min_fee_cad`, `max_fee_cad`.
-        buyer_province:       2-letter CA code. QST is only charged for "QC".
+    """Legacy API surface — returns a BrokerFeeBreakdown adapter wrapping the
+    new dict. Used by code paths that still use dataclass attribute access.
     """
-    hammer  = max(0.0, float(hammer_price or 0))
-    bidvex  = hammer * BIDVEX_PLATFORM_FEE_RATE
-    broker  = _broker_fee(hammer, broker_fee_structure or {})
-
-    taxable_base = bidvex + broker
-    province = (buyer_province or "").strip().upper()
-    gst = taxable_base * GST_RATE
-    qst = taxable_base * QST_RATE if province == "QC" else 0.0
-
-    pre_stripe = hammer + bidvex + broker + gst + qst
-    stripe_fee = _stripe_gross_up(pre_stripe)
-    total      = pre_stripe + stripe_fee
-
-    return BrokerFeeBreakdown(
-        hammer_price_cad        = hammer,
-        bidvex_platform_fee_cad = bidvex,
-        broker_fee_cad          = broker,
-        gst_cad                 = gst,
-        qst_cad                 = qst,
-        stripe_fee_cad          = stripe_fee,
-        total_cad               = total,
-    )
+    return BrokerFeeBreakdown(calculate_broker_transaction(
+        hammer_price          = hammer_price,
+        broker_fee_structure  = broker_fee_structure,
+        buyer_province        = buyer_province,
+    ))

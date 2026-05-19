@@ -141,13 +141,18 @@ async def test_mark_paid_then_release(db, cleanup_ids):
         inv_id = r.json()["id"]
         cleanup_ids["invoices"].append(inv_id)
         r2 = await c.patch(f"{API_URL}/api/broker-invoices/{inv_id}/mark-paid",
-                           headers={"Authorization": f"Bearer {t}"})
+                           headers={"Authorization": f"Bearer {t}"},
+                           json={"hammer_received_confirmed": True,
+                                 "payment_method": "wire",
+                                 "note": "wire received from buyer"})
         r3 = await c.post(f"{API_URL}/api/broker-invoices/{inv_id}/release-vehicle",
                           headers={"Authorization": f"Bearer {t}"})
     assert r2.status_code == 200 and r3.status_code == 200
     inv = await db.broker_invoices.find_one({"id": inv_id}, {"_id": 0})
     assert inv["buyer_payment_status"] == "paid"
     assert inv["vehicle_release_status"] == "released"
+    assert inv["hammer_payment_received"] is True
+    assert inv["hammer_payment_method"] == "wire"
 
 
 @pytest.mark.asyncio

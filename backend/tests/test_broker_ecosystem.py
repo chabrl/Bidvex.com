@@ -98,6 +98,9 @@ def make_user(db):
 
 
 # ── 1. Fee engine ─────────────────────────────────────────────────────
+# iter217 Phase 5 Hotfix v7 — calculate_broker_transaction now returns a
+# dict (per Senior Architect Legal Compliance directive). Tests below
+# validate the v7 shape AND that hammer is excluded from the Stripe total.
 class TestBrokerFeeEngine:
     def test_fixed_fee_basic(self):
         from services.broker_fee_engine import calculate_broker_transaction
@@ -106,13 +109,15 @@ class TestBrokerFeeEngine:
             broker_fee_structure={"type": "fixed", "fixed_amount_cad": 500},
             buyer_province="ON",
         )
-        assert bd.hammer_price_cad == 10000
-        assert bd.bidvex_platform_fee_cad == 250  # 2.5%
-        assert bd.broker_fee_cad == 500
-        assert round(bd.gst_cad, 2) == round((250 + 500) * 0.05, 2)  # 37.50
-        assert bd.qst_cad == 0  # ON has no QST
-        assert bd.stripe_fee_cad > 0
-        assert bd.total_cad > bd.hammer_price_cad + bd.bidvex_platform_fee_cad
+        assert bd["hammer_price"] == 10000
+        assert bd["hammer_settlement"] == "direct"
+        assert bd["platform_fee"] == 250.0           # 2.5% of 10000
+        assert bd["broker_fee"] == 500.0
+        assert bd["broker_fee_details"] == {"type": "fixed", "rate_value": 500.0}
+        assert round(bd["gst"], 2) == round((250 + 500) * 0.05, 2)  # 37.50
+        assert bd["qst"] == 0                          # ON has no QST
+        # CRITICAL: Stripe total must NOT include hammer
+        assert bd["stripe_total_charged"] < 1500, "hammer must not flow through Stripe!"
 
     def test_percentage_fee_qc(self):
         from services.broker_fee_engine import calculate_broker_transaction
@@ -121,10 +126,11 @@ class TestBrokerFeeEngine:
             broker_fee_structure={"type": "percentage", "percentage_rate": 0.03},
             buyer_province="QC",
         )
-        assert round(bd.broker_fee_cad, 2) == 600.0  # 20000 * 3%
-        # QST IS charged for QC
-        assert bd.qst_cad > 0
-        assert round(bd.qst_cad, 2) == round((500 + 600) * 0.09975, 2)
+        assert round(bd["broker_fee"], 2) == 600.0     # 20000 * 3%
+        assert bd["broker_fee_details"] == {"type": "percentage", "rate_value": 0.03}
+        assert bd["qst"] > 0                            # QST IS charged in QC
+        # QST on (platform 500 + broker 600) only — NEVER on hammer
+        assert round(bd["qst"], 2) == round((500 + 600) * 0.09975, 2)
 
     def test_min_fee_clamp(self):
         from services.broker_fee_engine import calculate_broker_transaction
@@ -133,8 +139,7 @@ class TestBrokerFeeEngine:
             broker_fee_structure={"type": "percentage", "percentage_rate": 0.03, "min_fee_cad": 200},
             buyer_province="ON",
         )
-        # 3% of 1000 = 30, clamped to min 200
-        assert bd.broker_fee_cad == 200
+        assert bd["broker_fee"] == 200
 
     def test_max_fee_clamp(self):
         from services.broker_fee_engine import calculate_broker_transaction
@@ -143,30 +148,63 @@ class TestBrokerFeeEngine:
             broker_fee_structure={"type": "percentage", "percentage_rate": 0.05, "max_fee_cad": 5000},
             buyer_province="ON",
         )
-        # 5% of 1M = 50k, clamped to max 5000
-        assert bd.broker_fee_cad == 5000
+        assert bd["broker_fee"] == 5000
 
     def test_zero_hammer_price_safe(self):
         from services.broker_fee_engine import calculate_broker_transaction
         bd = calculate_broker_transaction(
             hammer_price=0, broker_fee_structure={"type": "fixed", "fixed_amount_cad": 100}, buyer_province="ON",
         )
-        assert bd.hammer_price_cad == 0
-        # Even on zero hammer, broker still gets fixed fee + bidvex 0
-        assert bd.broker_fee_cad == 100
+        assert bd["hammer_price"] == 0
+        assert bd["broker_fee"] == 100
+        # Still must NEVER mix hammer into Stripe
+        assert bd["summary"]["buyer_pays_direct"] == 0
+
+    def test_hammer_never_in_stripe_total(self):
+        """LEGAL COMPLIANCE: Stripe-charged total must never include the
+        $15,000 (or any) hammer price. The hammer settles outside BidVex.
+        """
+        from services.broker_fee_engine import calculate_broker_transaction
+        bd = calculate_broker_transaction(
+            hammer_price=15000, broker_fee_structure={"type": "fixed", "fixed_amount_cad": 500},
+            buyer_province="QC",
+        )
+        # Stripe total ≈ (375 platform + 500 broker + ~44 GST + ~87 QST + ~30 stripe) = ~1036
+        # It should be FAR less than 15000.
+        assert bd["stripe_total_charged"] < 1500, "FATAL: hammer included in Stripe charge!"
+        assert bd["summary"]["buyer_pays_direct"] == 15000
+        assert bd["summary"]["buyer_pays_stripe"] == bd["stripe_total_charged"]
+        assert round(bd["summary"]["buyer_total_cost"], 2) == round(15000 + bd["stripe_total_charged"], 2)
 
     def test_stripe_gross_up_covers_processing_fee(self):
         """The Stripe gross-up should be large enough to cover Stripe's
-        2.9% + $0.30 fee on the TOTAL amount."""
+        2.9% + $0.30 fee on the TOTAL amount Stripe charges (services only).
+        """
         from services.broker_fee_engine import calculate_broker_transaction, STRIPE_PCT, STRIPE_FIXED_CAD
         bd = calculate_broker_transaction(
             hammer_price=10000, broker_fee_structure={"type": "fixed", "fixed_amount_cad": 500}, buyer_province="ON",
         )
-        # Stripe takes total * 0.029 + 0.30 — the merchant net should be
-        # net_target = hammer + bidvex + broker + gst (no QST in ON).
-        net_target = bd.hammer_price_cad + bd.bidvex_platform_fee_cad + bd.broker_fee_cad + bd.gst_cad
-        stripe_take = bd.total_cad * STRIPE_PCT + STRIPE_FIXED_CAD
-        assert abs((bd.total_cad - stripe_take) - net_target) < 0.05
+        # net_target = subtotal_taxable + gst + qst (NO hammer, NO QST in ON)
+        net_target = bd["subtotal_taxable"] + bd["gst"] + bd["qst"]
+        stripe_take = bd["stripe_total_charged"] * STRIPE_PCT + STRIPE_FIXED_CAD
+        assert abs((bd["stripe_total_charged"] - stripe_take) - net_target) < 0.05
+
+    def test_v7_output_shape(self):
+        """Every key the directive specifies must be present."""
+        from services.broker_fee_engine import calculate_broker_transaction
+        bd = calculate_broker_transaction(
+            hammer_price=15000, broker_fee_structure={"type": "fixed", "fixed_amount_cad": 500},
+            buyer_province="QC",
+        )
+        for k in ("hammer_price", "hammer_settlement", "hammer_settlement_note",
+                  "platform_fee", "broker_fee_details", "broker_fee",
+                  "subtotal_taxable", "gst", "qst",
+                  "stripe_subtotal", "stripe_processing_fee", "stripe_total_charged",
+                  "deposit_held", "summary"):
+            assert k in bd, f"v7 key missing: {k}"
+        for k in ("buyer_pays_stripe", "buyer_pays_direct", "buyer_total_cost",
+                  "bidvex_earns", "broker_earns"):
+            assert k in bd["summary"], f"v7 summary key missing: {k}"
 
 
 # ── 2. Broker application flow ────────────────────────────────────────
@@ -576,9 +614,12 @@ async def test_public_fee_preview_endpoint(db):
                              json={"hammer_price": 15000, "buyer_province": "QC"})
         assert r.status_code == 200
         body = r.json()
-        assert body["hammer_price_cad"] == 15000
-        assert body["broker_fee_cad"] == 500   # fixed
-        assert body["qst_cad"] > 0             # QC charges QST
+        assert body["hammer_price"] == 15000          # v7 dict key
+        assert body["broker_fee"] == 500              # fixed
+        assert body["qst"] > 0                         # QC charges QST
+        # Legal: hammer is INFORMATIONAL only — never in Stripe total
+        assert body["hammer_settlement"] == "direct"
+        assert body["stripe_total_charged"] < 2000     # services only, never hammer
     finally:
         await db.brokers.delete_one({"id": broker_id})
 

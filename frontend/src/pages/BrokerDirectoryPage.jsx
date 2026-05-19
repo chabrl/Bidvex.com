@@ -15,7 +15,7 @@ import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../components/ui/select';
-import { Handshake, MapPin, ShieldCheck, Banknote } from 'lucide-react';
+import { Handshake, MapPin, ShieldCheck, Banknote, Star, CheckCircle2 } from 'lucide-react';
 
 const PROVINCES = [
   { code: 'ALL', name_en: 'All Provinces',     name_fr: 'Toutes provinces' },
@@ -118,6 +118,24 @@ export default function BrokerDirectoryPage() {
               </div>
               <div className="text-xs text-slate-500">
                 {lang === 'fr' ? 'Licence' : 'License'}: {b.broker_license_number_masked}
+              </div>
+              {/* iter217 Phase 5 Hotfix v7 — Trust score */}
+              <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 border-t border-slate-200 dark:border-slate-700 pt-2.5">
+                {Number(b.rating_count || 0) > 0 ? (
+                  <span className="flex items-center gap-1" data-testid={`broker-rating-${b.id}`}>
+                    <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
+                    <strong className="text-slate-700 dark:text-slate-200">{Number(b.rating_avg || 0).toFixed(1)}</strong>
+                    <span>({b.rating_count})</span>
+                  </span>
+                ) : (
+                  <span className="text-slate-400">{lang === 'fr' ? 'Nouveau courtier' : 'New broker'}</span>
+                )}
+                {Number(b.completed_transactions || 0) > 0 && (
+                  <span className="flex items-center gap-1">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                    {b.completed_transactions} {lang === 'fr' ? 'transactions' : 'transactions'}
+                  </span>
+                )}
               </div>
               <Button
                 className="w-full bg-gradient-to-r from-[#1E3A8A] to-[#06B6D4] text-white"

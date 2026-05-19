@@ -49,6 +49,8 @@ const AdminTaxDashboard = lazy(() => import('./pages/AdminTaxDashboard'));
 const AdminBrokersPage = lazy(() => import('./pages/admin/AdminBrokersPage'));
 // iter217 Phase 5 Hotfix v6.5 — Admin Subscription Management
 const AdminSubscriptionsPage = lazy(() => import('./pages/admin/AdminSubscriptionsPage'));
+// iter217 Phase 5 Hotfix v7 — Public bilingual "How Brokers Work" landing page
+const HowBrokersWorkPage = lazy(() => import('./pages/HowBrokersWorkPage'));
 const BecomeABrokerPage = lazy(() => import('./pages/BecomeABrokerPage'));
 const BrokerDirectoryPage = lazy(() => import('./pages/BrokerDirectoryPage'));
 const BrokerBindingRequestPage = lazy(() => import('./pages/BrokerBindingRequestPage'));
@@ -453,6 +455,9 @@ const App = () => {
           <Route path="/admin/subscriptions" element={
             <ProtectedRoute><AdminSubscriptionsPage /></ProtectedRoute>
           } />
+          {/* iter217 Phase 5 Hotfix v7 — Public "How brokers work" (EN + FR) */}
+          <Route path="/how-brokers-work" element={<HowBrokersWorkPage />} />
+          <Route path="/comment-fonctionnent-les-courtiers" element={<HowBrokersWorkPage />} />
           <Route path="/become-a-broker" element={
             <ProtectedRoute><BecomeABrokerPage /></ProtectedRoute>
           } />

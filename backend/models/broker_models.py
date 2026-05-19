@@ -266,30 +266,54 @@ def make_invoice_doc(
     qst_cad:            float,
     total_cad:          float,
     pickup_code:        str,
+    fee_breakdown:      Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     now = _utcnow()
     return {
         "id":                          _new_id(),
-        "invoice_number":              f"BROKER-{now.year}-{str(uuid4())[:6].upper()}",
+        "invoice_number":              f"BVX-{now.year}-{str(uuid4())[:6].upper()}",
         "vehicle_listing_id":          vehicle_listing_id,
         "broker_id":                   broker_id,
         "buyer_user_id":               buyer_user_id,
         "dealer_user_id":              dealer_user_id,
 
+        # ─── Hammer (Section A — direct settlement, not Stripe) ───
         "hammer_price_cad":            float(hammer_price_cad),
+        "hammer_settlement":           "direct",
+        "hammer_payment_received":     False,
+        "hammer_payment_method":       None,    # wire | cheque | trust | other
+        "hammer_payment_confirmed_at": None,
+        "hammer_payment_confirmed_by": None,
+        "hammer_payment_proof_url":    None,
+        "hammer_payment_note":         None,
+
+        # ─── Service fees (Section B — Stripe-charged) ────────────
         "bidvex_platform_fee_cad":     float(bidvex_platform_fee_cad),
         "broker_fee_cad":              float(broker_fee_cad),
         "gst_cad":                     float(gst_cad),
         "qst_cad":                     float(qst_cad),
-        "total_cad":                   float(total_cad),
+        "total_cad":                   float(total_cad),   # Stripe charge total
+        "fee_breakdown":               fee_breakdown or {},
 
-        "buyer_payment_status":        "pending",
+        "buyer_payment_status":        "pending",          # pending|paid|overdue|failed
         "buyer_paid_at":               None,
         "stripe_payment_intent_id":    None,
+        "stripe_payment_status":       None,               # pending|succeeded|failed
+        "stripe_confirmed_at":         None,
 
-        "vehicle_release_status":      "pending",
+        # ─── Release ──────────────────────────────────────────────
+        "vehicle_release_status":      "pending",          # pending|ready|released|delivered
         "pickup_code":                 pickup_code,
         "released_at":                 None,
+
+        # ─── Dispute / timeout state ──────────────────────────────
+        "reminder_sent_at":            None,
+        "non_responsive_flagged_at":   None,
+        "admin_action":                None,                # re_auction|deposit_forfeit|suspend_buyer
+        "dispute_status":              "none",              # none|open|resolved
+        "dispute_opened_at":           None,
+        "dispute_resolved_at":         None,
+        "dispute_deadline_at":         None,                # released_at + 7 days
 
         "created_at":                  now,
     }

@@ -1,6 +1,74 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: iter217 Phase 5 Hotfix v6.5 — Broker Subscription Management + Legal Compliance Pass (Feb 19, 2026) ✅
+## Latest: iter217 Phase 5 Hotfix v7 — Legal Compliance / Infrastructure Patch (Feb 19, 2026) ✅
+
+### CRITICAL LEGAL FIX
+Under provincial law (Quebec OPC + SAAQ, Ontario OMVIC, Alberta AMVIC, BC VSA), only a licensed dealer / broker may handle the monetary settlement of a vehicle. Therefore:
+
+  > **BidVex Stripe NEVER processes the vehicle hammer price.** It is informational only — printed on invoices, settled directly buyer ↔ broker (wire / certified cheque / broker trust).
+
+### Tasks completed (all 10)
+
+**Task 1 — `services/broker_fee_engine.py` rewritten.**
+- `calculate_broker_transaction()` now returns a v7 dict (not a dataclass).
+- New keys: `hammer_settlement: "direct"`, `hammer_settlement_note`, `subtotal_taxable`, `summary { buyer_pays_stripe, buyer_pays_direct, buyer_total_cost, bidvex_earns, broker_earns }`.
+- GST 5% + QST 9.975% (QC only) are charged on **(platform fee + broker fee)** — never on hammer.
+- Stripe gross-up formula corrected: `(subtotal + 0.30) / (1 - 0.029)`.
+- Backwards-compat `BrokerFeeBreakdown` adapter retained for legacy call sites (deprecated `total_cad` now = Stripe charge ONLY).
+- 8 unit tests + 1 explicit "hammer-never-in-Stripe" regression test.
+
+**Task 2 — Invoice PDF rebuilt (`GET /api/broker-invoices/{id}/pdf?lang=en|fr`).**
+- Section A (amber band) — Vehicle Settlement (Direct Payment): hammer + warning that BidVex does not process this amount + SAAQ / provincial title transfer notice.
+- Section B (navy band) — BidVex Platform Services (Stripe): platform fee, broker fee, subtotal, GST, QST (QC only), Stripe processing fee, total.
+- Deposit row, broker / BidVex payout breakdown, GST/QST registration placeholders.
+- Bilingual (EN + FR) — `?lang=fr` switches every label.
+
+**Task 3 — `PATCH /api/broker-invoices/{id}/mark-paid` legal-compliant rewrite.**
+- Requires `hammer_received_confirmed: true` in the body.
+- Accepts `payment_method: "wire" | "certified_cheque" | "trust_account" | "other"`.
+- Optional `proof_url` (URL of uploaded PDF/JPG/PNG proof of direct payment).
+- All confirmations logged to `broker_invoice_audit` with actor + timestamp.
+- Only after confirmation does `vehicle_release_status` flip to `ready`.
+
+**Task 4 — Category-based broker requirement gate.**
+- New `services/category_rules.py` with `category_requires_broker()`, `commission_rate_for_category()`, `assert_broker_eligible()`, `assert_seller_can_list()`.
+- **Bid-side enforcement** in `routes/auctions_bids.py::place_bid`: individuals attempting to bid directly on a Vehicles listing receive 403 `broker_required` with `action_url=/brokers`.
+- **Listing-side enforcement** already in place via `enforce_vehicle_dealer_gate`.
+- Commission table: vehicles 2.5%, restaurant 5%, bankrupt 4%, general 5%, industrial 4.5%.
+
+**Task 5 — Individual seller flow (`POST /api/listings/individual`).**
+- Non-broker, non-dealer sellers may list **non-vehicle** items.
+- First 3 listings → `pending_review` (admin manual review); after 3 approved → auto-approve.
+- 8% commission rate stamped on listing; payout preview endpoint at `GET /api/individual-seller/payout-preview?hammer_price=&buyer_province=` computes hammer − 8% commission − 5% GST − 9.975% QST (QC) = seller net.
+
+**Task 6 — Dispute & non-payment timeout flow.**
+- `POST /api/broker-invoices/{id}/non-responsive` — broker flags after 48h (400 if too early).
+- `POST /api/admin/broker-invoices/{id}/admin-action` — admin chooses `re_auction | deposit_forfeit | suspend_buyer`.
+- `POST /api/broker-invoices/{id}/dispute` — opens a 7-day dispute window from `released_at`; rejects before release or after window closes.
+- `POST /api/admin/broker-invoices/{id}/resolve-dispute` — `award_to: "buyer" | "broker"` controls deposit fate.
+- All actions audited in `broker_invoice_audit`.
+
+**Task 7 — Broker trust score.**
+- `POST /api/broker-relationships/{id}/rate` — buyer-only after a released invoice; 1-5 stars; double-rate rejected; ≤2 stars auto-notifies admin.
+- `GET /api/brokers/{id}/ratings` — public anonymous list (no `buyer_user_id`).
+- `GET /api/brokers/{id}/trust-score` — verified flag, completed_transactions, avg_response_hours, rating_avg, rating_count, member_since.
+- Public `/api/brokers` endpoint now returns `rating_avg`, `rating_count`, `completed_transactions` on every card. Frontend `BrokerDirectoryPage` renders a star row and a "New broker" fallback.
+
+**Task 8 — Terms & Conditions sections added (EN + FR).**
+- **Section 19 — Buyer-Broker Security Deposit**: 5-part lifecycle (held → forfeited → released → dispute hold), with reference to Quebec Consumer Protection Act L.R.Q., c. P-40.1, s. 13.
+- **Section 20 — Vehicle Hammer Price — Direct Settlement**: explicit declaration that BidVex is not a dealer / broker / financial intermediary / trust account administrator; hammer settled directly outside the platform; Stripe processes service fees only.
+
+**Task 9 — Public bilingual landing page `/how-brokers-work` & `/comment-fonctionnent-les-courtiers`.**
+- 1 component, language-aware via i18n + URL.
+- Hero, 3 explainer cards (The Law / Your Protection / Full Transparency), 9-step timeline with Lucide icons, **live fee calculator** (slider for hammer, province select, fee type, fee value) running the v7 engine locally so the page works without auth, broker-CTA card, 6-item FAQ accordion, JSON-LD FAQPage schema for SEO, language toggle in the header, deep-navy + electric-blue palette matching brand.
+
+### Tests
+- `/app/backend/tests/test_broker_compliance_v7.py` (new, 18 tests).
+- Combined broker suite: **74 / 74 pass** in ~130s.
+
+---
+
+## Earlier: iter217 Phase 5 Hotfix v6.5 — Broker Subscription Management + Legal Compliance Pass (Feb 19, 2026) ✅
 
 ### Status: All 6 directive tasks completed and verified.
 - Backend: 54 / 54 broker tests pass (40 original + 14 new subscription tests).
