@@ -231,3 +231,64 @@ def is_base64_image(value: str) -> bool:
 S3_BUCKET   = _S3_BUCKET
 S3_BASE_URL = _S3_BASE_URL
 S3_REGION   = _AWS_REGION
+
+
+# ── Broker document upload (PDF / image, no resizing) ─────────────────
+# Used by `POST /api/brokers/upload-documents`. Unlike listing photos,
+# broker licenses and corporate-registration certificates are often PDFs
+# and MUST NOT be compressed. We stream them straight through.
+BROKER_DOC_MAX_BYTES   = 10 * 1024 * 1024
+BROKER_DOC_MIME_ALLOW  = (
+    "application/pdf",
+    "image/jpeg", "image/jpg", "image/png", "image/webp",
+)
+
+
+def _safe_label(label: str) -> str:
+    return re.sub(r"[^a-zA-Z0-9_-]", "", str(label or "doc"))[:32] or "doc"
+
+
+async def upload_broker_document(file: UploadFile, user_id: str, label: str = "doc") -> str:
+    """Upload a broker registration document (PDF / image) to S3.
+
+    Returns the public HTTPS URL. PDFs are uploaded as-is (no resize).
+    Images > 2000px are re-encoded as JPEG via `_process_image_bytes`
+    to keep file sizes small.
+    """
+    if file.content_type and file.content_type not in BROKER_DOC_MIME_ALLOW:
+        raise ValueError(f"unsupported_mime:{file.content_type}")
+    raw = await file.read()
+    if not raw:
+        raise ValueError("uploaded file is empty")
+    if len(raw) > BROKER_DOC_MAX_BYTES:
+        raise ValueError(f"file_too_large:max_{BROKER_DOC_MAX_BYTES // (1024*1024)}MB")
+
+    safe_uid    = _safe_listing_id(user_id)
+    safe_label_ = _safe_label(label)
+    suffix      = secrets.token_hex(4)
+
+    if (file.content_type or "").startswith("image/"):
+        body         = _process_image_bytes(raw)
+        key          = f"broker-docs/{safe_uid}/{safe_label_}-{suffix}.jpg"
+        content_type = "image/jpeg"
+    else:
+        body         = raw
+        ext          = "pdf" if "pdf" in (file.content_type or "") else "bin"
+        key          = f"broker-docs/{safe_uid}/{safe_label_}-{suffix}.{ext}"
+        content_type = file.content_type or "application/pdf"
+
+    def _upload():
+        client = _get_client()
+        client.put_object(
+            Bucket=_S3_BUCKET,
+            Key=key,
+            Body=body,
+            ContentType=content_type,
+            ACL="public-read",
+            CacheControl="public, max-age=86400",
+        )
+
+    await asyncio.to_thread(_upload)
+    url = _key_to_url(key)
+    logger.info("broker doc uploaded: %s (label=%s, %d bytes)", url, label, len(body))
+    return url

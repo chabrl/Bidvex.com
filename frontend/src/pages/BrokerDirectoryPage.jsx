@@ -18,13 +18,13 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '.
 import { Handshake, MapPin, ShieldCheck, Banknote } from 'lucide-react';
 
 const PROVINCES = [
-  { code: '',   name_en: 'All Provinces',     name_fr: 'Toutes provinces' },
-  { code: 'ON', name_en: 'Ontario',           name_fr: 'Ontario' },
-  { code: 'QC', name_en: 'Quebec',            name_fr: 'Québec' },
-  { code: 'BC', name_en: 'British Columbia',  name_fr: 'Colombie-Britannique' },
-  { code: 'AB', name_en: 'Alberta',           name_fr: 'Alberta' },
-  { code: 'MB', name_en: 'Manitoba',          name_fr: 'Manitoba' },
-  { code: 'SK', name_en: 'Saskatchewan',      name_fr: 'Saskatchewan' },
+  { code: 'ALL', name_en: 'All Provinces',     name_fr: 'Toutes provinces' },
+  { code: 'ON',  name_en: 'Ontario',           name_fr: 'Ontario' },
+  { code: 'QC',  name_en: 'Quebec',            name_fr: 'Québec' },
+  { code: 'BC',  name_en: 'British Columbia',  name_fr: 'Colombie-Britannique' },
+  { code: 'AB',  name_en: 'Alberta',           name_fr: 'Alberta' },
+  { code: 'MB',  name_en: 'Manitoba',          name_fr: 'Manitoba' },
+  { code: 'SK',  name_en: 'Saskatchewan',      name_fr: 'Saskatchewan' },
 ];
 
 const _fmtFee = (fs, lang) => {
@@ -42,13 +42,14 @@ export default function BrokerDirectoryPage() {
   const navigate = useNavigate();
 
   const [brokers, setBrokers] = useState([]);
-  const [province, setProvince] = useState('');
+  const [province, setProvince] = useState('ALL');
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await axios.get(`${API_BASE}/api/brokers${province ? `?province=${province}` : ''}`);
+      const qs = (province && province !== 'ALL') ? `?province=${province}` : '';
+      const r = await axios.get(`${API_BASE}/api/brokers${qs}`);
       setBrokers(r.data?.data || []);
     } catch {
       setBrokers([]);
@@ -78,7 +79,7 @@ export default function BrokerDirectoryPage() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {PROVINCES.map(p => <SelectItem key={p.code || 'all'} value={p.code}>{lang === 'fr' ? p.name_fr : p.name_en}</SelectItem>)}
+            {PROVINCES.map(p => <SelectItem key={p.code} value={p.code}>{lang === 'fr' ? p.name_fr : p.name_en}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>

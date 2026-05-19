@@ -252,6 +252,23 @@ const PrivacyPolicyPage = () => {
             <SH id="vehicle-opc" n="13">Vehicle Auctions — Platform Role &amp; OPC Compliance</SH>
             <p>BidVex is a technology platform and auction facilitator only. BidVex is not a vendor, dealer, or party to vehicle sale contracts. Vehicle data (VIN, history reports) is processed for listing purposes only and subject to the same data protection standards.</p>
 
+            {/* iter217 Phase 5 Hotfix v6 — Broker Ecosystem */}
+            <SH id="broker-ecosystem" n="14">Broker Ecosystem</SH>
+            <p>When you use BidVex as a Broker or as a Buyer bound to a Broker:</p>
+            <ul className="list-disc pl-5 space-y-2 text-sm mt-3">
+              <li><strong>Information collected:</strong> commercial broker license number, regulatory body, corporate registration number, business name, and uploaded license documents. For buyers bound to a broker, we collect your partnership agreement status and bidding activity under that broker.</li>
+              <li><strong>Legal attribution:</strong> Every bid placed via a broker is permanently recorded with the broker's license number, the buyer's user ID, IP address, device, and timestamp. These records are retained for 7 years in compliance with Canadian business record law and cannot be modified or deleted.</li>
+              <li><strong>Deposit handling:</strong> Security deposits ($500 CAD pre-authorization) are processed via Stripe. BidVex does not store card numbers. Deposits are released automatically when a partnership ends in good standing, or captured in cases of default as defined in our Terms of Service.</li>
+              <li><strong>Broker fee disclosure:</strong> Your broker's fee structure (fixed or percentage) is disclosed to you before you place any bid. BidVex does not set broker fees — they are independently configured by each licensed broker.</li>
+              <li><strong>Data sharing:</strong> Your personal information is shared with your bound broker solely for the purpose of facilitating vehicle transactions. Brokers are contractually prohibited from using your data for any other purpose.</li>
+              <li><strong>Regulatory compliance:</strong> BidVex cooperates with OMVIC, AMVIC, VSA, SAAQ, and other provincial regulatory bodies. Audit records may be disclosed in response to lawful regulatory requests.</li>
+            </ul>
+
+            <SH id="pricing-rights" n="15">Pricing &amp; Fee Changes</SH>
+            <RedBox>
+              <p><strong>BidVex reserves the right to change the price of any subscription, platform fee, commission, broker subscription fee, or buyer's premium rate at any time</strong>, with reasonable notice posted on our Platform. Continued use of the Platform after such a change constitutes acceptance of the new pricing. Active subscriptions are honored at the rate in effect at the time of purchase until they expire, unless otherwise required by law.</p>
+            </RedBox>
+
             <p className="text-xs text-slate-400 mt-10">&copy; 2026 BidVex Inc. All rights reserved.</p>
           </>) : (<>
 
@@ -340,6 +357,23 @@ const PrivacyPolicyPage = () => {
 
             <SH id="vehicle-opc" n="13">Enchères de véhicules — Rôle de la plateforme et conformité OPC</SH>
             <p>BidVex est une plateforme technologique et un facilitateur d'enchères uniquement. Les données véhicules (NIV, rapports d'historique) sont traitées uniquement aux fins d'annonce et soumises aux mêmes normes de protection des données.</p>
+
+            {/* iter217 Phase 5 Hotfix v6 — Écosystème de courtiers */}
+            <SH id="broker-ecosystem" n="14">Écosystème de courtiers</SH>
+            <p>Lorsque vous utilisez BidVex en tant que courtier ou en tant qu'acheteur lié à un courtier :</p>
+            <ul className="list-disc pl-5 space-y-2 text-sm mt-3">
+              <li><strong>Informations collectées :</strong> numéro de permis de courtier commercial, organisme de réglementation, numéro d'immatriculation de l'entreprise, raison sociale et documents de permis téléversés. Pour les acheteurs liés à un courtier, nous collectons votre statut de partenariat et votre activité d'enchères sous ce courtier.</li>
+              <li><strong>Attribution légale :</strong> Chaque enchère placée via un courtier est enregistrée de façon permanente avec le numéro de permis du courtier, l'identifiant de l'acheteur, l'adresse IP, l'appareil et l'horodatage. Ces dossiers sont conservés pendant 7 ans conformément à la loi canadienne et ne peuvent être modifiés ni supprimés.</li>
+              <li><strong>Gestion des dépôts :</strong> Les dépôts de garantie (préautorisation de 500 $ CAD) sont traités via Stripe. BidVex ne stocke pas les numéros de carte. Les dépôts sont libérés automatiquement à la fin d'un partenariat en règle, ou saisis en cas de défaut tel que défini dans nos Conditions d'utilisation.</li>
+              <li><strong>Divulgation des frais de courtier :</strong> La structure de frais de votre courtier (fixe ou en pourcentage) vous est communiquée avant toute enchère. BidVex ne fixe pas les frais des courtiers — ils sont configurés indépendamment par chaque courtier agréé.</li>
+              <li><strong>Partage des données :</strong> Vos informations personnelles sont partagées avec votre courtier lié uniquement aux fins de faciliter les transactions de véhicules.</li>
+              <li><strong>Conformité réglementaire :</strong> BidVex coopère avec l'OMVIC, l'AMVIC, la VSA, la SAAQ et d'autres organismes provinciaux.</li>
+            </ul>
+
+            <SH id="pricing-rights" n="15">Modifications de prix et de frais</SH>
+            <RedBox>
+              <p><strong>BidVex se réserve le droit de modifier le prix de tout abonnement, frais de plateforme, commission, frais d'abonnement de courtier ou prime d'acheteur à tout moment</strong>, moyennant un préavis raisonnable affiché sur notre Plateforme. L'utilisation continue de la Plateforme après une telle modification constitue l'acceptation des nouveaux tarifs. Les abonnements actifs sont honorés au tarif en vigueur au moment de l'achat jusqu'à leur expiration, sauf disposition légale contraire.</p>
+            </RedBox>
 
             <p className="text-xs text-slate-400 mt-10">&copy; 2026 BidVex Inc. Tous droits réservés.</p>
           </>)}

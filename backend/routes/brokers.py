@@ -36,9 +36,9 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from pydantic import BaseModel, Field
 
 from deps import get_current_user, get_db, require_admin, User
@@ -54,6 +54,14 @@ logger = logging.getLogger("broker_routes")
 brokers_router = APIRouter(prefix="/api", tags=["brokers"])
 
 DEFAULT_DEPOSIT_CAD = 500.0
+
+# iter217 Phase 5 Hotfix v6 — Broker subscription model.
+# Brokers pay a yearly platform fee. Default is $200/year; the launch
+# promotion applies a 50% discount until admin clears it. Per-broker
+# overrides are stored on the broker doc and take precedence.
+BROKER_SUBSCRIPTION_BASE_CAD     = 200.0
+BROKER_SUBSCRIPTION_DISCOUNT_PCT = 50.0   # 0..100, applied to base
+BROKER_SUBSCRIPTION_PERIOD_DAYS  = 365
 
 
 def _utcnow() -> datetime:
@@ -113,6 +121,131 @@ async def apply_to_become_broker(payload: BrokerCreate, current_user: User = Dep
         logger.warning("admin_notifications insert failed: %s", e)
 
     return {"success": True, "broker_id": doc["id"], "verification_status": doc["verification_status"]}
+
+
+# ── 1b. Broker document upload (multipart, partner-style) ──────────────
+@brokers_router.post("/brokers/upload-documents")
+async def upload_broker_documents(
+    license_document: Optional[UploadFile] = File(None),
+    registration_document: Optional[UploadFile] = File(None),
+    additional_documents: List[UploadFile] = File(default_factory=list),
+    current_user: User = Depends(get_current_user),
+):
+    """Upload broker registration documents to S3 and return their URLs.
+
+    The broker apply form calls this first to materialize URLs, then
+    submits the apply payload with those URLs. Mirrors the partner
+    upload UX (NEQ + certification files).
+    """
+    from services.s3_service import upload_broker_document
+
+    out: Dict[str, Any] = {"license_document_url": None, "registration_document_url": None, "additional_documents": []}
+    try:
+        if license_document:
+            out["license_document_url"] = await upload_broker_document(
+                license_document, current_user.id, "license"
+            )
+        if registration_document:
+            out["registration_document_url"] = await upload_broker_document(
+                registration_document, current_user.id, "registration"
+            )
+        for i, f in enumerate(additional_documents or []):
+            url = await upload_broker_document(f, current_user.id, f"extra-{i}")
+            out["additional_documents"].append(url)
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail={"error": "upload_failed", "message": str(ve)})
+    except Exception as e:
+        logger.error("broker upload failed: %s", e)
+        raise HTTPException(status_code=502, detail={"error": "s3_upload_failed"})
+
+    # Persist on broker doc if one exists (post-apply re-upload supported)
+    db = get_db()
+    broker = await db.brokers.find_one({"user_id": current_user.id}, {"_id": 0, "id": 1})
+    if broker:
+        update: Dict[str, Any] = {"updated_at": _utcnow()}
+        if out["license_document_url"]:      update["license_document_url"]      = out["license_document_url"]
+        if out["registration_document_url"]: update["registration_document_url"] = out["registration_document_url"]
+        if out["additional_documents"]:
+            await db.brokers.update_one(
+                {"id": broker["id"]},
+                {"$push": {"additional_documents": {"$each": out["additional_documents"]}}, "$set": update},
+            )
+        else:
+            await db.brokers.update_one({"id": broker["id"]}, {"$set": update})
+    return out
+
+
+# ── 1c. Broker subscription (yearly platform fee) ──────────────────────
+def _resolve_subscription_pricing(broker_doc: Dict[str, Any]) -> Dict[str, Any]:
+    """Compute the broker's effective subscription price + currency."""
+    base     = float(broker_doc.get("subscription_base_cad", BROKER_SUBSCRIPTION_BASE_CAD))
+    pct      = broker_doc.get("subscription_discount_pct")
+    pct_val  = float(pct) if pct is not None else BROKER_SUBSCRIPTION_DISCOUNT_PCT
+    pct_val  = max(0.0, min(100.0, pct_val))
+    final    = round(base * (1.0 - pct_val / 100.0), 2)
+    return {
+        "base_cad":       round(base, 2),
+        "discount_pct":   round(pct_val, 2),
+        "final_cad":      final,
+        "currency":       "CAD",
+        "period_days":    BROKER_SUBSCRIPTION_PERIOD_DAYS,
+        "status":         broker_doc.get("subscription_status") or "unpaid",
+        "expires_at":     broker_doc.get("subscription_expires_at"),
+        "promotion_note": "Launch promotion — 50% off. Admin can adjust per broker.",
+    }
+
+
+@brokers_router.get("/brokers/me/subscription")
+async def get_my_subscription(current_user: User = Depends(get_current_user)):
+    db = get_db()
+    broker = await db.brokers.find_one({"user_id": current_user.id}, {"_id": 0})
+    if not broker:
+        raise HTTPException(status_code=404, detail={"error": "not_a_broker"})
+    return _resolve_subscription_pricing(broker)
+
+
+class _SubscriptionOverrideIn(BaseModel):
+    base_cad:        Optional[float] = None    # Override the $200 base
+    discount_pct:    Optional[float] = None    # 0..100; 100 = free
+    status:          Optional[Literal["unpaid", "active", "expired", "comp"]] = None
+    expires_at:      Optional[datetime] = None
+    note:            Optional[str] = None
+
+
+@brokers_router.patch("/admin/brokers/{broker_id}/subscription")
+async def admin_set_broker_subscription(
+    broker_id: str,
+    payload:   _SubscriptionOverrideIn,
+    current_user: User = Depends(require_admin),
+):
+    """Admin per-broker subscription override.
+
+    Use cases:
+      • Promo accounts: discount_pct=100 → effective free
+      • Custom enterprise pricing: base_cad=500
+      • Comp accounts: status="comp" + discount_pct=100
+      • Manual activation after wire transfer: status="active", expires_at=now+365d
+    """
+    db = get_db()
+    if payload.base_cad is not None and payload.base_cad < 0:
+        raise HTTPException(status_code=422, detail={"error": "negative_base"})
+    if payload.discount_pct is not None and not (0.0 <= payload.discount_pct <= 100.0):
+        raise HTTPException(status_code=422, detail={"error": "discount_pct_out_of_range_0_100"})
+
+    update: Dict[str, Any] = {"updated_at": _utcnow()}
+    if payload.base_cad     is not None: update["subscription_base_cad"]     = float(payload.base_cad)
+    if payload.discount_pct is not None: update["subscription_discount_pct"] = float(payload.discount_pct)
+    if payload.status       is not None: update["subscription_status"]       = payload.status
+    if payload.expires_at   is not None: update["subscription_expires_at"]   = payload.expires_at
+    if payload.note         is not None: update["subscription_note"]         = payload.note
+    update["subscription_updated_by"] = current_user.email
+    update["subscription_updated_at"] = _utcnow()
+
+    res = await db.brokers.update_one({"id": broker_id}, {"$set": update})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail={"error": "broker_not_found"})
+    fresh = await db.brokers.find_one({"id": broker_id}, {"_id": 0})
+    return {"success": True, "pricing": _resolve_subscription_pricing(fresh)}
 
 
 @brokers_router.get("/brokers")
