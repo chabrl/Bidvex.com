@@ -12,6 +12,7 @@ import { Switch } from '../components/ui/switch';
 import { toast } from 'sonner';
 import EnhancedUserManager from './admin/EnhancedUserManager';
 import AdminFeedsPage from './admin/AdminFeedsPage';
+import AdminBrokersPage from './admin/AdminBrokersPage';
 import LotsModeration from './admin/LotsModeration';
 import ListingsModeration from './admin/ListingsModeration';
 import DisputedSettlements from './admin/DisputedSettlements';
@@ -102,6 +103,8 @@ const SECONDARY_TABS = {
     { id: 'facilities', label: 'Facilities', icon: '🏢', lucideIcon: Package },
     { id: 'categories', label: 'Categories', icon: '📂', lucideIcon: Settings },
     { id: 'partner-applications', label: 'Partner Applications', icon: '🏢', lucideIcon: Building2 },
+    // iter217 Phase 5 Hotfix v5b — Broker Ecosystem
+    { id: 'brokers', label: 'Broker Management', icon: '🤝', lucideIcon: Building2 },
   ],
   vehicles: [
     { id: 'vehicle-admin', label: 'Vehicle Administration', icon: '🚗', lucideIcon: Car },
@@ -417,6 +420,7 @@ const AdminDashboard = () => {
           case 'facilities': return <AdminFacilities />;
           case 'categories': return <CategoryManager />;
           case 'partner-applications': return <PartnerManager />;
+          case 'brokers': return <AdminBrokersPage />;
           default: return <EnhancedUserManager />;
         }
       case 'vehicles':

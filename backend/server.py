@@ -695,6 +695,16 @@ try:
     except Exception as e:
         logger.error(f"Failed to register marketing router: {e}")
 
+    # ─── iter217 Phase 5 Hotfix v5b — Broker Ecosystem ───
+    try:
+        from routes.brokers import brokers_router
+        app.include_router(brokers_router)
+        logger.info("Broker ecosystem router registered")
+    except Exception as e:
+        logger.error(f"Failed to register broker router: {e}")
+        import traceback
+        traceback.print_exc()
+
 except Exception as e:
     logger.error(f"CRITICAL: Could not load modular routers: {e}")
     import traceback

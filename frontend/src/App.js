@@ -45,6 +45,12 @@ const MultiItemListingDetailPage = lazy(() => import('./pages/MultiItemListingDe
 const ItemsMarketplacePage = lazy(() => import('./pages/ItemsMarketplacePage'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const AdminTaxDashboard = lazy(() => import('./pages/AdminTaxDashboard'));
+// iter217 Phase 5 Hotfix v5b — Broker Ecosystem
+const AdminBrokersPage = lazy(() => import('./pages/admin/AdminBrokersPage'));
+const BecomeABrokerPage = lazy(() => import('./pages/BecomeABrokerPage'));
+const BrokerDirectoryPage = lazy(() => import('./pages/BrokerDirectoryPage'));
+const BrokerBindingRequestPage = lazy(() => import('./pages/BrokerBindingRequestPage'));
+const BrokerDashboardPage = lazy(() => import('./pages/BrokerDashboardPage'));
 const WatchlistPage = lazy(() => import('./pages/WatchlistPage'));
 const HowItWorksPage = lazy(() => import('./pages/HowItWorksPage'));
 const SellerProfilePage = lazy(() => import('./pages/SellerProfilePage'));
@@ -436,6 +442,24 @@ const App = () => {
           } />
           <Route path="/admin/tax-dashboard" element={
             <ProtectedRoute><AdminTaxDashboard /></ProtectedRoute>
+          } />
+          {/* iter217 Phase 5 Hotfix v5b — Broker Ecosystem */}
+          <Route path="/admin/brokers" element={
+            <ProtectedRoute><AdminBrokersPage /></ProtectedRoute>
+          } />
+          <Route path="/become-a-broker" element={
+            <ProtectedRoute><BecomeABrokerPage /></ProtectedRoute>
+          } />
+          <Route path="/devenir-courtier" element={
+            <ProtectedRoute><BecomeABrokerPage /></ProtectedRoute>
+          } />
+          <Route path="/brokers" element={<BrokerDirectoryPage />} />
+          <Route path="/courtiers" element={<BrokerDirectoryPage />} />
+          <Route path="/brokers/:broker_id/request" element={
+            <ProtectedRoute><BrokerBindingRequestPage /></ProtectedRoute>
+          } />
+          <Route path="/broker/dashboard" element={
+            <ProtectedRoute><BrokerDashboardPage /></ProtectedRoute>
           } />
           <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
           <Route path="/privacy" element={<Navigate to="/privacy-policy" replace />} />

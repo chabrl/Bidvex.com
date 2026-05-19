@@ -217,6 +217,8 @@ const VehicleBuyerGateModal = ({ open, onClose, listingId, onVerified }) => {
               {[
                 { key: 'dealer', label_en: `I am a licensed dealer in ${provinceLabel}`, label_fr: `Je suis un concessionnaire licencié en ${provinceLabel}` },
                 { key: 'dealer_representative', label_en: 'I am purchasing on behalf of a licensed dealer', label_fr: "J'achète pour le compte d'un concessionnaire licencié" },
+                // iter217 Phase 5 Hotfix v5b — Broker Ecosystem option
+                { key: 'broker_buyer', label_en: 'I want to bid via a licensed BidVex Broker', label_fr: 'Je veux enchérir via un courtier BidVex licencié' },
                 { key: 'individual', label_en: 'I am an individual buyer (not a dealer)', label_fr: "Je suis un acheteur individuel (non concessionnaire)" },
               ].map((opt) => (
                 <label
@@ -249,6 +251,28 @@ const VehicleBuyerGateModal = ({ open, onClose, listingId, onVerified }) => {
                 <Input value={licenseNumber} onChange={(e) => setLicenseNumber(e.target.value)} data-testid="buyer-gate-license-input" />
                 <Label className="text-sm">{isFr ? "Nom de l'entreprise du concessionnaire" : 'Dealer Business Name'} *</Label>
                 <Input value={businessName} onChange={(e) => setBusinessName(e.target.value)} data-testid="buyer-gate-business-input" />
+              </div>
+            )}
+            {option === 'broker_buyer' && (
+              <div className="rounded-lg border-2 border-blue-200 bg-blue-50 dark:bg-blue-950/30 p-4 mt-3 text-sm" data-testid="buyer-gate-broker-block">
+                <p className="font-semibold text-blue-700 dark:text-blue-200">
+                  {isFr ? 'Partenariat avec un courtier requis' : 'Broker partnership required'}
+                </p>
+                <p className="text-blue-700 dark:text-blue-200 mt-1">
+                  {isFr
+                    ? `Pour enchérir sur des véhicules en ${provinceLabel}, associez-vous d'abord à un courtier agréé. Vous serez redirigé vers notre annuaire des courtiers.`
+                    : `To bid on vehicles in ${provinceLabel}, partner with a licensed broker first. You'll be redirected to our broker directory.`}
+                </p>
+                <Button
+                  className="mt-3 bg-gradient-to-r from-[#1E3A8A] to-[#06B6D4] text-white"
+                  onClick={() => {
+                    onClose?.();
+                    navigate(`/brokers?province=${state?.province || ''}`);
+                  }}
+                  data-testid="buyer-gate-broker-cta"
+                >
+                  {isFr ? 'Parcourir les courtiers →' : 'Browse Brokers →'}
+                </Button>
               </div>
             )}
             {option === 'individual' && (

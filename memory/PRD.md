@@ -1,6 +1,70 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: iter217 Phase 5 Hotfix v4 — S3 Image Migration + SafeImage Threshold (Feb 16, 2026) ✅
+## Latest: iter217 Phase 5 Hotfix v5b — Bid Panel Scroll + Category Filter + Broker Ecosystem MVP (Feb 16, 2026) ✅
+
+### PART 1 — Bid panel scroll + Buy Now investigation (✅ FIXED)
+**Root cause** — `DialogContent` (shadcn) and `BuyNowButton`'s custom modal had no `max-height` / `overflow-y` — content taller than the viewport was clipped, hiding "Place Bid" + "Buy Now" CTAs. Buy Now itself isn't broken; it goes straight to Stripe Checkout, but the button was unreachable due to clipping.
+
+**Fix** — Universal scroll rule on `ui/dialog.jsx`: `max-h-[90vh] overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]`. `BidConfirmationDialog` footer hoisted to `sticky bottom-0` so the CTA stays in view while the user scrolls. `BuyNowButton` mobile sheet adds bottom-sheet rounded corners + safe-area inset padding. Verified at 375px / 360px / 768px / desktop.
+
+### PART 2 — Sidebar category filter + top-bar duplicate removal (✅ FIXED)
+**Root cause** — categories collection had `name_en = "Furniture "` (trailing space). Sidebar emitted `"Furniture "`, backend filtered exact-match against listing `category = "Furniture"` → zero matches → Alex's listing disappeared. Additionally, `/lots` page's FilterBar `onFilterChange` was **overwriting** `sidebarFilters.categories` with the top-bar's empty selection on every change — confirming the user's "inversion" complaint.
+
+**Fix** — (a) `categories` collection cleaned via one-off whitespace trim. (b) `marketplace.py` filter now uses case+whitespace tolerant comparison (`strip().casefold()`). (c) `/multi-item-listings` accepts comma-separated `category=` with regex alternation for case insensitivity. (d) FilterBar gained `hideCategoryDropdown` + `sidebarCategoryChip` + `onClearSidebarCategory` props — top-bar dropdown removed on both `/marketplace` and `/lots`, replaced with a removable chip. (e) `LotsMarketplacePage` no longer clobbers `categories` from the top bar.
+
+### PART 3 — Broker Ecosystem MVP (Phase 1) (✅ SHIPPED)
+
+Complete vertical slice covering the legal-critical + revenue-critical path. Six broker dashboard tabs scoped — Overview + My Buyers are live now; Active Deals / Pipeline / Revenue / Settings are stubs reserved for Hotfix v6.
+
+**Backend** (4 new files):
+- NEW `models/broker_models.py` — Pydantic models for `brokers`, `broker_buyer_relationships`, `broker_bids` (immutable audit trail), `broker_invoices`. Includes `BrokerFeeStructure` with min/max clamps + percentage_rate range validation.
+- NEW `services/broker_fee_engine.py` — `calculate_broker_transaction(hammer, fee_structure, province)` → returns full breakdown (hammer + bidvex 2.5% + broker_fee + GST 5% + QST 9.975% [QC only] + Stripe gross-up). Stripe gross-up uses inverse of `gross × 0.029 + 0.30` so the net hits the merchant cleanly.
+- NEW `services/broker_conflict_guard.py` — `check_intra_broker_conflict()` blocks two buyers under the same broker from bidding against each other (legal blocker — a broker cannot bid against itself). Single Mongo lookup, returns bilingual error.
+- NEW `services/broker_deposit_service.py` — Stripe PaymentIntent with `capture_method="manual"` for $500 CAD pre-authorization. Three operations: `authorize_deposit`, `release_deposit` (cancel PI), `capture_deposit` (charge on buyer default).
+- NEW `routes/brokers.py` — 21 endpoints registered:
+  - **Broker self-service**: `POST /apply`, `GET /` (public directory, license-masked), `GET /me`, `GET /{id}`, `PATCH /settings`, `POST /{id}/fee-preview`
+  - **Buyer ↔ broker**: `POST /broker-relationships/request` (with $500 deposit), `GET /my-broker`, `GET /my-buyers`, `POST /{id}/approve`, `POST /{id}/reject`, `PATCH /{id}/bid-limit`, `POST /{id}/release-deposit`, `POST /{id}/terminate`, `POST /{id}/suspend`
+  - **Broker bidding**: `POST /vehicle-auctions/{id}/bid-via-broker` (audit trail + conflict guard + bid-limit), `GET /broker-bids/audit` (admin)
+  - **Admin**: `GET /admin/brokers`, `PATCH /admin/brokers/{id}/approve|reject|suspend`
+
+**Frontend** (4 new pages + 1 admin page + buyer-gate option C):
+- NEW `pages/BecomeABrokerPage.jsx` (`/become-a-broker`, `/devenir-courtier`) — 4-step wizard: Business → Documents (placeholder) → Fee → Legal. Live fee preview on $15k sample.
+- NEW `pages/BrokerDirectoryPage.jsx` (`/brokers`, `/courtiers`) — public directory of approved brokers, province filter, license-masked, Verified badge.
+- NEW `pages/BrokerBindingRequestPage.jsx` (`/brokers/:broker_id/request`) — buyer-facing partnership request page with full fee breakdown preview + $500 deposit authorization CTA.
+- NEW `pages/BrokerDashboardPage.jsx` (`/broker/dashboard`) — Broker CRM with sidebar nav; Overview (5 KPIs + fee config) and My Buyers (table with Approve/Reject/Suspend/Terminate actions) are live, the other 4 tabs are placeholders.
+- NEW `pages/admin/AdminBrokersPage.jsx` (`/admin/brokers` + tab in AdminDashboard) — Pending|Approved|Rejected|Suspended sub-tabs with approve/reject/suspend/re-approve actions.
+- MODIFIED `components/vehicles/VehicleBuyerGateModal.js` — new option **"I want to bid via a licensed BidVex Broker"** with bilingual notice + direct CTA to `/brokers?province=X`.
+
+**Privacy Policy + Terms of Service** — appended a full "Broker Ecosystem" section in EN + FR via `scripts/update_legal_pages_broker_section.py` (idempotent, marker-guarded). Verified live via `/api/site-config/legal-pages?language=en|fr` — both pages now serve the new sections.
+
+### Tests
+- NEW `tests/test_broker_ecosystem.py` — 27 tests covering: fee engine math (fixed, %, min/max clamps, QST-on-QC, Stripe gross-up identity, zero-hammer safe), broker application + admin approve/reject state machine, partner-account-cannot-apply guard, public directory (license masking, approved-only filter, pending-not-listed), buyer-bind-cannot-be-two-brokers, broker-approves-buyer (DB updates + user.bound_broker_id), other-broker-cannot-approve-my-rel, bid-via-broker creates audit trail with broker license, buyer-without-broker-cannot-bid 403, bid-exceeds-broker-limit 400, intra-broker conflict blocks 409, different-broker buyers can compete, public fee-preview endpoint, admin audit endpoint, broker router registered, models importable, fee-structure validation rejects invalid percentages.
+- **Targeted regression**: 244/244 passing across broker ecosystem + Phase 5 feed + iter217 Bill96 + iter217 Phase4 + iter210 demo-accounts.
+- **Broader sweep**: 355/355 passing across all iter217 phases + iter209/210/211/214/215/216 + Phase 5 + broker tests. **0 failures.**
+
+### Scoped for Hotfix v6 (next iteration)
+- Broker dashboard tabs: Active Deals (Kanban with live bid updates), Post-Auction Pipeline, Revenue & Payouts (Stripe Connect onboarding), Settings (fee + deposit editing UI).
+- PDF invoice generator (Phase 1 backend collection + model already in place via `make_invoice_doc`).
+- Email notifications: broker-application-received, broker-approved, buyer-request-received, buyer-approved, buyer-invitation.
+- Buyer invitation flow (`POST /api/broker-relationships/invite` + `/brokers/join?broker_id=X` landing page).
+- Admin sub-tabs: Buyer Deposits, Conflict Alerts, Audit Log, Revenue.
+- Document upload via S3 (broker_models has `license_document_url` field ready).
+
+### Files changed (Phase 5 Hotfix v5b — 27 files)
+
+**Backend new** (5): `models/broker_models.py`, `services/broker_fee_engine.py`, `services/broker_conflict_guard.py`, `services/broker_deposit_service.py`, `routes/brokers.py`, `scripts/update_legal_pages_broker_section.py`, `tests/test_broker_ecosystem.py`.
+
+**Backend modified** (3): `server.py` (mount broker router), `routes/marketplace.py` (case/whitespace tolerant category filter), `routes/listings.py` (comma-separated category list + regex match).
+
+**Frontend new** (5): `pages/BecomeABrokerPage.jsx`, `pages/BrokerDirectoryPage.jsx`, `pages/BrokerBindingRequestPage.jsx`, `pages/BrokerDashboardPage.jsx`, `pages/admin/AdminBrokersPage.jsx`.
+
+**Frontend modified** (8): `App.js` (lazy + routes), `pages/AdminDashboard.js` (sidebar tab + render case), `components/ui/dialog.jsx` (universal scroll fix), `components/BidConfirmationDialog.js` (sticky footer + responsive), `components/BuyNowButton.js` (bottom-sheet on mobile), `components/FilterBar/FilterBar.js` + `.css` (`hideCategoryDropdown` + chip), `components/FlattenedMarketplace.js` (chip props), `pages/MarketplacePage.js` + `LotsMarketplacePage.js` (chip-clear wiring), `components/MarketplaceSidebar.js` (externalFilters sync), `components/vehicles/VehicleBuyerGateModal.js` (option C broker).
+
+**Data** (1 category record, 1 listing): trimmed trailing whitespace on `categories.name_en` and `listings.category` for Alex's listing.
+
+---
+
+## Previous: iter217 Phase 5 Hotfix v4 — S3 Image Migration + SafeImage Threshold (Feb 16, 2026) ✅
 
 ### Goals
 - Migrate user-uploaded listing photos from base64-in-MongoDB to S3.
