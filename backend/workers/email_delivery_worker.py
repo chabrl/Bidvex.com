@@ -418,6 +418,39 @@ async def drain_email_outbox(db, batch_size: int = 50) -> Dict[str, int]:
         stats["processed"] += 1
         attempts = int(row.get("attempts", 0))
         try:
+            # Phase 5.4 — Fast path for rows that ship pre-rendered HTML
+            # (weekly_funnel_digest queues a complete HTML payload + subject
+            # + to_email directly, bypassing dynamic template resolution).
+            if row.get("html") and row.get("to_email") and row.get("subject"):
+                now = _utcnow()
+                try:
+                    from services.email_service import send_html_email
+                    sent = await send_html_email(
+                        to_email=row["to_email"],
+                        to_name=row.get("to_name", ""),
+                        subject=row["subject"],
+                        html_content=row["html"],
+                        is_marketing=False,
+                    )
+                    reason = "sent_html_inline" if sent else "stubbed_no_sendgrid"
+                except Exception as e:
+                    logger.error("[email_outbox] inline HTML send failed: %s", e, exc_info=True)
+                    sent, reason = False, f"exception_inline:{type(e).__name__}"
+                # Inline HTML always "completes" (success or graceful stub) so we
+                # never loop the same digest row forever — Mongo update inline.
+                upd = {
+                    "delivery_status": reason,
+                    "sent_at":         now,
+                    "sent_to":         row["to_email"],
+                    "sent_lang":       row.get("lang", "en"),
+                }
+                if reason == "stubbed_no_sendgrid":
+                    stats["stubbed"] += 1
+                else:
+                    stats["sent"] += 1
+                await db.email_outbox.update_one({"_id": row["_id"]}, {"$set": upd})
+                continue
+
             email, name, lang = await _resolve_recipient(db, row)
             if not email:
                 # No recipient → skip permanently

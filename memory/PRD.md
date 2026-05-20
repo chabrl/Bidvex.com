@@ -1,6 +1,44 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: Phase 5.3 — Production Funnel Configuration & Welcome Email Revamp (Feb 21, 2026) ✅
+## Latest: Phase 5.4 — Weekly Recap Engine & E2E Testing Cleanup (Feb 21, 2026) ✅
+
+### Task 1 — Automated Weekly Funnel Digest
+- New module `jobs/analytics_digest_cron.py::queue_weekly_funnel_digest(db)`.
+- Computes the 4-stage funnel for **this week** (T-7 → T) vs **prior week** (T-14 → T-7), with growth Δ% per stage.
+- Renders a branded bilingual HTML digest (BidVex navy/cyan header, funnel comparison table with ↑/↓ arrows, overall view → settled %, live-dashboard CTA, Law-25 footer).
+- Queues to `email_outbox` (kind `weekly_funnel_digest`) with full payload (`to_email`, `subject`, `html`, `context`). Recipient configurable via `ADMIN_DIGEST_RECIPIENT` env (default `admin_alerts@bidvex.com`).
+- New scheduler entry in `services/scheduler.py`: `CronTrigger(day_of_week="mon", hour=14, minute=0)` = Mondays 09:00 EST.
+- **Idempotency**: a `run_date` field on the row prevents same-day double-queueing.
+- **Zero-traffic safety**: `_safe_pct` and `_delta_pct` never throw NaN/Infinity/divide-by-zero; `_format_delta_html` renders "New" when prior_week=0 with this_week>0; "0%" when both are zero. BSON-incompatible `float('inf')` is stripped before insert.
+- Email worker fast-path: `drain_email_outbox` detects rows that carry pre-rendered `html`/`to_email`/`subject` and ships them via `send_html_email` directly (reason `sent_html_inline`), no template-id lookup required.
+
+### Task 2 — E2E Testing Cleanup
+- `data-testid="login-submit-button"` on the primary Sign In button (`AuthPage.js:424`) — verified via Playwright (count=1 on render).
+- `CookieConsentBanner.js` auto-dismiss bypass: when ANY of the following is set on mount it calls `acceptAll()` immediately so the banner never paints:
+  - `process.env.REACT_APP_E2E_AUTO_ACCEPT_COOKIES === 'true'` (build-time)
+  - `window.__BIDVEX_E2E__ === true` (runtime, set by Playwright before navigation)
+  - `localStorage.getItem('bidvex_e2e_auto_accept_cookies') === 'true'` (runtime, survives navigations)
+- Verified: with the flag set, banner is hidden + `login-submit-button` is clickable on first paint. Without the flag, banner shows after 800ms as before.
+
+### Tests (18 new pytests; 0 regressions)
+`tests/test_phase_5_4.py` — 18 tests:
+- `_delta_pct` zero-prior/zero-this, zero-prior/positive-this (returns inf), positive growth, negative growth, rounding.
+- `_safe_pct` zero-denom returns 0 (never crashes).
+- `_format_delta_html` None / +inf / positive / negative / zero.
+- `_render_digest_rows` returns all 4 stages + handles all-zero windows.
+- `_render_digest_html` contains required EN+FR headers, all 4 stage labels, thousands-formatted numbers, dashboard CTA, brand footer — and `NaN`/`Infinity` text NEVER appear in the rendered HTML.
+- `queue_weekly_funnel_digest` real-Mongo tests: row insert, idempotent per UTC date, and accurate aggregation when both windows have varied seed traffic (views + bids + proxies + matched bindings + paid invoices).
+- Full Phase 5 regression: **75 / 75 passing** (Phase 5.4 + 5.3 + v9 + v7 + Phase 5 conversion pipeline).
+
+### Scheduler additions
+| Job | Trigger | Source |
+|---|---|---|
+| Weekly Conversion-Funnel Digest | Mon 14:00 UTC (09:00 EST) | `jobs/analytics_digest_cron.py::queue_weekly_funnel_digest` |
+| AI Review Escalation (60-min admin reminder) | every 30 min | `routes/admin_ai_review.py::escalate_overdue_reviews` |
+
+---
+
+## Phase 5.3 — Production Funnel Configuration & Welcome Email Revamp (Feb 21, 2026) ✅
 
 Four-task production push hardening the v9 mail pipeline + adding admin analytics:
 

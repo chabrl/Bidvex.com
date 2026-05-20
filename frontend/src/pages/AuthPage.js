@@ -421,7 +421,7 @@ const AuthPage = () => {
               type="submit"
               className="w-full gradient-button text-white border-0"
               disabled={loading || (!isLogin && (!formData.terms_agreed || !formData.ai_disclosure_consent))}
-              data-testid="submit-auth-btn"
+              data-testid={isLogin ? "login-submit-button" : "submit-auth-btn"}
             >
               {loading ? (
                 <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t('common.loading')}</>

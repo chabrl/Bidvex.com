@@ -819,6 +819,21 @@ def init_scheduler(database):
         name="AI Review Escalation (60-min admin reminder)",
         replace_existing=True,
     )
+
+    # Phase 5.4 — Weekly Funnel Digest (Mondays 09:00 EST = 14:00 UTC)
+    async def weekly_funnel_digest_job():
+        if db_instance is None:
+            return
+        from jobs.analytics_digest_cron import queue_weekly_funnel_digest
+        await queue_weekly_funnel_digest(db_instance)
+
+    scheduler.add_job(
+        _tracked("weekly_funnel_digest", weekly_funnel_digest_job),
+        CronTrigger(day_of_week="mon", hour=14, minute=0),
+        id="weekly_funnel_digest",
+        name="Weekly Conversion-Funnel Digest (Mondays 09:00 EST)",
+        replace_existing=True,
+    )
     
     # Job 8: Auction ending soon notifications - every 5 minutes
     async def ending_soon_job():

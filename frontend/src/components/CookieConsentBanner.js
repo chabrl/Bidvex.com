@@ -12,13 +12,26 @@ const CookieConsentBanner = () => {
   const [strings, setStrings] = useState(null);
   const [prefs, setPrefs] = useState({ ...DEFAULT_CONSENT });
 
-  // Show banner after short delay if user hasn't consented yet
+  // Show banner after short delay if user hasn't consented yet.
+  // Phase 5.4 — E2E test bypass: if REACT_APP_E2E_AUTO_ACCEPT_COOKIES is set,
+  // OR window.__BIDVEX_E2E__ is true, OR localStorage flag is set, auto-accept
+  // on mount so Playwright suites can authenticate without clicking through
+  // the Law-25 banner.
   useEffect(() => {
+    const e2eEnv = (typeof process !== 'undefined' && process.env && process.env.REACT_APP_E2E_AUTO_ACCEPT_COOKIES === 'true');
+    let e2eWindow = false;
+    let e2eStorage = false;
+    try { e2eWindow = !!(typeof window !== 'undefined' && window.__BIDVEX_E2E__); } catch { /* noop */ }
+    try { e2eStorage = (localStorage.getItem('bidvex_e2e_auto_accept_cookies') === 'true'); } catch { /* noop */ }
+    if ((e2eEnv || e2eWindow || e2eStorage) && !hasConsented) {
+      try { acceptAll(); } catch { /* noop */ }
+      return;
+    }
     if (!hasConsented) {
       const timer = setTimeout(() => setVisible(true), 800);
       return () => clearTimeout(timer);
     }
-  }, [hasConsented]);
+  }, [hasConsented, acceptAll]);
 
   // Fetch localized strings from the API
   useEffect(() => {
