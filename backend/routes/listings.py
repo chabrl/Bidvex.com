@@ -214,6 +214,24 @@ async def create_listing(
 
     await validate_seller(db, current_user, listing_data.agreement_accepted)
 
+    # Phase 6.0 / Task 3 — Storage Locker validation + quantity policy override.
+    # Storage lockers sell as ONE absolute lot block — quantity is forced to 1.
+    if (listing_data.listing_type or "").lower() == "storage_locker":
+        from services.storage_locker import (
+            normalize_storage_metadata, storage_quantity_policy,
+        )
+        try:
+            listing_data.storage_metadata = normalize_storage_metadata(listing_data.storage_metadata)
+        except ValueError as ve:
+            raise HTTPException(status_code=400, detail={
+                "error": "invalid_storage_metadata",
+                "message_en": str(ve),
+                "message_fr": "Métadonnées du casier de stockage invalides : " + str(ve),
+            })
+        qty, multiplier = storage_quantity_policy(listing_data.quantity)
+        listing_data.quantity = qty
+        listing_data.multiply_hammer_by_quantity = multiplier
+
     client_ip = request.client.host if request else "unknown"
     user_agent = request.headers.get("user-agent", "unknown") if request else "unknown"
     agreement_metadata = build_agreement_metadata(current_user, client_ip, user_agent)
@@ -232,6 +250,9 @@ async def create_listing(
         # FEATURE PATCH v9 / Feature 4 — quantity field
         quantity=max(1, int(listing_data.quantity or 1)),
         multiply_hammer_by_quantity=bool(listing_data.multiply_hammer_by_quantity) and max(1, int(listing_data.quantity or 1)) > 1,
+        # Phase 6.0 / Task 3 — Storage Locker support
+        listing_type=listing_data.listing_type or None,
+        storage_metadata=listing_data.storage_metadata,
         currency=listing_data.currency if listing_data.currency else detect_currency_from_location(
             city=listing_data.city, region=listing_data.region, country=listing_data.country
         ),

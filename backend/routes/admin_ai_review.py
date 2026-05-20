@@ -390,6 +390,73 @@ async def admin_reject_listing_review(
     return {"success": True, "review_id": review_id, "listing_status": "rejected"}
 
 
+# ───────────────────────────────────────────────────────────────────────
+# Phase 6.0 / Task 1 — Alias routes at /admin/ai-review/listings/{id}/...
+# Frontend calls these new paths; they resolve the review_id from the
+# listing_id and delegate to the canonical handlers above.
+# ───────────────────────────────────────────────────────────────────────
+
+async def _resolve_review_id_by_listing(db, listing_id: str) -> str:
+    """Find the active (pending) listing_reviews row for a listing_id.
+
+    Falls back to the most recent review for that listing.
+    """
+    row = await db.listing_reviews.find_one(
+        {"listing_id": listing_id, "status": "pending"},
+        sort=[("created_at", -1)],
+        projection={"_id": 0, "id": 1},
+    )
+    if row:
+        return row["id"]
+    row = await db.listing_reviews.find_one(
+        {"listing_id": listing_id},
+        sort=[("created_at", -1)],
+        projection={"_id": 0, "id": 1},
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail={
+            "error": "review_not_found",
+            "message_en": f"No AI review row found for listing {listing_id}.",
+            "message_fr": f"Aucun examen IA trouvé pour l'annonce {listing_id}.",
+        })
+    return row["id"]
+
+
+@ai_review_router.post("/admin/ai-review/listings/{listing_id}/approve")
+async def admin_approve_listing_via_listing_id(
+    listing_id: str,
+    payload: ReviewActionRequest,
+    current_user: User = Depends(require_admin),
+):
+    """Alias for `/admin/listing-reviews/{review_id}/approve` keyed by listing_id."""
+    db = get_db()
+    review_id = await _resolve_review_id_by_listing(db, listing_id)
+    return await admin_approve_listing_review(review_id, payload, current_user)
+
+
+@ai_review_router.post("/admin/ai-review/listings/{listing_id}/reject")
+async def admin_reject_listing_via_listing_id(
+    listing_id: str,
+    payload: ReviewActionRequest,
+    current_user: User = Depends(require_admin),
+):
+    """Alias for `/admin/listing-reviews/{review_id}/reject` keyed by listing_id."""
+    db = get_db()
+    review_id = await _resolve_review_id_by_listing(db, listing_id)
+    return await admin_reject_listing_review(review_id, payload, current_user)
+
+
+@ai_review_router.get("/admin/ai-review/listings")
+async def admin_list_ai_review_listings(
+    status: Optional[str] = Query("pending", description="pending|approved|rejected|withdrawn|all"),
+    limit: int = Query(50, ge=1, le=200),
+    skip: int = Query(0, ge=0),
+    current_user: User = Depends(require_admin),
+):
+    """Alias for `/admin/listing-reviews?status=...`."""
+    return await admin_list_listing_reviews(status, limit, skip, current_user)
+
+
 @ai_review_router.post("/listings/{listing_id}/correct-category")
 async def seller_correct_category(
     listing_id: str,

@@ -42,6 +42,9 @@ const AuthPage = () => {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [resetting, setResetting] = useState(false);
 
+  // Phase 6.0 / Task 2 — Persistent duplicate-account error overlay
+  const [formError, setFormError] = useState('');
+
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
@@ -70,6 +73,13 @@ const AuthPage = () => {
         toast.info('Please set a new password to continue');
       } else {
         const errorMessage = extractErrorMessage(error);
+        // Phase 6.0 / Task 2 — duplicate email/mobile gets a persistent overlay
+        // alert that links to support@bidvex.com so the user can copy/click.
+        if (errorMessage && errorMessage.toLowerCase().includes('already registered in bidvex')) {
+          setFormError(errorMessage);
+        } else {
+          setFormError('');
+        }
         toast.error(errorMessage || t('auth.authFailedMessage'));
       }
     } finally {
@@ -250,6 +260,19 @@ const AuthPage = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {formError && (
+            <div
+              role="alert"
+              className="rounded-lg border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-900"
+              data-testid="auth-duplicate-error"
+            >
+              <p className="font-semibold mb-1">⚠️ {t('auth.duplicateTitle', 'Account already exists')}</p>
+              <p className="leading-relaxed">
+                {formError.split('support@bidvex.com')[0]}
+                <a href="mailto:support@bidvex.com" className="font-semibold underline">support@bidvex.com</a>
+              </p>
+            </div>
+          )}
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isLogin && (
               <div className="space-y-2">

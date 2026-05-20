@@ -84,6 +84,21 @@ const CreateListingPage = () => {
   const [quantity, setQuantity] = useState(1);
   const [multiplyHammerByQuantity, setMultiplyHammerByQuantity] = useState(false);
 
+  // Phase 6.0 / Task 4 — Storage Locker / Abandoned Unit
+  const [isStorageLocker, setIsStorageLocker] = useState(false);
+  const [storageMetadata, setStorageMetadata] = useState({
+    facility_name: '',
+    facility_address: '',
+    locker_size: '',
+    locker_number: '',
+    cleanout_deadline_hours: 72,
+    security_deposit_amount: 100,
+    security_deposit_preset: '100',   // UI helper: '100' | '250' | 'custom'
+    facility_manager_email: '',
+    facility_manager_phone: '',
+    notes: '',
+  });
+
   // Shipping & Visit Options
   const [shippingInfo, setShippingInfo] = useState({
     available: false,
@@ -209,6 +224,19 @@ const CreateListingPage = () => {
         // FEATURE PATCH v9 / Feature 4 — Quantity
         quantity: Math.max(1, parseInt(quantity) || 1),
         multiply_hammer_by_quantity: (Math.max(1, parseInt(quantity) || 1) > 1) && !!multiplyHammerByQuantity,
+        // Phase 6.0 / Task 4 — Storage Locker
+        listing_type: isStorageLocker ? 'storage_locker' : null,
+        storage_metadata: isStorageLocker ? {
+          facility_name:           storageMetadata.facility_name.trim(),
+          facility_address:        storageMetadata.facility_address.trim(),
+          locker_size:             storageMetadata.locker_size.trim(),
+          locker_number:           storageMetadata.locker_number.trim(),
+          cleanout_deadline_hours: parseInt(storageMetadata.cleanout_deadline_hours) || 72,
+          security_deposit_amount: parseFloat(storageMetadata.security_deposit_amount) || 100,
+          facility_manager_email:  storageMetadata.facility_manager_email.trim(),
+          facility_manager_phone:  storageMetadata.facility_manager_phone.trim(),
+          notes:                   storageMetadata.notes.trim(),
+        } : null,
         // Mandatory Binding Agreement
         agreement_accepted: finalAgreementAccepted,
       };
@@ -394,6 +422,153 @@ const CreateListingPage = () => {
                   </select>
                 </div>
               </div>
+
+              {/* Phase 6.0 / Task 4 — Storage Locker / Abandoned Unit category card */}
+              <div
+                className={`rounded-lg border p-4 cursor-pointer transition-all ${isStorageLocker ? 'border-amber-500 bg-amber-50' : 'border-slate-200 hover:border-slate-300 bg-white'}`}
+                onClick={() => setIsStorageLocker((v) => !v)}
+                data-testid="storage-locker-toggle-card"
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setIsStorageLocker((v) => !v)}
+              >
+                <div className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked={isStorageLocker}
+                    readOnly
+                    className="mt-1 w-4 h-4 accent-amber-600 pointer-events-none"
+                    data-testid="storage-locker-checkbox"
+                  />
+                  <div className="flex-1">
+                    <p className="font-semibold text-sm">
+                      📦 {t('createListing.storageLockerLabel', 'Storage Locker / Abandoned Unit')}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {t('createListing.storageLockerHelp', 'For self-storage facility cleanout auctions — the entire unit sells as one lot. Buyer must clear all contents within the cleanout deadline.')}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {isStorageLocker && (
+                <div className="space-y-4 rounded-lg border border-amber-200 bg-amber-50/30 p-4" data-testid="storage-metadata-panel">
+                  <div className="flex items-start gap-2 rounded-md bg-amber-100 border border-amber-300 p-3 text-xs text-amber-900">
+                    <span className="text-base leading-none">⚠️</span>
+                    <p data-testid="storage-locker-warning">
+                      <strong>{t('createListing.storageWarningTitle', 'Important — Cleanout Obligation')}.</strong>{' '}
+                      {t('createListing.storageWarningBody', 'Buyers are legally required to clear the entire contents of the unit within the specified deadline. The cleanout security deposit is held securely until facility manager verification.')}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="facility_name">{t('createListing.facilityName', 'Facility Name')} *</Label>
+                      <Input
+                        id="facility_name"
+                        type="text"
+                        value={storageMetadata.facility_name}
+                        onChange={(e) => setStorageMetadata((m) => ({ ...m, facility_name: e.target.value }))}
+                        required={isStorageLocker}
+                        maxLength={200}
+                        data-testid="facility-name-input"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="facility_address">{t('createListing.facilityAddress', 'Facility Address')}</Label>
+                      <Input
+                        id="facility_address"
+                        type="text"
+                        value={storageMetadata.facility_address}
+                        onChange={(e) => setStorageMetadata((m) => ({ ...m, facility_address: e.target.value }))}
+                        maxLength={300}
+                        data-testid="facility-address-input"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="locker_size">{t('createListing.lockerSize', 'Locker Size')}</Label>
+                      <Input
+                        id="locker_size"
+                        type="text"
+                        placeholder="10x10, 5x10, etc."
+                        value={storageMetadata.locker_size}
+                        onChange={(e) => setStorageMetadata((m) => ({ ...m, locker_size: e.target.value }))}
+                        maxLength={30}
+                        data-testid="locker-size-input"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="locker_number">{t('createListing.lockerNumber', 'Locker Number')}</Label>
+                      <Input
+                        id="locker_number"
+                        type="text"
+                        value={storageMetadata.locker_number}
+                        onChange={(e) => setStorageMetadata((m) => ({ ...m, locker_number: e.target.value }))}
+                        maxLength={30}
+                        data-testid="locker-number-input"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="cleanout_deadline_hours">{t('createListing.cleanoutDeadline', 'Cleanout Deadline')} *</Label>
+                    <select
+                      id="cleanout_deadline_hours"
+                      value={storageMetadata.cleanout_deadline_hours}
+                      onChange={(e) => setStorageMetadata((m) => ({ ...m, cleanout_deadline_hours: parseInt(e.target.value) }))}
+                      className="w-full px-3 py-2 border border-input rounded-md bg-background"
+                      data-testid="cleanout-deadline-select"
+                    >
+                      <option value={24}>24 hours / heures</option>
+                      <option value={48}>48 hours / heures</option>
+                      <option value={72}>72 hours / heures (recommended)</option>
+                      <option value={168}>1 week / 1 semaine</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="security_deposit_preset">{t('createListing.securityDeposit', 'Security Deposit Hold (CAD)')} *</Label>
+                    <div className="grid grid-cols-3 gap-2" data-testid="security-deposit-presets">
+                      {[
+                        { id: '100',     label: '$100',  amount: 100 },
+                        { id: '250',     label: '$250',  amount: 250 },
+                        { id: 'custom',  label: t('createListing.depositCustom', 'Custom'), amount: storageMetadata.security_deposit_amount },
+                      ].map((preset) => (
+                        <Button
+                          key={preset.id}
+                          type="button"
+                          variant={storageMetadata.security_deposit_preset === preset.id ? 'default' : 'outline'}
+                          className={storageMetadata.security_deposit_preset === preset.id ? 'bg-amber-600 hover:bg-amber-700 text-white border-0' : ''}
+                          onClick={() => setStorageMetadata((m) => ({
+                            ...m,
+                            security_deposit_preset: preset.id,
+                            security_deposit_amount: preset.id === 'custom' ? m.security_deposit_amount : preset.amount,
+                          }))}
+                          data-testid={`deposit-preset-${preset.id}`}
+                        >
+                          {preset.label}
+                        </Button>
+                      ))}
+                    </div>
+                    {storageMetadata.security_deposit_preset === 'custom' && (
+                      <Input
+                        type="number"
+                        min={50}
+                        max={5000}
+                        step={5}
+                        value={storageMetadata.security_deposit_amount}
+                        onChange={(e) => setStorageMetadata((m) => ({ ...m, security_deposit_amount: parseFloat(e.target.value) || 100 }))}
+                        className="mt-2"
+                        data-testid="deposit-custom-input"
+                        placeholder="Custom amount (50–5000 CAD)"
+                      />
+                    )}
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      {t('createListing.depositHelp', 'Held via Stripe authorization (capture_method=manual). Released or captured by facility manager after cleanout verification.')}
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* CFIA Soil Rule Banner — Section 4 */}
               {formData.category && CFIA_TRIGGER_CATEGORIES.some(c => formData.category.toLowerCase().includes(c.toLowerCase())) && (

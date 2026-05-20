@@ -1,6 +1,69 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: Phase 5.4 — Weekly Recap Engine & E2E Testing Cleanup (Feb 21, 2026) ✅
+## Latest: Phase 6.0 — Storage Initialization, Unique ID Guards & Admin Hotfix (Feb 21, 2026) ✅
+
+### Task 1 — Admin AI Review 404 hotfix
+- New alias routes in `routes/admin_ai_review.py`:
+  - `POST /api/admin/ai-review/listings/{listing_id}/approve`
+  - `POST /api/admin/ai-review/listings/{listing_id}/reject`
+  - `GET  /api/admin/ai-review/listings?status=pending`
+- These look up the active review row by `listing_id` then delegate to the canonical handlers.
+- `FlaggedListingsTab.js::submitAction` now calls the alias path keyed by `listing_id`, with try/catch + bilingual toast on failure (no React runtime breakage on 404).
+- Verified live: alias GET returns existing pending reviews; alias POST with missing listing returns 404 + bilingual `review_not_found` message.
+
+### Task 2 — Unique email + mobile enforcement
+- `UserCreate` model gained `mobile_number` field (canonical alongside legacy `phone`).
+- `routes/auth.py::register` normalises BOTH fields to digits-only and checks `users.mobile_number_normalized` (sparse-unique index added) for any verified existing account. Short values (<7 digits) are treated as absent.
+- Custom error message returned (HTTP 400):
+  > "Your email or mobile phone is already registered in BidVex. If you believe this is an error, please contact support immediately at support@bidvex.com"
+- Frontend `AuthPage.js` shows the message in a persistent red overlay (`data-testid="auth-duplicate-error"`) with a clickable `mailto:support@bidvex.com` link, on top of the existing toast.
+- Verified live via curl on a known-existing email (`charbel911@gmail.com`) → exact custom message returned.
+
+### Task 3 — Storage Locker schema + helpers
+- `Listing` + `ListingCreate` models gained `listing_type: Optional[str]` and `storage_metadata: Optional[Dict[str, Any]]`.
+- New `services/storage_locker.py`:
+  - `normalize_storage_metadata()` enforces `facility_name` required, snaps `cleanout_deadline_hours` to {24, 48, 72, 168}, clamps `security_deposit_amount` to [$50, $5000], scrubs/truncates strings to safe lengths.
+  - `storage_quantity_policy()` forces `(1, False)` regardless of submitted quantity — entire unit sells as one absolute lot block.
+  - `is_storage_locker()`, `storage_deposit_amount_for_listing()` helpers.
+- `routes/listings.py::create_listing` invokes the normalisation + quantity override when `listing_type == "storage_locker"`.
+
+### Task 4 — Frontend storage listing UI
+- New toggle card "📦 Storage Locker / Abandoned Unit" on `CreateListingPage.js` (just below category) — `data-testid="storage-locker-toggle-card"`.
+- Selecting the card reveals a styled amber metadata panel with:
+  - Facility Name * (required), Facility Address, Locker Size, Locker Number
+  - Cleanout Deadline select (24h / 48h / 72h recommended / 1 week)
+  - Security Deposit preset buttons ($100 / $250 / Custom) — Custom reveals an input clamped to 50–5000 CAD
+  - Prominent bilingual `data-testid="storage-locker-warning"` notice: "Buyers are legally required to clear the entire contents of the unit within the specified deadline. The cleanout security deposit is held securely until facility manager verification."
+- Submit payload now includes `listing_type` + `storage_metadata`.
+
+### Task 5 — Stripe Cleanout Security Hold + Admin release endpoint
+- New module `routes/storage_cleanout.py`:
+  - `create_storage_cleanout_hold(db, invoice_id, buyer_id, payment_method_id)` creates a Stripe `PaymentIntent` with `capture_method="manual"`, customer attach, metadata `kind=storage_cleanout_security_hold` + `label="Storage Cleanout Security Hold"`, statement descriptor "BIDVEX CLNUT". Idempotent on `invoice_id`.
+  - `POST /api/admin/storage-auctions/{invoice_id}/release-deposit` (admin/facility manager only):
+    - `forfeit_deposit=false` → `stripe.PaymentIntent.cancel(pi_id)` → hold released, buyer keeps funds, status `released`.
+    - `forfeit_deposit=true`  → `stripe.PaymentIntent.capture(pi_id)` → full amount captured, status `forfeited`.
+  - `GET /api/admin/storage-auctions/{invoice_id}/cleanout-hold` reads the current hold state.
+- `storage_cleanout_holds` collection mirrors per-invoice state; `broker_invoices` stamped with `cleanout_hold_id`, `cleanout_hold_pi`, `cleanout_hold_status`, `cleanout_resolved_*`.
+
+### Tests (14 new pytests; 0 regressions)
+`tests/test_phase_6_0.py` — 14 tests:
+- AI Review alias router registered.
+- Storage locker helpers: `is_storage_locker`, `normalize_storage_metadata` (required facility_name; snaps cleanout buckets; clamps deposit bounds; safely handles bad types), `storage_quantity_policy` always returns (1, False), `storage_deposit_amount_for_listing` defaults to 100 CAD.
+- `Listing` + `ListingCreate` models accept `listing_type` + `storage_metadata`.
+- Storage cleanout router exposes both endpoints.
+- `routes/auth.py::register` blocks duplicate email with custom support-link message.
+- `routes/auth.py::register` blocks duplicate verified mobile (matches cosmetically-different numbers e.g. `+1 (514) 555-1234` vs seeded `15145551234`).
+- Short-phone seeds (< 7 digits, normalised to `None`) do not collide.
+- **Full regression: 89 / 89 passing** across Phase 6.0 + 5.4 + 5.3 + v9 + v7 + Phase 5 conversion pipeline.
+
+### Live verification
+- AI review alias `GET /api/admin/ai-review/listings` returns existing review row.
+- AI review alias `POST /api/admin/ai-review/listings/non-existent/approve` returns 404 with bilingual `review_not_found`.
+- `POST /api/auth/register` with `charbel911@gmail.com` returns the exact custom support-link message.
+
+---
+
+## Phase 5.4 — Weekly Recap Engine & E2E Testing Cleanup (Feb 21, 2026) ✅
 
 ### Task 1 — Automated Weekly Funnel Digest
 - New module `jobs/analytics_digest_cron.py::queue_weekly_funnel_digest(db)`.

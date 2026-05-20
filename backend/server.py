@@ -661,6 +661,7 @@ try:
         ("routes.admin_end_time", "admin_end_time_router", None, False),
         ("routes.admin_ai_review", "ai_review_router", None, False),
         ("routes.admin_conversion_funnel", "conversion_funnel_router", None, False),
+        ("routes.storage_cleanout", "storage_cleanout_router", None, False),
         ("routes.down_payments", "down_payments_router", None, False),
         ("routes.partner_card", "partner_card_router", None, False),
         ("routes.dealer_subscription_routes", "dealer_subscription_router", None, False),
@@ -815,6 +816,8 @@ async def create_critical_indexes(database):
         ("listings", [("status", 1), ("end_time", 1)], {"background": True}),
         ("storage_auctions", [("status", 1), ("end_time", 1)], {"background": True}),
         ("users", [("email", 1)], {"unique": True, "background": True}),
+        # Phase 6.0 / Task 2 — Unique-when-set mobile number (sparse so null is allowed)
+        ("users", [("mobile_number_normalized", 1)], {"unique": True, "sparse": True, "background": True}),
         ("deposits", [("auction_id", 1), ("status", 1)], {"background": True}),
         # TTL — auto-deletes expired refresh tokens
         ("refresh_tokens", [("expires_at", 1)], {"expireAfterSeconds": 0, "background": True}),

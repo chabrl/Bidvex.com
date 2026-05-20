@@ -60,6 +60,10 @@ class UserCreate(BaseModel):
     name: str
     account_type: str = "personal"
     phone: Optional[str] = ""
+    # Phase 6.0 / Task 2 — Canonical mobile_number field. Frontend forms may
+    # submit either `phone` or `mobile_number`; the register handler will
+    # normalise both into a single E.164-ish digits-only value.
+    mobile_number: Optional[str] = ""
     address: Optional[str] = ""
     company_name: Optional[str] = ""
     tax_number: Optional[str] = ""
@@ -180,11 +184,45 @@ async def register(user_data: UserCreate, request: Request, background_tasks: Ba
     if not user_data.ai_disclosure_consent:
         raise HTTPException(status_code=400, detail="You must acknowledge the AI disclosure to create an account. / Vous devez accepter la divulgation sur l'IA pour créer un compte.")
     
-    # Check existing user (email normalized to lowercase)
+    # Phase 6.0 / Task 2 — Strict uniqueness for BOTH email AND mobile number.
+    # Frontend may post either `phone` or `mobile_number`. Both normalise to
+    # the digits-only canonical form so cosmetic differences like "+1 514..."
+    # vs "514..." vs "(514) 555-..." cannot bypass the check.
+    DUPLICATE_MSG = (
+        "Your email or mobile phone is already registered in BidVex. "
+        "If you believe this is an error, please contact support immediately at support@bidvex.com"
+    )
+
     normalized_email = user_data.email.strip().lower()
-    existing = await db.users.find_one({"email": normalized_email})
-    if existing:
-        raise HTTPException(status_code=400, detail="Email already registered")
+    raw_phone = (user_data.mobile_number or user_data.phone or "").strip()
+    normalized_phone = "".join(ch for ch in raw_phone if ch.isdigit())
+    # 7-digit minimum to be considered "real" (national-only fallback). Shorter
+    # values are treated as no phone provided.
+    has_phone = len(normalized_phone) >= 7
+
+    # Check email uniqueness
+    existing_by_email = await db.users.find_one({"email": normalized_email}, {"_id": 0, "id": 1})
+    if existing_by_email:
+        raise HTTPException(status_code=400, detail=DUPLICATE_MSG)
+
+    # Check mobile uniqueness (only for verified accounts when a phone is provided)
+    if has_phone:
+        existing_by_phone = await db.users.find_one(
+            {
+                "mobile_number_normalized": normalized_phone,
+                # Match users with any kind of verified status (email or phone)
+                "$or": [
+                    {"phone_verified": True},
+                    {"email_verified": True},
+                    # Legacy users may not have any *_verified field — treat
+                    # the row's mere existence as occupying the number.
+                    {"phone_verified": {"$exists": False}, "email_verified": {"$exists": False}},
+                ],
+            },
+            {"_id": 0, "id": 1},
+        )
+        if existing_by_phone:
+            raise HTTPException(status_code=400, detail=DUPLICATE_MSG)
     
     hashed_pwd = hash_password(user_data.password)
     
@@ -241,6 +279,9 @@ async def register(user_data: UserCreate, request: Request, background_tasks: Ba
         "name": user_data.name,
         "account_type": user_data.account_type,
         "phone": user_data.phone or "",
+        # Phase 6.0 / Task 2 — canonical mobile fields used for uniqueness lookup
+        "mobile_number":            raw_phone or None,
+        "mobile_number_normalized": normalized_phone if has_phone else None,
         "address": user_data.address or "",
         "company_name": user_data.company_name or "",
         "tax_number": user_data.tax_number or "",

@@ -32,6 +32,9 @@ class ListingCreate(BaseModel):
     # FEATURE PATCH v9 / Feature 4 — Quantity field for all listings
     quantity: int = 1
     multiply_hammer_by_quantity: bool = False
+    # Phase 6.0 / Task 3 — Storage Locker / Abandoned Unit
+    listing_type: Optional[str] = None
+    storage_metadata: Optional[Dict[str, Any]] = None
     agreement_accepted: bool = False
     agreement_metadata: Optional[Dict[str, Any]] = None
     # Listing-level buyer's premium (rate, e.g. 0.15 for 15%). None = use org/tier default
@@ -103,6 +106,9 @@ class Listing(BaseModel):
     description_fr: Optional[str] = None
     # Multi-lot fields (populated when listing is a lot within a multi-item auction)
     listing_type: Optional[str] = None
+    # Phase 6.0 / Task 3 — Storage Locker / Abandoned Unit embedded metadata.
+    # Populated only when listing_type == "storage_locker".
+    storage_metadata: Optional[Dict[str, Any]] = None
     parent_auction_id: Optional[str] = None
     parent_auction_title: Optional[str] = None
     lot_number: Optional[int] = None

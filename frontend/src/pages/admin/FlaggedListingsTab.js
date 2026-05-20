@@ -66,15 +66,28 @@ const FlaggedListingsTab = () => {
 
   const submitAction = async () => {
     const { mode, row, note, overrideCategory } = actionModal;
-    const url = `${API}/admin/listing-reviews/${row.id}/${mode}`;
+    // Phase 6.0 / Task 1 — Call the alias route keyed by listing_id so admins
+    // can approve/reject without needing the review_id surface.
+    const url = `${API}/admin/ai-review/listings/${row.listing_id}/${mode}`;
     const body = { admin_note: note || '' };
     if (mode === 'approve' && overrideCategory) {
       body.override_category = overrideCategory.trim();
     }
-    await axios.post(url, body, { headers: { Authorization: `Bearer ${token}` } });
-    toast.success(mode === 'approve' ? 'Listing approved' : 'Listing rejected');
-    setActionModal({ open: false, mode: null, row: null, note: '', overrideCategory: '' });
-    load();
+    try {
+      await axios.post(url, body, { headers: { Authorization: `Bearer ${token}` } });
+      toast.success(mode === 'approve' ? 'Listing approved' : 'Listing rejected');
+      setActionModal({ open: false, mode: null, row: null, note: '', overrideCategory: '' });
+      load();
+    } catch (e) {
+      // Phase 6.0 / Task 1 — graceful 404 / network error handling.
+      const detail = e?.response?.data?.detail;
+      const status = e?.response?.status;
+      const message = typeof detail === 'string'
+        ? detail
+        : (detail?.message_en || detail?.message_fr || e?.message || 'Action failed');
+      toast.error(`${status ? `(${status}) ` : ''}${message}`);
+      console.error('[FlaggedListingsTab.submitAction] failed:', e);
+    }
   };
 
   const renderStatusBadge = (s) => {
