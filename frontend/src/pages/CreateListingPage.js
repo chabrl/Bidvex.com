@@ -119,6 +119,9 @@ const CreateListingPage = () => {
   // iter207 — Vehicle compliance warning dialog (replaces narrow top-right toast)
   const [vehicleComplianceOpen, setVehicleComplianceOpen] = useState(false);
   const [vehicleComplianceSignals, setVehicleComplianceSignals] = useState([]);
+  // Phase 6.0 hotfix — Manual Review request state inside the vehicle-block modal
+  const [vehicleComplianceReviewRequested, setVehicleComplianceReviewRequested] = useState(false);
+  const [vehicleComplianceReviewSubmitting, setVehicleComplianceReviewSubmitting] = useState(false);
 
   // FEATURE PATCH v9 / Feature 3 — AI category mismatch warning popup
   const [aiMismatchModal, setAiMismatchModal] = useState({ open: false, suggested: '', reasonEn: '', reasonFr: '', confidence: 0 });
@@ -188,6 +191,8 @@ const CreateListingPage = () => {
       const detail = error?.response?.data?.detail;
       if (detail && typeof detail === 'object' && detail.error === 'vehicle_listing_dealer_required') {
         setVehicleComplianceSignals(Array.isArray(detail.signals) ? detail.signals : []);
+        setVehicleComplianceReviewRequested(false);
+        setVehicleComplianceReviewSubmitting(false);
         setVehicleComplianceOpen(true);
         return null;
       }
@@ -311,6 +316,30 @@ const CreateListingPage = () => {
     }
     setAiMismatchModal({ open: false, suggested: '', reasonEn: '', reasonFr: '', confidence: 0 });
     setPendingPayload(null);
+  };
+
+  // Phase 6.0 hotfix — POST /listings/request-manual-vehicle-review when the
+  // user clicks the new "Request Manual Review" button inside the vehicle-block
+  // modal. The listing has NOT been created yet at this point, so we send the
+  // form snapshot + detected signals so an admin can override the block.
+  const handleRequestManualVehicleReview = async () => {
+    if (vehicleComplianceReviewRequested || vehicleComplianceReviewSubmitting) return;
+    setVehicleComplianceReviewSubmitting(true);
+    try {
+      await axios.post(`${API}/listings/request-manual-vehicle-review`, {
+        title:            formData.title || '',
+        description:      formData.description || '',
+        category:         formData.category || '',
+        detected_signals: vehicleComplianceSignals,
+        images_count:     Array.isArray(formData.images) ? formData.images.length : 0,
+      });
+      setVehicleComplianceReviewRequested(true);
+    } catch (e) {
+      const errorMessage = extractErrorMessage(e);
+      toast.error(errorMessage || 'Failed to submit manual review request');
+    } finally {
+      setVehicleComplianceReviewSubmitting(false);
+    }
   };
 
   // Tax Onboarding Gatekeeper — CRA Part XX Compliance
@@ -1120,32 +1149,83 @@ const CreateListingPage = () => {
           )}
 
           <DialogFooter className="mt-4 flex-col sm:flex-row sm:justify-center gap-2">
-            <Button
-              variant="outline"
-              data-testid="vehicle-compliance-secondary-btn"
-              onClick={() => {
-                setVehicleComplianceOpen(false);
-                navigate('/vehicle-auctions');
-              }}
-              className="w-full sm:w-auto"
-            >
-              <ExternalLink className="mr-2 h-4 w-4" />
-              {(i18n.language || 'en').toLowerCase().startsWith('fr')
-                ? 'Voir les enchères de véhicules'
-                : 'Go to Vehicle Auctions'}
-            </Button>
-            <Button
-              data-testid="vehicle-compliance-primary-btn"
-              onClick={() => {
-                setVehicleComplianceOpen(false);
-                navigate('/vehicle-auctions/dealer-license');
-              }}
-              className="w-full sm:w-auto bg-rose-600 hover:bg-rose-700 text-white"
-            >
-              {(i18n.language || 'en').toLowerCase().startsWith('fr')
-                ? 'Vérifier ma licence de concessionnaire'
-                : 'Verify dealer licence'}
-            </Button>
+            {vehicleComplianceReviewRequested ? (
+              <div
+                data-testid="vehicle-compliance-review-submitted"
+                className="w-full rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-center"
+              >
+                <p className="text-sm font-semibold text-emerald-900 mb-1">
+                  ✅ {(i18n.language || 'en').toLowerCase().startsWith('fr')
+                      ? 'Demande de révision soumise'
+                      : 'Review Request Submitted'}
+                </p>
+                <p className="text-xs text-emerald-800 leading-relaxed">
+                  {(i18n.language || 'en').toLowerCase().startsWith('fr') ? (
+                    <>
+                      Notre équipe vérifiera manuellement cette annonce dans 5 à 50 minutes.
+                      Vous recevrez un courriel et une notification système instantanée dès l'approbation.
+                    </>
+                  ) : (
+                    <>
+                      Our team will manually verify this listing within 5 to 50 minutes.
+                      You will receive an instant email and system notification once approved.
+                    </>
+                  )}
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-3"
+                  onClick={() => setVehicleComplianceOpen(false)}
+                  data-testid="vehicle-compliance-review-close-btn"
+                >
+                  {(i18n.language || 'en').toLowerCase().startsWith('fr') ? 'Fermer' : 'Close'}
+                </Button>
+              </div>
+            ) : (
+              <>
+                <Button
+                  variant="outline"
+                  data-testid="vehicle-compliance-secondary-btn"
+                  onClick={() => {
+                    setVehicleComplianceOpen(false);
+                    navigate('/vehicle-auctions');
+                  }}
+                  className="w-full sm:w-auto"
+                >
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  {(i18n.language || 'en').toLowerCase().startsWith('fr')
+                    ? 'Voir les enchères de véhicules'
+                    : 'Go to Vehicle Auctions'}
+                </Button>
+                <Button
+                  data-testid="vehicle-compliance-primary-btn"
+                  onClick={() => {
+                    setVehicleComplianceOpen(false);
+                    navigate('/vehicle-auctions/dealer-license');
+                  }}
+                  className="w-full sm:w-auto bg-rose-600 hover:bg-rose-700 text-white"
+                >
+                  {(i18n.language || 'en').toLowerCase().startsWith('fr')
+                    ? 'Vérifier ma licence de concessionnaire'
+                    : 'Verify dealer licence'}
+                </Button>
+                <Button
+                  variant="outline"
+                  data-testid="vehicle-compliance-manual-review-btn"
+                  onClick={handleRequestManualVehicleReview}
+                  disabled={vehicleComplianceReviewSubmitting}
+                  className="w-full sm:w-auto border-amber-300 text-amber-800 hover:bg-amber-50"
+                >
+                  🔍&nbsp;
+                  {vehicleComplianceReviewSubmitting
+                    ? ((i18n.language || 'en').toLowerCase().startsWith('fr') ? 'Envoi…' : 'Sending…')
+                    : ((i18n.language || 'en').toLowerCase().startsWith('fr')
+                        ? 'Demander une révision manuelle'
+                        : 'Request Manual Review')}
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

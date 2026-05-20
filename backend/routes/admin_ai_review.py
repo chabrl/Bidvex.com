@@ -44,6 +44,90 @@ class CategorySuggestRequest(BaseModel):
     seller_category: Optional[str] = ""
 
 
+class ManualVehicleBlockReviewRequest(BaseModel):
+    """Payload for a pre-creation manual review request.
+
+    Triggered when the vehicle-compliance gate blocked a non-vehicle listing
+    via a false-positive signal (e.g. the word "sti" inside "restaurant
+    chairs"). The listing has NOT been created yet — we snapshot the form
+    data so an admin can review and either approve creation or confirm the
+    block.
+    """
+    title: Optional[str] = Field("", max_length=300)
+    description: Optional[str] = Field("", max_length=4000)
+    category: Optional[str] = Field("", max_length=120)
+    detected_signals: list[str] = Field(default_factory=list)
+    images_count: int = 0
+    extra_context: Optional[str] = Field("", max_length=2000)
+
+
+@ai_review_router.post("/listings/request-manual-vehicle-review")
+async def request_manual_vehicle_review(
+    payload: ManualVehicleBlockReviewRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Seller-side — invoked when the user clicks "Request Manual Review"
+    inside the vehicle-compliance block modal. Creates a row in
+    `manual_review_requests` and queues an admin alert email.
+
+    No listing exists yet, so this does NOT go through the regular
+    listing_reviews queue. Admins inspect from a dedicated tab and either
+    whitelist the seller for the next attempt or confirm the block.
+    """
+    db = get_db()
+    now = datetime.now(timezone.utc)
+    req_id = str(uuid.uuid4())
+    row = {
+        "id":               req_id,
+        "kind":             "vehicle_block_false_positive",
+        "seller_id":        current_user.id,
+        "seller_email":     current_user.email,
+        "title":            (payload.title or "").strip()[:300],
+        "description":      (payload.description or "").strip()[:4000],
+        "category":         (payload.category or "").strip()[:120],
+        "detected_signals": list(payload.detected_signals or [])[:50],
+        "images_count":     int(payload.images_count or 0),
+        "extra_context":    (payload.extra_context or "").strip()[:2000],
+        "status":           "pending",
+        "created_at":       now,
+        "updated_at":       now,
+        "resolved_at":      None,
+        "admin_id":         None,
+        "admin_email":      None,
+        "admin_note":       None,
+    }
+    await db.manual_review_requests.insert_one(row)
+
+    # Admin alert email (kind handled by email_delivery_worker w/ HTML fallback)
+    try:
+        await db.email_outbox.insert_one({
+            "id":         str(uuid.uuid4()),
+            "kind":       "ai_review_admin_alert",
+            "to_email":   None,
+            "context":    {
+                "review_id":         req_id,
+                "listing_id":        None,
+                "listing_title":     row["title"] or "(no title)",
+                "seller_category":   row["category"] or "—",
+                "suggested_category": "Vehicles",
+                "ai_reason_en":      "Manual review requested by seller after vehicle-compliance block.",
+                "detected_signals":  row["detected_signals"],
+            },
+            "queued_at":  now,
+        })
+    except Exception as exc:
+        logger.warning(f"[manual_review] admin alert email queue failed: {exc}")
+
+    logger.info(f"[manual_review] vehicle-block manual review requested req_id={req_id} by {current_user.email}")
+    return {
+        "success":    True,
+        "request_id": req_id,
+        "status":     "pending",
+        "eta_minutes_min": 5,
+        "eta_minutes_max": 50,
+    }
+
+
 @ai_review_router.post("/listings/suggest-category")
 async def suggest_category(payload: CategorySuggestRequest, current_user: User = Depends(get_current_user)):
     """Lightweight pre-publish AI category check.
