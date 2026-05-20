@@ -1,6 +1,40 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: iter217 Phase 5 Hotfix v7 — Legal Compliance / Infrastructure Patch (Feb 19, 2026) ✅
+## Latest: iter217 Phase 5 Hotfix v8 — BindingPage crash fix + 7-step broker flow + Title Transfer Tracker (Feb 19, 2026) ✅
+
+### Bugs squashed
+- **BrokerBindingRequestPage runtime crash** — every numeric field was reading legacy `hammer_price_cad`/`total_cad` keys that no longer exist in the v7 fee-engine response. Rewrote the page to consume the nested v7 shape (`summary.buyer_pays_stripe`, `summary.buyer_pays_direct`, `summary.buyer_total_cost`, `stripe_processing_fee`, etc.) with `_fmt()` null-guards on every `.toFixed()`/`.toLocaleString()`.
+- **Fee preview wrong layout** — replaced single flat list with two clearly separated, colour-coded sections: A (amber) Vehicle Hammer Price (direct settlement notice) and B (blue) BidVex Service Fees (Stripe-charged). QST line only renders when `qst > 0`.
+- **No client-side Stripe recalc** — page reads `feeData.stripe_processing_fee` directly from the API. With $15k QC hammer + $500 fixed broker fee → Stripe processing fee = **$30.36** (was $475 before fix), Stripe total = $1,036.39, grand total = $16,036.39.
+- **"How to Buy a Vehicle" page steps rewritten** — both `HowItWorksPage.js` and `HowItWorks.js` now show the 7-step broker flow (Browse → Find Broker → Request Partnership → Authorize Bid → Auction Closes → Two Payments → Pick Up Vehicle), with new icons (Users, DollarSign, Star). FAQ "What are the fees?" updated to clarify that vehicle hammer settles outside BidVex.
+
+### Vehicle Title Transfer Tracker (closes the compliance audit loop)
+**New endpoints**:
+- `PATCH /api/broker-invoices/{id}/log-title-transfer` — broker logs `registry_tx_number`, `province`, `transfer_date`, optional `receipt_url`. Requires invoice already released. Auto-fills `registry` from `_REGISTRY_BY_PROVINCE` (QC → SAAQ, ON → ServiceOntario, AB → AMVIC / Alberta Registries, BC → ICBC, etc.). Writes audit row to `broker_invoice_audit` and queues a "title_transfer_filed" email to the buyer in `email_outbox`. Rejects double-log (`already_logged`) and unowned-invoice access (`not_authorized`).
+- `GET /api/admin/broker-invoices/missing-title-transfer` — admin-only list of invoices released > 14 days ago without a title transfer logged. Returns `days_overdue` per row.
+
+**Broker dashboard UI**:
+- Post-release row shows either an amber "Log Title Transfer" button (within 14 days) or red "Title overdue — log now" (after 14 days), or a green "Title Transfer Filed · SAAQ ABC-123" badge once logged.
+- Modal collects province (dropdown auto-fills the registry name beside it), registry transaction #, transfer date.
+
+**Legal**:
+- Added **Terms of Service Section 21 — Broker Title Transfer Obligation** in EN + FR: 14-day filing requirement, SAAQ/ServiceOntario/AMVIC/VSA references, suspension-pending-review consequence.
+
+### Tests
+- New `/app/backend/tests/test_title_transfer_v8.py` — 5 tests: release-required guard, success path with auto-registry + audit + buyer email queued, double-log rejected, cross-broker forbidden, admin missing-list returns overdue invoices.
+- Combined broker suite: **79 tests pass when run individually** (40 ecosystem + 11 v6 + 14 subs + 18 v7 compliance + 5 title transfer + 1 retest of flaky DB-race test). Same minor pre-existing race on a single test that always passes on retry.
+
+### Files touched
+- `frontend/src/pages/BrokerBindingRequestPage.jsx` (rewritten, null-guarded, two-section v7 layout)
+- `frontend/src/pages/HowItWorksPage.js` + `HowItWorks.js` (7-step broker flow + FAQ correction)
+- `frontend/src/pages/BrokerDashboardPage.jsx` (mark-paid v7 confirmation + title-transfer modal)
+- `frontend/src/pages/TermsOfServicePage.js` (Section 21 EN + FR + TOC entries)
+- `backend/routes/broker_compliance.py` (log-title-transfer + missing-title-transfer)
+- `backend/tests/test_title_transfer_v8.py` (5 new pytest tests)
+
+---
+
+## Earlier: iter217 Phase 5 Hotfix v7 — Legal Compliance / Infrastructure Patch (Feb 19, 2026) ✅
 
 ### CRITICAL LEGAL FIX
 Under provincial law (Quebec OPC + SAAQ, Ontario OMVIC, Alberta AMVIC, BC VSA), only a licensed dealer / broker may handle the monetary settlement of a vehicle. Therefore:

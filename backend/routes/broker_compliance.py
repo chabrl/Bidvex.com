@@ -319,6 +319,146 @@ async def admin_resolve_dispute(
 
 
 # ─────────────────────────────────────────────────────────────────────
+# v8 — Vehicle Title Transfer Tracker (closes the compliance audit loop)
+# ─────────────────────────────────────────────────────────────────────
+class _TitleTransferIn(BaseModel):
+    registry_tx_number: str = Field(min_length=3, max_length=100)
+    province:           Literal["QC", "ON", "AB", "BC", "MB", "SK", "NS", "NB", "NL", "PE", "OTHER"]
+    registry:           Optional[str] = None   # auto-fills if omitted
+    transfer_date:      datetime
+    receipt_url:        Optional[str] = None   # PDF/JPG/PNG URL (uploaded separately)
+
+
+_REGISTRY_BY_PROVINCE = {
+    "QC":    "SAAQ",
+    "ON":    "ServiceOntario",
+    "AB":    "AMVIC / Alberta Registries",
+    "BC":    "ICBC",
+    "MB":    "Manitoba Public Insurance",
+    "SK":    "SGI",
+    "NS":    "Service Nova Scotia",
+    "NB":    "Service New Brunswick",
+    "NL":    "Motor Registration Division",
+    "PE":    "Access PEI",
+    "OTHER": "Provincial Registry",
+}
+
+
+@broker_compliance_router.patch("/broker-invoices/{invoice_id}/log-title-transfer")
+async def log_title_transfer(
+    invoice_id:   str,
+    payload:      _TitleTransferIn,
+    current_user: User = Depends(get_current_user),
+):
+    """Broker logs the provincial title transfer reference number.
+
+    Required within 14 days of vehicle release. Auth: broker only (owner
+    of the invoice). All actions audited.
+    """
+    db = get_db()
+    broker = await db.brokers.find_one({"user_id": current_user.id}, {"_id": 0, "id": 1, "legal_business_name": 1})
+    inv    = await db.broker_invoices.find_one({"id": invoice_id}, {"_id": 0})
+    if not broker or not inv or inv["broker_id"] != broker["id"]:
+        raise HTTPException(status_code=403, detail={"error": "not_authorized"})
+    if not inv.get("released_at"):
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "release_required_first",
+                    "message_en": "You can only log the title transfer after releasing the vehicle.",
+                    "message_fr": "Vous ne pouvez consigner le transfert de propriété qu'après la remise du véhicule."},
+        )
+    if inv.get("title_transfer_logged_at"):
+        raise HTTPException(status_code=400, detail={"error": "already_logged"})
+
+    registry = payload.registry or _REGISTRY_BY_PROVINCE.get(payload.province, _REGISTRY_BY_PROVINCE["OTHER"])
+    now = _utcnow()
+
+    await db.broker_invoices.update_one(
+        {"id": invoice_id},
+        {"$set": {
+            "title_transfer_logged_at":  now,
+            "title_transfer_logged_by":  current_user.id,
+            "title_transfer_registry":   registry,
+            "title_transfer_province":   payload.province,
+            "title_transfer_tx_number":  payload.registry_tx_number.strip(),
+            "title_transfer_date":       payload.transfer_date,
+            "title_transfer_receipt_url": payload.receipt_url,
+        }},
+    )
+    # Audit trail
+    try:
+        await db.broker_invoice_audit.insert_one({
+            "id":          str(uuid.uuid4()),
+            "invoice_id":  invoice_id,
+            "action":      "log_title_transfer",
+            "actor_id":    current_user.id,
+            "actor_email": current_user.email,
+            "details":     payload.model_dump() if hasattr(payload, "model_dump") else payload.dict(),
+            "at":          now,
+        })
+    except Exception:
+        pass   # non-fatal — audit failure must not break the user-facing call
+
+    # Buyer email is dispatched out-of-band by a background worker
+    # (not blocking the response). Mark a flag for the worker to pick up.
+    await db.email_outbox.insert_one({
+        "id":         str(uuid.uuid4()),
+        "kind":       "title_transfer_filed",
+        "to_user_id": inv.get("buyer_user_id"),
+        "context":    {
+            "invoice_id":         invoice_id,
+            "registry":           registry,
+            "registry_tx_number": payload.registry_tx_number.strip(),
+            "transfer_date":      payload.transfer_date.isoformat(),
+            "broker_name":        broker.get("legal_business_name"),
+        },
+        "queued_at":  now,
+    })
+    return {
+        "success":         True,
+        "registry":        registry,
+        "registry_tx_number": payload.registry_tx_number.strip(),
+        "logged_at":       now,
+    }
+
+
+@broker_compliance_router.get("/admin/broker-invoices/missing-title-transfer")
+async def admin_missing_title_transfers(current_user: User = Depends(get_current_user)):
+    """Invoices released > 14 days ago without a logged title transfer.
+    Admin dashboard polls this for the "Broker has not filed title transfer"
+    notification list.
+    """
+    if (current_user.role or "") not in ("admin", "superadmin"):
+        raise HTTPException(status_code=403, detail={"error": "admin_only"})
+    db = get_db()
+    cutoff = _utcnow() - timedelta(days=14)
+    rows: List[Dict[str, Any]] = []
+    async for inv in db.broker_invoices.find({
+        "released_at":              {"$ne": None, "$lt": cutoff},
+        "title_transfer_logged_at": None,
+    }, {"_id": 0}).limit(200):
+        broker = await db.brokers.find_one({"id": inv["broker_id"]}, {"_id": 0, "legal_business_name": 1, "broker_license_number": 1})
+        rel_days = None
+        if inv.get("released_at"):
+            rel = inv["released_at"]
+            if isinstance(rel, str):
+                from datetime import datetime as _dt
+                rel = _dt.fromisoformat(rel.replace("Z", "+00:00"))
+            if rel.tzinfo is None:
+                rel = rel.replace(tzinfo=timezone.utc)
+            rel_days = (_utcnow() - rel).days - 14
+        rows.append({
+            "invoice_id":     inv["id"],
+            "invoice_number": inv.get("invoice_number"),
+            "broker_id":      inv["broker_id"],
+            "broker_name":    (broker or {}).get("legal_business_name"),
+            "released_at":    inv.get("released_at"),
+            "days_overdue":   rel_days,
+        })
+    return {"data": rows, "count": len(rows)}
+
+
+# ─────────────────────────────────────────────────────────────────────
 # Task 7 — Broker trust score (ratings & response time)
 # ─────────────────────────────────────────────────────────────────────
 class _RateBrokerIn(BaseModel):

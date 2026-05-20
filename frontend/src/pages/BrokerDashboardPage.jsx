@@ -422,12 +422,54 @@ function BrokerPipelineTab({ lang }) {
     setTimeout(() => URL.revokeObjectURL(url), 500);
   };
   const markPaid = async (id) => {
-    await axios.patch(`${API_BASE}/broker-invoices/${id}/mark-paid`, {}, { headers: { Authorization: `Bearer ${_token()}` } });
+    // v7 — broker manually confirms direct hammer payment received
+    const ok = window.confirm(
+      lang === 'fr'
+        ? 'Confirmez-vous avoir reçu le prix marteau directement de l\'acheteur (virement / chèque certifié / compte en fiducie) ?'
+        : 'Do you confirm you received the hammer payment directly from the buyer (wire / certified cheque / trust account)?'
+    );
+    if (!ok) return;
+    await axios.patch(`${API_BASE}/broker-invoices/${id}/mark-paid`, {
+      hammer_received_confirmed: true,
+      payment_method: 'wire',
+    }, { headers: { Authorization: `Bearer ${_token()}` } });
     load();
   };
   const release  = async (id) => {
     await axios.post(`${API_BASE}/broker-invoices/${id}/release-vehicle`, {}, { headers: { Authorization: `Bearer ${_token()}` } });
     load();
+  };
+
+  // ── v8 — Title transfer logging ─────────────────────────────────
+  const [ttOpen, setTtOpen] = React.useState(null);   // invoice obj or null
+  const [ttForm, setTtForm] = React.useState({ registry_tx_number: '', province: 'QC', transfer_date: new Date().toISOString().slice(0, 10) });
+  const [ttSaving, setTtSaving] = React.useState(false);
+  const REGISTRY_BY_PROVINCE = {
+    QC: 'SAAQ', ON: 'ServiceOntario', AB: 'AMVIC / Alberta Registries',
+    BC: 'ICBC', MB: 'Manitoba Public Insurance', SK: 'SGI',
+    NS: 'Service Nova Scotia', NB: 'Service New Brunswick',
+    NL: 'Motor Registration Division', PE: 'Access PEI', OTHER: 'Provincial Registry',
+  };
+  const submitTitleTransfer = async () => {
+    if (!ttOpen || !ttForm.registry_tx_number.trim()) return;
+    setTtSaving(true);
+    try {
+      await axios.patch(`${API_BASE}/broker-invoices/${ttOpen.id}/log-title-transfer`, {
+        registry_tx_number: ttForm.registry_tx_number.trim(),
+        province:           ttForm.province,
+        transfer_date:      new Date(ttForm.transfer_date).toISOString(),
+      }, { headers: { Authorization: `Bearer ${_token()}` } });
+      setTtOpen(null);
+      setTtForm({ registry_tx_number: '', province: 'QC', transfer_date: new Date().toISOString().slice(0, 10) });
+      load();
+    } finally {
+      setTtSaving(false);
+    }
+  };
+  const releasedAt = (inv) => inv.released_at ? new Date(inv.released_at) : null;
+  const daysSinceRelease = (inv) => {
+    const d = releasedAt(inv);
+    return d ? Math.floor((Date.now() - d.getTime()) / 86400000) : null;
   };
 
   if (loading) return <div className="text-center text-slate-500 py-12">Loading…</div>;
@@ -479,11 +521,92 @@ function BrokerPipelineTab({ lang }) {
                         🚚 {lang === 'fr' ? 'Libérer véhicule' : 'Release Vehicle'}
                       </Button>
                     )}
+                    {/* v8 — Title transfer logger (post-release) */}
+                    {inv.released_at && !inv.title_transfer_logged_at && (
+                      <Button
+                        size="sm"
+                        variant={daysSinceRelease(inv) > 14 ? 'destructive' : 'default'}
+                        className={daysSinceRelease(inv) > 14 ? '' : 'bg-amber-500 hover:bg-amber-600 text-white'}
+                        onClick={() => setTtOpen(inv)}
+                        data-testid={`invoice-log-title-${inv.id}`}
+                      >
+                        📋 {daysSinceRelease(inv) > 14
+                          ? (lang === 'fr' ? 'Transfert en retard — consigner' : 'Title overdue — log now')
+                          : (lang === 'fr' ? 'Consigner le transfert de propriété' : 'Log Title Transfer')}
+                      </Button>
+                    )}
+                    {inv.title_transfer_logged_at && (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs bg-emerald-100 text-emerald-800" data-testid={`title-filed-${inv.id}`}>
+                        ✅ {lang === 'fr' ? 'Transfert déposé' : 'Title Transfer Filed'} · {inv.title_transfer_registry} {inv.title_transfer_tx_number}
+                      </span>
+                    )}
                   </div>
                 </CardContent>
               </Card>
             );
           })}
+        </div>
+      )}
+
+      {/* v8 — Title transfer modal */}
+      {ttOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => !ttSaving && setTtOpen(null)} data-testid="title-transfer-modal">
+          <div className="bg-white dark:bg-slate-900 rounded-lg max-w-md w-full p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold">
+              {lang === 'fr' ? 'Consigner le transfert de propriété' : 'Log Title Transfer'}
+            </h3>
+            <p className="text-xs text-slate-500">
+              {lang === 'fr'
+                ? 'Doit être consigné dans les 14 jours suivant la remise du véhicule (obligation OPC / SAAQ / OMVIC).'
+                : 'Required within 14 days of vehicle release (OPC / SAAQ / OMVIC obligation).'}
+            </p>
+            <div>
+              <label className="text-xs text-slate-500">{lang === 'fr' ? 'Province' : 'Province'}</label>
+              <select
+                value={ttForm.province}
+                onChange={(e) => setTtForm(f => ({ ...f, province: e.target.value }))}
+                className="w-full mt-1 px-3 py-2 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
+                data-testid="title-transfer-province"
+              >
+                {Object.keys(REGISTRY_BY_PROVINCE).map(p => (
+                  <option key={p} value={p}>{p} — {REGISTRY_BY_PROVINCE[p]}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-slate-500">{lang === 'fr' ? 'Numéro de transaction du registre' : 'Provincial Registry Transaction #'} *</label>
+              <input
+                value={ttForm.registry_tx_number}
+                onChange={(e) => setTtForm(f => ({ ...f, registry_tx_number: e.target.value }))}
+                placeholder="e.g. SAAQ-2026-12345"
+                className="w-full mt-1 px-3 py-2 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
+                data-testid="title-transfer-tx-number"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-slate-500">{lang === 'fr' ? 'Date du transfert' : 'Transfer Date'} *</label>
+              <input
+                type="date"
+                value={ttForm.transfer_date}
+                onChange={(e) => setTtForm(f => ({ ...f, transfer_date: e.target.value }))}
+                className="w-full mt-1 px-3 py-2 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
+                data-testid="title-transfer-date"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setTtOpen(null)} disabled={ttSaving}>
+                {lang === 'fr' ? 'Annuler' : 'Cancel'}
+              </Button>
+              <Button
+                onClick={submitTitleTransfer}
+                disabled={ttSaving || !ttForm.registry_tx_number.trim()}
+                className="bg-gradient-to-r from-[#1E3A8A] to-[#06B6D4] text-white"
+                data-testid="title-transfer-submit"
+              >
+                {ttSaving ? (lang === 'fr' ? 'Envoi…' : 'Saving…') : (lang === 'fr' ? 'Consigner' : 'File Transfer')}
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </section>

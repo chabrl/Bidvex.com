@@ -27,6 +27,7 @@ const tocEN = [
   { id: 'no-refund', label: '18. No-Refund Policy' },
   { id: 'buyer-broker-deposit', label: '19. Buyer-Broker Security Deposit' },
   { id: 'hammer-direct', label: '20. Vehicle Hammer Price — Direct Settlement' },
+  { id: 'title-transfer', label: '21. Broker Title Transfer Obligation' },
 ];
 
 const tocFR = [
@@ -319,6 +320,12 @@ const TermsOfServicePage = () => {
               <p className="mt-2">All vehicle title transfers are the sole responsibility of the licensed broker, conducted through the appropriate provincial registry (SAAQ in Quebec, ServiceOntario in Ontario, AMVIC in Alberta, ICBC / VSA in British Columbia, etc.).</p>
             </RedBox>
 
+            <SH id="title-transfer" n="21">Broker Title Transfer Obligation</SH>
+            <BlueBox>
+              <p>Licensed brokers are required to log the provincial title transfer reference number in their BidVex broker dashboard within <strong>fourteen (14) days</strong> of confirming vehicle release. This obligation exists to protect buyers and to maintain BidVex's compliance with SAAQ, ServiceOntario, AMVIC, and VSA regulatory audit requirements.</p>
+              <p className="mt-2">Failure to log a title transfer within 14 days may result in account suspension pending review. Once logged, the reference number appears permanently on the buyer's transaction history as proof that the title transfer was filed with the appropriate provincial registry.</p>
+            </BlueBox>
+
             <p className="text-xs text-slate-400 mt-10">&copy; 2026 BidVex Inc. All rights reserved.</p>
           </>) : (<>
 
@@ -489,6 +496,12 @@ const TermsOfServicePage = () => {
               <p className="mt-2">Tous les transferts de propriété de véhicules sont la seule responsabilité du courtier licencié, effectués via le registre provincial approprié (SAAQ au Québec, ServiceOntario en Ontario, AMVIC en Alberta, ICBC / VSA en Colombie-Britannique, etc.).</p>
             </RedBox>
 
+            <SH id="title-transfer" n="21">Obligation de transfert de propriété du courtier</SH>
+            <BlueBox>
+              <p>Les courtiers licenciés sont tenus de consigner le numéro de référence du transfert de propriété provincial dans leur tableau de bord BidVex dans un délai de <strong>quatorze (14) jours</strong> suivant la confirmation de la remise du véhicule. Cette obligation existe pour protéger les acheteurs et pour maintenir la conformité de BidVex avec les exigences d'audit réglementaire de la SAAQ, de ServiceOntario, d'AMVIC et de la VSA.</p>
+              <p className="mt-2">Le non-respect de ce délai de 14 jours peut entraîner la suspension du compte en attendant un examen. Une fois consigné, le numéro de référence apparaît de manière permanente dans l'historique des transactions de l'acheteur comme preuve que le transfert de propriété a été déposé auprès du registre provincial approprié.</p>
+            </BlueBox>
+
             <p className="text-xs text-slate-400 mt-10">&copy; 2026 BidVex Inc. Tous droits réservés.</p>
           </>)}
         </main>
@@ -498,3 +511,4 @@ const TermsOfServicePage = () => {
 };
 
 export default TermsOfServicePage;
+rmsOfServicePage;

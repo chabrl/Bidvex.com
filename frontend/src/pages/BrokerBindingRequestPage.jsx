@@ -1,19 +1,26 @@
 /**
- * iter217 Phase 5 Hotfix v5b — Buyer → Broker partnership request.
+ * iter217 Phase 5 Hotfix v8 — Buyer → Broker partnership request.
  *
  * Route: /brokers/:broker_id/request
  *
+ * v8 fixes:
+ *   • Reads the new v7 fee-engine response shape (nested `summary`,
+ *     `hammer_settlement`, `stripe_processing_fee`).
+ *   • Every numeric field is null-guarded — no more
+ *     `Cannot read property 'toFixed' of undefined` crashes.
+ *   • Fee preview rendered as TWO clearly separated sections:
+ *       A) Vehicle Hammer Price — direct settlement (amber)
+ *       B) BidVex Service Fees — Stripe-charged (blue)
+ *     plus a refundable deposit row and a final total.
+ *   • The Stripe processing fee is read straight from the API; no
+ *     client-side recalculation. Hammer NEVER enters the Stripe total.
+ *
  * Flow:
  *   1. Loads the broker's public profile + a $15,000 fee preview.
- *   2. Buyer reviews legal copy + the $500 CAD security deposit notice.
+ *   2. Buyer reviews legal copy + the $500 CAD security deposit.
  *   3. Click "Authorize Deposit" → POST /api/broker-relationships/request
- *      → backend creates relationship + Stripe PaymentIntent (capture
- *      method = manual). Card is held, not charged.
- *   4. Buyer is redirected to a "waiting for broker approval" page.
- *
- * NOTE: Stripe Card Element wiring for SCA-authentication is scoped for
- * Hotfix v6 — the MVP currently relies on Stripe's `automatic_payment_methods`
- * webhook flow + buyer follow-up in their Stripe portal if 3DS is needed.
+ *      → backend creates relationship + Stripe PaymentIntent
+ *      (capture_method=manual). Card is held, not charged.
  */
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -23,7 +30,32 @@ import API_BASE from '../config';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Alert, AlertDescription } from '../components/ui/alert';
-import { ShieldCheck, Lock, AlertTriangle, CheckCircle2, ChevronLeft } from 'lucide-react';
+import {
+  Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
+} from '../components/ui/select';
+import {
+  ShieldCheck, Lock, AlertTriangle, CheckCircle2, ChevronLeft,
+  CircleDollarSign, CreditCard,
+} from 'lucide-react';
+
+const _fmt = (n) =>
+  (n == null || Number.isNaN(Number(n)))
+    ? '—'
+    : new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD' }).format(Number(n));
+
+function Row({ label, value, accent, bold, big, muted, testId }) {
+  return (
+    <div className="flex justify-between items-baseline py-1" data-testid={testId}>
+      <span className={`text-sm ${muted ? 'text-slate-400' : 'text-slate-700 dark:text-slate-200'}`}>{label}</span>
+      <span className={`tabular-nums ${big ? 'text-xl font-bold text-[#1E3A8A] dark:text-cyan-300'
+                                            : bold ? 'font-semibold text-blue-700 dark:text-cyan-300'
+                                                   : accent ? 'font-semibold text-amber-700 dark:text-amber-300'
+                                                            : 'text-slate-900 dark:text-white'}`}>
+        {value}
+      </span>
+    </div>
+  );
+}
 
 export default function BrokerBindingRequestPage() {
   const { i18n } = useTranslation();
@@ -32,21 +64,19 @@ export default function BrokerBindingRequestPage() {
   const { broker_id } = useParams();
 
   const [broker, setBroker]     = useState(null);
-  const [feePreview, setFee]    = useState(null);
+  const [feeData, setFeeData]   = useState(null);
+  const [province, setProvince] = useState('ON');
   const [submitting, setSubmit] = useState(false);
   const [error, setError]       = useState(null);
   const [success, setSuccess]   = useState(false);
 
+  // ─── Load broker + initial fee preview ──────────────────────
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         const r = await axios.get(`${API_BASE}/brokers/${broker_id}`);
         if (!cancelled) setBroker(r.data);
-        const r2 = await axios.post(`${API_BASE}/brokers/${broker_id}/fee-preview`, {
-          hammer_price: 15000, buyer_province: 'ON',
-        });
-        if (!cancelled) setFee(r2.data);
       } catch (e) {
         if (!cancelled) setError(e?.response?.data?.detail?.error || 'failed_to_load_broker');
       }
@@ -54,6 +84,23 @@ export default function BrokerBindingRequestPage() {
     return () => { cancelled = true; };
   }, [broker_id]);
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r2 = await axios.post(`${API_BASE}/brokers/${broker_id}/fee-preview`, {
+          hammer_price: 15000, buyer_province: province,
+        });
+        if (!cancelled) setFeeData(r2.data);
+      } catch (e) {
+        // Non-fatal — keep the page usable
+        if (!cancelled) console.error('[fee-preview] failed', e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [broker_id, province]);
+
+  // ─── Authorize $500 hold ────────────────────────────────────
   const authorizeDeposit = async () => {
     setSubmit(true); setError(null);
     try {
@@ -102,6 +149,18 @@ export default function BrokerBindingRequestPage() {
 
   const depositAmount = Number(broker.default_deposit_amount_cad || 500);
 
+  // ─── Extract v7 fields with null guards ─────────────────────
+  const f = feeData || {};
+  const hammer       = f.hammer_price;
+  const platformFee  = f.platform_fee;
+  const brokerFee    = f.broker_fee;
+  const gst          = f.gst;
+  const qst          = f.qst;
+  const stripeFee    = f.stripe_processing_fee;
+  const stripeTotal  = f.summary?.buyer_pays_stripe ?? f.stripe_total_charged;
+  const directTotal  = f.summary?.buyer_pays_direct ?? hammer;
+  const grandTotal   = f.summary?.buyer_total_cost  ?? ((stripeTotal != null && directTotal != null) ? stripeTotal + directTotal : null);
+
   return (
     <div className="container mx-auto max-w-3xl py-8 px-4">
       <Button variant="ghost" onClick={() => navigate(-1)} className="mb-4" data-testid="broker-request-back">
@@ -113,27 +172,122 @@ export default function BrokerBindingRequestPage() {
         {broker.operating_province} · {broker.regulatory_body} · {lang === 'fr' ? 'Licence' : 'License'} {broker.broker_license_number_masked}
       </p>
 
-      {feePreview && (
-        <Card className="mb-4 bg-slate-50 dark:bg-slate-900" data-testid="broker-fee-preview-card">
-          <CardContent className="p-5">
-            <h2 className="font-semibold mb-3">{lang === 'fr' ? 'Aperçu des frais (sur 15 000 $)' : 'Fee preview (on $15,000)'}</h2>
-            <div className="text-sm space-y-1 font-mono">
-              <div className="flex justify-between"><span>{lang === 'fr' ? 'Prix final' : 'Hammer price'}</span><span>${feePreview.hammer_price_cad.toFixed(2)}</span></div>
-              <div className="flex justify-between"><span>{lang === 'fr' ? 'Frais BidVex (2,5 %)' : 'BidVex platform fee (2.5%)'}</span><span>+${feePreview.bidvex_platform_fee_cad.toFixed(2)}</span></div>
-              <div className="flex justify-between"><span>{lang === 'fr' ? 'Frais du courtier' : 'Broker fee'}</span><span>+${feePreview.broker_fee_cad.toFixed(2)}</span></div>
-              <div className="flex justify-between"><span>{lang === 'fr' ? 'TPS (5 %)' : 'GST (5%)'}</span><span>+${feePreview.gst_cad.toFixed(2)}</span></div>
-              {feePreview.qst_cad > 0 && <div className="flex justify-between"><span>{lang === 'fr' ? 'TVQ (9,975 %)' : 'QST (9.975%)'}</span><span>+${feePreview.qst_cad.toFixed(2)}</span></div>}
-              <div className="flex justify-between"><span>{lang === 'fr' ? 'Traitement Stripe' : 'Stripe processing'}</span><span>+${feePreview.stripe_fee_cad.toFixed(2)}</span></div>
-              <div className="border-t pt-2 mt-2 flex justify-between font-bold"><span>{lang === 'fr' ? 'Total' : 'Total'}</span><span>${feePreview.total_cad.toFixed(2)}</span></div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* ── Province selector for accurate preview ─────────────── */}
+      <Card className="mb-4">
+        <CardContent className="p-4 flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <p className="font-semibold text-sm">
+              {lang === 'fr' ? 'Votre province d\'acheteur' : 'Your buyer province'}
+            </p>
+            <p className="text-xs text-slate-500">
+              {lang === 'fr' ? 'Affecte le calcul de la TVQ' : 'Affects QST calculation'}
+            </p>
+          </div>
+          <Select value={province} onValueChange={setProvince}>
+            <SelectTrigger className="w-[200px]" data-testid="binding-province-select"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="QC">Quebec / Québec</SelectItem>
+              <SelectItem value="ON">Ontario</SelectItem>
+              <SelectItem value="AB">Alberta</SelectItem>
+              <SelectItem value="BC">British Columbia / C.-B.</SelectItem>
+              <SelectItem value="MB">Manitoba</SelectItem>
+              <SelectItem value="SK">Saskatchewan</SelectItem>
+              <SelectItem value="NS">Nova Scotia</SelectItem>
+              <SelectItem value="OTHER">{lang === 'fr' ? 'Autre' : 'Other'}</SelectItem>
+            </SelectContent>
+          </Select>
+        </CardContent>
+      </Card>
 
+      {/* ── Two-section fee preview ────────────────────────────── */}
+      <Card className="mb-4 overflow-hidden" data-testid="broker-fee-preview-card">
+        <CardContent className="p-0">
+          <div className="px-5 py-3 bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+            <h2 className="font-semibold text-slate-900 dark:text-white text-sm">
+              {lang === 'fr' ? 'Aperçu des frais (sur 15 000 $)' : 'Fee Preview (based on $15,000 sample)'}
+            </h2>
+          </div>
+
+          {/* SECTION A — VEHICLE HAMMER (DIRECT) */}
+          <div className="bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-900 px-5 py-4">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300 mb-2">
+              {lang === 'fr' ? 'Section A — Prix marteau du véhicule' : 'Section A — Vehicle Hammer Price'}
+            </p>
+            <Row
+              label={lang === 'fr' ? `Prix marteau ${'\u00a0'}(direct)` : `Hammer Price ${'\u00a0'}(direct)`}
+              value={_fmt(hammer)}
+              accent
+              testId="fee-row-hammer"
+            />
+            <div className="mt-2 flex items-start gap-2 text-xs text-amber-800 dark:text-amber-200">
+              <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+              <span>
+                {lang === 'fr'
+                  ? 'Réglé directement entre vous et votre courtier par virement bancaire ou chèque certifié. BidVex ne traite pas ce montant.'
+                  : 'Settled directly between you and your broker via bank wire or certified cheque. BidVex does not process this amount.'}
+              </span>
+            </div>
+          </div>
+
+          {/* SECTION B — STRIPE-CHARGED SERVICE FEES */}
+          <div className="bg-blue-50 dark:bg-blue-950/30 px-5 py-4">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:text-cyan-300 mb-2">
+              {lang === 'fr' ? 'Section B — Frais de service (via Stripe)' : 'Section B — BidVex Service Fees (via Stripe)'}
+            </p>
+            <Row label={lang === 'fr' ? 'Frais de plateforme BidVex (2,5 %)' : 'BidVex Platform Fee (2.5%)'} value={_fmt(platformFee)} testId="fee-row-platform" />
+            <Row label={lang === 'fr' ? 'Frais de service du courtier' : 'Broker Service Fee'} value={_fmt(brokerFee)} testId="fee-row-broker" />
+            <Row label={lang === 'fr' ? 'TPS (5 %)' : 'GST (5%)'} value={_fmt(gst)} testId="fee-row-gst" />
+            {(qst != null && Number(qst) > 0) && (
+              <Row label={lang === 'fr' ? 'TVQ (9,975 %) [QC uniquement]' : 'QST (9.975%) [QC only]'} value={_fmt(qst)} testId="fee-row-qst" />
+            )}
+            <Row label={lang === 'fr' ? 'Frais de traitement Stripe' : 'Stripe Processing Fee'} value={_fmt(stripeFee)} testId="fee-row-stripe-proc" />
+            <div className="border-t border-blue-200 dark:border-blue-800 mt-2 pt-2">
+              <Row
+                label={lang === 'fr' ? 'Vous payez via Stripe' : 'You Pay via Stripe'}
+                value={_fmt(stripeTotal)}
+                bold
+                testId="fee-row-stripe-total"
+              />
+            </div>
+          </div>
+
+          {/* DEPOSIT */}
+          <div className="bg-slate-50 dark:bg-slate-800 px-5 py-3 border-t border-slate-200 dark:border-slate-700">
+            <Row
+              label={
+                <span className="flex items-center gap-1.5">
+                  <Lock className="h-3.5 w-3.5" />
+                  {lang === 'fr' ? 'Caution de sécurité (remboursable)' : 'Security Deposit (refundable)'}
+                </span>
+              }
+              value={_fmt(depositAmount)}
+              testId="fee-row-deposit"
+            />
+            <p className="text-[11px] text-slate-500 mt-0.5">
+              {lang === 'fr' ? 'Libérée après la remise du véhicule' : 'Released after vehicle handoff'}
+            </p>
+          </div>
+
+          {/* GRAND TOTAL */}
+          <div className="bg-gradient-to-r from-blue-100 to-cyan-100 dark:from-blue-950 dark:to-cyan-950 px-5 py-4 border-t-2 border-[#1E3A8A]/20">
+            <Row
+              label={lang === 'fr' ? 'Coût total estimé' : 'Total Estimated Cost'}
+              value={_fmt(grandTotal)}
+              big
+              testId="fee-row-grand-total"
+            />
+            <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-1">
+              {lang === 'fr' ? 'Stripe' : 'Stripe'} {_fmt(stripeTotal)} + {lang === 'fr' ? 'Direct' : 'Direct'} {_fmt(directTotal)}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Deposit notice ─────────────────────────────────────── */}
       <Card className="border-2 border-amber-300 bg-amber-50 dark:bg-amber-950/30 mb-4">
         <CardContent className="p-5 space-y-3">
           <div className="flex items-center gap-2">
-            <Lock className="h-5 w-5 text-amber-600" />
+            <CircleDollarSign className="h-5 w-5 text-amber-600" />
             <h2 className="font-semibold">{lang === 'fr' ? 'Dépôt de garantie requis' : 'Security Deposit Required'}</h2>
           </div>
           <p className="text-sm text-slate-700 dark:text-slate-200">
@@ -166,7 +320,8 @@ export default function BrokerBindingRequestPage() {
           : (lang === 'fr' ? `Autoriser le dépôt — vous ne serez pas débité maintenant` : `Authorize Deposit — You won't be charged now`)}
       </Button>
 
-      <p className="text-xs text-center text-slate-500 mt-3">
+      <p className="text-xs text-center text-slate-500 mt-3 flex items-center justify-center gap-1.5">
+        <CreditCard className="h-3 w-3" />
         {lang === 'fr'
           ? 'BidVex ne stocke pas vos informations de carte. Tout le traitement des paiements est géré par Stripe.'
           : 'BidVex does not store your card information. All payment processing is handled by Stripe.'}
