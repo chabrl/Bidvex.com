@@ -1,0 +1,282 @@
+"""
+iter217 Phase 5 — Email outbox drainer.
+
+Background worker that polls the `email_outbox` MongoDB collection and
+delivers queued messages via SendGrid (or skips gracefully if SendGrid
+is not configured — the dev preview).
+
+Handles the kinds queued by v8 / v8.1:
+  • `vehicle_released_with_receipt`  — bilingual buyer receipt link
+  • `title_transfer_overdue`         — broker reminder (cron-triggered)
+  • `title_transfer_filed`           — buyer confirmation when broker
+                                         logs SAAQ / ServiceOntario etc.
+  • `day21_broker_reminder`          — retention reminder (Task 2)
+
+Each outbox row carries at minimum:
+    { id, kind, to_user_id?, to_email?, context: {...}, queued_at }
+
+Drained rows are stamped with `sent_at` and `delivery_status`.
+Failed rows are retried up to `MAX_ATTEMPTS` times before being marked
+`failed`. The job is idempotent — re-runs skip already-sent rows.
+
+Bilingual decision: we honor `user.language` if available, else default
+to English. Templates can be configured via env vars
+SENDGRID_TEMPLATE_<KIND>_<EN|FR>; if a template id is missing we log
+and skip rather than raising (keeps the worker green in dev).
+"""
+from __future__ import annotations
+
+import logging
+import os
+from datetime import datetime, timezone
+from typing import Any, Dict, Optional
+from urllib.parse import urlencode
+
+logger = logging.getLogger(__name__)
+
+MAX_ATTEMPTS = 3
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+# ── Subject lines, hard-coded fallbacks for dev (no SendGrid templates yet) ──
+_SUBJECTS = {
+    "vehicle_released_with_receipt": {
+        "en": "Your BidVex transaction receipt is ready",
+        "fr": "Votre reçu de transaction BidVex est prêt",
+    },
+    "title_transfer_overdue": {
+        "en": "ACTION REQUIRED — Title transfer overdue",
+        "fr": "ACTION REQUISE — Transfert de propriété en retard",
+    },
+    "title_transfer_filed": {
+        "en": "Your vehicle title transfer has been filed",
+        "fr": "Le transfert de propriété de votre véhicule a été déposé",
+    },
+    "day21_broker_reminder": {
+        "en": "Buying at auction? A licensed broker is required",
+        "fr": "Acheter aux enchères ? Un courtier licencié est requis",
+    },
+}
+
+
+def _public_url(path: str) -> str:
+    """Return the user-facing absolute URL for a path."""
+    base = (
+        os.environ.get("PUBLIC_FRONTEND_URL")
+        or os.environ.get("REACT_APP_BACKEND_URL")
+        or "https://bidvex.com"
+    ).rstrip("/")
+    return base + ("/" + path.lstrip("/") if path else "")
+
+
+async def _resolve_recipient(db, row: Dict[str, Any]) -> tuple[Optional[str], Optional[str], str]:
+    """Returns (email, name, lang).  Empty email = skip row."""
+    email = row.get("to_email")
+    name  = None
+    lang  = "en"
+    user_id = row.get("to_user_id")
+    if user_id:
+        u = await db.users.find_one({"id": user_id}, {"_id": 0,
+                                                       "email": 1, "name": 1, "full_name": 1, "language": 1,
+                                                       "preferred_language": 1})
+        if u:
+            email = email or u.get("email")
+            name  = u.get("full_name") or u.get("name")
+            lang  = (u.get("language") or u.get("preferred_language") or "en")[:2].lower()
+            if lang not in ("en", "fr"):
+                lang = "en"
+    return email, name, lang
+
+
+def _template_id(kind: str, lang: str) -> Optional[str]:
+    """Look up a SendGrid Dynamic Template id for `<kind>_<lang>`."""
+    env_key = f"SENDGRID_TEMPLATE_{kind.upper()}_{lang.upper()}"
+    return os.environ.get(env_key) or None
+
+
+async def _send_via_sendgrid(row: Dict[str, Any], email: str, name: Optional[str],
+                              lang: str, dynamic_data: Dict[str, Any]) -> tuple[bool, str]:
+    """Hands off to services/email_service.send_template_email. Returns (ok, reason)."""
+    if not email:
+        return False, "no_recipient_email"
+    tmpl_id = _template_id(row["kind"], lang)
+    if not tmpl_id:
+        # Dev / preview environment — no template configured. We log and
+        # mark the row as "delivered_stub" so the queue doesn't back up.
+        logger.info("[email_outbox] no SendGrid template for kind=%s lang=%s — stubbing", row["kind"], lang)
+        return True, "stubbed_no_template"
+    try:
+        from services.email_service import send_template_email
+        sent = await send_template_email(
+            to_email=email, to_name=name or "",
+            template_id=tmpl_id, dynamic_data=dynamic_data,
+            is_marketing=(row["kind"] == "day21_broker_reminder"),
+        )
+        return bool(sent), ("sent" if sent else "sendgrid_returned_false")
+    except Exception as e:
+        logger.error("[email_outbox] send failed kind=%s err=%s", row.get("kind"), e, exc_info=True)
+        return False, f"exception:{type(e).__name__}"
+
+
+def _build_dynamic_data(row: Dict[str, Any], lang: str, name: Optional[str]) -> Dict[str, Any]:
+    """Per-kind dynamic data assembly. Always includes `lang`, `name` and a CTA URL."""
+    ctx = row.get("context") or {}
+    kind = row["kind"]
+    data: Dict[str, Any] = {
+        "lang":           lang,
+        "name":           name or "",
+        "current_year":   datetime.now().year,
+        "subject":        _SUBJECTS.get(kind, {}).get(lang) or _SUBJECTS.get(kind, {}).get("en") or "BidVex",
+    }
+
+    if kind == "vehicle_released_with_receipt":
+        url = _public_url(ctx.get("receipt_url") or "/")
+        data.update({
+            "receipt_url":    url,
+            "invoice_number": ctx.get("invoice_number"),
+            "pickup_code":    ctx.get("pickup_code"),
+            "headline":       ("Your transaction receipt is ready"
+                               if lang == "en"
+                               else "Votre reçu de transaction est prêt"),
+            "body":           (f"Your broker has confirmed the release of your vehicle. "
+                               f"Your shareable transaction receipt is available at the link below — "
+                               f"you can forward it to your insurance company or provincial vehicle "
+                               f"registry as proof of purchase.")
+                              if lang == "en" else
+                              (f"Votre courtier a confirmé la remise de votre véhicule. "
+                               f"Votre reçu de transaction partageable est disponible au lien ci-dessous "
+                               f"— vous pouvez le transférer à votre compagnie d'assurance ou au registre "
+                               f"des véhicules provincial comme preuve d'achat."),
+            "cta_label":      "View Receipt" if lang == "en" else "Voir le reçu",
+            "cta_url":        url,
+        })
+
+    elif kind == "title_transfer_overdue":
+        url = _public_url("/broker/dashboard")
+        days_overdue = ctx.get("days_overdue")
+        data.update({
+            "invoice_number": ctx.get("invoice_number"),
+            "broker_name":    ctx.get("broker_name"),
+            "days_overdue":   days_overdue,
+            "headline":       "ACTION REQUIRED — Title transfer overdue" if lang == "en" else "ACTION REQUISE — Transfert de propriété en retard",
+            "body":           (f"The vehicle for invoice {ctx.get('invoice_number')} was released more than "
+                               f"14 days ago and the provincial title transfer reference has not been "
+                               f"logged yet. Please log it in your broker dashboard immediately to avoid "
+                               f"account suspension under BidVex Terms § 21.")
+                              if lang == "en" else
+                              (f"Le véhicule pour la facture {ctx.get('invoice_number')} a été remis il y a "
+                               f"plus de 14 jours et la référence du transfert de propriété provincial n'a "
+                               f"pas encore été consignée. Veuillez la consigner immédiatement dans votre "
+                               f"tableau de bord pour éviter la suspension du compte (art. 21 des CGU)."),
+            "cta_label":      "Log Title Transfer" if lang == "en" else "Consigner le transfert",
+            "cta_url":        url,
+        })
+
+    elif kind == "title_transfer_filed":
+        url = _public_url(ctx.get("receipt_url") or "/")
+        data.update({
+            "invoice_number":     ctx.get("invoice_number"),
+            "registry":           ctx.get("registry"),
+            "registry_tx_number": ctx.get("registry_tx_number"),
+            "transfer_date":      ctx.get("transfer_date"),
+            "broker_name":        ctx.get("broker_name"),
+            "headline":           "Your title transfer has been filed" if lang == "en" else "Votre transfert de propriété a été déposé",
+            "body":               (f"Your broker has filed the provincial title transfer for your vehicle. "
+                                   f"Reference: {ctx.get('registry')} {ctx.get('registry_tx_number')}. "
+                                   f"Keep this for your records.")
+                                  if lang == "en" else
+                                  (f"Votre courtier a déposé le transfert de propriété provincial pour votre "
+                                   f"véhicule. Référence : {ctx.get('registry')} {ctx.get('registry_tx_number')}. "
+                                   f"Conservez ceci pour vos dossiers."),
+            "cta_label":          "View Receipt" if lang == "en" else "Voir le reçu",
+            "cta_url":            url,
+        })
+
+    elif kind == "day21_broker_reminder":
+        url = _public_url("/brokers")
+        data.update({
+            "headline":  "Ready to buy at auction?" if lang == "en" else "Prêt à acheter aux enchères ?",
+            "body":      ("Canadian law requires a licensed dealer / broker to bid at vehicle auctions. "
+                          "It's just 7 simple steps: (1) browse vehicles, (2) find a verified broker in your "
+                          "province, (3) request a partnership ($500 refundable deposit held — not charged), "
+                          "(4) authorize your max bid, (5) auction closes & invoice is generated, "
+                          "(6) two separate payments (Stripe service fees + hammer paid directly to broker), "
+                          "(7) pick up your vehicle with the 8-character code. Start at the Broker Directory.")
+                         if lang == "en" else
+                         ("La loi canadienne exige qu'un concessionnaire / courtier licencié enchérisse "
+                          "aux enchères de véhicules. C'est simple en 7 étapes : (1) parcourir les véhicules, "
+                          "(2) trouver un courtier vérifié dans votre province, (3) demander un partenariat "
+                          "(caution remboursable de 500 $, non débitée), (4) autoriser votre enchère "
+                          "maximale, (5) fermeture des enchères et facture générée, (6) deux paiements "
+                          "distincts (frais Stripe + prix marteau payé directement au courtier), "
+                          "(7) récupérer votre véhicule avec le code de 8 caractères. "
+                          "Commencez au répertoire des courtiers."),
+            "cta_label": "Find a Broker" if lang == "en" else "Trouver un courtier",
+            "cta_url":   url,
+        })
+
+    else:
+        data.update(ctx)   # passthrough for unknown kinds
+
+    return data
+
+
+async def drain_email_outbox(db, batch_size: int = 50) -> Dict[str, int]:
+    """Process one batch of pending outbox rows.  Idempotent + retry-safe."""
+    stats = {"processed": 0, "sent": 0, "stubbed": 0, "failed": 0, "skipped": 0, "retried": 0}
+
+    cursor = db.email_outbox.find({
+        "sent_at": {"$exists": False},
+        "$or": [{"attempts": {"$exists": False}}, {"attempts": {"$lt": MAX_ATTEMPTS}}],
+    }).sort("queued_at", 1).limit(batch_size)
+
+    async for row in cursor:
+        stats["processed"] += 1
+        attempts = int(row.get("attempts", 0))
+        try:
+            email, name, lang = await _resolve_recipient(db, row)
+            if not email:
+                # No recipient → skip permanently
+                await db.email_outbox.update_one({"_id": row["_id"]},
+                    {"$set": {"delivery_status": "skipped_no_recipient",
+                              "sent_at": _utcnow()}})
+                stats["skipped"] += 1
+                continue
+
+            dynamic_data = _build_dynamic_data(row, lang, name)
+            ok, reason  = await _send_via_sendgrid(row, email, name, lang, dynamic_data)
+
+            now = _utcnow()
+            if ok:
+                upd = {
+                    "delivery_status": reason,
+                    "sent_at":         now,
+                    "sent_to":         email,
+                    "sent_lang":       lang,
+                }
+                if reason == "stubbed_no_template":
+                    stats["stubbed"] += 1
+                else:
+                    stats["sent"] += 1
+                await db.email_outbox.update_one({"_id": row["_id"]}, {"$set": upd})
+            else:
+                next_attempts = attempts + 1
+                stats["retried" if next_attempts < MAX_ATTEMPTS else "failed"] += 1
+                upd = {
+                    "attempts":      next_attempts,
+                    "last_error":    reason,
+                    "last_attempt_at": now,
+                }
+                if next_attempts >= MAX_ATTEMPTS:
+                    upd["delivery_status"] = "failed"
+                    upd["sent_at"]         = now    # stop polling
+                await db.email_outbox.update_one({"_id": row["_id"]}, {"$set": upd})
+        except Exception as e:
+            stats["failed"] += 1
+            logger.error("[email_outbox] unexpected error on row %s: %s", row.get("id"), e, exc_info=True)
+            await db.email_outbox.update_one({"_id": row["_id"]},
+                {"$set": {"attempts": attempts + 1, "last_error": f"unexpected:{type(e).__name__}"}})
+    return stats

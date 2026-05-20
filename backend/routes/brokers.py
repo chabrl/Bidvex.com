@@ -1025,6 +1025,25 @@ async def mark_invoice_paid(
         })
     except Exception as e:
         logger.warning("broker_invoice_audit insert failed: %s", e)
+
+    # iter217 Phase 5 — Meta CAPI Purchase event fires the moment the
+    # broker confirms service fees have settled. LEGAL: value = platform
+    # fee + broker fee only; the vehicle hammer NEVER touches Meta.
+    try:
+        inv  = await db.broker_invoices.find_one({"id": invoice_id}, {"_id": 0})
+        buyer = await db.users.find_one({"id": inv.get("buyer_user_id")}, {"_id": 0}) if inv else None
+        if inv:
+            from services.analytics_tracker import track_broker_purchase
+            await track_broker_purchase(
+                db=db,
+                invoice_id=invoice_id,
+                platform_fee=float(inv.get("bidvex_platform_fee_cad", 0)),
+                broker_fee=float(inv.get("broker_fee_cad", 0)),
+                buyer_user=buyer,
+            )
+    except Exception as e:
+        logger.warning("meta_capi mark_paid emit failed: %s", e)
+
     return {"success": True}
 
 

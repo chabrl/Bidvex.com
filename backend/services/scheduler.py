@@ -774,6 +774,36 @@ def init_scheduler(database):
         name="Broker Title Transfer 14-day Enforcement (v8.1)",
         replace_existing=True,
     )
+
+    # iter217 Phase 5 — Email outbox drainer (every 2 minutes)
+    async def email_outbox_drainer_job():
+        if db_instance is None:
+            return
+        from workers.email_delivery_worker import drain_email_outbox
+        await drain_email_outbox(db_instance, batch_size=50)
+
+    scheduler.add_job(
+        _tracked("email_outbox_drainer", email_outbox_drainer_job),
+        IntervalTrigger(minutes=2),
+        id="email_outbox_drainer",
+        name="Email Outbox → SendGrid Delivery Drainer",
+        replace_existing=True,
+    )
+
+    # iter217 Phase 5 — Day-21 broker-onboarding retention reminder (daily @ 14:00 UTC)
+    async def day21_broker_reminder_job():
+        if db_instance is None:
+            return
+        from jobs.retention_reminders import queue_day21_broker_reminders
+        await queue_day21_broker_reminders(db_instance)
+
+    scheduler.add_job(
+        _tracked("day21_broker_reminder", day21_broker_reminder_job),
+        CronTrigger(hour=14, minute=0),
+        id="day21_broker_reminder",
+        name="Day-21 Broker Onboarding Retention Reminder",
+        replace_existing=True,
+    )
     
     # Job 8: Auction ending soon notifications - every 5 minutes
     async def ending_soon_job():

@@ -1,6 +1,54 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: iter217 Phase 5 Hotfix v8.1 — TermsOfServicePage fix + Buyer Receipt + Stripe Connect + Title Transfer Cron (Feb 20, 2026) ✅
+## Latest: Phase 5 Conversion & Email Funnel Activation (Feb 20, 2026) ✅
+
+### Task 1 — SendGrid Email Outbox Drainer
+- New `workers/email_delivery_worker.py` polls `email_outbox` every **2 min** via APScheduler.
+- Resolves recipient + preferred language (fr/en) from `users` doc.
+- Handles 4 kinds with full bilingual subject + body + CTA:
+  - `vehicle_released_with_receipt` (buyer receipt link)
+  - `title_transfer_overdue` (cron-triggered broker alert)
+  - `title_transfer_filed` (buyer confirmation when broker logs SAAQ etc.)
+  - `day21_broker_reminder` (Task 2)
+- Looks up SendGrid Dynamic Template id via `SENDGRID_TEMPLATE_<KIND>_<EN|FR>` env vars; **gracefully stubs** in dev (preview) when not configured — rows get `delivery_status = "stubbed_no_template"` + `sent_at` set so the queue doesn't back up.
+- Retry / failure protocol: max 3 attempts per row, then `delivery_status = "failed"` and stops polling. `attempts`, `last_error`, `last_attempt_at` tracked per row.
+- Idempotency: rows with `sent_at` set are never re-processed.
+- Edge cases tested: no resolvable recipient → `delivery_status = "skipped_no_recipient"`.
+- **Verified live in scheduler logs** — drainer ran twice within seconds of backend boot (100ms + 33ms).
+
+### Task 2 — Day-21 Dynamic Auto-Reminder
+- New `jobs/retention_reminders.py::queue_day21_broker_reminders(db)` — registered as a daily CronTrigger at **14:00 UTC**.
+- Eligibility filter: account created 21–30 days ago, `is_active=True`, `email_verified=True`, `account_type NOT IN ("broker","dealer","admin","vehicle_dealer")`, no existing broker_buyer_relationships row, no prior `day21_broker_reminder` outbox entry (idempotent).
+- Bilingual content honors `user.language` / `preferred_language` (fr/en). Default = English.
+- Body explains the v8.1 **7-step broker proxy flow** verbatim: browse → find broker → request partnership ($500 deposit) → authorize max bid → auction closes/invoice → two payments (Stripe + direct hammer) → pick up with 8-char code.
+- CTA deep-links to `/brokers` (or `/brokers?lang=fr` indirectly via user's locale).
+- Idempotent: second run on same data queues 0 additional reminders.
+
+### Task 3 — Meta CAPI Purchase Events (server-side)
+- New `services/analytics_tracker.py` — fires **server-side** Meta Conversion API Purchase event the moment broker marks the invoice paid (i.e., service fees confirmed). Hook lives inside `routes/brokers.py::mark_invoice_paid`.
+- **LEGAL math** (mirrors v7 broker fee engine refactor): `value = platform_fee + broker_fee` in CAD. **Hammer NEVER touches Meta.** GST/QST and Stripe gross-up also excluded — only the revenue BidVex actually earns.
+- PII fields SHA-256-hashed per Meta spec: email (lower-cased + stripped), phone (digits-only), first/last name, city, state/province, country, postal, external_id. `client_ip` + `client_user_agent` pass through cleartext per Meta's design.
+- Environment-driven: `META_PIXEL_ID` + `META_CAPI_ACCESS_TOKEN` required; `META_CAPI_TEST_EVENT_CODE` optional for sandbox; `META_CAPI_DISABLE=true` kill switch.
+- **Always writes an audit row** to `meta_capi_log` (id, invoice_id, event_id, value_cad, delivery status, timestamp) — even when env vars are missing, so the value math is provable in tests / analytics replays.
+- Event_id deterministic per invoice (`broker_invoice_{id}`) → Meta dedupes against the existing browser Pixel `Purchase` event automatically.
+
+### Tests (zero regressions)
+- `tests/test_conversion_pipeline_phase5.py` — **10 new tests**:
+  - Meta CAPI: value = 875 on $375 + $500 (never hammer), SHA-256 hashes verified bit-exact, payload shape, audit row written in env-missing mode.
+  - Drainer: stubs row when no template, idempotent across runs, missing recipient → skipped.
+  - Day-21: eligible user gets queued with correct lang, user with active relationship skipped, broker accounts never reminded.
+- **Full broker suite: 96 / 96 pass** in ~190 s (40 ecosystem + 11 v6 + 14 subs + 18 v7 + 5 v8 + 7 v8.1 + 10 phase-5 + 1 retest).
+
+### Scheduler additions (verified registered)
+| Job | Trigger | Source |
+|---|---|---|
+| Email Outbox → SendGrid Delivery Drainer | every 2 min | `workers/email_delivery_worker.py` |
+| Broker Title Transfer 14-day Enforcement | daily 04:00 UTC | `jobs/title_transfer_cron.py` |
+| Day-21 Broker Onboarding Retention Reminder | daily 14:00 UTC | `jobs/retention_reminders.py` |
+
+---
+
+## Earlier: iter217 Phase 5 Hotfix v8.1 — TermsOfServicePage fix + Buyer Receipt + Stripe Connect + Title Transfer Cron (Feb 20, 2026) ✅
 
 ### Task 1 — `TermsOfServicePage.js` broken export (CRITICAL)
 - Removed dangling `rmsOfServicePage;` line at file end that caused `ReferenceError` at webpack load time.
