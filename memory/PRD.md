@@ -1,6 +1,56 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: Phase 5 Conversion & Email Funnel Activation (Feb 20, 2026) ✅
+## Latest: FEATURE PATCH v9 (Feb 21, 2026) ✅
+
+Four targeted features layered on top of v8.1 + Phase 5 (96 → 107 backend tests):
+
+### Feature 1 — Admin Edit Auction End Time
+- `PATCH /api/admin/auctions/{listing_id}/end-time` + `GET .../end-time-history` (routes/admin_end_time.py).
+- Validates: future date, status not in {closed, settled, ended, completed, archived, rejected}.
+- Writes immutable audit row to `auction_end_time_audit` collection + mirrors into `admin_logs`.
+- Queues bilingual EN/FR emails + in-app notifications to: seller + ALL active bidders + outbid bidders + watchlist subscribers (de-duped).
+- Admin UI: "End Time" button + datetime-local modal on every row in **Manage All Auctions**, complete with a "Recent edits" audit-log mini-feed sourced from the history endpoint.
+
+### Feature 2 — Listing Logistics Visibility (Visit / Shipping / Pickup / Item Details)
+- New reusable `ListingLogisticsDetails` component conditionally renders Visit, Shipping & Delivery, Pickup, Item Details and Quantity badges.
+- Hides null/empty/false; booleans → bilingual Yes / No badges.
+- Wired into `ListingDetailPage.js` (single-item) and `VehicleDetailPage.js`. Multi-item already had a per-lot view.
+
+### Feature 3 — AI Watchdog Admin Review Flow
+- `POST /api/listings/suggest-category` (lightweight rule-based pre-publish check — fails open).
+- `POST /api/listings/{id}/flag-for-ai-review` (sets `status=pending_ai_review`, creates `listing_reviews` row).
+- Admin: `GET /api/admin/listing-reviews` + `POST .../{review_id}/approve` (optional `override_category`) / `.../reject`.
+- Seller self-service: `POST /api/listings/{id}/correct-category` (auto-clears AI flag → normal queue) and `POST .../withdraw-from-review`.
+- 30-min APScheduler job escalates pending reviews older than 60 min (idempotent flag).
+- Frontend: AI mismatch dialog on `CreateListingPage` (two CTAs: "Use suggested" vs "OK — submit for admin review"); seller dashboard `PendingAiReviewBanner` with 3 actions (Edit & Resubmit, Withdraw, Contact Support); admin **Flagged Listings (AI Review)** tab in `AdminDashboard`.
+
+### Feature 4 — Quantity field for listings (LEGAL CRITICAL)
+- New `quantity` (default 1) + `multiply_hammer_by_quantity` (default False) on `ListingCreate`, `Listing`, `MultiItemListingCreate`, `MultiItemListing`, and `Lot` models.
+- `broker_fee_engine.py` updated: `base_amount = hammer_price * (quantity if multiplier else 1)`; all service fees (platform 2.5%, broker percentage, GST 5%, QST 9.975% QC-only, Stripe gross-up) compute against `base_amount`.
+- **v7 legal isolation preserved**: vehicle hammer NEVER enters the Stripe charge — even at qty > 1, `stripe_total_charged` continues to exclude hammer; `summary.buyer_pays_direct = hammer_total`. Tested explicitly at qty=10.
+- Output dict adds: `quantity`, `multiply_hammer_by_quantity`, `base_amount`, `hammer_total`.
+- Frontend: Quantity Input + Multiply toggle on `CreateListingPage` (toggle OFF by default; only visible when qty > 1). Public listing page surfaces a Quantity card when qty > 1 or multiplier is on.
+
+### Side-bug fixed during v9
+- **P0 — `GET /api/listings` 500 (`_sort_key` mixed datetime/string)**: tuple-bucketed comparator in `routes/listings.py:484` normalises heterogeneous values. Confirmed 200 across `?sort=created_at&order=-1`.
+
+### Email worker extensions
+`workers/email_delivery_worker.py::_SUBJECTS` extended with `auction_end_time_changed_*` (seller/bidder/watchlist), `ai_review_admin_alert`, `ai_review_admin_escalation`, `ai_review_approved`, `ai_review_rejected`. Each kind has its own bilingual dynamic_data branch + CTA URL. SendGrid templates intentionally NOT configured in preview → rows mark `stubbed_no_template`.
+
+### Scheduler additions
+| Job | Trigger | Source |
+|---|---|---|
+| AI Review Escalation (60-min admin reminder) | every 30 min | `routes/admin_ai_review.py::escalate_overdue_reviews` |
+
+### Tests (zero regressions)
+- `tests/test_feature_patch_v9.py` — 11 new tests (quantity math + legal isolation + router registration + model defaults).
+- Live HTTP suite: `tests/test_feature_patch_v9_live2.py` (12 tests from testing agent, all pass).
+- Regression: full broker suite (60 tests in v6 + v7 + ecosystem + subscriptions) **still 100 %**.
+- Backend total: **107 passing pytest** (96 prior + 11 v9). Testing agent confirmed 83/83 v9-relevant assertions green.
+
+---
+
+## Phase 5 Conversion & Email Funnel Activation (Feb 20, 2026) ✅
 
 ### Task 1 — SendGrid Email Outbox Drainer
 - New `workers/email_delivery_worker.py` polls `email_outbox` every **2 min** via APScheduler.

@@ -39,7 +39,7 @@ ai_review_router = APIRouter(tags=["AI Review"])
 
 
 class CategorySuggestRequest(BaseModel):
-    title: str = Field(..., max_length=300)
+    title: Optional[str] = Field("", max_length=300)
     description: Optional[str] = Field("", max_length=4000)
     seller_category: Optional[str] = ""
 

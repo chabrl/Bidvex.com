@@ -484,8 +484,23 @@ async def get_listings(
         def _sort_key(x):
             v = x.get(sort_field)
             if v is None:
-                return "" if isinstance(sort_field, str) and sort_field != "current_price" else 0
-            return v
+                return (0, "", 0.0)
+            # Normalise mixed datetime/string/number values so `<` is consistent
+            # across heterogeneous rows. Returns a (type-bucket, str, num) tuple.
+            if isinstance(v, datetime):
+                try:
+                    return (1, "", v.timestamp())
+                except Exception:
+                    return (1, "", 0.0)
+            if isinstance(v, str):
+                # Try ISO-8601 → epoch; otherwise compare lexically as string.
+                try:
+                    return (1, "", datetime.fromisoformat(v.replace("Z", "+00:00")).timestamp())
+                except Exception:
+                    return (2, v, 0.0)
+            if isinstance(v, (int, float)):
+                return (3, "", float(v))
+            return (4, str(v), 0.0)
         listings.sort(key=_sort_key, reverse=reverse)
     listings = listings[:limit]
 

@@ -55,3 +55,16 @@
   - Preview `.env`: `GOOGLE_CALLBACK_URL=https://prod-verify-2.preview.emergentagent.com/api/auth/google/callback` (currently set)
   - Production deploy: `GOOGLE_CALLBACK_URL=https://bidvex.com/api/auth/google/callback`
 - Test flow: click "Continue with Google" → backend `/api/auth/google` → Google consent → backend `/api/auth/google/callback` → frontend `/auth/google/finish#token=…` → `/marketplace`
+
+## Replacement test buyer (Feature Patch v9 — added 2026-02)
+- Email: v9test_1779311352@bidvex.com
+- Password: TestBuyer123!
+- Role: user (regular buyer/seller)
+- Note: created during v9 testing as a working replacement for the now-stale iter189buyer@test.com account. Used by /app/backend/tests/test_feature_patch_v9_live2.py.
+
+## E2E Playwright bypass for cookie consent
+Before clicking any button on `/auth`, automation runners should either click `text="Accept All Cookies"` first, OR set in browser context:
+```js
+localStorage.setItem('bidvex_cookie_consent', JSON.stringify({version: 1, accepted: true}));
+```
+Otherwise the Law-25 consent banner intercepts the Sign-In click.
