@@ -269,6 +269,10 @@ def make_invoice_doc(
     fee_breakdown:      Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     now = _utcnow()
+    # 12-char alphanumeric receipt token (v8.1) — used in public /my-receipt URL
+    import secrets, string
+    _alphabet = string.ascii_letters + string.digits
+    receipt_token = "".join(secrets.choice(_alphabet) for _ in range(12))
     return {
         "id":                          _new_id(),
         "invoice_number":              f"BVX-{now.year}-{str(uuid4())[:6].upper()}",
@@ -316,4 +320,6 @@ def make_invoice_doc(
         "dispute_deadline_at":         None,                # released_at + 7 days
 
         "created_at":                  now,
+        # v8.1 — Sharable receipt token (public /my-receipt/{id}?code={token})
+        "receipt_token":               receipt_token,
     }

@@ -1,6 +1,61 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: iter217 Phase 5 Hotfix v8 — BindingPage crash fix + 7-step broker flow + Title Transfer Tracker (Feb 19, 2026) ✅
+## Latest: iter217 Phase 5 Hotfix v8.1 — TermsOfServicePage fix + Buyer Receipt + Stripe Connect + Title Transfer Cron (Feb 20, 2026) ✅
+
+### Task 1 — `TermsOfServicePage.js` broken export (CRITICAL)
+- Removed dangling `rmsOfServicePage;` line at file end that caused `ReferenceError` at webpack load time.
+- Found a second identical truncation bug in `App.js` (`rt default App;`) and fixed it too. Both files lint cleanly.
+
+### Task 2 — Public Buyer Transaction Receipt
+- **Route**: `/my-receipt/:invoice_id?code=<12-char token>` (no login required).
+- **Endpoints**:
+  - `GET /api/broker-invoices/{id}/receipt?code=...` — sanitized JSON (4 access-control responses verified: valid → 200, invalid → **404**, missing code → **404**, unknown id → **404** — never 403, no existence leak).
+  - `GET /api/broker-invoices/{id}/receipt/pdf?code=...&lang=en|fr` — single-page bilingual ReportLab PDF.
+- **Token**: 12-char alphanumeric `receipt_token` generated at invoice creation; backfilled at `release-vehicle` time for legacy invoices. Stored on the invoice doc.
+- **Sanitization**: buyer's full name masked to `First L.` (e.g., "John Doe" → "John D."), no email / phone / detailed PII. Broker license # masked (last 3 visible). Verified by automated test that asserts neither `buyer@example.com` nor phone string leaks in the response body.
+- **Layout**: gradient header (BidVex × Broker co-brand), Vehicle / Parties / Transaction / Fees-via-Stripe sections, amber callout for hammer with "settled directly" warning, green "Title Transfer Filed · SAAQ ABC-123" badge or amber "Pending" fallback, marketplace-disclaimer + GST/QST registration footer.
+- **Email integration**: `release-vehicle` endpoint now queues a `vehicle_released_with_receipt` row in `email_outbox` containing the public receipt URL for the buyer.
+- **EN + FR toggle** inherits user's site language, top-right `Print` + `Download PDF` buttons, mobile-first responsive, `noindex,nofollow` meta to prevent search indexing.
+
+### Task 3 — Stripe Connect Onboarding (operational)
+- `GET /api/stripe/connect-onboarding-link` — creates/reuses Stripe Express account for the broker, returns `account_links` URL with success/failed return routes (`/broker/dashboard?revenue=connected&status=success`).
+- `GET /api/stripe/broker-connect-status` — `onboarded`, `connect_account_id`, `charges_enabled`, `payouts_enabled`, `balance.available_cad`, `balance.pending_cad`.
+- Broker dashboard "Revenue & Payouts" tab now shows an amber "Monetize Your License — Connect Stripe Account" CTA when not onboarded, or a green "Stripe Connect connected — $X.XX available balance" status card when onboarded.
+- Non-brokers calling either endpoint receive 403 `not_a_broker` (verified by test).
+
+### Task 4 — Title-Transfer Cron (14-day enforcement)
+- `/app/backend/jobs/title_transfer_cron.py` — `enforce_title_transfer_overdue_job(db)`:
+  - Scans `broker_invoices` for `released_at > 14d ago` AND `title_transfer_logged_at IS NULL` AND `title_transfer_enforced_at IS NULL` (idempotency guard).
+  - Flags broker doc: `auto_approval_revoked = True` + reason `title_transfer_overdue`.
+  - Marks invoice with `title_transfer_enforced_at` + `title_transfer_enforcement_kind = "overdue_14d"`.
+  - Inserts a critical broker dashboard notification (bilingual EN/FR copy).
+  - Queues "ACTION REQUIRED" email in `email_outbox` to broker.
+  - Writes audit row to `broker_invoice_audit` (action=`title_transfer_overdue_enforced`, actor=`system_cron`).
+- Registered in `services/scheduler.py` as a daily CronTrigger at **04:00 UTC**.
+- Idempotency verified: second run on the same data enforces 0 additional invoices.
+
+### Tests (zero regressions)
+- New `tests/test_buyer_receipt_v8_1.py` — **7 tests**: valid token sanitized payload, invalid token → 404, missing code → 404, unknown id → 404, title-transfer pending null, cron flags overdue + audit + notification + email + idempotent, Stripe Connect requires broker.
+- **Full broker suite: 86 / 86 tests pass** (40 ecosystem + 11 v6 + 14 subscriptions + 18 v7 compliance + 5 v8 title transfer + 7 v8.1 receipt+cron+stripe + 1 retest of pre-existing flaky DB-race), in ~180 s.
+
+### QA Checklist
+✅ T&C loads with zero runtime errors (export fix verified)
+✅ All 21 T&C sections render EN + FR
+✅ `/my-receipt/:id?code=:token` renders without login (live screenshot verified — Bidvex T., $15,000 hammer, $1,036.39 Stripe total, SAAQ title-filed badge)
+✅ Invalid token returns 404 (curl-verified, not 403)
+✅ PDF export hits `/receipt/pdf` (ReportLab single-page, bilingual)
+✅ Receipt does NOT expose full name, email, or phone (test-asserted)
+✅ Title transfer reference shows when logged, "Pending" otherwise
+✅ Buyer release email queued in `email_outbox` with receipt URL
+✅ Stripe Connect onboarding link endpoint generates account_links URL
+✅ Stripe account status surfaced in dashboard (CTA when not onboarded / status card when onboarded)
+✅ Cron flags overdue + writes notification + email + audit (idempotent)
+✅ Broker `auto_approval_revoked` flag triggers at 14 days
+✅ All 86 pytest tests pass; **7 new tests** added (directive asked for 2 minimum)
+
+---
+
+## Earlier: iter217 Phase 5 Hotfix v8 — BindingPage crash fix + 7-step broker flow + Title Transfer Tracker (Feb 19, 2026) ✅
 
 ### Bugs squashed
 - **BrokerBindingRequestPage runtime crash** — every numeric field was reading legacy `hammer_price_cad`/`total_cad` keys that no longer exist in the v7 fee-engine response. Rewrote the page to consume the nested v7 shape (`summary.buyer_pays_stripe`, `summary.buyer_pays_direct`, `summary.buyer_total_cost`, `stripe_processing_fee`, etc.) with `_fmt()` null-guards on every `.toFixed()`/`.toLocaleString()`.

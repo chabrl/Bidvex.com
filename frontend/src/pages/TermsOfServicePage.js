@@ -511,4 +511,3 @@ const TermsOfServicePage = () => {
 };
 
 export default TermsOfServicePage;
-rmsOfServicePage;

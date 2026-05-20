@@ -19,7 +19,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Literal, Optional
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from deps import get_current_user, get_db, User
@@ -575,3 +575,325 @@ async def broker_trust_score(broker_id: str):
         "rating_count":        int(broker.get("rating_count") or 0),
         "member_since":        broker.get("created_at"),
     }
+
+
+@broker_compliance_router.get("/stripe/connect-onboarding-link")
+async def broker_stripe_connect_onboarding(
+    request:      Request,
+    current_user: User = Depends(get_current_user),
+):
+    """v8.1 — Broker-specific Stripe Connect onboarding link.
+
+    Creates (or reuses) a Stripe Express account for the current broker,
+    then returns an `account_links` URL that bounces the broker back to
+    /dashboard/revenue?status=success (or ?status=failed on refresh).
+    """
+    import os
+    try:
+        import stripe
+    except ImportError:
+        raise HTTPException(status_code=501, detail={"error": "stripe_sdk_unavailable"})
+
+    stripe.api_key = (
+        os.environ.get("STRIPE_SECRET_KEY")
+        or os.environ.get("STRIPE_TEST_SECRET_KEY")
+    )
+    if not stripe.api_key:
+        raise HTTPException(status_code=503, detail={"error": "stripe_not_configured"})
+
+    db = get_db()
+    broker = await db.brokers.find_one({"user_id": current_user.id}, {"_id": 0})
+    if not broker:
+        raise HTTPException(status_code=403, detail={"error": "not_a_broker"})
+
+    connect_id = broker.get("stripe_connect_account_id")
+    if not connect_id:
+        try:
+            account = stripe.Account.create(
+                type="express",
+                country="CA",
+                email=current_user.email,
+                capabilities={"card_payments": {"requested": True},
+                              "transfers":     {"requested": True}},
+                business_type="company",
+                metadata={"user_id": current_user.id, "broker_id": broker["id"], "platform": "bidvex"},
+            )
+            connect_id = account.id
+            await db.brokers.update_one(
+                {"id": broker["id"]},
+                {"$set": {
+                    "stripe_connect_account_id":         connect_id,
+                    "stripe_connect_onboarding_complete": False,
+                    "stripe_connect_created_at":         _utcnow(),
+                }},
+            )
+        except Exception as e:
+            raise HTTPException(status_code=502, detail={"error": "stripe_account_create_failed", "message_en": str(e)})
+
+    base_url = os.environ.get("REACT_APP_BACKEND_URL", str(request.base_url).rstrip("/"))
+    try:
+        link = stripe.AccountLink.create(
+            account=connect_id,
+            refresh_url=f"{base_url}/broker/dashboard?revenue=refresh&status=failed",
+            return_url=f"{base_url}/broker/dashboard?revenue=connected&status=success",
+            type="account_onboarding",
+            collection_options={"fields": "eventually_due"},
+        )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail={"error": "stripe_link_create_failed", "message_en": str(e)})
+
+    return {"connect_account_id": connect_id, "onboarding_url": link.url}
+
+
+@broker_compliance_router.get("/stripe/broker-connect-status")
+async def broker_stripe_connect_status(current_user: User = Depends(get_current_user)):
+    """Return whether the broker's Stripe Connect account is onboarded + balance."""
+    import os
+    try:
+        import stripe
+    except ImportError:
+        raise HTTPException(status_code=501, detail={"error": "stripe_sdk_unavailable"})
+    stripe.api_key = os.environ.get("STRIPE_SECRET_KEY") or os.environ.get("STRIPE_TEST_SECRET_KEY")
+    db = get_db()
+    broker = await db.brokers.find_one({"user_id": current_user.id}, {"_id": 0})
+    if not broker:
+        raise HTTPException(status_code=403, detail={"error": "not_a_broker"})
+    connect_id = broker.get("stripe_connect_account_id")
+    if not connect_id:
+        return {"onboarded": False, "connect_account_id": None}
+    try:
+        acct = stripe.Account.retrieve(connect_id)
+        onboarded = bool(acct.charges_enabled and acct.payouts_enabled and acct.details_submitted)
+        balance = None
+        if onboarded:
+            try:
+                bal = stripe.Balance.retrieve(stripe_account=connect_id)
+                balance = {
+                    "available_cad": sum(b.amount for b in bal.available if b.currency == "cad") / 100.0,
+                    "pending_cad":   sum(b.amount for b in bal.pending   if b.currency == "cad") / 100.0,
+                }
+            except Exception:
+                balance = None
+        if onboarded != bool(broker.get("stripe_connect_onboarding_complete")):
+            await db.brokers.update_one({"id": broker["id"]},
+                                         {"$set": {"stripe_connect_onboarding_complete": onboarded}})
+        return {
+            "onboarded":         onboarded,
+            "connect_account_id": connect_id,
+            "charges_enabled":   bool(acct.charges_enabled),
+            "payouts_enabled":   bool(acct.payouts_enabled),
+            "details_submitted": bool(acct.details_submitted),
+            "balance":           balance,
+        }
+    except Exception as e:
+        return {"onboarded": False, "connect_account_id": connect_id, "error": str(e)}
+
+
+
+# Token-secured, no login required. The 12-char `receipt_token` is
+# stored on the invoice and embedded in the buyer release email link.
+# Returns 404 (NOT 403) on token mismatch to avoid leaking whether
+# the invoice_id exists.
+# ─────────────────────────────────────────────────────────────────────
+def _mask_full_name(full_name: Optional[str]) -> str:
+    """'John Doe' → 'John D.'  'Marie-Claire Dupont' → 'Marie-Claire D.'."""
+    if not full_name or not full_name.strip():
+        return "Anonymous"
+    parts = full_name.strip().split()
+    if len(parts) == 1:
+        return parts[0]
+    return f"{parts[0]} {parts[-1][0]}."
+
+
+@broker_compliance_router.get("/broker-invoices/{invoice_id}/receipt")
+async def get_buyer_receipt(invoice_id: str, code: Optional[str] = None):
+    """Public token-secured buyer transaction receipt."""
+    db = get_db()
+    inv = await db.broker_invoices.find_one({"id": invoice_id}, {"_id": 0})
+    if not inv or not code or inv.get("receipt_token") != code:
+        raise HTTPException(status_code=404, detail={"error": "not_found"})
+
+    broker  = await db.brokers.find_one({"id": inv["broker_id"]}, {"_id": 0}) or {}
+    buyer   = await db.users.find_one({"id": inv["buyer_user_id"]}, {"_id": 0, "full_name": 1, "name": 1}) or {}
+    listing = (await db.listings.find_one({"id": inv["vehicle_listing_id"]}, {"_id": 0})
+               or await db.vehicle_listings.find_one({"id": inv["vehicle_listing_id"]}, {"_id": 0})
+               or {})
+
+    lic = broker.get("broker_license_number") or ""
+    masked_license = ("•" * max(0, len(lic) - 3)) + lic[-3:] if lic else ""
+    fee_breakdown = inv.get("fee_breakdown") or {}
+
+    return {
+        "invoice_number":   inv.get("invoice_number"),
+        "issued_at":        inv.get("created_at"),
+        "vehicle": {
+            "title":            listing.get("title"),
+            "year":             listing.get("year"),
+            "make":             listing.get("make"),
+            "model":            listing.get("model"),
+            "vin":              listing.get("vin"),
+            "mileage":          listing.get("mileage") or listing.get("odometer"),
+            "origin_province":  (listing.get("region") or listing.get("province") or inv.get("title_transfer_province")),
+            "country":          listing.get("country") or "Canada",
+        },
+        "buyer":  {"display_name": _mask_full_name(buyer.get("full_name") or buyer.get("name"))},
+        "broker": {
+            "legal_business_name": broker.get("legal_business_name"),
+            "license_masked":      masked_license,
+            "regulatory_body":     broker.get("regulatory_body"),
+            "operating_province":  broker.get("operating_province"),
+        },
+        "transaction": {
+            "hammer_price_cad":              float(inv.get("hammer_price_cad", 0)),
+            "hammer_settlement":             "direct",
+            "hammer_settlement_note":        ("Settled directly between the buyer and the licensed broker outside of BidVex "
+                                              "(bank wire, certified cheque, or broker trust account)."),
+            "auction_closed_at":             inv.get("created_at"),
+            "vehicle_released_at":           inv.get("released_at"),
+            "title_transfer_logged_at":      inv.get("title_transfer_logged_at"),
+            "title_transfer_registry":       inv.get("title_transfer_registry"),
+            "title_transfer_tx_number":      inv.get("title_transfer_tx_number"),
+            "title_transfer_date":           inv.get("title_transfer_date"),
+            "pickup_code_used":              inv.get("pickup_code") if inv.get("released_at") else None,
+        },
+        "fees_via_stripe": {
+            "platform_fee_cad":              float(inv.get("bidvex_platform_fee_cad", 0)),
+            "broker_fee_cad":                float(inv.get("broker_fee_cad", 0)),
+            "gst_cad":                       float(inv.get("gst_cad", 0)),
+            "qst_cad":                       float(inv.get("qst_cad", 0)),
+            "stripe_processing_fee_cad":     float(fee_breakdown.get("stripe_processing_fee", 0)),
+            "total_via_stripe_cad":          float(inv.get("total_cad", 0)),
+        },
+        "platform_disclaimer": ("The vehicle hammer price was settled directly between the buyer and the licensed "
+                                "broker outside of BidVex. BidVex is a marketplace platform and does not act as a "
+                                "dealer or financial intermediary."),
+        "platform_address":   "BidVex Inc. — Sherbrooke, QC, Canada",
+        "gst_registration":   "GST# 00000 00000 RT0001",
+        "qst_registration":   "QST# 0000000000 TQ0001",
+    }
+
+
+@broker_compliance_router.get("/broker-invoices/{invoice_id}/receipt/pdf")
+async def get_buyer_receipt_pdf(invoice_id: str, code: Optional[str] = None, lang: str = "en"):
+    """Single-page bilingual PDF version of the buyer receipt."""
+    from fastapi.responses import StreamingResponse
+    import io
+    from reportlab.lib.pagesizes import LETTER
+    from reportlab.lib.colors import HexColor
+    from reportlab.lib.utils import simpleSplit
+    from reportlab.pdfgen import canvas as _pdf_canvas
+
+    data = await get_buyer_receipt(invoice_id, code)
+    fr = (lang == "fr")
+    t = {
+        "title":   "Reçu officiel de transaction BidVex"     if fr else "BidVex Official Transaction Receipt",
+        "invoice": "Facture n°"                              if fr else "Invoice #",
+        "vehicle": "Véhicule"                                if fr else "Vehicle",
+        "buyer":   "Acheteur"                                 if fr else "Buyer",
+        "broker":  "Courtier licencié"                       if fr else "Licensed Broker",
+        "license": "Permis"                                  if fr else "License #",
+        "registry":"Registre provincial"                     if fr else "Provincial Registry",
+        "txn":     "Détails de la transaction"               if fr else "Transaction Details",
+        "hammer":  "Prix marteau (réglé directement)"        if fr else "Hammer Price (settled directly)",
+        "released":"Véhicule remis"                          if fr else "Vehicle Released",
+        "tt":      "Transfert de propriété déposé"           if fr else "Title Transfer Filed",
+        "tt_pending": "En attente"                            if fr else "Pending",
+        "fees":    "Frais traités via BidVex (Stripe)"       if fr else "Fees Processed via BidVex (Stripe)",
+        "pf":      "Frais de plateforme BidVex"              if fr else "BidVex Platform Fee",
+        "bf":      "Frais de service du courtier"            if fr else "Broker Service Fee",
+        "gst":     "TPS (5 %)"                                if fr else "GST (5%)",
+        "qst":     "TVQ (9,975 %)"                            if fr else "QST (9.975%)",
+        "spf":     "Frais de traitement Stripe"              if fr else "Stripe Processing Fee",
+        "total_s": "TOTAL via Stripe"                         if fr else "TOTAL via Stripe",
+        "warn":    ("⚠ Le prix marteau a été réglé directement entre l'acheteur et le courtier licencié "
+                    "hors de BidVex. BidVex est une plateforme de marché et n'agit pas comme "
+                    "concessionnaire ou intermédiaire financier.")
+                   if fr else
+                   ("⚠ The vehicle hammer price was settled directly between the buyer and the "
+                    "licensed broker outside of BidVex. BidVex is a marketplace platform and does "
+                    "not act as a dealer or financial intermediary."),
+        "footer":  "Vérifié par BidVex Inc. — Sherbrooke, QC, Canada"
+                   if fr else "Verified by BidVex Inc. — Sherbrooke, QC, Canada",
+    }
+
+    buf = io.BytesIO()
+    c = _pdf_canvas.Canvas(buf, pagesize=LETTER)
+    w, h = LETTER
+    navy  = HexColor("#1E3A8A")
+    grey  = HexColor("#6B7280")
+    amber = HexColor("#92400E")
+    y = h - 50
+
+    c.setFillColor(navy); c.setFont("Helvetica-Bold", 18)
+    c.drawString(50, y, "🔒 " + t["title"]); y -= 22
+    c.setFillColor(grey); c.setFont("Helvetica", 9)
+    c.drawString(50, y, f"{t['invoice']}: {data.get('invoice_number','—')}  ·  {str(data.get('issued_at',''))[:10]}")
+    y -= 8
+    c.setStrokeColor(navy); c.setLineWidth(1.5); c.line(50, y, w - 50, y); y -= 18
+
+    v   = data["vehicle"]; b = data["buyer"]; brk = data["broker"]
+    tx  = data["transaction"]; fees = data["fees_via_stripe"]
+
+    def hd(lbl):
+        nonlocal y
+        c.setFillColor(navy); c.setFont("Helvetica-Bold", 11); c.drawString(50, y, lbl); y -= 14
+
+    def kv(k, val):
+        nonlocal y
+        c.setFillColor(HexColor("#1F2937")); c.setFont("Helvetica", 10)
+        c.drawString(60, y, str(k)); c.drawRightString(w - 50, y, str(val)); y -= 12
+
+    def amt(k, val):
+        nonlocal y
+        c.setFillColor(HexColor("#1F2937")); c.setFont("Helvetica", 10)
+        c.drawString(60, y, str(k)); c.drawRightString(w - 50, y, f"${float(val or 0):,.2f} CAD"); y -= 12
+
+    hd(t["vehicle"])
+    kv("Title",            v.get("title") or "—")
+    kv("Year/Make/Model",  " ".join(str(x) for x in [v.get("year"), v.get("make"), v.get("model")] if x) or "—")
+    kv("VIN",              v.get("vin") or "—")
+    kv("Mileage",          v.get("mileage") or "—")
+    kv("Origin",           f'{v.get("origin_province") or "—"}, {v.get("country") or ""}')
+    y -= 4
+    hd(t["buyer"]);  kv("Display name", b.get("display_name"))
+    hd(t["broker"]); kv("Business", brk.get("legal_business_name") or "—")
+    kv(t["license"],  brk.get("license_masked") or "—")
+    kv(t["registry"], f'{brk.get("regulatory_body") or "—"} ({brk.get("operating_province") or ""})')
+    y -= 4
+
+    hd(t["txn"])
+    c.setFillColor(amber); c.setFont("Helvetica-Bold", 10)
+    c.drawString(60, y, t["hammer"]); c.drawRightString(w - 50, y, f"${float(tx.get('hammer_price_cad', 0)):,.2f} CAD")
+    y -= 12
+    kv(t["released"], str(tx.get("vehicle_released_at") or "—")[:10])
+    if tx.get("title_transfer_logged_at"):
+        kv(t["tt"], f"{tx.get('title_transfer_registry') or ''} {tx.get('title_transfer_tx_number') or ''}".strip())
+        kv("Date", str(tx.get("title_transfer_date") or "—")[:10])
+    else:
+        c.setFillColor(amber); c.drawString(60, y, t["tt"]); c.drawRightString(w - 50, y, t["tt_pending"]); y -= 12
+    y -= 4
+
+    hd(t["fees"])
+    amt(t["pf"],  fees.get("platform_fee_cad"))
+    amt(t["bf"],  fees.get("broker_fee_cad"))
+    amt(t["gst"], fees.get("gst_cad"))
+    if float(fees.get("qst_cad", 0) or 0) > 0:
+        amt(t["qst"], fees.get("qst_cad"))
+    amt(t["spf"], fees.get("stripe_processing_fee_cad"))
+    c.setStrokeColor(navy); c.setLineWidth(1); c.line(50, y + 4, w - 50, y + 4); y -= 2
+    c.setFillColor(navy); c.setFont("Helvetica-Bold", 12)
+    c.drawString(50, y, t["total_s"]); c.drawRightString(w - 50, y, f"${float(fees.get('total_via_stripe_cad', 0)):,.2f} CAD")
+    y -= 18
+
+    c.setFillColor(amber); c.setFont("Helvetica-Oblique", 9)
+    for ln in simpleSplit(t["warn"], "Helvetica-Oblique", 9, w - 100):
+        c.drawString(50, y, ln); y -= 11
+    y -= 8
+    c.setFillColor(grey); c.setFont("Helvetica", 8)
+    c.drawString(50, y, t["footer"]); y -= 10
+    c.drawString(50, y, f'{data.get("gst_registration","")}   ·   {data.get("qst_registration","")}')
+
+    c.showPage(); c.save(); buf.seek(0)
+    return StreamingResponse(buf, media_type="application/pdf", headers={
+        "Content-Disposition": f'attachment; filename="bidvex-receipt-{data.get("invoice_number")}.pdf"',
+    })

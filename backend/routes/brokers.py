@@ -1032,14 +1032,42 @@ async def mark_invoice_paid(
 async def release_vehicle(invoice_id: str, current_user: User = Depends(get_current_user)):
     db = get_db()
     broker = await db.brokers.find_one({"user_id": current_user.id}, {"_id": 0, "id": 1})
-    inv = await db.broker_invoices.find_one({"id": invoice_id}, {"_id": 0, "broker_id": 1})
+    inv = await db.broker_invoices.find_one({"id": invoice_id}, {"_id": 0})
     if not inv or not broker or inv["broker_id"] != broker["id"]:
         raise HTTPException(status_code=403, detail={"error": "not_authorized"})
+
+    now = _utcnow()
     await db.broker_invoices.update_one(
         {"id": invoice_id},
-        {"$set": {"vehicle_release_status": "released", "released_at": _utcnow()}},
+        {"$set": {"vehicle_release_status": "released", "released_at": now}},
     )
-    return {"success": True}
+
+    # v8.1 — Backfill a receipt_token for invoices created before v8.1
+    # and queue a "vehicle released" email with the public receipt link.
+    receipt_token = inv.get("receipt_token")
+    if not receipt_token:
+        import secrets, string
+        _alphabet = string.ascii_letters + string.digits
+        receipt_token = "".join(secrets.choice(_alphabet) for _ in range(12))
+        await db.broker_invoices.update_one({"id": invoice_id}, {"$set": {"receipt_token": receipt_token}})
+
+    try:
+        await db.email_outbox.insert_one({
+            "id":           str(__import__("uuid").uuid4()),
+            "kind":         "vehicle_released_with_receipt",
+            "to_user_id":   inv.get("buyer_user_id"),
+            "context": {
+                "invoice_id":     invoice_id,
+                "invoice_number": inv.get("invoice_number"),
+                "pickup_code":    inv.get("pickup_code"),
+                "receipt_url":    f"/my-receipt/{invoice_id}?code={receipt_token}",
+            },
+            "queued_at":    now,
+        })
+    except Exception as e:
+        logger.warning("vehicle_released email queue failed: %s", e)
+
+    return {"success": True, "receipt_url": f"/my-receipt/{invoice_id}?code={receipt_token}"}
 
 
 # ── 8. Hotfix v7: PDF invoice generator (bilingual, two-section legal) ─

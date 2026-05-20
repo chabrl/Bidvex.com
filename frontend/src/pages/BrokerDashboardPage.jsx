@@ -613,14 +613,37 @@ function BrokerPipelineTab({ lang }) {
   );
 }
 
-// ── v6 — Revenue + Settings ────────────────────────────────────────────
+// ── v8.1 — Revenue + Settings (Stripe Connect onboarding live) ────────
 function BrokerRevenueTab({ lang, broker }) {
-  const [invoices, setInvoices] = React.useState([]);
+  const [invoices, setInvoices]       = React.useState([]);
+  const [stripeStatus, setStripeStatus] = React.useState(null);
+  const [linking, setLinking]         = React.useState(false);
+  const [linkError, setLinkError]     = React.useState(null);
+
+  const t = () => localStorage.getItem('access_token') || localStorage.getItem('token');
+  const auth = { headers: { Authorization: `Bearer ${t()}` } };
+
   React.useEffect(() => {
-    const t = localStorage.getItem('access_token') || localStorage.getItem('token');
-    axios.get(`${API_BASE}/broker-invoices`, { headers: { Authorization: `Bearer ${t}` } })
-      .then(r => setInvoices(r.data?.data || [])).catch(() => {});
+    axios.get(`${API_BASE}/broker-invoices`, auth).then(r => setInvoices(r.data?.data || [])).catch(() => {});
+    axios.get(`${API_BASE}/stripe/broker-connect-status`, auth).then(r => setStripeStatus(r.data)).catch(() => setStripeStatus({ onboarded: false }));
   }, []);
+
+  const startOnboarding = async () => {
+    setLinking(true); setLinkError(null);
+    try {
+      const r = await axios.get(`${API_BASE}/stripe/connect-onboarding-link`, auth);
+      if (r.data?.onboarding_url) {
+        window.location.href = r.data.onboarding_url;
+      } else {
+        setLinkError('Failed to obtain onboarding URL.');
+      }
+    } catch (e) {
+      setLinkError(e?.response?.data?.detail?.error || e?.response?.data?.detail?.message_en || 'Stripe link unavailable.');
+    } finally {
+      setLinking(false);
+    }
+  };
+
   const totals = invoices.reduce((acc, i) => ({
     hammer: acc.hammer + Number(i.hammer_price_cad || 0),
     broker: acc.broker + Number(i.broker_fee_cad || 0),
@@ -630,17 +653,60 @@ function BrokerRevenueTab({ lang, broker }) {
   return (
     <section data-testid="broker-revenue">
       <h2 className="text-xl font-semibold mb-4">{lang === 'fr' ? 'Revenus et paiements' : 'Revenue & Payouts'}</h2>
-      <Alert className="mb-4 border-blue-200 bg-blue-50 dark:bg-blue-950/30">
-        <AlertDescription>
-          {lang === 'fr'
-            ? '🔗 Configuration Stripe Connect — bientôt disponible. Vos paiements seront transférés vers votre compte une fois Stripe Connect activé.'
-            : '🔗 Stripe Connect onboarding — coming soon. Your payouts will transfer to your account once Stripe Connect is enabled.'}
-        </AlertDescription>
-      </Alert>
+
+      {/* Stripe Connect onboarding */}
+      {stripeStatus && !stripeStatus.onboarded && (
+        <Card className="mb-4 border-2 border-amber-300 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30" data-testid="stripe-connect-cta">
+          <CardContent className="p-5">
+            <div className="flex items-start gap-3 flex-wrap">
+              <div className="text-3xl">💰</div>
+              <div className="flex-1 min-w-[200px]">
+                <h3 className="font-semibold text-lg mb-1">
+                  {lang === 'fr' ? 'Monétisez votre licence' : 'Monetize Your License'}
+                </h3>
+                <p className="text-sm text-slate-700 dark:text-slate-200">
+                  {lang === 'fr'
+                    ? 'Connectez votre compte bancaire via Stripe pour recevoir des paiements automatiques des frais de service de BidVex.'
+                    : 'Connect your bank account via Stripe to receive automated service fee payouts from BidVex.'}
+                </p>
+                {linkError && <p className="text-xs text-rose-600 mt-2">{String(linkError)}</p>}
+              </div>
+              <Button
+                onClick={startOnboarding}
+                disabled={linking}
+                className="bg-amber-500 hover:bg-amber-600 text-white"
+                data-testid="stripe-connect-start"
+              >
+                {linking ? '...' : (lang === 'fr' ? 'Connecter Stripe' : 'Connect Stripe Account')}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {stripeStatus && stripeStatus.onboarded && (
+        <Card className="mb-4 border-emerald-200 bg-emerald-50 dark:bg-emerald-950/30" data-testid="stripe-connect-status">
+          <CardContent className="p-4 flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <p className="font-semibold text-sm text-emerald-800 dark:text-emerald-200 flex items-center gap-1.5">
+                ✅ {lang === 'fr' ? 'Stripe Connect connecté' : 'Stripe Connect connected'}
+              </p>
+              <p className="text-xs text-emerald-700 dark:text-emerald-300">{stripeStatus.connect_account_id}</p>
+            </div>
+            {stripeStatus.balance && (
+              <div className="text-right">
+                <p className="text-[11px] uppercase text-slate-500">{lang === 'fr' ? 'Solde disponible' : 'Available balance'}</p>
+                <p className="text-lg font-bold text-emerald-700 dark:text-emerald-300">${Number(stripeStatus.balance.available_cad || 0).toFixed(2)} CAD</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid grid-cols-3 gap-3 mb-4">
-        <KPI label={lang === 'fr' ? 'Total prix final' : 'Total Hammer'} value={`$${totals.hammer.toFixed(0)}`} testid="rev-hammer" />
-        <KPI label={lang === 'fr' ? 'Frais courtier' : 'Broker Fees'}     value={`$${totals.broker.toFixed(0)}`} testid="rev-broker" />
-        <KPI label={lang === 'fr' ? 'Commission BidVex' : 'BidVex Commission'} value={`$${totals.bidvex.toFixed(0)}`} testid="rev-bidvex" />
+        <KPI label={lang === 'fr' ? 'Total prix final' : 'Total Hammer'}        value={`$${totals.hammer.toFixed(0)}`} testid="rev-hammer" />
+        <KPI label={lang === 'fr' ? 'Frais courtier' : 'Broker Fees'}            value={`$${totals.broker.toFixed(0)}`} testid="rev-broker" />
+        <KPI label={lang === 'fr' ? 'Commission BidVex' : 'BidVex Commission'}  value={`$${totals.bidvex.toFixed(0)}`} testid="rev-bidvex" />
       </div>
       <Card><CardContent className="p-4">
         <h3 className="font-semibold mb-2">{lang === 'fr' ? 'Historique des paiements' : 'Payout History'}</h3>

@@ -51,6 +51,8 @@ const AdminBrokersPage = lazy(() => import('./pages/admin/AdminBrokersPage'));
 const AdminSubscriptionsPage = lazy(() => import('./pages/admin/AdminSubscriptionsPage'));
 // iter217 Phase 5 Hotfix v7 — Public bilingual "How Brokers Work" landing page
 const HowBrokersWorkPage = lazy(() => import('./pages/HowBrokersWorkPage'));
+// iter217 Phase 5 Hotfix v8.1 — Token-secured buyer transaction receipt
+const MyReceiptPage = lazy(() => import('./pages/MyReceiptPage'));
 const BecomeABrokerPage = lazy(() => import('./pages/BecomeABrokerPage'));
 const BrokerDirectoryPage = lazy(() => import('./pages/BrokerDirectoryPage'));
 const BrokerBindingRequestPage = lazy(() => import('./pages/BrokerBindingRequestPage'));
@@ -458,6 +460,8 @@ const App = () => {
           {/* iter217 Phase 5 Hotfix v7 — Public "How brokers work" (EN + FR) */}
           <Route path="/how-brokers-work" element={<HowBrokersWorkPage />} />
           <Route path="/comment-fonctionnent-les-courtiers" element={<HowBrokersWorkPage />} />
+          {/* iter217 Phase 5 Hotfix v8.1 — Token-secured buyer receipt */}
+          <Route path="/my-receipt/:invoice_id" element={<MyReceiptPage />} />
           <Route path="/become-a-broker" element={
             <ProtectedRoute><BecomeABrokerPage /></ProtectedRoute>
           } />

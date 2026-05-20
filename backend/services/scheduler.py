@@ -759,6 +759,21 @@ def init_scheduler(database):
         name="Check Subscription Expirations",
         replace_existing=True
     )
+
+    # iter217 Phase 5 Hotfix v8.1 — Title transfer 14-day enforcement (daily @ 04:00 UTC)
+    async def title_transfer_overdue_job():
+        if db_instance is None:
+            return
+        from jobs.title_transfer_cron import enforce_title_transfer_overdue_job
+        await enforce_title_transfer_overdue_job(db_instance)
+
+    scheduler.add_job(
+        _tracked("title_transfer_overdue_enforcement", title_transfer_overdue_job),
+        CronTrigger(hour=4, minute=0),
+        id="title_transfer_overdue_enforcement",
+        name="Broker Title Transfer 14-day Enforcement (v8.1)",
+        replace_existing=True,
+    )
     
     # Job 8: Auction ending soon notifications - every 5 minutes
     async def ending_soon_job():
