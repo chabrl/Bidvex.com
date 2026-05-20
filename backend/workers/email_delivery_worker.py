@@ -59,6 +59,36 @@ _SUBJECTS = {
         "en": "Buying at auction? A licensed broker is required",
         "fr": "Acheter aux enchères ? Un courtier licencié est requis",
     },
+    # FEATURE PATCH v9 — Feature 1: end-time change notifications
+    "auction_end_time_changed_seller": {
+        "en": "Your auction end time was updated by an administrator",
+        "fr": "L'heure de fin de votre enchère a été modifiée par un administrateur",
+    },
+    "auction_end_time_changed_bidder": {
+        "en": "Heads up — an auction you bid on has a new end time",
+        "fr": "Attention — une enchère sur laquelle vous avez enchéri a une nouvelle heure de fin",
+    },
+    "auction_end_time_changed_watchlist": {
+        "en": "An auction in your watchlist has a new end time",
+        "fr": "Une enchère de votre liste de suivi a une nouvelle heure de fin",
+    },
+    # FEATURE PATCH v9 — Feature 3: AI review flow
+    "ai_review_admin_alert": {
+        "en": "[BidVex Admin] A listing requires AI category review",
+        "fr": "[Admin BidVex] Une annonce nécessite un examen IA de catégorie",
+    },
+    "ai_review_admin_escalation": {
+        "en": "[BidVex Admin] AI review still open after 60 minutes",
+        "fr": "[Admin BidVex] L'examen IA est ouvert depuis plus de 60 minutes",
+    },
+    "ai_review_approved": {
+        "en": "Your listing has been approved",
+        "fr": "Votre annonce a été approuvée",
+    },
+    "ai_review_rejected": {
+        "en": "Your listing was rejected after review",
+        "fr": "Votre annonce a été rejetée après examen",
+    },
 }
 
 
@@ -217,6 +247,123 @@ def _build_dynamic_data(row: Dict[str, Any], lang: str, name: Optional[str]) -> 
             "cta_label": "Find a Broker" if lang == "en" else "Trouver un courtier",
             "cta_url":   url,
         })
+
+    elif kind in ("auction_end_time_changed_seller", "auction_end_time_changed_bidder", "auction_end_time_changed_watchlist"):
+        listing_id = ctx.get("listing_id") or ""
+        url = _public_url(f"/listing/{listing_id}" if listing_id else "/marketplace")
+        new_end = ctx.get("new_end_time") or ""
+        old_end = ctx.get("old_end_time") or ""
+        if lang == "fr":
+            headline = "Heure de fin mise à jour"
+            body = (
+                f"L'heure de fin de l'enchère « {ctx.get('listing_title', '')} » a été "
+                f"modifiée par un administrateur de BidVex. Nouvelle heure de fin : {new_end}."
+                + (f" Heure précédente : {old_end}." if old_end else "")
+            )
+            cta = "Voir l'enchère"
+        else:
+            headline = "Auction end time updated"
+            body = (
+                f"The end time of '{ctx.get('listing_title', '')}' was updated by a BidVex "
+                f"administrator. New end time: {new_end}."
+                + (f" Previous end time: {old_end}." if old_end else "")
+            )
+            cta = "View auction"
+        data.update({
+            "headline":  headline,
+            "body":      body,
+            "cta_label": cta,
+            "cta_url":   url,
+            "listing_id":     listing_id,
+            "listing_title":  ctx.get("listing_title"),
+            "new_end_time":   new_end,
+            "old_end_time":   old_end,
+        })
+
+    elif kind == "ai_review_admin_alert":
+        url = _public_url("/admin?tab=ai-review")
+        if lang == "fr":
+            headline = "Une annonce nécessite votre examen"
+            body = (
+                f"Le système IA a signalé une possible incohérence de catégorie pour "
+                f"« {ctx.get('listing_title', '')} ». Catégorie du vendeur : "
+                f"{ctx.get('seller_category', '?')} · Catégorie suggérée : "
+                f"{ctx.get('suggested_category', '?')}."
+            )
+            cta = "Ouvrir le panneau admin"
+        else:
+            headline = "A listing requires your review"
+            body = (
+                f"The AI system flagged a possible category mismatch for "
+                f"'{ctx.get('listing_title', '')}'. Seller's category: "
+                f"{ctx.get('seller_category', '?')} · Suggested: "
+                f"{ctx.get('suggested_category', '?')}."
+            )
+            cta = "Open admin panel"
+        data.update({"headline": headline, "body": body, "cta_label": cta, "cta_url": url, **ctx})
+
+    elif kind == "ai_review_admin_escalation":
+        url = _public_url("/admin?tab=ai-review")
+        if lang == "fr":
+            data["headline"] = "Examen IA en attente depuis plus de 60 minutes"
+            data["body"] = (
+                f"L'annonce « {ctx.get('listing_title', '')} » attend toujours un examen "
+                f"par un administrateur. Veuillez la traiter dès que possible."
+            )
+            data["cta_label"] = "Ouvrir le panneau admin"
+        else:
+            data["headline"] = "AI review pending for over 60 minutes"
+            data["body"] = (
+                f"Listing '{ctx.get('listing_title', '')}' is still awaiting admin review. "
+                f"Please action it as soon as possible."
+            )
+            data["cta_label"] = "Open admin panel"
+        data["cta_url"] = url
+        data.update(ctx)
+
+    elif kind == "ai_review_approved":
+        url = _public_url("/seller/dashboard")
+        if lang == "fr":
+            data["headline"] = "Votre annonce a été approuvée"
+            data["body"] = (
+                f"Bonne nouvelle — votre annonce « {ctx.get('listing_title', '')} » a été "
+                f"approuvée par notre équipe et est maintenant visible sur la place de marché."
+                + (f" Note de l'administrateur : {ctx.get('admin_note')}" if ctx.get("admin_note") else "")
+            )
+            data["cta_label"] = "Voir mes annonces"
+        else:
+            data["headline"] = "Your listing has been approved"
+            data["body"] = (
+                f"Good news — your listing '{ctx.get('listing_title', '')}' has been "
+                f"approved by our team and is now visible on the marketplace."
+                + (f" Admin note: {ctx.get('admin_note')}" if ctx.get("admin_note") else "")
+            )
+            data["cta_label"] = "View my listings"
+        data["cta_url"] = url
+        data.update(ctx)
+
+    elif kind == "ai_review_rejected":
+        url = _public_url("/seller/dashboard")
+        if lang == "fr":
+            data["headline"] = "Votre annonce a été rejetée"
+            data["body"] = (
+                f"Après examen, votre annonce « {ctx.get('listing_title', '')} » n'a pas pu être "
+                f"approuvée."
+                + (f" Note de l'administrateur : {ctx.get('admin_note')}" if ctx.get("admin_note") else "")
+                + " Vous pouvez modifier la catégorie depuis votre tableau de bord et la soumettre à nouveau."
+            )
+            data["cta_label"] = "Ouvrir le tableau de bord"
+        else:
+            data["headline"] = "Your listing was rejected"
+            data["body"] = (
+                f"After review, your listing '{ctx.get('listing_title', '')}' could not be "
+                f"approved."
+                + (f" Admin note: {ctx.get('admin_note')}" if ctx.get("admin_note") else "")
+                + " You can fix the category from your dashboard and resubmit it."
+            )
+            data["cta_label"] = "Open dashboard"
+        data["cta_url"] = url
+        data.update(ctx)
 
     else:
         data.update(ctx)   # passthrough for unknown kinds

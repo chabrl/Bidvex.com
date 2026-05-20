@@ -80,6 +80,10 @@ const CreateListingPage = () => {
   const [depositType, setDepositType] = useState('fixed'); // 'fixed' | 'percentage'
   const [depositAmount, setDepositAmount] = useState('');
 
+  // FEATURE PATCH v9 / Feature 4 — Quantity & per-unit hammer multiplier
+  const [quantity, setQuantity] = useState(1);
+  const [multiplyHammerByQuantity, setMultiplyHammerByQuantity] = useState(false);
+
   // Shipping & Visit Options
   const [shippingInfo, setShippingInfo] = useState({
     available: false,
@@ -100,6 +104,10 @@ const CreateListingPage = () => {
   // iter207 — Vehicle compliance warning dialog (replaces narrow top-right toast)
   const [vehicleComplianceOpen, setVehicleComplianceOpen] = useState(false);
   const [vehicleComplianceSignals, setVehicleComplianceSignals] = useState([]);
+
+  // FEATURE PATCH v9 / Feature 3 — AI category mismatch warning popup
+  const [aiMismatchModal, setAiMismatchModal] = useState({ open: false, suggested: '', reasonEn: '', reasonFr: '', confidence: 0 });
+  const [pendingPayload, setPendingPayload] = useState(null);
 
   useEffect(() => {
     fetchCategories();
@@ -154,6 +162,26 @@ const CreateListingPage = () => {
     });
   };
 
+  const submitListingPayload = async (payload) => {
+    try {
+      const response = await axios.post(`${API}/listings`, payload);
+      toast.success('Listing created successfully!');
+      navigate(`/listing/${response.data.id}`);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to create listing:', error);
+      const detail = error?.response?.data?.detail;
+      if (detail && typeof detail === 'object' && detail.error === 'vehicle_listing_dealer_required') {
+        setVehicleComplianceSignals(Array.isArray(detail.signals) ? detail.signals : []);
+        setVehicleComplianceOpen(true);
+        return null;
+      }
+      const errorMessage = extractErrorMessage(error);
+      toast.error(errorMessage || 'Failed to create listing');
+      return null;
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     // Iter187: enforce CRA Tax Onboarding at submit time, not at form-mount time
@@ -178,27 +206,83 @@ const CreateListingPage = () => {
         requires_deposit: requiresDeposit,
         deposit_amount: requiresDeposit && depositAmount ? parseFloat(depositAmount) : null,
         deposit_type: requiresDeposit ? depositType : null,
+        // FEATURE PATCH v9 / Feature 4 — Quantity
+        quantity: Math.max(1, parseInt(quantity) || 1),
+        multiply_hammer_by_quantity: (Math.max(1, parseInt(quantity) || 1) > 1) && !!multiplyHammerByQuantity,
         // Mandatory Binding Agreement
         agreement_accepted: finalAgreementAccepted,
       };
 
-      const response = await axios.post(`${API}/listings`, payload);
-      toast.success('Listing created successfully!');
-      navigate(`/listing/${response.data.id}`);
+      // FEATURE PATCH v9 / Feature 3 — Pre-publish AI category mismatch check
+      try {
+        const sg = await axios.post(`${API}/listings/suggest-category`, {
+          title: payload.title || '',
+          description: payload.description || '',
+          seller_category: payload.category || '',
+        });
+        if (sg.data && sg.data.match === false && sg.data.suggested_category) {
+          setPendingPayload(payload);
+          setAiMismatchModal({
+            open: true,
+            suggested: sg.data.suggested_category,
+            reasonEn: sg.data.reason_en || '',
+            reasonFr: sg.data.reason_fr || '',
+            confidence: sg.data.confidence || 0,
+          });
+          setLoading(false);
+          return;
+        }
+      } catch (_) { /* fail-open */ }
+
+      await submitListingPayload(payload);
     } catch (error) {
       console.error('Failed to create listing:', error);
-      // iter207 — Vehicle compliance gate: open a centered Dialog (toast was too narrow for the bilingual text + 2 CTAs)
-      const detail = error?.response?.data?.detail;
-      if (detail && typeof detail === 'object' && detail.error === 'vehicle_listing_dealer_required') {
-        setVehicleComplianceSignals(Array.isArray(detail.signals) ? detail.signals : []);
-        setVehicleComplianceOpen(true);
-        return;
-      }
-      const errorMessage = extractErrorMessage(error);
-      toast.error(errorMessage || 'Failed to create listing');
+      toast.error('Failed to create listing');
     } finally {
       setLoading(false);
     }
+  };
+
+  // FEATURE PATCH v9 / Feature 3 — Seller chooses to keep their category despite warning
+  const handleAiMismatchAcknowledge = async () => {
+    if (!pendingPayload) {
+      setAiMismatchModal({ open: false, suggested: '', reasonEn: '', reasonFr: '', confidence: 0 });
+      return;
+    }
+    setLoading(true);
+    try {
+      const created = await submitListingPayload(pendingPayload);
+      if (created?.id) {
+        // Flag for AI review (will move listing to pending_ai_review)
+        try {
+          await axios.post(`${API}/listings/${created.id}/flag-for-ai-review`, {
+            seller_category: pendingPayload.category,
+            suggested_category: aiMismatchModal.suggested,
+            ai_confidence: aiMismatchModal.confidence,
+            ai_reason_en: aiMismatchModal.reasonEn,
+            ai_reason_fr: aiMismatchModal.reasonFr,
+            listing_type: 'single',
+          });
+          toast.warning('Listing submitted — pending AI category review by admin.');
+        } catch (e) {
+          console.error('Failed to flag for review:', e);
+        }
+      }
+    } finally {
+      setLoading(false);
+      setAiMismatchModal({ open: false, suggested: '', reasonEn: '', reasonFr: '', confidence: 0 });
+      setPendingPayload(null);
+    }
+  };
+
+  const handleAiMismatchCorrect = () => {
+    // User wants to fix the category — switch to suggested
+    if (aiMismatchModal.suggested) {
+      setFormData((prev) => ({ ...prev, category: aiMismatchModal.suggested }));
+      toast.info(`Category updated to "${aiMismatchModal.suggested}". You can submit again.`);
+    }
+    setAiMismatchModal({ open: false, suggested: '', reasonEn: '', reasonFr: '', confidence: 0 });
+    setPendingPayload(null);
   };
 
   // Tax Onboarding Gatekeeper — CRA Part XX Compliance
@@ -356,6 +440,44 @@ const CreateListingPage = () => {
                     data-testid="buy-now-price-input"
                   />
                 </div>
+              </div>
+
+              {/* FEATURE PATCH v9 / Feature 4 — Quantity field with optional "multiply hammer by quantity" toggle */}
+              <div className="space-y-2" data-testid="quantity-section">
+                <Label htmlFor="quantity">{t('createListing.quantity', 'Quantity')}
+                  <InfoTip
+                    en="Number of identical units in this listing. If you set this above 1 you can choose whether the winning hammer price applies per unit or to the whole lot."
+                    fr="Nombre d'unités identiques dans cette annonce. Si vous indiquez plus de 1, vous pouvez choisir si le prix marteau gagnant s'applique par unité ou à l'ensemble du lot."
+                  />
+                </Label>
+                <Input
+                  id="quantity"
+                  type="number"
+                  min="1"
+                  step="1"
+                  inputMode="numeric"
+                  value={quantity}
+                  onChange={(e) => setQuantity(e.target.value)}
+                  className="min-h-[48px]"
+                  data-testid="quantity-input"
+                />
+                {parseInt(quantity) > 1 && (
+                  <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${multiplyHammerByQuantity ? 'border-cyan-500 bg-cyan-50' : 'border-slate-200 hover:border-slate-300'}`}>
+                    <input
+                      type="checkbox"
+                      checked={multiplyHammerByQuantity}
+                      onChange={(e) => setMultiplyHammerByQuantity(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 accent-cyan-600 cursor-pointer"
+                      data-testid="multiply-hammer-toggle"
+                    />
+                    <div>
+                      <span className="font-medium text-sm">{t('createListing.multiplyHammerLabel', 'Multiply hammer price by quantity')}</span>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {t('createListing.multiplyHammerHelp', 'When enabled, the winning bid is treated as a per-unit price. All platform & broker fees calculate against the full base amount (hammer × quantity).')}
+                      </p>
+                    </div>
+                  </label>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -848,6 +970,64 @@ const CreateListingPage = () => {
               {(i18n.language || 'en').toLowerCase().startsWith('fr')
                 ? 'Vérifier ma licence de concessionnaire'
                 : 'Verify dealer licence'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* FEATURE PATCH v9 / Feature 3 — AI category mismatch popup */}
+      <Dialog open={aiMismatchModal.open} onOpenChange={(v) => !v && handleAiMismatchCorrect()}>
+        <DialogContent className="sm:max-w-lg border-amber-200" data-testid="ai-mismatch-dialog">
+          <DialogHeader>
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 mb-2">
+              <ShieldAlert className="h-6 w-6 text-amber-600" />
+            </div>
+            <DialogTitle className="text-center text-xl font-semibold text-slate-900" data-testid="ai-mismatch-title">
+              {(i18n.language || 'en').toLowerCase().startsWith('fr')
+                ? 'Catégorie possiblement incorrecte'
+                : 'Possible category mismatch'}
+            </DialogTitle>
+            <DialogDescription className="text-center text-sm leading-relaxed text-slate-600 pt-2" data-testid="ai-mismatch-body">
+              {(i18n.language || 'en').toLowerCase().startsWith('fr')
+                ? (aiMismatchModal.reasonFr || aiMismatchModal.reasonEn || 'Notre système IA pense que votre annonce devrait se trouver dans une autre catégorie.')
+                : (aiMismatchModal.reasonEn || aiMismatchModal.reasonFr || 'Our AI system thinks your listing belongs in a different category.')
+              }
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-2 rounded-md border border-amber-200 bg-amber-50/60 p-3">
+            <div className="flex items-center justify-between text-sm gap-2 flex-wrap">
+              <span>{(i18n.language || 'en').toLowerCase().startsWith('fr') ? 'Votre catégorie' : 'Your category'}</span>
+              <span className="font-medium">{formData.category || '—'}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm gap-2 mt-2 flex-wrap">
+              <span>{(i18n.language || 'en').toLowerCase().startsWith('fr') ? 'Suggestion IA' : 'AI suggestion'}</span>
+              <span className="font-semibold text-amber-900">{aiMismatchModal.suggested || '—'}</span>
+            </div>
+            {aiMismatchModal.confidence ? (
+              <div className="text-[11px] text-amber-700 mt-1">
+                {(i18n.language || 'en').toLowerCase().startsWith('fr') ? 'Confiance' : 'Confidence'}: {Math.round((aiMismatchModal.confidence || 0) * 100)}%
+              </div>
+            ) : null}
+          </div>
+          <DialogFooter className="flex-col sm:flex-row sm:justify-between gap-2 mt-4">
+            <Button
+              variant="outline"
+              onClick={handleAiMismatchCorrect}
+              className="w-full sm:w-auto"
+              data-testid="ai-mismatch-correct-btn"
+            >
+              {(i18n.language || 'en').toLowerCase().startsWith('fr')
+                ? `Utiliser « ${aiMismatchModal.suggested} »`
+                : `Use "${aiMismatchModal.suggested}"`}
+            </Button>
+            <Button
+              onClick={handleAiMismatchAcknowledge}
+              className="w-full sm:w-auto bg-amber-600 hover:bg-amber-700 text-white"
+              data-testid="ai-mismatch-keep-btn"
+            >
+              {(i18n.language || 'en').toLowerCase().startsWith('fr')
+                ? 'OK — soumettre pour examen admin'
+                : 'OK — submit for admin review'}
             </Button>
           </DialogFooter>
         </DialogContent>

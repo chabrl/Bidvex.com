@@ -804,6 +804,21 @@ def init_scheduler(database):
         name="Day-21 Broker Onboarding Retention Reminder",
         replace_existing=True,
     )
+
+    # FEATURE PATCH v9 / Feature 3 — AI review escalation every 30 min
+    async def ai_review_escalation_job():
+        if db_instance is None:
+            return
+        from routes.admin_ai_review import escalate_overdue_reviews
+        await escalate_overdue_reviews(db_instance)
+
+    scheduler.add_job(
+        _tracked("ai_review_escalation", ai_review_escalation_job),
+        IntervalTrigger(minutes=30),
+        id="ai_review_escalation",
+        name="AI Review Escalation (60-min admin reminder)",
+        replace_existing=True,
+    )
     
     # Job 8: Auction ending soon notifications - every 5 minutes
     async def ending_soon_job():

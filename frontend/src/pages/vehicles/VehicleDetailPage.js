@@ -38,6 +38,7 @@ import {
 } from 'lucide-react';
 import useVehicleBidding from '../../hooks/useVehicleBidding';
 import { PricingEstimate } from '../../components/vehicles/PricingBreakdown';
+import ListingLogisticsDetails from '../../components/ListingLogisticsDetails';
 import MessageSellerModal from '../../components/MessageSellerModal';
 import { MessageSquare, ShieldCheck } from 'lucide-react';
 import VehicleLegalFooter from '../../components/vehicles/VehicleLegalFooter';
@@ -1095,6 +1096,9 @@ const VehicleDetailPage = () => {
                     )}
                   </CardContent>
                 </Card>
+
+                {/* FEATURE PATCH v9 / Feature 2 — Logistics (Visit / Shipping / Pickup) */}
+                <ListingLogisticsDetails listing={vehicle} />
                 
                 {/* Documentation */}
                 <Card>

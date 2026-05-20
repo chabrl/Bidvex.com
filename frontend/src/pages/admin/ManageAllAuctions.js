@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogD
 import { ConfirmDialog } from '../../components/ui/confirm-dialog';
 import { AsyncButton } from '../../components/ui/async-button';
 import { toast } from 'sonner';
-import { Package, Search, Edit2, Trash2, Pause, Archive, XCircle, Eye, AlertTriangle, Download, Star, Play } from 'lucide-react';
+import { Package, Search, Edit2, Trash2, Pause, Archive, XCircle, Eye, AlertTriangle, Download, Star, Play, Clock } from 'lucide-react';
 import { formatCurrency } from '../../utils/currencyFormatter';
 
 const API = API_BASE;
@@ -31,6 +31,8 @@ const ManageAllAuctions = () => {
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [bulkConfirm, setBulkConfirm] = useState(null);
   const [editModal, setEditModal] = useState({ open: false, listing: null, form: {} });
+  // FEATURE PATCH v9 / Feature 1 — Edit auction end time
+  const [endTimeModal, setEndTimeModal] = useState({ open: false, listing: null, newEndTime: '', reason: '', history: [] });
 
   useEffect(() => {
     fetchAllListings();
@@ -157,6 +159,38 @@ const ManageAllAuctions = () => {
       : `listings/${listing.id}`;
     await axios.put(`${API}/admin/${endpoint}`, body, { headers });
     setEditModal({ open: false, listing: null, form: {} });
+    fetchAllListings();
+  };
+
+  // FEATURE PATCH v9 / Feature 1 — Edit end time
+  const openEndTimeModal = async (listing) => {
+    const currentEnd = listing.auction_end_date ? new Date(listing.auction_end_date) : null;
+    // Local datetime string (yyyy-MM-ddThh:mm) for <input type="datetime-local">
+    const initial = currentEnd ? new Date(currentEnd.getTime() - currentEnd.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : '';
+    let history = [];
+    try {
+      const r = await axios.get(`${API}/admin/auctions/${listing.id}/end-time-history`, { headers });
+      history = r.data?.history || [];
+    } catch (_) { /* not critical */ }
+    setEndTimeModal({ open: true, listing, newEndTime: initial, reason: '', history });
+  };
+
+  const saveEndTime = async () => {
+    const { listing, newEndTime, reason } = endTimeModal;
+    if (!newEndTime) {
+      toast.error('Please choose a new end time');
+      throw new Error('validation');
+    }
+    const iso = new Date(newEndTime).toISOString();
+    const body = {
+      new_end_time: iso,
+      reason: reason || '',
+      listing_type: listing.type === 'multi' ? 'multi' : 'single',
+    };
+    const r = await axios.patch(`${API}/admin/auctions/${listing.id}/end-time`, body, { headers });
+    const notified = r.data?.notified || {};
+    toast.success(`End time updated · ${notified.bidders || 0} bidders · ${notified.watchlist || 0} watchers notified`);
+    setEndTimeModal({ open: false, listing: null, newEndTime: '', reason: '', history: [] });
     fetchAllListings();
   };
 
@@ -454,6 +488,12 @@ const ManageAllAuctions = () => {
                           ? `${listing.lots?.reduce((sum, lot) => sum + (lot.bid_count || 0), 0)} total bids`
                           : `${listing.bid_count || 0} bids`}
                       </span>
+                      {listing.auction_end_date && (
+                        <span className="text-slate-500" data-testid={`end-time-display-${listing.id}`}>
+                          <Clock className="inline h-3.5 w-3.5 mr-1" />
+                          Ends: {new Date(listing.auction_end_date).toLocaleString()}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -475,6 +515,17 @@ const ManageAllAuctions = () => {
                     >
                       <Edit2 className="h-4 w-4 mr-1" />
                       Edit
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => openEndTimeModal(listing)}
+                      disabled={['closed','settled','ended','completed','archived','rejected'].includes((listing.status || '').toLowerCase())}
+                      data-testid={`edit-end-time-btn-${listing.id}`}
+                      title="Edit auction end time"
+                    >
+                      <Clock className="h-4 w-4 mr-1" />
+                      End Time
                     </Button>
                     <Button
                       size="sm"
@@ -646,6 +697,79 @@ const ManageAllAuctions = () => {
       </Dialog>
 
       <ConfirmDialog state={bulkConfirm} onClose={() => setBulkConfirm(null)} />
+
+      {/* FEATURE PATCH v9 / Feature 1 — Edit End Time Modal */}
+      <Dialog open={endTimeModal.open} onOpenChange={(v) => !v && setEndTimeModal({ open: false, listing: null, newEndTime: '', reason: '', history: [] })}>
+        <DialogContent className="max-w-xl" data-testid="end-time-modal">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-cyan-600" /> Edit Auction End Time
+            </DialogTitle>
+            <DialogDescription>
+              {endTimeModal.listing?.title || ''}
+              <span className="block text-[11px] text-muted-foreground mt-1">
+                Modifier l'heure de fin · The seller, all bidders (active + outbid), and watchlist users will be notified by email + in-app.
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {endTimeModal.listing?.auction_end_date && (
+              <div className="rounded-md bg-slate-50 border border-slate-200 px-3 py-2 text-sm">
+                <span className="text-muted-foreground">Current end time: </span>
+                <span className="font-medium" data-testid="end-time-current">
+                  {new Date(endTimeModal.listing.auction_end_date).toLocaleString()}
+                </span>
+              </div>
+            )}
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">New end time *</label>
+              <Input
+                type="datetime-local"
+                value={endTimeModal.newEndTime}
+                onChange={(e) => setEndTimeModal((m) => ({ ...m, newEndTime: e.target.value }))}
+                data-testid="end-time-input"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Reason (recorded in audit log)</label>
+              <Input
+                placeholder="e.g. Extending by 24h due to platform outage"
+                value={endTimeModal.reason}
+                onChange={(e) => setEndTimeModal((m) => ({ ...m, reason: e.target.value }))}
+                data-testid="end-time-reason-input"
+                maxLength={500}
+              />
+            </div>
+            {endTimeModal.history && endTimeModal.history.length > 0 && (
+              <div className="rounded-md bg-amber-50 border border-amber-200 p-3" data-testid="end-time-history-list">
+                <p className="text-xs font-semibold text-amber-900 mb-2">Recent edits ({endTimeModal.history.length})</p>
+                <div className="space-y-2 max-h-32 overflow-y-auto">
+                  {endTimeModal.history.slice(0, 5).map((h) => (
+                    <div key={h.id} className="text-[11px] text-slate-700">
+                      <span className="font-mono">{new Date(h.timestamp).toLocaleString()}</span>
+                      {' · '}
+                      <span className="font-medium">{h.admin_email}</span>
+                      {' · '}
+                      <span>
+                        {h.old_end_time ? new Date(h.old_end_time).toLocaleString() : '—'} → {new Date(h.new_end_time).toLocaleString()}
+                      </span>
+                      {h.reason && <span className="italic"> · {h.reason}</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEndTimeModal({ open: false, listing: null, newEndTime: '', reason: '', history: [] })}>
+              Cancel
+            </Button>
+            <AsyncButton onAction={saveEndTime} successMessage="End time updated" data-testid="end-time-save-btn">
+              Update End Time
+            </AsyncButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

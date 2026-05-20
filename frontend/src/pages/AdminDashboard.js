@@ -16,6 +16,7 @@ import AdminBrokersPage from './admin/AdminBrokersPage';
 import AdminSubscriptionsPage from './admin/AdminSubscriptionsPage';
 import LotsModeration from './admin/LotsModeration';
 import ListingsModeration from './admin/ListingsModeration';
+import FlaggedListingsTab from './admin/FlaggedListingsTab';
 import DisputedSettlements from './admin/DisputedSettlements';
 import ManageAllAuctions from './admin/ManageAllAuctions';
 import DeletionRequestsManager from './admin/DeletionRequestsManager';
@@ -92,6 +93,7 @@ const SECONDARY_TABS = {
   marketplace: [
     { id: 'users', label: 'User Management', icon: '👥', lucideIcon: Users },
     { id: 'listings-moderation', label: 'Listings Moderation', icon: '🛡️', lucideIcon: Shield },
+    { id: 'flagged-listings',    label: 'Flagged Listings (AI Review)', icon: '🤖', lucideIcon: ShieldAlert },
     { id: 'disputed-settlements', label: 'Disputed Settlements', icon: '⚠️', lucideIcon: Shield },
     { id: 'lots', label: 'Lots Moderation', icon: '📦', lucideIcon: Package },
     { id: 'all-auctions', label: 'Manage All Auctions', icon: '🏛️', lucideIcon: Package },
@@ -410,6 +412,7 @@ const AdminDashboard = () => {
         switch (secondaryTab) {
           case 'users': return <EnhancedUserManager />;
           case 'listings-moderation': return <ListingsModeration />;
+          case 'flagged-listings': return <FlaggedListingsTab />;
           case 'disputed-settlements': return <DisputedSettlements />;
           case 'lots': return <LotsModeration />;
           case 'all-auctions': return <ManageAllAuctions />;

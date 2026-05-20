@@ -25,6 +25,7 @@ import PilotWelcomeBanner from './seller/PilotWelcomeBanner';
 import { formatCurrency, formatPercent } from '../utils/currencyFormatter';
 import { LoadingTimeout } from '../components/LoadingTimeout';
 import InfoTip from '../components/InfoTip';
+import PendingAiReviewBanner from '../components/PendingAiReviewBanner';
 
 const API = API_BASE;
 
@@ -634,6 +635,11 @@ const SellerDashboard = () => {
                             <p className="text-slate-600 mt-0.5">{listing.rejection_note}</p>
                           )}
                         </div>
+                      )}
+
+                      {/* FEATURE PATCH v9 / Feature 3 — Pending AI review banner */}
+                      {listing.status === 'pending_ai_review' && (
+                        <PendingAiReviewBanner listing={listing} onActionDone={fetchDashboard} />
                       )}
 
                       <div className="flex flex-wrap gap-4 text-sm mb-2">

@@ -229,6 +229,9 @@ async def create_listing(
         auction_end_date=listing_data.auction_end_date,
         shipping_info=listing_data.shipping_info,
         visit_availability=listing_data.visit_availability,
+        # FEATURE PATCH v9 / Feature 4 — quantity field
+        quantity=max(1, int(listing_data.quantity or 1)),
+        multiply_hammer_by_quantity=bool(listing_data.multiply_hammer_by_quantity) and max(1, int(listing_data.quantity or 1)) > 1,
         currency=listing_data.currency if listing_data.currency else detect_currency_from_location(
             city=listing_data.city, region=listing_data.region, country=listing_data.country
         ),

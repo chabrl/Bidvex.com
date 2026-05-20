@@ -42,6 +42,7 @@ import { CostBreakdown } from '../components/CostBreakdown'; // iter210 Step 6
 import Lightbox from 'yet-another-react-lightbox';
 import 'yet-another-react-lightbox/styles.css';
 import InfoTip from '../components/InfoTip';
+import ListingLogisticsDetails from '../components/ListingLogisticsDetails';
 import { useRealtimeBidding } from '../hooks/useRealtimeBidding';
 
 const API = API_BASE;
@@ -986,6 +987,9 @@ const ListingDetailPage = () => {
                 <p className="text-sm text-muted-foreground">{getLocalized(listing, 'description')}</p>
               </CardContent>
             </Card>
+
+            {/* FEATURE PATCH v9 / Feature 2 — Logistics details (Visit, Shipping, Pickup, Item Details, Quantity) */}
+            <ListingLogisticsDetails listing={listing} />
 
             {bids.length > 0 && (
               <Card className="glassmorphism">

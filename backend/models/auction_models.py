@@ -29,6 +29,9 @@ class ListingCreate(BaseModel):
     auction_end_date: datetime
     shipping_info: Optional[Dict[str, Any]] = None
     visit_availability: Optional[Dict[str, Any]] = None
+    # FEATURE PATCH v9 / Feature 4 — Quantity field for all listings
+    quantity: int = 1
+    multiply_hammer_by_quantity: bool = False
     agreement_accepted: bool = False
     agreement_metadata: Optional[Dict[str, Any]] = None
     # Listing-level buyer's premium (rate, e.g. 0.15 for 15%). None = use org/tier default
@@ -76,6 +79,9 @@ class Listing(BaseModel):
     views: int = 0
     shipping_info: Optional[Dict[str, Any]] = None
     visit_availability: Optional[Dict[str, Any]] = None
+    # FEATURE PATCH v9 / Feature 4 — Quantity field
+    quantity: int = 1
+    multiply_hammer_by_quantity: bool = False
     custom_buyer_premium_rate: Optional[float] = None
     is_partner_listing: bool = False
     # LEGACY: opc_permit → migrated to dealer_license_* (iter201).
@@ -179,6 +185,8 @@ class Lot(BaseModel):
     title: str
     description: str
     quantity: int
+    # FEATURE PATCH v9 / Feature 4 — lot-level "multiply hammer by quantity" opt-in
+    multiply_hammer_by_quantity: bool = False
     starting_price: float
     current_price: float
     condition: str
@@ -227,6 +235,9 @@ class MultiItemListingCreate(BaseModel):
     documents: Optional[Dict[str, Any]] = None
     shipping_info: Optional[Dict[str, Any]] = None
     visit_availability: Optional[Dict[str, Any]] = None
+    # FEATURE PATCH v9 / Feature 4 — Listing-level quantity (lots can override at lot level)
+    quantity: int = 1
+    multiply_hammer_by_quantity: bool = False
     auction_terms_en: Optional[str] = None
     auction_terms_fr: Optional[str] = None
     agreement_accepted: bool = False
@@ -282,6 +293,9 @@ class MultiItemListing(BaseModel):
     documents: Optional[Dict[str, Any]] = None
     shipping_info: Optional[Dict[str, Any]] = None
     visit_availability: Optional[Dict[str, Any]] = None
+    # FEATURE PATCH v9 / Feature 4
+    quantity: int = 1
+    multiply_hammer_by_quantity: bool = False
     payment_method: Optional[str] = None
     requires_deposit: bool = False
     deposit_amount: Optional[float] = None

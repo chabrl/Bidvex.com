@@ -85,10 +85,19 @@ def calculate_broker_transaction(
     broker_fee_structure:   Dict[str, Any],
     buyer_province:         Optional[str] = None,
     deposit_held_cad:       float = 500.0,
+    quantity:               int = 1,
+    multiply_hammer_by_quantity: bool = False,
 ) -> Dict[str, Any]:
     """Return the full fee breakdown for a broker-mediated vehicle deal.
 
     HAMMER PRICE IS DISPLAY-ONLY. It is NEVER added into the Stripe charge.
+
+    ── FEATURE PATCH v9 / Feature 4 — Quantity-aware base_amount ──
+    `base_amount` = `hammer_price * quantity` when `multiply_hammer_by_quantity=True`,
+    otherwise `base_amount` = `hammer_price` (single-unit pricing).  All service
+    fee percentages (platform 2.5%, broker percentage rate, GST, QST) and the
+    Stripe gross-up run on `base_amount`-derived service fees only.  The vehicle
+    hammer total displayed to the buyer also reflects the same multiplier.
 
     Output structure (per Senior Architect Directive v7):
 
@@ -121,10 +130,18 @@ def calculate_broker_transaction(
         }
     """
     hammer = max(0.0, float(hammer_price or 0))
+    # Quantity is always an integer >= 1; sane bounds prevent absurd math.
+    try:
+        qty = max(1, int(quantity or 1))
+    except Exception:
+        qty = 1
+    multiplier = qty if multiply_hammer_by_quantity else 1
+    base_amount = hammer * multiplier
+    hammer_total_for_buyer = base_amount   # what the buyer settles directly with broker
 
-    # 1. Platform fee + broker fee
-    platform_fee = hammer * BIDVEX_PLATFORM_FEE_RATE
-    broker_fee, broker_fee_details = _compute_broker_fee(hammer, broker_fee_structure)
+    # 1. Platform fee + broker fee — computed on `base_amount`, not raw hammer.
+    platform_fee = base_amount * BIDVEX_PLATFORM_FEE_RATE
+    broker_fee, broker_fee_details = _compute_broker_fee(base_amount, broker_fee_structure)
 
     subtotal_taxable = platform_fee + broker_fee
 
@@ -141,6 +158,10 @@ def calculate_broker_transaction(
     return {
         # ─── Hammer (informational only) ──────────────────────────
         "hammer_price":              _r(hammer),
+        "quantity":                  qty,
+        "multiply_hammer_by_quantity": bool(multiply_hammer_by_quantity and qty > 1),
+        "base_amount":               _r(base_amount),
+        "hammer_total":              _r(hammer_total_for_buyer),
         "hammer_settlement":         "direct",
         "hammer_settlement_note":    (
             "To be settled directly between buyer and broker via bank wire, "
@@ -167,8 +188,8 @@ def calculate_broker_transaction(
         # ─── Buyer-facing summary ─────────────────────────────────
         "summary": {
             "buyer_pays_stripe":     _r(stripe_total_charged),
-            "buyer_pays_direct":     _r(hammer),
-            "buyer_total_cost":      _r(stripe_total_charged + hammer),
+            "buyer_pays_direct":     _r(hammer_total_for_buyer),
+            "buyer_total_cost":      _r(stripe_total_charged + hammer_total_for_buyer),
             "bidvex_earns":          _r(platform_fee),
             "broker_earns":          _r(broker_fee),
         },
@@ -218,6 +239,8 @@ def calculate_broker_transaction_legacy(
     hammer_price:          float,
     broker_fee_structure:  Dict[str, Any],
     buyer_province:        Optional[str] = None,
+    quantity:              int = 1,
+    multiply_hammer_by_quantity: bool = False,
 ) -> BrokerFeeBreakdown:
     """Legacy API surface — returns a BrokerFeeBreakdown adapter wrapping the
     new dict. Used by code paths that still use dataclass attribute access.
@@ -226,4 +249,6 @@ def calculate_broker_transaction_legacy(
         hammer_price          = hammer_price,
         broker_fee_structure  = broker_fee_structure,
         buyer_province        = buyer_province,
+        quantity              = quantity,
+        multiply_hammer_by_quantity = multiply_hammer_by_quantity,
     ))
