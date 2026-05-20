@@ -129,26 +129,60 @@ def _template_id(kind: str, lang: str) -> Optional[str]:
 
 async def _send_via_sendgrid(row: Dict[str, Any], email: str, name: Optional[str],
                               lang: str, dynamic_data: Dict[str, Any]) -> tuple[bool, str]:
-    """Hands off to services/email_service.send_template_email. Returns (ok, reason)."""
+    """Hands off to SendGrid. Returns (ok, reason).
+
+    Phase 5.3 — when a Dynamic Template id is missing for the given kind,
+    we render an inline HTML fallback (services/templates/welcome_email.py)
+    and ship it as a plain HTML email via `send_html_email`. This means
+    the 7 v9 email kinds (auction_end_time_changed_*, ai_review_*,
+    quantity_invoice) no longer mark `stubbed_no_template` — they go live
+    immediately even without SendGrid template ids configured.
+    """
     if not email:
         return False, "no_recipient_email"
     tmpl_id = _template_id(row["kind"], lang)
-    if not tmpl_id:
-        # Dev / preview environment — no template configured. We log and
-        # mark the row as "delivered_stub" so the queue doesn't back up.
-        logger.info("[email_outbox] no SendGrid template for kind=%s lang=%s — stubbing", row["kind"], lang)
-        return True, "stubbed_no_template"
+    if tmpl_id:
+        try:
+            from services.email_service import send_template_email
+            sent = await send_template_email(
+                to_email=email, to_name=name or "",
+                template_id=tmpl_id, dynamic_data=dynamic_data,
+                is_marketing=(row["kind"] == "day21_broker_reminder"),
+            )
+            return bool(sent), ("sent" if sent else "sendgrid_returned_false")
+        except Exception as e:
+            logger.error("[email_outbox] send (template) failed kind=%s err=%s", row.get("kind"), e, exc_info=True)
+            return False, f"exception:{type(e).__name__}"
+
+    # No template id → try inline HTML fallback
     try:
-        from services.email_service import send_template_email
-        sent = await send_template_email(
+        from services.templates.welcome_email import render_kind_html
+        html = render_kind_html(row["kind"], dynamic_data)
+    except Exception as e:
+        logger.warning("[email_outbox] HTML fallback import failed kind=%s err=%s", row.get("kind"), e)
+        html = None
+
+    if not html:
+        # Truly no fallback available — keep legacy stub behaviour so we don't loop.
+        logger.info("[email_outbox] no template AND no HTML fallback for kind=%s lang=%s — stubbing", row["kind"], lang)
+        return True, "stubbed_no_template"
+
+    subject = dynamic_data.get("subject") or _SUBJECTS.get(row["kind"], {}).get(lang) \
+        or _SUBJECTS.get(row["kind"], {}).get("en") or "BidVex"
+    try:
+        from services.email_service import send_html_email
+        sent = await send_html_email(
             to_email=email, to_name=name or "",
-            template_id=tmpl_id, dynamic_data=dynamic_data,
+            subject=subject, html_content=html,
             is_marketing=(row["kind"] == "day21_broker_reminder"),
         )
-        return bool(sent), ("sent" if sent else "sendgrid_returned_false")
+        if sent:
+            return True, "sent_html_fallback"
+        # SendGrid not configured — gracefully degrade so the queue doesn't back up.
+        return True, "stubbed_no_sendgrid"
     except Exception as e:
-        logger.error("[email_outbox] send failed kind=%s err=%s", row.get("kind"), e, exc_info=True)
-        return False, f"exception:{type(e).__name__}"
+        logger.error("[email_outbox] HTML fallback send failed kind=%s err=%s", row.get("kind"), e, exc_info=True)
+        return False, f"exception_html:{type(e).__name__}"
 
 
 def _build_dynamic_data(row: Dict[str, Any], lang: str, name: Optional[str]) -> Dict[str, Any]:

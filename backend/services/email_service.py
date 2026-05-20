@@ -158,6 +158,70 @@ async def send_template_email(
     return False
 
 
+async def send_html_email(
+    to_email: str,
+    to_name: str,
+    subject: str,
+    html_content: str,
+    max_retries: int = 3,
+    is_marketing: bool = False,
+) -> bool:
+    """Send a raw HTML email via SendGrid (no Dynamic Template).
+
+    Used by the email_outbox drainer when a SendGrid Dynamic Template id
+    is missing from the environment — instead of marking the row as
+    `stubbed_no_template` we render an inline HTML fallback from
+    services/templates/welcome_email.py and ship it through this helper.
+
+    Same retry / suppression semantics as `send_template_email`.
+    """
+    if is_marketing:
+        try:
+            from routes.unsubscribe import is_marketing_suppressed
+            if await is_marketing_suppressed(to_email):
+                logger.info(f"[EMAIL] Suppressed (marketing) — {to_email} has unsubscribed")
+                return False
+        except Exception as e:
+            logger.warning(f"[EMAIL] Suppression check failed, sending anyway: {e}")
+
+    sg = _get_sg()
+    if not sg:
+        logger.warning(f"[EMAIL] SendGrid not configured — cannot ship HTML email to {to_email}")
+        return False
+
+    from_email = os.environ.get("SENDGRID_FROM_EMAIL", "noreply@bidvex.com")
+    from_name = os.environ.get("SENDGRID_FROM_NAME", "BidVex Canada")
+
+    from sendgrid.helpers.mail import Content
+    message = Mail(
+        from_email=Email(from_email, from_name),
+        to_emails=To(to_email, to_name or ""),
+        subject=subject or "BidVex",
+        html_content=html_content,
+    )
+    message.reply_to = Email("support@bidvex.com", "BidVex Support")
+
+    for attempt in range(max_retries):
+        try:
+            response = sg.send(message)
+            logger.info(
+                f"[EMAIL/HTML] Sent: to={to_email} subject={subject!r} "
+                f"status={response.status_code} msgid={response.headers.get('X-Message-Id', '?')} "
+                f"marketing={is_marketing}"
+            )
+            return True
+        except HTTPError as e:
+            error_body = e.body if hasattr(e, "body") else str(e)
+            logger.error(f"[EMAIL/HTML] HTTPError (attempt {attempt+1}/{max_retries}): to={to_email} err={error_body}")
+            if attempt == max_retries - 1:
+                return False
+            await asyncio.sleep(2 ** attempt)
+        except Exception as e:
+            logger.exception(f"[EMAIL/HTML] Unexpected error: to={to_email} err={e}")
+            return False
+    return False
+
+
 def resolve_template(name: str, lang: str) -> str:
     """Look up template ID by name and language. Falls back to EN."""
     entry = TEMPLATE_IDS.get(name)
@@ -175,11 +239,24 @@ def resolve_template(name: str, lang: str) -> str:
 async def send_welcome_email(user: dict) -> bool:
     lang = user.get("preferred_language", user.get("language_preference", "en"))
     tid = resolve_template("welcome", lang)
-    return await send_template_email(
+    first_name = user.get("name", "").split()[0] if user.get("name") else ""
+    if tid:
+        return await send_template_email(
+            to_email=user["email"],
+            to_name=user.get("name", ""),
+            template_id=tid,
+            dynamic_data={"first_name": first_name},
+        )
+    # Phase 5.3 — when no SendGrid Dynamic Template id is configured we fall
+    # back to the inline HTML template so the welcome email STILL ships live.
+    from services.templates.welcome_email import render_welcome_email
+    html = render_welcome_email(first_name=first_name)
+    subject = "Welcome to BidVex / Bienvenue chez BidVex"
+    return await send_html_email(
         to_email=user["email"],
         to_name=user.get("name", ""),
-        template_id=tid,
-        dynamic_data={"first_name": user.get("name", "").split()[0] if user.get("name") else ""},
+        subject=subject,
+        html_content=html,
     )
 
 

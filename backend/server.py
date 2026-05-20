@@ -660,6 +660,7 @@ try:
         ("routes.admin_listing_edit", "admin_listing_edit_router", None, False),
         ("routes.admin_end_time", "admin_end_time_router", None, False),
         ("routes.admin_ai_review", "ai_review_router", None, False),
+        ("routes.admin_conversion_funnel", "conversion_funnel_router", None, False),
         ("routes.down_payments", "down_payments_router", None, False),
         ("routes.partner_card", "partner_card_router", None, False),
         ("routes.dealer_subscription_routes", "dealer_subscription_router", None, False),

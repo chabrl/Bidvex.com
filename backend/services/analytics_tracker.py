@@ -135,13 +135,26 @@ def build_purchase_event(*,
 
 
 async def _send_to_meta(events: list[Dict[str, Any]]) -> Dict[str, Any]:
-    """POST to Meta CAPI. Returns a status dict (does not raise on Meta errors)."""
+    """POST to Meta CAPI. Returns a status dict (does not raise on Meta errors).
+
+    Phase 5.3 — when env vars are missing we no longer just bypass: we run
+    the full payload assembly (already done by the caller) and emit a
+    structured *server-side log line* with the value, currency and event_id
+    so downstream log-pipelines / Sentry / Datadog can still capture
+    conversion telemetry until credentials are wired.
+    """
     pixel_id = os.environ.get("META_PIXEL_ID")
     access_token = os.environ.get("META_CAPI_ACCESS_TOKEN")
     if (os.environ.get("META_CAPI_DISABLE") or "").lower() == "true":
+        # Even when explicitly disabled we still log so analytics replay
+        # can reconstruct the funnel.
+        _structured_log_fallback(events, reason="disabled_via_env")
         return {"ok": False, "reason": "disabled_via_env"}
     if not pixel_id or not access_token:
-        return {"ok": False, "reason": "missing_env"}
+        # Graceful structured-log fallback — no longer bypasses the
+        # full pipeline. Hashes are already in `events[].user_data`.
+        _structured_log_fallback(events, reason="missing_env")
+        return {"ok": False, "reason": "missing_env", "fallback": "structured_log"}
 
     url = f"https://graph.facebook.com/{META_API_VERSION}/{pixel_id}/events"
     payload: Dict[str, Any] = {"data": events}
@@ -161,6 +174,39 @@ async def _send_to_meta(events: list[Dict[str, Any]]) -> Dict[str, Any]:
     except Exception as e:
         logger.error("[meta_capi] request failed: %s", e, exc_info=True)
         return {"ok": False, "reason": "exception", "error": str(e)}
+
+
+def _structured_log_fallback(events: list[Dict[str, Any]], *, reason: str) -> None:
+    """Phase 5.3 — emit a structured single-line log per event so that even
+    without Meta credentials, conversion telemetry is captured in a form
+    that log-aggregators / analytics replays can ingest.
+
+    The log line is INFO level, prefixed with `[meta_capi/fallback]`, and
+    intentionally omits raw PII (only hashed identifiers are present in
+    the event payload anyway, but we double-check by stripping any
+    `client_ip_address` / `client_user_agent` before logging).
+    """
+    for ev in events or []:
+        try:
+            safe_user_data = dict(ev.get("user_data") or {})
+            # Remove cleartext-passthrough fields before logging
+            safe_user_data.pop("client_ip_address", None)
+            safe_user_data.pop("client_user_agent", None)
+            logger.info(
+                "[meta_capi/fallback] reason=%s event_name=%s event_id=%s value=%s currency=%s "
+                "content_type=%s content_category=%s hashed_user_data_keys=%s",
+                reason,
+                ev.get("event_name"),
+                ev.get("event_id"),
+                ev.get("custom_data", {}).get("value"),
+                ev.get("custom_data", {}).get("currency"),
+                ev.get("custom_data", {}).get("content_type"),
+                ev.get("custom_data", {}).get("content_category"),
+                ",".join(sorted(safe_user_data.keys())),
+            )
+        except Exception:
+            # Logging must never crash the request path
+            continue
 
 
 async def track_broker_purchase(*,

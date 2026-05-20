@@ -1,6 +1,54 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: FEATURE PATCH v9 (Feb 21, 2026) ✅
+## Latest: Phase 5.3 — Production Funnel Configuration & Welcome Email Revamp (Feb 21, 2026) ✅
+
+Four-task production push hardening the v9 mail pipeline + adding admin analytics:
+
+### Task 1 — Unstub SendGrid routing layers
+- New module `services/templates/welcome_email.py` ships **inline HTML fallback renderers** for all 7 v9 email kinds (`auction_end_time_changed_seller/_bidder/_watchlist`, `ai_review_admin_alert`, `ai_review_admin_escalation`, `ai_review_approved`, `ai_review_rejected`) **plus** a bonus `quantity_invoice` template.
+- New `send_html_email()` helper in `services/email_service.py` ships raw bilingual HTML via SendGrid `Mail` payload (no Dynamic Template required).
+- `workers/email_delivery_worker.py::_send_via_sendgrid` rewritten: when template id is missing it now renders the inline HTML and ships it live (reason = `sent_html_fallback`). Legacy `stubbed_no_template` only fires when **both** template id AND HTML fallback are missing — no longer the default for v9 kinds.
+
+### Task 2 — Meta CAPI production alignment
+- `services/analytics_tracker.py::_send_to_meta` no longer silently bypasses when `META_PIXEL_ID` / `META_CAPI_ACCESS_TOKEN` are missing.
+- New `_structured_log_fallback()` emits a single-line INFO log per event with `event_name`, `event_id`, `value`, `currency`, `content_type` + the *hashed* user-data keys (cleartext `client_ip_address` / `client_user_agent` are scrubbed).
+- The full payload assembly + SHA-256 hashing pipeline always executes — log-aggregators (Datadog/Sentry) can ingest conversion telemetry today, even before Meta keys land in env.
+
+### Task 3 — Admin Conversion-Rate Funnel Dashboard
+- New backend: `GET /api/admin/analytics/conversion-funnel?days={7|30|90|365|0}` (`routes/admin_conversion_funnel.py`).
+- 4-stage funnel:
+  1. **Auction Views** — sum of `listings.views + multi_item_listings.views`
+  2. **Bids / Proxy Auth.** — `bids` + `broker_proxy_authorizations`
+  3. **Broker Bindings Matched** — `broker_binding_requests.status ∈ {matched, approved, active, completed, finalised}`
+  4. **Settled Transactions** — `broker_invoices.status ∈ {paid, settled, released, completed}`
+- Returns `step_drop_off_pct` (vs previous step) + `cumulative_conversion_pct` (vs base views) + an `overall_conversion_pct` (views → settled).
+- Frontend: `src/pages/admin/ConversionFunnelDashboard.js` — visual funnel bars + 4 KPI cards + 5-stat summary + window selector (7/30/90/365d/all-time). Wired into Admin → Analytics → "Conversion Funnel" tab.
+- Live preview verified: charbel911@gmail.com sees 74 views, 0 bids/bindings/settled (preview env empty).
+
+### Task 4 — Welcome email revamp
+- `services/templates/welcome_email.py::render_welcome_email(first_name, marketplace_url, how_it_works_url)` returns full HTML.
+- Bilingual EN/FR stacked structure preserved + Law-25 footer in both languages.
+- New blocks: prominent **"How-It-Works Guide"** CTA module (left-bar accent) at the top of both EN and FR sections; **Featured Marketplace Spheres** 2-card grid (Vehicle Auctions + Multi-Lot Industrial) using table-cell layout that survives Outlook/Gmail rendering.
+- Wired into `services/email_service.py::send_welcome_email` — if `SENDGRID_TEMPLATE_WELCOME_EN/FR` env var is missing it now ships the inline HTML via `send_html_email` (no more silent skip).
+- Input is HTML-escaped (`<script>` → `&lt;script&gt;`) — verified by test.
+
+### Tests (18 new, 0 regressions)
+- `tests/test_phase_5_3.py` — 18 tests:
+  - Welcome HTML: bilingual headers, Law-25, dual How-It-Works links, both feature cards, marketplace CTA, logo, fallback name "there"/"à vous", XSS-escape.
+  - 7 v9 fallback renderers + `quantity_invoice` produce valid HTML with footer.
+  - Worker `_send_via_sendgrid` no longer returns `stubbed_no_template` (returns `sent_html_fallback` or `stubbed_no_sendgrid`).
+  - Meta CAPI structured-log fallback fires on `missing_env` AND `disabled_via_env`; cleartext PII never appears in log.
+  - Conversion funnel: router registered + `_safe_pct` math correctness (70 % / 100 % / 0 / rounding).
+- Full v9 + v7 + Phase 5 + ecosystem + subs + receipt + title regression: **126 / 126 passing** (one flaky `test_other_broker_cannot_approve_my_relationship` from handoff documented as flaky, passes on retry).
+
+### Scheduler additions
+| Job | Trigger | Source |
+|---|---|---|
+| AI Review Escalation (60-min admin reminder) | every 30 min | `routes/admin_ai_review.py::escalate_overdue_reviews` |
+
+---
+
+## FEATURE PATCH v9 (Feb 21, 2026) ✅
 
 Four targeted features layered on top of v8.1 + Phase 5 (96 → 107 backend tests):
 

@@ -17,6 +17,7 @@ import AdminSubscriptionsPage from './admin/AdminSubscriptionsPage';
 import LotsModeration from './admin/LotsModeration';
 import ListingsModeration from './admin/ListingsModeration';
 import FlaggedListingsTab from './admin/FlaggedListingsTab';
+import ConversionFunnelDashboard from './admin/ConversionFunnelDashboard';
 import DisputedSettlements from './admin/DisputedSettlements';
 import ManageAllAuctions from './admin/ManageAllAuctions';
 import DeletionRequestsManager from './admin/DeletionRequestsManager';
@@ -144,6 +145,7 @@ const SECONDARY_TABS = {
   ],
   analytics: [
     { id: 'dashboard', label: 'Dashboard', icon: '📈', lucideIcon: TrendingUp },
+    { id: 'conversion-funnel', label: 'Conversion Funnel', icon: '🪜', lucideIcon: TrendingUp },
     { id: 'reports', label: 'Reports', icon: '📑', lucideIcon: FileText },
     { id: 'system-monitoring', label: 'System Monitoring', icon: '🔧', lucideIcon: Activity },
   ],
@@ -469,6 +471,7 @@ const AdminDashboard = () => {
       case 'analytics':
         switch (secondaryTab) {
           case 'dashboard': return <AnalyticsDashboard />;
+          case 'conversion-funnel': return <ConversionFunnelDashboard />;
           case 'reports': return <ReportManager />;
           case 'system-monitoring': return <SystemMonitoringDashboard />;
           default: return <AnalyticsDashboard />;
