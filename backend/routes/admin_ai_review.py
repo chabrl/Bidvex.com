@@ -204,6 +204,32 @@ async def request_manual_vehicle_review(
         "escalation_emailed": False,
         "source":             "vehicle_block_manual_review",
     }
+    # ── FIX 4 (b) — Deduplication guard on manual-review path ──
+    # If the seller already has an open pending review for this listing,
+    # return that row instead of inserting a duplicate.
+    if payload.listing_id:
+        existing_pending = await db.listing_reviews.find_one(
+            {"listing_id": payload.listing_id, "status": "pending"},
+            {"_id": 0},
+        )
+        if existing_pending:
+            logger.info(
+                f"[manual_review] DEDUPE — open review {existing_pending.get('id')} already "
+                f"exists for listing {payload.listing_id}; returning existing row"
+            )
+            for k in ("created_at", "updated_at", "resolved_at"):
+                v = existing_pending.get(k)
+                if isinstance(v, datetime):
+                    existing_pending[k] = v.isoformat()
+            return {
+                "success": True,
+                "request_id": existing_pending["id"],
+                "review_id": existing_pending["id"],
+                "listing_id": payload.listing_id,
+                "deduped": True,
+                "status": "pending_admin_review",
+            }
+
     try:
         await db.listing_reviews.insert_one(lr_row)
     except Exception as exc:
@@ -513,14 +539,57 @@ async def flag_listing_for_ai_review(
     """Seller-side — invoked when seller dismisses the AI category mismatch popup.
 
     Sets listing.status = 'pending_ai_review' and creates a listing_reviews row.
+
+    HOTFIX (Eliminate AI Watchdog Amnesia Loop) / FIX 1:
+      Before any scanner logic runs, short-circuit when the listing already
+      carries an admin-approved-override / ai_scan_bypass passport. This
+      prevents edits to a previously-approved listing from re-triggering
+      the AI scanner and creating duplicate Flagged Listings rows.
     """
     db = get_db()
     collection, listing = await _resolve_listing(db, listing_id, payload.listing_type)
+
+    # ── FIX 1 — Bypass gate (FIRST line; runs before everything else) ──
+    if listing.get("admin_approved_override") is True or listing.get("ai_scan_bypass") is True:
+        logger.info(
+            f"[ai_watchdog] BYPASS — listing {listing_id} is admin-whitelisted; "
+            f"scanner skipped (approved_by={listing.get('admin_approved_by')})"
+        )
+        return {
+            "flagged": False,
+            "reason": "admin_whitelisted",
+            "success": True,
+            "review_id": None,
+            "status": listing.get("status") or "active",
+        }
 
     if listing.get("seller_id") != current_user.id and current_user.role not in ("admin", "superadmin"):
         raise HTTPException(status_code=403, detail="Not authorized")
 
     now = datetime.now(timezone.utc)
+
+    # ── FIX 4 (b) — Deduplication guard on insert ──
+    # Never create a second pending review row for the same listing.
+    existing_pending = await db.listing_reviews.find_one(
+        {"listing_id": listing_id, "status": "pending"},
+        {"_id": 0},
+    )
+    if existing_pending:
+        logger.info(
+            f"[ai_watchdog] DEDUPE — open review {existing_pending.get('id')} already exists "
+            f"for listing {listing_id}; returning existing row instead of inserting"
+        )
+        for k in ("created_at", "updated_at", "resolved_at"):
+            v = existing_pending.get(k)
+            if isinstance(v, datetime):
+                existing_pending[k] = v.isoformat()
+        return {
+            "success": True,
+            "review_id": existing_pending["id"],
+            "status": "pending_ai_review",
+            "deduped": True,
+        }
+
     review_id = str(uuid.uuid4())
 
     # Snapshot the listing's pre-review status so admin can re-approve to it
@@ -596,11 +665,33 @@ async def admin_list_listing_reviews(
     skip: int = Query(0, ge=0),
     current_user: User = Depends(require_admin),
 ):
-    """List AI review queue rows, default = pending only."""
+    """List AI review queue rows, default = pending only.
+
+    HOTFIX (Eliminate AI Watchdog Amnesia Loop) / FIX 4 (a):
+      Exclude every review whose underlying listing already carries the
+      `admin_approved_override` immunity passport. This stops stale rows
+      from appearing in the Flagged Listings table after admin approval.
+    """
     db = get_db()
     query = {}
     if status and status != "all":
         query["status"] = status
+
+    # Collect every listing_id that's already been admin-approved.
+    approved_ids: set[str] = set()
+    async for row in db.listings.find(
+        {"admin_approved_override": True},
+        {"_id": 0, "id": 1},
+    ):
+        approved_ids.add(row["id"])
+    async for row in db.multi_item_listings.find(
+        {"admin_approved_override": True},
+        {"_id": 0, "id": 1},
+    ):
+        approved_ids.add(row["id"])
+    if approved_ids:
+        query["listing_id"] = {"$nin": list(approved_ids)}
+
     cursor = db.listing_reviews.find(query, {"_id": 0}).sort("created_at", -1).skip(skip).limit(limit)
     rows = await cursor.to_list(length=limit)
     for r in rows:
@@ -888,6 +979,12 @@ async def admin_approve_listing_review(
         "published_at":             now,
         "ai_review_approved_at":    now,
         "ai_review_approved_by":    current_user.email,
+        # HOTFIX (Eliminate AI Watchdog Amnesia Loop) / FIX 2 — Immunity
+        # passport. These two flags persist through ALL future edits and
+        # cause the AI scanner's bypass gate to short-circuit.
+        "admin_approved_override":  True,
+        "ai_scan_bypass":           True,
+        "admin_approved_by":        current_user.id,
         # Wipe every AI-review breadcrumb so the listing leaves pending cleanly
         "ai_review_id":             None,
         "ai_review_flag":           None,
@@ -950,6 +1047,11 @@ async def admin_reject_listing_review(
                 "ai_review_rejected_at": now,
                 "ai_review_rejected_by": current_user.email,
                 "ai_review_admin_note":  (payload.admin_note or "")[:1000],
+                # HOTFIX (Eliminate AI Watchdog Amnesia Loop) / FIX 3 — Clear
+                # any immunity passport so a corrected resubmission gets
+                # scanned fresh. The bypass only sticks on approval.
+                "admin_approved_override": False,
+                "ai_scan_bypass":          False,
             }},
         )
     await db.listing_reviews.update_one(
