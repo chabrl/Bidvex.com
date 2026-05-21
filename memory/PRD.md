@@ -1,6 +1,54 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: Code Quality Sweep — Critical Fixes (Feb 21, 2026) ✅
+## Latest: Phase 6.2 — Storage Locker Live Bidding & Life-Cycle Controls (Feb 21, 2026) ✅
+
+All 6 tasks delivered as a single sequence. 68/68 pytests pass (4 new in `test_phase_6_2.py`).
+
+### Task 1 — Marketplace Wall-Off
+`backend/routes/listings.py`: Added `listing_type != "storage_locker"` filter to 3 endpoints (main marketplace, multi-item listings feed, lots feed). Storage auctions are visible ONLY on `/storage-auctions/*` routes.
+
+### Task 2 — Facility Role Gate + Tailored UX
+`backend/routes/listings.py`: `create_listing` now raises HTTP 403 (`facility_role_required`, bilingual message) when a non-admin / non-`storage_facility` user submits a `storage_locker` category. Admins bypass.
+
+### Task 3 — Deposit Pre-Auth Notice + Card-on-File Check
+`frontend/src/pages/storage/StorageAuctionDetail.js`: Injected a bilingual amber warning panel above the bid input announcing the Stripe authorization hold. The "Place Bid" button first hits `/api/payment-methods` — if no card on file, blocks the bid and redirects to `/payment-methods?return_to=...`.
+
+### Task 4 — Buyer Cleanout Countdown + "Mark Cleared" Flow
+- `backend/routes/storage_cleanout.py`: 2 new endpoints — `POST /api/storage-cleanout/{invoice_id}/request-clearance` (buyer marks unit cleared → hold flips to `pending_verification` + admin email queued to `charbel911@gmail.com`) and `GET /api/storage-cleanout/{invoice_id}/status` (buyer-facing status hydration).
+- `frontend/src/components/CleanoutCountdownTicker.jsx`: Live ticker (1-sec interval) with green (>48h) / amber (24–48h) / flashing red (<24h) / grey (resolved).
+- `frontend/src/pages/storage/MyCleanoutsPage.jsx` + route `/storage-auctions/my-cleanouts` — lists every won storage invoice with active hold; one-tap "🧼 Mark Unit as Completely Cleared" CTA.
+
+### Task 5 — Admin Storage Hold Settlements Desk
+`frontend/src/pages/admin/StorageHoldSettlementsTab.jsx` + route `/admin/storage-settlements`. Surfaces existing `GET /api/admin/storage-auctions/cleanout-holds` data with status filters, facility-name search, per-row Approve / Forfeit (10-char reason min) actions wired to `POST /api/admin/storage-auctions/{invoice_id}/release-deposit`. Forfeit captures the Stripe hold.
+
+### Task 6 — Storage Facility Manager Dashboard (NEW)
+**Backend**: `backend/routes/facility_dashboard.py` — 7 endpoints (overview, auctions, analytics, promotions GET+POST, ratings, ratings/{id}/reply) + a public `GET /api/facility/public/{facility_id}`. 5-minute in-process analytics cache. Role gate: `storage_facility` or admin only.
+
+**Frontend** (5 new pages):
+- `pages/facility/FacilityDashboard.jsx` — `/facility/dashboard[/:tab]` route. Header (name + verified badge + edit/public buttons) + 4 quick-stat cards (Live/Upcoming/Ended/Drafts, clickable) + collapsible sidebar (5 nav items: My Auctions, Analytics, Promotions, Ratings, Settings).
+- `pages/facility/FacilityAuctions.jsx` — 4 status tabs (Drafts / Upcoming / Live / Ended) with live counts. Pending listings show the `⏳ Under Review — 5 to 50 min` badge.
+- `pages/facility/FacilityAnalytics.jsx` — 6 metric cards + revenue-over-time bar chart + status donut summary + top-5-units list. Range selector (7d/30d/90d/all). Cache timestamp footer.
+- `pages/facility/FacilityPromotions.jsx` — 3 promo cards (Featured 24/48/72h, Email Blast, Reduced Reserve Badge). Pricing pulled from `GET /api/promote-config` (never hardcoded).
+- `pages/facility/FacilityRatings.jsx` — 5-row star-distribution bar chart + reviews list with inline one-reply form (24h edit window enforced server-side).
+- `pages/facility/FacilityPublicProfile.jsx` — public `/storage/facility/:facilityId` route. Hero (name + verified + city/region + avg rating) + Live auctions grid + Upcoming grid + 3 recent reviews.
+
+### Backend models
+- `facility_promotions` collection: `{id, facility_id, listing_id, listing_title, type, duration_hours, status, started_at, expires_at, created_at}`
+- `facility_ratings` collection: `{id, facility_id, buyer_user_id, listing_id, invoice_id, rating, review_text, buyer_display_name, reply: {reply_text, replied_at, replied_by_facility_id}, created_at}`
+
+### Tests (4 new in `tests/test_phase_6_2.py`)
+1. `test_facility_analytics_returns_metrics_and_charts` — analytics returns 6 metric fields + 3 chart shapes; top-units sorted desc by hammer.
+2. `test_promotion_activation_flags_listing_and_records_row` — featured promo activation creates `facility_promotions` row AND sets `is_promoted=True` on the listing.
+3. `test_rating_only_after_cleanout_approved` — rating insertion blocked while hold status is `pending_verification`; allowed after `released`.
+4. `test_facility_reply_limited_to_one_per_review` — reply field is a single dict (not list growth); in-window re-replies overwrite; >24h edit window expiry enforced.
+
+### Verification
+- 68/68 pytests pass. Backend reload clean. Frontend lint clean for all 9 new/modified files.
+- Live screenshot confirms: header, 4 quick-stat cards, sidebar, all 4 status tabs (Drafts (0)/Upcoming (0)/Live (0)/Ended (0)), analytics with 6 metric cards + revenue chart + status donut + top-units list.
+
+---
+
+## Previous: Code Quality Sweep — Critical Fixes (Feb 21, 2026) ✅
 
 Applied all CRITICAL fixes from the code review report. Quality-improvement (non-breaking) items are listed in the "Deferred / Follow-up" section.
 

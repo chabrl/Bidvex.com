@@ -669,6 +669,9 @@ try:
         ("routes.manual_settlement", "manual_settlement_router", None, False),
         ("routes.pricing_engine_routes", "pricing_engine_router", None, False),
         ("routes.demo_account_routes", "demo_accounts_router", None, False),
+        # Phase 6.2 Task 6 — Storage Facility Manager Dashboard
+        ("routes.facility_dashboard", "facility_router", None, True),
+        ("routes.facility_dashboard", "public_facility_router", None, True),
         # iter217 Phase 5 — public Meta product catalog feed
         ("routes.feeds", "router", None, False),
     ]

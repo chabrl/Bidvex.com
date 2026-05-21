@@ -32,7 +32,7 @@ import stripe
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from deps import get_db, require_admin, User
+from deps import get_db, get_current_user, require_admin, User
 from services.storage_locker import (
     is_storage_locker, storage_deposit_amount_for_listing,
 )
@@ -177,6 +177,123 @@ async def create_storage_cleanout_hold(
     )
     logger.info(f"[storage_cleanout] HOLD created invoice={invoice_id} pi={pi.id} ${amount_cad}")
     return {**hold, "_id": None}
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Phase 6.2 Task 4 — Buyer "Mark Unit as Cleared" endpoint.
+# Sets the hold into `pending_verification` so the admin desk surfaces
+# the row for approval. The buyer's deposit is NOT released yet — admin
+# verification is still required.
+# ─────────────────────────────────────────────────────────────────────
+class BuyerClearanceRequest(BaseModel):
+    notes: Optional[str] = None
+
+
+@storage_cleanout_router.post("/storage-cleanout/{invoice_id}/request-clearance")
+async def buyer_request_clearance(
+    invoice_id: str,
+    payload: BuyerClearanceRequest = None,
+    current_user: User = Depends(get_current_user),
+):
+    """Buyer marks their unit as fully cleared. Flips the cleanout hold into
+    `pending_verification` so the admin Storage Settlements desk picks it up.
+    """
+    db = get_db()
+    hold = await db.storage_cleanout_holds.find_one({"invoice_id": invoice_id}, {"_id": 0})
+    if not hold:
+        raise HTTPException(status_code=404, detail={
+            "error": "no_cleanout_hold",
+            "message_en": "No cleanout hold exists for this invoice.",
+            "message_fr": "Aucune retenue de sécurité n'existe pour cette facture.",
+        })
+    if hold.get("buyer_id") != current_user.id and (getattr(current_user, "role", "") or "").lower() not in ("admin", "superadmin"):
+        raise HTTPException(status_code=403, detail="Only the buyer or an admin can request clearance.")
+    if hold.get("status") in {"released", "forfeited", "captured", "pending_verification"}:
+        # Idempotent — return current state.
+        return {"status": hold.get("status"), "already_requested": True, "hold": hold}
+
+    now = datetime.now(timezone.utc)
+    notes = (payload.notes if payload else None) or ""
+    await db.storage_cleanout_holds.update_one(
+        {"invoice_id": invoice_id},
+        {"$set": {
+            "status": "pending_verification",
+            "clearance_requested_at": now,
+            "clearance_requested_by": current_user.email,
+            "clearance_notes": notes,
+        }},
+    )
+    # Mirror onto the invoice for buyer-facing visibility.
+    await db.broker_invoices.update_one(
+        {"id": invoice_id},
+        {"$set": {"cleanout_hold_status": "pending_verification"}},
+    )
+    # Notify the admin desk via email_outbox so the BidVex inbox sees it.
+    try:
+        await db.email_outbox.insert_one({
+            "id": str(uuid.uuid4()),
+            "kind": "storage_cleanout_pending_verification",
+            "to_email": "charbel911@gmail.com",
+            "context": {
+                "invoice_id": invoice_id,
+                "buyer_email": current_user.email,
+                "facility_name": hold.get("facility_name", ""),
+                "amount_cad": hold.get("amount_cad", 0),
+                "admin_review_url": f"https://bidvex.com/admin/storage-management?invoice_id={invoice_id}",
+            },
+            "queued_at": now,
+        })
+    except Exception as exc:
+        logger.warning(f"[storage_cleanout] pending_verification email queue failed: {exc}")
+    logger.info(f"[storage_cleanout] buyer {current_user.email} requested clearance invoice={invoice_id}")
+    return {"status": "pending_verification", "requested_at": now.isoformat()}
+
+
+@storage_cleanout_router.get("/storage-cleanout/{invoice_id}/status")
+async def buyer_get_cleanout_status(
+    invoice_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """Buyer-facing endpoint — returns the cleanout hold record + countdown.
+
+    Used by the invoice detail page to render the live ticker without exposing
+    admin-only fields.
+    """
+    db = get_db()
+    hold = await db.storage_cleanout_holds.find_one({"invoice_id": invoice_id}, {"_id": 0})
+    if not hold:
+        return {"has_hold": False}
+    invoice = await db.broker_invoices.find_one({"id": invoice_id}, {"_id": 0})
+    if hold.get("buyer_id") != current_user.id and (getattr(current_user, "role", "") or "").lower() not in ("admin", "superadmin"):
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    # Compute deadline
+    deadline_hours = hold.get("cleanout_deadline_hours") or 72
+    created_at = hold.get("created_at")
+    if isinstance(created_at, str):
+        try:
+            created_at = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+        except ValueError:
+            created_at = None
+    deadline_at = None
+    if isinstance(created_at, datetime):
+        from datetime import timedelta
+        deadline_at = created_at + timedelta(hours=deadline_hours)
+
+    return {
+        "has_hold": True,
+        "status": hold.get("status"),
+        "amount_cad": hold.get("amount_cad"),
+        "facility_name": hold.get("facility_name"),
+        "cleanout_deadline_hours": deadline_hours,
+        "deadline_at": deadline_at.isoformat() if deadline_at else None,
+        "clearance_requested_at": (
+            hold["clearance_requested_at"].isoformat()
+            if isinstance(hold.get("clearance_requested_at"), datetime)
+            else hold.get("clearance_requested_at")
+        ),
+        "invoice_status": (invoice or {}).get("status"),
+    }
 
 
 @storage_cleanout_router.post("/admin/storage-auctions/{invoice_id}/release-deposit")

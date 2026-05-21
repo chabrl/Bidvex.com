@@ -314,6 +314,26 @@ const StorageAuctionDetail = () => {
 
               {isLive && !needsDeposit && (
                 <>
+                  {/* Phase 6.2 Task 3 — Storage Auction deposit pre-auth notice.
+                      Always visible on the bid panel so buyers know that
+                      placing a bid creates a Stripe hold for the cleanout
+                      security deposit. */}
+                  <div
+                    className="mb-3 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700 p-3 text-xs leading-snug"
+                    data-testid="storage-bid-deposit-notice"
+                  >
+                    <p className="font-semibold text-amber-900 dark:text-amber-200 mb-1">
+                      ⚠️ {t('storage.detail.depositAuthTitle', 'Storage Auction Terms')}
+                    </p>
+                    <p className="text-amber-800 dark:text-amber-300">
+                      {t('storage.detail.depositAuthBody', {
+                        defaultValue:
+                          'Placing a bid requires an immediate pre-authorization hold of ${{amount}} CAD on your registered payment method. This hold is automatically released if you do not win, or held secure until full unit cleanout verification if you win.',
+                        amount: Number(auction?.security_deposit_amount || auction?.storage_metadata?.security_deposit_amount || 100).toFixed(2),
+                      })}
+                    </p>
+                  </div>
+
                   {/* Quick Bid pills (iter175) — one-tap +$X / +$Y / +$Z scaled by bid_increment */}
                   <div className="mb-3">
                     <QuickBidButtons
@@ -343,7 +363,38 @@ const StorageAuctionDetail = () => {
                       placeholder={`${minNext.toFixed(2)}`}
                       data-testid="max-bid-input"
                     />
-                    <Button onClick={handlePlaceBid} disabled={submittingBid} className="bg-blue-600 hover:bg-blue-700 text-white" data-testid="place-bid-btn">
+                    <Button
+                      onClick={async () => {
+                        // Phase 6.2 Task 3 — Verify card-on-file before
+                        // dispatching the bid. Block + prompt registration
+                        // if none found.
+                        try {
+                          const apiBase = process.env.REACT_APP_BACKEND_URL || '';
+                          const token = typeof window !== 'undefined' ? window.localStorage.getItem('token') : null;
+                          const resp = await fetch(`${apiBase}/api/payment-methods`, {
+                            credentials: 'include',
+                            headers: token ? { Authorization: `Bearer ${token}` } : {},
+                          });
+                          if (resp.ok) {
+                            const data = await resp.json();
+                            const methods = Array.isArray(data) ? data : (data?.payment_methods || data?.cards || []);
+                            if (!methods || methods.length === 0) {
+                              if (typeof window !== 'undefined') {
+                                window.alert(t('storage.detail.noCardOnFile', 'Please register a payment method before placing a storage auction bid.'));
+                                window.location.href = '/payment-methods?return_to=' + encodeURIComponent(window.location.pathname);
+                              }
+                              return;
+                            }
+                          }
+                        } catch (cardCheckErr) {
+                          console.debug('[storage] card-on-file check failed (continuing):', cardCheckErr);
+                        }
+                        await handlePlaceBid();
+                      }}
+                      disabled={submittingBid}
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                      data-testid="place-bid-btn"
+                    >
                       {submittingBid ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Gavel className="h-4 w-4 mr-1" /> {t('storage.detail.bidEnchRir')}</>}
                     </Button>
                   </div>

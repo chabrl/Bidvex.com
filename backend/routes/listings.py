@@ -253,6 +253,19 @@ async def create_listing(
         # `facility_name required` validation and any other client-side
         # gates so they can list a unit on behalf of a facility manager.
         is_admin = (getattr(current_user, "role", "") or "").lower() in ("admin", "superadmin")
+
+        # Phase 6.2 Task 2 — Role gate: only `storage_facility` accounts may
+        # create storage_locker listings. Admins bypass.
+        is_facility = (
+            getattr(current_user, "account_type", "") == "storage_facility"
+            or getattr(current_user, "is_storage_facility", False)
+        )
+        if not (is_admin or is_facility):
+            raise HTTPException(status_code=403, detail={
+                "error": "facility_role_required",
+                "message_en": "Storage locker auctions can only be created by verified storage facility accounts. Please apply for a facility account from your profile.",
+                "message_fr": "Les enchères de casier de stockage ne peuvent être créées que par les comptes d'installation de stockage vérifiés. Demandez un compte d'installation depuis votre profil.",
+            })
         try:
             listing_data.storage_metadata = normalize_storage_metadata(
                 listing_data.storage_metadata,
@@ -430,7 +443,10 @@ async def get_listings(
     buyer_province: Optional[str] = None,    # for "nearby_first" geo-sort
 ):
     db = get_db()
-    query = {"status": "active"}
+    # Phase 6.2 Task 1 — Storage locker auctions are walled off from the
+    # global marketplace. They are visible ONLY on /storage-auctions (which
+    # hits the dedicated routes in `storage_auctions.py`).
+    query = {"status": "active", "listing_type": {"$ne": "storage_locker"}}
     if category:
         query["category"] = category
     if city:
@@ -478,7 +494,8 @@ async def get_listings(
     listings = await db.listings.find(query, {"_id": 0}).sort(sort_spec).skip(skip).limit(limit).to_list(limit)
 
     # Also include individual lots from multi-item listings as independent items
-    multi_query = {"status": "active"}
+    # Phase 6.2 Task 1 — Wall-off storage_locker auctions from the marketplace.
+    multi_query = {"status": "active", "listing_type": {"$ne": "storage_locker"}}
     if category:
         multi_query["category"] = category
     if city:
@@ -1028,6 +1045,10 @@ async def get_multi_item_listings(
         query["status"] = status
     else:
         query["status"] = {"$in": ["active", "upcoming"]}
+
+    # Phase 6.2 Task 1 — Storage locker auctions are walled off from the
+    # multi-item listings feed. Visible only on /storage-auctions.
+    query["listing_type"] = {"$ne": "storage_locker"}
 
     if category:
         # Phase 5 Hotfix v5 — support comma-separated list + case/whitespace

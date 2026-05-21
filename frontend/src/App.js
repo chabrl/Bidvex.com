@@ -49,6 +49,7 @@ const AdminTaxDashboard = lazy(() => import('./pages/AdminTaxDashboard'));
 const AdminBrokersPage = lazy(() => import('./pages/admin/AdminBrokersPage'));
 // iter217 Phase 5 Hotfix v6.5 — Admin Subscription Management
 const AdminSubscriptionsPage = lazy(() => import('./pages/admin/AdminSubscriptionsPage'));
+const StorageHoldSettlementsTab = lazy(() => import('./pages/admin/StorageHoldSettlementsTab'));
 // iter217 Phase 5 Hotfix v7 — Public bilingual "How Brokers Work" landing page
 const HowBrokersWorkPage = lazy(() => import('./pages/HowBrokersWorkPage'));
 // iter217 Phase 5 Hotfix v8.1 — Token-secured buyer transaction receipt
@@ -71,6 +72,9 @@ const StorageAuctionDetail = lazy(() => import('./pages/storage/StorageAuctionDe
 const StorageFacilityRegister = lazy(() => import('./pages/storage/StorageFacilityRegister'));
 const MyStorageDeposits = lazy(() => import('./pages/storage/MyStorageDeposits'));
 const StorageDashboard = lazy(() => import('./pages/storage/StorageDashboard'));
+const MyCleanoutsPage = lazy(() => import('./pages/storage/MyCleanoutsPage'));
+const FacilityDashboard = lazy(() => import('./pages/facility/FacilityDashboard'));
+const FacilityPublicProfile = lazy(() => import('./pages/facility/FacilityPublicProfile'));
 const StorageAuctionCreate = lazy(() => import('./pages/storage/StorageAuctionCreate'));
 const StorageHowItWorks = lazy(() => import('./pages/storage/StoragePolicies').then(m => ({ default: m.HowItWorks })));
 const StorageTerms = lazy(() => import('./pages/storage/StoragePolicies').then(m => ({ default: m.StorageTerms })));
@@ -464,6 +468,10 @@ const App = () => {
           <Route path="/admin/subscriptions" element={
             <ProtectedRoute><AdminSubscriptionsPage /></ProtectedRoute>
           } />
+          {/* Phase 6.2 Task 5 — Admin Storage Hold Settlements */}
+          <Route path="/admin/storage-settlements" element={
+            <ProtectedRoute><StorageHoldSettlementsTab /></ProtectedRoute>
+          } />
           {/* iter217 Phase 5 Hotfix v7 — Public "How brokers work" (EN + FR) */}
           <Route path="/how-brokers-work" element={<HowBrokersWorkPage />} />
           <Route path="/comment-fonctionnent-les-courtiers" element={<HowBrokersWorkPage />} />
@@ -581,6 +589,20 @@ const App = () => {
             <ProtectedRoute><StorageDashboard /></ProtectedRoute>
           } />
           <Route path="/storage-auctions/:id" element={<StorageAuctionDetail />} />
+
+          {/* ── Phase 6.2 Task 4 — Buyer cleanouts ── */}
+          <Route path="/storage-auctions/my-cleanouts" element={
+            <ProtectedRoute><MyCleanoutsPage /></ProtectedRoute>
+          } />
+
+          {/* ── Phase 6.2 Task 6 — Facility Manager Dashboard ── */}
+          <Route path="/facility/dashboard" element={
+            <ProtectedRoute><FacilityDashboard /></ProtectedRoute>
+          } />
+          <Route path="/facility/dashboard/:tab" element={
+            <ProtectedRoute><FacilityDashboard /></ProtectedRoute>
+          } />
+          <Route path="/storage/facility/:facilityId" element={<FacilityPublicProfile />} />
 
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
