@@ -1,6 +1,53 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: Phase 6.2 — Storage Locker Live Bidding & Life-Cycle Controls (Feb 21, 2026) ✅
+## Latest: Critical Portal Rectification — Facility Session-State + Visibility Fixes (Feb 21, 2026) ✅
+
+Three production bugs found on `bidvex.com` after Phase 6.2 rollout, all rooted in the same disconnect: the `users` collection was never updated when an admin approved a `storage_facilities` row — so `/api/auth/me` returned stale role data and the frontend kept treating approved facility operators as unverified visitors.
+
+### Root cause
+- `storage_facilities.owner_user_id` → `users.id` linkage existed but the admin-approval endpoint at `POST /api/admin/storage-facilities/{id}/verify` only updated the facility row, never the owning user.
+- `/api/auth/me` returned the raw `users` doc with no join — frontend had no way to know the user was approved.
+- 1 production facility (`Bidvex Inc.`) was already approved but stranded — admin user could see zero facility affordances.
+
+### Fix 1 — Backend session-state hydration
+**`backend/routes/auth.py::get_me`**: Joins `storage_facilities` by `owner_user_id` and decorates the response with `storage_facility_approved`, `is_storage_facility`, `is_admin`, `facility_id`, `facility_name`. If approved, `account_type` is force-promoted to `"storage_facility"` so all legacy code paths recognize the role.
+
+**`backend/routes/storage_auctions.py::admin_verify_facility`**: Now mirrors approval onto the owning user record with `{account_type, is_storage_facility, storage_facility_approved, facility_id, facility_verified}` so subsequent `/api/auth/me` calls return the correct role without needing the join.
+
+**Data backfill**: Migrated 1 existing approved facility — owner user record now has `storage_facility_approved=True`.
+
+### Fix 2 — Navbar dropdown + mobile menu injection
+**`frontend/src/components/Navbar.js`**: Added 2 conditional dropdown items + 2 mobile-menu items:
+- 📊 `Facility Dashboard` → `/facility/dashboard` (emerald-600)
+- ➕ `Create Unit Auction` → `/create-listing?type=storage_locker` (emerald-700)
+
+Gate: shows whenever `storage_facility_approved === true` OR `account_type === 'storage_facility'` OR `is_storage_facility === true` OR `role === 'admin'/'superadmin'`. New `data-testid` hooks: `facility-dashboard-link`, `create-unit-auction-link`, `nav-mobile-facility-dashboard`, `nav-mobile-create-unit-auction`.
+
+### Fix 3 — Hide registration CTAs for approved users
+**`frontend/src/pages/storage/StorageHero.js`**: "Register Your Facility" CTA replaced by `📊 Facility Dashboard` + `➕ Create Unit Auction` chips for approved users.
+**`frontend/src/pages/storage/StorageFooterBanner.js`**: "Do you manage a storage facility?" headline + register CTA replaced by "Welcome back, facility manager" + dashboard/create chips (bilingual EN/FR).
+**`frontend/src/pages/storage/StorageAuctionsBrowse.js`**: Empty-state "Are you a storage facility?" button replaced by the same two facility chips.
+
+### Fix 4 — CreateListingPage URL auto-toggle
+**`frontend/src/pages/CreateListingPage.js`**: New `useSearchParams` hook auto-toggles the `storage_locker` category card when URL has `?type=storage_locker` (and user is facility/admin). The card itself was always visible; this just removes the manual-toggle step when the user clicks the new "Create Unit Auction" CTAs.
+
+### Live verification (preview)
+- `GET /api/auth/me` for admin → `account_type="storage_facility"`, `storage_facility_approved=true`, `is_admin=true`, `facility_id="3dcb79f8-..."`, `facility_name="Bidvex Inc."` ✅
+- `/storage-auctions` page screenshot confirms: 3 hero CTAs (Browse / Facility Dashboard / Create Unit Auction), footer banner shows "Welcome back, facility manager", empty-state shows the 2 facility chips. Zero "Register My Facility" CTAs visible. ✅
+- Navbar dropdown screenshot confirms: "Facility Dashboard" (green) + "Create Unit Auction" (green) + "Admin Panel" all visible. ✅
+- 21/21 backend regression pytests pass (`test_phase_6_2.py` + `test_phase_6_0.py` + `test_hotfix_v9_1.py`).
+- Frontend lint clean for 5 modified files.
+
+### Map of profile-check parameters
+| Surface | Boolean expression |
+|---|---|
+| Navbar dropdown + mobile menu | `user.storage_facility_approved === true ‖ user.account_type === 'storage_facility' ‖ user.is_storage_facility === true ‖ user.role === 'admin'/'superadmin'` |
+| StorageHero / FooterBanner / Browse empty-state | Same expression as above (extracted as local `isFacilityOrAdmin` constant) |
+| CreateListingPage URL auto-toggle | `isFacilityOrAdmin && searchParams.get('type') === 'storage_locker'` |
+
+---
+
+## Previous: Phase 6.2 — Storage Locker Live Bidding & Life-Cycle Controls (Feb 21, 2026) ✅
 
 All 6 tasks delivered as a single sequence. 68/68 pytests pass (4 new in `test_phase_6_2.py`).
 

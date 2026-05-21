@@ -1190,6 +1190,23 @@ async def admin_verify_facility(
             "company_registration_rejection_reason": None,
         }},
     )
+    # Phase 6.2 hotfix — Mirror the role flip onto the OWNING user record so
+    # the session-state check on /api/auth/me reflects facility approval the
+    # moment the page is reloaded (previously the user doc was never updated,
+    # which is why the "Are you a storage facility?" CTA kept showing for
+    # already-approved accounts). Linkage field is `owner_user_id`.
+    owner_id = fac.get("owner_user_id") or fac.get("user_id")
+    if owner_id:
+        await db.users.update_one(
+            {"id": owner_id},
+            {"$set": {
+                "account_type": "storage_facility",
+                "is_storage_facility": True,
+                "storage_facility_approved": True,
+                "facility_id": facility_id,
+                "facility_verified": True,
+            }},
+        )
     try:
         from services.email_notifications import send_storage_facility_approved_email
         background_tasks.add_task(send_storage_facility_approved_email, fac)

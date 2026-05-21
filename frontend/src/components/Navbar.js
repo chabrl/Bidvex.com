@@ -6,7 +6,8 @@ import { useTheme } from '../contexts/ThemeContext';
 import { 
   Moon, Sun, User, LogOut, LayoutDashboard, 
   MessageCircle, DollarSign, Shield, Lock, Menu, X,
-  ShoppingBag, Gavel, ChevronDown, Car, Building2
+  ShoppingBag, Gavel, ChevronDown, Car, Building2,
+  BarChart3, Plus
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -300,6 +301,38 @@ const Navbar = () => {
                         </DropdownMenuItem>
                       </>
                     )}
+                    {/* Phase 6.2 hotfix — Facility Dashboard + Create Unit Auction
+                        affordances for approved storage facilities + global admins.
+                        These were previously hidden because no menu item routed
+                        to the new /facility/dashboard surface, leaving approved
+                        facility operators with no entry point. */}
+                    {(
+                      user.storage_facility_approved === true
+                      || user.account_type === 'storage_facility'
+                      || user.is_storage_facility === true
+                      || user.role === 'admin'
+                      || user.role === 'superadmin'
+                    ) && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => navigate('/facility/dashboard')}
+                          data-testid="facility-dashboard-link"
+                          className="cursor-pointer text-emerald-600 font-semibold"
+                        >
+                          <BarChart3 className="mr-3 h-4 w-4" />
+                          {i18n?.language?.startsWith('fr') ? 'Tableau de bord' : 'Facility Dashboard'}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => navigate('/create-listing?type=storage_locker')}
+                          data-testid="create-unit-auction-link"
+                          className="cursor-pointer text-emerald-700"
+                        >
+                          <Plus className="mr-3 h-4 w-4" />
+                          {i18n?.language?.startsWith('fr') ? 'Créer une enchère' : 'Create Unit Auction'}
+                        </DropdownMenuItem>
+                      </>
+                    )}
                     {(user.role === 'admin' || user.role === 'superadmin' || user.account_type === 'admin' || user.email?.endsWith('@admin.bazario.com')) && (
                       <>
                         <DropdownMenuSeparator />
@@ -392,6 +425,36 @@ const Navbar = () => {
                   <DollarSign className="w-5 h-5 shrink-0" />
                   <span>{t('nav.sell')}</span>
                 </button>
+              )}
+              {/* Phase 6.2 hotfix — Mobile dashboard affordances for approved
+                  facilities + global admins. */}
+              {user && (
+                user.storage_facility_approved === true
+                || user.account_type === 'storage_facility'
+                || user.is_storage_facility === true
+                || user.role === 'admin'
+                || user.role === 'superadmin'
+              ) && (
+                <>
+                  <Link
+                    to="/facility/dashboard"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3 rounded-xl text-emerald-600 hover:bg-accent min-h-[44px] font-semibold"
+                    data-testid="nav-mobile-facility-dashboard"
+                  >
+                    <BarChart3 className="w-5 h-5 shrink-0" />
+                    <span>{i18n?.language?.startsWith('fr') ? 'Tableau de bord' : 'Facility Dashboard'}</span>
+                  </Link>
+                  <Link
+                    to="/create-listing?type=storage_locker"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3 rounded-xl text-emerald-700 hover:bg-accent min-h-[44px]"
+                    data-testid="nav-mobile-create-unit-auction"
+                  >
+                    <Plus className="w-5 h-5 shrink-0" />
+                    <span>{i18n?.language?.startsWith('fr') ? 'Créer une enchère' : 'Create Unit Auction'}</span>
+                  </Link>
+                </>
               )}
             </div>
           </div>

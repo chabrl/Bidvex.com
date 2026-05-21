@@ -12,6 +12,7 @@ import { Link } from 'react-router-dom';
 import StorageHero from './StorageHero';
 import StorageAuctionCard from './StorageAuctionCard';
 import StorageFooterBanner from './StorageFooterBanner';
+import { useAuth } from '../../contexts/AuthContext';
 
 const API = API_BASE;
 
@@ -29,9 +30,23 @@ const SORT_OPTIONS = [
   { v: 'most_bids', en: 'Most Bids', fr: "Plus d'offres" },
 ];
 
+// Phase 6.2 hotfix — Single source of truth for "this user has the facility
+// portal unlocked". Hides every "Are you a facility?" CTA + surfaces direct
+// links into the facility dashboard / create-unit flow.
+const _isFacilityOrAdmin = (user) => !!user && (
+  user.storage_facility_approved === true
+  || user.account_type === 'storage_facility'
+  || user.is_storage_facility === true
+  || user.role === 'admin'
+  || user.role === 'superadmin'
+  || user.is_admin === true
+);
+
 const StorageAuctionsBrowse = () => {
   const { t, i18n } = useTranslation();
   const isFr = (i18n.language || '').startsWith('fr');
+  const { user } = useAuth();
+  const isFacilityOrAdmin = _isFacilityOrAdmin(user);
 
   const [data, setData] = useState({ total: 0, auctions: [] });
   const [provinces, setProvinces] = useState([]);
@@ -261,9 +276,24 @@ const StorageAuctionsBrowse = () => {
                 {t('storage.browse.checkBackSoonOurPartnerFacilitiesAreCons')}
               </p>
               <div className="mt-5">
-                <Link to="/storage-auctions/register-facility">
-                  <Button>{t('storage.browse.areYouAStorageFacility')}</Button>
-                </Link>
+                {isFacilityOrAdmin ? (
+                  <div className="flex gap-2 justify-center flex-wrap" data-testid="storage-facility-portal-cta">
+                    <Link to="/facility/dashboard">
+                      <Button data-testid="empty-state-facility-dashboard-btn">
+                        📊 {isFr ? 'Tableau de bord' : 'Facility Dashboard'}
+                      </Button>
+                    </Link>
+                    <Link to="/create-listing?type=storage_locker">
+                      <Button variant="outline" data-testid="empty-state-create-unit-btn">
+                        ➕ {isFr ? 'Créer une enchère' : 'Create Unit Auction'}
+                      </Button>
+                    </Link>
+                  </div>
+                ) : (
+                  <Link to="/storage-auctions/register-facility">
+                    <Button>{t('storage.browse.areYouAStorageFacility')}</Button>
+                  </Link>
+                )}
               </div>
             </Card>
           ) : (

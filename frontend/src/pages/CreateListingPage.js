@@ -1,7 +1,7 @@
 import API_BASE from '../config';
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 import { extractErrorMessage } from '../utils/errorHandler';
@@ -46,6 +46,7 @@ const CreateListingPage = () => {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const geo = useGeoLocation();
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -73,6 +74,17 @@ const CreateListingPage = () => {
   const isPartner = user?.is_partner === true || user?.role === 'partner' || user?.role === 'admin';
   // Phase 6.0 hotfix — Admin / superadmin bypass for storage validation
   const isAdminUser = user?.role === 'admin' || user?.role === 'superadmin' || user?.is_admin === true;
+  // Phase 6.2 hotfix — Approved storage facilities can list units; everyone
+  // else is gated (backend returns 403 on submit). Used to (a) auto-toggle
+  // the storage_locker card when the URL specifies `?type=storage_locker`
+  // and (b) surface an upfront warning to non-facility users.
+  const isFacilityOrAdmin = isAdminUser || !!(
+    user && (
+      user.storage_facility_approved === true
+      || user.account_type === 'storage_facility'
+      || user.is_storage_facility === true
+    )
+  );
 
   // Seller Payment Method
   const [paymentMethod, setPaymentMethod] = useState('stripe');
@@ -142,6 +154,15 @@ const CreateListingPage = () => {
       setBuyersPremiumPercent(String(Math.round(user.custom_premium_rate * 100 * 100) / 100));
     }
   }, [user]);
+
+  // Phase 6.2 hotfix — Auto-toggle the storage_locker card when the URL
+  // includes ?type=storage_locker (used by the new Navbar / Footer / Hero
+  // facility CTAs). Only triggers for facility/admin users.
+  useEffect(() => {
+    if (searchParams.get('type') === 'storage_locker' && isFacilityOrAdmin) {
+      setIsStorageLocker(true);
+    }
+  }, [searchParams, isFacilityOrAdmin]);
 
   const fetchCategories = async () => {
     try {

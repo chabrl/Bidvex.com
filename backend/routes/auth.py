@@ -613,12 +613,44 @@ async def logout(current_user: dict = Depends(get_current_user_from_token)):
 async def get_me(current_user: dict = Depends(get_current_user_from_token)):
     """
     Get current authenticated user's profile
-    
-    Includes payment method status
+
+    Phase 6.2 hotfix — Hydrates the user dict with `storage_facility_approved`
+    by joining against the `storage_facilities` collection. The user's own
+    record is only updated lazily by the admin approval endpoint, so this
+    join guarantees the freshest possible role surface for the frontend's
+    portal-gating logic on /storage-auctions and the navbar dropdown.
     """
     # Add dynamic has_payment_method flag
     payment_methods_count = await db.payment_methods.count_documents({"user_id": current_user["id"]})
     current_user["has_payment_method"] = payment_methods_count > 0
+
+    # Phase 6.2 hotfix — storage facility live-status surface.
+    # NOTE: the linkage field in `storage_facilities` is `owner_user_id`
+    # (legacy from the registration flow), not `user_id`.
+    facility = await db.storage_facilities.find_one(
+        {"owner_user_id": current_user["id"]},
+        {"_id": 0, "status": 1, "verified": 1, "id": 1, "company_name": 1, "facility_name": 1},
+    )
+    is_facility_approved = bool(
+        facility and (facility.get("verified") is True or facility.get("status") == "verified")
+    )
+    current_user["storage_facility_approved"] = is_facility_approved
+    current_user["is_storage_facility"] = is_facility_approved or current_user.get("account_type") == "storage_facility"
+    if is_facility_approved:
+        # Surface the live account_type so the navbar + role-gate logic
+        # treats the user as a facility even if the underlying user doc
+        # still says "personal" (legacy pre-Phase 6.2 accounts).
+        current_user["account_type"] = "storage_facility"
+        current_user["facility_id"] = facility.get("id")
+        current_user["facility_name"] = facility.get("company_name") or facility.get("facility_name")
+
+    # Phase 6.2 hotfix — derive is_admin flag for the frontend.
+    current_user["is_admin"] = (
+        (current_user.get("role") or "").lower() in ("admin", "superadmin")
+        or current_user.get("account_type") == "admin"
+        or (current_user.get("email") or "").endswith("@admin.bazario.com")
+    )
+
     return current_user
 
 

@@ -1,14 +1,30 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '../../contexts/AuthContext';
 import './StorageHero.css';
 
 /**
  * StorageHero — iter193 single-language rendering.
  * Respects the global EN/FR toggle. The whole hero renders in the active language only.
+ *
+ * Phase 6.2 hotfix — When the visitor is already an approved storage facility
+ * OR a global admin, the "Register Your Facility" CTA swaps for a direct
+ * "Facility Dashboard" jump so the user never sees the registration teaser
+ * after approval.
  */
 const StorageHero = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const { user } = useAuth();
+  const isFr = (i18n.language || '').startsWith('fr');
+  const isFacilityOrAdmin = !!user && (
+    user.storage_facility_approved === true
+    || user.account_type === 'storage_facility'
+    || user.is_storage_facility === true
+    || user.role === 'admin'
+    || user.role === 'superadmin'
+    || user.is_admin === true
+  );
 
   return (
     <section className="storage-hero" data-testid="storage-hero">
@@ -70,13 +86,32 @@ const StorageHero = () => {
           >
             {t('storage.hero.ctaBrowse')}
           </Link>
-          <Link
-            to="/storage-auctions/register-facility"
-            className="storage-hero__cta storage-hero__cta--secondary"
-            data-testid="storage-hero-register-btn"
-          >
-            {t('storage.hero.ctaRegister')}
-          </Link>
+          {isFacilityOrAdmin ? (
+            <>
+              <Link
+                to="/facility/dashboard"
+                className="storage-hero__cta storage-hero__cta--secondary"
+                data-testid="storage-hero-facility-dashboard-btn"
+              >
+                📊 {isFr ? 'Tableau de bord' : 'Facility Dashboard'}
+              </Link>
+              <Link
+                to="/create-listing?type=storage_locker"
+                className="storage-hero__cta storage-hero__cta--secondary"
+                data-testid="storage-hero-create-unit-btn"
+              >
+                ➕ {isFr ? 'Créer une enchère' : 'Create Unit Auction'}
+              </Link>
+            </>
+          ) : (
+            <Link
+              to="/storage-auctions/register-facility"
+              className="storage-hero__cta storage-hero__cta--secondary"
+              data-testid="storage-hero-register-btn"
+            >
+              {t('storage.hero.ctaRegister')}
+            </Link>
+          )}
         </div>
 
         <div className="storage-hero__badges">
