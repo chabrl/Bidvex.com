@@ -188,68 +188,114 @@ async def request_manual_vehicle_review(
         except Exception as exc:
             logger.warning(f"[manual_review] listing status update failed: {exc}")
 
-    # 4. FIRE the admin alert email IMMEDIATELY (synchronous SendGrid call
-    #    via the inline HTML fallback renderer). We do NOT use the
-    #    email_outbox drainer for this — the user reports zero emails
-    #    arriving because the drainer needs a recipient on the row.
-    admin_recipients_raw = os.environ.get(
-        "ADMIN_ALERT_RECIPIENTS",
-        os.environ.get("ADMIN_DIGEST_RECIPIENT", "admin_alerts@bidvex.com"),
-    )
-    admin_recipients = [r.strip() for r in admin_recipients_raw.split(",") if r.strip()]
+    # 4. FIRE the admin alert email IMMEDIATELY (synchronous SendGrid call).
+    # Phase 6.0 hotfix — Failure 2 remediation:
+    #   * Recipient is HARDCODED to admin_alerts@bidvex.com (no env / user lookup).
+    #   * Subject / body match the exact spec format.
+    #   * Loud RuntimeError if SENDGRID_API_KEY or SENDGRID_FROM_EMAIL is missing —
+    #     no silent swallow.
+    ADMIN_ALERT_RECIPIENT = "admin_alerts@bidvex.com"
+
+    sg_key_missing = not os.environ.get("SENDGRID_API_KEY")
+    sg_from_missing = not os.environ.get("SENDGRID_FROM_EMAIL")
+    if sg_key_missing or sg_from_missing:
+        missing = []
+        if sg_key_missing:
+            missing.append("SENDGRID_API_KEY")
+        if sg_from_missing:
+            missing.append("SENDGRID_FROM_EMAIL")
+        # Loud server-side exception — surfaces in logs + Sentry.
+        logger.error(
+            "[manual_review] ❌ Cannot dispatch admin alert email — missing env: %s "
+            "(seller=%s listing_title=%r req_id=%s)",
+            ", ".join(missing), current_user.email, title, req_id,
+        )
+        # We still complete the request (the in-DB row + notification already
+        # fired) but mark the email status as a hard failure for visibility.
+
+    listing_id_for_email = payload.listing_id or synthetic_listing_id
+    direct_admin_url = f"https://bidvex.com/admin/flagged-listings?listing_id={listing_id_for_email}"
     email_context = {
         "review_id":         req_id,
-        "listing_id":        payload.listing_id or synthetic_listing_id,
+        "listing_id":        listing_id_for_email,
         "listing_title":     title or "(no title)",
+        "seller_id":         current_user.id,
         "seller_name":       seller_name,
         "seller_email":      current_user.email,
         "seller_category":   category or "—",
         "suggested_category": "Vehicles",
         "ai_reason_en":      lr_row["ai_reason_en"],
         "detected_signals":  detected_signals,
-        "cta_url":           f"{os.environ.get('PUBLIC_BASE_URL', 'https://bidvex.com')}/admin?tab=flagged-listings",
+        "flagged_keywords":  detected_signals,
+        "cta_url":           direct_admin_url,
     }
 
     email_sent_count = 0
     email_errors: list[str] = []
-    try:
-        from services.templates.welcome_email import render_kind_html
-        from services.email_service import send_html_email
-        html = render_kind_html("ai_review_admin_alert", email_context)
-        subject = (
-            f"[BidVex Admin] Manual review requested — "
-            f"{seller_name} flagged for vehicle-compliance block "
-            f"({', '.join(detected_signals) or 'no signals'})"
-        )
-        for to_email in admin_recipients:
+    if not (sg_key_missing or sg_from_missing):
+        try:
+            from services.email_service import send_html_email
+            subject = (
+                f"[BidVex Alert] Listing Flagged for Manual Review — ID: {listing_id_for_email}"
+            )
+            # Plain, fully-populated HTML body — every required field present.
+            sig_html = ", ".join(detected_signals) if detected_signals else "(none reported)"
+            body_html = f"""<!DOCTYPE html><html><body style="font-family:Helvetica,Arial,sans-serif;background:#F0F4F8;padding:24px;">
+<table width="600" cellpadding="0" cellspacing="0" style="margin:0 auto;background:#FFF;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.06);overflow:hidden;">
+  <tr><td style="background:#0B2545;color:#FFF;padding:24px 30px;">
+    <h1 style="margin:0;font-size:20px;">⚠️ BidVex Alert — Listing Flagged</h1>
+    <p style="margin:6px 0 0;font-size:13px;color:rgba(255,255,255,0.7);">Manual review required</p>
+  </td></tr>
+  <tr><td style="padding:24px 30px;font-size:14px;color:#1E293B;line-height:1.6;">
+    <p>A listing has been flagged for manual compliance review and is now <strong>blocked from going public</strong> until an admin approves or rejects it.</p>
+    <table cellpadding="6" cellspacing="0" style="margin:18px 0;border-collapse:collapse;font-size:13px;width:100%;">
+      <tr><td style="border:1px solid #E2E8F0;background:#F8FAFC;width:160px;"><strong>Listing ID</strong></td><td style="border:1px solid #E2E8F0;"><code>{listing_id_for_email}</code></td></tr>
+      <tr><td style="border:1px solid #E2E8F0;background:#F8FAFC;"><strong>Listing Title</strong></td><td style="border:1px solid #E2E8F0;">{title or "(no title)"}</td></tr>
+      <tr><td style="border:1px solid #E2E8F0;background:#F8FAFC;"><strong>Seller User ID</strong></td><td style="border:1px solid #E2E8F0;"><code>{current_user.id}</code></td></tr>
+      <tr><td style="border:1px solid #E2E8F0;background:#F8FAFC;"><strong>Seller Email</strong></td><td style="border:1px solid #E2E8F0;">{current_user.email}</td></tr>
+      <tr><td style="border:1px solid #E2E8F0;background:#F8FAFC;"><strong>Seller's category</strong></td><td style="border:1px solid #E2E8F0;">{category or "—"}</td></tr>
+      <tr><td style="border:1px solid #E2E8F0;background:#F8FAFC;"><strong>Flagged keywords</strong></td><td style="border:1px solid #E2E8F0;color:#B91C1C;font-weight:600;">{sig_html}</td></tr>
+    </table>
+    <p style="margin:18px 0 8px;">Open the admin panel to approve, reject, or override the block:</p>
+    <p><a href="{direct_admin_url}" style="display:inline-block;background:#2186C6;color:#FFF;padding:12px 24px;border-radius:8px;font-weight:bold;text-decoration:none;">Open Admin Panel →</a></p>
+    <p style="margin-top:24px;font-size:11px;color:#64748B;">Direct URL: <a href="{direct_admin_url}" style="color:#2186C6;">{direct_admin_url}</a></p>
+  </td></tr>
+  <tr><td style="background:#0B2545;color:rgba(255,255,255,0.6);padding:18px 30px;text-align:center;font-size:11px;">BidVex Canada · Sherbrooke, QC · <a href="mailto:support@bidvex.com" style="color:#3FB4CB;">support@bidvex.com</a></td></tr>
+</table></body></html>"""
+
             try:
                 ok = await send_html_email(
-                    to_email=to_email,
-                    to_name="BidVex Admin",
+                    to_email=ADMIN_ALERT_RECIPIENT,
+                    to_name="BidVex Admin Alerts",
                     subject=subject,
-                    html_content=html or f"<p>Review requested by {seller_name} ({current_user.email}). Listing: {title}. Signals: {detected_signals}</p>",
+                    html_content=body_html,
                 )
                 if ok:
-                    email_sent_count += 1
+                    email_sent_count = 1
                 else:
-                    email_errors.append(f"{to_email}:sendgrid_returned_false")
+                    email_errors.append("sendgrid_returned_false")
             except Exception as exc:
-                email_errors.append(f"{to_email}:{type(exc).__name__}")
-                logger.warning(f"[manual_review] admin email to {to_email} failed: {exc}")
-    except Exception as exc:
-        email_errors.append(f"render_or_send:{type(exc).__name__}")
-        logger.error(f"[manual_review] email render/send pipeline failed: {exc}", exc_info=True)
+                email_errors.append(f"send_exception:{type(exc).__name__}:{exc}")
+                logger.error(
+                    "[manual_review] ❌ SendGrid call FAILED to %s — %s",
+                    ADMIN_ALERT_RECIPIENT, exc, exc_info=True,
+                )
+        except Exception as exc:
+            email_errors.append(f"pipeline:{type(exc).__name__}")
+            logger.error(f"[manual_review] email pipeline failed: {exc}", exc_info=True)
+    else:
+        email_errors.append(f"missing_env:{','.join(missing)}")
 
     # Belt-and-suspenders — also drop a row into email_outbox for audit + replay
     try:
         await db.email_outbox.insert_one({
             "id":            str(uuid.uuid4()),
             "kind":          "ai_review_admin_alert",
-            "to_email":      admin_recipients[0] if admin_recipients else None,
+            "to_email":      ADMIN_ALERT_RECIPIENT,
             "context":       email_context,
             "queued_at":     now,
             "delivery_status": (
-                "sent_immediate" if email_sent_count > 0 else "queued_after_inline_send"
+                "sent_immediate" if email_sent_count > 0 else "send_failed"
             ),
             "immediate_send_count": email_sent_count,
             "immediate_send_errors": email_errors,
@@ -264,11 +310,12 @@ async def request_manual_vehicle_review(
             {"_id": 0, "id": 1, "email": 1},
         ).to_list(length=50)
         if admin_users:
-            # Phase 6.0 hotfix — populate the notification row with the structural
-            # title / description / route_url payload the frontend Navbar consumes.
             target_listing_id = payload.listing_id or synthetic_listing_id
             display_title = title or "(no title)"
-            route_url = f"/admin-control-panel?tab=flagged-listings&listing_id={target_listing_id}"
+            # Phase 6.0 / Failure 3 — Explicit admin-scoped deep-link.
+            # Frontend route alias `/admin/flagged-listings` mounts the same
+            # AdminDashboard component so the ?listing_id= query is preserved.
+            route_url = f"/admin/flagged-listings?listing_id={target_listing_id}"
             await db.notifications.insert_many([{
                 "id":         str(uuid.uuid4()),
                 "user_id":    a["id"],
@@ -283,6 +330,8 @@ async def request_manual_vehicle_review(
                 "message_en": f"{seller_name} ({current_user.email}) asked for manual review after a vehicle-compliance block.",
                 "message_fr": f"{seller_name} ({current_user.email}) a demandé une révision manuelle après un blocage de conformité véhicule.",
                 "route_url":  route_url,
+                "action_url": route_url,
+                "link":       route_url,
                 "path":       route_url,
                 "url":        route_url,
                 "context":    {**email_context, "route_url": route_url},
@@ -294,7 +343,7 @@ async def request_manual_vehicle_review(
 
     logger.info(
         f"[manual_review] req_id={req_id} seller={current_user.email} "
-        f"signals={detected_signals} emails_sent={email_sent_count}/{len(admin_recipients)} "
+        f"signals={detected_signals} emails_sent={email_sent_count}/1 "
         f"email_errors={email_errors}"
     )
     return {
@@ -305,7 +354,9 @@ async def request_manual_vehicle_review(
         "eta_minutes_min":   5,
         "eta_minutes_max":   50,
         "admin_emails_sent": email_sent_count,
-        "admin_emails_attempted": len(admin_recipients),
+        "admin_emails_attempted": 1,
+        "admin_alert_recipient": ADMIN_ALERT_RECIPIENT,
+        "email_errors":      email_errors,
     }
 
 
@@ -524,6 +575,79 @@ async def admin_get_listing_review(
         if isinstance(v, datetime):
             row[k] = v.isoformat()
     return row
+
+
+# ───────────────────────────────────────────────────────────────────────
+# Phase 6.0 / Failure 4 — FULL admin preview endpoint.
+# Returns the complete raw listing document joined with the review row
+# AND (when the listing is pre-creation / vehicle-block::*) the snapshot
+# stored in manual_review_requests. Every field the modal needs is here.
+# ───────────────────────────────────────────────────────────────────────
+
+@ai_review_router.get("/admin/flagged-listings/{review_id}/full")
+async def admin_get_flagged_listing_full(
+    review_id: str,
+    current_user: User = Depends(require_admin),
+):
+    """Returns: { review, listing, snapshot } — `listing` is the raw doc
+    from the primary collection (None when no real listing exists yet),
+    `snapshot` is the manual_review_requests row (when applicable)."""
+    db = get_db()
+    review = await db.listing_reviews.find_one({"id": review_id}, {"_id": 0})
+    if not review:
+        raise HTTPException(status_code=404, detail="Review not found")
+
+    # Stringify review datetimes
+    for k in ("created_at", "updated_at", "resolved_at"):
+        v = review.get(k)
+        if isinstance(v, datetime):
+            review[k] = v.isoformat()
+
+    listing_id = review.get("listing_id") or ""
+    listing = None
+    if listing_id and not listing_id.startswith("vehicle-block::"):
+        # Try primary collection first
+        listing = await db.listings.find_one({"id": listing_id}, {"_id": 0})
+        if not listing:
+            listing = await db.multi_item_listings.find_one({"id": listing_id}, {"_id": 0})
+    if listing:
+        for k in ("created_at", "updated_at", "auction_end_date"):
+            v = listing.get(k)
+            if isinstance(v, datetime):
+                listing[k] = v.isoformat()
+
+    # Pull the manual_review_requests snapshot (the seller's pre-creation
+    # form data) when this review was created from the vehicle-block flow.
+    snapshot = await db.manual_review_requests.find_one({"id": review_id}, {"_id": 0})
+    if snapshot:
+        for k in ("created_at", "updated_at", "resolved_at"):
+            v = snapshot.get(k)
+            if isinstance(v, datetime):
+                snapshot[k] = v.isoformat()
+
+    return {
+        "review":   review,
+        "listing":  listing,
+        "snapshot": snapshot,
+    }
+
+
+# Alias under /admin/flagged-listings/{listing_id}/full keyed by listing_id
+# (frontend often only has the listing_id from the URL query parameter).
+@ai_review_router.get("/admin/flagged-listings/by-listing/{listing_id}/full")
+async def admin_get_flagged_full_by_listing_id(
+    listing_id: str,
+    current_user: User = Depends(require_admin),
+):
+    db = get_db()
+    review = await db.listing_reviews.find_one(
+        {"listing_id": listing_id},
+        sort=[("created_at", -1)],
+        projection={"_id": 0},
+    )
+    if not review:
+        raise HTTPException(status_code=404, detail="No review found for this listing")
+    return await admin_get_flagged_listing_full(review["id"], current_user)
 
 
 async def _resolve_review_and_listing(db, review_id: str) -> tuple[dict, Optional[str], Optional[dict]]:

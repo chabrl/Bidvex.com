@@ -188,14 +188,17 @@ const AdminDashboard = () => {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Phase 6.0 / Repair 2 — read ?tab= from URL on mount + activate the
-  // matching secondary tab (incl. cross-primary-section routing).
+  // matching secondary tab (incl. cross-primary-section routing). Also
+  // honour the explicit `/admin/flagged-listings` route alias.
   React.useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
-      const tab = params.get('tab');
+      let tab = params.get('tab');
+      // Route alias /admin/flagged-listings → force the flagged-listings tab.
+      if (!tab && window.location.pathname.endsWith('/flagged-listings')) {
+        tab = 'flagged-listings';
+      }
       if (!tab) return;
-      // Map common tab ids to their primary section. If unknown we just set
-      // secondaryTab and let the renderer fall through.
       const SECONDARY_TO_PRIMARY = {
         'flagged-listings':   'marketplace',
         'listings-moderation': 'marketplace',

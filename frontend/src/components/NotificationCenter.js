@@ -268,7 +268,7 @@ const NotificationCenter = () => {
       // Phase 6.0 / Repair 2 — admin-facing manual review request notification
       case 'manual_vehicle_review_request': {
         const listingId = data.listing_id || '';
-        navigate(`/admin-control-panel?tab=flagged-listings${listingId ? `&listing_id=${encodeURIComponent(listingId)}` : ''}`);
+        navigate(`/admin/flagged-listings${listingId ? `?listing_id=${encodeURIComponent(listingId)}` : ''}`);
         break;
       }
       // Phase 6.0 / Repair 4 — seller-facing approval / rejection notifications

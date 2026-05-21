@@ -32,7 +32,8 @@ const FlaggedListingsTab = () => {
   const [search, setSearch] = useState('');
   const [actionModal, setActionModal] = useState({ open: false, mode: null, row: null, note: '', overrideCategory: '' });
   // Phase 6.0 / Repair 3 — Admin preview modal state
-  const [previewModal, setPreviewModal] = useState({ open: false, row: null, listing: null, loading: false, error: null });
+  const [previewModal, setPreviewModal] = useState({ open: false, row: null, full: null, loading: false, error: null });
+  const [lightbox, setLightbox] = useState({ open: false, src: null });
   const queryParamListingId = (() => {
     try {
       return new URLSearchParams(window.location.search).get('listing_id');
@@ -73,35 +74,32 @@ const FlaggedListingsTab = () => {
   }, [queryParamListingId, rows]);
 
   const openPreview = async (row) => {
-    setPreviewModal({ open: true, row, listing: null, loading: true, error: null });
+    setPreviewModal({ open: true, row, full: null, loading: true, error: null });
     try {
-      // Try to fetch the actual listing (single-item or multi-item)
-      let listing = null;
-      const isSynthetic = (row.listing_id || '').startsWith('vehicle-block::');
-      if (!isSynthetic && row.listing_id) {
-        try {
-          const r = await axios.get(`${API}/listings/${row.listing_id}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          listing = r.data;
-        } catch (e) {
-          if (e?.response?.status !== 404) throw e;
-          // Try multi-item
-          try {
-            const r2 = await axios.get(`${API}/multi-item-listings/${row.listing_id}`, {
-              headers: { Authorization: `Bearer ${token}` },
-            });
-            listing = r2.data;
-          } catch { /* fall through */ }
-        }
+      const r = await axios.get(`${API}/admin/flagged-listings/${row.id}/full`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const full = r.data || {};
+      // Phase 6.0 / Failure 4 — loud console.error if critical fields are
+      // missing so QA spots data shape regressions immediately.
+      const listing = full.listing || full.snapshot || {};
+      if (!listing.title || !listing.description) {
+        // eslint-disable-next-line no-console
+        console.error('[AdminPreview] FULL response missing title/description — raw payload:', full);
       }
-      setPreviewModal({ open: true, row, listing, loading: false, error: null });
+      if (!Array.isArray(listing.images) || listing.images.length === 0) {
+        // eslint-disable-next-line no-console
+        console.error('[AdminPreview] FULL response has no images — raw payload:', full);
+      }
+      setPreviewModal({ open: true, row, full, loading: false, error: null });
     } catch (e) {
-      setPreviewModal({ open: true, row, listing: null, loading: false, error: e?.response?.data?.detail || e.message });
+      // eslint-disable-next-line no-console
+      console.error('[AdminPreview] /full fetch FAILED:', e?.response || e);
+      setPreviewModal({ open: true, row, full: null, loading: false, error: e?.response?.data?.detail || e.message });
     }
   };
 
-  const closePreview = () => setPreviewModal({ open: false, row: null, listing: null, loading: false, error: null });
+  const closePreview = () => setPreviewModal({ open: false, row: null, full: null, loading: false, error: null });
 
   const filteredRows = rows.filter((r) => {
     if (!search.trim()) return true;
@@ -219,7 +217,16 @@ const FlaggedListingsTab = () => {
           ) : (
             <div className="space-y-3">
               {filteredRows.map((r) => (
-                <div key={r.id} className="p-4 border rounded-lg hover:bg-accent/30 transition-colors" data-testid={`review-row-${r.id}`}>
+                <div
+                  key={r.id}
+                  className={
+                    'p-4 border rounded-lg hover:bg-accent/30 transition-colors ' +
+                    (queryParamListingId && r.listing_id === queryParamListingId
+                      ? 'border-l-4 border-l-amber-400 bg-amber-50 ring-1 ring-amber-200 shadow-md'
+                      : '')
+                  }
+                  data-testid={`review-row-${r.id}`}
+                >
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div className="flex-1 min-w-[260px]">
                       <div className="flex items-center gap-2 flex-wrap mb-2">
@@ -352,154 +359,212 @@ const FlaggedListingsTab = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      {/* Phase 6.0 / Repair 3 — Admin preview modal (fully authenticated, no public 404) */}
+      {/* Phase 6.0 / Failure 4 — Admin preview modal (full data, lightbox, mobile-first) */}
       <Dialog open={previewModal.open} onOpenChange={(v) => !v && closePreview()}>
-        <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-y-auto" data-testid="admin-preview-modal">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Eye className="h-5 w-5 text-cyan-600" /> Admin Preview
-            </DialogTitle>
-            <DialogDescription>
-              Full snapshot of the original submission — never routes to the public marketplace.
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent
+          className="sm:max-w-3xl w-[95vw] max-h-[90vh] overflow-y-auto p-0"
+          data-testid="admin-preview-modal"
+        >
+          <div className="px-4 py-4 sm:px-6 sm:py-5">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Eye className="h-5 w-5 text-cyan-600" /> Admin Preview
+              </DialogTitle>
+              <DialogDescription>
+                Full original submission — admin-only view, never the public marketplace page.
+              </DialogDescription>
+            </DialogHeader>
 
-          {previewModal.loading ? (
-            <div className="flex justify-center py-10">
-              <div className="animate-spin rounded-full h-8 w-8 border-4 border-cyan-500 border-t-transparent"></div>
-            </div>
-          ) : (
-            <div className="flex flex-col lg:flex-row gap-4 w-full" data-testid="admin-preview-body">
-              {/* Left column — original submission */}
-              <div className="flex-1 min-w-0 space-y-3">
-                <div>
-                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold mb-1">Title</p>
-                  <p className="font-semibold text-base" data-testid="preview-title">
-                    {previewModal.listing?.title || previewModal.row?.listing_title || '(no title)'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold mb-1">Description</p>
-                  <p className="text-sm whitespace-pre-wrap bg-slate-50 rounded-md p-3 border border-slate-200" data-testid="preview-description">
-                    {previewModal.listing?.description || previewModal.row?.description || '(no description provided)'}
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-3 text-sm">
-                  <div>
-                    <p className="text-[11px] uppercase text-muted-foreground font-semibold">Starting Price</p>
-                    <p className="font-semibold text-emerald-700" data-testid="preview-price">
-                      {previewModal.listing?.starting_price != null
-                        ? `${(previewModal.listing.currency || 'CAD')} $${Number(previewModal.listing.starting_price).toLocaleString()}`
-                        : '—'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] uppercase text-muted-foreground font-semibold">Listing ID</p>
-                    <code className="text-[11px]" data-testid="preview-listing-id">{previewModal.row?.listing_id}</code>
-                  </div>
-                  <div>
-                    <p className="text-[11px] uppercase text-muted-foreground font-semibold">Seller</p>
-                    <p className="text-sm" data-testid="preview-seller">
-                      {previewModal.row?.seller_name || previewModal.row?.seller_email || previewModal.listing?.seller_id || '—'}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Images */}
-                {Array.isArray(previewModal.listing?.images) && previewModal.listing.images.length > 0 && (
-                  <div>
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold mb-1">
-                      Images ({previewModal.listing.images.length})
-                    </p>
-                    <div className="flex flex-wrap gap-2" data-testid="preview-images">
-                      {previewModal.listing.images.slice(0, 6).map((src, idx) => (
-                        // eslint-disable-next-line jsx-a11y/img-redundant-alt
-                        <img
-                          key={idx}
-                          src={src}
-                          alt={`Image ${idx + 1}`}
-                          className="w-24 h-24 object-cover rounded-md border border-slate-200"
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {!previewModal.listing && (
-                  <div className="rounded-md bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900" data-testid="preview-no-listing">
-                    <strong>Pre-creation request</strong> — the seller hit the vehicle-compliance block before the listing was created. Only the snapshot data on the right is available.
-                  </div>
-                )}
+            {previewModal.loading ? (
+              <div className="flex justify-center py-10">
+                <div className="animate-spin rounded-full h-8 w-8 border-4 border-cyan-500 border-t-transparent"></div>
               </div>
+            ) : (() => {
+              const full = previewModal.full || {};
+              const listing = full.listing || {};
+              const snapshot = full.snapshot || {};
+              const reviewData = full.review || previewModal.row || {};
+              // Merge with snapshot fallback for pre-creation requests
+              const title =
+                listing.title || snapshot.title || reviewData.listing_title || '';
+              const description =
+                listing.description || snapshot.description || '(no description provided)';
+              const images = Array.isArray(listing.images) ? listing.images : [];
+              const startingPrice = listing.starting_price ?? snapshot.starting_price ?? null;
+              const reservePrice = listing.reserve_price ?? null;
+              const category =
+                listing.category || snapshot.category || reviewData.seller_category || '';
+              const flaggedKeywords =
+                snapshot.detected_signals || reviewData.detected_signals || [];
+              const sellerId =
+                listing.seller_id || snapshot.seller_id || reviewData.seller_id || '';
+              const sellerEmail =
+                snapshot.seller_email || reviewData.seller_email || '';
+              const status = listing.status || 'pre-creation';
+              const createdAt = listing.created_at || snapshot.created_at || reviewData.created_at;
+              const suggestedCategory = reviewData.suggested_category || '';
+              const aiReason = reviewData.ai_reason_en || reviewData.ai_reason_fr || '';
 
-              {/* Right column — AI flags */}
-              <div className="w-full lg:w-72 flex-shrink-0 space-y-3">
-                <div className="rounded-md bg-amber-50 border border-amber-300 p-3" data-testid="preview-categories">
-                  <p className="text-[11px] uppercase tracking-wide font-semibold text-amber-900 mb-2">Category Mismatch</p>
-                  <div className="space-y-2">
-                    <div>
-                      <p className="text-[10px] uppercase text-muted-foreground">Seller's category</p>
-                      <Badge variant="outline" className="text-[11px]">
-                        {previewModal.row?.seller_category || '—'}
-                      </Badge>
-                    </div>
-                    <div className="text-center text-muted-foreground text-xs">↓</div>
-                    <div>
-                      <p className="text-[10px] uppercase text-muted-foreground">AI suggested</p>
-                      <Badge className="bg-amber-200 text-amber-900 border border-amber-300 text-[11px]">
-                        {previewModal.row?.suggested_category || '—'}
-                      </Badge>
+              return (
+                <div className="flex flex-col gap-4" data-testid="admin-preview-body">
+                  {/* Header summary band */}
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">Listing ID</p>
+                    <code className="text-[11px] block break-all" data-testid="preview-listing-id">{reviewData.listing_id || '—'}</code>
+                    <div className="flex flex-wrap gap-2 mt-2 text-[11px]">
+                      <Badge variant="outline">Status: {status}</Badge>
+                      {createdAt && <Badge variant="outline">{new Date(createdAt).toLocaleString()}</Badge>}
                     </div>
                   </div>
-                  {typeof previewModal.row?.ai_confidence === 'number' && (
-                    <p className="text-[10px] text-amber-700 mt-2">
-                      Confidence: {Math.round((previewModal.row.ai_confidence || 0) * 100)}%
-                    </p>
-                  )}
-                </div>
 
-                {Array.isArray(previewModal.row?.detected_signals) && previewModal.row.detected_signals.length > 0 && (
-                  <div className="rounded-md bg-rose-50 border border-rose-300 p-3" data-testid="preview-detected-signals">
-                    <p className="text-[11px] uppercase tracking-wide font-semibold text-rose-900 mb-2">
-                      🚨 Triggered Keywords
-                    </p>
-                    <div className="flex flex-wrap gap-1">
-                      {previewModal.row.detected_signals.map((sig, idx) => (
-                        <Badge
-                          key={idx}
-                          className="bg-rose-200 text-rose-900 border border-rose-400 font-mono text-[10px]"
+                  {/* Two-column on lg+, single column on mobile */}
+                  <div className="flex flex-col lg:flex-row gap-4 w-full">
+                    <div className="flex-1 min-w-0 space-y-3">
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold mb-1">Title</p>
+                        <p className="font-semibold text-base break-words" data-testid="preview-title">
+                          {title || '(no title)'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold mb-1">Description</p>
+                        <p
+                          className="text-sm whitespace-pre-wrap bg-slate-50 rounded-md p-3 border border-slate-200 max-h-48 overflow-y-auto"
+                          data-testid="preview-description"
                         >
-                          {sig}
-                        </Badge>
-                      ))}
+                          {description}
+                        </p>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <p className="text-[10px] uppercase text-muted-foreground font-semibold">Starting Price</p>
+                          <p className="font-semibold text-emerald-700" data-testid="preview-price">
+                            {startingPrice != null
+                              ? `${(listing.currency || 'CAD')} $${Number(startingPrice).toLocaleString()}`
+                              : '—'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] uppercase text-muted-foreground font-semibold">Reserve Price</p>
+                          <p className="font-semibold" data-testid="preview-reserve-price">
+                            {reservePrice != null
+                              ? `${(listing.currency || 'CAD')} $${Number(reservePrice).toLocaleString()}`
+                              : '—'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] uppercase text-muted-foreground font-semibold">Category</p>
+                          <p data-testid="preview-category">{category || '—'}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] uppercase text-muted-foreground font-semibold">Seller</p>
+                          <p className="text-sm break-all" data-testid="preview-seller">
+                            {sellerEmail || sellerId || '—'}
+                          </p>
+                          {sellerId && <code className="text-[10px] block break-all text-slate-500">{sellerId}</code>}
+                        </div>
+                      </div>
+
+                      {/* Images — 2-col on mobile, 3-col tablet+, lightbox on click */}
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold mb-1">
+                          Images ({images.length})
+                        </p>
+                        {images.length === 0 ? (
+                          <div
+                            className="rounded-md border border-dashed border-slate-300 bg-slate-50 px-3 py-6 text-center text-xs text-muted-foreground"
+                            data-testid="preview-no-images"
+                          >
+                            No images uploaded.
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2" data-testid="preview-images">
+                            {images.map((src, idx) => (
+                              <button
+                                type="button"
+                                key={idx}
+                                onClick={() => setLightbox({ open: true, src })}
+                                className="block aspect-square w-full overflow-hidden rounded-md border border-slate-200 bg-slate-100 hover:ring-2 hover:ring-cyan-400 transition"
+                                data-testid={`preview-image-${idx}`}
+                              >
+                                {/* eslint-disable-next-line jsx-a11y/img-redundant-alt */}
+                                <img src={src} alt={`Image ${idx + 1}`} className="w-full h-full object-cover" />
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {!full.listing && !full.snapshot && (
+                        <div className="rounded-md bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900" data-testid="preview-no-listing">
+                          <strong>Pre-creation request</strong> — only the review row is available. The seller hit the vehicle-compliance block before submitting.
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Right column on lg+, full-width on mobile */}
+                    <div className="w-full lg:w-72 flex-shrink-0 space-y-3">
+                      <div className="rounded-md bg-amber-50 border border-amber-300 p-3" data-testid="preview-categories">
+                        <p className="text-[11px] uppercase tracking-wide font-semibold text-amber-900 mb-2">Category Mismatch</p>
+                        <div className="space-y-2">
+                          <div>
+                            <p className="text-[10px] uppercase text-muted-foreground">Seller's category</p>
+                            <Badge variant="outline" className="text-[11px]">{category || '—'}</Badge>
+                          </div>
+                          <div className="text-center text-muted-foreground text-xs">↓</div>
+                          <div>
+                            <p className="text-[10px] uppercase text-muted-foreground">AI suggested</p>
+                            <Badge className="bg-amber-200 text-amber-900 border border-amber-300 text-[11px]">{suggestedCategory || '—'}</Badge>
+                          </div>
+                        </div>
+                      </div>
+
+                      {Array.isArray(flaggedKeywords) && flaggedKeywords.length > 0 && (
+                        <div className="rounded-md bg-rose-50 border border-rose-300 p-3" data-testid="preview-detected-signals">
+                          <p className="text-[11px] uppercase tracking-wide font-semibold text-rose-900 mb-2">
+                            🚨 Flagged Keywords
+                          </p>
+                          <div className="flex flex-wrap gap-1">
+                            {flaggedKeywords.map((sig, idx) => (
+                              <Badge
+                                key={idx}
+                                className="bg-rose-200 text-rose-900 border border-rose-400 font-mono text-[10px]"
+                              >
+                                {sig}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {aiReason && (
+                        <div className="rounded-md bg-slate-50 border border-slate-200 p-3 text-[11px] text-slate-700">
+                          <p className="font-semibold uppercase text-muted-foreground mb-1">AI Reason</p>
+                          <p>{aiReason}</p>
+                        </div>
+                      )}
+
+                      {previewModal.error && (
+                        <div className="rounded-md bg-rose-50 border border-rose-200 p-3 text-xs text-rose-800">
+                          {String(previewModal.error)}
+                        </div>
+                      )}
                     </div>
                   </div>
-                )}
+                </div>
+              );
+            })()}
+          </div>
 
-                {(previewModal.row?.ai_reason_en || previewModal.row?.ai_reason_fr) && (
-                  <div className="rounded-md bg-slate-50 border border-slate-200 p-3 text-[11px] text-slate-700">
-                    <p className="font-semibold uppercase text-muted-foreground mb-1">AI Reason</p>
-                    <p>{previewModal.row.ai_reason_en || previewModal.row.ai_reason_fr}</p>
-                  </div>
-                )}
-
-                {previewModal.error && (
-                  <div className="rounded-md bg-rose-50 border border-rose-200 p-3 text-xs text-rose-800">
-                    {String(previewModal.error)}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          <DialogFooter className="mt-4 flex-col sm:flex-row gap-2">
+          {/* Sticky full-width footer — always visible without scrolling */}
+          <div className="sticky bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-4 py-3 sm:px-6 flex flex-col sm:flex-row gap-2">
             <Button variant="outline" onClick={closePreview} className="w-full sm:w-auto" data-testid="preview-close-btn">
               Close
             </Button>
             {previewModal.row?.status === 'pending' && (
               <>
                 <Button
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white w-full sm:w-auto"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white w-full sm:flex-1"
                   onClick={() => { const row = previewModal.row; closePreview(); openAction('approve', row); }}
                   data-testid="preview-approve-btn"
                 >
@@ -507,7 +572,7 @@ const FlaggedListingsTab = () => {
                 </Button>
                 <Button
                   variant="destructive"
-                  className="w-full sm:w-auto"
+                  className="w-full sm:flex-1"
                   onClick={() => { const row = previewModal.row; closePreview(); openAction('reject', row); }}
                   data-testid="preview-reject-btn"
                 >
@@ -515,7 +580,17 @@ const FlaggedListingsTab = () => {
                 </Button>
               </>
             )}
-          </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Lightbox for full-size image view */}
+      <Dialog open={lightbox.open} onOpenChange={(v) => !v && setLightbox({ open: false, src: null })}>
+        <DialogContent className="max-w-4xl w-[95vw] p-2" data-testid="image-lightbox">
+          {lightbox.src && (
+            // eslint-disable-next-line jsx-a11y/img-redundant-alt
+            <img src={lightbox.src} alt="Full-size preview" className="w-full h-auto rounded-md" />
+          )}
         </DialogContent>
       </Dialog>
 

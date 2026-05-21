@@ -564,10 +564,22 @@ const SellerDashboard = () => {
                           )}
                         </div>
                         <Badge
-                          variant={listing.status === 'active' ? 'default' : listing.status === 'pending_review' ? 'destructive' : 'secondary'}
+                          variant={
+                            listing.status === 'active' ? 'default' :
+                            listing.status === 'pending_review' ? 'destructive' :
+                            listing.status === 'pending_admin_review' || listing.status === 'pending_ai_review' ? 'outline' :
+                            'secondary'
+                          }
+                          className={
+                            (listing.status === 'pending_admin_review' || listing.status === 'pending_ai_review')
+                              ? 'border-amber-400 bg-amber-100 text-amber-900 font-semibold'
+                              : undefined
+                          }
                           data-testid={`listing-status-${listing.id}`}
                         >
-                          {t(`dashboard.seller.status${listing.status.charAt(0).toUpperCase() + listing.status.slice(1)}`, listing.status)}
+                          {(listing.status === 'pending_admin_review' || listing.status === 'pending_ai_review')
+                            ? '⏳ Under Review — Verification takes 5–50 minutes.'
+                            : t(`dashboard.seller.status${listing.status.charAt(0).toUpperCase() + listing.status.slice(1)}`, listing.status)}
                         </Badge>
                       </div>
 
@@ -661,38 +673,38 @@ const SellerDashboard = () => {
                         </span>
                       </div>
                       <div className="flex flex-col lg:flex-row gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            // Phase 6.0 — Block public navigation while under admin review
-                            if (listing.status === 'pending_admin_review' || listing.status === 'pending_ai_review') {
-                              toast.info(
-                                listing.status === 'pending_admin_review'
-                                  ? 'This listing is under compliance review. The public page is locked until verification.'
-                                  : 'This listing is pending AI review.'
-                              );
-                              return;
-                            }
-                            navigate(isMultiItem ? `/lots/${listing.id}` : `/listing/${listing.id}`);
-                          }}
-                          disabled={listing.status === 'pending_admin_review' || listing.status === 'pending_ai_review'}
-                          data-testid={`view-listing-row-${listing.id}`}
-                          className="w-full lg:w-auto"
-                        >
-                          {(listing.status === 'pending_admin_review' || listing.status === 'pending_ai_review')
-                            ? `🔒 ${t('dashboard.seller.view', 'View')}`
-                            : t('dashboard.seller.view')}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleDeleteListing(listing.id, isMultiItem)}
-                          data-testid={`delete-listing-${listing.id}`}
-                          className="w-full lg:w-auto"
-                        >
-                          {t('dashboard.seller.requestDeletion', 'Request Deletion')}
-                        </Button>
+                        {/* Phase 6.0 hotfix — fully locked card while under admin review: no view, edit, or delete affordances. */}
+                        {(listing.status === 'pending_admin_review' || listing.status === 'pending_ai_review') ? (
+                          <div
+                            className="w-full text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2"
+                            data-testid={`locked-card-notice-${listing.id}`}
+                          >
+                            🔒 {(i18n.language || 'en').startsWith('fr')
+                                ? 'Annonce verrouillée pendant la révision — aucune modification possible.'
+                                : 'Listing locked while under review — no edits, deletions or public view.'}
+                          </div>
+                        ) : (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => navigate(isMultiItem ? `/lots/${listing.id}` : `/listing/${listing.id}`)}
+                              data-testid={`view-listing-row-${listing.id}`}
+                              className="w-full lg:w-auto"
+                            >
+                              {t('dashboard.seller.view')}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleDeleteListing(listing.id, isMultiItem)}
+                              data-testid={`delete-listing-${listing.id}`}
+                              className="w-full lg:w-auto"
+                            >
+                              {t('dashboard.seller.requestDeletion', 'Request Deletion')}
+                            </Button>
+                          </>
+                        )}
                       </div>
 
                       {/* Post-Sale Contact Info — Buyer */}
