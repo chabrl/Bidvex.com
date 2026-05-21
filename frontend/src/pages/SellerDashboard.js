@@ -42,6 +42,8 @@ const SellerDashboard = () => {
   const [deletionSubmitting, setDeletionSubmitting] = useState(false);
   const [showTaxModal, setShowTaxModal] = useState(false);
   const [dealerSubStatus, setDealerSubStatus] = useState(null);
+  // HOTFIX v9.1 / Fix 3 — Filter tab selection for "Your Listings"
+  const [listingsFilter, setListingsFilter] = useState('all'); // all|active|pending_review|draft|ended
 
   useEffect(() => {
     fetchDashboard();
@@ -520,14 +522,80 @@ const SellerDashboard = () => {
           </CardContent>
         </Card>
 
-        <Card className="glassmorphism">
+        <Card className="glassmorphism" data-testid="your-listings-card">
           <CardHeader>
-            <CardTitle>{t('dashboard.seller.yourListings')}</CardTitle>
+            {/* HOTFIX v9.1 / Fix 3 — Title row with pending count pill */}
+            <div className="flex flex-wrap items-center gap-3">
+              <CardTitle>{t('dashboard.seller.yourListings')}</CardTitle>
+              {(() => {
+                const pendingCount = (dashboard?.counts?.pending_review ?? 0) + (dashboard?.counts?.draft ?? 0);
+                if (pendingCount <= 0) return null;
+                return (
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full bg-amber-100 border border-amber-300 px-2.5 py-0.5 text-[12px] font-semibold text-amber-900"
+                    data-testid="your-listings-pending-count"
+                  >
+                    <Clock className="h-3 w-3" />
+                    {pendingCount} {(i18n.language || 'en').startsWith('fr') ? 'en attente' : 'Pending'}
+                  </span>
+                );
+              })()}
+            </div>
+
+            {/* HOTFIX v9.1 / Fix 3 — Filter tabs (horizontally scrollable on mobile) */}
+            {dashboard?.counts && (dashboard.counts.total ?? 0) > 0 && (
+              <div
+                className="mt-3 -mx-2 px-2 overflow-x-auto"
+                data-testid="your-listings-filter-tabs"
+              >
+                <div className="flex items-center gap-2 min-w-max">
+                  {[
+                    { key: 'all',            label_en: 'All',            label_fr: 'Toutes',         count: dashboard.counts.total ?? 0 },
+                    { key: 'active',         label_en: 'Active',         label_fr: 'Actives',        count: dashboard.counts.active ?? 0 },
+                    { key: 'pending_review', label_en: 'Pending Review', label_fr: 'En révision',    count: dashboard.counts.pending_review ?? 0 },
+                    { key: 'draft',          label_en: 'Draft',          label_fr: 'Brouillons',     count: dashboard.counts.draft ?? 0 },
+                    { key: 'ended',          label_en: 'Ended',          label_fr: 'Terminées',      count: dashboard.counts.ended ?? 0 },
+                  ].map((tab) => {
+                    const isActive = listingsFilter === tab.key;
+                    const label = (i18n.language || 'en').startsWith('fr') ? tab.label_fr : tab.label_en;
+                    return (
+                      <button
+                        type="button"
+                        key={tab.key}
+                        onClick={() => setListingsFilter(tab.key)}
+                        data-testid={`listings-filter-tab-${tab.key}`}
+                        className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                          isActive
+                            ? 'bg-slate-900 text-white border-slate-900'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        {label} ({tab.count})
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </CardHeader>
           <CardContent>
-            {dashboard?.all_listings && dashboard.all_listings.length > 0 ? (
+            {(() => {
+              const _PENDING = new Set(['pending_ai_review', 'pending_admin_review', 'pending_review']);
+              const _ENDED = new Set(['sold', 'ended', 'expired', 'completed']);
+              const all = dashboard?.all_listings || [];
+              const filtered = all.filter((l) => {
+                const s = l?.status;
+                if (listingsFilter === 'all') return true;
+                if (listingsFilter === 'active') return s === 'active';
+                if (listingsFilter === 'pending_review') return _PENDING.has(s);
+                if (listingsFilter === 'draft') return s === 'draft';
+                if (listingsFilter === 'ended') return _ENDED.has(s);
+                return true;
+              });
+              return (
+            filtered.length > 0 ? (
               <div className="space-y-4">
-                {dashboard.all_listings.map((listing) => {
+                {filtered.map((listing) => {
                   // Check if this is a multi-item listing or single listing
                   const isMultiItem = listing.lots && listing.lots.length > 0;
                   const displayPrice = isMultiItem 
@@ -541,10 +609,10 @@ const SellerDashboard = () => {
                   return (
                   <div
                     key={listing.id}
-                    className="flex flex-col sm:flex-row gap-4 p-4 border rounded-lg hover:bg-accent/50 transition-colors"
+                    className="flex flex-col sm:flex-row gap-4 p-4 border rounded-lg hover:bg-accent/50 transition-colors w-full max-w-full overflow-hidden box-border"
                     data-testid={`listing-item-${listing.id}`}
                   >
-                    <div className="w-full sm:w-24 h-24 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                    <div className="w-20 h-20 sm:w-[120px] sm:h-[90px] rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
                       {listing.images && listing.images[0] ? (
                         <img src={listing.images[0]} alt={listing.title} className="w-full h-full object-cover" />
                       ) : isMultiItem && listing.lots[0]?.images?.[0] ? (
@@ -555,32 +623,42 @@ const SellerDashboard = () => {
                         </div>
                       )}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <div>
-                          <h3 className="font-semibold truncate">{listing.title}</h3>
-                          {isMultiItem && (
-                            <p className="text-xs text-muted-foreground">{itemCount} {t('dashboard.seller.lots')}</p>
-                          )}
-                        </div>
-                        <Badge
-                          variant={
-                            listing.status === 'active' ? 'default' :
-                            listing.status === 'pending_review' ? 'destructive' :
-                            listing.status === 'pending_admin_review' || listing.status === 'pending_ai_review' ? 'outline' :
-                            'secondary'
-                          }
-                          className={
-                            (listing.status === 'pending_admin_review' || listing.status === 'pending_ai_review')
-                              ? 'border-amber-400 bg-amber-100 text-amber-900 font-semibold'
-                              : undefined
-                          }
-                          data-testid={`listing-status-${listing.id}`}
+                    {/* HOTFIX v9.1 / Fix 2 — Stacked layout (title on top, badge below)
+                        so the long "Under Review — Verification takes 5–50 minutes."
+                        pill no longer overflows the card boundary. */}
+                    <div className="flex-1 min-w-0 max-w-full">
+                      <div className="mb-2 space-y-1.5">
+                        <h3
+                          className="font-semibold text-sm sm:text-base leading-snug break-words"
+                          style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
+                          data-testid={`listing-title-${listing.id}`}
                         >
-                          {(listing.status === 'pending_admin_review' || listing.status === 'pending_ai_review')
-                            ? '⏳ Under Review — Verification takes 5–50 minutes.'
-                            : t(`dashboard.seller.status${listing.status.charAt(0).toUpperCase() + listing.status.slice(1)}`, listing.status)}
-                        </Badge>
+                          {listing.title}
+                        </h3>
+                        {isMultiItem && (
+                          <p className="text-xs text-muted-foreground">{itemCount} {t('dashboard.seller.lots')}</p>
+                        )}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <Badge
+                            variant={
+                              listing.status === 'active' ? 'default' :
+                              listing.status === 'pending_review' ? 'destructive' :
+                              listing.status === 'pending_admin_review' || listing.status === 'pending_ai_review' ? 'outline' :
+                              'secondary'
+                            }
+                            className={`max-w-full whitespace-normal break-words text-left ${
+                              (listing.status === 'pending_admin_review' || listing.status === 'pending_ai_review')
+                                ? 'border-amber-400 bg-amber-100 text-amber-900 font-semibold'
+                                : ''
+                            }`}
+                            style={{ position: 'static' }}
+                            data-testid={`listing-status-${listing.id}`}
+                          >
+                            {(listing.status === 'pending_admin_review' || listing.status === 'pending_ai_review')
+                              ? '⏳ Under Review — Verification takes 5–50 minutes.'
+                              : t(`dashboard.seller.status${listing.status.charAt(0).toUpperCase() + listing.status.slice(1)}`, listing.status)}
+                          </Badge>
+                        </div>
                       </div>
 
                       {/* iter211 — Featured countdown ribbon (seller-only, hidden when no active promotion) */}
@@ -747,12 +825,22 @@ const SellerDashboard = () => {
             ) : (
               <div className="text-center py-12">
                 <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground mb-4">{t('dashboard.seller.noListingsYet')}</p>
-                <Button onClick={() => navigate('/create-listing')} className="gradient-button text-white border-0">
-                  {t('dashboard.seller.createFirstListing')}
-                </Button>
+                <p className="text-muted-foreground mb-4">
+                  {listingsFilter === 'all'
+                    ? t('dashboard.seller.noListingsYet')
+                    : ((i18n.language || 'en').startsWith('fr')
+                        ? 'Aucune annonce dans cet onglet.'
+                        : 'No listings in this tab.')}
+                </p>
+                {listingsFilter === 'all' && (
+                  <Button onClick={() => navigate('/create-listing')} className="gradient-button text-white border-0">
+                    {t('dashboard.seller.createFirstListing')}
+                  </Button>
+                )}
               </div>
-            )}
+            )
+              );
+            })()}
           </CardContent>
         </Card>
           </>

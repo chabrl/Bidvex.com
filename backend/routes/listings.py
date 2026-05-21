@@ -101,6 +101,32 @@ _LISTING_CACHE_TTL = 30
 
 # ========== SINGLE-ITEM LISTINGS ==========
 
+@listings_router.get("/listings/my-listings")
+async def get_my_listings(current_user: User = Depends(get_current_user)):
+    """HOTFIX v9.1 / Fix 3 — Seller's own listings + filter-tab counts.
+
+    Returns:
+      { listings: [...], counts: { total, active, pending_review, draft, ended, sold } }
+    """
+    db = get_db()
+    single = await db.listings.find({"seller_id": current_user.id}, {"_id": 0}).to_list(1000)
+    multi = await db.multi_item_listings.find({"seller_id": current_user.id}, {"_id": 0}).to_list(1000)
+    all_listings = single + multi
+
+    _PENDING = ("pending_ai_review", "pending_admin_review", "pending_review")
+    _ENDED = ("sold", "ended", "expired", "completed")
+
+    counts = {
+        "total":          len(all_listings),
+        "active":         sum(1 for l in all_listings if l.get("status") == "active"),
+        "pending_review": sum(1 for l in all_listings if l.get("status") in _PENDING),
+        "draft":          sum(1 for l in all_listings if l.get("status") == "draft"),
+        "ended":          sum(1 for l in all_listings if l.get("status") in _ENDED),
+        "sold":           sum(1 for l in all_listings if l.get("status") == "sold"),
+    }
+    return {"listings": all_listings, "counts": counts}
+
+
 @listings_router.get("/sellers/{seller_id}/listings")
 async def get_seller_listings(seller_id: str, limit: int = 20, skip: int = 0):
     """Get active listings for a specific seller (both single-item and multi-lot auctions)."""

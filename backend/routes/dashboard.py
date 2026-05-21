@@ -62,9 +62,27 @@ async def get_seller_dashboard(
 
     all_listings = listings + multi_listings
 
-    active_listings = [l for l in all_listings if l["status"] == "active"]
-    sold_listings = [l for l in all_listings if l["status"] == "sold"]
-    draft_listings = [l for l in all_listings if l["status"] == "draft"]
+    # HOTFIX v9.1 / Fix 3 — Seller dashboard filter-tab counts.
+    # A listing is "pending_review" when it sits in any of the three
+    # review-pending statuses surfaced by the AI Watchdog or Manual Review
+    # flow: pending_ai_review, pending_admin_review, pending_review.
+    _PENDING_STATUSES = ("pending_ai_review", "pending_admin_review", "pending_review")
+    _ENDED_STATUSES = ("sold", "ended", "expired", "completed")
+
+    active_listings = [l for l in all_listings if l.get("status") == "active"]
+    sold_listings = [l for l in all_listings if l.get("status") == "sold"]
+    draft_listings = [l for l in all_listings if l.get("status") == "draft"]
+    pending_review_listings = [l for l in all_listings if l.get("status") in _PENDING_STATUSES]
+    ended_listings = [l for l in all_listings if l.get("status") in _ENDED_STATUSES]
+
+    counts = {
+        "total":          len(all_listings),
+        "active":         len(active_listings),
+        "pending_review": len(pending_review_listings),
+        "draft":          len(draft_listings),
+        "ended":          len(ended_listings),
+        "sold":           len(sold_listings),
+    }
 
     # Post-sale Contact Info — enrich every sold/ended listing with the
     # buyer's contact details so the seller can complete the transaction.
@@ -97,6 +115,8 @@ async def get_seller_dashboard(
         "listings": listings,
         "multi_item_listings": multi_listings,
         "all_listings": all_listings,
+        # HOTFIX v9.1 / Fix 3 — Filter-tab counts for the seller dashboard.
+        "counts": counts,
     }
 
 

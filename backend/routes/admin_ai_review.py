@@ -761,14 +761,17 @@ async def _queue_seller_email(db, kind: str, seller_id: str, context: dict):
             from services.templates.welcome_email import render_kind_html
             from services.email_service import send_html_email
             html = render_kind_html(kind, context)
+            # HOTFIX v9.1 / Fix 1 — Subject line per user spec: "Your listing is
+            # now live — [Title]" so the seller instantly recognises approval.
+            listing_title_subj = (context.get("listing_title") or "").strip() or "your listing"
             subject_map = {
                 "ai_review_approved": (
-                    "Listing Approved! / Annonce approuvée!" if not is_fr else
-                    "Annonce approuvée! / Listing Approved!"
+                    f"Votre annonce est maintenant en ligne — {listing_title_subj}" if is_fr else
+                    f"Your listing is now live — {listing_title_subj}"
                 ),
                 "ai_review_rejected": (
-                    "Listing Decision / Décision sur votre annonce" if not is_fr else
-                    "Décision sur votre annonce / Listing Decision"
+                    "Décision sur votre annonce / Listing Decision" if is_fr else
+                    "Listing Decision / Décision sur votre annonce"
                 ),
             }
             subject = subject_map.get(kind, "BidVex")
@@ -810,8 +813,8 @@ async def _queue_seller_email(db, kind: str, seller_id: str, context: dict):
         if kind == "ai_review_approved":
             title_en = "Listing Approved!"
             title_fr = "Annonce approuvée !"
-            msg_en = f"Your listing '{listing_title}' is now live on the BidVex marketplace."
-            msg_fr = f"Votre annonce « {listing_title} » est maintenant publiée sur la place de marché BidVex."
+            msg_en = f"✅ Your listing '{listing_title}' is now live on BidVex."
+            msg_fr = f"✅ Votre annonce « {listing_title} » est maintenant en ligne sur BidVex."
         else:  # ai_review_rejected
             title_en = "Listing Denied"
             title_fr = "Annonce refusée"
@@ -859,28 +862,43 @@ async def admin_approve_listing_review(
     payload: ReviewActionRequest,
     current_user: User = Depends(require_admin),
 ):
-    """Approve a flagged listing — restores it to its prior status (default 'active')."""
+    """Approve a flagged listing — flips to status='active', publishes, clears AI flags.
+
+    HOTFIX v9.1 / Fix 1:
+      - Always flips listing to 'active' (regardless of previous status —
+        pending_ai_review, pending_admin_review, locked-* stubs).
+      - Sets is_published=True + published_at=now so the listing appears
+        in the correct public marketplace feed immediately.
+      - Wipes every AI-review trace from the listing doc.
+      - Seller email + in-app notification dispatched via `_queue_seller_email`
+        (the "ai_review_approved" kind already routes to the live-listing copy).
+    """
     db = get_db()
     review, collection, listing = await _resolve_review_and_listing(db, review_id)
     now = datetime.now(timezone.utc)
 
-    # The status to restore: previous_status from the review snapshot, fallback to 'active'.
-    restored_status = review.get("previous_status") or "active"
-    if restored_status == "pending_ai_review":
-        restored_status = "active"
+    # HOTFIX v9.1 — Always restore to "active" (never leave the listing in a
+    # pending_* state after an admin approves). The previous logic kept
+    # `previous_status` for non-AI flows, which could resurface bad rows.
+    restored_status = "active"
 
     listing_update = {
-        "status":                  restored_status,
-        "ai_review_approved_at":   now,
-        "ai_review_approved_by":   current_user.email,
+        "status":                   restored_status,
+        "is_published":             True,
+        "published_at":             now,
+        "ai_review_approved_at":    now,
+        "ai_review_approved_by":    current_user.email,
+        # Wipe every AI-review breadcrumb so the listing leaves pending cleanly
+        "ai_review_id":             None,
+        "ai_review_flag":           None,
+        "ai_review_status":         None,
+        "ai_review_flagged_at":     None,
+        "ai_suggested_category":    None,
+        "ai_review_reason_en":      None,
+        "ai_review_reason_fr":      None,
     }
     if payload.override_category:
         listing_update["category"] = payload.override_category.strip()
-
-    # Clear the AI fields so the listing can leave pending state cleanly
-    listing_update["ai_suggested_category"] = None
-    listing_update["ai_review_reason_en"] = None
-    listing_update["ai_review_reason_fr"] = None
 
     # Phase 6.0 hotfix — collection may be None for pre-creation
     # (vehicle-block::*) requests where no listing exists yet.

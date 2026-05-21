@@ -1,6 +1,49 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: Phase 6.0 Hotfix 7 — Production AI Watchdog Verification Pass (Feb 21, 2026) ✅
+## Latest: HOTFIX v9.1 — AI Watchdog Review Flow (Feb 21, 2026) ✅
+
+### FIX 1 — Admin Approve = Listing Goes Live Immediately
+**File**: `backend/routes/admin_ai_review.py::admin_approve_listing_review`
+
+When admin clicks "Approve" on a flagged listing, the backend now ALWAYS flips:
+- `listing.status = "active"` (no more "pending_*" remnants)
+- `listing.is_published = True` + `published_at = now()`
+- Every AI breadcrumb wiped: `ai_review_id`, `ai_review_flag`, `ai_review_status`, `ai_review_flagged_at`, `ai_suggested_category`, `ai_review_reason_en/fr` all set to `None`
+- Seller email subject: `"Your listing is now live — [Title]"` (EN) / `"Votre annonce est maintenant en ligne — [Title]"` (FR)
+- Seller in-app notification: `✅ Your listing '[Title]' is now live on BidVex.`
+
+Listing automatically becomes visible in the correct public feed (single → marketplace, multi-lot → lots auction, vehicle → vehicle auctions, storage → storage auctions) by virtue of `status=active` and the existing feed query filters.
+
+### FIX 2 — Seller Dashboard Card Layout (No Overflow)
+**File**: `frontend/src/pages/SellerDashboard.js`
+
+Restructured the listing-card body from a `flex justify-between` (which caused the long "Under Review" badge to push outside the card boundary) to a vertically-stacked layout:
+- Title gets its own row (`break-words` + `overflowWrap: anywhere` — no truncation)
+- Badge moved to its own row below title (`whitespace-normal max-w-full`)
+- Card wrapper hardened: `w-full max-w-full overflow-hidden box-border`
+- Thumbnail: `w-20 h-20 sm:w-[120px] sm:h-[90px]` (matches user spec)
+- Title sizing: `text-sm sm:text-base` (mobile/desktop split per spec)
+- Verified live: badge right edge 821px stays well inside card right edge 1575px (desktop).
+
+### FIX 3 — Pending Count Badge + Filter Tabs
+**Files**: `frontend/src/pages/SellerDashboard.js`, `backend/routes/dashboard.py`, `backend/routes/listings.py`
+
+- Backend `/api/dashboard/seller` response now includes `counts: { total, active, pending_review, draft, ended, sold }`.
+- New backend route `GET /api/listings/my-listings` returns `{ listings, counts }`.
+- Pending-count pill `🕐 N Pending` shows next to "Your Listings" heading whenever `(pending_review + draft) > 0`; hidden at 0.
+- 5 filter tabs `[All]  [Active]  [Pending Review]  [Draft]  [Ended]` with counts (e.g. `Pending Review (1)`), horizontally scrollable on mobile (`overflow-x-auto`).
+- Selecting a tab filters the rendered list client-side.
+
+### Tests
+- `tests/test_hotfix_v9_1.py` — 3 new tests (admin approve flips to active + clears AI flags; `/dashboard/seller` returns `counts`; `/listings/my-listings` returns `counts`).
+- Full regression: **64/64 pytests pass** across Phase 5.3 + 5.4 + 6.0 + v9 + v9.1. Zero regressions.
+
+### Live verification
+- Live preview screenshot confirms `2 Pending` pill, all 5 filter tabs with correct counts (`All (3) | Active (1) | Pending Review (1) | Draft (1) | Ended (0)`), under-review badge contained inside the card, action buttons wrap correctly. Desktop + mobile viewport both verified.
+
+---
+
+## Previous: Phase 6.0 Hotfix 7 — Production AI Watchdog Verification Pass (Feb 21, 2026) ✅
 
 ### Directive Summary
 The user requested an end-to-end production trace of the AI Watchdog flow with **zero tolerance** for residual fallback strings, unrouted notifications, vanished seller listings, or admin storage-locker blockers. Every code-level deviation was patched and verified live in the preview environment.
