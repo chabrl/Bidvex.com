@@ -115,8 +115,9 @@ const VehicleAuctionsPage = () => {
       try {
         const res = await axios.get(`${API}/vehicles/categories`);
         if (!cancelled) setCategories(res.data?.items || []);
-      } catch (e) {
-        // non-fatal
+      } catch (catErr) {
+        // non-fatal — degraded UI: filter dropdown will show "All categories"
+        console.debug('[VehicleAuctionsPage] categories load failed:', catErr);
       } finally {
         if (!cancelled) setCategoriesLoading(false);
       }

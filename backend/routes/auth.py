@@ -16,6 +16,7 @@ import asyncio
 import hashlib
 import os
 import secrets
+import string
 import uuid
 import logging
 import aiohttp
@@ -229,11 +230,11 @@ async def register(user_data: UserCreate, request: Request, background_tasks: Ba
     # Generate unique user ID
     user_id = str(uuid.uuid4())
     
-    # Generate affiliate code
+    # Generate affiliate code — iter211: use `secrets` (CSPRNG) so the code
+    # cannot be predicted from the system random seed.
     prefix = user_id[:8].upper()
-    import random
-    import string
-    suffix = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+    alphabet = string.ascii_uppercase + string.digits
+    suffix = ''.join(secrets.choice(alphabet) for _ in range(4))
     affiliate_code = f"BVX{prefix}{suffix}"
     
     # Get client IP for geolocation

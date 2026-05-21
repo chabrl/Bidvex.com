@@ -4,6 +4,7 @@ Supports English (en) and French (fr)
 Supports CAD and USD currencies with appropriate tax logic
 """
 
+import os
 from datetime import datetime
 from typing import Dict, Any
 from logo_data import BIDVEX_LOGO_BASE64

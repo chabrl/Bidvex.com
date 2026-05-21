@@ -102,6 +102,32 @@ def _init_vehicle_admin(database):
     _db = database
 
 
+# iter211 — Module-level lazy `db` proxy. Resolves the F821 errors where
+# endpoints used `db.xxx` without first calling `db = get_db()`. The proxy
+# lazily delegates every attribute access to the runtime DB (either the
+# initialized `_db` reference set by `_init_vehicle_admin`, or the live db
+# returned by `deps.get_db()`).
+from deps import get_db as _get_db_runtime
+
+class _LazyDBProxy:
+    def __getattr__(self, name):
+        target = _db if _db is not None else _get_db_runtime()
+        return getattr(target, name)
+
+    def __getitem__(self, name):
+        target = _db if _db is not None else _get_db_runtime()
+        return target[name]
+
+db = _LazyDBProxy()
+
+
+# iter211 — Import the system-settings helper from the parent module so
+# endpoints can call `await get_system_settings()` without a NameError.
+async def get_system_settings():
+    from routes.vehicles import get_system_settings as _gss
+    return await _gss()
+
+
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """Reuse auth from parent — imported at runtime to avoid circular deps."""
     from routes.vehicles import get_current_user as _get_current_user

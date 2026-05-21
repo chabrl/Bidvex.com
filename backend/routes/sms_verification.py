@@ -183,8 +183,10 @@ async def send_otp(request: SendOTPRequest, req: Request):
                 if "21608" in error_str or "unverified" in error_str.lower() or "trial" in error_str.lower():
                     # Fallback to mock mode for trial accounts
                     logger.warning(f"📱 Trial account limitation - falling back to mock mode for {phone[:6]}***")
-                    import random
-                    mock_code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
+                    # iter211 — Use `secrets` (CSPRNG) for OTP digits so the
+                    # code is not predictable from the system random seed.
+                    import secrets as _secrets
+                    mock_code = ''.join(str(_secrets.randbelow(10)) for _ in range(6))
                     
                     await db.sms_verifications.update_one(
                         {"phone_number": phone, "verified": False},
@@ -200,9 +202,9 @@ async def send_otp(request: SendOTPRequest, req: Request):
                 else:
                     raise HTTPException(status_code=500, detail="Failed to send verification code. Please try again.")
         else:
-            # Mock mode for development
-            import random
-            mock_code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
+            # Mock mode for development — iter211: use `secrets` (CSPRNG).
+            import secrets as _secrets
+            mock_code = ''.join(str(_secrets.randbelow(10)) for _ in range(6))
             
             # Store mock code in database
             await db.sms_verifications.update_one(

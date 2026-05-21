@@ -430,9 +430,11 @@ Remember: You are not just an assistant - you are the Master Concierge, the face
             issue_summary = params.get("issue_summary")
             chat_history = params.get("chat_history", [])
             
-            # Generate reference number
-            import random
-            ref_number = f"BV-{random.randint(1000, 9999)}"
+            # Generate reference number — iter211: use `secrets` for an
+            # unpredictable ticket ID (random.randint is not cryptographically
+            # secure and can leak via timing).
+            import secrets as _secrets
+            ref_number = f"BV-{1000 + _secrets.randbelow(9000)}"
             
             # Create support ticket
             ticket = {

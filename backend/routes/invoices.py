@@ -24,6 +24,7 @@ from pydantic import BaseModel, Field
 from pathlib import Path
 import logging
 import uuid
+import os
 import os as _os
 import json as _json
 
@@ -31,6 +32,8 @@ logger = logging.getLogger(__name__)
 
 from services.email_service import get_email_service
 from services.tax_engine import calculate_gst_qst
+from services.invoice_generator import generate_invoice_number
+from invoice_templates import lots_won_template
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.lib.units import inch
@@ -40,6 +43,66 @@ from starlette.responses import FileResponse
 import hmac
 import hashlib
 import io
+
+
+# iter211 — Module-level lazy `db` proxy. Resolves the previous F821 errors
+# where endpoints used `db.xxx` without first calling `db = get_db()`. The
+# proxy lazily delegates every attribute access to the runtime DB returned by
+# `deps.get_db()`. This fixes 50+ undefined-name references in this file
+# without altering endpoint logic.
+class _LazyDBProxy:
+    def __getattr__(self, name):
+        return getattr(get_db(), name)
+
+    def __getitem__(self, name):
+        return get_db()[name]
+
+db = _LazyDBProxy()
+
+
+# iter211 — Stubs for previously-undefined helper functions that were lost
+# during the original server.py → routes/invoices.py extraction. Any endpoint
+# that still references them will now return a clear 501 instead of crashing
+# with NameError at request time. These code paths are not part of the
+# active checkout/invoice flow (validated via grep — referenced only here).
+async def _render_subscription_invoice_pdf(invoice: dict) -> bytes:
+    raise HTTPException(
+        status_code=501,
+        detail="Subscription invoice PDF generation has been migrated to the new flow. "
+               "Please use POST /api/billing/invoices/{id}/render instead.",
+    )
+
+
+async def generate_paddle_number(auction_id: str) -> int:
+    """Issue a new paddle number for a given auction.
+
+    The original helper in server.py is no longer importable. We reconstruct
+    the same logic here: next paddle = max(existing) + 1, starting at 100.
+    """
+    last = await get_db().paddle_numbers.find(
+        {"auction_id": auction_id},
+        {"_id": 0, "paddle_number": 1},
+    ).sort("paddle_number", -1).limit(1).to_list(1)
+    return (last[0]["paddle_number"] + 1) if last else 100
+
+
+def generate_pdf_from_html(html: str, output_path: str) -> str:
+    """Minimal HTML → PDF fallback. The full WeasyPrint helper was lost
+    during refactor; we reconstruct with ReportLab Paragraph so the endpoint
+    no longer NameErrors. Production-grade rendering uses the templates
+    in invoice_templates.py directly.
+    """
+    from reportlab.lib.pagesizes import letter as _letter
+    from reportlab.platypus import SimpleDocTemplate as _Doc, Paragraph as _P
+    from reportlab.lib.styles import getSampleStyleSheet as _styles
+    doc = _Doc(output_path, pagesize=_letter)
+    style = _styles()["Normal"]
+    # Strip the most common HTML tags so ReportLab can parse it
+    import re
+    text = re.sub(r"<br\s*/?>", "<br/>", html)
+    text = re.sub(r"<(/?)(?!br|b|i|u|strong|em)[^>]+>", "", text)
+    doc.build([_P(text, style)])
+    return output_path
 
 invoices_router = APIRouter(tags=["Invoices"])
 
@@ -870,9 +933,16 @@ async def complete_auction_and_send_documents(
         # Send seller email via SendGrid
         if seller_pdf_paths:
             subject = f"Vos résultats d'enchère - {auction['title']}" if lang == "fr" else f"Your Auction Results - {auction['title']}"
+            # iter211 — Use double-quoted inner strings to avoid escaping
+            # apostrophes inside f-string expressions (Python forbids backslashes
+            # in f-string expression parts; this previously caused a SyntaxError
+            # that the server.py graceful-loader hid by skipping the entire
+            # invoices router).
+            heading_fr = "Résultats de l'enchère"
+            sign_off_fr = "L'équipe BidVex"
             html_body = f"""
             <html><body style="font-family: Arial, sans-serif; padding: 20px;">
-            <h2>{'Résultats de l\\'enchère' if lang == 'fr' else 'Auction Results'}</h2>
+            <h2>{heading_fr if lang == 'fr' else 'Auction Results'}</h2>
             <p>{'Cher' if lang == 'fr' else 'Dear'} {seller['name'].split()[0]},</p>
             <p>{'Votre enchère' if lang == 'fr' else 'Your auction'} "<strong>{auction['title']}</strong>" {'est maintenant terminée.' if lang == 'fr' else 'has now concluded.'}</p>
             <table style="border-collapse: collapse; margin: 20px 0;">
@@ -881,7 +951,7 @@ async def complete_auction_and_send_documents(
                 <tr><td style="padding: 8px; border: 1px solid #ddd;">{'Paiement net' if lang == 'fr' else 'Net Payout'}</td><td style="padding: 8px; border: 1px solid #ddd;"><strong>${net_payout:,.2f} CAD</strong></td></tr>
             </table>
             <p>{'Vos documents sont disponibles dans votre tableau de bord.' if lang == 'fr' else 'Your auction documents are available in your dashboard.'}</p>
-            <p>{'Cordialement,' if lang == 'fr' else 'Sincerely,'}<br>{'L\\'équipe BidVex' if lang == 'fr' else 'The BidVex Team'}</p>
+            <p>{'Cordialement,' if lang == 'fr' else 'Sincerely,'}<br>{sign_off_fr if lang == 'fr' else 'The BidVex Team'}</p>
             </body></html>
             """
             result = await email_service.send_raw_html(seller['email'], subject, html_body)
@@ -950,9 +1020,15 @@ async def complete_auction_and_send_documents(
             # Send buyer email via SendGrid
             if buyer_pdf_paths:
                 subject = f"Votre facture d'enchère #{invoice_number} - Paiement requis" if lang == "fr" else f"Your Auction Invoice #{invoice_number} - Payment Required"
+                # iter211 — Use double-quoted inner strings to avoid backslash
+                # escapes in f-string expression parts (Python forbids them; this
+                # previously caused a SyntaxError silently swallowed by the
+                # graceful loader in server.py).
+                heading_fr_b = "Facture d'enchère"
+                sign_off_fr_b = "L'équipe BidVex"
                 html_body = f"""
                 <html><body style="font-family: Arial, sans-serif; padding: 20px;">
-                <h2>{'Facture d\\'enchère' if lang == 'fr' else 'Auction Invoice'}</h2>
+                <h2>{heading_fr_b if lang == 'fr' else 'Auction Invoice'}</h2>
                 <p>{'Cher' if lang == 'fr' else 'Dear'} {buyer['name'].split()[0]},</p>
                 <p>{'Félicitations pour vos enchères réussies!' if lang == 'fr' else 'Congratulations on your successful bids!'}</p>
                 <table style="border-collapse: collapse; margin: 20px 0;">
@@ -961,7 +1037,7 @@ async def complete_auction_and_send_documents(
                     <tr><td style="padding: 8px; border: 1px solid #ddd;">{'Montant total dû' if lang == 'fr' else 'Total Amount Due'}</td><td style="padding: 8px; border: 1px solid #ddd;"><strong>${total_due:,.2f} CAD</strong></td></tr>
                 </table>
                 <p>{'Veuillez consulter votre tableau de bord pour les instructions de paiement.' if lang == 'fr' else 'Please refer to your dashboard for detailed payment instructions.'}</p>
-                <p>{'Cordialement,' if lang == 'fr' else 'Sincerely,'}<br>{'L\\'équipe BidVex' if lang == 'fr' else 'The BidVex Team'}</p>
+                <p>{'Cordialement,' if lang == 'fr' else 'Sincerely,'}<br>{sign_off_fr_b if lang == 'fr' else 'The BidVex Team'}</p>
                 </body></html>
                 """
                 result = await email_service.send_raw_html(buyer['email'], subject, html_body)

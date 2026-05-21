@@ -202,9 +202,15 @@ async def _invalidate_listing_caches_async():
 
 
 def make_cache_key(namespace: str, params: dict) -> str:
-    """Generate deterministic cache key from namespace + query params."""
+    """Generate deterministic cache key from namespace + query params.
+
+    iter211 — Use SHA-256 (truncated) instead of MD5. The hash is only used
+    to deterministically derive a short cache-key suffix; the truncation makes
+    the collision space identical to the previous implementation, but the
+    underlying primitive is no longer the broken MD5.
+    """
     sorted_params = json.dumps(params, sort_keys=True, default=str)
-    param_hash = hashlib.md5(sorted_params.encode()).hexdigest()[:12]
+    param_hash = hashlib.sha256(sorted_params.encode()).hexdigest()[:12]
     return f"{namespace}{param_hash}"
 
 

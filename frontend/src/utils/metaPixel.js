@@ -60,7 +60,9 @@ const _hasConsent = () => {
         const parsed = JSON.parse(bannerRaw);
         if (parsed && parsed.analytics === true) return true;
         if (parsed && parsed.analytics === false) return false;
-      } catch (e) { /* fall through */ }
+    } catch (parseErr) {
+      console.debug('[meta-pixel] consent JSON parse failed (legacy fallback):', parseErr);
+    }
     }
     // 3. Legacy keys — kept for backward compatibility with older sessions.
     const v1 = window.localStorage.getItem(CONSENT_KEY_PRIMARY);
@@ -71,7 +73,8 @@ const _hasConsent = () => {
       v2 === 'true' ||
       v2 === 'accepted'
     );
-  } catch (e) {
+    } catch (consentReadErr) {
+    console.debug('[meta-pixel] consent read failed:', consentReadErr);
     return false;
   }
 };
@@ -105,8 +108,9 @@ const _flushQueue = () => {
     try {
       if (custom) window.fbq('trackCustom', name, params);
       else window.fbq('track', name, params);
-    } catch (e) {
-      // silent — pixel must never throw
+    } catch (flushErr) {
+      // pixel must never throw — debug-log so devs can see swallowed events
+      console.debug('[meta-pixel] flush event swallowed:', name, flushErr);
     }
   }
 };
@@ -132,8 +136,9 @@ export const initMetaPixel = () => {
     window.fbq('track', 'PageView');
     _initialized = true;
     _flushQueue();
-  } catch (e) {
-    // silent — pixel must never throw
+  } catch (initErr) {
+    // pixel must never throw — debug-log so devs can see init failures
+    console.debug('[meta-pixel] init failed (swallowed):', initErr);
   }
 };
 
@@ -142,7 +147,9 @@ export const notifyConsentGranted = () => {
   if (typeof window !== 'undefined') {
     try {
       window.localStorage.setItem(CONSENT_KEY_CANONICAL, 'true');
-    } catch (e) { /* silent */ }
+    } catch (storageErr) {
+      console.debug('[meta-pixel] consent localStorage write failed:', storageErr);
+    }
   }
   _initAttempted = false; // allow re-attempt
   initMetaPixel();
@@ -158,10 +165,15 @@ export const revokeConsent = () => {
   if (typeof window === 'undefined') return;
   try {
     window.localStorage.setItem(CONSENT_KEY_CANONICAL, 'false');
-  } catch (e) { /* silent */ }
+  } catch (storageErr) {
+    console.debug('[meta-pixel] revoke localStorage write failed:', storageErr);
+  }
   try {
     if (window.fbq) window.fbq('consent', 'revoke');
-  } catch (e) { /* silent — pixel must never throw */ }
+  } catch (revokeErr) {
+    // pixel must never throw — debug-log so devs can see revoke failures
+    console.debug('[meta-pixel] consent-revoke fbq() failed:', revokeErr);
+  }
   // Drop any queued (un-flushed) events so they can never fire.
   _queue.length = 0;
   _initialized = false;
@@ -173,8 +185,9 @@ const _enqueue = (name, params, custom = false) => {
     try {
       if (custom) window.fbq('trackCustom', name, params);
       else window.fbq('track', name, params);
-    } catch (e) {
-      // silent
+    } catch (trackErr) {
+      // pixel must never throw — debug-log so devs can see swallowed events
+      console.debug('[meta-pixel] trackEvent swallowed:', name, trackErr);
     }
     return;
   }

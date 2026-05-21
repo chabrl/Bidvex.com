@@ -1,6 +1,60 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: HOTFIX v9.1 — AI Watchdog Review Flow (Feb 21, 2026) ✅
+## Latest: Code Quality Sweep — Critical Fixes (Feb 21, 2026) ✅
+
+Applied all CRITICAL fixes from the code review report. Quality-improvement (non-breaking) items are listed in the "Deferred / Follow-up" section.
+
+### Critical Backend Fixes Applied
+
+**1. Production-breaking SyntaxError fixed** (`routes/invoices.py:886, 973`)
+- Two f-strings had `\\'` escapes inside expression parts → Python 3.11 forbids this → entire `invoices_router` failed to import → server.py graceful loader silently skipped it → `/api/invoices` was returning 404 in production.
+- Fix: Extract apostrophe-containing strings to local variables (`heading_fr`, `sign_off_fr`) so the f-string expression no longer contains a backslash.
+- Verified: `curl /api/invoices` now returns HTTP 200 with real data.
+
+**2. 70 F821 (undefined-name) errors → 0** across `routes/invoices.py`, `routes/vehicles_admin.py`, `routes/trust_safety.py`, `invoice_templates_complete.py`
+- Pattern: bare `db` and `os` references in endpoints where they weren't imported/assigned (refactoring leftover from server.py extraction).
+- Fix: Added module-level `_LazyDBProxy` (lazy `__getattr__` delegating to `deps.get_db()`) + `import os` aliases. Also stubbed 3 orphaned helpers (`_render_subscription_invoice_pdf`, `generate_paddle_number`, `generate_pdf_from_html`) so dead code paths return HTTP 501 instead of `NameError`.
+- Verified: `ruff check --select F821` → zero errors across production source.
+
+**3. Weak crypto (MD5 → SHA-256)** (`services/api_cache.py:207`)
+- Cache-key hashing upgraded from MD5 to SHA-256 (truncated to 12 hex chars — same collision space).
+
+**4. Insecure `random` → CSPRNG `secrets`** in 4 security-sensitive code paths:
+- `shared.py::generate_affiliate_code` — affiliate codes
+- `routes/auth.py:236` — registration affiliate codes
+- `routes/sms_verification.py:187, 205` — SMS OTP digits (mock-mode + trial fallback)
+- `services/ai_assistant.py:435` — support-ticket reference numbers
+
+### Critical Frontend Fixes Applied
+
+**5. Empty catch blocks → debug-logged**:
+- `utils/pushNotifications.js:145, 195` — unsubscribe cleanup + local-notification show
+- `utils/metaPixel.js:63, 109, 136, 145, 161, 164, 177` — all 7 silent `catch (e) {}` blocks now `console.debug(...)` so devs can see swallowed events while keeping pixel side-effects non-throwing
+- `pages/vehicles/VehicleAuctionsPage.js:118` — categories-load failure now debug-logged
+
+### Verification
+- `python -c "from routes import invoices; ..."` → ✓ all modified modules import cleanly
+- `ruff check --select F821` → 0 errors across production source
+- `pytest tests/test_phase_5_3.py tests/test_phase_5_4.py tests/test_phase_6_0.py tests/test_feature_patch_v9.py tests/test_hotfix_v9_1.py` → **64/64 pass** (zero regressions)
+- Backend reload clean, `GET /api/invoices` returns 200 (previously dead).
+- Frontend lint clean for all 3 patched files.
+
+### Deferred / Follow-up (non-blocking quality improvements)
+
+The remaining "Important" findings from the report are quality improvements that don't break production. Each requires multi-hour focused work and a dedicated session:
+
+- **Circular imports** (`services/email_notifications.py` ↔ `routes/storage_auctions.py`; `services/fee_calculator.py` ↔ `services/vehicle_pricing.py` ↔ `services/tax_engine.py`) → needs module decomposition.
+- **High-complexity functions** (5 invoice-template functions 226–296 lines each; `geolocation_service.calculate_location_confidence` complexity 17) → needs extraction to helper functions.
+- **Dynamic imports** (5 files, 7 sites) → mostly intentional lazy-loading for circular-import workarounds; need case-by-case audit.
+- **Frontend missing-hook deps (406 instances)** → needs page-by-page audit; fixing all without thought can introduce render loops.
+- **Frontend localStorage usage (20+ instances)** → migrating sensitive data to httpOnly cookies needs a coordinated backend session refactor.
+- **Frontend oversized components (5 files, 447–566 lines)** → needs component-extraction refactor.
+- **Index-as-key (110 instances)** → needs review case-by-case; not all are bugs (some are static lists).
+- **Hardcoded test secrets (129 in `tests/`)** → tests-only, never reach production code or git remote.
+
+---
+
+## Previous: HOTFIX v9.1 — AI Watchdog Review Flow (Feb 21, 2026) ✅
 
 ### FIX 1 — Admin Approve = Listing Goes Live Immediately
 **File**: `backend/routes/admin_ai_review.py::admin_approve_listing_review`

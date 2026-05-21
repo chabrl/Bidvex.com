@@ -142,7 +142,9 @@ export async function subscribeToPush() {
     console.error('[push] backend returned', response.status, text);
     // If save failed, undo the local push subscription so a retry doesn't
     // silently use a stale subscription the server doesn't know about.
-    try { await sub.unsubscribe(); } catch (_) { /* best-effort */ }
+    try { await sub.unsubscribe(); } catch (cleanupErr) {
+      console.debug('[push] unsubscribe-after-failure cleanup error (best-effort):', cleanupErr);
+    }
     return {
       ok: false,
       code: 'backend_save_failed',
@@ -192,7 +194,9 @@ export async function isPushSubscribed() {
 
 export function showLocalNotification(title, options = {}) {
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
-  try { new Notification(title, options); } catch (_) { /* noop */ }
+  try { new Notification(title, options); } catch (notifErr) {
+    console.debug('[push] showLocalNotification swallowed:', notifErr);
+  }
 }
 
 export default {

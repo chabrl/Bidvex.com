@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
 import uuid
-import random
+import secrets
 import string
 import logging
 
@@ -17,8 +17,11 @@ logger = logging.getLogger(__name__)
 AFFILIATE_COMMISSION_RATE = 0.015
 
 def generate_affiliate_code(user_id: str) -> str:
+    """Generate a unique affiliate code. iter211 — Uses `secrets` instead of
+    `random` so that codes are not predictable from the system clock seed."""
     prefix = user_id[:8].upper()
-    suffix = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+    alphabet = string.ascii_uppercase + string.digits
+    suffix = ''.join(secrets.choice(alphabet) for _ in range(4))
     return f"BVX{prefix}{suffix}"
 
 # ─── Email Template Defaults ───
