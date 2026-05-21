@@ -20,7 +20,7 @@ import {
   DialogFooter,
 } from '../components/ui/dialog';
 import { toast } from 'sonner';
-import { Loader2, Upload, AlertTriangle, ShieldAlert, ExternalLink } from 'lucide-react';
+import { Loader2, Upload, AlertTriangle, ShieldAlert, ExternalLink, Search } from 'lucide-react';
 import LocationSelector from '../components/LocationSelector';
 import CategorySelector from '../components/CategorySelector';
 import InfoTip from '../components/InfoTip';
@@ -1089,7 +1089,7 @@ const CreateListingPage = () => {
       <Dialog open={vehicleComplianceOpen} onOpenChange={setVehicleComplianceOpen}>
         <DialogContent
           data-testid="vehicle-compliance-dialog"
-          className="sm:max-w-lg border-rose-200"
+          className="sm:max-w-2xl border-rose-200"
         >
           <DialogHeader>
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-rose-100 mb-2">
@@ -1148,18 +1148,22 @@ const CreateListingPage = () => {
             </div>
           )}
 
-          <DialogFooter className="mt-4 flex-col sm:flex-row sm:justify-center gap-2">
+          <DialogFooter
+            data-testid="vehicle-compliance-footer"
+            className="mt-4 flex flex-col sm:flex-row sm:flex-wrap sm:items-stretch sm:justify-center gap-3 py-2"
+          >
             {vehicleComplianceReviewRequested ? (
               <div
                 data-testid="vehicle-compliance-review-submitted"
-                className="w-full rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-center"
+                className="w-full rounded-lg border border-slate-200 bg-slate-50 text-center"
+                style={{ padding: '24px' }}
               >
-                <p className="text-sm font-semibold text-emerald-900 mb-1">
+                <p className="text-base font-semibold text-emerald-900 mb-2">
                   ✅ {(i18n.language || 'en').toLowerCase().startsWith('fr')
                       ? 'Demande de révision soumise'
                       : 'Review Request Submitted'}
                 </p>
-                <p className="text-xs text-emerald-800 leading-relaxed">
+                <p className="text-sm text-slate-700 leading-relaxed max-w-md mx-auto">
                   {(i18n.language || 'en').toLowerCase().startsWith('fr') ? (
                     <>
                       Notre équipe vérifiera manuellement cette annonce dans 5 à 50 minutes.
@@ -1175,7 +1179,7 @@ const CreateListingPage = () => {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="mt-3"
+                  className="mt-4"
                   onClick={() => setVehicleComplianceOpen(false)}
                   data-testid="vehicle-compliance-review-close-btn"
                 >
@@ -1191,12 +1195,14 @@ const CreateListingPage = () => {
                     setVehicleComplianceOpen(false);
                     navigate('/vehicle-auctions');
                   }}
-                  className="w-full sm:w-auto"
+                  className="flex-1 sm:flex-none sm:min-w-[180px] whitespace-nowrap h-11"
                 >
-                  <ExternalLink className="mr-2 h-4 w-4" />
-                  {(i18n.language || 'en').toLowerCase().startsWith('fr')
-                    ? 'Voir les enchères de véhicules'
-                    : 'Go to Vehicle Auctions'}
+                  <ExternalLink className="mr-2 h-4 w-4 flex-shrink-0" />
+                  <span className="truncate">
+                    {(i18n.language || 'en').toLowerCase().startsWith('fr')
+                      ? 'Enchères de véhicules'
+                      : 'Go to Vehicle Auctions'}
+                  </span>
                 </Button>
                 <Button
                   data-testid="vehicle-compliance-primary-btn"
@@ -1204,25 +1210,30 @@ const CreateListingPage = () => {
                     setVehicleComplianceOpen(false);
                     navigate('/vehicle-auctions/dealer-license');
                   }}
-                  className="w-full sm:w-auto bg-rose-600 hover:bg-rose-700 text-white"
+                  className="flex-1 sm:flex-none sm:min-w-[180px] whitespace-nowrap h-11 bg-rose-600 hover:bg-rose-700 text-white"
                 >
-                  {(i18n.language || 'en').toLowerCase().startsWith('fr')
-                    ? 'Vérifier ma licence de concessionnaire'
-                    : 'Verify dealer licence'}
+                  <span className="truncate">
+                    {(i18n.language || 'en').toLowerCase().startsWith('fr')
+                      ? 'Vérifier ma licence'
+                      : 'Verify dealer licence'}
+                  </span>
                 </Button>
                 <Button
                   variant="outline"
                   data-testid="vehicle-compliance-manual-review-btn"
                   onClick={handleRequestManualVehicleReview}
                   disabled={vehicleComplianceReviewSubmitting}
-                  className="w-full sm:w-auto border-amber-300 text-amber-800 hover:bg-amber-50"
+                  className="flex-1 sm:flex-none sm:min-w-[180px] whitespace-nowrap h-11 border-amber-400 bg-amber-50 text-amber-900 hover:bg-amber-100 hover:border-amber-500 disabled:opacity-60"
+                  style={{ paddingLeft: 20, paddingRight: 20 }}
                 >
-                  🔍&nbsp;
-                  {vehicleComplianceReviewSubmitting
-                    ? ((i18n.language || 'en').toLowerCase().startsWith('fr') ? 'Envoi…' : 'Sending…')
-                    : ((i18n.language || 'en').toLowerCase().startsWith('fr')
-                        ? 'Demander une révision manuelle'
-                        : 'Request Manual Review')}
+                  <Search className="mr-2 h-4 w-4 flex-shrink-0" />
+                  <span className="truncate">
+                    {vehicleComplianceReviewSubmitting
+                      ? ((i18n.language || 'en').toLowerCase().startsWith('fr') ? 'Envoi…' : 'Sending…')
+                      : ((i18n.language || 'en').toLowerCase().startsWith('fr')
+                          ? 'Révision manuelle'
+                          : 'Request Manual Review')}
+                  </span>
                 </Button>
               </>
             )}
