@@ -443,6 +443,10 @@ const App = () => {
           } />
           {/* iter217 — Partner-friendly alias for the lot auction creator */}
           <Route path="/lots/create" element={<Navigate to="/create-multi-item-listing" replace />} />
+          {/* Phase 6.0 / Repair 2 — admin notification route alias (mounts the same dashboard so ?listing_id= is preserved) */}
+          <Route path="/admin-control-panel" element={
+            <ProtectedRoute><AdminDashboard /></ProtectedRoute>
+          } />
           <Route path="/admin" element={
             <ProtectedRoute><AdminDashboard /></ProtectedRoute>
           } />

@@ -637,8 +637,8 @@ const SellerDashboard = () => {
                         </div>
                       )}
 
-                      {/* FEATURE PATCH v9 / Feature 3 — Pending AI review banner */}
-                      {listing.status === 'pending_ai_review' && (
+                      {/* FEATURE PATCH v9 / Feature 3 + Phase 6.0 — Pending review banner */}
+                      {(listing.status === 'pending_ai_review' || listing.status === 'pending_admin_review') && (
                         <PendingAiReviewBanner listing={listing} onActionDone={fetchDashboard} />
                       )}
 
@@ -660,19 +660,36 @@ const SellerDashboard = () => {
                           {listing.wishlist_count || 0} {t('dashboard.seller.wishlisted')}
                         </span>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex flex-col lg:flex-row gap-2">
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => navigate(isMultiItem ? `/lots/${listing.id}` : `/listing/${listing.id}`)}
+                          onClick={() => {
+                            // Phase 6.0 — Block public navigation while under admin review
+                            if (listing.status === 'pending_admin_review' || listing.status === 'pending_ai_review') {
+                              toast.info(
+                                listing.status === 'pending_admin_review'
+                                  ? 'This listing is under compliance review. The public page is locked until verification.'
+                                  : 'This listing is pending AI review.'
+                              );
+                              return;
+                            }
+                            navigate(isMultiItem ? `/lots/${listing.id}` : `/listing/${listing.id}`);
+                          }}
+                          disabled={listing.status === 'pending_admin_review' || listing.status === 'pending_ai_review'}
+                          data-testid={`view-listing-row-${listing.id}`}
+                          className="w-full lg:w-auto"
                         >
-                          {t('dashboard.seller.view')}
+                          {(listing.status === 'pending_admin_review' || listing.status === 'pending_ai_review')
+                            ? `🔒 ${t('dashboard.seller.view', 'View')}`
+                            : t('dashboard.seller.view')}
                         </Button>
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => handleDeleteListing(listing.id, isMultiItem)}
                           data-testid={`delete-listing-${listing.id}`}
+                          className="w-full lg:w-auto"
                         >
                           {t('dashboard.seller.requestDeletion', 'Request Deletion')}
                         </Button>

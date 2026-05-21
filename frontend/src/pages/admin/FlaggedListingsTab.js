@@ -31,6 +31,13 @@ const FlaggedListingsTab = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [actionModal, setActionModal] = useState({ open: false, mode: null, row: null, note: '', overrideCategory: '' });
+  // Phase 6.0 / Repair 3 — Admin preview modal state
+  const [previewModal, setPreviewModal] = useState({ open: false, row: null, listing: null, loading: false, error: null });
+  const queryParamListingId = (() => {
+    try {
+      return new URLSearchParams(window.location.search).get('listing_id');
+    } catch { return null; }
+  })();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -48,6 +55,53 @@ const FlaggedListingsTab = () => {
   }, [status, token]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Phase 6.0 / Repair 2 — When the admin clicks a notification with
+  // ?listing_id=XYZ, auto-scroll to and highlight the matching row.
+  useEffect(() => {
+    if (!queryParamListingId || rows.length === 0) return;
+    const match = rows.find((r) => r.listing_id === queryParamListingId);
+    if (match) {
+      setTimeout(() => {
+        try {
+          document.querySelector(`[data-testid="review-row-${match.id}"]`)?.scrollIntoView({
+            behavior: 'smooth', block: 'center',
+          });
+        } catch { /* noop */ }
+      }, 200);
+    }
+  }, [queryParamListingId, rows]);
+
+  const openPreview = async (row) => {
+    setPreviewModal({ open: true, row, listing: null, loading: true, error: null });
+    try {
+      // Try to fetch the actual listing (single-item or multi-item)
+      let listing = null;
+      const isSynthetic = (row.listing_id || '').startsWith('vehicle-block::');
+      if (!isSynthetic && row.listing_id) {
+        try {
+          const r = await axios.get(`${API}/listings/${row.listing_id}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          listing = r.data;
+        } catch (e) {
+          if (e?.response?.status !== 404) throw e;
+          // Try multi-item
+          try {
+            const r2 = await axios.get(`${API}/multi-item-listings/${row.listing_id}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            listing = r2.data;
+          } catch { /* fall through */ }
+        }
+      }
+      setPreviewModal({ open: true, row, listing, loading: false, error: null });
+    } catch (e) {
+      setPreviewModal({ open: true, row, listing: null, loading: false, error: e?.response?.data?.detail || e.message });
+    }
+  };
+
+  const closePreview = () => setPreviewModal({ open: false, row: null, listing: null, loading: false, error: null });
 
   const filteredRows = rows.filter((r) => {
     if (!search.trim()) return true;
@@ -201,21 +255,21 @@ const FlaggedListingsTab = () => {
                         )}
                       </div>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      <a
-                        href={r.listing_type === 'multi' ? `/lots/${r.listing_id}` : `/listing/${r.listing_id}`}
-                        target="_blank"
-                        rel="noreferrer noopener"
+                    <div className="flex flex-col lg:flex-row flex-wrap gap-2 w-full lg:w-auto">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => openPreview(r)}
+                        data-testid={`view-listing-${r.id}`}
+                        className="w-full lg:w-auto"
                       >
-                        <Button size="sm" variant="outline" data-testid={`view-listing-${r.id}`}>
-                          <Eye className="h-4 w-4 mr-1" /> View
-                        </Button>
-                      </a>
+                        <Eye className="h-4 w-4 mr-1" /> View
+                      </Button>
                       {r.status === 'pending' && (
                         <>
                           <Button
                             size="sm"
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white w-full lg:w-auto"
                             onClick={() => openAction('approve', r)}
                             data-testid={`approve-${r.id}`}
                           >
@@ -226,6 +280,7 @@ const FlaggedListingsTab = () => {
                             variant="destructive"
                             onClick={() => openAction('reject', r)}
                             data-testid={`reject-${r.id}`}
+                            className="w-full lg:w-auto"
                           >
                             <XCircle className="h-4 w-4 mr-1" /> Reject
                           </Button>
@@ -297,6 +352,173 @@ const FlaggedListingsTab = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Phase 6.0 / Repair 3 — Admin preview modal (fully authenticated, no public 404) */}
+      <Dialog open={previewModal.open} onOpenChange={(v) => !v && closePreview()}>
+        <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-y-auto" data-testid="admin-preview-modal">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="h-5 w-5 text-cyan-600" /> Admin Preview
+            </DialogTitle>
+            <DialogDescription>
+              Full snapshot of the original submission — never routes to the public marketplace.
+            </DialogDescription>
+          </DialogHeader>
+
+          {previewModal.loading ? (
+            <div className="flex justify-center py-10">
+              <div className="animate-spin rounded-full h-8 w-8 border-4 border-cyan-500 border-t-transparent"></div>
+            </div>
+          ) : (
+            <div className="flex flex-col lg:flex-row gap-4 w-full" data-testid="admin-preview-body">
+              {/* Left column — original submission */}
+              <div className="flex-1 min-w-0 space-y-3">
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold mb-1">Title</p>
+                  <p className="font-semibold text-base" data-testid="preview-title">
+                    {previewModal.listing?.title || previewModal.row?.listing_title || '(no title)'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold mb-1">Description</p>
+                  <p className="text-sm whitespace-pre-wrap bg-slate-50 rounded-md p-3 border border-slate-200" data-testid="preview-description">
+                    {previewModal.listing?.description || previewModal.row?.description || '(no description provided)'}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-3 text-sm">
+                  <div>
+                    <p className="text-[11px] uppercase text-muted-foreground font-semibold">Starting Price</p>
+                    <p className="font-semibold text-emerald-700" data-testid="preview-price">
+                      {previewModal.listing?.starting_price != null
+                        ? `${(previewModal.listing.currency || 'CAD')} $${Number(previewModal.listing.starting_price).toLocaleString()}`
+                        : '—'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] uppercase text-muted-foreground font-semibold">Listing ID</p>
+                    <code className="text-[11px]" data-testid="preview-listing-id">{previewModal.row?.listing_id}</code>
+                  </div>
+                  <div>
+                    <p className="text-[11px] uppercase text-muted-foreground font-semibold">Seller</p>
+                    <p className="text-sm" data-testid="preview-seller">
+                      {previewModal.row?.seller_name || previewModal.row?.seller_email || previewModal.listing?.seller_id || '—'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Images */}
+                {Array.isArray(previewModal.listing?.images) && previewModal.listing.images.length > 0 && (
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold mb-1">
+                      Images ({previewModal.listing.images.length})
+                    </p>
+                    <div className="flex flex-wrap gap-2" data-testid="preview-images">
+                      {previewModal.listing.images.slice(0, 6).map((src, idx) => (
+                        // eslint-disable-next-line jsx-a11y/img-redundant-alt
+                        <img
+                          key={idx}
+                          src={src}
+                          alt={`Image ${idx + 1}`}
+                          className="w-24 h-24 object-cover rounded-md border border-slate-200"
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {!previewModal.listing && (
+                  <div className="rounded-md bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900" data-testid="preview-no-listing">
+                    <strong>Pre-creation request</strong> — the seller hit the vehicle-compliance block before the listing was created. Only the snapshot data on the right is available.
+                  </div>
+                )}
+              </div>
+
+              {/* Right column — AI flags */}
+              <div className="w-full lg:w-72 flex-shrink-0 space-y-3">
+                <div className="rounded-md bg-amber-50 border border-amber-300 p-3" data-testid="preview-categories">
+                  <p className="text-[11px] uppercase tracking-wide font-semibold text-amber-900 mb-2">Category Mismatch</p>
+                  <div className="space-y-2">
+                    <div>
+                      <p className="text-[10px] uppercase text-muted-foreground">Seller's category</p>
+                      <Badge variant="outline" className="text-[11px]">
+                        {previewModal.row?.seller_category || '—'}
+                      </Badge>
+                    </div>
+                    <div className="text-center text-muted-foreground text-xs">↓</div>
+                    <div>
+                      <p className="text-[10px] uppercase text-muted-foreground">AI suggested</p>
+                      <Badge className="bg-amber-200 text-amber-900 border border-amber-300 text-[11px]">
+                        {previewModal.row?.suggested_category || '—'}
+                      </Badge>
+                    </div>
+                  </div>
+                  {typeof previewModal.row?.ai_confidence === 'number' && (
+                    <p className="text-[10px] text-amber-700 mt-2">
+                      Confidence: {Math.round((previewModal.row.ai_confidence || 0) * 100)}%
+                    </p>
+                  )}
+                </div>
+
+                {Array.isArray(previewModal.row?.detected_signals) && previewModal.row.detected_signals.length > 0 && (
+                  <div className="rounded-md bg-rose-50 border border-rose-300 p-3" data-testid="preview-detected-signals">
+                    <p className="text-[11px] uppercase tracking-wide font-semibold text-rose-900 mb-2">
+                      🚨 Triggered Keywords
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {previewModal.row.detected_signals.map((sig, idx) => (
+                        <Badge
+                          key={idx}
+                          className="bg-rose-200 text-rose-900 border border-rose-400 font-mono text-[10px]"
+                        >
+                          {sig}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {(previewModal.row?.ai_reason_en || previewModal.row?.ai_reason_fr) && (
+                  <div className="rounded-md bg-slate-50 border border-slate-200 p-3 text-[11px] text-slate-700">
+                    <p className="font-semibold uppercase text-muted-foreground mb-1">AI Reason</p>
+                    <p>{previewModal.row.ai_reason_en || previewModal.row.ai_reason_fr}</p>
+                  </div>
+                )}
+
+                {previewModal.error && (
+                  <div className="rounded-md bg-rose-50 border border-rose-200 p-3 text-xs text-rose-800">
+                    {String(previewModal.error)}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="mt-4 flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={closePreview} className="w-full sm:w-auto" data-testid="preview-close-btn">
+              Close
+            </Button>
+            {previewModal.row?.status === 'pending' && (
+              <>
+                <Button
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white w-full sm:w-auto"
+                  onClick={() => { const row = previewModal.row; closePreview(); openAction('approve', row); }}
+                  data-testid="preview-approve-btn"
+                >
+                  <CheckCircle className="h-4 w-4 mr-1" /> Approve
+                </Button>
+                <Button
+                  variant="destructive"
+                  className="w-full sm:w-auto"
+                  onClick={() => { const row = previewModal.row; closePreview(); openAction('reject', row); }}
+                  data-testid="preview-reject-btn"
+                >
+                  <XCircle className="h-4 w-4 mr-1" /> Reject
+                </Button>
+              </>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 };

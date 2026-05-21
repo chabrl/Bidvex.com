@@ -174,9 +174,17 @@ const NotificationCenter = () => {
     const data = notification.data || {};
     setIsOpen(false);
 
-    // iter217 Bug 8 — Universal navigation: prefer the explicit action_url
-    // set by the backend; fall back to type-based routing.
-    const explicitUrl = notification.action_url;
+    // iter217 Bug 8 / Phase 6.0 — Universal navigation: prefer the explicit
+    // route URL set by the backend; supports legacy `action_url` plus the new
+    // `route_url` / `path` / `url` fields written by the manual review +
+    // approval / rejection pipelines.
+    const explicitUrl =
+      notification.action_url ||
+      notification.route_url ||
+      notification.path ||
+      notification.url ||
+      data.route_url ||
+      data.action_url;
     if (explicitUrl && typeof explicitUrl === 'string' && explicitUrl.length > 0) {
       if (/^https?:\/\//i.test(explicitUrl)) {
         window.open(explicitUrl, '_blank', 'noopener,noreferrer');
@@ -256,6 +264,23 @@ const NotificationCenter = () => {
         } else {
           navigate('/orders');
         }
+        break;
+      // Phase 6.0 / Repair 2 — admin-facing manual review request notification
+      case 'manual_vehicle_review_request': {
+        const listingId = data.listing_id || '';
+        navigate(`/admin-control-panel?tab=flagged-listings${listingId ? `&listing_id=${encodeURIComponent(listingId)}` : ''}`);
+        break;
+      }
+      // Phase 6.0 / Repair 4 — seller-facing approval / rejection notifications
+      case 'ai_review_approved':
+        if (data.listing_id) {
+          navigate(`/listing/${data.listing_id}`);
+        } else {
+          navigate('/seller/dashboard');
+        }
+        break;
+      case 'ai_review_rejected':
+        navigate('/seller/dashboard');
         break;
       default:
         // iter217 Phase 4 — guaranteed navigation: try listing/auction first,

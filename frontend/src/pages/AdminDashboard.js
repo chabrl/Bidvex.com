@@ -186,6 +186,30 @@ const AdminDashboard = () => {
   const [primaryTab, setPrimaryTab] = useState('marketplace');
   const [secondaryTab, setSecondaryTab] = useState('users');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Phase 6.0 / Repair 2 — read ?tab= from URL on mount + activate the
+  // matching secondary tab (incl. cross-primary-section routing).
+  React.useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get('tab');
+      if (!tab) return;
+      // Map common tab ids to their primary section. If unknown we just set
+      // secondaryTab and let the renderer fall through.
+      const SECONDARY_TO_PRIMARY = {
+        'flagged-listings':   'marketplace',
+        'listings-moderation': 'marketplace',
+        'conversion-funnel':  'analytics',
+        'dashboard':          'analytics',
+        'reports':            'analytics',
+        'system-monitoring':  'analytics',
+      };
+      const inferredPrimary = SECONDARY_TO_PRIMARY[tab];
+      if (inferredPrimary) setPrimaryTab(inferredPrimary);
+      setSecondaryTab(tab);
+    } catch { /* noop */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   
   // Live Controls State
   const [liveControlsOpen, setLiveControlsOpen] = useState(false);
@@ -294,12 +318,18 @@ const AdminDashboard = () => {
     fetchLiveSettings();
   }, [user, navigate]);
 
-  // Update secondary tab when primary changes
+  // Update secondary tab when primary changes — but respect any ?tab= override.
   useEffect(() => {
     const secondaryOptions = SECONDARY_TABS[primaryTab];
-    if (secondaryOptions && secondaryOptions.length > 0) {
-      setSecondaryTab(secondaryOptions[0].id);
+    if (!secondaryOptions || secondaryOptions.length === 0) return;
+    let urlTab = null;
+    try { urlTab = new URLSearchParams(window.location.search).get('tab'); } catch { /* noop */ }
+    // If the URL specifies a tab that exists under the current primary, keep it.
+    if (urlTab && secondaryOptions.some((t) => t.id === urlTab)) {
+      setSecondaryTab(urlTab);
+      return;
     }
+    setSecondaryTab(secondaryOptions[0].id);
   }, [primaryTab]);
 
   // Scroll to top when navigating between admin tabs

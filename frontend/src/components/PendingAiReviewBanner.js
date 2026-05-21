@@ -68,30 +68,67 @@ const PendingAiReviewBanner = ({ listing, onActionDone }) => {
     }
   };
 
+  const isAdminReview = (listing.status || '') === 'pending_admin_review';
+
   return (
     <div
-      className="mb-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-xs"
+      className={`mb-2 rounded-md border p-3 text-xs ${isAdminReview ? 'border-slate-300 bg-slate-100' : 'border-amber-300 bg-amber-50'}`}
       data-testid={`pending-ai-review-banner-${listing.id}`}
     >
       <div className="flex items-start gap-2">
-        <ShieldAlert className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+        <ShieldAlert className={`h-4 w-4 mt-0.5 flex-shrink-0 ${isAdminReview ? 'text-slate-600' : 'text-amber-600'}`} />
         <div className="min-w-0 flex-1">
-          <p className="font-semibold text-amber-900">
-            {isFr ? 'En attente d\u2019examen IA' : 'Pending AI Review'}
-          </p>
-          <p className="text-amber-800 mt-0.5">
-            {isFr
-              ? 'Notre système IA a soulev\u00E9 une possible incoh\u00E9rence de cat\u00E9gorie. Un administrateur examinera votre annonce sous peu. Vous pouvez aussi corriger la cat\u00E9gorie maintenant pour acc\u00E9l\u00E9rer l\u2019examen.'
-              : 'Our AI system flagged a possible category mismatch. An admin will review your listing shortly. You can also correct the category now to speed things up.'}
-          </p>
+          {isAdminReview ? (
+            <>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-200 text-amber-900 border border-amber-300 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide" data-testid={`under-review-badge-${listing.id}`}>
+                  {isFr ? '⏳ En cours de révision' : '⏳ Under Review'}
+                </span>
+                <span className="text-[10px] text-slate-500">{isFr ? '5 à 50 minutes' : '5 to 50 minutes'}</span>
+              </div>
+              <p className="text-slate-700 mt-1.5 leading-relaxed">
+                {isFr
+                  ? 'Cette annonce est actuellement vérifiée manuellement par notre équipe de conformité afin d\u2019assurer l\u2019alignement de la catégorie. La vérification prend de 5 à 50 minutes.'
+                  : 'This listing is currently being manually verified by our compliance team to ensure category alignment. Verification takes 5 to 50 minutes.'}
+              </p>
+              <div className="flex flex-col lg:flex-row gap-2 mt-2 w-full">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-xs w-full lg:w-auto cursor-not-allowed opacity-70"
+                  disabled
+                  data-testid={`view-public-blocked-${listing.id}`}
+                  title={isFr ? 'Vue publique bloquée pendant la révision' : 'Public view blocked while under review'}
+                >
+                  🔒 {isFr ? 'Vue publique bloquée' : 'Public view blocked'}
+                </Button>
+                <a
+                  href="/contact-support"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs h-7 w-full lg:w-auto justify-center"
+                  data-testid={`contact-support-${listing.id}`}
+                >
+                  <MessageCircle className="h-3.5 w-3.5" /> {isFr ? 'Contacter le support' : 'Contact Support'}
+                </a>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="font-semibold text-amber-900">
+                {isFr ? 'En attente d\u2019examen IA' : 'Pending AI Review'}
+              </p>
+              <p className="text-amber-800 mt-0.5">
+                {isFr
+                  ? 'Notre système IA a soulev\u00E9 une possible incoh\u00E9rence de cat\u00E9gorie. Un administrateur examinera votre annonce sous peu. Vous pouvez aussi corriger la cat\u00E9gorie maintenant pour acc\u00E9l\u00E9rer l\u2019examen.'
+                  : 'Our AI system flagged a possible category mismatch. An admin will review your listing shortly. You can also correct the category now to speed things up.'}
+              </p>
 
-          {listing.ai_suggested_category && (
-            <div className="text-[11px] text-amber-700 mt-1">
-              {isFr ? 'Suggestion IA' : 'AI suggestion'}: <strong>{listing.ai_suggested_category}</strong>
-            </div>
-          )}
+              {listing.ai_suggested_category && (
+                <div className="text-[11px] text-amber-700 mt-1">
+                  {isFr ? 'Suggestion IA' : 'AI suggestion'}: <strong>{listing.ai_suggested_category}</strong>
+                </div>
+              )}
 
-          {editing ? (
+              {editing ? (
             <div className="mt-2 flex items-end gap-2 flex-wrap">
               <div className="flex-1 min-w-[180px]">
                 <label className="text-[10px] text-amber-700">{isFr ? 'Nouvelle cat\u00E9gorie' : 'New category'}</label>
@@ -150,6 +187,8 @@ const PendingAiReviewBanner = ({ listing, onActionDone }) => {
                 <MessageCircle className="h-3.5 w-3.5" /> {isFr ? 'Contacter le support' : 'Contact Support'}
               </a>
             </div>
+          )}
+            </>
           )}
         </div>
       </div>

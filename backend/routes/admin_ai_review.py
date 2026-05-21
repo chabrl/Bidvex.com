@@ -264,15 +264,28 @@ async def request_manual_vehicle_review(
             {"_id": 0, "id": 1, "email": 1},
         ).to_list(length=50)
         if admin_users:
+            # Phase 6.0 hotfix — populate the notification row with the structural
+            # title / description / route_url payload the frontend Navbar consumes.
+            target_listing_id = payload.listing_id or synthetic_listing_id
+            display_title = title or "(no title)"
+            route_url = f"/admin-control-panel?tab=flagged-listings&listing_id={target_listing_id}"
             await db.notifications.insert_many([{
                 "id":         str(uuid.uuid4()),
                 "user_id":    a["id"],
                 "type":       "manual_vehicle_review_request",
-                "title_en":   "Manual review requested",
-                "title_fr":   "Demande de révision manuelle",
+                "title":      "🔍 Manual Review Requested / Demande de révision",
+                "title_en":   "🔍 Manual Review Requested",
+                "title_fr":   "🔍 Demande de révision manuelle",
+                "description":   f"Seller requested manual review for Listing ID: {target_listing_id} ({display_title}).",
+                "description_en": f"Seller requested manual review for Listing ID: {target_listing_id} ({display_title}).",
+                "description_fr": f"Le vendeur a demandé une révision manuelle pour l'annonce {target_listing_id} ({display_title}).",
+                "message":    f"Seller requested manual review for Listing ID: {target_listing_id} ({display_title}).",
                 "message_en": f"{seller_name} ({current_user.email}) asked for manual review after a vehicle-compliance block.",
                 "message_fr": f"{seller_name} ({current_user.email}) a demandé une révision manuelle après un blocage de conformité véhicule.",
-                "context":    email_context,
+                "route_url":  route_url,
+                "path":       route_url,
+                "url":        route_url,
+                "context":    {**email_context, "route_url": route_url},
                 "read":       False,
                 "created_at": now,
             } for a in admin_users])
@@ -513,7 +526,11 @@ async def admin_get_listing_review(
     return row
 
 
-async def _resolve_review_and_listing(db, review_id: str) -> tuple[dict, str, dict]:
+async def _resolve_review_and_listing(db, review_id: str) -> tuple[dict, Optional[str], Optional[dict]]:
+    """Returns (review, collection, listing). Phase 6.0 hotfix —
+    `collection` and `listing` may be None when the review was created from
+    a pre-creation manual review request (synthetic `vehicle-block::*`
+    listing_id). The approve/reject handlers handle that gracefully."""
     review = await db.listing_reviews.find_one({"id": review_id}, {"_id": 0})
     if not review:
         raise HTTPException(status_code=404, detail="Review not found")
@@ -523,24 +540,142 @@ async def _resolve_review_and_listing(db, review_id: str) -> tuple[dict, str, di
             "message_en": f"This review is already {review.get('status')}.",
             "message_fr": f"Cet examen est déjà {review.get('status')}.",
         })
+    listing_id = review.get("listing_id") or ""
+    if listing_id.startswith("vehicle-block::"):
+        # Pre-creation request — no listing exists yet.
+        return review, None, None
     collection = review.get("collection") or _collection_for(review.get("listing_type", "single"))
-    listing = await db[collection].find_one({"id": review["listing_id"]}, {"_id": 0})
+    if collection == "manual_review_requests":
+        collection = _collection_for(review.get("listing_type", "single"))
+    listing = await db[collection].find_one({"id": listing_id}, {"_id": 0})
+    if not listing:
+        # Try the other collection as a fallback
+        other = "multi_item_listings" if collection == "listings" else "listings"
+        listing = await db[other].find_one({"id": listing_id}, {"_id": 0})
+        if listing:
+            collection = other
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
     return review, collection, listing
 
 
 async def _queue_seller_email(db, kind: str, seller_id: str, context: dict):
+    """Phase 6.0 hotfix — fires seller email IMMEDIATELY via SendGrid (with
+    HTML fallback) AND inserts a row in `notifications`. Also drops an audit
+    record in `email_outbox` so admins can replay if needed.
+
+    Returns True if at least one notification channel succeeded.
+    """
+    import os
+    now = datetime.now(timezone.utc)
+    delivery_status = "queued"
+    email_sent = False
+    # 1. Lookup the seller's email / name / language
+    seller = await db.users.find_one(
+        {"id": seller_id},
+        {"_id": 0, "email": 1, "name": 1, "preferred_language": 1, "language_preference": 1},
+    ) or {}
+    seller_email = seller.get("email")
+    seller_name = seller.get("name") or seller_email or ""
+    lang = (seller.get("preferred_language") or seller.get("language_preference") or "en")[:2].lower()
+    is_fr = lang == "fr"
+
+    # 2. Fire the SendGrid email immediately via the inline HTML fallback
+    if seller_email:
+        try:
+            from services.templates.welcome_email import render_kind_html
+            from services.email_service import send_html_email
+            html = render_kind_html(kind, context)
+            subject_map = {
+                "ai_review_approved": (
+                    "Listing Approved! / Annonce approuvée!" if not is_fr else
+                    "Annonce approuvée! / Listing Approved!"
+                ),
+                "ai_review_rejected": (
+                    "Listing Decision / Décision sur votre annonce" if not is_fr else
+                    "Décision sur votre annonce / Listing Decision"
+                ),
+            }
+            subject = subject_map.get(kind, "BidVex")
+            if html:
+                ok = await send_html_email(
+                    to_email=seller_email, to_name=seller_name,
+                    subject=subject, html_content=html,
+                )
+                email_sent = bool(ok)
+                delivery_status = "sent_immediate" if ok else "stubbed_no_sendgrid"
+        except Exception as exc:
+            logger.warning(f"[ai_review] seller email immediate send failed ({kind}): {exc}")
+            delivery_status = f"exception:{type(exc).__name__}"
+
+    # 3. Audit row in email_outbox (so admins can replay if needed)
     try:
         await db.email_outbox.insert_one({
-            "id":         str(uuid.uuid4()),
-            "kind":       kind,
-            "to_user_id": seller_id,
-            "context":    context,
-            "queued_at":  datetime.now(timezone.utc),
+            "id":              str(uuid.uuid4()),
+            "kind":            kind,
+            "to_user_id":      seller_id,
+            "to_email":        seller_email,
+            "context":         context,
+            "queued_at":       now,
+            "delivery_status": delivery_status,
         })
     except Exception as exc:
-        logger.warning(f"[ai_review] seller email queue failed ({kind}): {exc}")
+        logger.warning(f"[ai_review] seller email outbox audit failed ({kind}): {exc}")
+
+    # 4. In-app system notification (bilingual)
+    try:
+        listing_id = context.get("listing_id") or ""
+        listing_title = context.get("listing_title") or ""
+        admin_note = (context.get("admin_note") or "").strip()
+        public_base = os.environ.get("PUBLIC_BASE_URL", "https://bidvex.com")
+        route_url = (
+            f"/listing/{listing_id}" if kind == "ai_review_approved" and listing_id
+            else "/seller/dashboard"
+        )
+        if kind == "ai_review_approved":
+            title_en = "Listing Approved!"
+            title_fr = "Annonce approuvée !"
+            msg_en = f"Your listing '{listing_title}' is now live on the BidVex marketplace."
+            msg_fr = f"Votre annonce « {listing_title} » est maintenant publiée sur la place de marché BidVex."
+        else:  # ai_review_rejected
+            title_en = "Listing Denied"
+            title_fr = "Annonce refusée"
+            reason_en = admin_note or "Did not meet our compliance guidelines."
+            reason_fr = admin_note or "Ne respecte pas nos directives de conformité."
+            msg_en = (
+                f"Your listing '{listing_title}' was rejected by compliance. "
+                f"Reason: {reason_en}. "
+                f"If you see that it's wrong, please contact support at support@bidvex.com."
+            )
+            msg_fr = (
+                f"Votre annonce « {listing_title} » a été rejetée par notre équipe de conformité. "
+                f"Raison : {reason_fr}. "
+                f"Si vous pensez qu'il s'agit d'une erreur, contactez le support à support@bidvex.com."
+            )
+        await db.notifications.insert_one({
+            "id":              str(uuid.uuid4()),
+            "user_id":         seller_id,
+            "type":            kind,
+            "title":           (title_fr if is_fr else title_en),
+            "title_en":        title_en,
+            "title_fr":        title_fr,
+            "description":     (msg_fr if is_fr else msg_en),
+            "description_en":  msg_en,
+            "description_fr":  msg_fr,
+            "message":         (msg_fr if is_fr else msg_en),
+            "message_en":      msg_en,
+            "message_fr":      msg_fr,
+            "route_url":       route_url,
+            "path":            route_url,
+            "url":             route_url,
+            "context":         {**context, "public_base": public_base},
+            "read":            False,
+            "created_at":      now,
+        })
+    except Exception as exc:
+        logger.warning(f"[ai_review] seller notification insert failed ({kind}): {exc}")
+
+    return email_sent
 
 
 @ai_review_router.post("/admin/listing-reviews/{review_id}/approve")
@@ -572,7 +707,10 @@ async def admin_approve_listing_review(
     listing_update["ai_review_reason_en"] = None
     listing_update["ai_review_reason_fr"] = None
 
-    await db[collection].update_one({"id": review["listing_id"]}, {"$set": listing_update})
+    # Phase 6.0 hotfix — collection may be None for pre-creation
+    # (vehicle-block::*) requests where no listing exists yet.
+    if collection is not None:
+        await db[collection].update_one({"id": review["listing_id"]}, {"$set": listing_update})
 
     await db.listing_reviews.update_one(
         {"id": review_id},
@@ -610,15 +748,17 @@ async def admin_reject_listing_review(
     review, collection, listing = await _resolve_review_and_listing(db, review_id)
     now = datetime.now(timezone.utc)
 
-    await db[collection].update_one(
-        {"id": review["listing_id"]},
-        {"$set": {
-            "status":                "rejected",
-            "ai_review_rejected_at": now,
-            "ai_review_rejected_by": current_user.email,
-            "ai_review_admin_note":  (payload.admin_note or "")[:1000],
-        }},
-    )
+    # Phase 6.0 hotfix — collection may be None for vehicle-block:: requests.
+    if collection is not None:
+        await db[collection].update_one(
+            {"id": review["listing_id"]},
+            {"$set": {
+                "status":                "rejected",
+                "ai_review_rejected_at": now,
+                "ai_review_rejected_by": current_user.email,
+                "ai_review_admin_note":  (payload.admin_note or "")[:1000],
+            }},
+        )
     await db.listing_reviews.update_one(
         {"id": review_id},
         {"$set": {
