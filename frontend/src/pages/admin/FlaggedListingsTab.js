@@ -489,8 +489,7 @@ const FlaggedListingsTab = () => {
                                 className="block aspect-square w-full overflow-hidden rounded-md border border-slate-200 bg-slate-100 hover:ring-2 hover:ring-cyan-400 transition"
                                 data-testid={`preview-image-${idx}`}
                               >
-                                {/* eslint-disable-next-line jsx-a11y/img-redundant-alt */}
-                                <img src={src} alt={`Image ${idx + 1}`} className="w-full h-full object-cover" />
+                                <img src={src} alt={`Item photo ${idx + 1}`} className="w-full h-full object-cover" />
                               </button>
                             ))}
                           </div>
@@ -590,8 +589,7 @@ const FlaggedListingsTab = () => {
       <Dialog open={lightbox.open} onOpenChange={(v) => !v && setLightbox({ open: false, src: null })}>
         <DialogContent className="max-w-4xl w-[95vw] p-2" data-testid="image-lightbox">
           {lightbox.src && (
-            // eslint-disable-next-line jsx-a11y/img-redundant-alt
-            <img src={lightbox.src} alt="Full-size preview" className="w-full h-auto rounded-md" />
+            <img src={lightbox.src} alt="Listing attachment full view" className="w-full h-auto rounded-md" />
           )}
         </DialogContent>
       </Dialog>

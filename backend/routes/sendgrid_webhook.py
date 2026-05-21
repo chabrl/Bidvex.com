@@ -28,7 +28,7 @@ sendgrid_webhook_router = APIRouter(tags=["SendGrid Webhook"])
 # ─── Config ─────────────────────────────────────────────────────────────────
 
 SENDGRID_WEBHOOK_PUBLIC_KEY = os.environ.get("SENDGRID_WEBHOOK_PUBLIC_KEY", "").strip()
-ADMIN_ALERT_EMAIL = os.environ.get("ADMIN_ALERT_EMAIL", "info@bidvex.com")
+ADMIN_ALERT_EMAIL = os.environ.get("ADMIN_ALERT_EMAIL", "charbel911@gmail.com")
 HQ_LABEL = "BidVex Canada — Sherbrooke, QC"
 
 # Event → category (used for concise routing)

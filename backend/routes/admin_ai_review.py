@@ -563,11 +563,14 @@ async def flag_listing_for_ai_review(
     )
 
     # Queue an admin alert email (drained by SendGrid worker — graceful if SG missing)
+    # Phase 6.0 hotfix — recipient HARDCODED to the BidVex ops inbox. We do NOT
+    # leave `to_email=None` here because the worker's _resolve_recipient skips
+    # rows with no recipient (the alert was silently disappearing in prod).
     try:
         await db.email_outbox.insert_one({
             "id":         str(uuid.uuid4()),
             "kind":       "ai_review_admin_alert",
-            "to_email":   None,    # worker resolves admin distro list
+            "to_email":   "charbel911@gmail.com",
             "context":    {
                 "review_id":         review_id,
                 "listing_id":        listing_id,
@@ -575,6 +578,7 @@ async def flag_listing_for_ai_review(
                 "seller_category":   review_doc["seller_category"],
                 "suggested_category": payload.suggested_category,
                 "ai_reason_en":      payload.ai_reason_en,
+                "admin_review_url":  f"https://bidvex.com/admin/flagged-listings?listing_id={listing_id}",
             },
             "queued_at":  now,
         })
@@ -1123,6 +1127,8 @@ async def escalate_overdue_reviews(db) -> int:
     """Scheduler hook — email admins again for reviews open > 60 minutes.
 
     Returns the number of escalations emitted (idempotent — sets escalation_emailed=True).
+    Phase 6.0 hotfix — recipient HARDCODED to the BidVex ops inbox to bypass
+    the worker's distro-list resolution (which silently skips empty recipients).
     """
     cutoff = datetime.now(timezone.utc) - __import__("datetime").timedelta(minutes=60)
     count = 0
@@ -1135,12 +1141,13 @@ async def escalate_overdue_reviews(db) -> int:
             await db.email_outbox.insert_one({
                 "id":         str(uuid.uuid4()),
                 "kind":       "ai_review_admin_escalation",
-                "to_email":   None,
+                "to_email":   "charbel911@gmail.com",
                 "context":    {
                     "review_id":     r["id"],
                     "listing_id":    r["listing_id"],
                     "listing_title": r.get("listing_title", ""),
                     "minutes_open":  60,
+                    "admin_review_url": f"https://bidvex.com/admin/flagged-listings?listing_id={r['listing_id']}",
                 },
                 "queued_at":  datetime.now(timezone.utc),
             })

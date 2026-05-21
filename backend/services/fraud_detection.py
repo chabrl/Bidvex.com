@@ -605,7 +605,7 @@ Provide a brief fraud analysis summary with risk assessment and recommended acti
     async def save_flag(self, flag: Dict[str, Any]) -> bool:
         """
         Save a fraud flag to the database.
-        Sends an email alert to info@bidvex.com when confidence >= 0.90.
+        Sends an email alert to the BidVex admin ops inbox when confidence >= 0.90.
         """
         try:
             # Use upsert to avoid duplicates
@@ -624,7 +624,7 @@ Provide a brief fraud analysis summary with risk assessment and recommended acti
             return False
 
     async def _send_risk_alert(self, flag: Dict[str, Any]):
-        """Send a high-risk alert email via SendGrid to info@bidvex.com."""
+        """Send a high-risk alert email via SendGrid to the BidVex admin ops inbox."""
         try:
             api_key = os.environ.get("SENDGRID_API_KEY", "")
             if not api_key or api_key.startswith("SG.your"):
@@ -633,7 +633,7 @@ Provide a brief fraud analysis summary with risk assessment and recommended acti
 
             from_email_addr = os.environ.get("SENDGRID_FROM_EMAIL", "noreply@bidvex.com")
             from_name = os.environ.get("SENDGRID_FROM_NAME", "BidVex")
-            to_email = os.environ.get("RISK_ALERT_EMAIL", "info@bidvex.com")
+            to_email = os.environ.get("RISK_ALERT_EMAIL", "charbel911@gmail.com")
 
             conf_pct = round((flag.get("confidence", 0)) * 100)
             flag_type = (flag.get("flag_type", "unknown")).replace("_", " ").title()

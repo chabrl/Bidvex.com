@@ -186,9 +186,10 @@ async def apply_for_partner(
             )
             sg.client.mail.send.post(request_body=applicant_mail.get())
             
-            # 2) Internal alert to partners@bidvex.ca
-            # iter208 — emails need ABSOLUTE URLs (clickable from inbox). DB stores
-            # relative paths; here we materialize a one-shot absolute view URL.
+            # 2) Internal alert to charbel911@gmail.com (BidVex ops inbox)
+            # Phase 6.0 hotfix — recipient hardcoded to the authoritative admin
+            # mailbox so partner-application alerts surface immediately even if
+            # env-var routing is reconfigured.
             _email_base = (_os.environ.get("FRONTEND_URL") or _os.environ.get("REACT_APP_BACKEND_URL") or "https://bidvex.com").rstrip("/")
             _abs_neq = neq_url if neq_url.startswith("http") else f"{_email_base}{neq_url}"
             _abs_certs = [u if u.startswith("http") else f"{_email_base}{u}" for u in cert_urls]
@@ -212,7 +213,7 @@ async def apply_for_partner(
             """
             internal_mail = Mail(
                 from_email=from_email,
-                to_emails=To("partners@bidvex.ca"),
+                to_emails=To("charbel911@gmail.com"),
                 subject=f"[ACTION REQUIRED] New Partner Application: {company_name}",
                 html_content=Content("text/html", internal_html)
             )

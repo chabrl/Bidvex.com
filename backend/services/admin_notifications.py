@@ -3,7 +3,10 @@ BidVex Admin Notifications — recipient resolved at call-time from env vars.
 Uses raw HTML via SendGrid (no template required).
 
 Recipient resolution order (first non-empty wins):
-    ADMIN_NOTIFICATION_EMAIL  →  ADMIN_EMAIL  →  "info@bidvex.com"
+    ADMIN_NOTIFICATION_EMAIL  →  ADMIN_EMAIL  →  "charbel911@gmail.com"
+
+The hardcoded fallback is the authoritative BidVex ops inbox — any deployment
+that loses the env-var values still routes admin alerts to a real human inbox.
 """
 import os
 import logging
@@ -17,7 +20,7 @@ def _resolve_admin_email() -> str:
     return (
         os.environ.get("ADMIN_NOTIFICATION_EMAIL")
         or os.environ.get("ADMIN_EMAIL")
-        or "info@bidvex.com"
+        or "charbel911@gmail.com"
     )
 
 

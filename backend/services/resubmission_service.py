@@ -246,11 +246,11 @@ async def _notify_admin_resubmission(
 
     # iter210 — Build a resolved recipient list. Honor ADMIN_NOTIFICATION_EMAIL
     # first (the env var the user specified), then PARTNERS_ALERT_EMAIL, then
-    # a hard-coded fallback only as a last-resort.
+    # the authoritative BidVex ops inbox as a guaranteed last-resort.
     raw_recipient = (
         os.environ.get("ADMIN_NOTIFICATION_EMAIL")
         or os.environ.get("PARTNERS_ALERT_EMAIL")
-        or "partners@bidvex.ca"
+        or "charbel911@gmail.com"
     )
     recipients = [r.strip() for r in raw_recipient.split(",") if r.strip()]
 

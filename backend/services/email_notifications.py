@@ -1916,7 +1916,7 @@ async def send_storage_facility_registration_admin_alert(facility: dict) -> bool
     admin_email = (
         _os.environ.get("ADMIN_NOTIFICATION_EMAIL")
         or _os.environ.get("ADMIN_EMAIL")
-        or "info@bidvex.com"
+        or "charbel911@gmail.com"
     )
     body_en = (
         f"New storage facility registration awaiting verification:<br/>"

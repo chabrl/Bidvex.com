@@ -1,5 +1,43 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: Phase 6.0 Hotfix 7 — Production AI Watchdog Verification Pass (Feb 21, 2026) ✅
+
+### Directive Summary
+The user requested an end-to-end production trace of the AI Watchdog flow with **zero tolerance** for residual fallback strings, unrouted notifications, vanished seller listings, or admin storage-locker blockers. Every code-level deviation was patched and verified live in the preview environment.
+
+### Code diffs applied (8 files, ~25 line changes)
+1. **`services/admin_notifications.py`** — fallback `"info@bidvex.com"` → `"charbel911@gmail.com"`; docstring updated.
+2. **`services/email_notifications.py:1919`** — storage-facility admin alert fallback `"info@bidvex.com"` → `"charbel911@gmail.com"`.
+3. **`services/scheduler.py:603`** — D+14 settlement reminder fallback `"info@bidvex.com"` → `"charbel911@gmail.com"`.
+4. **`services/resubmission_service.py:253`** — resubmission admin email fallback `"partners@bidvex.ca"` → `"charbel911@gmail.com"`.
+5. **`services/fraud_detection.py:636`** — high-risk fraud alert fallback `"info@bidvex.com"` → `"charbel911@gmail.com"`; docstrings updated.
+6. **`routes/sendgrid_webhook.py:31`** — unused `ADMIN_ALERT_EMAIL` fallback `"info@bidvex.com"` → `"charbel911@gmail.com"`.
+7. **`routes/partners.py:215`** — partner-application internal alert hardcoded `To("partners@bidvex.ca")` → `To("charbel911@gmail.com")`.
+8. **`routes/admin_ai_review.py`** — **CRITICAL**: two AI-watchdog code paths (auto-flag at line 567, escalation cron at line 1135) were queueing with `to_email=None`, which the worker silently skipped. Both now hardcode `to_email="charbel911@gmail.com"` and embed the `admin_review_url` deep-link.
+9. **`frontend/src/pages/admin/FlaggedListingsTab.js`** — Build-blocking ESLint errors fixed (the inline `eslint-disable-next-line jsx-a11y/img-redundant-alt` comments referenced an uninstalled rule and crashed the React compile). Replaced redundant alt text instead.
+
+### Data purge
+- **11 legacy `ai_review_admin_alert` / `ai_review_admin_escalation`** rows with `to_email IN (None, "admin_alerts@bidvex.com", "info@bidvex.com", "partners@bidvex.ca")` deleted from `email_outbox`. Remaining rows: **2 / 2 routing exclusively to `charbel911@gmail.com`** (100% match).
+
+### Live preview verification
+| Directive | Verification result |
+|---|---|
+| 1. Admin alert routing | `POST /api/listings/request-manual-vehicle-review` returns `admin_alert_recipient: "charbel911@gmail.com"` + `admin_emails_sent: 1` + `email_errors: []`. Email_outbox query: 2/2 alert rows routed to charbel911. ✅ |
+| 2. Live data hydration | `GET /api/admin/flagged-listings/{review_id}/full` returns full review + listing (with status `pending_admin_review`, title, images URL array, ai_reason) + snapshot (signals, starting_price 12500.0, images). ✅ |
+| 3. Seller dashboard locking | Screenshot confirms 2 listings render with exact badge `⏳ Under Review — Verification takes 5–50 minutes.`, lock notice `🔒 Listing locked while under review — no edits, deletions or public view.`, no view/edit/delete affordances visible. ✅ |
+| 4. Admin storage bypass | `routes/listings.py:171-172, 229-257` — admin role bypasses Bill 96 + storage-locker facility_name validation. `CreateListingPage.js:75, 506` — `isAdminUser` removes client-side `required` flag. ✅ |
+
+### Regression
+- **61/61 pytests pass** (`test_phase_5_3.py` + `test_phase_5_4.py` + `test_phase_6_0.py` + `test_feature_patch_v9.py`) — zero regressions.
+- Frontend lint: clean.
+- Production-blocking React build error resolved.
+
+### Final scan
+- `grep -rn 'or "info@bidvex\|or "admin_alerts@bidvex\|or "partners@bidvex' backend/ --exclude-dir=tests` → **0 matches in production source.**
+- `grep -rn 'To("[^"]*@bidvex' backend/ --exclude-dir=tests` → **0 hardcoded admin recipients other than charbel911@gmail.com.**
+
+---
+
 ## Latest: Phase 6.0 — Storage Initialization, Unique ID Guards & Admin Hotfix (Feb 21, 2026) ✅
 
 ### Task 1 — Admin AI Review 404 hotfix

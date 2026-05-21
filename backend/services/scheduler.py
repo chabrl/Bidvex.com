@@ -600,7 +600,7 @@ async def _send_settlement_reminder_emails():
     admin_email = (
         _os.environ.get("ADMIN_NOTIFICATION_EMAIL")
         or _os.environ.get("ADMIN_EMAIL")
-        or "info@bidvex.com"
+        or "charbel911@gmail.com"
     )
     cursor = db.vehicle_settlements.find({
         "settlement_status": "AWAITING_DEALER_CONFIRMATION",
