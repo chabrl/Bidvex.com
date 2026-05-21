@@ -71,6 +71,8 @@ const CreateListingPage = () => {
   const [buyersPremiumPercent, setBuyersPremiumPercent] = useState('');
   const isOpcCertified = user?.is_opc_certified === true;
   const isPartner = user?.is_partner === true || user?.role === 'partner' || user?.role === 'admin';
+  // Phase 6.0 hotfix — Admin / superadmin bypass for storage validation
+  const isAdminUser = user?.role === 'admin' || user?.role === 'superadmin' || user?.is_admin === true;
 
   // Seller Payment Method
   const [paymentMethod, setPaymentMethod] = useState('stripe');
@@ -331,7 +333,9 @@ const CreateListingPage = () => {
         description:      formData.description || '',
         category:         formData.category || '',
         detected_signals: vehicleComplianceSignals,
+        images:           Array.isArray(formData.images) ? formData.images : [],
         images_count:     Array.isArray(formData.images) ? formData.images.length : 0,
+        starting_price:   parseFloat(formData.starting_price) || 0,
         listing_id:       formData.id || null,
       });
       setVehicleComplianceReviewRequested(true);
@@ -499,7 +503,7 @@ const CreateListingPage = () => {
                         type="text"
                         value={storageMetadata.facility_name}
                         onChange={(e) => setStorageMetadata((m) => ({ ...m, facility_name: e.target.value }))}
-                        required={isStorageLocker}
+                        required={isStorageLocker && !isAdminUser}
                         maxLength={200}
                         data-testid="facility-name-input"
                       />

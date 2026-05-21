@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Literal
 
 from fastapi import APIRouter, HTTPException, Depends, Query
@@ -58,6 +58,10 @@ class ManualVehicleBlockReviewRequest(BaseModel):
     category: Optional[str] = Field("", max_length=120)
     detected_signals: list[str] = Field(default_factory=list)
     images_count: int = 0
+    # Phase 6.0 hotfix — accept actual uploaded image URLs / base64 so the
+    # admin preview modal can hydrate the thumbnails grid.
+    images: list[str] = Field(default_factory=list, max_length=20)
+    starting_price: Optional[float] = 0
     extra_context: Optional[str] = Field("", max_length=2000)
     # Optional — when the seller already has a draft listing tied to this
     # block (rare; mostly the listing has NOT been created yet).
@@ -100,6 +104,8 @@ async def request_manual_vehicle_review(
     seller_name = (seller.get("name") or current_user.email or "(unknown)").strip()
 
     # 1. manual_review_requests row (authoritative audit trail)
+    # Phase 6.0 hotfix — store full image URLs + starting_price so admin
+    # preview can hydrate without needing a real listing.
     mrr_row = {
         "id":               req_id,
         "kind":             "vehicle_block_false_positive",
@@ -112,7 +118,9 @@ async def request_manual_vehicle_review(
         "description":      description,
         "category":         category,
         "detected_signals": detected_signals,
-        "images_count":     int(payload.images_count or 0),
+        "images":           list(payload.images or [])[:20],
+        "images_count":     int(payload.images_count or len(payload.images or [])),
+        "starting_price":   float(payload.starting_price or 0),
         "extra_context":    (payload.extra_context or "").strip()[:2000],
         "status":           "pending",
         "created_at":       now,
@@ -127,15 +135,54 @@ async def request_manual_vehicle_review(
     except Exception as exc:
         logger.error(f"[manual_review] manual_review_requests.insert failed: {exc}", exc_info=True)
 
+    # Phase 6.0 hotfix — Failure 2: create an actual listing row in
+    # status=pending_admin_review so the seller sees it on their dashboard
+    # (instead of vanishing) AND the admin can preview the real document.
+    actual_listing_id = payload.listing_id
+    if not actual_listing_id:
+        actual_listing_id = f"locked-{req_id}"
+        try:
+            await db.listings.insert_one({
+                "id":                 actual_listing_id,
+                "seller_id":          current_user.id,
+                "title":              title or "(no title)",
+                "description":        description,
+                "category":           category,
+                "condition":          "good",
+                "starting_price":     float(payload.starting_price or 0),
+                "current_price":      float(payload.starting_price or 0),
+                "buy_now_price":      None,
+                "images":             list(payload.images or [])[:20],
+                "location":           "",
+                "city":               "",
+                "region":             "",
+                "country":            "",
+                "currency":           "CAD",
+                "status":             "pending_admin_review",
+                "ai_review_id":       req_id,
+                "ai_review_flagged_at": now,
+                "ai_suggested_category":  "Vehicles",
+                "ai_review_reason_en":  f"Vehicle-compliance gate triggered: {', '.join(detected_signals) or '—'}",
+                "ai_review_reason_fr":  f"Conformité véhicule déclenchée : {', '.join(detected_signals) or '—'}",
+                "vehicle_block_signals": detected_signals,
+                "created_at":         now,
+                "updated_at":         now,
+                "auction_end_date":   now + timedelta(days=7),
+                "bid_count":          0,
+                "views":              0,
+            })
+            logger.info(f"[manual_review] created locked listing {actual_listing_id} for seller dashboard visibility")
+        except Exception as exc:
+            logger.error(f"[manual_review] locked listing create failed: {exc}", exc_info=True)
+
     # 2. listing_reviews mirror row so the Admin "Flagged Listings" tab
-    #    surfaces this entry without UI changes. We tag it with a synthetic
-    #    listing_id when none exists.
-    synthetic_listing_id = payload.listing_id or f"vehicle-block::{req_id}"
+    #    surfaces this entry without UI changes.
+    synthetic_listing_id = actual_listing_id   # now points to the actual created listing
     lr_row = {
         "id":                 req_id,                       # reuse the same id for cross-lookup
         "listing_id":         synthetic_listing_id,
-        "listing_type":       "vehicle_block_request",
-        "collection":         "manual_review_requests",
+        "listing_type":       "single",
+        "collection":         "listings",
         "seller_id":          current_user.id,
         "seller_name":        seller_name,
         "seller_email":       current_user.email,
@@ -190,11 +237,11 @@ async def request_manual_vehicle_review(
 
     # 4. FIRE the admin alert email IMMEDIATELY (synchronous SendGrid call).
     # Phase 6.0 hotfix — Failure 2 remediation:
-    #   * Recipient is HARDCODED to admin_alerts@bidvex.com (no env / user lookup).
+    #   * Recipient is HARDCODED to charbel911@gmail.com (authoritative ops inbox).
     #   * Subject / body match the exact spec format.
     #   * Loud RuntimeError if SENDGRID_API_KEY or SENDGRID_FROM_EMAIL is missing —
     #     no silent swallow.
-    ADMIN_ALERT_RECIPIENT = "admin_alerts@bidvex.com"
+    ADMIN_ALERT_RECIPIENT = "charbel911@gmail.com"
 
     sg_key_missing = not os.environ.get("SENDGRID_API_KEY")
     sg_from_missing = not os.environ.get("SENDGRID_FROM_EMAIL")

@@ -389,7 +389,9 @@ const FlaggedListingsTab = () => {
                 listing.title || snapshot.title || reviewData.listing_title || '';
               const description =
                 listing.description || snapshot.description || '(no description provided)';
-              const images = Array.isArray(listing.images) ? listing.images : [];
+              const images = (Array.isArray(listing.images) && listing.images.length > 0)
+                ? listing.images
+                : (Array.isArray(snapshot.images) ? snapshot.images : []);
               const startingPrice = listing.starting_price ?? snapshot.starting_price ?? null;
               const reservePrice = listing.reserve_price ?? null;
               const category =

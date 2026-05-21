@@ -21,7 +21,7 @@ from typing import Any, Dict, Optional
 logger = logging.getLogger(__name__)
 
 
-_ADMIN_RECIPIENT_DEFAULT = "admin_alerts@bidvex.com"
+_ADMIN_RECIPIENT_DEFAULT = "charbel911@gmail.com"
 
 
 def _safe_pct(numer: float, denom: float) -> float:

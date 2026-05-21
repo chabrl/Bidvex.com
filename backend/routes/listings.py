@@ -167,16 +167,19 @@ async def create_listing(
         })
 
     # iter217 — Quebec Bill 96 compliance — French title required for QC listings
-    from services.qc_bilingual_validator import assert_qc_bilingual_titles
-    assert_qc_bilingual_titles(
-        title=listing_data.title,
-        title_fr=listing_data.title_fr,
-        description=listing_data.description,
-        description_fr=listing_data.description_fr,
-        region=listing_data.region,
-        city=listing_data.city,
-        content_language=listing_data.content_language,
-    )
+    # Phase 6.0 hotfix — admins bypass (master role override).
+    _is_admin_role = (getattr(current_user, "role", "") or "").lower() in ("admin", "superadmin")
+    if not _is_admin_role:
+        from services.qc_bilingual_validator import assert_qc_bilingual_titles
+        assert_qc_bilingual_titles(
+            title=listing_data.title,
+            title_fr=listing_data.title_fr,
+            description=listing_data.description,
+            description_fr=listing_data.description_fr,
+            region=listing_data.region,
+            city=listing_data.city,
+            content_language=listing_data.content_language,
+        )
 
     # ── iter203 P0 — Hard-coded vehicle/dealer compliance gate (FIRST line of defence) ──
     # This runs BEFORE payment-method validation so a non-dealer attempting a
@@ -225,7 +228,10 @@ async def create_listing(
         # gates so they can list a unit on behalf of a facility manager.
         is_admin = (getattr(current_user, "role", "") or "").lower() in ("admin", "superadmin")
         try:
-            listing_data.storage_metadata = normalize_storage_metadata(listing_data.storage_metadata)
+            listing_data.storage_metadata = normalize_storage_metadata(
+                listing_data.storage_metadata,
+                allow_missing_required=is_admin,
+            )
         except ValueError as ve:
             if not is_admin:
                 raise HTTPException(status_code=400, detail={

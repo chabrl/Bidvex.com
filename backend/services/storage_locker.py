@@ -29,13 +29,14 @@ def is_storage_locker(listing: Dict[str, Any] | object) -> bool:
     return (getattr(listing, "listing_type", "") or "").lower() == LISTING_TYPE_STORAGE_LOCKER
 
 
-def normalize_storage_metadata(raw: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+def normalize_storage_metadata(raw: Optional[Dict[str, Any]], *, allow_missing_required: bool = False) -> Dict[str, Any]:
     """Coerce the user-submitted storage_metadata into a clean dict with
     defaults applied. Required field `facility_name` is enforced — missing
-    or empty triggers a ValueError.
+    or empty triggers a ValueError UNLESS `allow_missing_required=True`
+    (admin power-user override).
 
     Schema produced:
-        facility_name              : str   (required)
+        facility_name              : str   (required unless admin override)
         facility_address           : str   (optional)
         locker_size                : str   (e.g. "10x10")
         locker_number              : str
@@ -49,8 +50,10 @@ def normalize_storage_metadata(raw: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     raw = raw or {}
 
     facility_name = str(raw.get("facility_name") or "").strip()
-    if not facility_name:
+    if not facility_name and not allow_missing_required:
         raise ValueError("storage_metadata.facility_name is required for storage_locker listings.")
+    if not facility_name and allow_missing_required:
+        facility_name = "(admin-created — pending facility manager attachment)"
 
     try:
         cleanout_hours = int(raw.get("cleanout_deadline_hours") or 72)
