@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Loader2 } from 'lucide-react';
+import { authHeaders } from '../../utils/authToken';
 
 const API = process.env.REACT_APP_BACKEND_URL || '';
 
@@ -50,8 +51,7 @@ export default function FacilityPromotions() {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const token = window.localStorage.getItem('token');
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const headers = authHeaders();
       const [promosRes, pricingRes, auctionsRes] = await Promise.all([
         axios.get(`${API}/api/facility/promotions`, { headers }),
         axios.get(`${API}/api/promote-config`, { headers }).catch(() => ({ data: null })),
@@ -75,11 +75,10 @@ export default function FacilityPromotions() {
       return;
     }
     try {
-      const token = window.localStorage.getItem('token');
       await axios.post(
         `${API}/api/facility/promotions`,
         { listing_id: selectedListingId, type, duration_hours: duration },
-        { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+        { headers: authHeaders() },
       );
       toast.success('Promotion activated.');
       await fetchAll();

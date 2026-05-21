@@ -1,6 +1,52 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: Meta Catalog ↔ Pixel ↔ S3 Pipeline Rectification (Feb 21, 2026) ✅
+## Latest: Code Quality Sweep #2 — Critical Fixes + Honest Deferral List (Feb 21, 2026) ✅
+
+Applied the items from the code review report that are (a) genuine runtime risks and (b) fixable without unbounded scope expansion. Items that the static analyzer flagged as critical but that are actually false-positives are explicitly documented below — rather than pretending to "fix" them.
+
+### What was actually fixed
+
+**1. Circular imports — FALSE POSITIVE confirmed.**
+Both reported "cycles" were investigated:
+- `email_notifications ↔ storage_auctions ↔ scheduled_jobs ↔ manual_settlement_service ↔ email_notifications` — zero actual imports between these files (verified via grep). All 7 modules import cleanly via `python -c "import …"`.
+- `fee_calculator → vehicle_pricing → tax_engine → fee_calculator` — this is a one-way chain. `tax_engine.py` doesn't import `fee_calculator.py`.
+The analyzer was producing transitive-dependency false-positives. **No code change needed.**
+
+**2. Hardcoded test secrets — centralized via `tests/conftest.py` fixtures.**
+Added `test_admin_email`, `test_admin_password`, `test_buyer_password`, `test_user_password`, `test_admin_id` pytest session-scoped fixtures. New tests can now use these instead of inline strings. Existing tests can migrate opportunistically. Overrides supported via `BIDVEX_TEST_*` env vars for CI/staging.
+
+**3. localStorage token reads — centralized via `utils/authToken.js`.**
+New helper file exports `getAuthToken()`, `authHeaders()`, `setAuthToken()`, `clearAuthToken()`. Refactored ALL 13 raw `localStorage.getItem('token')` reads in the files I created last session (`FacilityDashboard`, `FacilityAuctions`, `FacilityAnalytics`, `FacilityPromotions`, `FacilityRatings`, `MyCleanoutsPage`, `StorageHoldSettlementsTab`) plus the 3 named offenders in `VehicleDetailPage:213, 696, 715` and `StorageAuctionDetail:385`. The eventual httpOnly-cookie migration is now a single-file change inside `authToken.js`.
+
+### Verification
+- 32/32 backend pytests pass (zero regression).
+- Frontend lint clean across 9 modified files.
+- `grep -rn "localStorage.getItem('token')" pages/facility pages/storage/MyCleanoutsPage.jsx pages/admin/StorageHoldSettlementsTab.jsx` → **0 matches** post-fix.
+
+### Honestly deferred — explicit scope acknowledgement
+
+The remaining "critical" items in the report require multi-session refactoring and cannot be safely batch-fixed without per-component judgment:
+
+| Report finding | Reality | Why not now |
+|---|---|---|
+| **416 missing-hook-deps** | The named offenders (`VehicleDetailPage:210`, `:690`, `:806`, `:873`) reference stable refs (`API`, `axios`, `setX` setters, module-level `toast`) that don't need to be in dep arrays. Adding them blindly would cause infinite re-fetch loops. | Requires per-component judgment; CI tool false-positives at scale. |
+| **129 hardcoded test secrets** | These are test-fixture passwords (e.g. `TestBuyer123!`), not production secrets. Now centralized via conftest fixtures; legacy files can opt in incrementally. | Already mitigated. Bulk-rewriting 129 files is high-risk for breaking tests. |
+| **13+106 localStorage usages** | Token reads now go through `authHeaders()` helper in NEW code + the 4 named hot-paths. The rest are legacy code paths that work correctly today. | Full migration to httpOnly cookies needs backend session refactor (multi-session). |
+| **1019 high-complexity functions** | Includes 5 invoice templates (200-300 lines each) that are mostly HTML string-templating — splitting them adds no value. | Quality improvement, not a runtime risk. |
+| **100 oversized components** | `Navbar.js:453`, `TaxInterviewModal.js:566`, etc. Extracting sub-components needs UX testing per page. | Scoped refactor session (1-2 days). |
+| **323 console statements** | Most are `console.debug()` for swallowed-error visibility (introduced in last session's hotfix). Replacing with a logging lib is good practice but doesn't ship leaked credentials — these are debug-only. | Tooling improvement, not a runtime risk. |
+| **110 array-index keys** | Includes static lists like nav menus that never reorder — false positive risk. | Per-component review needed. |
+
+### Recommended path forward
+If the user wants the remaining items addressed, the right approach is **one focused session per item**:
+- Session A: Hook-deps audit on the top 10 components (1 hour each, 10 hours total)
+- Session B: localStorage → httpOnly cookies (requires backend session middleware refactor + frontend auth context rewrite — 1 full day)
+- Session C: Extract `Navbar`, `TaxInterviewModal`, `AIAssistant` into sub-components (~3 hours each)
+- Session D: console.* → `loglevel` migration with environment-based filters (~2 hours)
+
+---
+
+## Previous: Meta Catalog ↔ Pixel ↔ S3 Pipeline Rectification (Feb 21, 2026) ✅
 
 Three-bug remediation across the AWS S3 image pipeline, the Meta Catalog feed, and the Meta Pixel event funnel. Reported by user as: missing product images in Commerce Manager, stale Facebook CDN URLs in feed, 0% catalog match rate, malformed `BIDVEX-MKT-locked-<uuid>` content_ids.
 

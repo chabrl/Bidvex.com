@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Loader2, Star } from 'lucide-react';
+import { authHeaders } from '../../utils/authToken';
 
 const API = process.env.REACT_APP_BACKEND_URL || '';
 
@@ -38,9 +39,8 @@ export default function FacilityRatings() {
   const fetchRatings = useCallback(async () => {
     setLoading(true);
     try {
-      const token = window.localStorage.getItem('token');
       const res = await axios.get(`${API}/api/facility/ratings`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        headers: authHeaders(),
       });
       setData(res.data);
     } catch (e) {
@@ -60,11 +60,10 @@ export default function FacilityRatings() {
     }
     setSubmittingId(ratingId);
     try {
-      const token = window.localStorage.getItem('token');
       await axios.post(
         `${API}/api/facility/ratings/${ratingId}/reply`,
         { reply_text: text },
-        { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+        { headers: authHeaders() },
       );
       toast.success('Reply posted.');
       setReplyDrafts({ ...replyDrafts, [ratingId]: '' });

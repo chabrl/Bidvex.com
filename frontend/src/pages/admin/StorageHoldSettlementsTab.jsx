@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Badge } from '../../components/ui/badge';
 import { Input } from '../../components/ui/input';
 import { Loader2, RefreshCw } from 'lucide-react';
+import { authHeaders } from '../../utils/authToken';
 
 const API = process.env.REACT_APP_BACKEND_URL || '';
 
@@ -37,13 +38,12 @@ export default function StorageHoldSettlementsTab() {
   const fetchHolds = useCallback(async () => {
     setLoading(true);
     try {
-      const token = window.localStorage.getItem('token');
       const params = new URLSearchParams();
       if (statusFilter) params.set('status', statusFilter);
       if (facilityFilter) params.set('facility_name', facilityFilter);
       const res = await axios.get(
         `${API}/api/admin/storage-auctions/cleanout-holds?${params.toString()}`,
-        { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+        { headers: authHeaders() },
       );
       setRows(res.data?.rows || []);
       setTotal(res.data?.total || 0);
@@ -63,11 +63,10 @@ export default function StorageHoldSettlementsTab() {
     if (!window.confirm('Approve cleanout? Buyer\'s deposit will be released back to their card.')) return;
     setActionRowId(invoiceId);
     try {
-      const token = window.localStorage.getItem('token');
       await axios.post(
         `${API}/api/admin/storage-auctions/${invoiceId}/release-deposit`,
         { forfeit_deposit: false, reason: 'Admin approved cleanout' },
-        { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+        { headers: authHeaders() },
       );
       toast.success('Cleanout approved — deposit released.');
       await fetchHolds();
@@ -88,11 +87,10 @@ export default function StorageHoldSettlementsTab() {
     if (!window.confirm(`Forfeit this deposit?\n\nReason: "${reason}"\n\nThis will capture the funds via Stripe and log a violation against the buyer. This action cannot be undone.`)) return;
     setActionRowId(invoiceId);
     try {
-      const token = window.localStorage.getItem('token');
       await axios.post(
         `${API}/api/admin/storage-auctions/${invoiceId}/release-deposit`,
         { forfeit_deposit: true, reason },
-        { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+        { headers: authHeaders() },
       );
       toast.success('Deposit forfeited — funds captured.');
       await fetchHolds();

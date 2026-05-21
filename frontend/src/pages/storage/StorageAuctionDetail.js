@@ -6,6 +6,7 @@ import axios from 'axios';
 import { useParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
+import { authHeaders } from '../../utils/authToken';
 import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -382,10 +383,9 @@ const StorageAuctionDetail = () => {
                         // if none found.
                         try {
                           const apiBase = process.env.REACT_APP_BACKEND_URL || '';
-                          const token = typeof window !== 'undefined' ? window.localStorage.getItem('token') : null;
                           const resp = await fetch(`${apiBase}/api/payment-methods`, {
                             credentials: 'include',
-                            headers: token ? { Authorization: `Bearer ${token}` } : {},
+                            headers: authHeaders(),
                           });
                           if (resp.ok) {
                             const data = await resp.json();

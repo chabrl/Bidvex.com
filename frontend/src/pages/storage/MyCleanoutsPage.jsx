@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Loader2 } from 'lucide-react';
 
 import CleanoutCountdownTicker from '../../components/CleanoutCountdownTicker';
+import { authHeaders } from '../../utils/authToken';
 
 const API = process.env.REACT_APP_BACKEND_URL || '';
 
@@ -27,12 +28,10 @@ export default function MyCleanoutsPage() {
   const fetchHolds = useCallback(async () => {
     setLoading(true);
     try {
-      const token = window.localStorage.getItem('token');
+      const headers = authHeaders();
       // Reuse the existing buyer-storage-deposits endpoint as the source of
       // won invoices. We hydrate cleanout status per-row via the new endpoint.
-      const res = await axios.get(`${API}/api/storage-auctions/my-bids`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
+      const res = await axios.get(`${API}/api/storage-auctions/my-bids`, { headers });
       const won = (res.data?.bids || []).filter(
         (b) => b.status === 'won' && b.invoice_id,
       );
@@ -41,7 +40,7 @@ export default function MyCleanoutsPage() {
           try {
             const sr = await axios.get(
               `${API}/api/storage-cleanout/${b.invoice_id}/status`,
-              { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+              { headers },
             );
             return { ...b, cleanout: sr.data };
           } catch (e) {
@@ -73,11 +72,10 @@ export default function MyCleanoutsPage() {
     }
     setSubmittingId(invoiceId);
     try {
-      const token = window.localStorage.getItem('token');
       await axios.post(
         `${API}/api/storage-cleanout/${invoiceId}/request-clearance`,
         { notes: '' },
-        { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+        { headers: authHeaders() },
       );
       toast.success(t('cleanouts.requestedSuccess', 'Clearance requested. Awaiting admin verification.'));
       await fetchHolds();

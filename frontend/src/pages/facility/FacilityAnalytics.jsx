@@ -9,6 +9,7 @@ import axios from 'axios';
 
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Loader2 } from 'lucide-react';
+import { authHeaders } from '../../utils/authToken';
 
 const API = process.env.REACT_APP_BACKEND_URL || '';
 
@@ -29,9 +30,8 @@ export default function FacilityAnalytics() {
   const fetchAnalytics = useCallback(async () => {
     setLoading(true);
     try {
-      const token = window.localStorage.getItem('token');
       const res = await axios.get(`${API}/api/facility/analytics?range=${range}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        headers: authHeaders(),
       });
       setData(res.data);
     } catch (e) {

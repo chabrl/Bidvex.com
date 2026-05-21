@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Loader2, Package, Plus } from 'lucide-react';
+import { authHeaders } from '../../utils/authToken';
 
 const API = process.env.REACT_APP_BACKEND_URL || '';
 
@@ -32,9 +33,8 @@ export default function FacilityAuctions() {
   const fetchAuctions = useCallback(async () => {
     setLoading(true);
     try {
-      const token = window.localStorage.getItem('token');
       const res = await axios.get(`${API}/api/facility/auctions?status=${statusFilter}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        headers: authHeaders(),
       });
       setData(res.data || { auctions: [], counts: {} });
     } catch (e) {

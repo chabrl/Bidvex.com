@@ -11,6 +11,7 @@ import SafeImage from '../../components/SafeImage';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
+import { authHeaders } from '../../utils/authToken';
 import axios from 'axios';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
@@ -209,9 +210,7 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
   // Fetch dealer license status if needed
   useEffect(() => {
     if (!user || !vehicle || vehicle.auction_access !== 'licensed_only') return;
-    axios.get(`${API}/dealer-licenses/me`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-    })
+    axios.get(`${API}/dealer-licenses/me`, { headers: authHeaders() })
       .then((r) => setDealerLicenseStatus(r.data?.status || 'none'))
       .catch(() => setDealerLicenseStatus('none'));
   }, [user, vehicle]);
@@ -693,11 +692,10 @@ const VehicleBuyNowBody = ({ vehicle, preview, setPreview, loading, setLoading, 
     (async () => {
       setLoading(true);
       try {
-        const token = localStorage.getItem('token');
         const r = await axios.post(
           `${API}/payments/vehicle-buy-now-preview`,
           { listing_id: vehicle.id },
-          { headers: { Authorization: `Bearer ${token}` } },
+          { headers: authHeaders() },
         );
         if (!cancelled) setPreview(r.data);
       } catch (err) {
@@ -712,11 +710,10 @@ const VehicleBuyNowBody = ({ vehicle, preview, setPreview, loading, setLoading, 
   const submit = async () => {
     setProcessing(true);
     try {
-      const token = localStorage.getItem('token');
       const r = await axios.post(
         `${API}/payments/vehicle-buy-now-checkout`,
         { listing_id: vehicle.id },
-        { headers: { Authorization: `Bearer ${token}` } },
+        { headers: authHeaders() },
       );
       if (r.data?.requires_checkout && r.data?.checkout_url) {
         window.location.href = r.data.checkout_url;

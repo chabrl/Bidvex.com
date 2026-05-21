@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Loader2, Package, BarChart3, Megaphone, Star, Settings, ShieldCheck, ExternalLink } from 'lucide-react';
+import { authHeaders } from '../../utils/authToken';
 
 import FacilityAuctions from './FacilityAuctions';
 import FacilityAnalytics from './FacilityAnalytics';
@@ -42,9 +43,8 @@ export default function FacilityDashboard() {
 
   const fetchOverview = useCallback(async () => {
     try {
-      const token = window.localStorage.getItem('token');
       const res = await axios.get(`${API}/api/facility/overview`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        headers: authHeaders(),
       });
       setOverview(res.data);
     } catch (e) {
