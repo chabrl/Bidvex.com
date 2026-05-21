@@ -77,8 +77,25 @@ const BidConfirmationDialog = ({
       console.error('Failed to fetch cost breakdown:', err);
       setError('Unable to calculate costs. Please try again.');
       
-      // Fallback calculation if API fails
-      const effectivePremiumRate = buyersPremiumRate ?? 0.05;
+      // HOTFIX — Fallback calculation must respect the buyer's subscription
+      // tier so VIP/Premium users never see the 5% default when the API call
+      // fails. Mirrors the backend `BUYER_PREMIUM_RATES` + `TIER_ALIASES` tables
+      // in services/fee_calculator.py.
+      const _TIER_RATES = {
+        standard: 0.050,
+        premium: 0.035,
+        vip_elite: 0.030,
+      };
+      const _TIER_ALIASES = {
+        vip: 'vip_elite',
+        free: 'standard',
+        basic: 'standard',
+      };
+      const _normalizedTier = _TIER_ALIASES[String(buyerTier || '').toLowerCase()]
+        || String(buyerTier || '').toLowerCase()
+        || 'standard';
+      const _fallbackRate = _TIER_RATES[_normalizedTier] ?? 0.05;
+      const effectivePremiumRate = buyersPremiumRate ?? _fallbackRate;
       const buyerPremium = bidAmount * effectivePremiumRate;
       const platformFee = isVehicle ? bidAmount * 0.025 : 0;
       const taxRate = 0.14975; // Quebec GST + QST

@@ -1,6 +1,42 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: AI Watchdog Amnesia Loop — 4 Targeted Hotfixes (Feb 21, 2026) ✅
+## Latest: Quick Bid Modal Buyer's Premium Desync — Hotfix (Feb 21, 2026) ✅
+
+VIP/Premium subscribers were quoted the standard 5.0% buyer's premium in the Quick Bid modal on the marketplace list, while the Listing Detail view correctly showed their discounted 3.0% / 3.5% rate. Fixed in a single targeted change to the props chain.
+
+### Root cause
+`components/FlattenedMarketplace.js` invoked `<BidConfirmationDialog>` without any of the tier-context props (`buyerTier`, `sellerTier`, `category`, `buyersPremiumRate`). The dialog's defaults are `buyerTier="basic"` + `sellerTier="basic"` — neither of which exist in the backend's `BUYER_PREMIUM_RATES` table, so `services/fee_calculator.py` falls through to the `"standard"` rate (5.0%).
+
+The Listing Detail view (`pages/ListingDetailPage.js:1137-1141`) correctly forwarded `buyerTier={user?.subscription_tier || 'basic'}` and `sellerTier={seller?.subscription_tier || 'basic'}` — which is why that surface showed the right rate.
+
+### Backend was already correct
+- `routes/fees.py::tax_calculate` accepts `buyer_tier` and runs it through `services/fee_calculator.py::_normalize_tier` (TIER_ALIASES: `vip → vip_elite → 0.030`).
+- The actual bid-placement endpoint (`POST /bids`) doesn't compute premium at bid time — premium is computed at INVOICE generation using the buyer's authoritative `subscription_tier` from the user record (`buyer.get("subscription_tier", "free")`). So **financial integrity was never at risk** — only the DISPLAY was wrong.
+
+### Fix 1 — Frontend props forwarding
+`components/FlattenedMarketplace.js`: pass `buyerTier={user?.subscription_tier || 'standard'}`, `sellerTier={selectedItem.seller_subscription_tier || 'standard'}`, `category={selectedItem.category || 'general'}`, `buyersPremiumRate={selectedItem.custom_buyer_premium_rate}`, `currency={selectedItem.currency || 'CAD'}` to `<BidConfirmationDialog>`.
+
+### Fix 2 — Defensive fallback in the dialog
+`components/BidConfirmationDialog.js`: the API-failure fallback rate now mirrors the backend `BUYER_PREMIUM_RATES` + `TIER_ALIASES` tables — `vip → vip_elite → 0.030`, `premium → 0.035`, `standard → 0.050`. So even if the network call to `/payments/tax/calculate` fails, the displayed preview matches the eventual invoice for the user's tier.
+
+### Live verification on preview backend
+| Tier | Expected | Actual `buyer_premium_rate` |
+|---|---|---|
+| `standard` | 5.0% | **0.05** ✅ |
+| `vip` | 3.0% | **0.03** ✅ |
+| `premium` | 3.5% | **0.035** ✅ |
+| (no tier) | 5.0% | **0.05** ✅ |
+
+### Tests
+- **24/24 backend pytests pass** (test_ai_watchdog_amnesia_fix + test_phase_6_2 + test_phase_6_0 + test_hotfix_v9_1).
+- Frontend lint clean for the 2 modified files.
+
+### Note
+Changes are in PREVIEW. Production `bidvex.com` needs `Save to GitHub` → redeploy. Once redeployed, VIP users will see their correct 3.0% rate in the Quick Bid modal immediately.
+
+---
+
+## Previous: AI Watchdog Amnesia Loop — 4 Targeted Hotfixes (Feb 21, 2026) ✅
 
 Eliminated the infinite-lockout bug where editing an admin-approved listing re-triggered the AI scanner and created duplicate Flagged Listings rows. All 4 user-specified fixes applied verbatim. Three new pytest tests prove the bug can no longer reoccur.
 

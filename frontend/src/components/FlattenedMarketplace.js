@@ -495,6 +495,18 @@ const FlattenedMarketplace = ({
           sellerIsBusiness={selectedItem.seller_is_business || false}
           region={selectedItem.region || 'QC'}
           loading={placingBid}
+          /* HOTFIX — Quick Bid premium desync. Previously the Quick Bid modal
+             rendered the BidConfirmationDialog without any tier context, so it
+             defaulted to `buyerTier="basic"` which the backend resolves to the
+             standard 5% rate. The ListingDetailPage already forwards these
+             props from the user session; we now mirror them here so VIP / Premium
+             subscribers see the correct discounted rate (3.0% / 3.5%) in the
+             marketplace Quick Bid flow. */
+          buyerTier={user?.subscription_tier || 'standard'}
+          sellerTier={selectedItem.seller_subscription_tier || 'standard'}
+          category={selectedItem.category || 'general'}
+          buyersPremiumRate={selectedItem.custom_buyer_premium_rate}
+          currency={selectedItem.currency || 'CAD'}
         />
       )}
 
