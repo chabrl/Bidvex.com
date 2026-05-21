@@ -332,6 +332,7 @@ const CreateListingPage = () => {
         category:         formData.category || '',
         detected_signals: vehicleComplianceSignals,
         images_count:     Array.isArray(formData.images) ? formData.images.length : 0,
+        listing_id:       formData.id || null,
       });
       setVehicleComplianceReviewRequested(true);
     } catch (e) {

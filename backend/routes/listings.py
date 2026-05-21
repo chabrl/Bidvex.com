@@ -220,14 +220,39 @@ async def create_listing(
         from services.storage_locker import (
             normalize_storage_metadata, storage_quantity_policy,
         )
+        # Phase 6.0 hotfix — Admin power-user override: admins skip the
+        # `facility_name required` validation and any other client-side
+        # gates so they can list a unit on behalf of a facility manager.
+        is_admin = (getattr(current_user, "role", "") or "").lower() in ("admin", "superadmin")
         try:
             listing_data.storage_metadata = normalize_storage_metadata(listing_data.storage_metadata)
         except ValueError as ve:
-            raise HTTPException(status_code=400, detail={
-                "error": "invalid_storage_metadata",
-                "message_en": str(ve),
-                "message_fr": "Métadonnées du casier de stockage invalides : " + str(ve),
-            })
+            if not is_admin:
+                raise HTTPException(status_code=400, detail={
+                    "error": "invalid_storage_metadata",
+                    "message_en": str(ve),
+                    "message_fr": "Métadonnées du casier de stockage invalides : " + str(ve),
+                })
+            # Admin override: fall back to a minimal placeholder so the row
+            # still passes Pydantic. Admins can edit the row post-creation.
+            listing_data.storage_metadata = {
+                "facility_name":           "(admin-created — pending facility manager attachment)",
+                "facility_address":        "",
+                "locker_size":             "",
+                "locker_number":           "",
+                "cleanout_deadline_hours": 72,
+                "security_deposit_amount": 100.00,
+                "lien_compliance_verified": True,   # admins bear responsibility
+                "facility_manager_email":  "",
+                "facility_manager_phone":  "",
+                "notes":                   "",
+                "admin_created":           True,
+                "admin_created_by":        current_user.email,
+            }
+            logger.info(
+                f"[storage_locker] admin override — {current_user.email} created a locker "
+                f"with missing facility_name (reason: {ve})"
+            )
         qty, multiplier = storage_quantity_policy(listing_data.quantity)
         listing_data.quantity = qty
         listing_data.multiply_hammer_by_quantity = multiplier

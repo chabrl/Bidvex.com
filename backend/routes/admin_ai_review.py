@@ -59,6 +59,9 @@ class ManualVehicleBlockReviewRequest(BaseModel):
     detected_signals: list[str] = Field(default_factory=list)
     images_count: int = 0
     extra_context: Optional[str] = Field("", max_length=2000)
+    # Optional — when the seller already has a draft listing tied to this
+    # block (rare; mostly the listing has NOT been created yet).
+    listing_id: Optional[str] = None
 
 
 @ai_review_router.post("/listings/request-manual-vehicle-review")
@@ -67,25 +70,48 @@ async def request_manual_vehicle_review(
     current_user: User = Depends(get_current_user),
 ):
     """Seller-side — invoked when the user clicks "Request Manual Review"
-    inside the vehicle-compliance block modal. Creates a row in
-    `manual_review_requests` and queues an admin alert email.
+    inside the vehicle-compliance block modal.
 
-    No listing exists yet, so this does NOT go through the regular
-    listing_reviews queue. Admins inspect from a dedicated tab and either
-    whitelist the seller for the next attempt or confirm the block.
+    Phase 6.0 hotfix:
+      - Writes a row in BOTH `manual_review_requests` AND `listing_reviews`
+        so the existing Admin Flagged Listings tab surfaces it automatically.
+      - If a draft listing_id is supplied, forces its status to
+        `pending_admin_review`.
+      - Fires the `ai_review_admin_alert` email IMMEDIATELY (synchronous
+        SendGrid call via the inline HTML fallback renderer) — no longer
+        merely queued in email_outbox with no recipient.
+      - Drops a row in `notifications` so the admin sees an in-app badge.
     """
+    import os
     db = get_db()
     now = datetime.now(timezone.utc)
     req_id = str(uuid.uuid4())
-    row = {
+
+    title = (payload.title or "").strip()[:300]
+    description = (payload.description or "").strip()[:4000]
+    category = (payload.category or "").strip()[:120]
+    detected_signals = list(payload.detected_signals or [])[:50]
+
+    # Lookup seller name for email context
+    seller = await db.users.find_one(
+        {"id": current_user.id},
+        {"_id": 0, "name": 1, "email": 1, "phone": 1},
+    ) or {}
+    seller_name = (seller.get("name") or current_user.email or "(unknown)").strip()
+
+    # 1. manual_review_requests row (authoritative audit trail)
+    mrr_row = {
         "id":               req_id,
         "kind":             "vehicle_block_false_positive",
         "seller_id":        current_user.id,
+        "seller_name":      seller_name,
         "seller_email":     current_user.email,
-        "title":            (payload.title or "").strip()[:300],
-        "description":      (payload.description or "").strip()[:4000],
-        "category":         (payload.category or "").strip()[:120],
-        "detected_signals": list(payload.detected_signals or [])[:50],
+        "seller_phone":     seller.get("phone", ""),
+        "listing_id":       payload.listing_id,
+        "title":            title,
+        "description":      description,
+        "category":         category,
+        "detected_signals": detected_signals,
         "images_count":     int(payload.images_count or 0),
         "extra_context":    (payload.extra_context or "").strip()[:2000],
         "status":           "pending",
@@ -96,35 +122,177 @@ async def request_manual_vehicle_review(
         "admin_email":      None,
         "admin_note":       None,
     }
-    await db.manual_review_requests.insert_one(row)
+    try:
+        await db.manual_review_requests.insert_one(mrr_row)
+    except Exception as exc:
+        logger.error(f"[manual_review] manual_review_requests.insert failed: {exc}", exc_info=True)
 
-    # Admin alert email (kind handled by email_delivery_worker w/ HTML fallback)
+    # 2. listing_reviews mirror row so the Admin "Flagged Listings" tab
+    #    surfaces this entry without UI changes. We tag it with a synthetic
+    #    listing_id when none exists.
+    synthetic_listing_id = payload.listing_id or f"vehicle-block::{req_id}"
+    lr_row = {
+        "id":                 req_id,                       # reuse the same id for cross-lookup
+        "listing_id":         synthetic_listing_id,
+        "listing_type":       "vehicle_block_request",
+        "collection":         "manual_review_requests",
+        "seller_id":          current_user.id,
+        "seller_name":        seller_name,
+        "seller_email":       current_user.email,
+        "listing_title":      title or "(vehicle block — no title yet)",
+        "seller_category":    category or "—",
+        "suggested_category": "Vehicles",
+        "ai_confidence":      0.85,
+        "ai_reason_en":       f"Vehicle-compliance gate detected signal(s): {', '.join(detected_signals) or '—'}",
+        "ai_reason_fr":       f"La barrière de conformité véhicule a détecté le(s) signal/signaux : {', '.join(detected_signals) or '—'}",
+        "detected_signals":   detected_signals,
+        "previous_status":    "pending_admin_review",
+        "status":             "pending",
+        "created_at":         now,
+        "updated_at":         now,
+        "resolved_at":        None,
+        "admin_id":           None,
+        "admin_email":        None,
+        "admin_note":         None,
+        "escalation_emailed": False,
+        "source":             "vehicle_block_manual_review",
+    }
+    try:
+        await db.listing_reviews.insert_one(lr_row)
+    except Exception as exc:
+        logger.error(f"[manual_review] listing_reviews.insert failed: {exc}", exc_info=True)
+
+    # 3. If the seller supplied a draft listing_id, force its status.
+    if payload.listing_id:
+        try:
+            r = await db.listings.update_one(
+                {"id": payload.listing_id, "seller_id": current_user.id},
+                {"$set": {
+                    "status":                  "pending_admin_review",
+                    "ai_review_id":            req_id,
+                    "ai_review_flagged_at":    now,
+                    "ai_suggested_category":   "Vehicles",
+                    "ai_review_reason_en":     lr_row["ai_reason_en"],
+                    "vehicle_block_signals":   detected_signals,
+                }},
+            )
+            if r.matched_count == 0:
+                await db.multi_item_listings.update_one(
+                    {"id": payload.listing_id, "seller_id": current_user.id},
+                    {"$set": {
+                        "status":                  "pending_admin_review",
+                        "ai_review_id":            req_id,
+                        "vehicle_block_signals":   detected_signals,
+                    }},
+                )
+        except Exception as exc:
+            logger.warning(f"[manual_review] listing status update failed: {exc}")
+
+    # 4. FIRE the admin alert email IMMEDIATELY (synchronous SendGrid call
+    #    via the inline HTML fallback renderer). We do NOT use the
+    #    email_outbox drainer for this — the user reports zero emails
+    #    arriving because the drainer needs a recipient on the row.
+    admin_recipients_raw = os.environ.get(
+        "ADMIN_ALERT_RECIPIENTS",
+        os.environ.get("ADMIN_DIGEST_RECIPIENT", "admin_alerts@bidvex.com"),
+    )
+    admin_recipients = [r.strip() for r in admin_recipients_raw.split(",") if r.strip()]
+    email_context = {
+        "review_id":         req_id,
+        "listing_id":        payload.listing_id or synthetic_listing_id,
+        "listing_title":     title or "(no title)",
+        "seller_name":       seller_name,
+        "seller_email":      current_user.email,
+        "seller_category":   category or "—",
+        "suggested_category": "Vehicles",
+        "ai_reason_en":      lr_row["ai_reason_en"],
+        "detected_signals":  detected_signals,
+        "cta_url":           f"{os.environ.get('PUBLIC_BASE_URL', 'https://bidvex.com')}/admin?tab=flagged-listings",
+    }
+
+    email_sent_count = 0
+    email_errors: list[str] = []
+    try:
+        from services.templates.welcome_email import render_kind_html
+        from services.email_service import send_html_email
+        html = render_kind_html("ai_review_admin_alert", email_context)
+        subject = (
+            f"[BidVex Admin] Manual review requested — "
+            f"{seller_name} flagged for vehicle-compliance block "
+            f"({', '.join(detected_signals) or 'no signals'})"
+        )
+        for to_email in admin_recipients:
+            try:
+                ok = await send_html_email(
+                    to_email=to_email,
+                    to_name="BidVex Admin",
+                    subject=subject,
+                    html_content=html or f"<p>Review requested by {seller_name} ({current_user.email}). Listing: {title}. Signals: {detected_signals}</p>",
+                )
+                if ok:
+                    email_sent_count += 1
+                else:
+                    email_errors.append(f"{to_email}:sendgrid_returned_false")
+            except Exception as exc:
+                email_errors.append(f"{to_email}:{type(exc).__name__}")
+                logger.warning(f"[manual_review] admin email to {to_email} failed: {exc}")
+    except Exception as exc:
+        email_errors.append(f"render_or_send:{type(exc).__name__}")
+        logger.error(f"[manual_review] email render/send pipeline failed: {exc}", exc_info=True)
+
+    # Belt-and-suspenders — also drop a row into email_outbox for audit + replay
     try:
         await db.email_outbox.insert_one({
-            "id":         str(uuid.uuid4()),
-            "kind":       "ai_review_admin_alert",
-            "to_email":   None,
-            "context":    {
-                "review_id":         req_id,
-                "listing_id":        None,
-                "listing_title":     row["title"] or "(no title)",
-                "seller_category":   row["category"] or "—",
-                "suggested_category": "Vehicles",
-                "ai_reason_en":      "Manual review requested by seller after vehicle-compliance block.",
-                "detected_signals":  row["detected_signals"],
-            },
-            "queued_at":  now,
+            "id":            str(uuid.uuid4()),
+            "kind":          "ai_review_admin_alert",
+            "to_email":      admin_recipients[0] if admin_recipients else None,
+            "context":       email_context,
+            "queued_at":     now,
+            "delivery_status": (
+                "sent_immediate" if email_sent_count > 0 else "queued_after_inline_send"
+            ),
+            "immediate_send_count": email_sent_count,
+            "immediate_send_errors": email_errors,
         })
-    except Exception as exc:
-        logger.warning(f"[manual_review] admin alert email queue failed: {exc}")
+    except Exception:
+        pass
 
-    logger.info(f"[manual_review] vehicle-block manual review requested req_id={req_id} by {current_user.email}")
+    # 5. In-app admin notifications (so the admin badge counter rises)
+    try:
+        admin_users = await db.users.find(
+            {"role": {"$in": ["admin", "superadmin"]}},
+            {"_id": 0, "id": 1, "email": 1},
+        ).to_list(length=50)
+        if admin_users:
+            await db.notifications.insert_many([{
+                "id":         str(uuid.uuid4()),
+                "user_id":    a["id"],
+                "type":       "manual_vehicle_review_request",
+                "title_en":   "Manual review requested",
+                "title_fr":   "Demande de révision manuelle",
+                "message_en": f"{seller_name} ({current_user.email}) asked for manual review after a vehicle-compliance block.",
+                "message_fr": f"{seller_name} ({current_user.email}) a demandé une révision manuelle après un blocage de conformité véhicule.",
+                "context":    email_context,
+                "read":       False,
+                "created_at": now,
+            } for a in admin_users])
+    except Exception as exc:
+        logger.warning(f"[manual_review] in-app notifications failed: {exc}")
+
+    logger.info(
+        f"[manual_review] req_id={req_id} seller={current_user.email} "
+        f"signals={detected_signals} emails_sent={email_sent_count}/{len(admin_recipients)} "
+        f"email_errors={email_errors}"
+    )
     return {
-        "success":    True,
-        "request_id": req_id,
-        "status":     "pending",
-        "eta_minutes_min": 5,
-        "eta_minutes_max": 50,
+        "success":           True,
+        "request_id":        req_id,
+        "status":            "pending",
+        "listing_review_id": req_id,
+        "eta_minutes_min":   5,
+        "eta_minutes_max":   50,
+        "admin_emails_sent": email_sent_count,
+        "admin_emails_attempted": len(admin_recipients),
     }
 
 

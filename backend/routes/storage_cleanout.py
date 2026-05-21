@@ -278,3 +278,89 @@ async def admin_get_cleanout_hold(
         if isinstance(v, datetime):
             hold[k] = v.isoformat()
     return hold
+
+
+# ───────────────────────────────────────────────────────────────────────
+# Phase 6.0 hotfix — Admin power-user storage dashboard
+# Global GET of every active storage cleanout hold across all facilities,
+# so admins can monitor + override without being scoped to a single
+# facility-manager view.
+# ───────────────────────────────────────────────────────────────────────
+
+@storage_cleanout_router.get("/admin/storage-auctions/cleanout-holds")
+async def admin_list_all_cleanout_holds(
+    status: Optional[str] = None,
+    facility_name: Optional[str] = None,
+    limit: int = 100,
+    skip: int = 0,
+    current_user: User = Depends(require_admin),
+):
+    """Admin global dashboard — lists every cleanout hold across every
+    facility/seller. Supports optional filter by `status` (held|released|
+    forfeited|captured) and case-insensitive `facility_name` substring."""
+    db = get_db()
+    query: Dict[str, Any] = {}
+    if status:
+        query["status"] = status
+    if facility_name:
+        query["facility_name"] = {"$regex": facility_name, "$options": "i"}
+    cur = db.storage_cleanout_holds.find(query, {"_id": 0}).sort("created_at", -1).skip(skip).limit(limit)
+    rows = await cur.to_list(length=limit)
+    for r in rows:
+        for k in ("created_at", "released_at", "forfeited_at"):
+            v = r.get(k)
+            if isinstance(v, datetime):
+                r[k] = v.isoformat()
+    total = await db.storage_cleanout_holds.count_documents(query)
+    return {"rows": rows, "total": total, "filters": {"status": status, "facility_name": facility_name}}
+
+
+class AdminEditCleanoutRequest(BaseModel):
+    cleanout_deadline_hours: Optional[int] = None
+    security_deposit_amount: Optional[float] = None
+    facility_manager_email: Optional[str] = None
+    facility_manager_phone: Optional[str] = None
+    notes: Optional[str] = None
+
+
+@storage_cleanout_router.patch("/admin/storage-auctions/listings/{listing_id}/storage-metadata")
+async def admin_edit_storage_metadata(
+    listing_id: str,
+    payload: AdminEditCleanoutRequest,
+    current_user: User = Depends(require_admin),
+):
+    """Phase 6.0 hotfix — admin-only superuser endpoint to edit cleanout
+    variables on any storage_locker listing. Bypasses facility-manager role
+    locks since admins have absolute authority."""
+    db = get_db()
+    # Locate the listing in either collection
+    listing = await db.listings.find_one({"id": listing_id}, {"_id": 0})
+    collection = "listings"
+    if not listing:
+        listing = await db.multi_item_listings.find_one({"id": listing_id}, {"_id": 0})
+        collection = "multi_item_listings"
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    if (listing.get("listing_type") or "").lower() != "storage_locker":
+        raise HTTPException(status_code=400, detail="Listing is not a storage_locker")
+
+    meta = dict(listing.get("storage_metadata") or {})
+    updates: Dict[str, Any] = {}
+    if payload.cleanout_deadline_hours is not None:
+        meta["cleanout_deadline_hours"] = max(1, int(payload.cleanout_deadline_hours))
+    if payload.security_deposit_amount is not None:
+        meta["security_deposit_amount"] = max(0.0, float(payload.security_deposit_amount))
+    if payload.facility_manager_email is not None:
+        meta["facility_manager_email"] = payload.facility_manager_email[:200]
+    if payload.facility_manager_phone is not None:
+        meta["facility_manager_phone"] = payload.facility_manager_phone[:30]
+    if payload.notes is not None:
+        meta["notes"] = (payload.notes or "")[:1000]
+    meta["last_admin_edit_at"] = datetime.now(timezone.utc).isoformat()
+    meta["last_admin_edit_by"] = current_user.email
+    updates["storage_metadata"] = meta
+
+    await db[collection].update_one({"id": listing_id}, {"$set": updates})
+    logger.info(f"[storage_locker] admin edit by {current_user.email} on listing={listing_id} → {list(payload.dict(exclude_unset=True).keys())}")
+    return {"success": True, "listing_id": listing_id, "storage_metadata": meta}
+

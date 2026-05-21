@@ -22,7 +22,11 @@ async def validate_seller(db, current_user: User, agreement_accepted: bool):
     Run all gatekeeping checks before a seller can create a listing.
     Raises HTTPException on failure; returns agreement_metadata on success.
     """
-    if not agreement_accepted:
+    is_admin = (getattr(current_user, "role", "") or "").lower() in ("admin", "superadmin")
+    # Phase 6.0 hotfix — Admins skip the agreement_accepted check; their
+    # role binds them organisationally and they may create listings on
+    # behalf of facilities, sellers, or dealers.
+    if not agreement_accepted and not is_admin:
         raise HTTPException(
             status_code=422,
             detail={
@@ -33,7 +37,7 @@ async def validate_seller(db, current_user: User, agreement_accepted: bool):
             }
         )
 
-    if current_user.role != 'admin':
+    if not is_admin:
         if current_user.is_partner and not current_user.platform_fee_paid:
             raise HTTPException(
                 status_code=403,

@@ -662,6 +662,7 @@ try:
         ("routes.admin_ai_review", "ai_review_router", None, False),
         ("routes.admin_conversion_funnel", "conversion_funnel_router", None, False),
         ("routes.storage_cleanout", "storage_cleanout_router", None, False),
+        ("routes.admin_maintenance", "admin_maintenance_router", None, False),
         ("routes.down_payments", "down_payments_router", None, False),
         ("routes.partner_card", "partner_card_router", None, False),
         ("routes.dealer_subscription_routes", "dealer_subscription_router", None, False),
