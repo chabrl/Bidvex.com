@@ -264,6 +264,20 @@ const ListingDetailPage = () => {
       
       setBidConfirmDialogOpen(false);
       toast.success('Bid placed successfully!');
+      // iter213 — Meta Pixel AddToCart signal. BidVex has no literal cart;
+      // a bid is the strongest funnel-commit signal between ViewContent and
+      // Purchase. content_ids must match the catalog feed format exactly
+      // (BIDVEX-MKT-<listing_id>) — buildContentId() inside metaPixel.js does it.
+      try {
+        const { trackAddToCart } = await import('../utils/metaPixel');
+        trackAddToCart({
+          listingId: listing?.id,
+          listingType: listing?.listing_type || 'marketplace',
+          bidAmount: pendingBidAmount || parseFloat(bidAmount) || 0,
+        });
+      } catch (pixelErr) {
+        console.debug('[ListingDetailPage] AddToCart pixel emit failed:', pixelErr);
+      }
       confetti({
         particleCount: 100,
         spread: 70,

@@ -126,11 +126,30 @@ def _strip_html(s: Optional[str], max_len: int) -> str:
 
 
 # ── Image URL filter — Meta requires absolute https:// JPEG/PNG ──────
+# iter213 — Reject the legacy Facebook redirect / CDN URLs that previously
+# leaked into the catalog. They render as expired placeholders in Meta
+# Commerce Manager because Facebook strips their session-bound query
+# parameters before the crawler can hydrate them.
+_BANNED_HOST_FRAGMENTS = (
+    "l.facebook.com/l.php",  # Facebook click-tracking redirect
+    "fbcdn.net",             # Bare Facebook CDN domain (session-bound)
+)
+
+
 def _is_valid_image_url(url: Any) -> bool:
     if not isinstance(url, str):
         return False
     u = url.strip()
     if not u.startswith("https://"):
+        return False
+    lower = u.lower()
+    for frag in _BANNED_HOST_FRAGMENTS:
+        if frag in lower:
+            return False
+    # Also reject Facebook scontent CDN (subdomain-encoded session tokens
+    # expire within hours of generation; Meta's crawler returns 404 once
+    # the token is invalidated).
+    if "scontent" in lower and ".facebook" in lower:
         return False
     # Meta auto-detects content-type, so we don't enforce extension.
     return True

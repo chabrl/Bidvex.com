@@ -90,6 +90,18 @@ const StorageAuctionDetail = () => {
           ? (isFr ? `Vous êtes en tête à ${res.data.current_bid} $` : `You are winning at $${res.data.current_bid}`)
           : (t('storage.detail.bidPlacedYouVeBeenOutbidByAnExistingProx'))
       );
+      // iter213 — Meta Pixel AddToCart for storage auction bids. content_id
+      // = BIDVEX-STO-<listing_id> per the catalog feed schema.
+      try {
+        const { trackAddToCart } = await import('../../utils/metaPixel');
+        trackAddToCart({
+          listingId: auction?.id || id,
+          listingType: 'storage_locker',
+          bidAmount: amt,
+        });
+      } catch (pixelErr) {
+        console.debug('[StorageAuctionDetail] AddToCart pixel emit failed:', pixelErr);
+      }
       if (res.data.soft_close_extended) {
         toast.info(t('storage.detail.auctionExtendedBy2MinutesSoftClose'));
       }

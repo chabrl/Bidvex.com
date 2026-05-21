@@ -1,6 +1,54 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: Critical Portal Rectification — Facility Session-State + Visibility Fixes (Feb 21, 2026) ✅
+## Latest: Meta Catalog ↔ Pixel ↔ S3 Pipeline Rectification (Feb 21, 2026) ✅
+
+Three-bug remediation across the AWS S3 image pipeline, the Meta Catalog feed, and the Meta Pixel event funnel. Reported by user as: missing product images in Commerce Manager, stale Facebook CDN URLs in feed, 0% catalog match rate, malformed `BIDVEX-MKT-locked-<uuid>` content_ids.
+
+### Root causes diagnosed
+1. **Listings stored images as base64 data URLs in MongoDB**, not S3. The Meta feed mapper's `_is_valid_image_url` rejected base64 → fell back to the bilingual placeholder for every listing. (4 of 5 listings affected.)
+2. **2 listings had malformed `id` fields prefixed with `locked-`** (legacy lock-for-editing bug) → catalog rows materialized as `BIDVEX-MKT-locked-385b5477-...` which the Pixel never matched.
+3. **No `AddToCart` Pixel event existed.** BidVex has no literal cart, but Meta's funnel needs that signal between `ViewContent` and `Purchase` — without it, ad attribution model can't optimize for bid intent.
+
+### Part 1 — S3 Image Pipeline Fixes
+- **Backfill executed**: `scripts/migrate_base64_images_to_s3.py` migrated 13/13 base64 images for the 5 active listings (3 marketplace + 1 multi-lot + 1 storage) to `s3://bidvex-marketplace-images/listings/{listing_id}/{idx}.jpg`. All URLs return HTTP 200 with `Content-Type: image/jpeg`.
+- **Auto-upload at listing creation**: `backend/routes/listings.py::create_listing` now runs every incoming image through `_promote_base64_images_to_s3()` before persistence. Already-uploaded https URLs are passed through; base64 strings are converted to S3 URLs; failures fall back to base64 so the seller dashboard still renders a thumbnail.
+- **Reject stale Facebook redirects**: `services/meta_feed_mapper.py::_is_valid_image_url` now blocks `l.facebook.com/l.php`, `fbcdn.net`, and `scontent*.facebook` URL fragments — these were leaking expired session-bound CDN links into the feed.
+
+### Part 2 — Catalog content_id repair
+- Fixed 2 malformed listings — renamed `locked-<uuid>` IDs to clean `<uuid>` form across `listings` + cascaded references in `bids`, `watchlist`, `broker_invoices`, `notifications`, `listing_reviews`, `manual_review_requests`, `email_outbox`. Total: 4 cascading refs updated.
+- Verified Meta feed now serves `BIDVEX-MKT-<clean-uuid>` for all 3 active marketplace listings, plus the 2 padded `BIDVEX-SEED-00X` seed items needed to meet Meta's 5-item catalog floor.
+
+### Part 3 — Pixel funnel coverage
+- **New `trackAddToCart` event** in `frontend/src/utils/metaPixel.js`. content_id schema uses the same `buildContentId(listingType, listingId)` helper as feed mapping → guaranteed 1:1 match.
+- **Wired into 3 bid-placement flows**: `pages/ListingDetailPage.js` (marketplace, content_id = `BIDVEX-MKT-<uuid>`), `pages/MultiItemListingDetailPage.js` (lots, content_id = `BIDVEX-LOT-<uuid>-<lot>`), `pages/storage/StorageAuctionDetail.js` (storage, content_id = `BIDVEX-STO-<uuid>`).
+
+### Live verification
+| Check | Result |
+|---|---|
+| Bucket reachable + listing folders | 5 folders present after backfill ✅ |
+| S3 URL HEAD requests | 3/3 return HTTP 200 + Content-Type=image/jpeg (75-83 KB each) ✅ |
+| Meta feed image origins | 3 S3, 0 Facebook, 2 SEED placeholders (intentional) ✅ |
+| Feed content_id format | `BIDVEX-MKT-<uuid>` (no `locked-` prefix) ✅ |
+| Pixel `buildContentId` schema | `BIDVEX-${TYPE_PREFIX}-${listingId}` — matches feed exactly ✅ |
+| Regression pytests | 36/36 pass ✅ |
+| Frontend lint | 0 issues across 4 modified files ✅ |
+
+### File diffs
+- `backend/scripts/migrate_base64_images_to_s3.py` — backfill executed (pre-existing script).
+- `backend/services/meta_feed_mapper.py:129-155` — `_BANNED_HOST_FRAGMENTS` + tighter `_is_valid_image_url`.
+- `backend/routes/listings.py:81-115, 318-326` — `_promote_base64_images_to_s3` helper + wired into `create_listing`.
+- `frontend/src/utils/metaPixel.js:224-249` — new `trackAddToCart` export.
+- `frontend/src/pages/ListingDetailPage.js:263-279` — AddToCart on bid placement.
+- `frontend/src/pages/MultiItemListingDetailPage.js:284-298` — AddToCart on lot bid.
+- `frontend/src/pages/storage/StorageAuctionDetail.js:92-105` — AddToCart on storage bid.
+
+### Action required for production
+- **Redeploy preview → production** (the backfill ran against the shared MongoDB so production already has clean S3 URLs).
+- **Trigger Meta Catalog re-ingest** in Commerce Manager (Data Sources → Data Feeds → "Fetch Now"). Meta will pull the fixed feed and replace all stale Facebook CDN URLs within 30 minutes.
+
+---
+
+## Previous: Critical Portal Rectification — Facility Session-State + Visibility Fixes (Feb 21, 2026) ✅
 
 Three production bugs found on `bidvex.com` after Phase 6.2 rollout, all rooted in the same disconnect: the `users` collection was never updated when an admin approved a `storage_facilities` row — so `/api/auth/me` returned stale role data and the frontend kept treating approved facility operators as unverified visitors.
 

@@ -23,6 +23,42 @@ from utils import (
 )
 from services.image_compression import compress_image_list
 from services.sanitizer import sanitize_string, safe_regex
+from services.s3_service import (
+    upload_base64_to_s3,
+    is_base64_image,
+    is_marketplace_s3_url,
+)
+
+
+async def _promote_base64_images_to_s3(images: list, listing_id: str) -> list:
+    """iter213 — Walk an image array and upload any base64 entry to S3.
+
+    Already-uploaded https URLs (S3 or otherwise) and stale Facebook redirects
+    are returned as-is (we never destructively overwrite). Failures fall back
+    to the original base64 string so the listing still has *something* visible
+    to the seller in the dashboard even when S3 hiccups.
+    """
+    if not images:
+        return []
+    out: list = []
+    for idx, img in enumerate(images or []):
+        if not isinstance(img, str) or not img:
+            continue
+        if is_marketplace_s3_url(img) or (img.startswith("https://") and not is_base64_image(img)):
+            out.append(img)
+            continue
+        if is_base64_image(img):
+            try:
+                out.append(await upload_base64_to_s3(img, listing_id, idx))
+                continue
+            except Exception as exc:
+                logger.warning(
+                    "[listing-create] S3 promote failed for %s img %d: %s",
+                    listing_id, idx, exc,
+                )
+        out.append(img)
+    return out
+
 
 logger = logging.getLogger(__name__)
 
@@ -306,11 +342,22 @@ async def create_listing(
     user_agent = request.headers.get("user-agent", "unknown") if request else "unknown"
     agreement_metadata = build_agreement_metadata(current_user, client_ip, user_agent)
 
+    listing_id_for_images = str(uuid.uuid4())
+
+    # iter213 — Auto-promote any base64-encoded image to S3 so the DB never
+    # stores base64 (and the Meta feed never falls back to the placeholder).
+    # Images that are already https:// URLs are passed through untouched.
+    promoted_images = await _promote_base64_images_to_s3(
+        compress_image_list(listing_data.images),
+        listing_id_for_images,
+    )
+
     listing = Listing(
+        id=listing_id_for_images,
         seller_id=current_user.id, title=listing_data.title, description=listing_data.description,
         category=listing_data.category, condition=listing_data.condition,
         starting_price=listing_data.starting_price, current_price=listing_data.starting_price,
-        buy_now_price=listing_data.buy_now_price, images=compress_image_list(listing_data.images),
+        buy_now_price=listing_data.buy_now_price, images=promoted_images,
         location=listing_data.location, city=listing_data.city, region=listing_data.region,
         country=listing_data.country, postal_code=listing_data.postal_code,
         latitude=listing_data.latitude, longitude=listing_data.longitude,

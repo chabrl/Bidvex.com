@@ -232,6 +232,24 @@ export const trackAddToWishlist = (listing, price) => {
   });
 };
 
+// iter213 — AddToCart Pixel event.
+// BidVex has no literal cart, but Meta's funnel KPIs require an AddToCart
+// signal between ViewContent and Purchase. We fire AddToCart when a bidder
+// places their FIRST bid on a listing — the functional commit equivalent.
+// content_ids MUST match the Meta Catalog feed format exactly
+// (`BIDVEX-{MKT|LOT|VEH|STO}-{listing_id}`) so Commerce Manager can attribute
+// the event to the correct catalog row.
+export const trackAddToCart = ({ listingId, listingType, bidAmount }) => {
+  if (!listingId) return;
+  trackEvent('AddToCart', {
+    content_ids: [buildContentId(listingType, listingId)],
+    content_type: 'product',
+    value: parseFloat(Number(bidAmount || 0).toFixed(2)),
+    currency: 'CAD',
+    num_items: 1,
+  });
+};
+
 export const trackPurchase = ({ listingId, listingType, totalCharged }) => {
   if (!listingId) return;
   trackEvent('Purchase', {

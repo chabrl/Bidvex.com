@@ -309,6 +309,18 @@ const MultiItemListingDetailPage = () => {
         { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
       );
       toast.success('Bid placed successfully!');
+      // iter213 — Meta Pixel AddToCart for the lot just bid on. content_id is
+      // BIDVEX-LOT-{listing_id}-{lot_number} to match the catalog feed format.
+      try {
+        const { trackAddToCart } = await import('../utils/metaPixel');
+        trackAddToCart({
+          listingId: `${id}-${lotNumber}`,
+          listingType: 'multi_lot',
+          bidAmount,
+        });
+      } catch (pixelErr) {
+        console.debug('[MultiItemListingDetailPage] AddToCart pixel emit failed:', pixelErr);
+      }
       fetchListing();
       setBidAmounts({ ...bidAmounts, [lotNumber]: '' });
     } catch (error) {
