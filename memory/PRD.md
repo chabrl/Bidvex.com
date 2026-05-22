@@ -1,6 +1,58 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: AI Watchdog Infinite Re-flag Loop — 4 Hotfixes (Feb 21, 2026) ✅
+## Latest: Phase 6.3 — Storage Auctions Bidding Suite (Feb 21, 2026) ✅
+
+Three high-velocity frontend components shipped + backend cleanout photo gate. All wired into the existing `StorageAuctionDetail.js` + `MyCleanoutsPage.jsx` flows without disrupting any pre-existing routing.
+
+### Task 1 — `components/storage/StorageBiddingPanel.jsx` (NEW, 160 lines)
+- Sticky right-rail bidding card (mounts inside the existing `<aside>` which is already sticky on desktop).
+- **Leader status ring**: 🏆 emerald "You are the current high bidder!" / ⚠️ amber "You've been outbid!" — driven by `auction.leader_id === user?.id` + `auction.has_user_bid`.
+- **Current high bid + min-next**: dynamic — uses `current_bid + 25` (or `starting_bid` for the first bid).
+- **3 quick-tap increments**: `+$25`, `+$50`, `+$100` — taps populate the input field instantly and reset the slider.
+- **Slide-to-confirm gate**: HTML `<input type="range">` overlaid with progress bar; threshold 100 fires the bid; prevents accidental pocket-bids on mobile.
+- Forward placed-bid response to parent so the clock can flash the soft-close banner.
+
+### Task 2 — `components/storage/StorageAuctionClock.jsx` (NEW, 90 lines)
+- 1-second interval ticker (cleaned up via `useEffect` return).
+- **4 visual states**:
+  - `> 2h`: slate text, no animation.
+  - `< 2h`: bold amber.
+  - `< 5m`: pulsing crimson + animated `<Bell>` icon + red ring offset.
+  - `<= 0`: greyed-out "Auction ended" sentinel.
+- **Soft-close flash banner** — when `extendedAt` prop is set, shows "⚡ Extended: 2 minutes added to prevent sniping!" for 8 seconds. Wired to the bid response's `soft_close_extended=True` payload in `StorageAuctionDetail.js`.
+
+### Task 3 — `MyCleanoutsPage.jsx` + backend photo gate
+- **Frontend**: Replaced the single-tap "🧼 Mark Unit as Completely Cleared" CTA with an inline upload drawer that:
+  - Requires `<input type="file" accept="image/*" multiple>` selection.
+  - Renders 3-column thumbnail grid with per-photo remove `<X>` button.
+  - Shows `N photos attached` counter.
+  - "Submit Clearance" button is **disabled until ≥ 1 photo is attached** (client-side gate).
+- **Backend**: `routes/storage_cleanout.py::buyer_request_clearance` now requires `photos: List[str]` in the payload. Returns HTTP 400 with `{"error": "photos_required", "message_en": "...", "message_fr": "..."}` if empty. Photos persist on the hold doc as `clearance_photos` + `clearance_photo_count` for admin review.
+
+### Integration in `StorageAuctionDetail.js`
+- New `lastExtendedAt` state tracks the most recent bid-response extension; flowed to `<StorageAuctionClock extendedAt={lastExtendedAt}>`.
+- Existing `StorageCountdown` swapped for `<StorageAuctionClock>` in the bidding card.
+- `<StorageBiddingPanel>` injected at the bottom of the existing right-rail `<aside>` for active auctions, alongside the legacy inline bid form (gives both the legacy QuickBid pills and the new slide-to-confirm flow).
+
+### Verification
+- **Backend**: live `curl POST /api/storage-cleanout/{invoice}/request-clearance` with empty `photos=[]` returns HTTP 400 + bilingual `photos_required` error.
+- **Backend regression**: 28/28 pytests pass (`test_ai_watchdog_amnesia_fix`, `test_watchdog_exempt_loop`, `test_phase_6_2`, `test_phase_6_0`, `test_hotfix_v9_1`).
+- **Frontend lint**: clean across all 4 modified files (`StorageBiddingPanel.jsx`, `StorageAuctionClock.jsx`, `StorageAuctionDetail.js`, `MyCleanoutsPage.jsx`).
+- **Live preview screenshot**: `/storage-auctions/my-cleanouts` renders cleanly with empty-state for the admin (no active holds).
+
+### Files
+- NEW: `frontend/src/components/storage/StorageBiddingPanel.jsx`
+- NEW: `frontend/src/components/storage/StorageAuctionClock.jsx`
+- MODIFIED: `frontend/src/pages/storage/StorageAuctionDetail.js` (3 surgical edits — imports, state, render)
+- MODIFIED: `frontend/src/pages/storage/MyCleanoutsPage.jsx` (drawer-based photo upload flow)
+- MODIFIED: `backend/routes/storage_cleanout.py` (photo gate in `buyer_request_clearance`)
+
+### Action required for production
+- Redeploy preview → production. After redeploy, buyers winning storage auctions will see the new slide-to-confirm bidding panel + 4-state clock; cleanout requests will require photo proof before submission.
+
+---
+
+## Previous: AI Watchdog Infinite Re-flag Loop — 4 Hotfixes (Feb 21, 2026) ✅
 
 Production listing `385b5477-7510-4b5e-8225-6f0dadf9b2b9` ("Lot de 7 tabourets Meridian") was being re-paused 17 min after admin approval by the **scheduled** safety_watchdog cron — separate from the previously-fixed seller-edit re-trigger path. Both paths now respect a unified immunity model.
 

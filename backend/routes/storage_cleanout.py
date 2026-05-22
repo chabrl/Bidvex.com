@@ -26,7 +26,7 @@ import logging
 import os
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import stripe
 from fastapi import APIRouter, Depends, HTTPException
@@ -187,6 +187,11 @@ async def create_storage_cleanout_hold(
 # ─────────────────────────────────────────────────────────────────────
 class BuyerClearanceRequest(BaseModel):
     notes: Optional[str] = None
+    # Phase 6.3 Task 3 — Mandatory broom-swept proof photos (base64 data URLs
+    # OR https URLs; the storage backfill helper will promote base64 to S3
+    # in the background). At least one photo is required; client enforces the
+    # UI gate, but we re-validate here for defence-in-depth.
+    photos: Optional[List[str]] = None
 
 
 @storage_cleanout_router.post("/storage-cleanout/{invoice_id}/request-clearance")
@@ -197,6 +202,8 @@ async def buyer_request_clearance(
 ):
     """Buyer marks their unit as fully cleared. Flips the cleanout hold into
     `pending_verification` so the admin Storage Settlements desk picks it up.
+
+    Phase 6.3 Task 3 — Now requires at least one broom-swept proof photo.
     """
     db = get_db()
     hold = await db.storage_cleanout_holds.find_one({"invoice_id": invoice_id}, {"_id": 0})
@@ -212,6 +219,15 @@ async def buyer_request_clearance(
         # Idempotent — return current state.
         return {"status": hold.get("status"), "already_requested": True, "hold": hold}
 
+    # Phase 6.3 Task 3 — Photo requirement enforcement.
+    photos = (payload.photos if payload else None) or []
+    if not photos:
+        raise HTTPException(status_code=400, detail={
+            "error": "photos_required",
+            "message_en": "Please attach at least one photo of the empty, broom-swept unit before requesting clearance.",
+            "message_fr": "Veuillez joindre au moins une photo du casier vidé et balayé avant de demander la libération.",
+        })
+
     now = datetime.now(timezone.utc)
     notes = (payload.notes if payload else None) or ""
     await db.storage_cleanout_holds.update_one(
@@ -221,6 +237,9 @@ async def buyer_request_clearance(
             "clearance_requested_at": now,
             "clearance_requested_by": current_user.email,
             "clearance_notes": notes,
+            # Phase 6.3 Task 3 — store the proof photos so admin can review.
+            "clearance_photos": photos,
+            "clearance_photo_count": len(photos),
         }},
     )
     # Mirror onto the invoice for buyer-facing visibility.

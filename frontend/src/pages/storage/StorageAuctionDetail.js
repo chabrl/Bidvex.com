@@ -23,6 +23,9 @@ import QuickBidButtons from '../../components/QuickBidButtons';
 import StorageDepositBanner from './StorageDepositBanner';
 import AuctionStatusBadge, { CountdownTimer } from '../../components/AuctionStatusBadge';
 import ListingPromotionModal from '../../components/ListingPromotionModal';
+// Phase 6.3 — new bidding suite components
+import StorageBiddingPanel from '../../components/storage/StorageBiddingPanel';
+import StorageAuctionClock from '../../components/storage/StorageAuctionClock';
 import { TrendingUp } from 'lucide-react';
 
 const API = API_BASE;
@@ -42,6 +45,9 @@ const StorageAuctionDetail = () => {
   const [submittingBid, setSubmittingBid] = useState(false);
   const [depositPaid, setDepositPaid] = useState(false);
   const [showPromoModal, setShowPromoModal] = useState(false);
+  // Phase 6.3 — track the timestamp of the most recent soft-close extension
+  // so the clock can flash a "+2 min added" banner for 8 seconds.
+  const [lastExtendedAt, setLastExtendedAt] = useState(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -105,6 +111,8 @@ const StorageAuctionDetail = () => {
       }
       if (res.data.soft_close_extended) {
         toast.info(t('storage.detail.auctionExtendedBy2MinutesSoftClose'));
+        // Phase 6.3 — trigger the clock's flash banner.
+        setLastExtendedAt(new Date().toISOString());
       }
       // iter179 FIX 4: update current bid IMMEDIATELY from the server response
       // so the displayed price doesn't lag behind the bid history.
@@ -280,11 +288,13 @@ const StorageAuctionDetail = () => {
                 {auction.bid_count || 0} {t('storage.detail.bids')}
               </p>
 
-              <div className="bg-slate-50 dark:bg-slate-900/50 rounded-lg p-3 text-center mb-4">
-                <p className="text-[10px] uppercase text-muted-foreground mb-1 flex items-center justify-center gap-1">
-                  <Clock className="h-3 w-3" /> {t('storage.detail.timeRemaining')}
-                </p>
-                <StorageCountdown endTime={auction.end_time} />
+              <div className="bg-slate-50 dark:bg-slate-900/50 rounded-lg p-3 mb-4">
+                {/* Phase 6.3 Task 2 — Live clock with 4 visual states + soft-close flash banner */}
+                <StorageAuctionClock
+                  endTime={auction.end_time}
+                  extendedAt={lastExtendedAt}
+                  extensionMinutes={auction.soft_close_extension_minutes || 2}
+                />
               </div>
 
               {auction.soft_close_enabled && (
@@ -460,6 +470,25 @@ const StorageAuctionDetail = () => {
               {' • '}
               <Link to="/storage-auctions/how-it-works" className="underline">{t('storage.detail.howItWorks')}</Link>
             </div>
+
+            {/* Phase 6.3 Task 1 — Premium bidding panel with slide-to-confirm.
+                Sticky position is handled by the parent <aside> wrapper. */}
+            {auction.status === 'active' && (
+              <StorageBiddingPanel
+                auction={{
+                  ...auction,
+                  // Map snake_case fields to the panel's expectations
+                  current_bid: auction.current_bid,
+                  leader_id: auction.leader_id || auction.high_bidder_id,
+                  has_user_bid: !!auction.has_user_bid,
+                  status: auction.status,
+                  starting_bid: auction.starting_price,
+                }}
+                currentUserId={user?.id}
+                onPlaceBid={handlePlaceBid}
+                loading={submittingBid}
+              />
+            )}
           </aside>
         </div>
       </div>

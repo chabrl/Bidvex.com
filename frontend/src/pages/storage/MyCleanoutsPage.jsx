@@ -1,18 +1,20 @@
 /**
- * BidVex — Phase 6.2 Task 4
+ * BidVex — Phase 6.2 Task 4 / Phase 6.3 Task 3
  * Buyer-facing "My Cleanouts" page.
  *
  * Shows every won storage-locker invoice that has an active cleanout hold,
- * with a live countdown ticker and a "Mark Unit as Completely Cleared" CTA.
+ * with a live countdown ticker. The "🧼 Mark Unit as Completely Cleared" CTA
+ * now opens an inline file-uploader drawer that REQUIRES at least one
+ * broom-swept photo before the request-clearance API call is dispatched.
  */
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Upload, X } from 'lucide-react';
 
 import CleanoutCountdownTicker from '../../components/CleanoutCountdownTicker';
 import { authHeaders } from '../../utils/authToken';
@@ -24,6 +26,11 @@ export default function MyCleanoutsPage() {
   const [holds, setHolds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submittingId, setSubmittingId] = useState(null);
+  // Phase 6.3 Task 3 — Drawer state: which invoice is in upload mode + the
+  // attached photos for that invoice (as base64 data URLs).
+  const [uploadDrawerFor, setUploadDrawerFor] = useState(null);
+  const [photosByInvoice, setPhotosByInvoice] = useState({});
+  const fileInputRef = useRef(null);
 
   const fetchHolds = useCallback(async () => {
     setLoading(true);
@@ -61,7 +68,41 @@ export default function MyCleanoutsPage() {
     fetchHolds();
   }, [fetchHolds]);
 
+  // Phase 6.3 Task 3 — file → base64 data URL conversion for the photo drawer.
+  const _readAsDataURL = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  const handlePhotoSelect = async (invoiceId, files) => {
+    const valid = Array.from(files || []).filter((f) => f.type.startsWith('image/'));
+    if (valid.length === 0) {
+      toast.error(t('cleanouts.photoMustBeImage', 'Please select an image file.'));
+      return;
+    }
+    const dataUrls = await Promise.all(valid.map(_readAsDataURL));
+    setPhotosByInvoice((prev) => ({
+      ...prev,
+      [invoiceId]: [...(prev[invoiceId] || []), ...dataUrls],
+    }));
+  };
+
+  const removePhoto = (invoiceId, idx) => {
+    setPhotosByInvoice((prev) => ({
+      ...prev,
+      [invoiceId]: (prev[invoiceId] || []).filter((_, i) => i !== idx),
+    }));
+  };
+
   const handleMarkCleared = async (invoiceId) => {
+    const photos = photosByInvoice[invoiceId] || [];
+    // Phase 6.3 Task 3 — Client-side validation: at least 1 photo required.
+    if (photos.length === 0) {
+      toast.error(t('cleanouts.photoRequired', 'Please attach at least one photo of the empty, broom-swept unit before submitting.'));
+      return;
+    }
     if (!window.confirm(
       t('cleanouts.confirmMarkCleared', {
         defaultValue:
@@ -74,14 +115,24 @@ export default function MyCleanoutsPage() {
     try {
       await axios.post(
         `${API}/api/storage-cleanout/${invoiceId}/request-clearance`,
-        { notes: '' },
+        { notes: '', photos },
         { headers: authHeaders() },
       );
       toast.success(t('cleanouts.requestedSuccess', 'Clearance requested. Awaiting admin verification.'));
+      // Clear state for this invoice
+      setPhotosByInvoice((prev) => {
+        const next = { ...prev };
+        delete next[invoiceId];
+        return next;
+      });
+      setUploadDrawerFor(null);
       await fetchHolds();
     } catch (e) {
       console.error(e);
-      toast.error(t('cleanouts.requestedError', 'Failed to request clearance. Please contact support.'));
+      toast.error(
+        e?.response?.data?.detail?.message_en
+        || t('cleanouts.requestedError', 'Failed to request clearance. Please contact support.'),
+      );
     } finally {
       setSubmittingId(null);
     }
@@ -142,18 +193,91 @@ export default function MyCleanoutsPage() {
                 </div>
 
                 {!isResolved && !isRequested && (
-                  <Button
-                    onClick={() => handleMarkCleared(h.invoice_id)}
-                    disabled={submittingId === h.invoice_id}
-                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
-                    data-testid={`mark-cleared-btn-${h.invoice_id}`}
-                  >
-                    {submittingId === h.invoice_id ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                  <>
+                    {uploadDrawerFor !== h.invoice_id ? (
+                      <Button
+                        onClick={() => setUploadDrawerFor(h.invoice_id)}
+                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                        data-testid={`mark-cleared-btn-${h.invoice_id}`}
+                      >
+                        🧼 {t('cleanouts.markCleared', 'Mark Unit as Completely Cleared')}
+                      </Button>
                     ) : (
-                      <>🧼 {t('cleanouts.markCleared', 'Mark Unit as Completely Cleared')}</>
+                      <div className="rounded-md border border-emerald-300 bg-emerald-50/40 dark:bg-emerald-900/10 p-3 space-y-3" data-testid={`upload-drawer-${h.invoice_id}`}>
+                        <div className="text-xs font-semibold text-emerald-900 dark:text-emerald-200">
+                          {t('cleanouts.uploadPrompt', 'Attach at least 1 photo of the empty, broom-swept unit.')}
+                        </div>
+                        {/* File input */}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          ref={fileInputRef}
+                          onChange={(e) => handlePhotoSelect(h.invoice_id, e.target.files)}
+                          className="hidden"
+                          data-testid={`upload-input-${h.invoice_id}`}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="w-full"
+                          data-testid={`upload-trigger-${h.invoice_id}`}
+                        >
+                          <Upload className="h-4 w-4 mr-1.5" />
+                          {t('cleanouts.choosePhotos', 'Choose Photos')}
+                        </Button>
+
+                        {/* Thumbnails */}
+                        {(photosByInvoice[h.invoice_id] || []).length > 0 && (
+                          <div className="grid grid-cols-3 gap-1.5" data-testid={`upload-thumbs-${h.invoice_id}`}>
+                            {(photosByInvoice[h.invoice_id] || []).map((src, idx) => (
+                              <div key={idx} className="relative aspect-square rounded overflow-hidden bg-slate-200">
+                                <img src={src} alt={`Cleanout proof ${idx + 1}`} className="w-full h-full object-cover" />
+                                <button
+                                  type="button"
+                                  onClick={() => removePhoto(h.invoice_id, idx)}
+                                  className="absolute top-0.5 right-0.5 bg-red-600 text-white rounded-full p-0.5 hover:bg-red-700"
+                                  aria-label="Remove photo"
+                                  data-testid={`upload-remove-${h.invoice_id}-${idx}`}
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        <div className="text-[10px] text-muted-foreground">
+                          {((photosByInvoice[h.invoice_id] || []).length)} {(photosByInvoice[h.invoice_id] || []).length === 1 ? 'photo' : 'photos'} attached
+                        </div>
+
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => { setUploadDrawerFor(null); }}
+                            className="flex-1"
+                            data-testid={`upload-cancel-${h.invoice_id}`}
+                          >
+                            {t('common.cancel', 'Cancel')}
+                          </Button>
+                          <Button
+                            onClick={() => handleMarkCleared(h.invoice_id)}
+                            disabled={submittingId === h.invoice_id || (photosByInvoice[h.invoice_id] || []).length === 0}
+                            className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+                            data-testid={`upload-submit-${h.invoice_id}`}
+                          >
+                            {submittingId === h.invoice_id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <>{t('cleanouts.submitClearance', 'Submit Clearance')}</>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
                     )}
-                  </Button>
+                  </>
                 )}
                 {isRequested && (
                   <div className="rounded-md bg-amber-50 border border-amber-300 px-3 py-2 text-xs text-amber-900" data-testid={`cleanout-pending-${h.invoice_id}`}>
