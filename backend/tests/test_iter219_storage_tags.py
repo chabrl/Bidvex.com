@@ -167,6 +167,24 @@ def test_storage_listing_publishes_with_no_tags(auth_token):
     )
 
 
+def test_storage_listing_strips_buy_now_price(auth_token):
+    """Storage Locker auctions MUST not support Buy Now Price (open-ended
+    bidding only). Even when caller submits buy_now_price=999, backend
+    forces it to None."""
+    payload = _storage_payload({"buy_now_price": 999.99})
+    r = requests.post(
+        f"{BASE_URL}/api/listings",
+        json=payload,
+        headers={"Authorization": f"Bearer {auth_token}"},
+        timeout=30,
+    )
+    assert r.status_code in (200, 201), r.text
+    out = r.json()
+    assert out.get("buy_now_price") in (None, 0, 0.0), (
+        f"Expected buy_now_price stripped to None, got {out.get('buy_now_price')!r}"
+    )
+
+
 def test_storage_listing_filters_unknown_tags_but_keeps_valid_ones(auth_token):
     """Unknown tag values dropped silently, valid ones kept."""
     payload = _storage_payload(

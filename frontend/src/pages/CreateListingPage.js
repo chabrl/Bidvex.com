@@ -241,7 +241,11 @@ const CreateListingPage = () => {
       const payload = {
         ...formData,
         starting_price: parseFloat(formData.starting_price),
-        buy_now_price: formData.buy_now_price ? parseFloat(formData.buy_now_price) : null,
+        // iter219 — Storage Locker auctions don't support instant Buy Now
+        // (abandoned-property auctions are open-ended bidding only).
+        buy_now_price: isStorageLocker
+          ? null
+          : (formData.buy_now_price ? parseFloat(formData.buy_now_price) : null),
         auction_end_date: new Date(formData.auction_end_date).toISOString(),
         // Phase 6.3 Task 2 — Storage locker sanitization. Strip retail
         // marketplace fields that are hidden in the UI so the payload stays
@@ -751,23 +755,28 @@ const CreateListingPage = () => {
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="buy_now_price">{t('createListing.buyNowPrice', 'Buy Now Price')} ({formData.currency})
-                    <InfoTip en="Optional. Allows buyers to skip bidding and purchase instantly at this price." fr="Optionnel. Permet aux acheteurs de sauter l'enchère et d'acheter instantanément à ce prix." />
-                  </Label>
-                  <Input
-                    id="buy_now_price"
-                    name="buy_now_price"
-                    type="number"
-                    inputMode="decimal"
-                    step="0.01"
-                    min="0.01"
-                    value={formData.buy_now_price}
-                    onChange={handleChange}
-                    className="min-h-[48px]"
-                    data-testid="buy-now-price-input"
-                  />
-                </div>
+                {/* iter219 — Buy Now Price hidden for storage_locker.
+                    Storage auctions are open-ended bidding only (no instant
+                    purchase), aligning with abandoned-property auction norms. */}
+                {!isStorageLocker && (
+                  <div className="space-y-2">
+                    <Label htmlFor="buy_now_price">{t('createListing.buyNowPrice', 'Buy Now Price')} ({formData.currency})
+                      <InfoTip en="Optional. Allows buyers to skip bidding and purchase instantly at this price." fr="Optionnel. Permet aux acheteurs de sauter l'enchère et d'acheter instantanément à ce prix." />
+                    </Label>
+                    <Input
+                      id="buy_now_price"
+                      name="buy_now_price"
+                      type="number"
+                      inputMode="decimal"
+                      step="0.01"
+                      min="0.01"
+                      value={formData.buy_now_price}
+                      onChange={handleChange}
+                      className="min-h-[48px]"
+                      data-testid="buy-now-price-input"
+                    />
+                  </div>
+                )}
               </div>
 
               {/* FEATURE PATCH v9 / Feature 4 — Quantity field with optional "multiply hammer by quantity" toggle.

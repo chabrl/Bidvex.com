@@ -400,6 +400,9 @@ async def create_listing(
         # operator is never prompted to pick a retail niche. All storage
         # listings index under one canonical category for routing + analytics.
         listing_dict["category"] = "storage_locker"
+        # iter219 — Buy Now Price is not supported on storage-locker auctions
+        # (abandoned-property auctions are open-ended bidding only).
+        listing_dict["buy_now_price"] = None
 
     # iter219 — Storage Locker visible content tags. Sanitize on the way in;
     # unknown values are dropped silently so the tag system stays OPTIONAL.
