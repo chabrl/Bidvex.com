@@ -112,6 +112,9 @@ const CreateListingPage = () => {
     facility_manager_phone: '',
     notes: '',
   });
+  // iter219 — Visible Content Tags (optional bilingual checkbox cluster).
+  // Canonical EN slugs stored in DB; bilingual labels rendered in the UI.
+  const [visibleContentTags, setVisibleContentTags] = useState([]);
 
   // Shipping & Visit Options
   const [shippingInfo, setShippingInfo] = useState({
@@ -275,30 +278,42 @@ const CreateListingPage = () => {
           facility_manager_phone:  storageMetadata.facility_manager_phone.trim(),
           notes:                   storageMetadata.notes.trim(),
         } : null,
+        // iter219 — Storage Locker forces category="storage_locker" (no
+        // retail picker shown to facility operators). For non-storage flows
+        // the user's selected category is preserved as-is.
+        category: isStorageLocker ? 'storage_locker' : formData.category,
+        // iter219 — Visible Content Tags (canonical EN slugs). Stays empty
+        // when the facility couldn't see inside the unit. Always sent so
+        // the backend can clear any legacy values on edit.
+        visible_content_tags: isStorageLocker ? visibleContentTags : [],
         // Mandatory Binding Agreement
         agreement_accepted: finalAgreementAccepted,
       };
 
-      // FEATURE PATCH v9 / Feature 3 — Pre-publish AI category mismatch check
-      try {
-        const sg = await axios.post(`${API}/listings/suggest-category`, {
-          title: payload.title || '',
-          description: payload.description || '',
-          seller_category: payload.category || '',
-        });
-        if (sg.data && sg.data.match === false && sg.data.suggested_category) {
-          setPendingPayload(payload);
-          setAiMismatchModal({
-            open: true,
-            suggested: sg.data.suggested_category,
-            reasonEn: sg.data.reason_en || '',
-            reasonFr: sg.data.reason_fr || '',
-            confidence: sg.data.confidence || 0,
+      // FEATURE PATCH v9 / Feature 3 — Pre-publish AI category mismatch check.
+      // iter219 — Skip for storage_locker auctions (no retail category to
+      // mismatch against; category is force-set to "storage_locker").
+      if (!isStorageLocker) {
+        try {
+          const sg = await axios.post(`${API}/listings/suggest-category`, {
+            title: payload.title || '',
+            description: payload.description || '',
+            seller_category: payload.category || '',
           });
-          setLoading(false);
-          return;
-        }
-      } catch (_) { /* fail-open */ }
+          if (sg.data && sg.data.match === false && sg.data.suggested_category) {
+            setPendingPayload(payload);
+            setAiMismatchModal({
+              open: true,
+              suggested: sg.data.suggested_category,
+              reasonEn: sg.data.reason_en || '',
+              reasonFr: sg.data.reason_fr || '',
+              confidence: sg.data.confidence || 0,
+            });
+            setLoading(false);
+            return;
+          }
+        } catch (_) { /* fail-open */ }
+      }
 
       await submitListingPayload(payload);
     } catch (error) {
@@ -458,15 +473,21 @@ const CreateListingPage = () => {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <CategorySelector
-                    value={formData.category}
-                    onChange={(val) => setFormData(prev => ({ ...prev, category: val }))}
-                    required
-                    filterVehicles
-                    userRole={user?.role}
-                  />
-                </div>
+                {/* iter219 — Storage Locker auctions don't use retail
+                    categories. The category is forced to "storage_locker"
+                    server-side; this dropdown is hidden so facility operators
+                    are never prompted to pick a niche. */}
+                {!isStorageLocker && (
+                  <div className="space-y-2" data-testid="category-section">
+                    <CategorySelector
+                      value={formData.category}
+                      onChange={(val) => setFormData(prev => ({ ...prev, category: val }))}
+                      required
+                      filterVehicles
+                      userRole={user?.role}
+                    />
+                  </div>
+                )}
 
                 {/* Phase 6.3 Task 2 — Condition is irrelevant for storage
                     locker auctions (abandoned property lots are sold as-is). */}
@@ -635,6 +656,69 @@ const CreateListingPage = () => {
                     <p className="text-[11px] text-muted-foreground mt-1">
                       {t('createListing.depositHelp', 'Held via Stripe authorization (capture_method=manual). Released or captured by facility manager after cleanout verification.')}
                     </p>
+                  </div>
+
+                  {/* iter219 — Visible Content Tags (optional bilingual cluster).
+                      Facility manager can skip entirely if they only cut a lock
+                      and see closed boxes. Tags drive buyer keyword search on
+                      /storage-auctions. */}
+                  <div className="space-y-2" data-testid="visible-content-tags-section">
+                    <Label>
+                      {t('createListing.visibleContentsTitle', 'Visible Contents / Contenu visible')}{' '}
+                      <span className="text-xs font-normal text-muted-foreground">
+                        ({t('createListing.optionalLabel', 'Optional / Optionnel')})
+                      </span>
+                    </Label>
+                    <p className="text-[11px] text-muted-foreground">
+                      {t(
+                        'createListing.visibleContentsHelp',
+                        "Tag what you can see inside the unit so buyers can search by keyword. Skip if you can only see closed boxes — listing publishes fine without any tag.",
+                      )}
+                    </p>
+                    <div
+                      className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2"
+                      data-testid="visible-content-tags-grid"
+                    >
+                      {[
+                        { slug: 'boxes',          en: 'Boxes',          fr: 'Boîtes' },
+                        { slug: 'tools',          en: 'Tools',          fr: 'Outils' },
+                        { slug: 'furniture',      en: 'Furniture',      fr: 'Meubles' },
+                        { slug: 'electronics',    en: 'Electronics',    fr: 'Électronique' },
+                        { slug: 'sporting_goods', en: 'Sporting Goods', fr: 'Articles de sport' },
+                        { slug: 'appliances',     en: 'Appliances',     fr: 'Électroménagers' },
+                        { slug: 'miscellaneous',  en: 'Miscellaneous',  fr: 'Divers' },
+                      ].map((tag) => {
+                        const checked = visibleContentTags.includes(tag.slug);
+                        return (
+                          <label
+                            key={tag.slug}
+                            className={`flex items-center gap-2 rounded-md border px-3 py-2 cursor-pointer transition-colors ${
+                              checked
+                                ? 'border-amber-500 bg-amber-100/60'
+                                : 'border-slate-200 bg-white hover:border-amber-300'
+                            }`}
+                            data-testid={`tag-pill-${tag.slug}`}
+                          >
+                            <input
+                              type="checkbox"
+                              className="accent-amber-600"
+                              checked={checked}
+                              onChange={(e) => {
+                                setVisibleContentTags((prev) =>
+                                  e.target.checked
+                                    ? [...prev, tag.slug]
+                                    : prev.filter((s) => s !== tag.slug),
+                                );
+                              }}
+                              data-testid={`tag-checkbox-${tag.slug}`}
+                            />
+                            <span className="text-xs font-medium">
+                              {tag.en} / {tag.fr}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               )}

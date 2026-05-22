@@ -102,6 +102,12 @@ class StorageAuctionCreate(BaseModel):
     # ── iter216 P1 — Legal-notice confirmation (required before publish) ──
     accepted_legal_notice: bool = False
 
+    # ── iter219 — Visible Content Tags (optional) ──
+    # Facility manager can OPTIONALLY tag what they can see inside the unit.
+    # Empty list = closed boxes / lock-cut visibility, no tagging possible.
+    # Buyers filter by these on the /storage-auctions browse page.
+    visible_content_tags: List[str] = []
+
     @field_validator("payment_method")
     @classmethod
     def _vm(cls, v):

@@ -35,6 +35,10 @@ class ListingCreate(BaseModel):
     # Phase 6.0 / Task 3 — Storage Locker / Abandoned Unit
     listing_type: Optional[str] = None
     storage_metadata: Optional[Dict[str, Any]] = None
+    # iter219 — Storage Locker bilingual content tags (optional).
+    # Buyers can browse-filter on these. Allowed values (EN slugs):
+    #   boxes, tools, furniture, electronics, sporting_goods, appliances, miscellaneous
+    visible_content_tags: Optional[List[str]] = None
     agreement_accepted: bool = False
     agreement_metadata: Optional[Dict[str, Any]] = None
     # Listing-level buyer's premium (rate, e.g. 0.15 for 15%). None = use org/tier default
@@ -109,6 +113,11 @@ class Listing(BaseModel):
     # Phase 6.0 / Task 3 — Storage Locker / Abandoned Unit embedded metadata.
     # Populated only when listing_type == "storage_locker".
     storage_metadata: Optional[Dict[str, Any]] = None
+    # iter219 — Bilingual content tags for storage-locker buyer keyword search.
+    # Stored as English slugs (boxes, tools, furniture, electronics,
+    # sporting_goods, appliances, miscellaneous). Empty = facility couldn't
+    # see inside (closed boxes / lock-cut visibility only). Optional.
+    visible_content_tags: List[str] = []
     parent_auction_id: Optional[str] = None
     parent_auction_title: Optional[str] = None
     lot_number: Optional[int] = None

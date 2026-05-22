@@ -64,6 +64,10 @@ from services.storage_deposit_service import (
     release_deposits_on_close,
     forfeit_deposit,
 )
+from services.visible_content_tags import (
+    sanitize_visible_content_tags as _sanitize_visible_content_tags_inline,
+    ALLOWED_CONTENT_TAGS as _ALLOWED_CONTENT_TAGS,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -222,6 +226,15 @@ async def list_storage_auctions(
     sort: str = "ending_soon",            # ending_soon | newest | price_low | most_bids
     limit: int = 24,
     skip: int = 0,
+    # iter219 — Visible Content Tags filter + free-text search.
+    # `tags` is a comma-separated list of canonical EN slugs
+    # (boxes, tools, furniture, electronics, sporting_goods, appliances,
+    # miscellaneous). Aliases (FR / casing variants) are normalized.
+    # `search` runs case-insensitive substring match against description_en,
+    # description_fr, facility_name, unit_number, AND every value inside the
+    # `visible_content_tags` array.
+    tags: Optional[str] = None,
+    search: Optional[str] = None,
 ):
     db = get_db()
     now = _now()
@@ -242,6 +255,36 @@ async def list_storage_auctions(
         query["current_bid"] = {"$gte": min_price}
     if max_price is not None:
         query.setdefault("current_bid", {})["$lte"] = max_price
+
+    # iter219 — Visible Content Tags filter (canonical slug $in)
+    if tags:
+        tag_list = _sanitize_visible_content_tags_inline(
+            [t.strip() for t in str(tags).split(",") if t.strip()]
+        )
+        if tag_list:
+            query["visible_content_tags"] = {"$in": tag_list}
+
+    # iter219 — Free-text search across description, facility, unit#, AND
+    # the visible_content_tags array elements. Buyers typing "Meubles" or
+    # "Furniture" surface every locker carrying that tag, in either language.
+    if search:
+        s = str(search).strip()
+        if s:
+            safe = re.escape(s)
+            # Also match if the search term aligns with a canonical tag slug
+            # or one of its bilingual aliases. We sanitize the query to a
+            # canonical list so MongoDB can use the indexed `$in`.
+            tag_hits = _sanitize_visible_content_tags_inline([s])
+            or_clauses = [
+                {"description_en":      {"$regex": safe, "$options": "i"}},
+                {"description_fr":      {"$regex": safe, "$options": "i"}},
+                {"facility_name":       {"$regex": safe, "$options": "i"}},
+                {"unit_number":         {"$regex": safe, "$options": "i"}},
+                {"visible_content_tags": {"$regex": safe, "$options": "i"}},
+            ]
+            if tag_hits:
+                or_clauses.append({"visible_content_tags": {"$in": tag_hits}})
+            query["$or"] = or_clauses
 
     if status == "ending_soon":
         cutoff = (now + timedelta(hours=1)).isoformat()
@@ -267,7 +310,17 @@ async def list_storage_auctions(
     # Live status reconciliation
     for a in auctions:
         a["live_status"] = _resolve_status(a)
-    return {"total": total, "auctions": auctions, "limit": limit, "skip": skip, "sort": sort}
+    return {
+        "total":              total,
+        "auctions":           auctions,
+        "limit":              limit,
+        "skip":               skip,
+        "sort":               sort,
+        "applied_tags":       list(_sanitize_visible_content_tags_inline(
+                                  [t.strip() for t in (tags or "").split(",") if t.strip()]
+                              )) if tags else [],
+        "available_tags":     list(_ALLOWED_CONTENT_TAGS),
+    }
 
 
 @storage_router.get("/storage-auctions/my-bids")
@@ -781,6 +834,8 @@ async def create_storage_auction(
         "buyer_premium_pct": float(payload.buyer_premium_pct or 0.0),
         "accepted_legal_notice": bool(payload.accepted_legal_notice),
         "accepted_legal_notice_at": _now().isoformat() if payload.accepted_legal_notice else None,
+        # iter219 — Visible Content Tags (optional bilingual content guide)
+        "visible_content_tags": _sanitize_visible_content_tags_inline(payload.visible_content_tags),
         "created_at": _now().isoformat(),
         "updated_at": _now().isoformat(),
     }

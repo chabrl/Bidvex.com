@@ -4,10 +4,11 @@ import axios from 'axios';
 import { useTranslation } from 'react-i18next';
 import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
+import { Input } from '../../components/ui/input';
 import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from '../../components/ui/select';
-import { Loader2, Filter, MapPin, Layers, RefreshCw, ShieldCheck } from 'lucide-react';
+import { Loader2, Filter, MapPin, Layers, RefreshCw, ShieldCheck, Search, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import StorageHero from './StorageHero';
 import StorageAuctionCard from './StorageAuctionCard';
@@ -28,6 +29,18 @@ const SORT_OPTIONS = [
   { v: 'newest', en: 'Newest Listed', fr: 'Plus récent' },
   { v: 'price_low', en: 'Lowest Price', fr: 'Prix bas' },
   { v: 'most_bids', en: 'Most Bids', fr: "Plus d'offres" },
+];
+
+// iter219 — Visible Content Tags (mirror of backend
+// services/visible_content_tags.py::ALLOWED_CONTENT_TAGS).
+const CONTENT_TAGS = [
+  { slug: 'boxes',          en: 'Boxes',          fr: 'Boîtes' },
+  { slug: 'tools',          en: 'Tools',          fr: 'Outils' },
+  { slug: 'furniture',      en: 'Furniture',      fr: 'Meubles' },
+  { slug: 'electronics',    en: 'Electronics',    fr: 'Électronique' },
+  { slug: 'sporting_goods', en: 'Sporting Goods', fr: 'Articles de sport' },
+  { slug: 'appliances',     en: 'Appliances',     fr: 'Électroménagers' },
+  { slug: 'miscellaneous',  en: 'Miscellaneous',  fr: 'Divers' },
 ];
 
 // Phase 6.2 hotfix — Single source of truth for "this user has the facility
@@ -59,7 +72,20 @@ const StorageAuctionsBrowse = () => {
     is_lien_unit: '',
     status: '',
     sort: 'ending_soon',
+    // iter219 — Visible-content tag filter (array of canonical slugs) + free-text search.
+    tags: [],
+    search: '',
   });
+  // iter219 — Debounced search input. Local state mirrors the input value;
+  // we push it into `filters.search` after 400 ms of inactivity so each
+  // keystroke doesn't fire a network call.
+  const [searchInput, setSearchInput] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setFilters((p) => (p.search === searchInput ? p : { ...p, search: searchInput }));
+    }, 400);
+    return () => clearTimeout(t);
+  }, [searchInput]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -70,6 +96,9 @@ const StorageAuctionsBrowse = () => {
       if (filters.unit_type) params.append('unit_type', filters.unit_type);
       if (filters.is_lien_unit !== '') params.append('is_lien_unit', filters.is_lien_unit);
       if (filters.status) params.append('status', filters.status);
+      // iter219 — Tags (comma-separated) + search (free text) pushed to API
+      if (filters.tags && filters.tags.length > 0) params.append('tags', filters.tags.join(','));
+      if (filters.search && filters.search.trim()) params.append('search', filters.search.trim());
       params.append('sort', filters.sort);
       params.append('limit', '24');
 
@@ -91,6 +120,13 @@ const StorageAuctionsBrowse = () => {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const setFilter = (k, v) => setFilters(p => ({ ...p, [k]: v === '__all' ? '' : v }));
+  // iter219 — Toggle a canonical tag slug in/out of the active filter set.
+  const toggleTag = (slug) => {
+    setFilters((p) => ({
+      ...p,
+      tags: p.tags.includes(slug) ? p.tags.filter((s) => s !== slug) : [...p.tags, slug],
+    }));
+  };
 
   return (
     <div className="min-h-screen bg-sky-50 dark:bg-slate-900" data-testid="storage-browse-page">
@@ -136,6 +172,80 @@ const StorageAuctionsBrowse = () => {
         {t('storage.browse.transparentFeesBody')}
         {' • '}
         <Link to="/storage-auctions/how-it-works" className="underline hover:no-underline">{t('storage.browse.howItWorksLink')}</Link>
+      </div>
+
+      {/* iter219 — Buyer keyword search + visible-content tag pills.
+          Tags filter by `visible_content_tags` server-side; the search box
+          additionally scans description / facility / unit# / tag labels. */}
+      <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 space-y-3">
+          <div className="relative max-w-2xl mx-auto" data-testid="storage-search-row">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+            <Input
+              type="search"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder={
+                isFr
+                  ? 'Rechercher : meubles, outils, électronique…'
+                  : 'Search: furniture, tools, electronics…'
+              }
+              className="pl-9 pr-9 h-10 text-sm"
+              data-testid="storage-search-input"
+            />
+            {searchInput && (
+              <button
+                type="button"
+                aria-label="Clear search"
+                onClick={() => setSearchInput('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+                data-testid="storage-search-clear"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          <div
+            className="flex flex-wrap items-center justify-center gap-2"
+            data-testid="storage-tag-pill-row"
+          >
+            <span className="text-[11px] uppercase tracking-wider text-slate-500 mr-1">
+              {isFr ? 'Contenu visible :' : 'Visible Contents:'}
+            </span>
+            {CONTENT_TAGS.map((tag) => {
+              const active = filters.tags.includes(tag.slug);
+              return (
+                <button
+                  key={tag.slug}
+                  type="button"
+                  onClick={() => toggleTag(tag.slug)}
+                  className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                    active
+                      ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
+                      : 'bg-white text-slate-700 border-slate-300 hover:border-amber-400 hover:bg-amber-50'
+                  }`}
+                  data-testid={`storage-tag-pill-${tag.slug}`}
+                  aria-pressed={active}
+                >
+                  {isFr ? tag.fr : tag.en}
+                </button>
+              );
+            })}
+            {(filters.tags.length > 0 || filters.search) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setFilters((p) => ({ ...p, tags: [], search: '' }));
+                  setSearchInput('');
+                }}
+                className="text-[11px] text-slate-500 underline hover:text-slate-700 ml-2"
+                data-testid="storage-tag-pill-clear"
+              >
+                {isFr ? 'Effacer' : 'Clear'}
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
@@ -228,9 +338,14 @@ const StorageAuctionsBrowse = () => {
                 variant="outline"
                 size="sm"
                 className="w-full"
-                onClick={() =>
-                  setFilters({ province: '', unit_size: '', unit_type: '', is_lien_unit: '', status: '', sort: 'ending_soon' })
-                }
+                onClick={() => {
+                  setFilters({
+                    province: '', unit_size: '', unit_type: '',
+                    is_lien_unit: '', status: '', sort: 'ending_soon',
+                    tags: [], search: '',
+                  });
+                  setSearchInput('');
+                }}
                 data-testid="filter-clear"
               >
                 <RefreshCw className="h-3.5 w-3.5 mr-1" />

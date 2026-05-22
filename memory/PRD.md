@@ -1,5 +1,45 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter219 — STORAGE LOCKER VISIBLE-CONTENT TAGS + CATEGORY SANITIZATION (Feb 22, 2026) ✅
+
+Facility operators creating storage-locker auctions no longer face the retail category picker — `category="storage_locker"` is now force-set server-side. A new optional bilingual "Visible Contents" tag cluster replaces it, driving keyword filtering on the buyer-facing browse page.
+
+### What was implemented
+- **Backend schema** — `models/auction_models.py::Listing` + `ListingCreate` and `models/storage_auction.py::StorageAuctionCreate` gain `visible_content_tags: List[str]`.
+- **NEW `services/visible_content_tags.py`** — canonical 7-slug allow-list (`boxes, tools, furniture, electronics, sporting_goods, appliances, miscellaneous`) + `sanitize_visible_content_tags()` that normalizes EN/FR aliases (`Meubles → furniture`, `Outils → tools`, etc.) and silently drops unknowns so tag-system stays OPTIONAL.
+- **`POST /api/listings`** — for `listing_type=storage_locker`, hard-codes `category="storage_locker"` even when payload supplies something else; sanitizes `visible_content_tags` on the way in.
+- **`POST /api/storage-auctions`** — accepts + sanitizes `visible_content_tags` on the dedicated storage auction creation flow.
+- **`GET /api/storage-auctions`** — extended with `?tags=furniture,tools` (canonical slug list with FR-alias normalization via `$in`) and `?search=Meubles` (free-text regex against `description_en/fr/facility_name/unit_number/visible_content_tags` AND a sanitized tag-slug `$in`). Response now also returns `applied_tags` + `available_tags` for FE drift-prevention.
+- **Frontend `CreateListingPage.js`** — Category dropdown + Condition selector are hidden when `isStorageLocker`. New responsive bilingual checkbox cluster ("Visible Contents / Contenu visible (Optional / Optionnel)") with all 7 amber-active pill toggles. AI category-mismatch check skipped for storage_locker. Payload force-sets `category="storage_locker"` and emits `visible_content_tags: string[]`.
+- **Frontend `StorageAuctionsBrowse.js`** — New search bar + tag pill row at the top with bilingual EN/FR labels. 400ms-debounced search input → `/api/storage-auctions?search=`. Tag pills wire to `?tags=` (multi-select, toggle, amber-active state). "Clear" link resets both. Sidebar "Clear Filters" button now also clears tags + search.
+
+### Verification (49/49 tests pass)
+- **NEW `tests/test_iter219_storage_tags.py`** (16 tests):
+  - Sanitizer (7): canonical slugs, FR aliases, dedup, unknown drop, None/empty/non-list handling, whitespace+casing, 7-tag count lock-down.
+  - POST /api/listings (3): category force-set, no-tag publish succeeds, unknown-tag filtered.
+  - GET /api/storage-auctions (6): available_tags exposed, ?tags accepted, FR aliases normalized, unknown tags dropped, ?search no crash, regex special-char safe.
+- Storage Phase 6.2 (4) + Meta Pixel funnel (29) regression: all green.
+- Frontend smoke screenshots: storage-locker create form shows new tag cluster, no Category/Condition; storage-auctions browse shows new search box + bilingual pill row with active state on click.
+
+### Files changed
+- NEW: `backend/services/visible_content_tags.py`
+- NEW: `backend/tests/test_iter219_storage_tags.py` (16 tests)
+- MODIFIED: `backend/models/auction_models.py` (Listing + ListingCreate fields)
+- MODIFIED: `backend/models/storage_auction.py` (StorageAuctionCreate field)
+- MODIFIED: `backend/routes/listings.py` (force category + sanitize tags)
+- MODIFIED: `backend/routes/storage_auctions.py` (tags + search filters, applied_tags/available_tags response, persist tags on create)
+- MODIFIED: `frontend/src/pages/CreateListingPage.js` (hide Category, render 7-tag cluster, payload mapping)
+- MODIFIED: `frontend/src/pages/storage/StorageAuctionsBrowse.js` (search bar + tag pill row + filter state)
+
+### QA Remediation Checklist
+- [x] Standard category selectors are hidden and automated behind the scenes for storage flows.
+- [x] The 7 bilingual tags render cleanly with responsive grid alignments (`grid-cols-2 sm:grid-cols-3 lg:grid-cols-4`).
+- [x] Bypassing the checkboxes entirely allows successful, error-free listing creation (verified via `test_storage_listing_publishes_with_no_tags`).
+- [x] Typing an active tag keyword into the marketplace lookup filters successfully pulls up matched storage documents (verified via `?tags=` + `?search=` query handling).
+
+---
+
+
 ## Latest: iter218 — META PIXEL + CATALOG MATCH-RATE REPAIR (Feb 22, 2026) ✅ P0
 
 Production reported **0% catalog match rate** + missing AddToCart / InitiateCheckout / Purchase events on `bidvex.com`. Root cause: Pixel `content_ids` were emitted in legacy formats (`locked-<uuid>`, ad-hoc lot suffixes) that did not match the catalog feed's `BIDVEX-{TYPE}-{uuid}` token. The full funnel was also missing `InitiateCheckout`, and `Purchase` had no CAPI parity for non-broker checkouts.

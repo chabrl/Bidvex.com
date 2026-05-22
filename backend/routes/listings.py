@@ -396,6 +396,17 @@ async def create_listing(
         listing_dict["requires_deposit"] = False
         listing_dict["deposit_amount"] = None
         listing_dict["deposit_type"] = None
+        # iter219 — Hardcode `category="storage_locker"` so the facility
+        # operator is never prompted to pick a retail niche. All storage
+        # listings index under one canonical category for routing + analytics.
+        listing_dict["category"] = "storage_locker"
+
+    # iter219 — Storage Locker visible content tags. Sanitize on the way in;
+    # unknown values are dropped silently so the tag system stays OPTIONAL.
+    from services.visible_content_tags import sanitize_visible_content_tags
+    listing_dict["visible_content_tags"] = sanitize_visible_content_tags(
+        getattr(listing_data, "visible_content_tags", None)
+    )
 
     # LEGACY: opc_permit → migrated to dealer_license_* (iter201). Field kept for back-compat.
     # Dealer-certified seller check + buyer-premium rate
