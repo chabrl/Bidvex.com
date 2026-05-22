@@ -1026,13 +1026,20 @@ async def mark_invoice_paid(
     except Exception as e:
         logger.warning("broker_invoice_audit insert failed: %s", e)
 
-    # iter217 Phase 5 — Meta CAPI Purchase event fires the moment the
-    # broker confirms service fees have settled. LEGAL: value = platform
-    # fee + broker fee only; the vehicle hammer NEVER touches Meta.
+    # iter218 — Meta CAPI Purchase event fires the moment the broker confirms
+    # service fees have settled. LEGAL: value = platform fee + broker fee only;
+    # the vehicle hammer NEVER touches Meta. content_ids now carry the
+    # canonical BIDVEX-VEH-<vehicle_id> token for catalog match.
     try:
         inv  = await db.broker_invoices.find_one({"id": invoice_id}, {"_id": 0})
         buyer = await db.users.find_one({"id": inv.get("buyer_user_id")}, {"_id": 0}) if inv else None
         if inv:
+            # Look up vehicle to get title + category for richer event data.
+            vehicle_doc = None
+            vid = inv.get("vehicle_id") or inv.get("listing_id")
+            if vid:
+                vehicle_doc = await db.vehicles.find_one({"id": vid}, {"_id": 0, "title": 1, "make": 1, "model": 1, "year": 1, "category_id": 1, "category": 1}) or \
+                              await db.listings.find_one({"id": vid}, {"_id": 0, "title": 1, "category": 1, "listing_type": 1})
             from services.analytics_tracker import track_broker_purchase
             await track_broker_purchase(
                 db=db,
@@ -1040,6 +1047,16 @@ async def mark_invoice_paid(
                 platform_fee=float(inv.get("bidvex_platform_fee_cad", 0)),
                 broker_fee=float(inv.get("broker_fee_cad", 0)),
                 buyer_user=buyer,
+                listing_id=vid,
+                listing_type="vehicle",
+                listing_title=(vehicle_doc or {}).get("title") or
+                              " ".join(filter(None, [
+                                  str((vehicle_doc or {}).get("year") or ""),
+                                  (vehicle_doc or {}).get("make") or "",
+                                  (vehicle_doc or {}).get("model") or "",
+                              ])).strip() or None,
+                listing_category=(vehicle_doc or {}).get("category") or
+                                 (vehicle_doc or {}).get("category_id") or "vehicle",
             )
     except Exception as e:
         logger.warning("meta_capi mark_paid emit failed: %s", e)

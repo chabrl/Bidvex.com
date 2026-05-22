@@ -225,7 +225,9 @@ async def get_checkout_status(
                 _db = get_db()
                 txn = await _db.payment_transactions.find_one(
                     {"session_id": session_id},
-                    {"_id": 0, "listing_id": 1, "seller_id": 1, "user_id": 1},
+                    {"_id": 0, "listing_id": 1, "seller_id": 1, "user_id": 1,
+                     "amount": 1, "currency": 1, "transaction_type": 1,
+                     "meta_purchase_emitted": 1},
                 )
                 if txn and txn.get("seller_id"):
                     out["listing_id"] = txn.get("listing_id")
@@ -245,6 +247,107 @@ async def get_checkout_status(
                                 "email": seller.get("email", ""),
                                 "phone": seller.get("phone", ""),
                             }
+
+                    # iter218 — Meta CAPI Purchase emit. Idempotent on
+                    # `meta_purchase_emitted`. Returns the deterministic
+                    # event_id to the browser so the pixel-side Purchase
+                    # event is deduplicated against this server-side one.
+                    try:
+                        listing_doc = None
+                        listing_type = None
+                        listing_id = txn.get("listing_id")
+                        if listing_id:
+                            # Locate the listing across all 4 collections.
+                            listing_doc = await _db.listings.find_one(
+                                {"id": listing_id},
+                                {"_id": 0, "title": 1, "category": 1, "listing_type": 1},
+                            )
+                            if listing_doc:
+                                listing_type = listing_doc.get("listing_type") or "marketplace"
+                            else:
+                                listing_doc = await _db.multi_item_listings.find_one(
+                                    {"id": listing_id},
+                                    {"_id": 0, "title": 1, "category": 1},
+                                )
+                                if listing_doc:
+                                    listing_type = "multi_lot"
+                                else:
+                                    listing_doc = await _db.vehicles.find_one(
+                                        {"id": listing_id},
+                                        {"_id": 0, "title": 1, "make": 1, "model": 1, "year": 1, "category": 1},
+                                    )
+                                    if listing_doc:
+                                        listing_type = "vehicle"
+                                        if not listing_doc.get("title"):
+                                            listing_doc["title"] = " ".join(filter(None, [
+                                                str(listing_doc.get("year") or ""),
+                                                listing_doc.get("make") or "",
+                                                listing_doc.get("model") or "",
+                                            ])).strip()
+                                    else:
+                                        listing_doc = await _db.storage_auctions.find_one(
+                                            {"id": listing_id},
+                                            {"_id": 0, "title": 1, "category": 1, "unit_number": 1, "facility_name": 1},
+                                        )
+                                        if listing_doc:
+                                            listing_type = "storage"
+                                            if not listing_doc.get("title"):
+                                                listing_doc["title"] = (
+                                                    f"Storage Unit {listing_doc.get('unit_number', '')} "
+                                                    f"@ {listing_doc.get('facility_name', '')}"
+                                                ).strip()
+
+                        if listing_id and listing_type:
+                            from services.analytics_tracker import (
+                                track_listing_purchase,
+                                canonical_content_id,
+                                deterministic_event_id,
+                            )
+                            content_id = canonical_content_id(listing_type, listing_id)
+                            event_id = deterministic_event_id(
+                                event_name="Purchase",
+                                content_id=content_id or f"BIDVEX-MKT-{listing_id}",
+                                discriminator=f"session_{session_id}",
+                            )
+                            out["meta_purchase_event_id"] = event_id
+                            out["listing_type"] = listing_type
+                            out["listing_title"] = (listing_doc or {}).get("title")
+                            out["listing_category"] = (listing_doc or {}).get("category")
+
+                            if not txn.get("meta_purchase_emitted"):
+                                buyer_user = None
+                                if current_user:
+                                    buyer_user = await _db.users.find_one(
+                                        {"id": current_user.id},
+                                        {"_id": 0, "name": 1, "full_name": 1, "email": 1, "phone": 1,
+                                         "city": 1, "province": 1, "postal_code": 1, "country": 1, "id": 1},
+                                    )
+                                total_charged = float(session.amount_total or 0) / 100.0
+                                try:
+                                    await track_listing_purchase(
+                                        db=_db,
+                                        session_id=session_id,
+                                        listing_id=listing_id,
+                                        listing_type=listing_type,
+                                        total_charged=total_charged,
+                                        buyer_user=buyer_user,
+                                        listing_title=(listing_doc or {}).get("title"),
+                                        listing_category=(listing_doc or {}).get("category"),
+                                    )
+                                except Exception as capi_err:
+                                    logger.warning(f"[meta_capi/listing] emit failed: {capi_err}")
+                                # Idempotency stamp so subsequent polls of
+                                # /payments/status don't re-fire CAPI.
+                                await _db.payment_transactions.update_one(
+                                    {"session_id": session_id},
+                                    {"$set": {
+                                        "meta_purchase_emitted":   True,
+                                        "meta_purchase_event_id":  event_id,
+                                        "meta_purchase_emitted_at": datetime.now(timezone.utc),
+                                    }},
+                                )
+                    except Exception as meta_err:
+                        logger.warning(f"[/payments/status] meta_capi enrichment failed: {meta_err}")
             except Exception as e:
                 logger.warning(f"[/payments/status] seller_contact enrichment failed: {e}")
 

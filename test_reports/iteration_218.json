@@ -1,0 +1,36 @@
+{
+  "summary": "iter218 — P0 Meta Pixel + Catalog match-rate fix validated. All 29 unit tests in tests/test_meta_pixel_funnel.py pass. Added 19 new integration tests in tests/test_iter218_meta_pixel_integration.py — all pass. Live /api/feeds/facebook-local endpoint returns clean BIDVEX-MKT-{uuid} content_ids (5 rows, zero legacy locked-/auction_/listing_ prefixes, all match strict regex). /api/payments/status/{session_id} route wired correctly (returns 4xx for synthetic IDs, not 5xx). track_listing_purchase + track_broker_purchase emit correct content_ids/contents/num_items/content_type payloads via mocked Meta delivery. Adjacent regression suites (test_phase_5_3, test_conversion_pipeline_phase5) also pass — 28/28. Combined backend success: 76/76.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_meta_pixel_funnel.py",
+    "/app/backend/tests/test_iter218_meta_pixel_integration.py",
+    "/app/test_reports/pytest/iter218_meta_pixel.xml",
+    "/app/test_reports/pytest/iter218_integration.xml",
+    "/app/test_reports/pytest/iter218_regression.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "analytics_tracker.py is 485 lines — borderline-OK; consider extracting build_purchase_event + track_*_purchase into a separate module when it grows past ~700.",
+    "routes/payments.py get_checkout_status has a 4-level-deep nested if-elif-else listing lookup (lines 261-298). Could be cleaned by extracting a `_lookup_listing_meta(db, listing_id)` helper that returns (doc, type) — improves readability and unit-testability.",
+    "track_listing_purchase return shape on missing content_id is `{ok: False, reason: ...}` while success returns `{event_id, value_cad, content_ids, delivery}`. Inconsistent return contract — callers must check both keys. Consider always returning the same shape with `ok: bool`.",
+    "Live feed currently only contains MKT-prefix rows (no live VEH/LOT/STO listings on prod at test time). Unit tests cover all 4 prefixes via parametrize, so parity is locked down, but a live smoke test for vehicle/storage feeds (if/when separate endpoints exist) would close the loop."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter218_meta_pixel_integration.py (NEW — 19 integration tests)"
+  ],
+  "success_rate": {"backend": "100% (76/76)", "frontend": "skipped per request"},
+  "test_credentials": "Not used — backend-only validation, no auth required for the surfaces under test.",
+  "seed_data_creation": "None — used existing production feed data + in-memory stubs for analytics_tracker tests.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Meta Pixel + CAPI parity is now locked down by 48 dedicated tests (29 funnel + 19 integration). To re-validate: `cd /app/backend && pytest tests/test_meta_pixel_funnel.py tests/test_iter218_meta_pixel_integration.py -v`. The integration suite stubs _send_to_meta and db, so it is hermetic. The /api/feeds/facebook-local live check depends on REACT_APP_BACKEND_URL — fine for preview env. Frontend was NOT tested per the review request — getCanonicalContentId / metaContentId.js will need a separate FE pass when requested.",
+  "rca of the issue": "Original P0: catalog match rate 0% because Pixel events emitted content_ids in legacy formats (`locked-<uuid>`, `auction_<id>`, `listing_<id>`) that did not match the feed's BIDVEX-{TYPE}-{uuid} format. Root fix landed in iter218: (1) backend canonical_content_id() + frontend getCanonicalContentId() now share the exact same algorithm as meta_feed_mapper._content_id(); (2) deterministic_event_id() shared between FE+BE enables Pixel/CAPI dedup; (3) /payments/status/{id} now enriches response with meta_purchase_event_id so the FE Purchase pixel uses the same event_id as the server-side CAPI Purchase. All three layers were verified parity-tied via test_feed_and_capi_produce_identical_content_id_for_same_listing and test_tracker_prefix_map_superset_of_feed_map."
+}

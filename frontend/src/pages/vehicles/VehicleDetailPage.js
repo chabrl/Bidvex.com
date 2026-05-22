@@ -282,7 +282,20 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
       toast.error(`Minimum bid is ${formatPrice(minBid, vehicle?.currency)}`);
       return;
     }
-    
+
+    // Meta Pixel AddToCart — intent signal fired BEFORE deposit/bid POST.
+    // Dedup-safe per (listing, session). content_id = BIDVEX-VEH-<vehicle_id>.
+    try {
+      const { trackAddToCart } = await import('../../utils/metaPixel');
+      trackAddToCart({
+        listing: vehicle,
+        bidAmount: amount,
+        routeHint: 'vehicle',
+      });
+    } catch (pixelErr) {
+      console.debug('[VehicleDetailPage] AddToCart pixel emit failed:', pixelErr);
+    }
+
     setBidding(true);
     try {
       // Check deposit if required
@@ -311,6 +324,18 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
       });
       
       toast.success(`Bid placed: ${formatPrice(amount, vehicle?.currency)}`);
+      // Meta Pixel InitiateCheckout — every successful bid emits a distinct
+      // InitiateCheckout. Catalog match via canonical BIDVEX-VEH-<id>.
+      try {
+        const { trackInitiateCheckout } = await import('../../utils/metaPixel');
+        trackInitiateCheckout({
+          listing: vehicle,
+          bidAmount: amount,
+          routeHint: 'vehicle',
+        });
+      } catch (pixelErr) {
+        console.debug('[VehicleDetailPage] InitiateCheckout pixel emit failed:', pixelErr);
+      }
       onBidPlaced?.(response.data);
       // iter202 Phase B — auto-set the next bid amount using +$100 vehicle increment
       setBidAmount((amount + 100).toString());
@@ -872,6 +897,13 @@ const VehicleDetailPage = () => {
       const response = await axios.get(`${API}/vehicles/${id}`);
       setVehicle(response.data);
       setSeller(response.data.seller);
+      // Meta Pixel ViewContent — dedupe-safe per (listing, session)
+      try {
+        const { trackViewContent } = await import('../../utils/metaPixel');
+        trackViewContent(response.data, { routeHint: 'vehicle' });
+      } catch (pixelErr) {
+        console.debug('[VehicleDetailPage] ViewContent pixel emit failed:', pixelErr);
+      }
     } catch (err) {
       setError(err.response?.data?.detail || 'Vehicle not found');
     } finally {

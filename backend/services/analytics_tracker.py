@@ -114,9 +114,34 @@ def build_purchase_event(*,
                          event_id:      Optional[str] = None,
                          event_source_url: Optional[str] = None,
                          action_source: str = "website",
-                         currency:      str = "CAD") -> Dict[str, Any]:
-    """Build a single Meta CAPI Purchase event payload."""
+                         currency:      str = "CAD",
+                         content_ids:   Optional[list[str]] = None,
+                         content_type:  Optional[str] = None,
+                         content_name:  Optional[str] = None,
+                         content_category: Optional[str] = None) -> Dict[str, Any]:
+    """Build a single Meta CAPI Purchase event payload.
+
+    iter218 — `content_ids` MUST be supplied for catalog match. Format mirrors
+    the frontend canonical helper:
+        BIDVEX-{MKT|LOT|VEH|STO}-{listing_id}
+    Producing this exact string is the only way Meta Commerce Manager can
+    attribute the Purchase event to the catalog row.
+    """
     value = compute_purchase_value_cad(platform_fee=platform_fee, broker_fee=broker_fee)
+    custom_data: Dict[str, Any] = {
+        "currency":         currency,
+        "value":            value,
+        "content_type":     content_type or "product",
+        "content_name":     content_name or "BidVex Broker Service Fees",
+        "content_category": content_category or "broker_transaction",
+    }
+    if content_ids:
+        custom_data["content_ids"] = content_ids
+        # `contents` is required by Meta Advantage+ for full catalog matching.
+        custom_data["contents"] = [
+            {"id": cid, "quantity": 1, "item_price": value} for cid in content_ids
+        ]
+        custom_data["num_items"] = len(content_ids)
     return {
         "event_name":     "Purchase",
         "event_time":     int(time.time()),
@@ -124,14 +149,65 @@ def build_purchase_event(*,
         "action_source":  action_source,
         "event_source_url": event_source_url or "https://bidvex.com/",
         "user_data":      user_data,
-        "custom_data": {
-            "currency":     currency,
-            "value":        value,
-            "content_type": "product",
-            "content_name": "BidVex Broker Service Fees",
-            "content_category": "broker_transaction",
-        },
+        "custom_data":    custom_data,
     }
+
+
+# ── Canonical content_id + event_id helpers (mirror frontend) ────────
+# Both functions MUST produce identical strings to the frontend's
+# `utils/metaContentId.js`. Backend and frontend share these formats so
+# Meta dedupes the browser pixel and CAPI events.
+
+_TYPE_PREFIX_MAP = {
+    "marketplace":    "MKT",
+    "single":         "MKT",
+    "product":        "MKT",
+    "lots":           "LOT",
+    "multi_lot":      "LOT",
+    "multi_item":     "LOT",
+    "vehicle":        "VEH",
+    "vehicles":       "VEH",
+    "vehicle_dealer": "VEH",
+    "storage":        "STO",
+    "storage_locker": "STO",
+    "storage_unit":   "STO",
+}
+
+
+def canonical_content_id(listing_type: Optional[str], listing_id: Optional[str]) -> Optional[str]:
+    """Returns the canonical Meta content_id for a (listing_type, listing_id).
+
+    Matches both `services/meta_feed_mapper.py::_content_id()` and the
+    frontend `utils/metaContentId.js::getCanonicalContentId()`.
+    """
+    if not listing_id:
+        return None
+    prefix = _TYPE_PREFIX_MAP.get((listing_type or "").lower(), "MKT")
+    return f"BIDVEX-{prefix}-{listing_id}"
+
+
+def canonical_content_type(listing_type: Optional[str]) -> str:
+    """Returns 'vehicle' for vehicle listings, 'product' for everything else.
+
+    Mirrors `utils/metaContentId.js::getCanonicalContentType()`.
+    """
+    t = (listing_type or "").lower()
+    return "vehicle" if t in ("vehicle", "vehicles", "vehicle_dealer") else "product"
+
+
+def deterministic_event_id(*, event_name: str,
+                           content_id: str,
+                           discriminator: Optional[str] = None) -> str:
+    """Builds the same event_id the frontend would build via
+    `metaContentId.js::buildEventId`. Used so the server-side Purchase event
+    deduplicates against the browser pixel's Purchase event when Meta receives
+    both copies (within the 7-day attribution window).
+    """
+    parts = ["bidvex", (event_name or "").lower(), content_id]
+    if discriminator:
+        parts.append(str(discriminator))
+    return "_".join(parts).replace(" ", "")
+
 
 
 async def _send_to_meta(events: list[Dict[str, Any]]) -> Dict[str, Any]:
@@ -219,17 +295,24 @@ async def track_broker_purchase(*,
                                  client_ua:     Optional[str] = None,
                                  event_source_url: Optional[str] = None,
                                  fbp:           Optional[str] = None,
-                                 fbc:           Optional[str] = None) -> Dict[str, Any]:
+                                 fbc:           Optional[str] = None,
+                                 listing_id:    Optional[str] = None,
+                                 listing_type:  Optional[str] = None,
+                                 listing_title: Optional[str] = None,
+                                 listing_category: Optional[str] = None) -> Dict[str, Any]:
     """One-call entrypoint to fire a Meta CAPI Purchase event for a broker
     transaction. Persists a row in `meta_capi_log` either way so we have
     a verifiable audit trail (and so tests pass even without env vars).
 
     LEGAL: never pass `hammer_price` — value is always
     `platform_fee + broker_fee` in CAD.
+
+    iter218 — `listing_id` + `listing_type` are now passed for catalog match.
+    When supplied, the event carries content_ids = ["BIDVEX-VEH-<id>"] so
+    Meta Commerce Manager can attribute the Purchase to the catalog row.
     """
     user_data: Dict[str, Any] = {}
     if buyer_user:
-        # Split full name → first / last for hashing
         full = buyer_user.get("full_name") or buyer_user.get("name") or ""
         parts = full.strip().split()
         first = parts[0] if parts else None
@@ -250,32 +333,152 @@ async def track_broker_purchase(*,
             fbc         = fbc,
         )
 
+    # iter218 — canonical content_id + deterministic event_id for FE↔BE dedup.
+    content_id = canonical_content_id(listing_type or "vehicle", listing_id)
+    content_ids = [content_id] if content_id else None
+    content_type = canonical_content_type(listing_type or "vehicle") if listing_id else None
+    # event_id is deterministic per invoice — every retry / replay produces
+    # the same event_id, so Meta deduplicates server-side replays.
+    event_id = f"broker_invoice_{invoice_id}"
+
     event = build_purchase_event(
         platform_fee     = platform_fee,
         broker_fee       = broker_fee,
         user_data        = user_data,
-        event_id         = f"broker_invoice_{invoice_id}",
+        event_id         = event_id,
         event_source_url = event_source_url,
+        content_ids      = content_ids,
+        content_type     = content_type,
+        content_name     = listing_title or ("BidVex Broker Service Fees" if not content_id else None),
+        content_category = listing_category or ("broker_transaction" if not content_id else None),
     )
     value = event["custom_data"]["value"]
 
     delivery = await _send_to_meta([event])
 
-    # Persist audit row — same payload, but never re-emit user_data hashes
-    # (they're irreversible but writing them all to disk is overkill).
     try:
         await db.meta_capi_log.insert_one({
-            "id":           str(uuid.uuid4()),
-            "invoice_id":   invoice_id,
-            "event_name":   "Purchase",
-            "event_id":     event["event_id"],
-            "value_cad":    value,
-            "currency":     "CAD",
-            "delivery":     delivery,
-            "had_user_data": bool(user_data),
-            "at":           _utcnow(),
+            "id":             str(uuid.uuid4()),
+            "invoice_id":     invoice_id,
+            "event_name":     "Purchase",
+            "event_id":       event["event_id"],
+            "value_cad":      value,
+            "currency":       "CAD",
+            "content_ids":    content_ids or [],
+            "content_type":   content_type,
+            "listing_id":     listing_id,
+            "listing_type":   listing_type,
+            "delivery":       delivery,
+            "had_user_data":  bool(user_data),
+            "at":             _utcnow(),
         })
     except Exception as e:
         logger.warning("[meta_capi] audit insert failed: %s", e)
 
-    return {"event_id": event["event_id"], "value_cad": value, "delivery": delivery}
+    return {"event_id": event["event_id"], "value_cad": value, "delivery": delivery, "content_ids": content_ids}
+
+
+async def track_listing_purchase(*,
+                                  db,
+                                  session_id:   str,
+                                  listing_id:   str,
+                                  listing_type: str,
+                                  total_charged: float,
+                                  buyer_user:   Optional[Dict[str, Any]] = None,
+                                  client_ip:    Optional[str] = None,
+                                  client_ua:    Optional[str] = None,
+                                  event_source_url: Optional[str] = None,
+                                  listing_title: Optional[str] = None,
+                                  listing_category: Optional[str] = None,
+                                  fbp:          Optional[str] = None,
+                                  fbc:          Optional[str] = None) -> Dict[str, Any]:
+    """Fires Meta CAPI Purchase for a non-broker checkout (marketplace,
+    multi-lot, storage). `event_id` is deterministic based on the Stripe
+    `session_id` so the browser-side pixel can be deduplicated.
+
+    For BidVex revenue accounting this passes the buyer's TOTAL charged
+    amount (gross) as the Meta value — Meta's catalog attribution model
+    uses gross as the conversion value for non-broker SKUs.
+    """
+    user_data: Dict[str, Any] = {}
+    if buyer_user:
+        full = buyer_user.get("full_name") or buyer_user.get("name") or ""
+        parts = full.strip().split()
+        first = parts[0] if parts else None
+        last  = parts[-1] if len(parts) > 1 else None
+        user_data = build_user_data(
+            email       = buyer_user.get("email"),
+            phone       = buyer_user.get("phone"),
+            first_name  = first,
+            last_name   = last,
+            city        = buyer_user.get("city"),
+            state       = buyer_user.get("province") or buyer_user.get("state"),
+            country     = (buyer_user.get("country") or "ca"),
+            zip_code    = buyer_user.get("postal_code") or buyer_user.get("zip"),
+            external_id = buyer_user.get("id"),
+            client_ip   = client_ip,
+            client_ua   = client_ua,
+            fbp         = fbp,
+            fbc         = fbc,
+        )
+
+    content_id = canonical_content_id(listing_type, listing_id)
+    if not content_id:
+        return {"ok": False, "reason": "missing_content_id"}
+    content_ids = [content_id]
+    content_type = canonical_content_type(listing_type)
+
+    # Deterministic event_id matches the format used by the frontend
+    # `metaContentId.js::buildEventId` (eventName=Purchase, contentId,
+    # discriminator=session_id). This is the dedup key Meta uses to merge
+    # the browser-side pixel + server-side CAPI Purchase.
+    event_id = deterministic_event_id(
+        event_name="Purchase",
+        content_id=content_id,
+        discriminator=f"session_{session_id}",
+    )
+
+    value = round(float(total_charged or 0.0), 2)
+    event = {
+        "event_name":       "Purchase",
+        "event_time":       int(time.time()),
+        "event_id":         event_id,
+        "action_source":    "website",
+        "event_source_url": event_source_url or "https://bidvex.com/",
+        "user_data":        user_data,
+        "custom_data": {
+            "currency":         "CAD",
+            "value":            value,
+            "content_ids":      content_ids,
+            "content_type":     content_type,
+            "content_name":     listing_title or "",
+            "content_category": listing_category or "",
+            "contents": [{"id": content_id, "quantity": 1, "item_price": value}],
+            "num_items":        1,
+        },
+    }
+    delivery = await _send_to_meta([event])
+    try:
+        await db.meta_capi_log.insert_one({
+            "id":             str(uuid.uuid4()),
+            "session_id":     session_id,
+            "event_name":     "Purchase",
+            "event_id":       event_id,
+            "value_cad":      value,
+            "currency":       "CAD",
+            "content_ids":    content_ids,
+            "content_type":   content_type,
+            "listing_id":     listing_id,
+            "listing_type":   listing_type,
+            "delivery":       delivery,
+            "had_user_data":  bool(user_data),
+            "at":             _utcnow(),
+        })
+    except Exception as e:
+        logger.warning("[meta_capi] listing-purchase audit insert failed: %s", e)
+    return {
+        "event_id":    event_id,
+        "value_cad":   value,
+        "content_ids": content_ids,
+        "delivery":    delivery,
+    }

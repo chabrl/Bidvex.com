@@ -123,19 +123,12 @@ const ListingDetailPage = () => {
       
       setListing(data);
 
-      // Phase 5 — Meta Pixel ViewContent
+      // Meta Pixel ViewContent — dedupe-safe per (listing, session)
       import('../utils/metaPixel').then(({ trackViewContent }) => {
-        trackViewContent({
-          id: data.id,
-          listing_type: 'marketplace',
-          title: data.title,
-          category: data.category,
-          current_bid: data.current_bid ?? data.current_price,
-          starting_bid: data.starting_bid ?? data.starting_price,
-          city: data.city,
-          region: data.region || data.province,
-        });
-      }).catch(() => {});
+        trackViewContent(data, { routeHint: 'marketplace' });
+      }).catch((pixelErr) => {
+        console.debug('[ListingDetailPage] ViewContent pixel emit failed:', pixelErr);
+      });
 
       const sellerResponse = await axios.get(`${API}/users/${data.seller_id}`);
       setSeller(sellerResponse.data);
@@ -245,6 +238,19 @@ const ListingDetailPage = () => {
       return;
     }
 
+    // Meta Pixel AddToCart — intent signal fired when user clicks "Place Bid"
+    // CTA, BEFORE the confirmation dialog. Dedup-safe per (listing, session).
+    try {
+      const { trackAddToCart } = await import('../utils/metaPixel');
+      trackAddToCart({
+        listing,
+        bidAmount: amount,
+        routeHint: 'marketplace',
+      });
+    } catch (pixelErr) {
+      console.debug('[ListingDetailPage] AddToCart pixel emit failed:', pixelErr);
+    }
+
     // Show bid confirmation dialog with cost breakdown
     setPendingBidAmount(amount);
     setBidConfirmDialogOpen(true);
@@ -264,19 +270,18 @@ const ListingDetailPage = () => {
       
       setBidConfirmDialogOpen(false);
       toast.success('Bid placed successfully!');
-      // iter213 — Meta Pixel AddToCart signal. BidVex has no literal cart;
-      // a bid is the strongest funnel-commit signal between ViewContent and
-      // Purchase. content_ids must match the catalog feed format exactly
-      // (BIDVEX-MKT-<listing_id>) — buildContentId() inside metaPixel.js does it.
+      // Meta Pixel InitiateCheckout — every successful bid submission is a
+      // distinct funnel-commit signal. NOT dedup-protected: bidding wars
+      // strengthen Meta's optimization data.
       try {
-        const { trackAddToCart } = await import('../utils/metaPixel');
-        trackAddToCart({
-          listingId: listing?.id,
-          listingType: listing?.listing_type || 'marketplace',
+        const { trackInitiateCheckout } = await import('../utils/metaPixel');
+        trackInitiateCheckout({
+          listing,
           bidAmount: pendingBidAmount || parseFloat(bidAmount) || 0,
+          routeHint: 'marketplace',
         });
       } catch (pixelErr) {
-        console.debug('[ListingDetailPage] AddToCart pixel emit failed:', pixelErr);
+        console.debug('[ListingDetailPage] InitiateCheckout pixel emit failed:', pixelErr);
       }
       confetti({
         particleCount: 100,

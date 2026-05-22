@@ -198,23 +198,12 @@ const MultiItemListingDetailPage = () => {
         setSelectedLot(response.data.lots[0]);
       }
 
-      // Phase 5 — Meta Pixel ViewContent (multi-lot auction)
-      const _lots = response.data.lots || [];
-      const _highest = _lots.reduce(
-        (m, l) => Math.max(m, l.current_price || l.starting_price || 0),
-        0,
-      );
+      // Meta Pixel ViewContent — dedupe-safe per (listing, session)
       import('../utils/metaPixel').then(({ trackViewContent }) => {
-        trackViewContent({
-          id: response.data.id,
-          listing_type: 'lots',
-          title: response.data.title,
-          category: response.data.category,
-          current_bid: _highest,
-          city: response.data.city,
-          region: response.data.region || response.data.province,
-        });
-      }).catch(() => {});
+        trackViewContent(response.data, { routeHint: 'multi_lot' });
+      }).catch((pixelErr) => {
+        console.debug('[MultiItemListingDetailPage] ViewContent pixel emit failed:', pixelErr);
+      });
 
       // Fetch seller info for tax status badge
       if (response.data.seller_id) {
@@ -302,6 +291,20 @@ const MultiItemListingDetailPage = () => {
       }
     }
 
+    // Meta Pixel AddToCart — intent signal fired BEFORE the actual POST.
+    // Dedup-safe per (listing, session). Uses parent listing_id so the
+    // content_id matches the Meta Catalog feed 1:1 (BIDVEX-LOT-<listing_id>).
+    try {
+      const { trackAddToCart } = await import('../utils/metaPixel');
+      trackAddToCart({
+        listing,
+        bidAmount,
+        routeHint: 'multi_lot',
+      });
+    } catch (pixelErr) {
+      console.debug('[MultiItemListingDetailPage] AddToCart pixel emit failed:', pixelErr);
+    }
+
     try {
       await axios.post(
         `${API}/multi-item-listings/${id}/lots/${lotNumber}/bid`,
@@ -309,17 +312,19 @@ const MultiItemListingDetailPage = () => {
         { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
       );
       toast.success('Bid placed successfully!');
-      // iter213 — Meta Pixel AddToCart for the lot just bid on. content_id is
-      // BIDVEX-LOT-{listing_id}-{lot_number} to match the catalog feed format.
+      // Meta Pixel InitiateCheckout — every successful bid is a distinct
+      // funnel-commit signal. Carries the lot_number in `contents` for
+      // attribution while keeping content_ids parent-scoped for catalog match.
       try {
-        const { trackAddToCart } = await import('../utils/metaPixel');
-        trackAddToCart({
-          listingId: `${id}-${lotNumber}`,
-          listingType: 'multi_lot',
+        const { trackInitiateCheckout } = await import('../utils/metaPixel');
+        trackInitiateCheckout({
+          listing,
           bidAmount,
+          lotNumber,
+          routeHint: 'multi_lot',
         });
       } catch (pixelErr) {
-        console.debug('[MultiItemListingDetailPage] AddToCart pixel emit failed:', pixelErr);
+        console.debug('[MultiItemListingDetailPage] InitiateCheckout pixel emit failed:', pixelErr);
       }
       fetchListing();
       setBidAmounts({ ...bidAmounts, [lotNumber]: '' });

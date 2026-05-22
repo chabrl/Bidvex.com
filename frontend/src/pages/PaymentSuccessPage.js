@@ -53,16 +53,36 @@ const PaymentSuccessPage = () => {
             origin: { y: 0.6 },
             colors: ['#F05A4F', '#30C7B5', '#FFD700']
           });
-          // Phase 5 — Meta Pixel Purchase event
+          // Meta Pixel Purchase event. The backend CAPI fires the matching
+          // server-side Purchase with the SAME event_id so Meta deduplicates
+          // (max 1 attributed conversion per session). content_ids resolve
+          // via the canonical helper so they match the catalog feed exactly.
           try {
             const meta = data.metadata || {};
-            const listingId = meta.listing_id || meta.multi_item_listing_id || meta.auction_id;
-            const listingType = meta.listing_type || (meta.multi_item_listing_id ? 'lots' : 'marketplace');
+            const listingId =
+              data.listing_id ||
+              meta.listing_id ||
+              meta.multi_item_listing_id ||
+              meta.auction_id;
+            const listingType =
+              data.listing_type ||
+              meta.listing_type ||
+              (meta.multi_item_listing_id ? 'multi_lot' : 'marketplace');
             const totalCharged = (data.amount_total || 0) / 100;
+            const eventId = data.meta_purchase_event_id || meta.meta_purchase_event_id;
             if (listingId) {
               import('../utils/metaPixel').then(({ trackPurchase }) => {
-                trackPurchase({ listingId, listingType, totalCharged });
-              }).catch(() => {});
+                trackPurchase({
+                  listingId,
+                  listingType,
+                  totalCharged,
+                  eventId,
+                  title: data.listing_title || meta.listing_title,
+                  category: data.listing_category || meta.listing_category,
+                });
+              }).catch((pixelErr) => {
+                console.debug('[PaymentSuccessPage] Purchase pixel emit failed:', pixelErr);
+              });
             }
           } catch (e) { /* silent */ }
           return;

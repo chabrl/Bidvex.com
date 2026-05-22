@@ -60,6 +60,13 @@ const StorageAuctionDetail = () => {
       setAuction(a.data);
       setHistory(h.data?.bids || []);
       setPricing(p.data);
+      // Meta Pixel ViewContent — dedupe-safe per (listing, session).
+      try {
+        const { trackViewContent } = await import('../../utils/metaPixel');
+        trackViewContent(a.data, { routeHint: 'storage' });
+      } catch (pixelErr) {
+        console.debug('[StorageAuctionDetail] ViewContent pixel emit failed:', pixelErr);
+      }
     } catch (err) {
       toast.error(t('storage.detail.auctionNotFound'));
     } finally {
@@ -85,6 +92,19 @@ const StorageAuctionDetail = () => {
       toast.error(t('storage.detail.signInToPlaceABid'));
       return;
     }
+    // Meta Pixel AddToCart — intent signal fired BEFORE the POST so it
+    // captures users who attempt to bid even if their bid eventually fails.
+    // Dedup-safe per (listing, session). content_id = BIDVEX-STO-<listing_id>.
+    try {
+      const { trackAddToCart } = await import('../../utils/metaPixel');
+      trackAddToCart({
+        listing: auction || { id, listing_type: 'storage' },
+        bidAmount: amt,
+        routeHint: 'storage',
+      });
+    } catch (pixelErr) {
+      console.debug('[StorageAuctionDetail] AddToCart pixel emit failed:', pixelErr);
+    }
     setSubmittingBid(true);
     try {
       const res = await axios.post(
@@ -97,17 +117,18 @@ const StorageAuctionDetail = () => {
           ? (isFr ? `Vous êtes en tête à ${res.data.current_bid} $` : `You are winning at $${res.data.current_bid}`)
           : (t('storage.detail.bidPlacedYouVeBeenOutbidByAnExistingProx'))
       );
-      // iter213 — Meta Pixel AddToCart for storage auction bids. content_id
-      // = BIDVEX-STO-<listing_id> per the catalog feed schema.
+      // Meta Pixel InitiateCheckout — every successful bid submission fires
+      // a distinct InitiateCheckout for funnel optimization. content_id
+      // matches the catalog feed schema (BIDVEX-STO-<listing_id>).
       try {
-        const { trackAddToCart } = await import('../../utils/metaPixel');
-        trackAddToCart({
-          listingId: auction?.id || id,
-          listingType: 'storage_locker',
+        const { trackInitiateCheckout } = await import('../../utils/metaPixel');
+        trackInitiateCheckout({
+          listing: auction || { id, listing_type: 'storage' },
           bidAmount: amt,
+          routeHint: 'storage',
         });
       } catch (pixelErr) {
-        console.debug('[StorageAuctionDetail] AddToCart pixel emit failed:', pixelErr);
+        console.debug('[StorageAuctionDetail] InitiateCheckout pixel emit failed:', pixelErr);
       }
       if (res.data.soft_close_extended) {
         toast.info(t('storage.detail.auctionExtendedBy2MinutesSoftClose'));
