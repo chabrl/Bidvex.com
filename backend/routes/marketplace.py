@@ -437,13 +437,32 @@ async def get_marketplace_items(
 
     cached_items = await cache_get(f"{MARKETPLACE_ITEMS_NS}all")
 
-    # If cache is cold (first request ever), kick off background build
+    # iter220 Task 1 — Hydration Ghost Fix.
+    # OLD behaviour: cold cache returned `{items:[], total:0, cache_warming:true}`
+    # — the buyer saw an empty grid until React Query retried 2s later. On
+    # production this caused the "5 items in counter / 0 in grid" ghost-load
+    # bug because counters use a separate endpoint that doesn't share the
+    # same cache key.
+    # NEW behaviour: on cold cache we BUILD INLINE (with a 5s ceiling),
+    # serve the result this request, and only fall back to the warming
+    # response if the build itself fails or times out. This adds ~200-500ms
+    # latency on the very first request after a Redis flush, but eliminates
+    # the empty-grid hydration race entirely.
     if cached_items is None:
-        if not _refreshing_items:
-            _refreshing_items = True
-            asyncio.ensure_future(_refresh_items_cache())
-        return {"items": [], "total": 0, "limit": limit, "skip": 0,
-                "has_more": False, "next_cursor": None, "cache_warming": True}
+        try:
+            cached_items = await asyncio.wait_for(_build_marketplace_items(), timeout=5.0)
+            try:
+                await cache_set(f"{MARKETPLACE_ITEMS_NS}all", cached_items, ITEMS_TTL)
+            except Exception as cache_err:
+                logger.warning(f"[cache] inline-build cache_set failed: {cache_err}")
+            _refreshing_items = False
+        except (asyncio.TimeoutError, Exception) as inline_err:
+            logger.warning(f"[cache] inline build failed/slow, falling back to async: {inline_err}")
+            if not _refreshing_items:
+                _refreshing_items = True
+                asyncio.ensure_future(_refresh_items_cache())
+            return {"items": [], "total": 0, "limit": limit, "skip": 0,
+                    "has_more": False, "next_cursor": None, "cache_warming": True}
 
     # Stale-while-revalidate: always refresh in background on every hit
     # (Redis TTL handles expiry; this ensures near-real-time data)
@@ -502,6 +521,18 @@ async def get_marketplace_items(
     if no_taxes and no_taxes.lower() == 'true':
         # iter217 Phase 4 — "No Taxes" pill = TRUE private sales only.
         items = [i for i in items if i.get("seller_account_type") == "individual"]
+
+    # iter220 Task 1 — Hide auctions that have already passed their end_time.
+    # Cron status-flip runs every 60s; this defensive in-memory filter ensures
+    # buyers never see expired auctions even in the worst-case 60s lag window.
+    # Listings remain visible 100% of the time until end_time elapses, exactly
+    # per directive: "Listings remain visible until end_time countdown <= 0."
+    _now_iso = datetime.now(timezone.utc).isoformat()
+    items = [
+        i for i in items
+        if not i.get("auction_end_date")
+        or str(i.get("auction_end_date")) > _now_iso
+    ]
 
     # iter217 Phase 4 — Private sales pill
     if private_sales_only and str(private_sales_only).lower() == 'true':

@@ -35,16 +35,25 @@ const fetchMarketplaceItems = async ({ pageParam, filters, limit }) => {
     timeout: 15000,
   });
 
-  // If cache is still warming, retry after 2 seconds
-  if (data.cache_warming) {
-    await new Promise(r => setTimeout(r, 2000));
+  // iter220 Task 1 — Hydration Ghost Fix (FE side).
+  // If the backend reports the cache is still warming, retry with exponential
+  // backoff up to 3 times (1s → 2s → 4s). The previous single-retry version
+  // could return empty data when the cache took longer than 2s to build —
+  // leaving the buyer staring at "No items found" even when 5+ listings existed
+  // (the filter-counts endpoint hits a different cache so it would correctly
+  // report 5). This loop matches the new backend behaviour that inline-builds
+  // the cache when cold; warming is now only seen during very heavy load.
+  let attempt = 0;
+  let resp = data;
+  while (resp?.cache_warming && attempt < 3) {
+    await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt)));
     const { data: retryData } = await axios.get(`${API}/marketplace/items?${params.toString()}`, {
       timeout: 15000,
     });
-    return retryData;
+    resp = retryData;
+    attempt += 1;
   }
-
-  return data;
+  return resp;
 };
 
 export const useMarketplaceItems = (filters, limit = 24) => {

@@ -72,15 +72,17 @@ const MarketplacePage = () => {
         </div>
       </div>
 
-      {/* Content with Sidebar */}
-      <div className="container mx-auto max-w-7xl px-4 py-6">
+      {/* iter220 Task 2 — Layout unified with VehicleAuctionsPage:
+          max-w-7xl + sm:px-6 lg:px-8 + py-6 sm:py-8 for consistent breathing
+          room. Sidebar uses lg breakpoint so mobile+tablet gets the drawer. */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         <div className="flex gap-6">
           {/* Sidebar handles its own desktop/mobile rendering */}
           <MarketplaceSidebar onFiltersChange={setSidebarFilters} externalFilters={sidebarFilters} />
-          
+
           {/* Main Content */}
           <div className="flex-1 min-w-0">
-            <FlattenedMarketplace 
+            <FlattenedMarketplace
               showFilters={true}
               showHeader={false}
               variant="full"

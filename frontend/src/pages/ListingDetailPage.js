@@ -558,6 +558,23 @@ const ListingDetailPage = () => {
                     <p className="text-xs text-muted-foreground mt-1">
                       {realtimeBidCount ?? listing.bid_count ?? 0} {(realtimeBidCount ?? listing.bid_count ?? 0) === 1 ? 'bid' : 'bids'} placed
                     </p>
+                    {/* iter220 Task 5 — Per-item bid warning. When a listing
+                        has quantity > 1 AND multiply_hammer_by_quantity is on,
+                        bids are PER ITEM and the buyer's total = hammer × qty.
+                        Shown directly under the current price so it's
+                        impossible to miss before placing a bid. */}
+                    {(listing.quantity || 1) > 1 && listing.multiply_hammer_by_quantity && (
+                      <div
+                        className="mt-3 p-3 rounded-lg border-2 border-amber-500 bg-amber-50 dark:bg-amber-950/30"
+                        data-testid="per-item-bid-warning"
+                      >
+                        <p className="text-sm font-bold text-amber-900 dark:text-amber-200 leading-snug">
+                          {i18n.language?.startsWith('fr')
+                            ? `⚠️ Note : Votre mise est par article. Coût total = Prix d'adjudication × Quantité (${listing.quantity}).`
+                            : `⚠️ Note: Your bid is per item. Total cost = Hammer Price × Quantity (${listing.quantity}).`}
+                        </p>
+                      </div>
+                    )}
                   </div>
                   
                   {/* Bidding status badge */}
@@ -898,13 +915,47 @@ const ListingDetailPage = () => {
                           <span className="bg-background px-2 text-muted-foreground">Or</span>
                         </div>
                       </div>
+                      {/* iter220 Task 5 — Buy Now math breakdown.
+                          When quantity > 1 AND multiply_hammer_by_quantity is
+                          on, the BUY NOW unit price multiplies too. We render
+                          the formula directly under the CTA so buyers see
+                          exactly what they're charged before clicking. */}
+                      {(listing.quantity || 1) > 1 && listing.multiply_hammer_by_quantity && (
+                        <div
+                          className="p-2.5 rounded-md bg-slate-100 dark:bg-slate-800 text-xs leading-relaxed"
+                          data-testid="buy-now-breakdown"
+                        >
+                          <div className="font-semibold text-slate-700 dark:text-slate-200 mb-1">
+                            {i18n.language?.startsWith('fr') ? 'Décomposition' : 'Breakdown'}
+                          </div>
+                          <div className="text-slate-600 dark:text-slate-400">
+                            {formatListingPrice(listing.buy_now_price, listing.currency)} {' × '} {listing.quantity}
+                            {' = '}
+                            <span className="font-bold text-slate-900 dark:text-white">
+                              {formatListingPrice(listing.buy_now_price * listing.quantity, listing.currency)}
+                            </span>
+                            <span className="text-[10px] ml-1">
+                              ({i18n.language?.startsWith('fr') ? 'avant prime + taxes' : 'before premium + taxes'})
+                            </span>
+                          </div>
+                        </div>
+                      )}
                       <Button
                         variant="outline"
                         className="w-full"
                         onClick={handleBuyNow}
                         data-testid="buy-now-btn"
                       >
-                        {t('marketplace.buyNow')}: {formatListingPrice(listing.buy_now_price, listing.currency)}
+                        {t('marketplace.buyNow')}: {
+                          (listing.quantity || 1) > 1 && listing.multiply_hammer_by_quantity
+                            ? formatListingPrice(listing.buy_now_price * listing.quantity, listing.currency)
+                            : formatListingPrice(listing.buy_now_price, listing.currency)
+                        }
+                        {(listing.quantity || 1) > 1 && listing.multiply_hammer_by_quantity && (
+                          <span className="ml-1 text-[10px] opacity-75">
+                            ({formatListingPrice(listing.buy_now_price, listing.currency)} × {listing.quantity})
+                          </span>
+                        )}
                       </Button>
                     </>
                   )}

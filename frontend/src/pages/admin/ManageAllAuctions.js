@@ -134,6 +134,10 @@ const ManageAllAuctions = () => {
         buy_now_price: listing.buy_now_price || '',
         city: listing.city || '',
         region: listing.region || '',
+        // iter220 Task 4 — Image asset array for in-place admin management.
+        // Frontend builds the FINAL desired list (additions appended, deletions
+        // filtered out) and the backend writes it atomically.
+        images: Array.isArray(listing.images) ? [...listing.images] : [],
       },
     });
   };
@@ -153,6 +157,8 @@ const ManageAllAuctions = () => {
       buy_now_price: form.buy_now_price === '' ? null : Number(form.buy_now_price),
       city: form.city,
       region: form.region,
+      // iter220 Task 4 — full-array replacement of images
+      images: Array.isArray(form.images) ? form.images : [],
     };
     const endpoint = listing.type === 'multi'
       ? `multi-item-listings/${listing.id}`
@@ -160,6 +166,46 @@ const ManageAllAuctions = () => {
     await axios.put(`${API}/admin/${endpoint}`, body, { headers });
     setEditModal({ open: false, listing: null, form: {} });
     fetchAllListings();
+  };
+
+  // iter220 Task 4 — Add/Remove images in the admin Edit modal.
+  // `addEditImage` accepts a URL OR a File (uploads via existing /uploads
+  // multipart endpoint then appends the returned URL).
+  const addEditImageUrl = (url) => {
+    const u = (url || '').trim();
+    if (!u) return;
+    setEditModal((m) => ({
+      ...m,
+      form: { ...m.form, images: [...(m.form.images || []), u].slice(0, 30) },
+    }));
+  };
+  const removeEditImage = (idx) => {
+    setEditModal((m) => ({
+      ...m,
+      form: {
+        ...m.form,
+        images: (m.form.images || []).filter((_, i) => i !== idx),
+      },
+    }));
+  };
+  const uploadEditImageFile = async (file) => {
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+      const r = await axios.post(`${API}/uploads/image`, fd, {
+        headers: { ...headers, 'Content-Type': 'multipart/form-data' },
+      });
+      const u = r.data?.url || r.data?.image_url || r.data?.s3_url;
+      if (u) {
+        addEditImageUrl(u);
+        toast.success('Image added');
+      } else {
+        toast.error('Upload returned no URL');
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Image upload failed');
+    }
   };
 
   // FEATURE PATCH v9 / Feature 1 — Edit end time
@@ -686,6 +732,70 @@ const ManageAllAuctions = () => {
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">Region / Province</label>
               <Input value={editModal.form.region || ''} onChange={(e) => setEditModal(m => ({ ...m, form: { ...m.form, region: e.target.value } }))} />
+            </div>
+
+            {/* iter220 Task 4 — Image Asset Manager (admin only).
+                Append new uploads or delete bad ones inline. Saved atomically
+                with the rest of the form via /admin/(multi-item-)listings/:id. */}
+            <div className="md:col-span-2 space-y-2 pt-2 border-t" data-testid="edit-images-manager">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-muted-foreground">
+                  Images ({(editModal.form.images || []).length}/30)
+                </label>
+                <label className="text-xs font-semibold text-cyan-600 hover:text-cyan-700 cursor-pointer">
+                  + Upload
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) uploadEditImageFile(f);
+                      e.target.value = '';
+                    }}
+                    data-testid="edit-images-upload-input"
+                  />
+                </label>
+              </div>
+              {(editModal.form.images || []).length === 0 ? (
+                <p className="text-xs text-muted-foreground italic">No images yet. Upload one or paste a URL below.</p>
+              ) : (
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2" data-testid="edit-images-grid">
+                  {(editModal.form.images || []).map((src, idx) => (
+                    <div key={`${src}-${idx}`} className="relative group rounded-md overflow-hidden border border-slate-200">
+                      <img
+                        src={src}
+                        alt={`asset-${idx}`}
+                        className="aspect-square object-cover w-full"
+                        onError={(e) => { e.currentTarget.style.opacity = '0.3'; }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeEditImage(idx)}
+                        className="absolute top-1 right-1 inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-600 text-white opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold"
+                        title="Remove image"
+                        data-testid={`edit-image-remove-${idx}`}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Paste image URL (https://…)"
+                  className="flex-1 text-xs"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      addEditImageUrl(e.currentTarget.value);
+                      e.currentTarget.value = '';
+                    }
+                  }}
+                  data-testid="edit-images-url-input"
+                />
+              </div>
             </div>
           </div>
           <DialogFooter>

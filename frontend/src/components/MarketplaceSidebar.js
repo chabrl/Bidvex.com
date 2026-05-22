@@ -55,7 +55,25 @@ const MarketplaceSidebar = ({ onFiltersChange, externalFilters = null, className
     }
   }, [externalFilters?.categories?.length]);
 
+  // iter220 Task 1 — Hydration Ghost Fix (sidebar side).
+  // Skip the initial empty-state emission. On mount this useEffect used to
+  // fire `onFiltersChange({auctioneers:[], categories:[], ...})` immediately,
+  // which created a fresh `sidebarFilters` reference on the parent page and
+  // re-mounted FlattenedMarketplace's debounce timer mid-fetch. The new ref
+  // guard waits for the FIRST user interaction before emitting filters.
+  const _filtersInitialized = React.useRef(false);
   useEffect(() => {
+    const hasAny =
+      selectedAuctioneers.length ||
+      selectedCategories.length ||
+      selectedRegions.length ||
+      selectedCities.length ||
+      (searchQuery && searchQuery.trim());
+    if (!_filtersInitialized.current && !hasAny) {
+      _filtersInitialized.current = true;
+      return;
+    }
+    _filtersInitialized.current = true;
     if (onFiltersChange) {
       onFiltersChange({
         auctioneers: selectedAuctioneers,
@@ -238,7 +256,7 @@ const MarketplaceSidebar = ({ onFiltersChange, externalFilters = null, className
   return (
     <>
       {/* ═══ DESKTOP SIDEBAR ═══ */}
-      <div className={`hidden lg:block w-[240px] flex-shrink-0 ${className}`}>
+      <div className={`hidden lg:block w-[280px] flex-shrink-0 ${className}`}>
         <div
           className="sticky top-20 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm flex flex-col"
           style={{ maxHeight: 'calc(100vh - 100px)' }}

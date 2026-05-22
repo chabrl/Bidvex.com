@@ -114,11 +114,21 @@ async def create_checkout_session(
             bnp = listing.get("buy_now_price")
             if not bnp or float(bnp) <= 0:
                 raise HTTPException(status_code=400, detail="Buy Now price is not set for this listing")
-            hammer_price = float(bnp)
+            unit_price = float(bnp)
             transaction_type = "buy_it_now"
         else:
-            hammer_price = listing.get("current_price") or listing.get("final_price") or 0
+            unit_price = listing.get("current_price") or listing.get("final_price") or 0
             transaction_type = "auction_win"
+
+        # iter220 Task 5 — Quantity multiplier in the settlement total.
+        # When a listing carries quantity > 1 AND `multiply_hammer_by_quantity`
+        # is true, the buyer pays the unit_price × quantity (then premium +
+        # taxes are computed on that grossed-up base). Without this, a listing
+        # of 10 chairs at $50 each would settle for $50 instead of $500.
+        listing_qty = int(listing.get("quantity") or 1)
+        multiply_hammer = bool(listing.get("multiply_hammer_by_quantity"))
+        effective_qty = listing_qty if (listing_qty > 1 and multiply_hammer) else 1
+        hammer_price = unit_price * effective_qty
 
         breakdown = calculate_connect_checkout(
             hammer_price=hammer_price,
@@ -156,6 +166,11 @@ async def create_checkout_session(
             "transaction_type": transaction_type,
             "amount": breakdown["buyer_total"],
             "hammer_price": breakdown["hammer_price"],
+            # iter220 Task 5 — Persist the unit price + quantity multiplier
+            # so the seller invoice / refund flows can reconstruct the
+            # `unit × qty = hammer` arithmetic.
+            "unit_price": unit_price,
+            "quantity": effective_qty,
             "buyer_premium": breakdown["buyer_premium"],
             "platform_fee": breakdown["platform_fee"],
             "seller_commission": breakdown["seller_commission"],

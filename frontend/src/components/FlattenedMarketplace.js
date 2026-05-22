@@ -334,10 +334,12 @@ const FlattenedMarketplace = ({
         </div>
       )}
 
-      {/* Items Grid */}
+      {/* Items Grid — iter220 Task 2: matches VehicleAuctionsPage breakpoints
+          (sm:2 / lg:3 / xl:4) so wider workspaces (≥1280px) get 4 columns
+          and tablets get 2 instead of jumping straight to 3. */}
       {loading && items.length === 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {[...Array(6)].map((_, i) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
+          {[...Array(8)].map((_, i) => (
             <Card key={i} className="animate-pulse">
               <div className="h-52 bg-gray-200 dark:bg-slate-700 rounded-t-lg"></div>
               <CardContent className="p-4 space-y-2">
@@ -368,7 +370,7 @@ const FlattenedMarketplace = ({
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
           {items.map((item) => (
             <ItemCard 
               key={item.id} 

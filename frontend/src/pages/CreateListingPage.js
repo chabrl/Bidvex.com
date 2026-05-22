@@ -44,6 +44,10 @@ const CFIA_TRIGGER_CATEGORIES = [
 
 const CreateListingPage = () => {
   const { t, i18n } = useTranslation();
+  // iter220 Task 3 — Single language detector shared across the Storage Locker
+  // panel so every label/placeholder/help-text auto-switches when the global
+  // i18n language flips. Use this instead of inline `i18n.language?.startsWith(...)`.
+  const isFr = (i18n.language || 'en').toLowerCase().startsWith('fr');
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -584,7 +588,7 @@ const CreateListingPage = () => {
                       <Input
                         id="locker_size"
                         type="text"
-                        placeholder="10x10, 5x10, etc."
+                        placeholder={isFr ? '3 m × 3 m, 1,5 m × 3 m, etc.' : '10x10, 5x10, etc.'}
                         value={storageMetadata.locker_size}
                         onChange={(e) => setStorageMetadata((m) => ({ ...m, locker_size: e.target.value }))}
                         maxLength={30}
@@ -613,10 +617,10 @@ const CreateListingPage = () => {
                       className="w-full px-3 py-2 border border-input rounded-md bg-background"
                       data-testid="cleanout-deadline-select"
                     >
-                      <option value={24}>24 hours / heures</option>
-                      <option value={48}>48 hours / heures</option>
-                      <option value={72}>72 hours / heures (recommended)</option>
-                      <option value={168}>1 week / 1 semaine</option>
+                      <option value={24}>{isFr ? '24 heures' : '24 hours'}</option>
+                      <option value={48}>{isFr ? '48 heures' : '48 hours'}</option>
+                      <option value={72}>{isFr ? '72 heures (recommandé)' : '72 hours (recommended)'}</option>
+                      <option value={168}>{isFr ? '1 semaine' : '1 week'}</option>
                     </select>
                   </div>
 
@@ -654,7 +658,7 @@ const CreateListingPage = () => {
                         onChange={(e) => setStorageMetadata((m) => ({ ...m, security_deposit_amount: parseFloat(e.target.value) || 100 }))}
                         className="mt-2"
                         data-testid="deposit-custom-input"
-                        placeholder="Custom amount (50–5000 CAD)"
+                        placeholder={isFr ? 'Montant personnalisé (50–5 000 CAD)' : 'Custom amount (50–5000 CAD)'}
                       />
                     )}
                     <p className="text-[11px] text-muted-foreground mt-1">
@@ -717,7 +721,12 @@ const CreateListingPage = () => {
                               data-testid={`tag-checkbox-${tag.slug}`}
                             />
                             <span className="text-xs font-medium">
-                              {tag.en} / {tag.fr}
+                              {/* iter220 Task 3 — Show single-language tag
+                                  label based on global i18n state. The side-
+                                  by-side EN/FR was useful for facility-onboarding
+                                  but feels redundant once the user has picked
+                                  a language. */}
+                              {isFr ? tag.fr : tag.en}
                             </span>
                           </label>
                         );

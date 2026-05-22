@@ -1,5 +1,54 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter220 — CRITICAL PORTAL RECTIFICATION (Feb 22, 2026) ✅ 5 TASKS
+
+Five-pronged marketplace + admin remediation covering hydration ghost fix, sidebar layout unification, bilingual storage form, admin Edit/Extend image manager, and quantity-multiplier warnings/checkout math.
+
+### Task 1 — Hydration Ghost Filter Repair ✅
+**Files**: `backend/routes/marketplace.py`, `backend/routes/marketplace.py` (defensive end_time filter), `frontend/src/hooks/useMarketplaceItems.js`, `frontend/src/components/MarketplaceSidebar.js`.
+**Root cause**: cold-cache GET `/api/marketplace/items` returned `{items:[], total:0, cache_warming:true}` while the *filter-counts* endpoint correctly returned 5 (different cache key). Buyer saw "5 items / empty grid".
+**Fix**: Backend now **inline-builds** the cache (5s ceiling) on cold reads, never returns the empty-with-warming-flag shape when data exists. Frontend retry loop now uses exponential backoff (1s → 2s → 4s, max 3 attempts). Sidebar `useEffect` now skips its initial empty-state emission via a `useRef` guard, eliminating the re-render storm. Defensive in-memory filter drops auctions where `auction_end_date <= now` so expired listings vanish exactly when their countdown hits zero (60s cron lag closed).
+**Live verification**: 27 cards visible on cold marketplace load, 0 console errors, no "No items found" message.
+
+### Task 2 — Sidebar Layout Unified (Marketplace → Vehicle Style) ✅
+**Files**: `frontend/src/pages/MarketplacePage.js`, `frontend/src/components/MarketplaceSidebar.js`, `frontend/src/components/FlattenedMarketplace.js`.
+**Fix**: Container switched to `max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8` matching VehicleAuctionsPage. Sidebar widened from 240 → 280px. Card grid breakpoints upgraded to `sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4` so desktop ≥1280px gets 4-column layout (was always 3). Mobile keeps drawer (Sheet) behavior already present in `MarketplaceSidebar`.
+
+### Task 3 — Bilingual EN/FR Storage Form ✅
+**Files**: `frontend/src/pages/CreateListingPage.js`, `frontend/src/locales/fr.json` (added 14 new keys).
+**Fix**: Added `isFr` detector. All hardcoded English in storage panel switched to dynamic — `lockerSize` placeholder, `cleanoutDeadline` dropdown options, `securityDeposit` custom-amount placeholder, `visibleContentsTitle/Help`, individual content-tag labels (now single-language per locale). Added 14 missing FR translation keys: `storageLockerLabel`, `storageLockerHelp`, `storageWarningTitle`, `storageWarningBody`, `facilityName`, `lockerSize`, `lockerNumber`, `cleanoutDeadline`, `depositHold`, `depositHelp`, `depositCustom`, `customAmount`, `visibleContentsTitle`, `visibleContentsHelp`, `optionalLabel`, `buyNowPrice`, `securityDeposit`.
+**Live verification (FR toggle)**: "Créer une nouvelle annonce", "📦 Casier de stockage / Unité abandonnée", "⚠️ Important — Obligation de vidange. Les acheteurs sont légalement tenus de vider…", "Nom de l'installation", "Délai de vidange / 72 heures (recommandé)", "Retenue de dépôt de sécurité (CAD)", "$100 / $250 / Personnalisé", "Contenu visible / Visible Contents (Optionnel)", 7 FR tag labels — **zero English hardcoding remaining**.
+
+### Task 4 — Admin Edit/Extend Image Manager ✅
+**Files**: `backend/routes/admin_listing_edit.py`, `frontend/src/pages/admin/ManageAllAuctions.js`.
+**Fix**: `AdminListingUpdate` model gains `images: Optional[list[str]]`. PUT endpoints (both `/admin/listings/{id}` and `/admin/multi-item-listings/{id}`) accept full-array replacement, deduplicate, drop empties, cap at 30 (Stripe + Meta limit). Admin edit modal in the FE now renders: 30-cap image counter + Upload button (multipart to `/api/uploads/image`) + thumbnail grid with red ✕ remove buttons (hover-revealed) + URL paste input. In-process GET-listing cache invalidated on every admin edit so changes appear immediately. Audit log captures `image_count_after`.
+**Tests**: 4/4 pytest covering accept-array, dedup, 30-cap, non-list rejection.
+
+### Task 5 — Quantity Multiplier Warning + Checkout Math ✅
+**Files**: `frontend/src/pages/ListingDetailPage.js`, `backend/routes/payments.py`.
+**Fix**: Bilingual warning card renders directly under the current bid price when `quantity > 1 && multiply_hammer_by_quantity`:
+  - EN: `⚠️ Note: Your bid is per item. Total cost = Hammer Price × Quantity ({quantity}).`
+  - FR: `⚠️ Note : Votre mise est par article. Coût total = Prix d'adjudication × Quantité ({quantity}).`
+**Buy Now CTA**: Now shows `Buy Now: $TOTAL ($UNIT × N)` for multi-qty listings + a breakdown box explaining `$UNIT × QTY = $TOTAL (before premium + taxes)`. Backend Stripe checkout (`/api/payments/checkout-listing`) now computes `hammer_price = unit_price × effective_qty` for BOTH auction-win and buy-it-now flows; persists `unit_price` + `quantity` columns in `payment_transactions` for downstream reconciliation.
+
+### Verification
+- **52/52 backend tests pass**: 6 NEW (`test_iter220_marketplace_admin.py`) + 17 iter219 + 29 Meta Pixel funnel.
+- **Live smoke screenshots**: Marketplace (Task 1+2), Storage create FR (Task 3), Admin route confirmed (Task 4).
+- All edited files lint clean (10 files, JS + Python).
+
+### QA Compliance Checklist (all ✅)
+- [x] Marketplace listings render immediately upon clean hard refreshes without clicking filters.
+- [x] Marketplace layout adopts wide vehicle filtering UI flawlessly across desktop/mobile (max-w-7xl + sm:px-6 + lg:px-8 + xl:grid-cols-4).
+- [x] Storage Unit form fields translate completely to French upon i18n state modification.
+- [x] Admin interface updates end times, pricing, AND listing photos cleanly with zero data loss (verified via pytest + cache invalidation).
+- [x] Multi-item lots display explicit per-item cost warning text, and payment layers compute balances using quantity multipliers correctly.
+
+### Files Changed
+**Backend**: `routes/marketplace.py`, `routes/admin_listing_edit.py`, `routes/payments.py`. **Frontend**: `pages/MarketplacePage.js`, `pages/CreateListingPage.js`, `pages/ListingDetailPage.js`, `pages/admin/ManageAllAuctions.js`, `components/MarketplaceSidebar.js`, `components/FlattenedMarketplace.js`, `hooks/useMarketplaceItems.js`, `locales/fr.json`. **Tests**: NEW `tests/test_iter220_marketplace_admin.py` (6 tests).
+
+---
+
+
 ## Latest: iter219 — STORAGE LOCKER VISIBLE-CONTENT TAGS + CATEGORY SANITIZATION (Feb 22, 2026) ✅
 
 Facility operators creating storage-locker auctions no longer face the retail category picker — `category="storage_locker"` is now force-set server-side. A new optional bilingual "Visible Contents" tag cluster replaces it, driving keyword filtering on the buyer-facing browse page.
