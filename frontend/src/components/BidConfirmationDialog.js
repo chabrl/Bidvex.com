@@ -51,6 +51,32 @@ const BidConfirmationDialog = ({
   const isVehicle = ['vehicle', 'car', 'auto', 'automobile', 'truck', 'motorcycle', 'suv', 'van']
     .some(keyword => (category || '').toLowerCase().includes(keyword));
 
+  // iter221 Task 3 — Single source of truth for tier→buyer-premium-rate
+  // resolution. Removes the legacy `|| 0.05` hardcoded fallback that masked
+  // the correct VIP rate (0.03) and Premium rate (0.035) whenever the
+  // backend response was slow / missing. Mirrors the backend tables in
+  // `services/fee_calculator.py::INDIVIDUAL_BUYER_RATES` + `TIER_ALIASES`.
+  const resolveBuyerPremiumRate = () => {
+    // Listing-level override always wins (custom premium set by seller).
+    if (typeof buyersPremiumRate === 'number' && buyersPremiumRate >= 0) {
+      return buyersPremiumRate;
+    }
+    // If the API breakdown carried a rate, use it verbatim — note we
+    // intentionally do NOT use `||` here (which falsy-treats 0) but
+    // an explicit `typeof number` check so 0 (some partner sellers) is
+    // honoured.
+    if (costBreakdown && typeof costBreakdown.buyer_premium_rate === 'number') {
+      return costBreakdown.buyer_premium_rate;
+    }
+    // Tier-derived fallback (mirrors backend, no 0.05 default).
+    const TIER_RATES = { standard: 0.050, premium: 0.035, vip_elite: 0.030 };
+    const TIER_ALIASES = { vip: 'vip_elite', free: 'standard', basic: 'standard', starter: 'standard' };
+    const t = String(buyerTier || '').toLowerCase().trim() || 'standard';
+    const norm = TIER_ALIASES[t] || t;
+    return TIER_RATES[norm] ?? TIER_RATES.standard;
+  };
+  const effectivePremiumRate = resolveBuyerPremiumRate();
+
   // Fetch cost breakdown when dialog opens or bid amount changes
   useEffect(() => {
     if (isOpen && bidAmount > 0) {
@@ -76,32 +102,19 @@ const BidConfirmationDialog = ({
     } catch (err) {
       console.error('Failed to fetch cost breakdown:', err);
       setError('Unable to calculate costs. Please try again.');
-      
-      // HOTFIX — Fallback calculation must respect the buyer's subscription
-      // tier so VIP/Premium users never see the 5% default when the API call
-      // fails. Mirrors the backend `BUYER_PREMIUM_RATES` + `TIER_ALIASES` tables
-      // in services/fee_calculator.py.
-      const _TIER_RATES = {
-        standard: 0.050,
-        premium: 0.035,
-        vip_elite: 0.030,
-      };
-      const _TIER_ALIASES = {
-        vip: 'vip_elite',
-        free: 'standard',
-        basic: 'standard',
-      };
-      const _normalizedTier = _TIER_ALIASES[String(buyerTier || '').toLowerCase()]
-        || String(buyerTier || '').toLowerCase()
-        || 'standard';
-      const _fallbackRate = _TIER_RATES[_normalizedTier] ?? 0.05;
-      const effectivePremiumRate = buyersPremiumRate ?? _fallbackRate;
+
+      // iter221 Task 3 — Network-failure fallback. We pre-compute the rate
+      // via the same helper as the success path so VIP/Premium users see
+      // their correct rate even when the tax/calculate API is unreachable.
+      // The legacy `?? 0.05` shortcut was the actual source of the production
+      // discrepancy (it could win over the tier table when buyer_premium_rate
+      // was undefined in the response shape).
       const buyerPremium = bidAmount * effectivePremiumRate;
       const platformFee = isVehicle ? bidAmount * 0.025 : 0;
       const taxRate = 0.14975; // Quebec GST + QST
       const taxOnHammer = sellerIsBusiness && !isVehicle ? bidAmount * taxRate : 0;
       const taxOnFees = (buyerPremium + platformFee) * taxRate;
-      
+
       setCostBreakdown({
         payment_type: isVehicle ? 'vehicle' : 'general',
         hammer_price: bidAmount,
@@ -168,15 +181,17 @@ const BidConfirmationDialog = ({
                 <span className="font-semibold">{formatCurrency(costBreakdown.hammer_price)}</span>
               </div>
 
-              {/* Buyer Premium */}
+              {/* Buyer Premium — iter221 Task 3: pct sourced from
+                  effectivePremiumRate (tier-aware) so VIP users see 3.0%
+                  and Premium see 3.5% with no 0.05 hardcoded fallback. */}
               <div className="flex justify-between items-center text-sm">
                 <div className="flex items-center gap-2">
                   <span className="text-muted-foreground">
-                    Buyer&apos;s Premium ({((costBreakdown.buyer_premium_rate || 0.05) * 100).toFixed(1)}%)
+                    Buyer&apos;s Premium ({(effectivePremiumRate * 100).toFixed(1)}%)
                   </span>
                   <InfoTip en="A standard platform fee added to winning bids. Your tier determines the rate." fr="Frais de plateforme standard ajoutés aux enchères gagnantes. Votre niveau détermine le taux." />
                 </div>
-                <span>{formatCurrency(costBreakdown.buyer_premium)}</span>
+                <span data-testid="bid-buyer-premium">{formatCurrency(costBreakdown.buyer_premium)}</span>
               </div>
 
               {/* Platform Fee (Vehicles only) */}

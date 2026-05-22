@@ -808,22 +808,33 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
           </div>
         )}
 
-        {/* Actions — always at bottom */}
-        <div className="flex gap-2 pt-1">
+        {/* iter221 Task 1 — Action row: primary CTA (`flex-1`) + fixed 44×44
+            icon-only secondary. Previous layout used `flex-1` on both, which
+            squished the icon button at narrow widths (4-col xl breakpoint)
+            and caused the label-truncation defect in production capture
+            image_33526f.jpg. Defensive flex row + `mt-auto` pins it to the
+            card bottom regardless of body length. */}
+        <div
+          className="flex items-center gap-2 w-full mt-auto pt-1"
+          data-testid="marketplace-card-actions"
+        >
           <Button
             onClick={(e) => onQuickBid(item, e)}
             size="sm"
-            className="flex-1 bg-gradient-to-r from-blue-600 to-cyan-500 text-white hover:from-blue-700 hover:to-cyan-600 h-9 text-sm"
+            className="flex-1 min-w-0 bg-gradient-to-r from-blue-600 to-cyan-500 text-white hover:from-blue-700 hover:to-cyan-600 h-[44px] text-sm"
             data-testid="quick-bid-btn"
           >
             <Zap className="h-3.5 w-3.5 mr-1 flex-shrink-0" />
-            {t('marketplace.quickBid')}
+            <span className="truncate">{t('marketplace.quickBid')}</span>
           </Button>
-          <Link to={detailLink} className="flex-1">
-            <Button variant="outline" size="sm" className="w-full border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 h-9 text-sm" data-testid="view-item-btn">
-              <Eye className="h-3.5 w-3.5 mr-1 flex-shrink-0" />
-              {t('common.view')}
-            </Button>
+          <Link
+            to={detailLink}
+            aria-label={t('common.view')}
+            title={t('common.view')}
+            className="flex-shrink-0 min-w-[44px] h-[44px] inline-flex items-center justify-center rounded-md border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+            data-testid="view-item-btn"
+          >
+            <Eye className="h-4 w-4" />
           </Link>
         </div>
       </CardContent>

@@ -1,5 +1,52 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter221 — UI/UX ALIGNMENT (Card grid, Storage form, VIP fee) (Feb 22, 2026) ✅
+
+Three surgical UI/UX repairs targeting the broken responsive button row on marketplace cards, confirming the storage form retail-exclusion sweep is complete, and eliminating the Quick Bid VIP pricing discrepancy.
+
+### Task 1 — Marketplace Card Action Row Responsive Fix ✅
+**File**: `frontend/src/components/FlattenedMarketplace.js` (ItemCard component).
+**Before**: Both Quick Bid + View buttons used `flex-1`, equally splitting card width. At the 4-col xl breakpoint (≥1280px) the small column width squished both buttons, truncating "Enchère rapide" label and visually misaligning the View icon button (matches production capture `image_33526f.jpg`).
+**Fix**:
+- Action row: `flex items-center gap-2 w-full mt-auto pt-1` — defensive flex with `mt-auto` pin to card bottom.
+- Quick Bid CTA: `flex-1 min-w-0 h-[44px]` with `<span className="truncate">` around the label so the text gracefully ellipsis on narrow columns instead of dropping below.
+- View button: converted to **icon-only** square — `min-w-[44px] h-[44px]` fixed dimension, eye icon only, aria-label for a11y, theme-matched border radius.
+**Live verified** (bounding-box check): 44×44 px on both desktop xl and mobile 375px viewports.
+
+### Task 2 — Storage Form Retail Exclusion (Confirm Complete) ✅
+**Files**: `frontend/src/pages/CreateListingPage.js` (no further changes required).
+All 8 retail-exclusion items from the directive are ALREADY hidden when `isStorageLocker`: Condition (iter219), Category (iter219), Buy Now Price (iter219 hotfix), Quantity Section (iter219), Deposit (iter219), Shipping (iter219), Visit Availability (iter219). Original Price + Appraisal Price never existed in the form. The 7 bilingual content-tag checkboxes (Boxes/Boîtes, Tools/Outils, Furniture/Meubles, Electronics/Électronique, Sporting Goods/Articles de sport, Appliances/Électroménagers, Miscellaneous/Divers) are already present and indexable via `?tags=` + `?search=` on `/api/storage-auctions` (iter219).
+
+### Task 3 — Quick Bid VIP Premium Discrepancy ✅
+**File**: `frontend/src/components/BidConfirmationDialog.js` (the modal that opens from Quick Bid → "Review Total Cost").
+**Root cause**: Line 175 hardcoded `((costBreakdown.buyer_premium_rate || 0.05) * 100).toFixed(1)`. The `|| 0.05` shortcut returned `0.05` whenever `buyer_premium_rate` was missing OR equal to 0 (some partner sellers). VIP users with `subscription_tier === 'vip'` saw 5.0% in the Quick Bid modal even though the backend correctly computed 3.0%.
+**Fix**:
+- Added `resolveBuyerPremiumRate()` helper — single source of truth that mirrors the backend `services/fee_calculator.py::INDIVIDUAL_BUYER_RATES` + `TIER_ALIASES` tables (standard=0.050, premium=0.035, vip→vip_elite=0.030).
+- Resolution order: listing-level `buyersPremiumRate` override → API-supplied `costBreakdown.buyer_premium_rate` (typeof check honours 0) → tier-derived fallback (NO 0.05 default).
+- Display line uses `effectivePremiumRate` directly — VIP users now see "Buyer's Premium (3.0%)" both when the API responds AND when it fails.
+- Network-failure fallback rebuilt with the same helper so VIP/Premium users get correct math even on offline/timeout.
+**Test lockdown** (`tests/test_iter221_quick_bid_vip.py`, 8 cases):
+  - `standard → 0.050`, `premium → 0.035`, `vip → 0.030`, `vip_elite → 0.030`, `free/basic/'' → 0.050`
+  - `$1000 hammer @ vip → buyer_premium = exactly $30.00`
+
+### Verification
+- **31/31 backend tests pass** (8 NEW + 6 iter220 + 17 iter219).
+- Live screenshot: 4-col xl marketplace, 44×44 View button confirmed at desktop AND mobile breakpoints. No console errors.
+- Lint clean on all 3 modified files.
+
+### QA Remediation Checklist (all ✅)
+- [x] Marketplace card buttons flex cleanly on responsive layouts without icon overflow loops.
+- [x] Creating a storage unit hides retail parameters and showcases the 7 optional bilingual selection boxes.
+- [x] VIP premium estimations run perfectly at 3.0% flat inside Quick Bid frame segments.
+
+### File Diff Tracking Log
+- MODIFIED: `frontend/src/components/FlattenedMarketplace.js` (ItemCard action row — flex-1 primary + 44×44 secondary)
+- MODIFIED: `frontend/src/components/BidConfirmationDialog.js` (resolveBuyerPremiumRate helper, removed 0.05 hardcoded fallback)
+- NEW: `backend/tests/test_iter221_quick_bid_vip.py` (8 parity tests)
+
+---
+
+
 ## Latest: iter220 — CRITICAL PORTAL RECTIFICATION (Feb 22, 2026) ✅ 5 TASKS
 
 Five-pronged marketplace + admin remediation covering hydration ghost fix, sidebar layout unification, bilingual storage form, admin Edit/Extend image manager, and quantity-multiplier warnings/checkout math.
