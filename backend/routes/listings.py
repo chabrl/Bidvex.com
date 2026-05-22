@@ -380,6 +380,23 @@ async def create_listing(
     )
     listing_dict = listing.model_dump()
 
+    # Phase 6.3 Task 2 — Storage locker sanitization. The frontend hides the
+    # condition / quantity / deposit / shipping / visit fields for
+    # storage_locker, but defend-in-depth here too: strip any legacy values
+    # that may arrive from older clients or admin tooling so the DB schema
+    # stays clean.
+    if (listing_data.listing_type or "").lower() == "storage_locker":
+        # For storage_locker, condition is meaningless — set to "as_is"
+        # sentinel rather than None (the Listing model requires str).
+        listing_dict["condition"] = "as_is"
+        listing_dict["quantity"] = 1
+        listing_dict["multiply_hammer_by_quantity"] = False
+        listing_dict["shipping_info"] = None
+        listing_dict["visit_availability"] = None
+        listing_dict["requires_deposit"] = False
+        listing_dict["deposit_amount"] = None
+        listing_dict["deposit_type"] = None
+
     # LEGACY: opc_permit → migrated to dealer_license_* (iter201). Field kept for back-compat.
     # Dealer-certified seller check + buyer-premium rate
     seller_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0, "is_opc_certified": 1})

@@ -1,6 +1,60 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: Phase 6.3 — Storage Auctions Bidding Suite (Feb 21, 2026) ✅
+## Latest: Storage Form Sanitization (Phase 6.3 Task 2 / Feb 21, 2026) ✅
+
+User reported retail-marketplace fields cluttering the storage locker creation flow. All 5 irrelevant sections now hidden when `listing_type=storage_locker` (verified live + via control test).
+
+### Task 1 — Quick Bid VIP Premium (verified intact from prior turn)
+Previously fixed in this session. Verified still in place: `FlattenedMarketplace.js` forwards `buyerTier={user?.subscription_tier}` to `BidConfirmationDialog`, and the dialog's fallback rate now mirrors the backend `BUYER_PREMIUM_RATES`/`TIER_ALIASES` tables (`vip → vip_elite → 0.030`, `premium → 0.035`, `standard → 0.050`).
+
+### Task 2 — Storage Form Sanitization
+
+**Frontend** (`pages/CreateListingPage.js`):
+- Wrapped 5 sections with `{!isStorageLocker && (...)}` guards:
+  - Condition dropdown (`data-testid="condition-select"`)
+  - Quantity section + multiply-hammer toggle (`data-testid="quantity-section"`)
+  - Deposit checkbox + amount block (`data-testid="deposit-section"`)
+  - Shipping Options card (`<Card>` containing the shipping methods)
+  - Visit Before Purchase card (`<Card>` containing inspection toggles)
+- Submit-time payload now uses `isStorageLocker ? sentinel_value : real_value` for `condition`, `quantity`, `multiply_hammer_by_quantity`, `requires_deposit`, `deposit_amount`, `deposit_type`, `shipping_info`, `visit_availability`.
+
+**Backend** (`routes/listings.py::create_listing`):
+- Added defence-in-depth sanitization block: when `listing_type=='storage_locker'`, the in-memory `listing_dict` is normalized to:
+  ```python
+  condition='as_is'    # required str (model schema), but semantically null
+  quantity=1
+  multiply_hammer_by_quantity=False
+  shipping_info=None
+  visit_availability=None
+  requires_deposit=False
+  deposit_amount=None
+  deposit_type=None
+  ```
+- Prevents legacy clients or admin tooling from polluting storage_locker docs with retail fields.
+
+### Live verification (preview)
+Screenshot of `/create-listing?type=storage_locker` confirms a clean form: title → description → category → **the highlighted "Storage Locker / Abandoned Unit" panel** → facility name/address/size/number → cleanout deadline → security deposit → media upload. **NONE** of the 5 hidden fields render.
+
+Control test on `/create-listing` (no query param) confirms all 5 fields ARE visible (selectors return 1, not 0).
+
+| Field | Storage form | Standard form |
+|---|---|---|
+| `condition-select` | 0 ✅ | 1 ✅ |
+| `quantity-section` | 0 ✅ | 1 ✅ |
+| `deposit-section` | 0 ✅ | 1 ✅ |
+| "Shipping Options" | 0 ✅ | 1 ✅ |
+| "Visit Before Purchase" | 0 ✅ | 1 ✅ |
+
+### Tests
+- **25/25 backend pytests pass** (`test_phase_6_0` + `test_phase_6_2` + `test_ai_watchdog_amnesia_fix` + `test_watchdog_exempt_loop`). No regression.
+- Frontend lint clean.
+
+### Note
+Changes are in PREVIEW. Production needs `Save to GitHub` → redeploy.
+
+---
+
+## Previous: Phase 6.3 — Storage Auctions Bidding Suite (Feb 21, 2026) ✅
 
 Three high-velocity frontend components shipped + backend cleanout photo gate. All wired into the existing `StorageAuctionDetail.js` + `MyCleanoutsPage.jsx` flows without disrupting any pre-existing routing.
 

@@ -240,18 +240,28 @@ const CreateListingPage = () => {
         starting_price: parseFloat(formData.starting_price),
         buy_now_price: formData.buy_now_price ? parseFloat(formData.buy_now_price) : null,
         auction_end_date: new Date(formData.auction_end_date).toISOString(),
-        shipping_info: shippingInfo.available ? shippingInfo : null,
-        visit_availability: visitAvailability.offered ? visitAvailability : null,
+        // Phase 6.3 Task 2 — Storage locker sanitization. Strip retail
+        // marketplace fields that are hidden in the UI so the payload stays
+        // clean and matches the backend's defensive normalization.
+        shipping_info: !isStorageLocker && shippingInfo.available ? shippingInfo : null,
+        visit_availability: !isStorageLocker && visitAvailability.offered ? visitAvailability : null,
+        condition: isStorageLocker ? 'as_is' : formData.condition,
+        quantity: isStorageLocker ? 1 : Math.max(1, parseInt(quantity) || 1),
+        multiply_hammer_by_quantity: !isStorageLocker
+          && (Math.max(1, parseInt(quantity) || 1) > 1)
+          && !!multiplyHammerByQuantity,
         // Convert percent → rate (e.g. 15 → 0.15), null if blank (org default applies server-side)
         buyers_premium_rate: buyersPremiumPercent !== '' ? parseFloat(buyersPremiumPercent) / 100 : null,
         payment_method: paymentMethod,
-        // Deposit (spec Feature 1)
-        requires_deposit: requiresDeposit,
-        deposit_amount: requiresDeposit && depositAmount ? parseFloat(depositAmount) : null,
-        deposit_type: requiresDeposit ? depositType : null,
-        // FEATURE PATCH v9 / Feature 4 — Quantity
-        quantity: Math.max(1, parseInt(quantity) || 1),
-        multiply_hammer_by_quantity: (Math.max(1, parseInt(quantity) || 1) > 1) && !!multiplyHammerByQuantity,
+        // Deposit (spec Feature 1) — disabled for storage_locker (native pre-auth holds replace this)
+        requires_deposit: !isStorageLocker && requiresDeposit,
+        deposit_amount: !isStorageLocker && requiresDeposit && depositAmount ? parseFloat(depositAmount) : null,
+        deposit_type: !isStorageLocker && requiresDeposit ? depositType : null,
+        // FEATURE PATCH v9 / Feature 4 — Quantity (forced to 1 for storage_locker)
+        quantity: isStorageLocker ? 1 : Math.max(1, parseInt(quantity) || 1),
+        multiply_hammer_by_quantity: !isStorageLocker
+          && (Math.max(1, parseInt(quantity) || 1) > 1)
+          && !!multiplyHammerByQuantity,
         // Phase 6.0 / Task 4 — Storage Locker
         listing_type: isStorageLocker ? 'storage_locker' : null,
         storage_metadata: isStorageLocker ? {
@@ -458,24 +468,28 @@ const CreateListingPage = () => {
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="condition">{t('createListing.condition', 'Condition')} *</Label>
-                  <select
-                    id="condition"
-                    name="condition"
-                    value={formData.condition}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-3 py-2 border border-input rounded-md bg-background"
-                    data-testid="condition-select"
-                  >
-                    <option value="new">{t('createListing.conditionNew', 'New')}</option>
-                    <option value="like_new">{t('createListing.conditionLikeNew', 'Like New')}</option>
-                    <option value="good">{t('createListing.conditionGood', 'Good')}</option>
-                    <option value="fair">{t('createListing.conditionFair', 'Fair')}</option>
-                    <option value="poor">{t('createListing.conditionPoor', 'Poor')}</option>
-                  </select>
-                </div>
+                {/* Phase 6.3 Task 2 — Condition is irrelevant for storage
+                    locker auctions (abandoned property lots are sold as-is). */}
+                {!isStorageLocker && (
+                  <div className="space-y-2">
+                    <Label htmlFor="condition">{t('createListing.condition', 'Condition')} *</Label>
+                    <select
+                      id="condition"
+                      name="condition"
+                      value={formData.condition}
+                      onChange={handleChange}
+                      required
+                      className="w-full px-3 py-2 border border-input rounded-md bg-background"
+                      data-testid="condition-select"
+                    >
+                      <option value="new">{t('createListing.conditionNew', 'New')}</option>
+                      <option value="like_new">{t('createListing.conditionLikeNew', 'Like New')}</option>
+                      <option value="good">{t('createListing.conditionGood', 'Good')}</option>
+                      <option value="fair">{t('createListing.conditionFair', 'Fair')}</option>
+                      <option value="poor">{t('createListing.conditionPoor', 'Poor')}</option>
+                    </select>
+                  </div>
+                )}
               </div>
 
               {/* Phase 6.0 / Task 4 — Storage Locker / Abandoned Unit category card */}
@@ -672,7 +686,9 @@ const CreateListingPage = () => {
                 </div>
               </div>
 
-              {/* FEATURE PATCH v9 / Feature 4 — Quantity field with optional "multiply hammer by quantity" toggle */}
+              {/* FEATURE PATCH v9 / Feature 4 — Quantity field with optional "multiply hammer by quantity" toggle.
+                  Phase 6.3 Task 2 — Hidden for storage_locker (each unit IS the whole lot). */}
+              {!isStorageLocker && (
               <div className="space-y-2" data-testid="quantity-section">
                 <Label htmlFor="quantity">{t('createListing.quantity', 'Quantity')}
                   <InfoTip
@@ -709,6 +725,7 @@ const CreateListingPage = () => {
                   </label>
                 )}
               </div>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor="buyers_premium_percent">{t('createListing.buyersPremium', "Buyer's Premium (%)")}
@@ -779,7 +796,10 @@ const CreateListingPage = () => {
                 )}
               </div>
 
-              {/* Deposit (Spec Feature 1) — single field, single flow */}
+              {/* Deposit (Spec Feature 1) — single field, single flow.
+                  Phase 6.3 Task 2 — Hidden for storage_locker (replaced by the
+                  centralized storage auction pre-auth hold system). */}
+              {!isStorageLocker && (
               <div className="space-y-3" data-testid="deposit-section">
                 <Label>
                   {t('createListing.bidderDepositLabel')}
@@ -826,6 +846,7 @@ const CreateListingPage = () => {
                   </div>
                 )}
               </div>
+              )}
 
               {/* Final Listing Disclosure (Spec Feature 6) */}
               <div className="p-4 bg-slate-100 border border-slate-300 rounded-md text-xs leading-relaxed" data-testid="seller-final-disclosure">
@@ -950,7 +971,10 @@ const CreateListingPage = () => {
                 )}
               </div>
 
-              {/* Shipping Options Section */}
+              {/* Shipping Options Section.
+                  Phase 6.3 Task 2 — Hidden for storage_locker (buyer must
+                  collect from the facility's physical address). */}
+              {!isStorageLocker && (
               <Card className="border-2">
                 <CardHeader>
                   <CardTitle className="text-lg">{t('createListing.shipping', 'Shipping Options')}
@@ -1022,8 +1046,12 @@ const CreateListingPage = () => {
                   )}
                 </CardContent>
               </Card>
+              )}
 
-              {/* Visit Availability Section */}
+              {/* Visit Availability Section.
+                  Phase 6.3 Task 2 — Hidden for storage_locker (cleanout windows
+                  are governed by the facility-managed pickup schedule). */}
+              {!isStorageLocker && (
               <Card className="border-2">
                 <CardHeader>
                   <CardTitle className="text-lg">{t('createListing.visitBeforePurchase', 'Visit Before Purchase')}</CardTitle>
@@ -1064,6 +1092,7 @@ const CreateListingPage = () => {
                   )}
                 </CardContent>
               </Card>
+              )}
 
               {/* Final Seller Agreement - Mandatory Legal Checkbox */}
               <div className="p-6 border-2 border-blue-600 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
