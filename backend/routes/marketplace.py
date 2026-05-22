@@ -8,10 +8,11 @@ Handles all marketplace browsing, searching, and filtering:
 - Click tracking for analytics
 """
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime, timezone, timedelta
+from deps import get_current_user_optional, User
 from services.api_cache import (
     cache_get, cache_set, invalidate_prefix,
     make_cache_key, MARKETPLACE_ITEMS_NS, FILTER_COUNTS_NS,
@@ -148,7 +149,7 @@ async def _build_marketplace_items():
     VEHICLE_CATEGORIES = ["vehicles", "vehicle", "car", "auto", "automobile", "truck", "motorcycle"]
     
     auctions = await db.multi_item_listings.find(
-        {"status": {"$in": ["active", "upcoming"]}, "category": {"$nin": VEHICLE_CATEGORIES}, "is_demo": {"$ne": True}}, _MULTI_PROJECTION
+        {"status": {"$in": ["active", "upcoming"]}, "category": {"$nin": VEHICLE_CATEGORIES}, "is_demo": {"$ne": True}, "is_demo_sandbox": {"$ne": True}}, _MULTI_PROJECTION
     ).sort("auction_end_date", 1).limit(500).to_list(500)
 
     single_listings = await db.listings.find(
@@ -157,6 +158,7 @@ async def _build_marketplace_items():
             "category": {"$nin": VEHICLE_CATEGORIES + ["storage_locker"]},
             "listing_type": {"$ne": "storage_locker"},
             "is_demo": {"$ne": True},
+            "is_demo_sandbox": {"$ne": True},
         },
         _LISTING_PROJECTION,
     ).sort("auction_end_date", 1).limit(500).to_list(500)
@@ -433,7 +435,12 @@ async def get_marketplace_items(
     limit: int = 20,
     skip: int = 0,
     cursor: Optional[str] = None,
-    track_impression: bool = False
+    track_impression: bool = False,
+    # iter223 — Owner-self-include for demo sandbox. When the requester is a
+    # demo account, their own `is_demo_sandbox` listings are tail-merged
+    # into the cached public feed so they can see their creations inside
+    # the real product surfaces.
+    current_user: Optional[User] = Depends(get_current_user_optional),
 ):
     """
     Marketplace view: Redis-cached, paginated, with stale-while-revalidate.
@@ -478,6 +485,37 @@ async def get_marketplace_items(
 
     # Filter the cached items
     items = cached_items
+
+    # iter223 — Demo sandbox owner-self-include. When the requester is a demo
+    # account, tail-merge their own `is_demo_sandbox=true` listings so they
+    # see their creations inside the real marketplace frame. The PUBLIC cache
+    # never contains these; we fetch them on-demand from MongoDB.
+    if current_user is not None:
+        try:
+            _db = get_db()
+            _user = await _db.users.find_one(
+                {"id": current_user.id},
+                {"_id": 0, "is_demo_account": 1},
+            )
+            if _user and _user.get("is_demo_account"):
+                own_sandbox = await _db.listings.find(
+                    {
+                        "status": "active",
+                        "seller_id": current_user.id,
+                        "is_demo_sandbox": True,
+                        "category": {"$nin": ["storage_locker"]},
+                        "listing_type": {"$ne": "storage_locker"},
+                    },
+                    _LISTING_PROJECTION,
+                ).sort("auction_end_date", 1).limit(100).to_list(100)
+                # Mark each so the FE can render a "SANDBOX" pill.
+                for s in own_sandbox:
+                    s["is_demo_sandbox"] = True
+                # Avoid dupes (paranoia — public cache should never contain these).
+                existing_ids = {i.get("id") for i in items}
+                items = list(items) + [s for s in own_sandbox if s.get("id") not in existing_ids]
+        except Exception as e:
+            logger.warning(f"[demo-sandbox] owner-self-include failed: {e}")
 
     if search:
         s_lower = search.lower()

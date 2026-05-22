@@ -407,7 +407,11 @@ const CreateListingPage = () => {
   const taxOnboardingPending = !!(user && !user.tax_onboarding_completed);
 
   // Partner Fee Lockdown
-  if (user?.is_partner && !user?.platform_fee_paid) {
+  // iter223 — Demo accounts bypass the partner-fee lockdown entirely
+  // so leads can experience the full create-listing flow. Their listings
+  // are server-side stamped `is_demo_sandbox=true` and stay invisible
+  // to the public marketplace.
+  if (user?.is_partner && !user?.platform_fee_paid && !user?.is_demo_account) {
     return (
       <div className="min-h-screen py-8 px-4" data-testid="partner-fee-lockdown-page">
         <div className="max-w-lg mx-auto">

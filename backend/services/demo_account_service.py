@@ -27,7 +27,7 @@ from passlib.context import CryptContext
 
 logger = logging.getLogger(__name__)
 
-DEMO_ACCOUNT_TYPES = {"vehicle_dealer", "partner", "storage_facility"}
+DEMO_ACCOUNT_TYPES = {"vehicle_dealer", "partner", "storage_facility", "auctioneer"}
 DEMO_DURATION_PRESETS = {7, 14, 30}
 
 # Same passlib config as routes/auth.py so demo accounts can log in normally
@@ -107,6 +107,16 @@ async def create_demo_account(
     elif account_type == "storage_facility":
         user_doc["is_storage_facility"] = True
         user_doc["account_type"] = "storage_facility"
+    elif account_type == "auctioneer":
+        # iter223 — Auctioneer demos act as multi-lot auction operators
+        # (the "AUC" persona). They get partner-tier UX + multi-item creation
+        # permissions so leads can experience the full lot-bidding flow.
+        user_doc["is_auctioneer"] = True
+        user_doc["is_partner"] = True
+        user_doc["partner_verification_status"] = "verified"
+        user_doc["partner_verified_at"] = now
+        user_doc["partner_company_name"] = company_name
+        user_doc["account_type"] = "auctioneer"
 
     if existing:
         await db.users.update_one({"id": uid}, {"$set": user_doc})

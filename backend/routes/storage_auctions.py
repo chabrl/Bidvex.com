@@ -47,7 +47,7 @@ from fastapi import (
 )
 from fastapi.responses import FileResponse
 
-from deps import User, get_current_user, get_db, jwt_secret, security
+from deps import User, get_current_user, get_current_user_optional, get_db, jwt_secret, security
 from fastapi.security import HTTPAuthorizationCredentials
 from jose import jwt, JWTError, ExpiredSignatureError
 from rate_limit import limiter as _limiter
@@ -241,20 +241,21 @@ async def list_storage_auctions(
     limit: int = 24,
     skip: int = 0,
     # iter219 — Visible Content Tags filter + free-text search.
-    # `tags` is a comma-separated list of canonical EN slugs
-    # (boxes, tools, furniture, electronics, sporting_goods, appliances,
-    # miscellaneous). Aliases (FR / casing variants) are normalized.
-    # `search` runs case-insensitive substring match against description_en,
-    # description_fr, facility_name, unit_number, AND every value inside the
-    # `visible_content_tags` array.
     tags: Optional[str] = None,
     search: Optional[str] = None,
+    # iter223 — Demo sandbox owner-self-include
+    current_user: Optional[User] = Depends(get_current_user_optional),
 ):
     db = get_db()
     now = _now()
 
     # iter211 P4 — exclude demo facilities' auctions from public list
-    query = {"status": {"$in": ["active", "upcoming"]}, "is_demo": {"$ne": True}}
+    # iter223 — also exclude `is_demo_sandbox` listings from public view
+    query = {
+        "status": {"$in": ["active", "upcoming"]},
+        "is_demo": {"$ne": True},
+        "is_demo_sandbox": {"$ne": True},
+    }
     if province:
         query["facility_province"] = province.upper()
     if city:
@@ -333,6 +334,7 @@ async def list_storage_auctions(
         "status": "active",
         "listing_type": "storage_locker",
         "is_demo": {"$ne": True},
+        "is_demo_sandbox": {"$ne": True},
     }
     if province:
         # The listings collection stores province under `region`.
@@ -377,6 +379,43 @@ async def list_storage_auctions(
 
     auctions = auctions + listing_locker_docs
     total = total + listings_total
+
+    # iter223 — Owner-self-include: demo creator sees their own sandbox
+    # storage entries inside the real /storage-auctions feed.
+    if current_user is not None:
+        try:
+            udoc = await db.users.find_one(
+                {"id": current_user.id},
+                {"_id": 0, "is_demo_account": 1},
+            )
+            if udoc and udoc.get("is_demo_account"):
+                own_sandbox = await db.listings.find(
+                    {
+                        "status": "active",
+                        "listing_type": "storage_locker",
+                        "seller_id": current_user.id,
+                        "is_demo_sandbox": True,
+                    },
+                    {"_id": 0},
+                ).limit(50).to_list(50)
+                for ld in own_sandbox:
+                    meta = ld.get("storage_metadata") or {}
+                    ld.setdefault("facility_name", meta.get("facility_name") or "")
+                    ld.setdefault("facility_city", ld.get("city") or "")
+                    ld.setdefault("facility_province", ld.get("region") or "")
+                    ld.setdefault("unit_number", meta.get("locker_number") or "")
+                    ld.setdefault("unit_size", meta.get("locker_size") or "")
+                    ld.setdefault("current_bid", ld.get("current_price") or ld.get("starting_price") or 0)
+                    ld.setdefault("end_time", ld.get("auction_end_date"))
+                    ld.setdefault("source", "listings")
+                    ld["is_demo_sandbox"] = True
+                    ld["live_status"] = _resolve_status(ld)
+                # Avoid dupes
+                seen_ids = {a.get("id") for a in auctions}
+                auctions = auctions + [s for s in own_sandbox if s.get("id") not in seen_ids]
+                total = total + len(own_sandbox)
+        except Exception as e:
+            logger.warning(f"[demo-sandbox] storage owner-self-include failed: {e}")
 
     # Live status reconciliation
     for a in auctions:

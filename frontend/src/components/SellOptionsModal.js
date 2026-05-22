@@ -27,7 +27,8 @@ const SellOptionsModal = ({ isOpen, onClose }) => {
   const { canCreateMultiLot } = useFeatureFlags();
   const [paymentLoading, setPaymentLoading] = useState(false);
 
-  const isPartnerLocked = user?.is_partner && !user?.platform_fee_paid;
+  // iter223 — Demo accounts bypass the annual partner-fee gate.
+  const isPartnerLocked = user?.is_partner && !user?.platform_fee_paid && !user?.is_demo_account;
 
   const handleSelectOption = (path) => {
     if (isPartnerLocked) {

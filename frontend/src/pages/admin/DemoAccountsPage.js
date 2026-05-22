@@ -19,9 +19,10 @@ import { useAuth } from '../../contexts/AuthContext';
 import API_BASE from '../../config';
 
 const TYPE_LABELS = {
-  vehicle_dealer: { en: 'Vehicle Dealer', fr: 'Marchand automobile' },
-  partner: { en: 'Partner', fr: 'Partenaire' },
+  vehicle_dealer:   { en: 'Vehicle Dealer',   fr: 'Marchand automobile' },
+  partner:          { en: 'Partner',          fr: 'Partenaire' },
   storage_facility: { en: 'Storage Facility', fr: 'Établissement de stockage' },
+  auctioneer:       { en: 'Auctioneer',       fr: 'Commissaire-priseur' },
 };
 
 const STATUS_BADGE = {

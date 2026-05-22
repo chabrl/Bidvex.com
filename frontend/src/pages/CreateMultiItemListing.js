@@ -2397,7 +2397,8 @@ const CreateMultiItemListing = () => {
   const taxOnboardingPending = !!(user && !user.tax_onboarding_completed);
 
   // Partner Fee Lockdown
-  if (user?.is_partner && !user?.platform_fee_paid) {
+  // iter223 — Demo accounts bypass partner-fee lockdown (sandbox-only listings).
+  if (user?.is_partner && !user?.platform_fee_paid && !user?.is_demo_account) {
     return (
       <div className="min-h-screen py-8 px-4" data-testid="partner-fee-lockdown-page">
         <div className="max-w-lg mx-auto">

@@ -216,17 +216,15 @@ async def create_listing(
     from services.stripe_customer_service import validate_payment_method_for_listing
     db = get_db()
 
-    # iter210 Step 5 — Demo accounts cannot place real bids / payments.
-    # Hoisted ABOVE the Bill 96 validator (Phase 5 Hotfix v2) so demo users
-    # get a clear 403 regardless of whether their payload is bilingual —
-    # account status takes precedence over content validation.
-    user_demo_row = await db.users.find_one({"id": current_user.id}, {"_id": 0, "is_demo_account": 1})
-    if user_demo_row and user_demo_row.get("is_demo_account"):
-        raise HTTPException(status_code=403, detail={
-            "error": "demo_mode_payments_disabled",
-            "message_en": "Demo mode — payments disabled. This account is for demonstration purposes only.",
-            "message_fr": "Mode démo — paiements désactivés. Ce compte est uniquement à des fins de démonstration.",
-        })
+    # iter223 — Demo Sandbox: demo accounts can NOW create listings, but each
+    # is force-stamped `is_demo_sandbox=True` and invisible to the public.
+    # The demo user sees their own sandbox items live in the real product
+    # frames; everyone else sees an unchanged marketplace.
+    user_demo_row = await db.users.find_one(
+        {"id": current_user.id},
+        {"_id": 0, "is_demo_account": 1, "account_type": 1},
+    )
+    _is_demo_creator = bool(user_demo_row and user_demo_row.get("is_demo_account"))
 
     # iter217 — Quebec Bill 96 compliance — French title required for QC listings
     # Phase 6.0 hotfix — admins bypass (master role override).
@@ -461,6 +459,13 @@ async def create_listing(
     # and the seller has zero completed listings, mark as pending so admins moderate.
     settings = await get_marketplace_settings(db)
     listing_dict["status"] = await resolve_listing_status(db, current_user, settings)
+
+    # iter223 — Sandbox stamp. Demo creators' listings stay invisible to the
+    # public marketplace; only the demo user themselves can see them inside
+    # the real product surfaces.
+    if _is_demo_creator:
+        listing_dict["is_demo_sandbox"] = True
+        listing_dict["is_demo"] = True  # legacy public-exclusion flag
 
     result = await persist_listing(db, listing_dict, agreement_metadata)
 
@@ -883,16 +888,13 @@ async def create_multi_item_listing(
     from services.stripe_customer_service import validate_payment_method_for_listing
     db = get_db()
 
-    # iter210 Step 5 — Demo accounts cannot place real bids / payments.
-    # Hoisted ABOVE the Bill 96 validator (Phase 5 Hotfix v2) so demo users
-    # get a clear 403 regardless of payload language.
-    user_demo_row = await db.users.find_one({"id": current_user.id}, {"_id": 0, "is_demo_account": 1})
-    if user_demo_row and user_demo_row.get("is_demo_account"):
-        raise HTTPException(status_code=403, detail={
-            "error": "demo_mode_payments_disabled",
-            "message_en": "Demo mode — payments disabled. This account is for demonstration purposes only.",
-            "message_fr": "Mode démo — paiements désactivés. Ce compte est uniquement à des fins de démonstration.",
-        })
+    # iter223 — Demo Sandbox (multi-item creation). Same isolated-visibility
+    # treatment as single-listing flow.
+    user_demo_row = await db.users.find_one(
+        {"id": current_user.id},
+        {"_id": 0, "is_demo_account": 1, "account_type": 1},
+    )
+    _is_demo_creator_multi = bool(user_demo_row and user_demo_row.get("is_demo_account"))
 
     # iter217 — Quebec Bill 96 compliance — French title required for QC listings
     from services.qc_bilingual_validator import assert_qc_bilingual_titles
@@ -1053,6 +1055,12 @@ async def create_multi_item_listing(
     # iter211 P4 — tag demo accounts' multi-item listings
     from services.demo_filter import tag_listing_if_demo
     await tag_listing_if_demo(db, current_user.id, listing_dict)
+
+    # iter223 — Sandbox stamp for multi-item. Public feeds exclude
+    # `is_demo_sandbox: true`; the demo creator still sees their own.
+    if _is_demo_creator_multi:
+        listing_dict["is_demo_sandbox"] = True
+        listing_dict["is_demo"] = True
 
     await db.multi_item_listings.insert_one(listing_dict)
     listing_dict.pop("_id", None)

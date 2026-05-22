@@ -119,6 +119,11 @@ class Listing(BaseModel):
     # see inside (closed boxes / lock-cut visibility only). Optional.
     visible_content_tags: List[str] = []
     parent_auction_id: Optional[str] = None
+    # iter223 — Demo sandbox isolation flags. `is_demo_sandbox` is the
+    # iter223-onwards public-exclusion field; `is_demo` is legacy and kept
+    # for backwards-compat with older queries.
+    is_demo_sandbox: bool = False
+    is_demo: bool = False
     parent_auction_title: Optional[str] = None
     lot_number: Optional[int] = None
     total_lots: Optional[int] = None

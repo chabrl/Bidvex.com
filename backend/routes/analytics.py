@@ -256,15 +256,71 @@ async def get_seller_analytics(
     
     # Get top performing listings
     top_listings = sorted(all_listings, key=lambda x: x.get("clicks", 0) or 0, reverse=True)[:5]
-    
+
+    # iter223 Task 3 — Realistic seed-data waterfall for demo accounts.
+    # When the demo lead's actual transaction arrays are empty, inject a
+    # high-fidelity mock dataset so they immediately see how BidVex tracks
+    # business margins ($24,800 total sales, 9 lots closed, etc.). Real data
+    # is preserved when it exists.
+    seller_doc = await db.users.find_one({"id": seller_id}, {"_id": 0, "is_demo_account": 1})
+    is_demo_seller = bool(seller_doc and seller_doc.get("is_demo_account"))
+    demo_metrics_injected = False
+    if is_demo_seller and total_impressions == 0 and total_clicks == 0 and total_bids == 0:
+        total_impressions = 14_320
+        total_clicks = 2_481
+        total_bids = 87
+        ctr = round((total_clicks / total_impressions) * 100, 2)
+        from datetime import date as _date
+        today = _date.today()
+        impressions_by_day = [
+            {"_id": (today - timedelta(days=i)).isoformat(),
+             "count": 1800 + 220 * ((6 - i) % 4)}
+            for i in range(6, -1, -1)
+        ]
+        clicks_by_day = [
+            {"_id": d["_id"], "count": int(d["count"] * 0.17)}
+            for d in impressions_by_day
+        ]
+        bids_chart_data = [
+            {"date": d["_id"], "count": int(d["count"] * 0.011), "total_amount": int(d["count"] * 3.45)}
+            for d in impressions_by_day
+        ]
+        impression_sources = [
+            {"_id": "marketplace", "count": 8_120},
+            {"_id": "search",      "count": 3_640},
+            {"_id": "category",    "count": 1_870},
+            {"_id": "direct_link", "count":   690},
+        ]
+        # Synthesize 5 realistic top-performing listings
+        top_listings = [
+            {"id": f"demo-lot-{i}", "title": title, "views": views, "clicks": clicks,
+             "impressions": views, "status": "active"}
+            for i, (title, views, clicks) in enumerate([
+                ("Industrial Pallet Lot — 200 units",     4_120, 612),
+                ("Estate Sale: Antique Furniture Bundle", 3_240, 488),
+                ("Restaurant Equipment Liquidation",      2_870, 401),
+                ("Storage Unit B-12 — Mixed Contents",    2_315, 347),
+                ("Wholesale Electronics Pallet",          1_775, 233),
+            ])
+        ]
+        demo_metrics_injected = True
+
     return {
         "summary": {
             "total_impressions": total_impressions,
             "total_clicks": total_clicks,
             "total_bids": total_bids,
             "click_through_rate": round(ctr, 2),
-            "total_listings": len(all_listings),
-            "active_listings": len([l for l in all_listings if l.get("status") == "active"])
+            "total_listings": len(all_listings) if not demo_metrics_injected else 12,
+            "active_listings": (
+                len([l for l in all_listings if l.get("status") == "active"])
+                if not demo_metrics_injected
+                else 9
+            ),
+            # iter223 — Top-line revenue figures for the demo waterfall
+            "total_sales_volume":      24_800.00 if demo_metrics_injected else None,
+            "lots_successfully_closed": 9          if demo_metrics_injected else None,
+            "average_hammer_price":     2_755.55  if demo_metrics_injected else None,
         },
         "charts": {
             "impressions": [{"date": i["_id"], "count": i["count"]} for i in impressions_by_day],
@@ -273,7 +329,8 @@ async def get_seller_analytics(
         },
         "sources": {s["_id"]: s["count"] for s in impression_sources},
         "top_listings": top_listings,
-        "period": period
+        "period": period,
+        "demo_metrics_injected": demo_metrics_injected,
     }
 
 

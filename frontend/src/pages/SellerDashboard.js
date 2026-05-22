@@ -160,7 +160,12 @@ const SellerDashboard = () => {
           <div className="flex flex-wrap gap-2 w-full sm:w-auto">
             {(() => {
               // iter211 P3 — Gate "Create Listing" when dealer has no active subscription
-              const isDealerLocked = user?.is_vehicle_dealer
+              // iter223 — Demo accounts bypass the partner-fee gate entirely so
+              // leads can experience the full create-listing flow without
+              // payment friction. Their listings are sandbox-stamped backend-side.
+              const isDealerLocked =
+                !user?.is_demo_account
+                && user?.is_vehicle_dealer
                 && dealerSubStatus !== null
                 && dealerSubStatus?.active !== true;
               return (

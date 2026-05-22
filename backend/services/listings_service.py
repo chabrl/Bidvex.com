@@ -23,10 +23,27 @@ async def validate_seller(db, current_user: User, agreement_accepted: bool):
     Raises HTTPException on failure; returns agreement_metadata on success.
     """
     is_admin = (getattr(current_user, "role", "") or "").lower() in ("admin", "superadmin")
+    # iter223 — Demo accounts bypass all seller gatekeeping (partner fee,
+    # phone verification, payment method on file). Their listings get
+    # `is_demo_sandbox=true` server-side and are invisible to the public
+    # marketplace, so the friction of these prereqs would only block the
+    # demo experience without any business value.
+    is_demo = bool(getattr(current_user, "is_demo_account", False))
+    if not is_demo:
+        # Some User models don't expose `is_demo_account` directly; fall
+        # back to a fresh DB lookup so we never falsely demo-bypass.
+        try:
+            udoc = await db.users.find_one(
+                {"id": current_user.id},
+                {"_id": 0, "is_demo_account": 1},
+            )
+            is_demo = bool(udoc and udoc.get("is_demo_account"))
+        except Exception:
+            is_demo = False
     # Phase 6.0 hotfix — Admins skip the agreement_accepted check; their
     # role binds them organisationally and they may create listings on
     # behalf of facilities, sellers, or dealers.
-    if not agreement_accepted and not is_admin:
+    if not agreement_accepted and not is_admin and not is_demo:
         raise HTTPException(
             status_code=422,
             detail={
@@ -37,7 +54,7 @@ async def validate_seller(db, current_user: User, agreement_accepted: bool):
             }
         )
 
-    if not is_admin:
+    if not is_admin and not is_demo:
         if current_user.is_partner and not current_user.platform_fee_paid:
             raise HTTPException(
                 status_code=403,
@@ -114,6 +131,10 @@ async def apply_partner_tags(db, current_user: User, listing_dict: Dict, buyers_
     # ── Partner-specific BP rate (validated below) ──
     partner_bp_rate = seller_doc.get("partner_bp_rate")
     if seller_type == SELLER_TYPE_PARTNER:
+        # iter223 — Demo accounts get an auto-assigned BP rate (5.0%) so the
+        # partner gate doesn't block the sandbox creation flow.
+        if partner_bp_rate is None and seller_doc.get("is_demo_account"):
+            partner_bp_rate = 0.05
         if partner_bp_rate is None:
             raise HTTPException(
                 status_code=422,

@@ -21,7 +21,13 @@ from typing import Any, Dict, Optional
 
 
 async def tag_listing_if_demo(db, user_id: str, doc: Dict[str, Any]) -> Dict[str, Any]:
-    """Set `doc['is_demo'] = True` if the creating user is a demo account.
+    """Set `doc['is_demo'] = True` AND `doc['is_demo_sandbox'] = True` if the
+    creating user is a demo account.
+
+    iter223 — `is_demo_sandbox` is the iter223 sandbox-only flag used by
+    the owner-self-include query (so the demo creator can still see their
+    own listings inside the real product surfaces). `is_demo` is kept for
+    legacy public-feed exclusion paths that haven't migrated yet.
 
     Idempotent: if the doc is already tagged or the user is not a demo
     account, the doc is returned untouched. Always returns the same dict
@@ -35,22 +41,55 @@ async def tag_listing_if_demo(db, user_id: str, doc: Dict[str, Any]) -> Dict[str
     )
     if user_row and user_row.get("is_demo_account") is True:
         doc["is_demo"] = True
+        doc["is_demo_sandbox"] = True
     return doc
 
 
 def public_listing_filter(extra: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Return a Mongo filter that EXCLUDES demo listings.
+    """Return a Mongo filter that EXCLUDES demo listings (no user context).
 
     Usage:
       cursor = db.listings.find(public_listing_filter({"status": "active"}))
     """
-    base = {"is_demo": {"$ne": True}}
+    base = {"is_demo": {"$ne": True}, "is_demo_sandbox": {"$ne": True}}
     if extra:
         merged = dict(extra)
-        # If caller already specified an is_demo clause, respect it; otherwise inject.
         if "is_demo" not in merged:
             merged["is_demo"] = base["is_demo"]
+        if "is_demo_sandbox" not in merged:
+            merged["is_demo_sandbox"] = base["is_demo_sandbox"]
         return merged
+    return base
+
+
+def sandbox_aware_filter(
+    *,
+    user_id: Optional[str] = None,
+    extra: Optional[Dict[str, Any]] = None,
+    seller_field: str = "seller_id",
+) -> Dict[str, Any]:
+    """iter223 — Listing-feed filter that hides public sandbox listings BUT
+    shows the demo user their own creations inside the real product frame.
+
+    - Anonymous / non-demo authenticated users → pure public filter.
+    - Demo user with a valid `user_id` → `$or` clause: either the listing is
+      not a sandbox listing, OR it belongs to this user.
+
+    `seller_field` lets the caller adapt the field name for collections that
+    use a different identifier (e.g., `owner_user_id` for multi-item).
+    """
+    base = dict(extra or {})
+    if user_id:
+        # Anyone authenticated gets the self-include $or so their own demo
+        # creations surface. Non-demo users have no sandbox listings, so
+        # this is effectively a no-op for them.
+        base["$or"] = [
+            {"is_demo_sandbox": {"$ne": True}, "is_demo": {"$ne": True}},
+            {seller_field: user_id},
+        ]
+    else:
+        base["is_demo_sandbox"] = {"$ne": True}
+        base["is_demo"] = {"$ne": True}
     return base
 
 

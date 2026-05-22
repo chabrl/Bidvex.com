@@ -1,5 +1,63 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter223 — ADMIN DEMO SECTION: SANDBOX + AUCTIONEER + MOCK METRICS (Feb 22, 2026) ✅
+
+Three-task upgrade to the existing `/admin/demo-accounts` flow: a 4th demo persona (Auctioneer), invisible-sandbox listing isolation with owner-self-include, and a mock-metrics waterfall for empty-data demo dashboards.
+
+### Task 1 — Demo User Mgmt + Auto-Promotions ✅
+**Files**: `backend/services/demo_account_service.py`, `frontend/src/pages/admin/DemoAccountsPage.js`.
+- **New "Auctioneer" demo type** added to `DEMO_ACCOUNT_TYPES`. Account auto-inherits `is_auctioneer=true` + `is_partner=true` + `partner_verification_status='verified'` so the lead experiences the full multi-lot back-office workflow.
+- Admin UI TYPE_LABELS extended with bilingual EN/FR labels (`Auctioneer / Commissaire-priseur`).
+- **Fee/banner suppression** for demo accounts across 3 lockdown gates:
+  - `SellerDashboard.js`: dealer-subscription gate bypasses when `is_demo_account=true`.
+  - `CreateListingPage.js` + `CreateMultiItemListing.js`: partner-fee redirect bypassed.
+  - `SellOptionsModal.js`: `isPartnerLocked` evaluates false for demo users.
+  - `services/listings_service.py`: agreement_accepted + partner-fee + BP-rate guards bypassed for demo accounts.
+  - `services/stripe_customer_service.py::validate_payment_method_for_listing`: 402 payment-method-required guard bypassed for demo.
+
+### Task 2 — Invisible Sandbox Listing Engine ✅
+**Files**: `backend/routes/listings.py`, `backend/services/demo_filter.py`, `backend/models/auction_models.py`, `backend/routes/marketplace.py`, `backend/routes/storage_auctions.py`.
+- **Listing creation now permitted for demo users** (was hard-blocked with 403 since iter210). Both single-item `POST /api/listings` and multi-item `POST /api/multi-item-listings` are gated by `_is_demo_creator` flag.
+- **Auto-stamp**: `services/demo_filter.tag_listing_if_demo()` now sets BOTH `is_demo=true` AND `is_demo_sandbox=true` on demo-user listings. Single-item route stamps inline (same logic). `Listing` model gains both fields.
+- **Public exclusion**: Marketplace cache (`_build_marketplace_items`), storage browse (`list_storage_auctions`), location-search — all add `is_demo_sandbox: {$ne: true}` to base queries.
+- **Owner-self-include via $or**: `/api/marketplace/items` + `/api/storage-auctions` accept `Optional[User] = Depends(get_current_user_optional)`. When the requester is a demo account, their own sandbox listings tail-merge into the response so they see their creations inside the real product surfaces. Public anonymous requests never see them.
+- Inventory coverage: marketplace + storage flows wired in this iter. (Vehicle + dedicated storage_auctions creation already filtered by existing `is_demo` exclusion.)
+
+### Task 3 — Pre-Seeded Back-Office Metrics ✅
+**File**: `backend/routes/analytics.py::get_seller_analytics`.
+- When `is_demo_account=true` AND impressions+clicks+bids are all 0, inject high-fidelity mock:
+  - `total_sales_volume: $24,800.00`, `lots_successfully_closed: 9`, `average_hammer_price: $2,755.55`
+  - 14,320 impressions, 2,481 clicks (CTR 17.32%), 87 bids
+  - 7-day stepped impression/click/bid chart series
+  - 4-source impression breakdown (marketplace/search/category/direct)
+  - 5 synthetic top-performing listings with realistic titles
+- Response carries `demo_metrics_injected: true` so the FE can render a small "Demo Data" pill.
+
+### Verification (7/7 NEW + cross-iter regression)
+- **NEW `tests/test_iter223_demo_sandbox.py`** (7 tests, all pass):
+  1. `DEMO_ACCOUNT_TYPES` includes "auctioneer".
+  2. Demo user can POST `/api/listings` without 403.
+  3. Listings get `is_demo_sandbox=true` + `is_demo=true` stamps.
+  4. Public `/api/marketplace/items` excludes sandbox listings.
+  5. Demo user with bearer token sees own sandbox listings (owner-self-include).
+  6. `/api/analytics/seller/{id}` injects mock waterfall for empty demo users.
+  7. Normal seller does NOT get mock injection.
+- Cross-iter regression: iter222 (8) + iter221 (8) + iter220 (6) + iter219 (17) — 38 tests stable.
+
+### QA Remediation Checklist (all ✅)
+- [x] Admin Demo configuration updates target user profiles cleanly (auctioneer + 3 existing types).
+- [x] Flagged sandbox accounts browse dashboard clear of pricing banners (4 gates bypassed).
+- [x] Test listings populate for the creator but stay 100% invisible to external buyers (owner-self-include $or).
+- [x] Simulated operational metrics render immediately for empty demo accounts ($24,800 volume + 9 lots + charts).
+
+### Files Changed
+**Backend**: `services/demo_account_service.py`, `services/demo_filter.py`, `services/listings_service.py`, `services/stripe_customer_service.py`, `routes/listings.py`, `routes/marketplace.py`, `routes/storage_auctions.py`, `routes/analytics.py`, `models/auction_models.py`.
+**Frontend**: `pages/admin/DemoAccountsPage.js`, `pages/SellerDashboard.js`, `pages/CreateListingPage.js`, `pages/CreateMultiItemListing.js`, `components/SellOptionsModal.js`.
+**Tests**: NEW `tests/test_iter223_demo_sandbox.py` (7 tests).
+
+---
+
+
 ## Latest: iter222 — STORAGE ROUTING SEGREGATION + CONCIERGE DEFENSIVE CONTEXT (Feb 22, 2026) ✅
 
 Two emergency directives: storage-locker query isolation across collections, badge logic by item-type not seller-profile, and concierge defensive context for null retail descriptors.

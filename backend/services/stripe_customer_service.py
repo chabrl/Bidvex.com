@@ -41,11 +41,17 @@ async def get_or_create_stripe_customer(db, user) -> str:
 async def validate_payment_method_for_listing(db, user):
     """
     Called at listing creation. Raises HTTP 402 if no valid payment method on file.
+
+    iter223 — Demo accounts bypass this guard. Their listings are
+    sandbox-stamped (`is_demo_sandbox=true`) and don't drive real payments,
+    so requiring a card on file would needlessly block the demo experience.
     """
     user_doc = await db.users.find_one(
         {"id": user.id},
-        {"_id": 0, "has_payment_method": 1, "default_payment_method_id": 1, "stripe_customer_id": 1},
+        {"_id": 0, "has_payment_method": 1, "default_payment_method_id": 1, "stripe_customer_id": 1, "is_demo_account": 1},
     )
+    if user_doc and user_doc.get("is_demo_account"):
+        return  # demo bypass
     if not user_doc or not user_doc.get("has_payment_method"):
         raise HTTPException(
             status_code=402,
