@@ -599,18 +599,58 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
     return null;
   };
 
-  // iter217 Phase 4 — Read seller_account_type set by the bulk enrichment.
-  // Fallback path supports old cached payloads that don't have the new fields yet.
-  const acctType = item.seller_account_type
-    || (item.seller_is_partner ? 'partner'
-      : item.seller_is_vehicle_dealer ? 'vehicle_dealer'
-      : item.seller_is_storage_facility ? 'storage_facility'
-      : (item.seller_is_business ? 'business' : 'individual'));
+  // iter222 Repair 2 — Badge resolution by ITEM TYPE first, seller profile
+  // second. Previously a seller who happened to be a vehicle dealer would
+  // tag their non-vehicle listings (e.g. storage lockers, retail surplus) with
+  // the "Vehicle Dealer / Concessionnaire" badge. We now derive the badge
+  // strictly from `listing_type` + `category` and only fall back to the
+  // seller profile when those two signals are silent.
+  const _resolveAcctType = () => {
+    const lt = (item.listing_type || '').toLowerCase();
+    const cat = (item.category || '').toLowerCase();
+    const isVehicleItem =
+      lt === 'vehicle' ||
+      cat === 'vehicle' || cat === 'vehicles' || cat === 'car' || cat === 'auto' || cat === 'automobile' ||
+      cat === 'truck' || cat === 'motorcycle';
+
+    // 1) Item-driven: storage locker is ALWAYS a storage_facility card,
+    //    regardless of whether the seller account is a dealer or partner.
+    if (lt === 'storage_locker' || cat === 'storage_locker') return 'storage_facility';
+
+    // 2) Item-driven: only render Vehicle Dealer when the item itself is
+    //    flagged as a vehicle. Otherwise the dealer badge is irrelevant.
+    if (isVehicleItem) {
+      if (item.seller_is_vehicle_dealer || item.seller_account_type === 'vehicle_dealer') {
+        return 'vehicle_dealer';
+      }
+    }
+
+    // 3) Seller-profile fallback (legacy path) — Partner overrides.
+    if (item.seller_account_type) {
+      const sat = item.seller_account_type;
+      // Block stale vehicle_dealer leakage on non-vehicle items.
+      if (sat === 'vehicle_dealer' && !isVehicleItem) {
+        return item.seller_is_business ? 'business' : 'individual';
+      }
+      return sat;
+    }
+    if (item.seller_is_partner) return 'partner';
+    if (item.seller_is_storage_facility) return 'storage_facility';
+    return item.seller_is_business ? 'business' : 'individual';
+  };
+  const acctType = _resolveAcctType();
   const isPrivateSale = acctType === 'individual';
   const isPartner = acctType === 'partner';
-  // Smart routing: vehicles -> /vehicle-auctions/:id, lots -> /lots/:id, default -> /listing/:id
+  // Smart routing: vehicles -> /vehicle-auctions/:id, storage -> /storage-auctions/:id, lots -> /lots/:id, default -> /listing/:id
   const getDetailLink = (item) => {
     const cat = (item.category || '').toLowerCase();
+    const lt = (item.listing_type || '').toLowerCase();
+    // iter222 — storage lockers from `listings` collection route to the
+    // dedicated storage detail page so the storage-specific bidding UI
+    // (deposit hold, cleanout deadline, etc.) renders correctly.
+    if (lt === 'storage_locker' || cat === 'storage_locker') {
+      return `/storage-auctions/${item.id}`;
+    }
     if (cat === 'vehicle' || cat === 'vehicles' || cat === 'car' || cat === 'auto') {
       return `/vehicle-auctions/${item.id}`;
     }

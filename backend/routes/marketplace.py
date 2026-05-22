@@ -152,7 +152,13 @@ async def _build_marketplace_items():
     ).sort("auction_end_date", 1).limit(500).to_list(500)
 
     single_listings = await db.listings.find(
-        {"status": "active", "category": {"$nin": VEHICLE_CATEGORIES}, "is_demo": {"$ne": True}}, _LISTING_PROJECTION
+        {
+            "status": "active",
+            "category": {"$nin": VEHICLE_CATEGORIES + ["storage_locker"]},
+            "listing_type": {"$ne": "storage_locker"},
+            "is_demo": {"$ne": True},
+        },
+        _LISTING_PROJECTION,
     ).sort("auction_end_date", 1).limit(500).to_list(500)
 
     # iter217 Phase 4 — Batch-fetch FULL seller record so we can compute
@@ -628,7 +634,12 @@ async def track_item_click(item_id: str):
 async def search_by_location(params: LocationSearchParams):
     db = get_db()
     # iter211 P4 — exclude demo listings from public location search
-    query = {"status": "active", "is_demo": {"$ne": True}}
+    # iter222 Repair 1 — exclude storage_locker listings (own surface)
+    query = {
+        "status": "active",
+        "is_demo": {"$ne": True},
+        "listing_type": {"$ne": "storage_locker"},
+    }
     
     if params.category:
         query["category"] = params.category

@@ -394,61 +394,188 @@ Please answer the user's question using the context provided above. If the conte
         return "\n".join(context_parts)
 
     async def _get_lot_obligations_context(self, listing_id: str, lot_number: Optional[str] = None) -> str:
-        """Fetch and format seller obligations from a specific listing for RAG context."""
+        """Fetch and format seller obligations from a specific listing for RAG context.
+
+        iter222 — Now safely falls back across all 3 auction collections:
+          1. `multi_item_listings` (sub-lots, lot-level obligations)
+          2. `listings` (single-item retail + storage_locker)
+          3. `storage_auctions` (dedicated facility-flow storage)
+        For storage-locker entries (which intentionally lack `condition`,
+        `quantity`, etc.) the helper injects `visible_content_tags` so the
+        Gemini concierge can answer "what's inside?" questions without
+        falling back to "I don't have that information."
+        Returns "" if no listing matches — never raises.
+        """
         try:
-            listing = await self.db.multi_item_listings.find_one({"id": listing_id})
-            if not listing:
-                return ""
-            obligations = listing.get("seller_obligations", {})
-            if not obligations:
-                return ""
-
-            context_parts = ["\n[LOT-SPECIFIC SELLER OBLIGATIONS - VERIFIED DATA]"]
-            context_parts.append(f"Auction: {listing.get('title', 'N/A')}")
-            context_parts.append(f"Location: {listing.get('city', 'N/A')}, {listing.get('region', 'N/A')}")
-
-            if obligations.get("facility_address"):
-                context_parts.append(f"Pickup Address: {obligations['facility_address']}")
-
-            context_parts.append("\n**Site Capabilities:**")
-            if obligations.get("has_overhead_crane"):
-                context_parts.append(f"- Overhead Crane: YES (Capacity: {obligations.get('crane_capacity', 'N/A')} tons)")
-            else:
-                context_parts.append("- Overhead Crane: NO")
-            if obligations.get("has_loading_dock"):
-                context_parts.append(f"- Loading Dock: YES ({obligations.get('loading_dock_type', 'standard')})")
-            else:
-                context_parts.append("- Loading Dock: NO - Ground level loading only")
-            if obligations.get("has_forklift_available"):
-                context_parts.append("- Forklift: YES - Available on site")
-            else:
-                context_parts.append("- Forklift: NO - Buyer must provide")
-            if obligations.get("has_scale_on_site"):
-                context_parts.append("- Scale: YES")
-            if obligations.get("ground_level_loading_only"):
-                context_parts.append("- IMPORTANT: Ground level loading ONLY")
-
-            if obligations.get("authorized_personnel_only"):
-                context_parts.append(f"\n**Safety Requirements:** {obligations.get('safety_requirements', 'PPE required')}")
-
-            context_parts.append("\n**Shipping & Rigging:**")
-            if obligations.get("provides_shipping") == "yes":
-                context_parts.append(f"- Seller provides shipping: YES - {obligations.get('shipping_details', 'Contact seller')}")
-            else:
-                context_parts.append("- Seller provides shipping: NO - Buyer must arrange pickup")
-
-            context_parts.append("\n**Financial Terms:**")
-            if obligations.get("custom_exchange_rate"):
-                context_parts.append(f"- Exchange Rate: 1 USD = {obligations['custom_exchange_rate']} CAD")
-            refund_policy = obligations.get("refund_policy", "non_refundable")
-            context_parts.append(f"- Refund Policy: {'FINAL SALE' if refund_policy == 'non_refundable' else obligations.get('refund_terms', 'See terms')}")
-            if obligations.get("removal_deadline_days"):
-                context_parts.append(f"- Removal Deadline: {obligations['removal_deadline_days']} days after auction close")
-
-            return "\n".join(context_parts)
-        except Exception as e:
-            logger.error(f"Error fetching lot obligations: {e}")
+            return await self._build_safe_listing_context(listing_id, lot_number)
+        except Exception as e:  # defensive: NEVER let context-build crash chat
+            logger.warning(f"[ai_assistant] context build failed for {listing_id}: {e}")
             return ""
+
+    async def _build_safe_listing_context(self, listing_id: str, lot_number: Optional[str] = None) -> str:
+        """Internal — assemble lot context across multiple collections."""
+        # 1) Try multi-item first (richest obligations data)
+        listing = await self.db.multi_item_listings.find_one({"id": listing_id})
+        if listing:
+            obligations = listing.get("seller_obligations", {})
+            if obligations:
+                return self._format_multi_item_obligations(listing, obligations)
+            # Multi-item without obligations: render a minimal context
+            return self._format_minimal_listing(listing, kind="multi_lot")
+
+        # 2) Try general listings (covers storage_locker)
+        listing = await self.db.listings.find_one({"id": listing_id})
+        if listing:
+            return self._format_listing_context(listing)
+
+        # 3) Try dedicated storage auctions
+        listing = await self.db.storage_auctions.find_one({"id": listing_id})
+        if listing:
+            return self._format_storage_auction_context(listing)
+
+        return ""
+
+    def _format_listing_context(self, listing: Dict[str, Any]) -> str:
+        """iter222 — Defensive context builder for general listings.
+
+        Handles storage_locker entries gracefully by ALWAYS reading
+        `visible_content_tags` and `storage_metadata` instead of the
+        retail-only `condition` / `quantity` fields (which are intentionally
+        null for storage lockers). Never raises on missing keys."""
+        parts: List[str] = ["\n[LISTING CONTEXT — VERIFIED DATA]"]
+        parts.append(f"Title: {listing.get('title') or 'N/A'}")
+        parts.append(f"Location: {listing.get('city') or 'N/A'}, {listing.get('region') or 'N/A'}")
+        lt = (listing.get("listing_type") or "").lower()
+
+        if lt == "storage_locker":
+            parts.append("Listing Type: Storage Locker / Abandoned Unit Auction")
+            meta = listing.get("storage_metadata") or {}
+            if meta.get("facility_name"):
+                parts.append(f"Facility: {meta['facility_name']}")
+            if meta.get("locker_size"):
+                parts.append(f"Locker Size: {meta['locker_size']}")
+            if meta.get("locker_number"):
+                parts.append(f"Locker Number: {meta['locker_number']}")
+            if meta.get("cleanout_deadline_hours"):
+                parts.append(f"Cleanout Deadline: {meta['cleanout_deadline_hours']} hours after auction close")
+            if meta.get("security_deposit_amount"):
+                parts.append(
+                    f"Cleanout Security Deposit: ${meta['security_deposit_amount']} CAD "
+                    f"(held via Stripe Authorization, released after verification)"
+                )
+            tags = listing.get("visible_content_tags") or []
+            if tags:
+                parts.append(f"Visible Contents (tagged by facility): {', '.join(tags)}")
+            else:
+                parts.append(
+                    "Visible Contents: Not tagged — facility could only see "
+                    "closed boxes / sealed containers. Sold as-is."
+                )
+            parts.append(
+                "IMPORTANT: Storage locker auctions sell the ENTIRE unit's "
+                "contents as one lot. Condition, quantity, and individual "
+                "item details are unknown until cleanout."
+            )
+        else:
+            # Retail listing — standard fields
+            if listing.get("category"):
+                parts.append(f"Category: {listing['category']}")
+            if listing.get("condition"):
+                parts.append(f"Condition: {listing['condition']}")
+            if listing.get("quantity") and int(listing.get("quantity") or 1) > 1:
+                parts.append(
+                    f"Quantity: {listing['quantity']} units "
+                    f"(bid is {'per item' if listing.get('multiply_hammer_by_quantity') else 'total'})"
+                )
+            if listing.get("buy_now_price"):
+                parts.append(f"Buy Now Price: ${listing['buy_now_price']} {listing.get('currency') or 'CAD'}")
+
+        if listing.get("starting_price") is not None:
+            parts.append(f"Starting Price: ${listing['starting_price']} {listing.get('currency') or 'CAD'}")
+        if listing.get("current_price") is not None and listing.get("current_price") != listing.get("starting_price"):
+            parts.append(f"Current Bid: ${listing['current_price']} {listing.get('currency') or 'CAD'}")
+        if listing.get("auction_end_date"):
+            parts.append(f"Auction Ends: {listing['auction_end_date']}")
+        return "\n".join(parts)
+
+    def _format_storage_auction_context(self, auction: Dict[str, Any]) -> str:
+        """Context builder for dedicated storage_auctions collection rows."""
+        parts: List[str] = ["\n[STORAGE AUCTION CONTEXT — VERIFIED DATA]"]
+        parts.append(f"Facility: {auction.get('facility_name') or 'N/A'}")
+        parts.append(f"Location: {auction.get('facility_city') or 'N/A'}, {auction.get('facility_province') or 'N/A'}")
+        if auction.get("unit_number"):
+            parts.append(f"Unit Number: {auction['unit_number']}")
+        if auction.get("unit_size"):
+            parts.append(f"Unit Size: {auction['unit_size']}")
+        if auction.get("unit_type"):
+            parts.append(f"Unit Type: {auction['unit_type']}")
+        if auction.get("is_lien_unit"):
+            parts.append("Sale Reason: Lien sale (legal possession transfer)")
+        tags = auction.get("visible_content_tags") or []
+        if tags:
+            parts.append(f"Visible Contents: {', '.join(tags)}")
+        else:
+            parts.append(
+                "Visible Contents: Not tagged — sold as-is, contents unknown until cleanout."
+            )
+        if auction.get("current_bid") is not None:
+            parts.append(f"Current Bid: ${auction['current_bid']} CAD")
+        if auction.get("end_time"):
+            parts.append(f"Auction Ends: {auction['end_time']}")
+        return "\n".join(parts)
+
+    def _format_minimal_listing(self, listing: Dict[str, Any], kind: str) -> str:
+        return (
+            f"\n[{kind.upper()} CONTEXT]\n"
+            f"Title: {listing.get('title') or 'N/A'}\n"
+            f"Location: {listing.get('city') or 'N/A'}, {listing.get('region') or 'N/A'}"
+        )
+
+    def _format_multi_item_obligations(self, listing: Dict[str, Any], obligations: Dict[str, Any]) -> str:
+        """Format multi-item lot obligations (facility, site capabilities, terms)."""
+        context_parts = ["\n[LOT-SPECIFIC SELLER OBLIGATIONS - VERIFIED DATA]"]
+        context_parts.append(f"Auction: {listing.get('title', 'N/A')}")
+        context_parts.append(f"Location: {listing.get('city', 'N/A')}, {listing.get('region', 'N/A')}")
+
+        if obligations.get("facility_address"):
+            context_parts.append(f"Pickup Address: {obligations['facility_address']}")
+
+        context_parts.append("\n**Site Capabilities:**")
+        if obligations.get("has_overhead_crane"):
+            context_parts.append(f"- Overhead Crane: YES (Capacity: {obligations.get('crane_capacity', 'N/A')} tons)")
+        else:
+            context_parts.append("- Overhead Crane: NO")
+        if obligations.get("has_loading_dock"):
+            context_parts.append(f"- Loading Dock: YES ({obligations.get('loading_dock_type', 'standard')})")
+        else:
+            context_parts.append("- Loading Dock: NO - Ground level loading only")
+        if obligations.get("has_forklift_available"):
+            context_parts.append("- Forklift: YES - Available on site")
+        else:
+            context_parts.append("- Forklift: NO - Buyer must provide")
+        if obligations.get("has_scale_on_site"):
+            context_parts.append("- Scale: YES")
+        if obligations.get("ground_level_loading_only"):
+            context_parts.append("- IMPORTANT: Ground level loading ONLY")
+
+        if obligations.get("authorized_personnel_only"):
+            context_parts.append(f"\n**Safety Requirements:** {obligations.get('safety_requirements', 'PPE required')}")
+
+        context_parts.append("\n**Shipping & Rigging:**")
+        if obligations.get("provides_shipping") == "yes":
+            context_parts.append(f"- Seller provides shipping: YES - {obligations.get('shipping_details', 'Contact seller')}")
+        else:
+            context_parts.append("- Seller provides shipping: NO - Buyer must arrange pickup")
+
+        context_parts.append("\n**Financial Terms:**")
+        if obligations.get("custom_exchange_rate"):
+            context_parts.append(f"- Exchange Rate: 1 USD = {obligations['custom_exchange_rate']} CAD")
+        refund_policy = obligations.get("refund_policy", "non_refundable")
+        context_parts.append(f"- Refund Policy: {'FINAL SALE' if refund_policy == 'non_refundable' else obligations.get('refund_terms', 'See terms')}")
+        if obligations.get("removal_deadline_days"):
+            context_parts.append(f"- Removal Deadline: {obligations['removal_deadline_days']} days after auction close")
+
+        return "\n".join(context_parts)
 
     def _parse_response(self, content: str, language: str, needs_verification: bool = False) -> Dict:
         """Parse response for rich content (action buttons, product cards)"""

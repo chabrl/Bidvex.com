@@ -1,5 +1,63 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter222 — STORAGE ROUTING SEGREGATION + CONCIERGE DEFENSIVE CONTEXT (Feb 22, 2026) ✅
+
+Two emergency directives: storage-locker query isolation across collections, badge logic by item-type not seller-profile, and concierge defensive context for null retail descriptors.
+
+### Repair 1.1 — Marketplace EXCLUDES storage_locker ✅
+**File**: `backend/routes/marketplace.py`.
+- `_build_marketplace_items()`: added `listing_type: {"$ne": "storage_locker"}` + `category not in ["storage_locker"]` filter to the `db.listings.find()` query (cached endpoint).
+- `marketplace/search` location endpoint: same exclusion baked in.
+- **Verified live**: `/api/marketplace/items?limit=50` → 5 retail items, **0 storage_locker leaked**.
+
+### Repair 1.2 — Storage Auctions surfaces BOTH collections ✅
+**File**: `backend/routes/storage_auctions.py::list_storage_auctions()`.
+- Cross-collection merge: queries `db.storage_auctions` AND `db.listings` (where `listing_type=storage_locker`).
+- Synthesizes storage-card schema fields on listings-collection docs from `storage_metadata` (`facility_name`, `facility_address`, `locker_size`, `locker_number`, etc.).
+- Search + tag filters apply to BOTH collections, with FR alias normalization (`Meubles → furniture`).
+- `live_status` now defensive against missing `start_time` (listings-collection docs only have `auction_end_date`).
+- **Verified live**: a `?type=storage_locker` listing created via `/api/listings` shows up in `/api/storage-auctions` with `source: "listings"`, normalized `facility_name`, and tag-filter matches.
+
+### Repair 2 — Badge logic by ITEM TYPE first ✅
+**File**: `frontend/src/components/FlattenedMarketplace.js`.
+- NEW `_resolveAcctType()` helper inside `ItemCard`. Resolution order:
+  1. `listing_type === 'storage_locker'` OR `category === 'storage_locker'` → **`storage_facility`** (always; never inherits seller's vehicle-dealer status).
+  2. Vehicle item (`listing_type === 'vehicle'` or vehicle category) + seller is dealer → `vehicle_dealer`.
+  3. Seller-profile fallback (legacy) — with explicit guard to STRIP `vehicle_dealer` leakage from non-vehicle items.
+- Smart routing: storage_locker items now link to `/storage-auctions/:id` (where storage-specific bidding UI renders).
+
+### Directive B — Gemini Concierge ✅
+**File**: `backend/services/ai_assistant_v2.py`.
+- Concierge was operational in preview (verified via curl: `success: true`).
+- Hardened the context builder for storage_locker listings (which intentionally lack `condition`/`quantity`):
+  - NEW `_build_safe_listing_context()` walks `multi_item_listings` → `listings` → `storage_auctions` collections.
+  - NEW `_format_listing_context()` branches on `listing_type`: storage_locker reads `storage_metadata` + `visible_content_tags`; retail reads condition/quantity/buy_now.
+  - NEW `_format_storage_auction_context()` for dedicated storage_auctions collection.
+  - Top-level try/except so context failures NEVER crash chat (returns `""`).
+- **Verified live**: AI Chat with storage_locker `listing_id` returns a coherent response mentioning the tagged contents (boxes, furniture) AND warns "auctions sell the entire unit's contents as one lot" — no crash, no fallback.
+
+### Verification (38/38 backend tests pass + 1 skipped)
+- NEW `tests/test_iter222_storage_routing.py`: 7 tests + 1 skipped (location-search endpoint not exposed).
+- Cross-iter regression: iter221 (8) + iter220 (6) + iter219 (17) — all green.
+- Frontend lint clean on all modified files. Backend lint clean.
+
+### QA Remediation Matrix (all ✅)
+- [x] Storage units vanish completely from main `/marketplace` retail index.
+- [x] Test storage lockers render perfectly in dedicated `/storage-auctions` dashboard grids.
+- [x] User account elements on card blocks render facility names instead of vehicle merchant tags.
+- [x] AI Chat returns HTTP 200 on mock prompts.
+- [x] Server processes don't collapse on storage_locker contextual queries.
+
+### Files Changed
+- MODIFIED: `backend/routes/marketplace.py` (`_build_marketplace_items`, search endpoint)
+- MODIFIED: `backend/routes/storage_auctions.py` (`list_storage_auctions` cross-collection merge + `_resolve_status` defensive)
+- MODIFIED: `backend/services/ai_assistant_v2.py` (`_get_lot_obligations_context` + 4 new helpers)
+- MODIFIED: `frontend/src/components/FlattenedMarketplace.js` (`_resolveAcctType` + smart routing)
+- NEW: `backend/tests/test_iter222_storage_routing.py` (7 tests)
+
+---
+
+
 ## Latest: iter221 — UI/UX ALIGNMENT (Card grid, Storage form, VIP fee) (Feb 22, 2026) ✅
 
 Three surgical UI/UX repairs targeting the broken responsive button row on marketplace cards, confirming the storage form retail-exclusion sweep is complete, and eliminating the Quick Bid VIP pricing discrepancy.

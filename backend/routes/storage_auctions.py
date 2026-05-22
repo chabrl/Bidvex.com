@@ -152,18 +152,32 @@ def _parse_dt(v):
 
 
 def _resolve_status(auction: dict) -> str:
-    """Compute live status from time fields."""
-    now = _now()
-    start = _parse_dt(auction["start_time"])
-    end = _parse_dt(auction["end_time"])
+    """Compute live status from time fields.
+
+    iter222 — Defensive: storage lockers from the `listings` collection
+    don't carry `start_time` (they go live immediately on create); accept
+    `auction_end_date` as an end-time substitute and treat missing
+    `start_time` as "already started". Never raises.
+    """
     persisted = auction.get("status")
-    if persisted in {"sold", "cancelled"}:
+    if persisted in {"sold", "cancelled", "ended"}:
         return persisted
-    if now < start:
-        return "upcoming"
-    if now >= end:
-        return "ended"
-    return "active"
+    now = _now()
+    try:
+        start_raw = auction.get("start_time") or auction.get("created_at")
+        end_raw = auction.get("end_time") or auction.get("auction_end_date")
+        if not end_raw:
+            return persisted or "active"
+        end = _parse_dt(end_raw)
+        if now >= end:
+            return "ended"
+        if start_raw:
+            start = _parse_dt(start_raw)
+            if now < start:
+                return "upcoming"
+        return "active"
+    except Exception:
+        return persisted or "active"
 
 
 # ─────────────────────────────────────────────────────────────
@@ -307,9 +321,67 @@ async def list_storage_auctions(
     auctions = await cursor.to_list(limit)
     total = await db.storage_auctions.count_documents(query)
 
+    # iter222 Repair 1 — Storage lockers created via the general
+    # `/create-listing?type=storage_locker` form write to the `listings`
+    # collection rather than `storage_auctions`. Pull them in here so
+    # buyers see EVERY storage locker on `/storage-auctions`, regardless
+    # of which authoring flow created the doc.
+    # `listings`-collection storage lockers don't have facility metadata
+    # (those fields live in `storage_metadata`); we map them into the same
+    # shape the storage card component expects.
+    listings_query = {
+        "status": "active",
+        "listing_type": "storage_locker",
+        "is_demo": {"$ne": True},
+    }
+    if province:
+        # The listings collection stores province under `region`.
+        listings_query["region"] = province.upper()
+    if city:
+        listings_query["city"] = {"$regex": city, "$options": "i"}
+    if tags:
+        tag_list = _sanitize_visible_content_tags_inline(
+            [t.strip() for t in str(tags).split(",") if t.strip()]
+        )
+        if tag_list:
+            listings_query["visible_content_tags"] = {"$in": tag_list}
+    if search:
+        s = str(search).strip()
+        if s:
+            safe = re.escape(s)
+            listings_query["$or"] = [
+                {"title":       {"$regex": safe, "$options": "i"}},
+                {"description": {"$regex": safe, "$options": "i"}},
+                {"visible_content_tags": {"$regex": safe, "$options": "i"}},
+            ]
+
+    listing_locker_docs = await db.listings.find(listings_query, {"_id": 0}).limit(limit).to_list(limit)
+    listings_total = await db.listings.count_documents(listings_query)
+
+    for ld in listing_locker_docs:
+        meta = ld.get("storage_metadata") or {}
+        # Synthesize storage-card schema from the marketplace listing doc.
+        ld.setdefault("facility_name",      meta.get("facility_name") or ld.get("seller_name") or "")
+        ld.setdefault("facility_city",      ld.get("city") or "")
+        ld.setdefault("facility_province",  ld.get("region") or "")
+        ld.setdefault("facility_address",   meta.get("facility_address") or "")
+        ld.setdefault("unit_number",        meta.get("locker_number") or "")
+        ld.setdefault("unit_size",          meta.get("locker_size") or "")
+        ld.setdefault("current_bid",        ld.get("current_price") or ld.get("starting_price") or 0)
+        ld.setdefault("starting_bid",       ld.get("starting_price") or 0)
+        ld.setdefault("end_time",           ld.get("auction_end_date"))
+        ld.setdefault("description_en",     ld.get("description") or "")
+        ld.setdefault("description_fr",     ld.get("description") or "")
+        ld.setdefault("source",             "listings")
+        ld["live_status"] = _resolve_status(ld)
+
+    auctions = auctions + listing_locker_docs
+    total = total + listings_total
+
     # Live status reconciliation
     for a in auctions:
-        a["live_status"] = _resolve_status(a)
+        if "live_status" not in a:
+            a["live_status"] = _resolve_status(a)
     return {
         "total":              total,
         "auctions":           auctions,
