@@ -1,5 +1,74 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter218 — META PIXEL + CATALOG MATCH-RATE REPAIR (Feb 22, 2026) ✅ P0
+
+Production reported **0% catalog match rate** + missing AddToCart / InitiateCheckout / Purchase events on `bidvex.com`. Root cause: Pixel `content_ids` were emitted in legacy formats (`locked-<uuid>`, ad-hoc lot suffixes) that did not match the catalog feed's `BIDVEX-{TYPE}-{uuid}` token. The full funnel was also missing `InitiateCheckout`, and `Purchase` had no CAPI parity for non-broker checkouts.
+
+### What was fixed
+- **Single canonical content_id source** — `frontend/src/utils/metaContentId.js` (NEW):
+  - `getCanonicalContentId(listing, {routeHint})` — only place the FE produces `BIDVEX-{MKT|LOT|VEH|STO}-{listing_id}`.
+  - `deriveListingType()` resolves type from route hint → URL path → DB field → category keyword (DB nullable values never trusted in isolation).
+  - `buildEventId({eventName, contentId, discriminator})` for FE↔BE dedup parity.
+- **Pixel funnel rewrite** — `frontend/src/utils/metaPixel.js`:
+  - NEW `trackInitiateCheckout({listing, bidAmount, lotNumber, routeHint})` for every Place Bid POST success.
+  - `trackViewContent` / `trackAddToCart` / `trackPurchase` are now dedupe-safe (one per `kind:contentId` per tab session, persisted in `sessionStorage`).
+  - Pixel `eventID` is wired through `fbq('track', name, params, {eventID})` so Meta dedupes browser-side events against server-side CAPI events with identical `event_id`.
+- **Backend CAPI parity** — `backend/services/analytics_tracker.py`:
+  - NEW `canonical_content_id()` / `canonical_content_type()` / `deterministic_event_id()` that produce byte-identical strings to the FE helper + `services/meta_feed_mapper._content_id()`.
+  - `build_purchase_event(...)` extended with `content_ids`, `content_type`, `content_name`, `content_category` params; emits `contents=[{id, quantity, item_price}]` + `num_items` for full Meta Advantage+ matching.
+  - NEW `track_listing_purchase(...)` fires Meta CAPI Purchase for non-broker checkouts (marketplace/multi_lot/storage) with `value = total_charged` (gross). Idempotent via `meta_purchase_emitted` flag on `payment_transactions`.
+  - `track_broker_purchase(...)` extended with `listing_id/listing_type/listing_title/listing_category` kwargs — broker Purchase now carries `content_ids = ["BIDVEX-VEH-<vehicle_id>"]` while preserving the legal `value = platform_fee + broker_fee` constraint (hammer NEVER touches Meta).
+- **Purchase wiring**:
+  - `routes/payments.py::get_checkout_status` now looks up the listing across all 4 collections (`listings`, `multi_item_listings`, `vehicles`, `storage_auctions`), fires `track_listing_purchase` on first successful poll, stamps `meta_purchase_emitted=True` on the txn, and returns `meta_purchase_event_id` to the browser so the Pixel-side Purchase uses the SAME event_id (Meta dedupes).
+  - `routes/brokers.py::mark_paid` enriches `track_broker_purchase` with vehicle title/category/listing_id.
+- **Pixel events wired in 4 detail pages**:
+  - `ListingDetailPage.js` — AddToCart on Bid Now intent, InitiateCheckout on confirm POST success.
+  - `MultiItemListingDetailPage.js` — same pattern; parent listing_id used for content_id (catalog match), lot_number in `contents` array for attribution.
+  - `StorageAuctionDetail.js` — ViewContent on fetch (was missing), AddToCart on intent, InitiateCheckout on submit.
+  - `VehicleDetailPage.js` — ALL 3 events newly added (was previously uninstrumented).
+- **PaymentSuccessPage.js** — Purchase Pixel event now uses canonical helper + consumes server-supplied `meta_purchase_event_id` for FE↔BE dedup.
+
+### Verification
+- **48 new dedicated tests** + 28 adjacent regression tests = **76/76 pass**:
+  - `tests/test_meta_pixel_funnel.py` — 29 unit tests (prefix parity, deterministic event_id, content_ids carry-through, strict regex format, legacy backwards-compat).
+  - `tests/test_iter218_meta_pixel_integration.py` — 19 integration tests (mocked CAPI delivery, idempotency, response shape).
+- **Live `/api/feeds/facebook-local`** returns 5 clean rows; every `id` matches `^BIDVEX-(MKT|LOT|VEH|STO)-[A-Za-z0-9_-]+$`; zero `locked-` / `auction_` / `listing_` legacy prefixes.
+- **Live preview ViewContent fire** — visited `/listing/952ffaa8-...` → sessionStorage carries `["ViewContent:BIDVEX-MKT-952ffaa8-8a30-4f75-b485-14a7adda5b4d"]`, fbq loaded, dedupe single-entry.
+- Backend reload clean, frontend lint clean across all 7 modified files + 2 new files.
+
+### Files changed
+- NEW: `frontend/src/utils/metaContentId.js`
+- NEW: `backend/tests/test_meta_pixel_funnel.py` (29 tests)
+- NEW: `backend/tests/test_iter218_meta_pixel_integration.py` (19 tests, created by testing agent)
+- REWRITTEN: `frontend/src/utils/metaPixel.js`
+- MODIFIED: `backend/services/analytics_tracker.py` (added canonical helpers + track_listing_purchase + content_ids carry-through)
+- MODIFIED: `backend/routes/payments.py` (CAPI Purchase wiring + event_id propagation to FE)
+- MODIFIED: `backend/routes/brokers.py` (vehicle listing context for CAPI)
+- MODIFIED: `frontend/src/pages/ListingDetailPage.js`
+- MODIFIED: `frontend/src/pages/MultiItemListingDetailPage.js`
+- MODIFIED: `frontend/src/pages/storage/StorageAuctionDetail.js`
+- MODIFIED: `frontend/src/pages/vehicles/VehicleDetailPage.js`
+- MODIFIED: `frontend/src/pages/PaymentSuccessPage.js`
+
+### Action required for production validation
+1. **Save to GitHub → redeploy** preview to production.
+2. **Trigger Meta Catalog re-ingest** in Commerce Manager (Data Sources → Data Feeds → "Fetch Now"). Within ~30 min Meta will see fresh `BIDVEX-{TYPE}-{uuid}` IDs.
+3. **Verify with Meta Pixel Helper Chrome extension**:
+   - Visit `/listing/<id>` → expect 1× ViewContent with `content_ids: ["BIDVEX-MKT-<id>"]`, `content_type: "product"`, value, currency.
+   - Click "Place Bid" → expect 1× AddToCart (deduped on subsequent bids).
+   - Submit bid → expect N× InitiateCheckout (one per submit).
+   - Complete checkout → expect 1× Purchase with `eventID` matching the backend CAPI Purchase.
+4. **Meta Events Manager → Test Events** — confirm Browser + Server columns BOTH show Purchase for the same event_id (dedup confirmed).
+5. **Catalog Diagnostics** — match rate should climb from 0% → 90+% within the 24h attribution window.
+
+### Remaining risks
+- `REACT_APP_META_PIXEL_ID` + `META_PIXEL_ID` + `META_CAPI_ACCESS_TOKEN` env must be set in production (preview env has Pixel ID set, fbq boots fine).
+- Meta's catalog re-ingest is async; full match-rate climb takes 24-48h.
+- Vehicle Purchase value remains `platform_fee + broker_fee` (legal constraint preserved). Marketplace/Storage/Multi-lot Purchase value = total `amount_total` from Stripe (gross). Document this in Commerce Manager so the ROAS model interprets it correctly.
+
+---
+
+
 ## Latest: Storage Form Sanitization (Phase 6.3 Task 2 / Feb 21, 2026) ✅
 
 User reported retail-marketplace fields cluttering the storage locker creation flow. All 5 irrelevant sections now hidden when `listing_type=storage_locker` (verified live + via control test).
