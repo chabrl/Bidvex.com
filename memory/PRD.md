@@ -1,6 +1,61 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: Quick Bid Modal Buyer's Premium Desync — Hotfix (Feb 21, 2026) ✅
+## Latest: AI Watchdog Infinite Re-flag Loop — 4 Hotfixes (Feb 21, 2026) ✅
+
+Production listing `385b5477-7510-4b5e-8225-6f0dadf9b2b9` ("Lot de 7 tabourets Meridian") was being re-paused 17 min after admin approval by the **scheduled** safety_watchdog cron — separate from the previously-fixed seller-edit re-trigger path. Both paths now respect a unified immunity model.
+
+### Fix 1 — Stamp `watchdog_exempt` on admin approve
+`backend/routes/admin_ai_review.py::admin_approve_listing_review` now writes:
+```python
+"watchdog_exempt":      True,
+"watchdog_exempt_at":   now,
+"watchdog_exempt_by":   current_user.id,
+"paused_by_watchdog":   False,
+"paused_by":            None,
+"paused_reason":        None,
+```
+…in the SAME atomic update that already sets `status='active'` + `admin_approved_override=True`. One admin click protects against both the scheduled cron AND seller-edit paths.
+
+### Fix 2 — Skip gate at query level + safety net
+`backend/services/safety_watchdog.py::_scan_collection`:
+- Query filter excludes `watchdog_exempt=True | admin_approved_override=True | ai_scan_bypass=True` rows from the cursor — they never load into memory.
+- Per-listing in-loop guard (defence-in-depth) double-checks the passport flags before keyword analysis runs.
+
+### Fix 3 — Startup backfill migration
+- New `backend/services/watchdog_exempt_backfill.py::backfill_watchdog_exempt(db)` — idempotent.
+- Wired into `server.py` lifespan handler. On every boot, it walks `listing_reviews` where `status='approved'` and stamps the immunity passport on every matching listing in both `listings` and `multi_item_listings`. Also bounces any `paused_by_watchdog` rows back to `status='active'`.
+- **Live backfill executed**: 8 previously-approved listings stamped. Named row `385b5477-...` now carries `watchdog_exempt=True` and `status='active'`. Restored 0 rows that were currently paused (none).
+
+### Fix 4 — Compliance email short-circuit
+`backend/services/safety_watchdog.py::_pause_listing` refuses to pause AND refuses to send the admin compliance email when `watchdog_exempt=True | admin_approved_override=True | ai_scan_bypass=True`. Admin will NEVER receive a compliance email for a listing they already approved.
+
+### Tests (4 new in `tests/test_watchdog_exempt_loop.py`)
+1. `test_admin_approve_stamps_watchdog_exempt` — verifies the approve handler writes all 5 watchdog fields atomically.
+2. `test_safety_watchdog_skips_exempt_listings` — seeds an exempt + non-exempt vehicle listing with the same VIN-like keywords; only the non-exempt row even enters the scanner.
+3. `test_pause_listing_refuses_exempt` — directly calls `_pause_listing` with an exempt listing dict and confirms it's a no-op (no pause, no email).
+4. `test_backfill_stamps_named_production_listing` — idempotent run + verifies `385b5477-...` carries the passport.
+
+### Verification
+| QA Item | Status |
+|---|---|
+| Listing 385b5477 has `watchdog_exempt=True` | ✅ confirmed via live MongoDB scan post-backfill |
+| Admin approves any listing → `watchdog_exempt=True` written | ✅ `test_admin_approve_stamps_watchdog_exempt` |
+| Watchdog scheduled job query excludes exempt listings | ✅ `test_safety_watchdog_skips_exempt_listings` |
+| No compliance alert email sent for exempt listings | ✅ `test_pause_listing_refuses_exempt` |
+| All existing tests still pass | ✅ **39/39** pytests pass |
+
+### Startup logs confirm
+```
+[watchdog_exempt_backfill] approved=8 listings_modified=0 multi_modified=0 restored=0
+```
+(`modified=0` is expected — the live backfill earlier in this session already stamped all 8; the lifespan migration is now idempotent.)
+
+### Action required for production
+- Redeploy preview → production. The lifespan backfill will run automatically on the next prod boot and stamp the immunity passport on every previously-approved listing.
+
+---
+
+## Previous: Quick Bid Modal Buyer's Premium Desync — Hotfix (Feb 21, 2026) ✅
 
 VIP/Premium subscribers were quoted the standard 5.0% buyer's premium in the Quick Bid modal on the marketplace list, while the Listing Detail view correctly showed their discounted 3.0% / 3.5% rate. Fixed in a single targeted change to the props chain.
 

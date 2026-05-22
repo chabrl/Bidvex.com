@@ -46,6 +46,22 @@ async def _pause_listing(
     seller_user_doc: dict,
 ) -> None:
     listing_id = listing.get("id")
+
+    # HOTFIX (Infinite Re-flag Loop) / FIX 4 — Absolute admin-exempt guard.
+    # If a direct caller bypasses _scan_collection's query filter, this
+    # blocks any pause action AND any compliance email. Admin must NEVER
+    # receive a compliance email for a listing they already approved.
+    if (
+        listing.get("watchdog_exempt") is True
+        or listing.get("admin_approved_override") is True
+        or listing.get("ai_scan_bypass") is True
+    ):
+        logger.info(
+            "[safety_watchdog] BLOCKED — refusing to pause/email admin-exempt listing %s",
+            listing_id,
+        )
+        return
+
     update = {
         "$set": {
             "status": PAUSED_STATUS,
@@ -97,6 +113,13 @@ async def _scan_collection(db, collection_name: str, triggered_by: str) -> dict:
     """Generic scanner used for both `listings` and `multi_item_listings`.
     Multi-item listings are paused when EITHER the parent or any LOT looks
     like a vehicle from a non-dealer (the listing is the unit of moderation).
+
+    HOTFIX (AI Watchdog Infinite Re-flag Loop) / FIX 2:
+      Exempt admin-approved listings at the DB query level so they never even
+      enter the scanner loop. The compound query also filters out the legacy
+      `admin_approved_override` / `ai_scan_bypass` passport set by the AI
+      review approve flow (so a single admin approve protects against BOTH
+      the scheduled cron and the seller-edit re-trigger path).
     """
     coll = db[collection_name]
     paused = 0
@@ -104,7 +127,13 @@ async def _scan_collection(db, collection_name: str, triggered_by: str) -> dict:
     examined = 0
 
     cursor = coll.find(
-        {"status": {"$in": list(ACTIVE_STATUSES)}},
+        {
+            "status": {"$in": list(ACTIVE_STATUSES)},
+            # ── FIX 2 — Admin-approved listings never enter the scan ──
+            "watchdog_exempt": {"$ne": True},
+            "admin_approved_override": {"$ne": True},
+            "ai_scan_bypass": {"$ne": True},
+        },
         {
             "_id": 0,
             "id": 1,
@@ -114,6 +143,8 @@ async def _scan_collection(db, collection_name: str, triggered_by: str) -> dict:
             "description": 1,
             "lots": 1,
             "status": 1,
+            "watchdog_exempt": 1,
+            "admin_approved_override": 1,
         },
     )
 
@@ -122,6 +153,20 @@ async def _scan_collection(db, collection_name: str, triggered_by: str) -> dict:
 
     async for listing in cursor:
         examined += 1
+
+        # ── FIX 2 (safety net) — in-loop guard for defence-in-depth. The
+        # DB query already excludes exempt listings, but if a future caller
+        # invokes _pause_listing directly (or someone removes the query
+        # filter), this guard guarantees the immunity passport still wins.
+        if listing.get("watchdog_exempt") is True \
+           or listing.get("admin_approved_override") is True \
+           or listing.get("ai_scan_bypass") is True:
+            logger.info(
+                "[safety_watchdog] SKIP — listing %s is admin-exempt (no scan, no email)",
+                listing.get("id"),
+            )
+            continue
+
         all_signals: list[str] = []
         max_strength = 0
 

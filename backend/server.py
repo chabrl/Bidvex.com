@@ -147,8 +147,7 @@ async def lifespan(app):
         await ensure_payment_charges_indexes(db)
         await ensure_refund_queue_indexes(db)
         await ensure_email_blast_queue_indexes(db)
-    except Exception as e:
-        logger.warning(f"Strict payment indexes registration failed (non-fatal): {e}")
+    except Exception as e:        logger.warning(f"Strict payment indexes registration failed (non-fatal): {e}")
 
     # ── iter212 — Grandfather existing storage facilities ──
     try:
@@ -168,6 +167,24 @@ async def lifespan(app):
             )
     except Exception as e:
         logger.warning(f"[iter212] storage-facility grandfather pass failed (non-fatal): {e}")
+
+    # ── HOTFIX (AI Watchdog Infinite Re-flag Loop) / FIX 3 ──
+    # One-shot backfill: stamp `watchdog_exempt=True` on every listing the
+    # admin already approved through the listing_reviews queue, and bounce
+    # any paused-by-watchdog rows back to active. Idempotent — re-runs are
+    # no-ops once every row already carries the passport.
+    try:
+        from services.watchdog_exempt_backfill import backfill_watchdog_exempt
+        result = await backfill_watchdog_exempt(db)
+        if result["listings_modified"] or result["restored_to_active"]:
+            logger.info(
+                "[watchdog-exempt-backfill] approved=%s listings_modified=%s "
+                "multi_modified=%s restored=%s",
+                result["approved_count"], result["listings_modified"],
+                result["multi_modified"], result["restored_to_active"],
+            )
+    except Exception as e:
+        logger.warning(f"[watchdog-exempt-backfill] non-fatal failure: {e}")
 
     # ── iter216 — Sync legacy/new subscription fields so dashboards never
     # disagree with admin manual-settle. For every partner / dealer / facility

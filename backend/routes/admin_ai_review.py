@@ -985,6 +985,16 @@ async def admin_approve_listing_review(
         "admin_approved_override":  True,
         "ai_scan_bypass":           True,
         "admin_approved_by":        current_user.id,
+        # HOTFIX (Infinite Re-flag Loop) / FIX 1 — Stamp watchdog immunity so
+        # the scheduled scanner never re-touches this listing. Also clear any
+        # `paused_by_watchdog` state inherited from a prior scheduled scan so
+        # the listing returns to active immediately.
+        "watchdog_exempt":          True,
+        "watchdog_exempt_at":       now,
+        "watchdog_exempt_by":       current_user.id,
+        "paused_by_watchdog":       False,
+        "paused_by":                None,
+        "paused_reason":            None,
         # Wipe every AI-review breadcrumb so the listing leaves pending cleanly
         "ai_review_id":             None,
         "ai_review_flag":           None,
