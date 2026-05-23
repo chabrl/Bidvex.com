@@ -40,9 +40,12 @@ from services.analytics_tracker import (
     ],
 )
 def test_capi_type_prefix_matches_feed(ltype, expected):
-    """analytics_tracker MUST share the exact prefix mapping with the feed."""
+    """iter224 hotfix — Pixel content_ids and Catalog item ids are now BOTH
+    the raw listing_id with no prefix. The `expected` arg is kept for
+    backwards-compat with the prior parametrize matrix but no longer used."""
+    _ = expected  # prefix no longer baked in
     capi_id = canonical_content_id(ltype, "test-uuid-1234")
-    assert capi_id == f"BIDVEX-{expected}-test-uuid-1234"
+    assert capi_id == "test-uuid-1234"
 
 
 def test_feed_and_capi_produce_identical_content_id_for_same_listing():
@@ -55,12 +58,13 @@ def test_feed_and_capi_produce_identical_content_id_for_same_listing():
             f"Catalog feed and CAPI diverged for type={ltype!r}: "
             f"feed={feed_id!r} capi={capi_id!r}"
         )
+        assert feed_id == listing_id  # iter224 — raw id, no prefix
 
 
-def test_canonical_content_id_handles_unknown_type():
-    """Unknown listing_type defaults to marketplace ('MKT')."""
+def test_canonical_content_id_is_raw_listing_id():
+    """iter224 hotfix — content_id MUST be the raw UUID, no prefix."""
     cid = canonical_content_id("__unknown__", "uuid-x")
-    assert cid == "BIDVEX-MKT-uuid-x"
+    assert cid == "uuid-x"
 
 
 def test_canonical_content_id_none_listing_id():
@@ -169,7 +173,7 @@ def test_build_purchase_event_legacy_fallback_when_no_content_ids():
 # ─────────────────────────────────────────────────────────────────────
 
 
-_CONTENT_ID_RE = re.compile(r"^BIDVEX-(MKT|LOT|VEH|STO)-[A-Za-z0-9_\-]+$")
+_CONTENT_ID_RE = re.compile(r"^[A-Za-z0-9_\-]+$")  # iter224 — raw UUID format
 
 
 @pytest.mark.parametrize(
@@ -182,27 +186,32 @@ _CONTENT_ID_RE = re.compile(r"^BIDVEX-(MKT|LOT|VEH|STO)-[A-Za-z0-9_\-]+$")
     ],
 )
 def test_content_id_passes_meta_strict_regex(ltype, lid):
-    """Catalog match requires strict alphanumeric + dash format."""
+    """iter224 hotfix — Catalog match requires strict alphanumeric + dash
+    format. Content_id is now the raw listing_id."""
     cid = canonical_content_id(ltype, lid)
     assert _CONTENT_ID_RE.match(cid), f"Bad content_id format: {cid!r}"
+    assert cid == lid
 
 
-def test_content_id_never_contains_locked_prefix():
-    """Regression guard for the legacy `locked-<uuid>` bug that broke
-    catalog ingestion in the previous session."""
+def test_content_id_never_contains_legacy_prefixes():
+    """iter224 hotfix — content_id is the raw UUID. No prefixes whatsoever."""
     cid = canonical_content_id("marketplace", "385b5477-7510-4b5e-8225-6f0dadf9b2b9")
     assert "locked-" not in cid
     assert "auction_" not in cid
     assert "listing_" not in cid
+    assert "BIDVEX-" not in cid  # iter224 — no longer prefixed
+    assert cid == "385b5477-7510-4b5e-8225-6f0dadf9b2b9"
 
 
 # ─────────────────────────────────────────────────────────────────────
-# 6. Type-prefix maps internal consistency
+# 6. Type-prefix maps internal consistency (legacy backwards-compat)
 # ─────────────────────────────────────────────────────────────────────
 
 
 def test_tracker_prefix_map_superset_of_feed_map():
-    """analytics_tracker must support every type the feed knows about."""
+    """analytics_tracker must support every type the feed knows about
+    (kept for legacy code paths that still reference the prefix map even
+    though iter224 hotfix no longer uses prefixes in content_ids)."""
     for k, v in FEED_TYPE_PREFIX.items():
         assert TRACKER_PREFIX_MAP.get(k) == v, (
             f"Prefix divergence for {k!r}: feed={v!r} tracker={TRACKER_PREFIX_MAP.get(k)!r}"

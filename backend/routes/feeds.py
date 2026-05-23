@@ -92,7 +92,13 @@ async def _walk_active_listings(
     if type_filter:
         collections = [c for c in collections if c[1] == type_filter]
 
-    query: Dict[str, Any] = {"status": "active"}
+    # iter224 hotfix — Include ended/sold/closed listings in the catalog feed
+    # so they survive as `availability: out of stock` rather than being
+    # hard-deleted (which breaks Meta match rate). The mapper applies the
+    # final out-of-stock flip + final hammer price.
+    query: Dict[str, Any] = {
+        "status": {"$in": ["active", "ended", "sold", "closed", "completed"]}
+    }
     if category:
         query["category"] = category
     if province:
@@ -200,7 +206,10 @@ _CSV_COLUMNS: List[str] = [
     "price", "link", "image_link", "brand", "latitude", "longitude",
     "neighborhood", "city", "region", "country", "postal_code",
     "additional_image_link", "google_product_category",
-    "sale_price", "custom_label_0", "custom_label_1",
+    # iter224 hotfix — sale_price column removed entirely. Auctions have
+    # no concept of MSRP / sale price; sending it caused Google Merchant
+    # Center "Invalid sales price" validation failures.
+    "custom_label_0", "custom_label_1",
     "custom_label_2", "custom_label_3",
 ]
 
@@ -364,4 +373,59 @@ async def refresh_facebook_local_feed() -> Dict[str, Any]:
         "item_count": len(items),
         "cleared":    cleared,
         "exclusions": exclusions,
+    }
+
+
+# ── iter224 hotfix — Out-of-stock backfill for ended/sold listings ──
+@router.post("/facebook-local/backfill-ended", dependencies=[Depends(require_admin)])
+async def backfill_ended_listings_as_out_of_stock(dry_run: bool = False) -> Dict[str, Any]:
+    """One-shot admin tool. Lists listings that are ended/sold/closed and were
+    previously marked `meta_catalog_synced=true`, then logs a counter of how
+    many will flip to `availability: out of stock` on the next feed refresh.
+
+    The Meta + Google feeds are now rebuilt from MongoDB on every request
+    (with a Redis cache layer), so all this endpoint really does is:
+      1. Bust the feed cache so the next request rebuilds.
+      2. Confirm ended/sold listings still surface in the rebuilt feed
+         with `availability: "out of stock"` + final_hammer_price.
+    Returns a count summary so admins can verify against Meta Commerce
+    Manager + Google Merchant Center.
+    """
+    db = get_db()
+    # Find candidates that previously synced to the catalog but are no
+    # longer active. These were the rows at risk of being hard-deleted.
+    cursor = db.listings.find(
+        {
+            "status": {"$in": ["ended", "sold", "closed", "completed"]},
+        },
+        {"_id": 0, "id": 1, "status": 1, "final_hammer_price": 1, "current_bid": 1, "current_price": 1, "listing_type": 1},
+    )
+    rows = await cursor.to_list(5000)
+    flips = []
+    for r in rows:
+        price = (
+            r.get("final_hammer_price")
+            or r.get("current_bid")
+            or r.get("current_price")
+            or 0
+        )
+        flips.append({
+            "id":             r.get("id"),
+            "status":         r.get("status"),
+            "listing_type":   r.get("listing_type"),
+            "final_price":    price,
+            "new_availability": "out of stock",
+        })
+
+    if not dry_run:
+        invalidate_feed_cache()
+    return {
+        "status":         "ok" if not dry_run else "dry_run",
+        "total_candidates": len(flips),
+        "first_10":        flips[:10],
+        "note":            (
+            "Meta + Google feeds now include ended listings with "
+            "`availability: out of stock`. Trigger a Meta Catalog 'Fetch Now' "
+            "and Google Merchant Center 'Fetch feed now' to re-ingest."
+        ),
     }

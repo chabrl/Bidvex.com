@@ -84,15 +84,19 @@ export const deriveListingType = ({ listing, routeHint } = {}) => {
  * Returns the canonical content_id string that MUST appear in every
  * pixel/CAPI event for this listing.
  *
+ * iter224 hotfix — Format is now the RAW `listing.id` (UUID string). Earlier
+ * iterations used a `BIDVEX-{TYPE}-{id}` token to embed type metadata, but
+ * that broke Google Merchant Center's `id ↔ link page id` validation and
+ * Meta catalog match rate. Per the directive, Pixel content_ids MUST equal
+ * the catalog item id EXACTLY (no prefix, no reformatting). The backend
+ * mapper (`services/meta_feed_mapper.py::_content_id`) returns the same.
+ *
  * @param {object} listing  — listing payload (must have .id)
- * @param {object} [opts]   — { routeHint }
  * @returns {string|null}
  */
-export const getCanonicalContentId = (listing, opts = {}) => {
+export const getCanonicalContentId = (listing) => {
   if (!listing || !listing.id) return null;
-  const type = deriveListingType({ listing, routeHint: opts.routeHint });
-  const prefix = TYPE_PREFIX[type] || 'MKT';
-  return `BIDVEX-${prefix}-${listing.id}`;
+  return String(listing.id);
 };
 
 /**

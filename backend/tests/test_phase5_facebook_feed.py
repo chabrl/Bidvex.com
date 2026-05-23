@@ -37,19 +37,21 @@ from services.meta_feed_mapper import (
 # ────────────────────────────────────────────────────────────────────────
 class TestContentIdFormat:
     def test_id_format_marketplace(self):
-        assert _content_id("marketplace", "abc123") == "BIDVEX-MKT-abc123"
+        # iter224 hotfix — content_id is now raw listing_id (no prefix).
+        assert _content_id("marketplace", "abc123") == "abc123"
 
     def test_id_format_lots(self):
-        assert _content_id("lots", "x9") == "BIDVEX-LOT-x9"
+        assert _content_id("lots", "x9") == "x9"
 
     def test_id_format_vehicle(self):
-        assert _content_id("vehicle", "uuid-1") == "BIDVEX-VEH-uuid-1"
+        assert _content_id("vehicle", "uuid-1") == "uuid-1"
 
     def test_id_format_storage(self):
-        assert _content_id("storage", "S-42") == "BIDVEX-STO-S-42"
+        assert _content_id("storage", "S-42") == "S-42"
 
     def test_id_unknown_type_defaults_to_mkt(self):
-        assert _content_id("unknown", "id1").startswith("BIDVEX-MKT-")
+        # iter224 — unknown type still returns raw id (no prefix).
+        assert _content_id("unknown", "id1") == "id1"
 
 
 class TestConditionMapping:
@@ -278,11 +280,17 @@ class TestMapperExclusions:
         c = _fresh_exclusion_counter()
         item = map_listing_to_meta_item(_good_listing(), "marketplace", {}, c)
         assert item is not None
-        assert item["id"] == "BIDVEX-MKT-L1"
+        # iter224 hotfix — content_id is now the raw listing id (no prefix).
+        assert item["id"] == "L1"
 
-    def test_excludes_inactive(self):
+    def test_inactive_listing_now_included_as_out_of_stock(self):
+        """iter224 hotfix — ended/sold listings stay in the catalog with
+        `availability: out of stock` (instead of being hard-excluded which
+        broke Meta match rate)."""
         c = _fresh_exclusion_counter()
-        assert map_listing_to_meta_item(_good_listing(status="ended"), "marketplace", {}, c) is None
+        item = map_listing_to_meta_item(_good_listing(status="ended"), "marketplace", {}, c)
+        assert item is not None
+        assert item["availability"] == "out of stock"
 
     def test_excludes_pending_review(self):
         c = _fresh_exclusion_counter()
@@ -676,7 +684,7 @@ class TestFeedEndpoint:
             "price,link,image_link,brand,latitude,longitude,"
             "neighborhood,city,region,country,postal_code,"
             "additional_image_link,google_product_category,"
-            "sale_price,custom_label_0,custom_label_1,"
+            "custom_label_0,custom_label_1,"
             "custom_label_2,custom_label_3"
         )
         assert first_line == expected, f"header mismatch:\n{first_line}\n--vs--\n{expected}"
@@ -757,11 +765,15 @@ class TestFrontendPixel:
                     "revokeConsent"):
             assert sym in src, f"missing {sym}"
 
-    def test_pixel_storage_prefix_is_sto(self):
-        """content_ids must match backend: storage → STO (not STG)."""
-        src = pathlib.Path("/app/frontend/src/utils/metaPixel.js").read_text(encoding="utf-8")
-        assert "storage: 'STO'" in src
-        assert "storage: 'STG'" not in src
+    def test_pixel_storage_prefix_is_raw_id(self):
+        """iter224 hotfix — content_ids are now raw listing.id (no prefix).
+        Test renamed from `test_pixel_storage_prefix_is_sto`."""
+        src = pathlib.Path("/app/frontend/src/utils/metaContentId.js").read_text(encoding="utf-8")
+        # getCanonicalContentId must return the raw listing.id.
+        assert "return String(listing.id)" in src
+        # Verify no BIDVEX-{prefix}- template-literal pattern survives in the
+        # canonical content_id helper (older iterations used this format).
+        assert "`BIDVEX-${prefix}-${listing.id}`" not in src
 
     def test_pixel_uses_canonical_consent_key(self):
         src = pathlib.Path("/app/frontend/src/utils/metaPixel.js").read_text(encoding="utf-8")
@@ -773,9 +785,10 @@ class TestFrontendPixel:
         assert "fbq('consent', 'revoke')" in src or 'fbq("consent", "revoke")' in src
 
     def test_pixel_id_format_matches_backend(self):
-        src = pathlib.Path("/app/frontend/src/utils/metaPixel.js").read_text(encoding="utf-8")
-        # The frontend must produce ids in the same shape: BIDVEX-{PREFIX}-{id}
-        assert "BIDVEX-${prefix}-${listingId}" in src
+        """iter224 hotfix — FE + BE both emit RAW listing.id as content_id."""
+        src = pathlib.Path("/app/frontend/src/utils/metaContentId.js").read_text(encoding="utf-8")
+        # The helper must return the raw listing.id (no template-literal prefix).
+        assert "return String(listing.id)" in src
 
     def test_pixel_consent_gated(self):
         src = pathlib.Path("/app/frontend/src/utils/metaPixel.js").read_text(encoding="utf-8")

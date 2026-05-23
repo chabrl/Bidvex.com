@@ -177,13 +177,16 @@ _TYPE_PREFIX_MAP = {
 def canonical_content_id(listing_type: Optional[str], listing_id: Optional[str]) -> Optional[str]:
     """Returns the canonical Meta content_id for a (listing_type, listing_id).
 
-    Matches both `services/meta_feed_mapper.py::_content_id()` and the
-    frontend `utils/metaContentId.js::getCanonicalContentId()`.
+    iter224 hotfix — Format is now RAW `listing_id` (UUID string). Matches
+    `services/meta_feed_mapper.py::_content_id()` and the frontend
+    `utils/metaContentId.js::getCanonicalContentId()`. Pixel content_ids and
+    catalog item ids MUST be byte-identical (no prefix, no reformatting) per
+    Meta + Google Merchant Center matching rules.
     """
     if not listing_id:
         return None
-    prefix = _TYPE_PREFIX_MAP.get((listing_type or "").lower(), "MKT")
-    return f"BIDVEX-{prefix}-{listing_id}"
+    # `listing_type` arg retained for backwards-compat with callers; ignored.
+    return str(listing_id)
 
 
 def canonical_content_type(listing_type: Optional[str]) -> str:

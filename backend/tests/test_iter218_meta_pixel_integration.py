@@ -32,7 +32,7 @@ from services.analytics_tracker import (  # noqa: E402
 )
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://prod-verify-2.preview.emergentagent.com").rstrip("/")
-_CONTENT_ID_RE = re.compile(r"^BIDVEX-(MKT|LOT|VEH|STO)-[A-Za-z0-9_\-]+$")
+_CONTENT_ID_RE = re.compile(r"^[A-Za-z0-9_\-]+$")  # iter224 — raw UUID
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -146,10 +146,10 @@ class TestTrackListingPurchase:
         ))
 
         # Return shape
-        assert result["content_ids"] == ["BIDVEX-MKT-uuid-mkt-1"]
+        assert result["content_ids"] == ["uuid-mkt-1"]
         assert result["value_cad"] == 199.99
         assert result["event_id"] == (
-            "bidvex_purchase_BIDVEX-MKT-uuid-mkt-1_session_cs_test_abc"
+            "bidvex_purchase_uuid-mkt-1_session_cs_test_abc"
         )
 
         # Emitted Meta event payload
@@ -157,19 +157,19 @@ class TestTrackListingPurchase:
         ev = patched_meta_send[0]
         assert ev["event_name"] == "Purchase"
         cd = ev["custom_data"]
-        assert cd["content_ids"] == ["BIDVEX-MKT-uuid-mkt-1"]
+        assert cd["content_ids"] == ["uuid-mkt-1"]
         assert cd["content_type"] == "product"
         assert cd["num_items"] == 1
         assert cd["value"] == 199.99
         assert cd["contents"] == [
-            {"id": "BIDVEX-MKT-uuid-mkt-1", "quantity": 1, "item_price": 199.99}
+            {"id": "uuid-mkt-1", "quantity": 1, "item_price": 199.99}
         ]
 
         # Audit-log row
         assert len(db.meta_capi_log.docs) == 1
         log = db.meta_capi_log.docs[0]
         assert log["session_id"] == "cs_test_abc"
-        assert log["content_ids"] == ["BIDVEX-MKT-uuid-mkt-1"]
+        assert log["content_ids"] == ["uuid-mkt-1"]
         assert log["listing_type"] == "marketplace"
 
     def test_listing_purchase_missing_listing_id_short_circuits(self, patched_meta_send):
@@ -197,7 +197,7 @@ class TestTrackListingPurchase:
             total_charged=5000.0,
             listing_title="2018 Honda Civic",
         ))
-        assert patched_meta_send[0]["custom_data"]["content_ids"] == ["BIDVEX-VEH-veh-1"]
+        assert patched_meta_send[0]["custom_data"]["content_ids"] == ["veh-1"]
         assert patched_meta_send[0]["custom_data"]["content_type"] == "vehicle"
 
     def test_listing_purchase_storage_uses_STO_prefix(self, patched_meta_send):
@@ -209,7 +209,7 @@ class TestTrackListingPurchase:
             listing_type="storage",
             total_charged=300.0,
         ))
-        assert patched_meta_send[0]["custom_data"]["content_ids"] == ["BIDVEX-STO-sto-1"]
+        assert patched_meta_send[0]["custom_data"]["content_ids"] == ["sto-1"]
 
 
 class TestTrackBrokerPurchase:
@@ -241,16 +241,16 @@ class TestTrackBrokerPurchase:
             listing_title="2020 Ford F-150",
             listing_category="vehicle",
         ))
-        assert result["content_ids"] == ["BIDVEX-VEH-veh-uuid-42"]
+        assert result["content_ids"] == ["veh-uuid-42"]
         # CRITICAL: value remains platform_fee+broker_fee (NOT hammer)
         assert result["value_cad"] == 875.0
         cd = patched_meta_send[0]["custom_data"]
-        assert cd["content_ids"] == ["BIDVEX-VEH-veh-uuid-42"]
+        assert cd["content_ids"] == ["veh-uuid-42"]
         assert cd["content_type"] == "vehicle"
         assert cd["content_name"] == "2020 Ford F-150"
         # Contents array present
         assert cd["contents"] == [
-            {"id": "BIDVEX-VEH-veh-uuid-42", "quantity": 1, "item_price": 875.0}
+            {"id": "veh-uuid-42", "quantity": 1, "item_price": 875.0}
         ]
 
 
@@ -275,4 +275,4 @@ class TestTrackBrokerPurchase:
 )
 def test_canonical_content_id_defaults(ltype, prefix):
     cid = canonical_content_id(ltype, "uuid-x")
-    assert cid == f"BIDVEX-{prefix}-uuid-x"
+    assert cid == "uuid-x"  # iter224 — raw id (prefix arg ignored)

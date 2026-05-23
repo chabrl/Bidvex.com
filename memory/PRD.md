@@ -1,5 +1,81 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter224 — META PIXEL + GOOGLE MERCHANT CENTER HOTFIX (Feb 22, 2026) ✅
+
+Surgical 6-fix hotfix per directive. No refactoring.
+
+### Fix 1+6 — Feed Price Hygiene (Meta + Google) ✅
+**File**: `backend/services/meta_feed_mapper.py`.
+- NEW `_final_or_current_price(listing, lots)` returns:
+  - `final_hammer_price` for ended/sold/closed listings
+  - `current_bid` / `current_price` for active listings
+  - `starting_price` if no bids yet (fallback)
+  - Never `buy_now_price`
+- `_price_str` formats as `"X.XX CAD"`.
+- **sale_price field REMOVED** from item payload (Fix-6 requirement). The buy_now_price → sale_price block deleted.
+- **`sale_price` CSV column REMOVED** from `_CSV_COLUMNS` in `routes/feeds.py`.
+
+### Fix 4 — content_id Mismatch (RAW listing.id) ✅
+**Files**: `backend/services/meta_feed_mapper.py::_content_id`, `backend/services/analytics_tracker.py::canonical_content_id`, `frontend/src/utils/metaContentId.js::getCanonicalContentId`.
+- Earlier iterations (iter218) used `BIDVEX-{TYPE}-{id}` to embed type metadata. Per directive: **raw `listing.id` UUID, no prefix, no reformatting**. Identical strings across:
+  - Meta Catalog item `id` field
+  - Pixel `content_ids` array (ViewContent, AddToCart, InitiateCheckout, Purchase)
+  - CAPI `content_ids` payload
+  - Google Merchant Center `id` field
+- Backend + frontend helpers now return `String(listing.id)` directly.
+
+### Fix 5 — Never Hard-Delete Ended Listings ✅
+**Files**: `backend/services/meta_feed_mapper.py::_availability`, `backend/routes/feeds.py` (query expansion + backfill endpoint).
+- NEW `_availability(listing)` returns `"out of stock"` for status in `(ended, sold, closed, completed, deleted, archived)`, else `"in stock"`.
+- `map_listing_to_meta_item` no longer drops non-active listings; only moderation-pending and explicit drafts are excluded.
+- Feed builder query expanded: `status: $in: [active, ended, sold, closed, completed]`.
+- NEW admin endpoint `POST /api/feeds/facebook-local/backfill-ended` (admin-only) — dry-runs / commits a sweep that confirms how many ended listings will flip to `out of stock` on next ingest. Busts the feed cache so next request rebuilds.
+
+### Fix 2+3 — Pixel AddToCart + Purchase (already wired in iter218; content_id refresh)
+- AddToCart fires on every bid submission across all 4 detail pages (Listing, MultiItem, Vehicle, Storage) with content_ids = `[listing.id]`.
+- Purchase fires from `PaymentSuccessPage` Pixel + backend CAPI (`track_listing_purchase`, `track_broker_purchase`) with shared `event_id` for dedup.
+- iter224 hotfix swap: content_ids in all events are now the raw UUID (was `BIDVEX-{TYPE}-{id}`).
+
+### Verification (231/232 backend tests pass)
+- iter218 funnel parity tests (29) — all green after raw-UUID update.
+- iter218 integration tests (19) — all green after raw-UUID update.
+- Phase 5 facebook feed tests (123) — green except 1 pre-existing seed-padding flake documented in handoff.
+- iter222/iter221/iter223 — all green.
+- **Live feed verified**: 5 rows, `id` = raw UUID, `price` = `100.00 CAD` (current_bid), `sale_price` column absent, BIDVEX- prefixes count = 0.
+- **Live ended-listing test**: ended status → `availability: out of stock`, `price: 150.00 CAD` (final_hammer_price).
+
+### QA Checklist (all ✅)
+- [x] Meta catalog feed: no sale_price field anywhere
+- [x] Meta catalog feed: price = current_bid in CAD
+- [x] Google feed: no sale_price field anywhere (same CSV serves both)
+- [x] Google feed: price = current_bid in CAD
+- [x] Pixel fires AddToCart on every bid submission (iter218 + iter224)
+- [x] Pixel fires Purchase on every Stripe success (iter218 + iter224)
+- [x] All Pixel events use listing.id raw as content_ids (iter224)
+- [x] Meta catalog id field = listing.id exact match (iter224)
+- [x] Ended/deleted listings serve as out_of_stock, NOT hard-deleted
+- [x] Backfill admin endpoint available at `POST /api/feeds/facebook-local/backfill-ended`
+
+### Action items (user)
+1. **Save to GitHub → redeploy** preview → production.
+2. **Meta Commerce Manager** → Data Sources → Data Feeds → "Fetch Now". Meta will re-ingest with raw UUIDs (next catalog ID change since iter218 introduced BIDVEX-prefixed IDs).
+3. **Google Merchant Center** → Products → Feeds → "Fetch now". The "Invalid sales price" rejection should clear.
+4. **Meta Events Manager → Test Events** — verify ViewContent/AddToCart/Purchase content_ids match the new raw-UUID catalog item IDs.
+5. **Pixel Helper** on production listings → confirm `content_ids: ["<uuid>"]` (no prefix).
+6. Optional: `POST /api/feeds/facebook-local/backfill-ended` (with admin token) to see how many historical ended listings will flip on next ingest.
+
+### Files Changed
+- `backend/services/meta_feed_mapper.py` (price helpers, availability, content_id)
+- `backend/services/analytics_tracker.py` (canonical_content_id)
+- `backend/routes/feeds.py` (CSV columns, query expansion, backfill endpoint)
+- `frontend/src/utils/metaContentId.js` (getCanonicalContentId)
+- `backend/tests/test_meta_pixel_funnel.py` (raw-id assertions)
+- `backend/tests/test_iter218_meta_pixel_integration.py` (raw-id assertions)
+- `backend/tests/test_phase5_facebook_feed.py` (raw-id, CSV header, out-of-stock assertions)
+
+---
+
+
 ## Latest: iter223 — ADMIN DEMO SECTION: SANDBOX + AUCTIONEER + MOCK METRICS (Feb 22, 2026) ✅
 
 Three-task upgrade to the existing `/admin/demo-accounts` flow: a 4th demo persona (Auctioneer), invisible-sandbox listing isolation with owner-self-include, and a mock-metrics waterfall for empty-data demo dashboards.

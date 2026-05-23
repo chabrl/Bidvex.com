@@ -295,38 +295,92 @@ def _brand(listing: Dict[str, Any]) -> str:
     return "BidVex Marketplace"
 
 
-def _price_str(listing: Dict[str, Any], lots: Optional[List[Dict]]) -> str:
-    """Returns 'X.XX CAD' using the highest priority value available."""
-    current = listing.get("current_bid") or listing.get("current_price")
-    starting = listing.get("starting_bid") or listing.get("starting_price")
+def _content_id(listing_type: str, listing_id: str) -> str:
+    """iter224 hotfix — Meta catalog item ID + Pixel content_ids must be
+    EXACTLY identical to `listing.id`. No prefix, no reformatting.
 
-    # For multi-lot listings, fall back to the highest lot's current_price.
-    if (not current or current <= 0) and lots:
+    Earlier iterations (iter218) used a `BIDVEX-{TYPE}-{id}` token to bake
+    a type discriminator into the ID, but that breaks Google Merchant
+    Center's `id ↔ link page id` validation and prevents the Pixel↔Catalog
+    match-rate fix. Going forward the raw UUID is the canonical ID across
+    Pixel, CAPI, Meta catalog, and Google Merchant Center.
+    """
+    return str(listing_id)
+
+
+def _price_str_from_value(v: Any) -> str:
+    """Helper: format a single price value as 'X.XX CAD' (no fallbacks)."""
+    try:
+        f = float(v) if v is not None else 0.0
+    except (TypeError, ValueError):
+        f = 0.0
+    return f"{f:.2f} CAD"
+
+
+def _final_or_current_price(listing: Dict[str, Any], lots: Optional[List[Dict]]) -> Any:
+    """iter224 hotfix — Return the single canonical price for catalog/feed.
+
+    Auction price priority:
+      1. status in ("ended","sold","closed") AND `final_hammer_price` → use it
+      2. status in ("ended","sold","closed") AND `current_price/current_bid` → use it
+      3. Live current_bid / current_price → use it
+      4. Highest lot price (multi-lot) → use it
+      5. starting_price / starting_bid → use it
+      6. 1.00 (Meta refuses 0)
+    `buy_now_price` is NEVER returned — auctions only expose live bid prices.
+    """
+    status = (listing.get("status") or "").lower()
+    if status in ("ended", "sold", "closed", "completed"):
+        for k in ("final_hammer_price", "winning_bid", "final_price", "current_bid", "current_price"):
+            v = listing.get(k)
+            if v is not None:
+                try:
+                    if float(v) > 0:
+                        return v
+                except (TypeError, ValueError):
+                    continue
+
+    current = listing.get("current_bid") or listing.get("current_price")
+    if current and float(current) > 0:
+        return current
+
+    if lots:
         currents = [
             (lot.get("current_price") or lot.get("starting_price") or 0) for lot in lots
         ]
         currents = [c for c in currents if c]
         if currents:
-            current = max(currents)
+            return max(currents)
 
-    try:
-        v = float(current) if current and float(current) > 0 else (
-            float(starting) if starting and float(starting) > 0 else 1.00
-        )
-    except (TypeError, ValueError):
-        v = 1.00
-    return f"{v:.2f} CAD"
+    starting = listing.get("starting_bid") or listing.get("starting_price")
+    if starting:
+        try:
+            if float(starting) > 0:
+                return starting
+        except (TypeError, ValueError):
+            pass
+
+    return 1.00
+
+
+def _price_str(listing: Dict[str, Any], lots: Optional[List[Dict]]) -> str:
+    """Returns 'X.XX CAD' using the canonical (NO buy_now) price."""
+    return _price_str_from_value(_final_or_current_price(listing, lots))
+
+
+def _availability(listing: Dict[str, Any]) -> str:
+    """iter224 hotfix — Ended/sold listings remain in the catalog but flip
+    to `out of stock` so Meta + Google retain match history instead of
+    hard-deleting and breaking attribution."""
+    status = (listing.get("status") or "").lower()
+    if status in ("ended", "sold", "closed", "completed", "deleted", "archived"):
+        return "out of stock"
+    return "in stock"
 
 
 def _build_link(listing_type: str, listing_id: str) -> str:
     path = LISTING_TYPE_TO_PATH.get(listing_type, "listings")
     return f"{BIDVEX_BASE_URL}/{path}/{listing_id}"
-
-
-def _content_id(listing_type: str, listing_id: str) -> str:
-    """MUST match the format used by the frontend Meta Pixel content_ids."""
-    prefix = TYPE_PREFIX.get(listing_type, "MKT")
-    return f"BIDVEX-{prefix}-{listing_id}"
 
 
 def _is_demo(seller: Dict[str, Any]) -> bool:
@@ -363,10 +417,15 @@ def map_listing_to_meta_item(
     """
     # ── Pre-flight exclusion checks ──
     status = listing.get("status")
-    if status != "active":
-        if status in ("pending_review", "manual_review"):
-            exclusion_counter["moderation_pending"] += 1
-        # Other non-active statuses just aren't counted here; the caller pre-filters.
+    # iter224 hotfix — ended/sold/closed listings are NO LONGER excluded
+    # from the catalog. Per Meta best practice we keep them indexed with
+    # `availability: "out of stock"` so attribution + match history survive.
+    # Only moderation-blocked listings are still dropped.
+    if status in ("pending_review", "manual_review"):
+        exclusion_counter["moderation_pending"] += 1
+        return None
+    if status not in ("active", "ended", "sold", "closed", "completed"):
+        # Anything else (draft, deleted by user, archived without sale, etc.)
         return None
 
     if _is_demo(seller):
@@ -426,8 +485,12 @@ def map_listing_to_meta_item(
         "id":              _content_id(listing_type, listing_id),
         "title":           title,
         "description":     description,
-        "availability":    "in stock",
+        # iter224 hotfix — availability flips to "out of stock" for ended/sold
+        # listings so Meta + Google keep match history instead of hard-delete.
+        "availability":    _availability(listing),
         "condition":       _map_condition(listing.get("condition")),
+        # iter224 hotfix — price is ALWAYS the live bid (or final hammer if
+        # the auction has ended). buy_now_price is NEVER sent to external feeds.
         "price":           _price_str(listing, listing.get("lots")),
         "link":            _build_link(listing_type, listing_id),
         "image_link":      primary_image,
@@ -458,14 +521,11 @@ def map_listing_to_meta_item(
     if extra_images:
         item["additional_image_link"] = ",".join(extra_images)
 
-    # Sale price — only when buy-it-now differs from current bid
-    buy_now = listing.get("buy_it_now_price") or listing.get("buy_now_price")
-    current = listing.get("current_bid") or listing.get("current_price")
-    if buy_now and (not current or float(buy_now) != float(current)):
-        try:
-            item["sale_price"] = f"{float(buy_now):.2f} CAD"
-        except (TypeError, ValueError):
-            pass
+    # iter224 hotfix — sale_price/buy_now removed from feed entirely.
+    # BidVex is an auction platform; the only valid price is the live bid.
+    # Google Merchant Center was rejecting listings with "Invalid sales
+    # price — Prevents from showing in Canada" because the feed sale_price
+    # didn't match the crawled-page current bid.
 
     return item
 
