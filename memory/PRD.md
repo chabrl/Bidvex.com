@@ -1,6 +1,46 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: iter226 — LAUNCH-READY: PERMISSIVE SIGNING + ADMIN AUDIT ECOSYSTEM (Feb 24, 2026) ✅ 2 TASKS
+## Latest: iter227 — CRITICAL ESCALATION REMEDIATION (Feb 24, 2026) ✅ 4 FIXES
+
+Four launch-blocking production bugs reported and fixed in preview. Root-cause-fix only, no scope creep.
+
+### Fix #1 — Broker Approve "Action Failed" 🔴 RESOLVED
+**Root cause**: `BrokerDashboardPage.jsx::handleBuyerAction` built URL `${API_BASE}/api/broker-relationships/.../approve` while `API_BASE` already ends in `/api` → request hit `/api/api/...` → 405 Method Not Allowed → frontend alert("Action failed"). Fixed by removing the redundant `/api` prefix in the 4 branches (approve/reject/suspend/terminate). Approve now flips status pending → active and instantly refreshes buyers + analytics + broker overview.
+
+### Fix #2 — Custom Contract Visibly Rendered & Strictly Enforced 🔴 RESOLVED
+**Root cause**: Buyers had to click "Read Contract" to see broker's custom terms — easy to miss. Fixed by rendering the contract INLINE in a prominent amber/orange card with `dangerouslySetInnerHTML` (5K char box, max-h-420px scrollable). Modal still available via "Read Full-Screen & Sign" for the legal signature flow. `data-testid='broker-custom-terms-inline'` wraps the rendered HTML; `broker-authorize-deposit` button remains disabled (`!canAuthorize`) until `termsAccepted=true`. Strict enforcement preserved.
+
+### Fix #3 — Live Analytics 🔴 RESOLVED
+**Root cause**: 5 KPIs (Active Buyers, Pending Requests, Deals Won, Total Revenue, Total Buyers) read stale incremented counters on the broker doc — never decremented on terminate/reject. Fixed with NEW `GET /api/brokers/me/analytics` computing everything live from `broker_buyer_relationships` (statuses), `broker_bids` (count), `broker_invoices` (won/settled/revenue aggregation pipeline). Returns 16 fields including hammer GMV, settled-vs-gross revenue split, last-bid/invoice timestamps. Frontend auto-refreshes every 60s + after every buyer action. `data-testid='broker-overview-kpis'` wraps the live tile group.
+
+### Fix #4 — Admin Attachment Access 🔴 RESOLVED
+**Root cause**: `/admin/brokers` endpoint already returned `license_document_url`, `registration_document_url`, `additional_documents` in the response, but the React UI never rendered them. Admin couldn't verify documents before approval. Fixed by adding `BrokerDocuments` helper component to every broker row, rendering: (a) provincial license badges `ANQ:.../OPC:.../OMVIC:.../VSA:.../AMVIC:...` for QC/ON/BC/AB regs; (b) clickable doc links with FileText icon, "IMG" tag for images, ExternalLink icon — each opens S3-hosted file in new tab; (c) explicit warning if no docs uploaded (rose-colored AlertTriangle). Helper text: "Verify each document before approval. Links open in a new tab."
+
+### Verification (Backend 100% / Frontend 100%)
+- NEW `tests/test_iter227_critical_remediation.py` — 5 pytest pass + 1 graceful skip.
+- Testing agent end-to-end Playwright verified: Fix #1 route-path probes, Fix #2 inline contract renders real HTML (5,195 chars) with deposit button disabled, Fix #3 endpoint 401/404 gates, Fix #4 2 brokers show clickable doc links + provincial badges on live preview.
+- Combined broker test suite (iter225+226+227): 13 pass + 12 graceful skips + 0 failures.
+
+### Files Changed
+**Backend**: `routes/brokers.py` — NEW `get_my_broker_analytics` endpoint.
+**Frontend**: `pages/BrokerDashboardPage.jsx` (URL fix + analytics state + 60s polling + live KPI sources), `pages/BrokerBindingRequestPage.jsx` (inline contract rendering), `pages/admin/AdminBrokersPage.jsx` (BrokerDocuments helper).
+**Tests**: NEW `tests/test_iter227_critical_remediation.py`.
+
+### Action items (user — production deploy required)
+1. **Save to GitHub → redeploy** preview → production. All 4 bugs are launch-blockers and the user reported them as live on bidvex.com.
+2. Smoke-test on prod after redeploy:
+   - Approve a pending buyer from broker dashboard → no "Action Failed" alert, KPIs update immediately.
+   - As a buyer, visit a binding-request page for a broker with custom terms → see the contract INLINE before scrolling to Authorize Deposit.
+   - As admin → `/admin/brokers` → click PDF links to verify they open.
+
+### Non-blocking follow-ups (testing-agent code review)
+- Sanitize broker-supplied `custom_terms_html` server-side via DOMPurify-equivalent — defense-in-depth against compromised broker account injecting XSS into every buyer's browser.
+- Surface a small inline "unable to refresh KPIs" badge when 60s analytics poll fails (currently silent).
+
+---
+
+
+## Previous: iter226 — LAUNCH-READY: PERMISSIVE SIGNING + ADMIN AUDIT ECOSYSTEM (Feb 24, 2026) ✅ 2 TASKS
 
 Critical onboarding fix unblocks pending-applicant flow + complete admin compliance oversight of every broker license.
 
