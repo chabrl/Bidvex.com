@@ -8,6 +8,7 @@ import ErrorBoundary from '../../components/ErrorBoundary';
 
 import React, { useState, useEffect, useCallback } from 'react';
 import SafeImage from '../../components/SafeImage';
+import VehicleBidPanel from '../../components/broker/VehicleBidPanel';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
@@ -455,6 +456,15 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
           {/* Bid Input */}
           {!isEnded && (
             <div className="space-y-3">
+              {/* iter229 — System-Proxy Compliance Gateway (vehicle-only) */}
+              <VehicleBidPanel
+                listingId={vehicle?.id}
+                vehicleProvince={vehicle?.seller_province || vehicle?.province}
+                currentHighestBid={vehicle?.current_bid || 0}
+                lang={i18n.language?.startsWith('fr') ? 'fr' : 'en'}
+                onBidSuccess={() => { try { window.location.reload(); } catch {} }}
+              />
+
               {/* Security Deposit Banner for High-Value Vehicles */}
               <SecurityDepositBanner
                 listingId={vehicle?.id}

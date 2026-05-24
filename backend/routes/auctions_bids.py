@@ -101,16 +101,22 @@ async def place_bid(request: Request, bid_data: BidCreate, current_user: User = 
     else:
         _auction_type = "marketplace"
 
-    # ===== iter217 Phase 5 Hotfix v7 — Vehicle broker gate (LEGAL) =====
-    # Under OPC / SAAQ / OMVIC / AMVIC / VSA, individual buyers cannot
-    # bid directly on a vehicle auction. They must route through a
-    # licensed broker via POST /api/bid-via-broker.
+    # ===== iter229 — System-Proxy Vehicle Bidding Gateway (LEGAL) =====
+    # For vehicle listings, the buyer can place a bid only via the
+    # System-Proxy engine: an ACTIVE broker partnership must exist,
+    # bid cap (if any) must not be exceeded, and the buyer must have
+    # accepted the proxy-bidding legal rider once. The bid is then
+    # stamped as legally executed under the broker's license, with
+    # full compliance metadata stored alongside the standard bid doc.
+    proxy_compliance_stamps = None
     if current_user.role != "admin":
         from services.category_rules import assert_broker_eligible
         bidder_account_type = (current_user.account_type or "individual")
-        has_rel = await db.broker_buyer_relationships.count_documents({
-            "buyer_user_id": current_user.id, "status": "active",
-        }) > 0 if hasattr(db, "broker_buyer_relationships") else False
+        rel = await db.broker_buyer_relationships.find_one(
+            {"buyer_user_id": current_user.id, "status": "active"},
+            {"_id": 0},
+        )
+        has_rel = rel is not None
         ok, err = assert_broker_eligible(
             category=listing.get("category", ""),
             bidder_account_type=bidder_account_type,
@@ -118,6 +124,53 @@ async def place_bid(request: Request, bid_data: BidCreate, current_user: User = 
         )
         if not ok:
             raise HTTPException(status_code=403, detail=err)
+
+        # If broker is required for this category, enforce the cap + agreement
+        if has_rel and _auction_type == "vehicle":
+            broker = await db.brokers.find_one(
+                {"id": rel["broker_id"], "verification_status": "approved"},
+                {"_id": 0},
+            )
+            if not broker:
+                raise HTTPException(status_code=403, detail={
+                    "error":      "broker_not_active",
+                    "message_en": "Your broker is no longer authorized to place vehicle bids on your behalf.",
+                    "message_fr": "Votre courtier n'est plus autorisé à enchérir sur des véhicules en votre nom.",
+                })
+            # Bid cap gate
+            cap = rel.get("bid_cap")
+            if cap is not None:
+                try:
+                    cap_f = float(cap)
+                except (TypeError, ValueError):
+                    cap_f = None
+                if cap_f is not None and float(bid_data.amount) > cap_f:
+                    raise HTTPException(status_code=400, detail={
+                        "error":      "bid_cap_exceeded",
+                        "message_en": f"This bid exceeds your pre-authorized broker bid cap of ${cap_f:.0f} CAD. Update your cap in partnership settings or ask your broker to adjust it.",
+                        "message_fr": f"Cette enchère dépasse votre plafond pré-autorisé de {cap_f:.0f} $ CAD. Mettez à jour votre plafond dans les paramètres du partenariat.",
+                        "bid_cap":    cap_f,
+                    })
+            # Proxy rider gate
+            if not rel.get("proxy_bid_agreement_accepted", False):
+                raise HTTPException(status_code=403, detail={
+                    "error":      "proxy_agreement_required",
+                    "message_en": "You must accept the proxy bid agreement before placing vehicle bids.",
+                    "message_fr": "Vous devez accepter l'accord de procuration avant de placer des enchères sur des véhicules.",
+                })
+            # Compliance stamps written to the bid document below
+            proxy_compliance_stamps = {
+                "legal_bidder_of_record_id":     rel["broker_id"],
+                "broker_license":                broker.get("broker_license_number"),
+                "broker_regulatory_body":        broker.get("regulatory_body"),
+                "broker_operating_province":     broker.get("operating_province"),
+                "acting_on_behalf_of_buyer_id":  current_user.id,
+                "proxy_routing_mode":            "system_proxy_auto",
+                "relationship_id":               rel["id"],
+                "jurisdiction_verified":         (listing.get("seller_province") or "").upper() or None,
+                "bid_cap_at_time_of_bid":        rel.get("bid_cap"),
+                "proxy_agreement_accepted_at":   rel.get("proxy_bid_agreement_accepted_at"),
+            }
 
     # ========== HIGH-VALUE DEPOSIT CHECK ($1k hold for >$10k auctions) ==========
     from services.pricing_config import DEPOSIT_THRESHOLD_CAD, DEPOSIT_AMOUNT_DOLLARS
@@ -202,6 +255,11 @@ async def place_bid(request: Request, bid_data: BidCreate, current_user: User = 
     bid = Bid(listing_id=bid_data.listing_id, bidder_id=current_user.id, amount=bid_data.amount)
     bid_dict = bid.model_dump()
     bid_dict["created_at"] = bid_dict["created_at"].isoformat()
+    # iter229 — proxy compliance stamps (vehicle bids only)
+    if proxy_compliance_stamps:
+        bid_dict["proxy_compliance"]          = proxy_compliance_stamps
+        bid_dict["legal_bidder_of_record_id"] = proxy_compliance_stamps["legal_bidder_of_record_id"]
+        bid_dict["bidder_type"]               = "broker_proxy"
 
     await db.bids.insert_one(bid_dict)
     new_bid_count = listing.get("bid_count", 0) + 1

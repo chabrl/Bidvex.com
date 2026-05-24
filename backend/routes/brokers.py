@@ -790,7 +790,6 @@ async def broker_buyer_ledger(current_user: User = Depends(get_current_user)):
             ended = l_status in ("ended", "completed", "won", "sold", "closed")
             our_top = listing.get("highest_bidder_id") == buyer_id and bid.get("status") in ("placed", "winning", "won")
             if not ended:
-                # Auction still live — count once per listing
                 active += 1
             else:
                 if our_top:
@@ -825,6 +824,155 @@ async def broker_buyer_ledger(current_user: User = Depends(get_current_user)):
         "total_bid_cad": round(sum(r["total_bid_amount_cad"] for r in rows), 2),
     }
     return {"data": rows, "totals": totals, "count": len(rows)}
+
+
+# ── iter229 — System-Proxy Bidding Compliance Gateway ──────────────────
+@brokers_router.get("/broker-relationships/compliance-check")
+async def broker_compliance_check(
+    listing_id:   str,
+    current_user: User = Depends(get_current_user),
+):
+    """Returns the proxy-bid eligibility verdict for a buyer × listing pair.
+
+    Verdicts (status field):
+      • eligible             — buyer can place a system-proxy bid right now
+      • no_broker            — buyer is not bound to any broker
+      • relationship_pending — broker hasn't approved the partnership yet
+      • no_deposit           — $500 escrow not authorized
+      • province_mismatch    — broker not licensed in the vehicle's province
+      • not_a_vehicle        — listing doesn't require a broker (non-vehicle)
+    """
+    db = get_db()
+
+    listing = await db.listings.find_one({"id": listing_id}, {"_id": 0})
+    if not listing:
+        raise HTTPException(status_code=404, detail={"error": "listing_not_found"})
+
+    cat = (listing.get("category") or "").lower()
+    vehicle_cats = ("vehicle", "car", "auto", "truck", "motorcycle", "suv", "van", "rv")
+    is_vehicle = bool(listing.get("requires_broker")) or any(v in cat for v in vehicle_cats)
+    if not is_vehicle:
+        return {"status": "not_a_vehicle"}
+
+    listing_province = (listing.get("seller_province") or listing.get("province") or "").upper() or None
+
+    rel = await db.broker_buyer_relationships.find_one(
+        {"buyer_user_id": current_user.id, "status": {"$in": ["pending", "approved", "active"]}},
+        {"_id": 0},
+    )
+    if not rel:
+        return {"status": "no_broker"}
+    if rel.get("status") in ("pending", "approved"):
+        return {"status": "relationship_pending"}
+
+    # Active — keep going
+    if (rel.get("deposit_status") or "").lower() not in ("held", "captured", "succeeded", "authorized"):
+        return {"status": "no_deposit"}
+
+    broker = await db.brokers.find_one(
+        {"id": rel["broker_id"], "verification_status": "approved"},
+        {"_id": 0},
+    )
+    if not broker:
+        return {"status": "no_broker"}
+
+    broker_province = (broker.get("operating_province") or "").upper() or None
+    if listing_province and broker_province and listing_province != broker_province:
+        return {
+            "status":           "province_mismatch",
+            "broker_name":      broker.get("legal_business_name"),
+            "broker_province":  broker_province,
+            "listing_province": listing_province,
+        }
+
+    return {
+        "status":                       "eligible",
+        "relationship_id":              rel["id"],
+        "broker_id":                    broker["id"],
+        "broker_name":                  broker.get("legal_business_name"),
+        "broker_license":               broker.get("broker_license_number"),
+        "broker_registry":              broker.get("regulatory_body"),
+        "broker_province":              broker_province,
+        "listing_province":             listing_province,
+        "bid_cap":                      rel.get("bid_cap"),
+        "bid_cap_currency":             rel.get("bid_cap_currency", "CAD"),
+        "max_bid_amount_cad":           rel.get("max_bid_amount_cad"),
+        "proxy_bid_agreement_accepted": bool(rel.get("proxy_bid_agreement_accepted", False)),
+        "proxy_bid_agreement_accepted_at": rel.get("proxy_bid_agreement_accepted_at"),
+    }
+
+
+@brokers_router.post("/broker-relationships/accept-proxy-agreement")
+async def accept_proxy_agreement(
+    request:      Request,
+    current_user: User = Depends(get_current_user),
+):
+    """Buyer accepts the proxy-bidding legal rider — one-time per partnership."""
+    db = get_db()
+    now = _utcnow()
+    result = await db.broker_buyer_relationships.update_one(
+        {"buyer_user_id": current_user.id, "status": "active"},
+        {"$set": {
+            "proxy_bid_agreement_accepted":     True,
+            "proxy_bid_agreement_accepted_at":  now,
+            "proxy_bid_agreement_accepted_ip":  request.client.host if request.client else None,
+            "proxy_bid_agreement_accepted_ua":  request.headers.get("user-agent"),
+            "updated_at":                       now,
+        }},
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=400, detail={
+            "error":      "no_active_partnership",
+            "message_en": "No active broker configuration found to accept rider agreements.",
+            "message_fr": "Aucune configuration de courtier active trouvée pour accepter l'accord de procuration.",
+        })
+    try:
+        await db.broker_legal_audit.insert_one({
+            "id":      str(__import__("uuid").uuid4()),
+            "user_id": current_user.id,
+            "kind":    "proxy_bid_agreement_accepted",
+            "details": {"signed_ip": request.client.host if request.client else None,
+                        "signed_user_agent": request.headers.get("user-agent")},
+            "at":      now,
+        })
+    except Exception as e:
+        logger.warning("proxy-agreement audit failed (non-fatal): %s", e)
+    return {"success": True, "accepted_at": now, "message": "Legal proxy rider recorded successfully."}
+
+
+class _BidCapIn(BaseModel):
+    bid_cap: Optional[float] = None  # None / null → no cap
+
+
+@brokers_router.patch("/broker-relationships/{rel_id}/bid-cap")
+async def set_relationship_bid_cap(
+    rel_id:       str,
+    payload:      _BidCapIn,
+    current_user: User = Depends(get_current_user),
+):
+    """Buyer sets/updates the maximum bid cap for an active or pending relationship."""
+    db = get_db()
+    rel = await db.broker_buyer_relationships.find_one({"id": rel_id}, {"_id": 0})
+    if not rel:
+        raise HTTPException(status_code=404, detail={"error": "relationship_not_found"})
+    if rel["buyer_user_id"] != current_user.id:
+        raise HTTPException(status_code=403, detail={"error": "not_your_relationship"})
+
+    if payload.bid_cap is not None and payload.bid_cap <= 0:
+        raise HTTPException(status_code=422, detail={"error": "bid_cap_must_be_positive_or_null"})
+
+    now = _utcnow()
+    await db.broker_buyer_relationships.update_one(
+        {"id": rel_id},
+        {"$set": {
+            "bid_cap":           payload.bid_cap,
+            "bid_cap_currency":  "CAD",
+            "bid_cap_set_at":    now,
+            "bid_cap_set_by":    "buyer",
+            "updated_at":        now,
+        }},
+    )
+    return {"success": True, "bid_cap": payload.bid_cap, "bid_cap_set_at": now}
 
 
 # ── iter225 Task 3 — Broker Liability Agreement (digital signature) ───

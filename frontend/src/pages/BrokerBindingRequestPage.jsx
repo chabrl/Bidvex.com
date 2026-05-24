@@ -75,6 +75,8 @@ export default function BrokerBindingRequestPage() {
   const [termsAccepted, setTermsAccepted]   = useState(false);
   const [termsSignature, setTermsSignature] = useState(null);
   const [termsModalOpen, setTermsModalOpen] = useState(false);
+  // iter229 — optional buyer-set bid cap
+  const [bidCap, setBidCap] = useState('');
 
   // Load broker custom terms in parallel so we know whether to gate the deposit click
   useEffect(() => {
@@ -139,6 +141,16 @@ export default function BrokerBindingRequestPage() {
         { headers: { Authorization: `Bearer ${token}` } },
       );
       if (r.data?.success) {
+        // iter229 — set optional bid cap right after relationship creation
+        if (bidCap && r.data?.relationship_id) {
+          try {
+            await axios.patch(
+              `${API_BASE}/broker-relationships/${r.data.relationship_id}/bid-cap`,
+              { bid_cap: parseFloat(bidCap) },
+              { headers: { Authorization: `Bearer ${token}` } },
+            );
+          } catch (e) { console.error('[bid-cap] failed', e); }
+        }
         // iter225 Task 4 — Post acceptance against the new relationship_id
         if (needsCustomTerms && termsSignature && r.data?.relationship_id) {
           try {
@@ -357,6 +369,39 @@ export default function BrokerBindingRequestPage() {
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold uppercase" data-testid="refundable-badge-amount">
               {lang === 'fr' ? 'Garantie 100 %' : '100% Guarantee'}
             </span>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* iter229 — Optional buyer-defined bid cap */}
+      <Card className="border-2 border-slate-200 dark:border-slate-700 mb-4" data-testid="bid-cap-form-card">
+        <CardContent className="p-4">
+          <label htmlFor="bid_cap" className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">
+            {lang === 'fr' ? 'Définir un plafond budgétaire (optionnel)' : 'Set a maximum budget cap (optional)'}
+          </label>
+          <p className="text-xs text-slate-500 mb-3">
+            {lang === 'fr'
+              ? 'Votre courtier ne pourra pas placer d\'enchères au-dessus de ce montant en votre nom, toutes enchères confondues. Laissez vide pour aucun plafond.'
+              : 'Your broker cannot place bids above this amount on your behalf across all auctions. Leave blank for no cap.'}
+          </p>
+          <div className="relative rounded-md shadow-sm max-w-xs">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <span className="text-slate-500 sm:text-sm">$</span>
+            </div>
+            <input
+              type="number"
+              name="bid_cap"
+              id="bid_cap"
+              min="1"
+              placeholder={lang === 'fr' ? 'Illimité' : 'Unlimited'}
+              value={bidCap || ''}
+              onChange={(e) => setBidCap(e.target.value)}
+              className="focus:ring-blue-500 focus:border-blue-500 block w-full pl-7 pr-12 sm:text-sm border border-slate-300 dark:border-slate-700 dark:bg-slate-900 rounded-md py-2"
+              data-testid="bid-cap-input"
+            />
+            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+              <span className="text-slate-500 sm:text-sm">CAD</span>
+            </div>
           </div>
         </CardContent>
       </Card>
