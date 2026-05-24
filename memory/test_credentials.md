@@ -68,3 +68,9 @@ Before clicking any button on `/auth`, automation runners should either click `t
 localStorage.setItem('bidvex_cookie_consent', JSON.stringify({version: 1, accepted: true}));
 ```
 Otherwise the Law-25 consent banner intercepts the Sign-In click.
+
+## iter225 Buyer Test Account (added 2026-02-24 — works on preview)
+- Email: iter225buyer@bidvex.com
+- Password: TestBuyer225!
+- Role: user (regular buyer)
+- Notes: created to unblock E2E broker-binding-request UI flow tests (refundable badges, custom terms modal, authorize-deposit gate). User id 3b07c46e-998c-4f1f-915d-cdba43e40c5b.

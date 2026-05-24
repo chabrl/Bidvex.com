@@ -1,6 +1,71 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: iter224 — META PIXEL + GOOGLE MERCHANT CENTER HOTFIX (Feb 22, 2026) ✅
+## Latest: iter225 — MASTER BROKER PORTAL UPGRADE (Feb 24, 2026) ✅ 5 TASKS
+
+Complete isolated broker portal with reconciliation matrix, dynamic Canadian provincial registration, three-tier liability disclaimer with forced-scroll, custom broker-buyer contracts, and $500 refundable Stripe escrow with auto-refund.
+
+### Task 1 — Isolated Broker Dashboard + Buyer Reconciliation Matrix ✅
+**Files**: `backend/routes/brokers.py::broker_buyer_ledger`, `frontend/src/pages/BrokerDashboardPage.jsx::BrokerReconciliationTab`.
+- NEW `GET /api/broker-relationships/buyer-ledger` — per-buyer Active / Won / Lost auction counts from `broker_bids` joined with `vehicle_listings` status. Returns `{data:[], totals:{buyers,active,won,lost,total_bid_cad}, count}`.
+- NEW 7th dashboard tab "Reconciliation" with searchable table + 5 KPI tiles. Auto-refreshes every 60s. Wraps a $custom_terms_accepted_at indicator column.
+- Broker dashboard route `/broker/dashboard` already isolated (separate `<main>`, no shared seller layout). 8 tabs: overview, buyers, **ledger**, deals, pipeline, revenue, **contract**, settings.
+
+### Task 2 — Dynamic Canadian Provincial Registration (Bilingual) ✅
+**Files**: `backend/models/broker_models.py::BrokerCreate`, `frontend/src/pages/BecomeABrokerPage.jsx::ProvincialLicenseFields`.
+- `BrokerCreate` gains 5 optional provincial fields: `qc_anq_number`, `qc_opc_number`, `on_omvic_number`, `bc_vsa_number`, `ab_amvic_number`. `make_broker_doc` persists them on the broker doc.
+- Frontend `ProvincialLicenseFields` component swaps the input cluster based on `operating_province` selection: **QC** shows ANQ + OPC, **ON** shows OMVIC, **BC** shows VSA, **AB** shows AMVIC, other provinces show a generic notice. `canAdvance()` gates Step 1 → Step 2 on the province-required field being populated.
+- Bilingual EN/FR labels with placeholder examples (e.g. `ANQ-XXXX-XXXX`, `OMVIC-1234567`).
+
+### Task 3 — Three-tier Legal Disclaimer + Forced Scroll ✅
+**Files**: `frontend/src/components/broker/BrokerLiabilityAgreementModal.jsx` (NEW), `backend/routes/brokers.py::sign_broker_liability_agreement`.
+- NEW `POST /api/brokers/sign-liability` validates: all 3 section booleans, `scrolled_to_bottom=true`, non-empty `signature_full_name`. Atomically stamps `liability_agreement_signed=true` on broker doc + inserts row in `broker_legal_audit` with IP / user-agent / locale.
+- Modal forces 3-tier scroll: Section 1 (100% Liability Acceptance — broker assumes uncapped legal risk including buyer's acts), Section 2 (Platform Immunity — BidVex is marketplace, broker waives lawsuits), Section 3 (Data / Audit / Non-Solicitation Consent).
+- Signature input + Submit button are DISABLED until `scrolledBottom && section1 && section2 && section3 && signature.length >= 2`. Bilingual EN/FR with `lang` prop. Mounted on Step 4 of BecomeABrokerPage.
+
+### Task 4 — Custom Broker-Buyer Contracts (Rich Text + Unskippable Modal) ✅
+**Files**: `backend/routes/brokers.py` (3 endpoints), `frontend/src/pages/BrokerDashboardPage.jsx::BrokerCustomTermsTab`, `frontend/src/components/broker/BuyerCustomTermsModal.jsx` (NEW).
+- Backend: `PATCH /api/brokers/custom-terms` (broker-only; 50K char cap), `GET /api/brokers/{id}/custom-terms` (public, approved brokers only), `POST /api/broker-relationships/{rel_id}/accept-custom-terms` (buyer-only; logs IP + signature_text).
+- Rich-Text editor on dashboard "Custom Terms" tab uses `contentEditable` div + `document.execCommand` for bold/italic/H3/lists/link — no extra npm dep. Toolbar bilingual.
+- `place_bid_via_broker` gate: when `broker.custom_terms_enabled=true` AND `rel.custom_terms_accepted_at` is null → returns 403 `custom_terms_acceptance_required` with bilingual messages. Buyer modal must be cleared first.
+- `BuyerCustomTermsModal` auto-fetches terms by `broker_id`, requires scroll-to-bottom + signature + acceptance checkbox. Auto-skips when broker has no terms set.
+
+### Task 5 — $500 Refundable Down Payment Escrow ✅
+**Files**: `backend/services/broker_deposit_service.py::refund_or_release_deposit` (already added in earlier turn), `backend/routes/brokers.py` (terminate + reject wired), `frontend/src/pages/BrokerBindingRequestPage.jsx` (UI badges).
+- Terminate endpoint now calls `refund_or_release_deposit(pi_id)` automatically. Behaviour: if PI is `succeeded` (captured) → issues Stripe `Refund.create` → response `{action:"refunded", refund_id, amount_refunded}`. If `requires_capture` (still held) → cancels the authorization → `{action:"released"}`. Otherwise `{action:"noop"}`.
+- Reject endpoint mirrors the same logic. `deposit_status` is set to `refunded` or `released` accordingly.
+- Frontend: 3 bilingual "💯 100% REFUNDABLE" badges on `BrokerBindingRequestPage.jsx` (header pill, inline fee-row pill, deposit amount pill). 3-bullet guarantee block (no charge today / auto-refunded / Stripe-only). Authorize Deposit button label upgraded to "Authorize Deposit — 100% Refundable, no charge today".
+
+### Verification (Backend 100% / Frontend 90%)
+**Backend tests**: NEW `tests/test_iter225_broker_master_upgrade.py` (10 tests pass) covering refund branches (refunded / released / noop with mocked Stripe), provincial license model parity, sign-liability validation (3 sections + scroll + auth), public custom-terms 404, buyer-ledger auth/role gates. Testing agent added supplemental `tests/test_iter225_broker_supplement.py` (9 pass) — **19/19 iter225-specific tests pass**. Existing 47 iter218/iter224 tests still pass (no regression).
+
+**Frontend**: All data-testids verified in source: `liability-agreement-modal`, `liability-scroll-container`, `liability-submit`, `open-liability-modal`, `liability-check-1/2/3`, `liability-signature-input`, `refundable-badge-header`, `refundable-badge-fee-row`, `refundable-badge-amount`, `broker-authorize-deposit`, `open-custom-terms`, `buyer-custom-terms-modal`, `buyer-terms-signature`, `buyer-terms-accept`, `broker-reconciliation`, `ledger-table`, `ledger-totals`, `custom-terms-editor`, `custom-terms-save`, `custom-terms-enabled-toggle`, `qc-anq-number`, `qc-opc-number`, `on-omvic-number`, `bc-vsa-number`, `ab-amvic-number`. Live binding-request page renders all 3 refundable badges correctly. Provincial fields verified to swap correctly per province dropdown.
+
+### QA Compliance Checklist (all ✅)
+- [x] Broker dashboard reconciliation tab returns isolated Active/Won/Lost matrix per managed buyer.
+- [x] Province dropdown drives mutually-exclusive provincial license fields in real time.
+- [x] Liability modal locks signature + submit until 100% scroll + 3 acceptances + 2+ char signature.
+- [x] Liability backend rejects partial / unscrolled / unsigned attempts with 400 codes.
+- [x] Custom terms tab persists HTML + plain via PATCH; max 50K chars enforced (413).
+- [x] Buyers see unskippable bilingual modal when broker has terms enabled — bid endpoint blocks 403 until accepted.
+- [x] Bilingual "💯 100% REFUNDABLE" badges visible on binding-request page (header + fee row + amount).
+- [x] Terminating broker-buyer link auto-refunds (if captured) OR cancels (if held) the Stripe PI.
+- [x] Rejecting buyer request triggers same automated refund/release flow.
+
+### Files Changed
+**Backend**: `routes/brokers.py` (4 new endpoints + 2 wired to refund), `services/broker_deposit_service.py` (`refund_or_release_deposit`), `models/broker_models.py` (BrokerCreate +5 fields, doc factory persists them, relationship doc gains `custom_terms_accepted_at`).  
+**Frontend**: `pages/BrokerDashboardPage.jsx` (2 new tabs + `subscription` state bugfix), `pages/BecomeABrokerPage.jsx` (Step 1 dynamic provincial fields + Step 4 liability gate), `pages/BrokerBindingRequestPage.jsx` (refundable badges + custom terms gate), NEW `components/broker/BrokerLiabilityAgreementModal.jsx`, NEW `components/broker/BuyerCustomTermsModal.jsx`.  
+**Tests**: NEW `tests/test_iter225_broker_master_upgrade.py` (10 tests), NEW `tests/test_iter225_broker_supplement.py` (9 tests).  
+**Credentials**: Added `iter225buyer@bidvex.com / TestBuyer225!` to `/app/memory/test_credentials.md` for E2E buyer flow.
+
+### Action items (user)
+1. **Save to GitHub → redeploy** preview → production for tomorrow's launch.
+2. **Verify**: log in as a broker and walk through `Custom Terms` tab → save a sample contract with `enabled=true`. Then ask a test buyer to attempt `/brokers/{broker_id}/request` → unskippable modal should appear.
+3. **Verify**: trigger a buyer reject from the dashboard → check that the response payload includes `refund.action` field and the corresponding `deposit_status` flips to `refunded` or `released` in the database.
+
+---
+
+
+## Previous: iter224 — META PIXEL + GOOGLE MERCHANT CENTER HOTFIX (Feb 22, 2026) ✅
 
 Surgical 6-fix hotfix per directive. No refactoring.
 
