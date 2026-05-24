@@ -91,3 +91,56 @@ def capture_deposit(payment_intent_id: str, amount_cad: Optional[float] = None) 
     pi = stripe.PaymentIntent.capture(payment_intent_id, **kwargs)
     logger.info("broker_deposit captured PI=%s status=%s amount=%s", pi.id, pi.status, amount_cad)
     return {"payment_intent_id": pi.id, "status": pi.status, "amount_captured": pi.amount_received}
+
+
+def refund_or_release_deposit(payment_intent_id: str) -> Dict[str, Any]:
+    """iter225 — Single-call refund handler for the broker-buyer disconnect
+    flow. If the PaymentIntent was already CAPTURED (i.e. broker took the
+    deposit because the buyer defaulted), this issues a full Stripe refund
+    that returns the funds to the buyer's bank account. If the PI is still
+    HELD (manual-capture, not yet charged), this cancels the authorization
+    so the hold drops off the buyer's card statement.
+
+    Returns: `{action: "refunded" | "released" | "noop", ...stripe fields}`.
+    """
+    try:
+        pi = stripe.PaymentIntent.retrieve(payment_intent_id)
+    except Exception as e:
+        logger.warning("refund_or_release lookup failed PI=%s: %s", payment_intent_id, e)
+        return {"action": "lookup_failed", "error": str(e)}
+
+    status = (pi.status or "").lower()
+    # Already-captured: issue a refund to the buyer's card.
+    if status in ("succeeded",):
+        try:
+            refund = stripe.Refund.create(
+                payment_intent=payment_intent_id,
+                reason="requested_by_customer",
+                metadata={"kind": "broker_deposit_refund_on_disconnect"},
+            )
+            logger.info("broker_deposit refunded PI=%s refund=%s", pi.id, refund.id)
+            return {
+                "action":             "refunded",
+                "payment_intent_id":  pi.id,
+                "refund_id":          refund.id,
+                "amount_refunded":    refund.amount,
+                "status":             refund.status,
+            }
+        except Exception as e:
+            logger.warning("refund_or_release: stripe refund failed PI=%s: %s", pi.id, e)
+            return {"action": "refund_failed", "error": str(e)}
+    # Still-held: cancel the authorization (no charge ever hit the card).
+    if status in ("requires_capture", "requires_payment_method", "requires_confirmation", "requires_action", "processing"):
+        try:
+            pi_cancelled = stripe.PaymentIntent.cancel(payment_intent_id)
+            logger.info("broker_deposit released PI=%s status=%s", pi_cancelled.id, pi_cancelled.status)
+            return {
+                "action":             "released",
+                "payment_intent_id":  pi_cancelled.id,
+                "status":             pi_cancelled.status,
+            }
+        except Exception as e:
+            logger.warning("refund_or_release: cancel failed PI=%s: %s", pi.id, e)
+            return {"action": "release_failed", "error": str(e)}
+    # Already cancelled / refunded — noop.
+    return {"action": "noop", "payment_intent_id": pi.id, "status": status}
