@@ -398,6 +398,79 @@ async def get_my_broker(current_user: User = Depends(get_current_user)):
     return broker
 
 
+# ── iter227 Fix #3 — Live Broker Analytics (computed, not stored) ───────
+@brokers_router.get("/brokers/me/analytics")
+async def get_my_broker_analytics(current_user: User = Depends(get_current_user)):
+    """Return REAL-TIME analytics for the authenticated broker.
+
+    Replaces the stale `broker.total_buyers_managed` / `total_revenue_cad` /
+    `total_deals_completed` counters with live aggregates from the actual
+    `broker_buyer_relationships`, `broker_bids`, and `broker_invoices`
+    collections.
+    """
+    db = get_db()
+    broker = await db.brokers.find_one({"user_id": current_user.id}, {"_id": 0, "id": 1})
+    if not broker:
+        raise HTTPException(status_code=404, detail={"error": "not_a_broker"})
+    base_q = {"broker_id": broker["id"]}
+
+    total_buyers      = await db.broker_buyer_relationships.count_documents(base_q)
+    active_buyers     = await db.broker_buyer_relationships.count_documents({**base_q, "status": "active"})
+    pending_requests  = await db.broker_buyer_relationships.count_documents({**base_q, "status": "pending"})
+    terminated        = await db.broker_buyer_relationships.count_documents({**base_q, "status": "terminated"})
+    rejected          = await db.broker_buyer_relationships.count_documents({**base_q, "status": "rejected"})
+    suspended         = await db.broker_buyer_relationships.count_documents({**base_q, "status": "suspended"})
+
+    total_bids        = await db.broker_bids.count_documents(base_q)
+    deals_won         = await db.broker_invoices.count_documents({"broker_id": broker["id"]})
+    deals_settled     = await db.broker_invoices.count_documents({
+        "broker_id": broker["id"], "released_at": {"$ne": None},
+    })
+
+    revenue_pipeline = [
+        {"$match": {"broker_id": broker["id"]}},
+        {"$group": {"_id": None,
+                    "total_revenue_cad":   {"$sum": {"$ifNull": ["$broker_fee_cad", 0]}},
+                    "total_hammer_cad":    {"$sum": {"$ifNull": ["$hammer_price_cad", 0]}},
+                    "total_settled_cad":   {"$sum": {"$cond": [{"$ne": ["$released_at", None]},
+                                                               {"$ifNull": ["$broker_fee_cad", 0]}, 0]}}}},
+    ]
+    revenue_doc = None
+    async for d in db.broker_invoices.aggregate(revenue_pipeline):
+        revenue_doc = d
+        break
+    total_revenue_cad   = float((revenue_doc or {}).get("total_revenue_cad", 0))
+    total_hammer_cad    = float((revenue_doc or {}).get("total_hammer_cad", 0))
+    settled_revenue_cad = float((revenue_doc or {}).get("total_settled_cad", 0))
+
+    last_bid = None
+    async for b in db.broker_bids.find(base_q, {"_id": 0, "placed_at": 1}).sort("placed_at", -1).limit(1):
+        last_bid = b.get("placed_at")
+    last_invoice = None
+    async for inv in db.broker_invoices.find({"broker_id": broker["id"]}, {"_id": 0, "created_at": 1}).sort("created_at", -1).limit(1):
+        last_invoice = inv.get("created_at")
+
+    return {
+        "broker_id":           broker["id"],
+        "total_buyers":        total_buyers,
+        "active_buyers":       active_buyers,
+        "pending_requests":    pending_requests,
+        "terminated_buyers":   terminated,
+        "rejected_buyers":     rejected,
+        "suspended_buyers":    suspended,
+        "deals_won":           deals_won,
+        "deals_settled":       deals_settled,
+        "total_bids":          total_bids,
+        "total_revenue_cad":   total_revenue_cad,
+        "settled_revenue_cad": settled_revenue_cad,
+        "total_hammer_cad":    total_hammer_cad,
+        "last_bid_at":         last_bid,
+        "last_invoice_at":     last_invoice,
+        "computed_at":         _utcnow(),
+    }
+
+
+
 @brokers_router.get("/brokers/{broker_id}")
 async def get_broker_public(broker_id: str):
     db = get_db()

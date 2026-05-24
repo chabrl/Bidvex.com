@@ -361,31 +361,67 @@ export default function BrokerBindingRequestPage() {
         </CardContent>
       </Card>
 
-      {/* iter225 Task 4 — Custom Contract banner (if broker has one) */}
+      {/* iter227 Fix #2 — Custom Contract rendered INLINE & PROMINENTLY */}
       {needsCustomTerms && (
-        <Card className={`border-2 mb-4 ${termsAccepted ? 'border-emerald-300 bg-emerald-50 dark:bg-emerald-950/30' : 'border-amber-300 bg-amber-50 dark:bg-amber-950/30'}`} data-testid="broker-custom-contract-banner">
-          <CardContent className="p-4 flex items-start gap-3 flex-wrap">
-            <CircleDollarSign className={`w-5 h-5 flex-shrink-0 ${termsAccepted ? 'text-emerald-600' : 'text-amber-600'}`} />
-            <div className="flex-1 min-w-[200px]">
-              <p className="font-semibold text-sm">
-                {lang === 'fr' ? 'Contrat sur mesure du courtier' : "Broker's Custom Contract"}
-              </p>
-              <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
-                {termsAccepted
-                  ? (lang === 'fr' ? 'Vous avez accepté le contrat personnalisé du courtier.' : "You've accepted the broker's custom contract.")
-                  : (lang === 'fr' ? 'Vous devez consulter et accepter le contrat avant d\'autoriser le dépôt.' : 'You must review & accept the contract before authorizing the deposit.')}
-              </p>
+        <Card className={`border-2 mb-4 ${termsAccepted ? 'border-emerald-400 bg-emerald-50 dark:bg-emerald-950/30' : 'border-amber-400 bg-white dark:bg-slate-900'}`} data-testid="broker-custom-contract-banner">
+          <CardContent className="p-0">
+            <div className={`px-5 py-3 ${termsAccepted ? 'bg-emerald-500' : 'bg-gradient-to-r from-amber-500 to-orange-500'} text-white flex items-center gap-2 flex-wrap`}>
+              <CircleDollarSign className="w-5 h-5 flex-shrink-0" />
+              <h2 className="font-bold flex-1 min-w-0">
+                {lang === 'fr' ? 'Contrat sur mesure du courtier — à lire' : "Broker's Custom Contract — Required Reading"}
+              </h2>
+              {termsAccepted && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white text-emerald-700 text-[11px] font-bold uppercase tracking-wide" data-testid="custom-terms-accepted-badge">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  {lang === 'fr' ? 'Accepté' : 'Accepted'}
+                </span>
+              )}
             </div>
-            {!termsAccepted ? (
-              <Button onClick={() => setTermsModalOpen(true)} variant="outline" className="border-amber-400 text-amber-700 hover:bg-amber-100" data-testid="open-custom-terms">
-                {lang === 'fr' ? 'Lire le contrat' : 'Read Contract'}
-              </Button>
-            ) : (
-              <span className="inline-flex items-center gap-1 text-emerald-700 text-sm font-medium">
-                <CheckCircle2 className="w-4 h-4" />
-                {lang === 'fr' ? 'Accepté' : 'Accepted'}
-              </span>
-            )}
+            <div className="p-5 space-y-4">
+              <p className="text-sm text-slate-700 dark:text-slate-200">
+                {lang === 'fr'
+                  ? 'Ce courtier exige que vous acceptiez les conditions ci-dessous AVANT de pouvoir verser le dépôt de 500 $ et placer des enchères. Lisez-les attentivement.'
+                  : 'This broker requires you to accept the terms below BEFORE you can authorize the $500 deposit and place any bids. Read carefully.'}
+              </p>
+              {/* INLINE rendered custom contract — always visible */}
+              <div
+                className="rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-4 max-h-[420px] overflow-y-auto text-sm prose prose-sm dark:prose-invert max-w-none"
+                data-testid="broker-custom-terms-inline"
+              >
+                {customTerms?.custom_terms_html?.trim() ? (
+                  <div dangerouslySetInnerHTML={{ __html: customTerms.custom_terms_html }} />
+                ) : (
+                  <pre className="whitespace-pre-wrap font-sans m-0">{customTerms?.custom_terms_plain || ''}</pre>
+                )}
+              </div>
+
+              {/* Acceptance row */}
+              {!termsAccepted ? (
+                <div className="space-y-3">
+                  <Button
+                    onClick={() => setTermsModalOpen(true)}
+                    className="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-white"
+                    data-testid="open-custom-terms"
+                  >
+                    {lang === 'fr' ? 'Lire en plein écran et signer' : 'Read Full-Screen & Sign'}
+                  </Button>
+                  <p className="text-[11px] text-amber-700 dark:text-amber-300 text-center">
+                    {lang === 'fr'
+                      ? 'L\'acceptation est obligatoire avant de pouvoir débloquer le dépôt.'
+                      : 'Acceptance is required before the deposit button unlocks.'}
+                  </p>
+                </div>
+              ) : (
+                <Alert className="border-emerald-300 bg-emerald-50">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  <AlertDescription className="text-emerald-800">
+                    {lang === 'fr'
+                      ? `Vous avez signé le contrat${termsSignature ? ` (${termsSignature})` : ''}. Vous pouvez maintenant autoriser le dépôt.`
+                      : `You've signed the contract${termsSignature ? ` (${termsSignature})` : ''}. You can now authorize the deposit.`}
+                  </AlertDescription>
+                </Alert>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}

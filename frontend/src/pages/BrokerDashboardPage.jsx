@@ -54,6 +54,7 @@ export default function BrokerDashboardPage() {
   const [tab, setTab]           = useState('overview');
   const [buyers, setBuyers]     = useState([]);
   const [subscription, setSubscription] = useState(null);
+  const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState(null);
 
@@ -76,6 +77,15 @@ export default function BrokerDashboardPage() {
     }
   }, [navigate]);
 
+  const loadAnalytics = useCallback(async () => {
+    try {
+      const r = await axios.get(`${API_BASE}/brokers/me/analytics`, {
+        headers: { Authorization: `Bearer ${_token()}` },
+      });
+      setAnalytics(r.data);
+    } catch { /* noop */ }
+  }, []);
+
   const loadBuyers = useCallback(async () => {
     try {
       const r = await axios.get(`${API_BASE}/broker-relationships/my-buyers`, {
@@ -88,7 +98,14 @@ export default function BrokerDashboardPage() {
   }, []);
 
   useEffect(() => { loadBroker(); }, [loadBroker]);
-  useEffect(() => { if (broker) loadBuyers(); }, [broker, loadBuyers]);
+  useEffect(() => {
+    if (!broker) return;
+    loadBuyers();
+    loadAnalytics();
+    // Refresh analytics every 60s for real-time accuracy
+    const i = setInterval(loadAnalytics, 60000);
+    return () => clearInterval(i);
+  }, [broker, loadBuyers, loadAnalytics]);
   useEffect(() => {
     if (!broker) return;
     (async () => {
@@ -104,17 +121,17 @@ export default function BrokerDashboardPage() {
   const handleBuyerAction = async (relId, action) => {
     try {
       const path = action === 'approve'
-        ? `/api/broker-relationships/${relId}/approve`
+        ? `/broker-relationships/${relId}/approve`
         : action === 'reject'
-        ? `/api/broker-relationships/${relId}/reject`
+        ? `/broker-relationships/${relId}/reject`
         : action === 'suspend'
-        ? `/api/broker-relationships/${relId}/suspend`
+        ? `/broker-relationships/${relId}/suspend`
         : action === 'terminate'
-        ? `/api/broker-relationships/${relId}/terminate`
+        ? `/broker-relationships/${relId}/terminate`
         : null;
       if (!path) return;
       await axios.post(`${API_BASE}${path}`, {}, { headers: { Authorization: `Bearer ${_token()}` } });
-      await loadBuyers();
+      await Promise.all([loadBuyers(), loadAnalytics(), loadBroker()]);
     } catch (e) {
       alert(e?.response?.data?.detail?.error || 'Action failed');
     }
@@ -187,12 +204,12 @@ export default function BrokerDashboardPage() {
                   </AlertDescription>
                 </Alert>
               )}
-              <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-                <KPI label={lang === 'fr' ? 'Acheteurs actifs' : 'Active Buyers'}   value={activeBuyers} testid="kpi-active-buyers" />
-                <KPI label={lang === 'fr' ? 'Demandes en attente' : 'Pending Requests'} value={pendingBuyers} testid="kpi-pending-buyers" />
-                <KPI label={lang === 'fr' ? 'Affaires gagnées' : 'Deals Won'}       value={broker.total_deals_completed || 0} testid="kpi-deals-won" />
-                <KPI label={lang === 'fr' ? 'Revenu total' : 'Total Revenue'}        value={_fmt(broker.total_revenue_cad)} testid="kpi-revenue" />
-                <KPI label={lang === 'fr' ? 'Acheteurs gérés' : 'Total Buyers Managed'} value={broker.total_buyers_managed || 0} testid="kpi-total-buyers" />
+              <div className="grid grid-cols-2 lg:grid-cols-5 gap-3" data-testid="broker-overview-kpis">
+                <KPI label={lang === 'fr' ? 'Acheteurs actifs' : 'Active Buyers'}   value={analytics?.active_buyers ?? activeBuyers} testid="kpi-active-buyers" />
+                <KPI label={lang === 'fr' ? 'Demandes en attente' : 'Pending Requests'} value={analytics?.pending_requests ?? pendingBuyers} testid="kpi-pending-buyers" />
+                <KPI label={lang === 'fr' ? 'Affaires gagnées' : 'Deals Won'}       value={analytics?.deals_won ?? 0} testid="kpi-deals-won" />
+                <KPI label={lang === 'fr' ? 'Revenu total' : 'Total Revenue'}        value={_fmt(analytics?.total_revenue_cad ?? 0)} testid="kpi-revenue" />
+                <KPI label={lang === 'fr' ? 'Total acheteurs' : 'Total Buyers'}      value={analytics?.total_buyers ?? buyers.length} testid="kpi-total-buyers" />
               </div>
               <Card><CardContent className="p-5">
                 <h3 className="font-semibold mb-2">{lang === 'fr' ? 'Structure de frais' : 'Fee Structure'}</h3>

@@ -9,7 +9,7 @@ import API_BASE from '../../config';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
-import { Handshake, ShieldCheck, Clock, XCircle, AlertTriangle, CreditCard, Eye } from 'lucide-react';
+import { Handshake, ShieldCheck, Clock, XCircle, AlertTriangle, CreditCard, Eye, FileText, ExternalLink, Paperclip } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import AdminBrokerAuditDrawer from '../../components/admin/AdminBrokerAuditDrawer';
 
@@ -135,6 +135,9 @@ export default function AdminBrokersPage() {
                       ? `Fixed: $${Number(b.fee_structure.fixed_amount_cad).toFixed(0)} per deal`
                       : `${(Number(b.fee_structure?.percentage_rate || 0) * 100).toFixed(2)}% of hammer`}
                   </div>
+
+                  {/* iter227 Fix #4 — Admin attachment / compliance docs viewer */}
+                  <BrokerDocuments broker={b} lang={lang} />
                 </div>
                 <div className="flex gap-2 flex-wrap">
                   <Button
@@ -187,6 +190,99 @@ export default function AdminBrokersPage() {
         lang={lang}
         onClose={() => setAuditBroker(null)}
       />
+    </div>
+  );
+}
+
+// ── iter227 Fix #4 — Compliance Documents block for a broker row ──────
+function BrokerDocuments({ broker, lang }) {
+  const docs = [];
+  if (broker.license_document_url) {
+    docs.push({ kind: 'license', url: broker.license_document_url,
+                en: 'Broker / Dealer Licence', fr: 'Licence courtier / concessionnaire' });
+  }
+  if (broker.registration_document_url) {
+    docs.push({ kind: 'registration', url: broker.registration_document_url,
+                en: 'Corporate Registration', fr: 'Inscription corporative' });
+  }
+  (broker.additional_documents || []).forEach((url, i) => {
+    docs.push({ kind: `extra-${i}`, url,
+                en: `Additional Document ${i + 1}`, fr: `Document supplémentaire ${i + 1}` });
+  });
+
+  // Provincial license numbers — surfaced inline so admin sees them before approving
+  const provLabels = [];
+  if (broker.qc_anq_number)   provLabels.push(['ANQ',   broker.qc_anq_number]);
+  if (broker.qc_opc_number)   provLabels.push(['OPC',   broker.qc_opc_number]);
+  if (broker.on_omvic_number) provLabels.push(['OMVIC', broker.on_omvic_number]);
+  if (broker.bc_vsa_number)   provLabels.push(['VSA',   broker.bc_vsa_number]);
+  if (broker.ab_amvic_number) provLabels.push(['AMVIC', broker.ab_amvic_number]);
+
+  if (docs.length === 0 && provLabels.length === 0) {
+    return (
+      <div className="mt-2 text-xs text-rose-600 flex items-center gap-1.5" data-testid={`broker-no-docs-${broker.id}`}>
+        <AlertTriangle className="w-3.5 h-3.5" />
+        {lang === 'fr' ? 'Aucun document compliance téléversé.' : 'No compliance documents uploaded.'}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 p-3 space-y-2" data-testid={`broker-docs-${broker.id}`}>
+      <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+        <Paperclip className="w-3.5 h-3.5" />
+        {lang === 'fr' ? 'Documents de conformité' : 'Compliance Documents'}
+        <span className="ml-auto text-[10px] font-normal text-slate-400">
+          {docs.length} {lang === 'fr' ? 'fichier(s)' : 'file(s)'}
+        </span>
+      </div>
+
+      {provLabels.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 pb-1" data-testid={`broker-provincial-${broker.id}`}>
+          {provLabels.map(([k, v]) => (
+            <Badge key={k} className="bg-blue-100 text-blue-800 font-mono text-[10px]">{k}: {v}</Badge>
+          ))}
+        </div>
+      )}
+
+      {docs.length === 0 ? (
+        <p className="text-[11px] text-amber-700">
+          {lang === 'fr' ? 'Aucun fichier téléversé pour ce courtier.' : 'No files uploaded for this broker.'}
+        </p>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+          {docs.map((d) => {
+            const isImage = /\.(png|jpe?g|webp|gif|heic|heif)(\?.*)?$/i.test(d.url);
+            return (
+              <a
+                key={d.kind}
+                href={d.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group flex items-center gap-2 px-2.5 py-1.5 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-xs hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition"
+                data-testid={`broker-doc-link-${broker.id}-${d.kind}`}
+                title={lang === 'fr' ? 'Ouvrir dans un nouvel onglet' : 'Open in new tab'}
+              >
+                <FileText className="w-3.5 h-3.5 flex-shrink-0 text-blue-600" />
+                <span className="flex-1 min-w-0 truncate font-medium">
+                  {lang === 'fr' ? d.fr : d.en}
+                </span>
+                {isImage && (
+                  <span className="text-[9px] uppercase font-bold text-emerald-700 bg-emerald-100 px-1 rounded">
+                    IMG
+                  </span>
+                )}
+                <ExternalLink className="w-3 h-3 text-slate-400 group-hover:text-blue-600" />
+              </a>
+            );
+          })}
+        </div>
+      )}
+      <p className="text-[10px] text-slate-500 italic">
+        {lang === 'fr'
+          ? 'Vérifiez chaque document avant d\'approuver. Les liens s\'ouvrent dans un nouvel onglet.'
+          : 'Verify each document before approval. Links open in a new tab.'}
+      </p>
     </div>
   );
 }
