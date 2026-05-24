@@ -9,8 +9,9 @@ import API_BASE from '../../config';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
-import { Handshake, ShieldCheck, Clock, XCircle, AlertTriangle, CreditCard } from 'lucide-react';
+import { Handshake, ShieldCheck, Clock, XCircle, AlertTriangle, CreditCard, Eye } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import AdminBrokerAuditDrawer from '../../components/admin/AdminBrokerAuditDrawer';
 
 const SUBTABS = [
   { id: 'pending_review', en: 'Pending',   fr: 'En attente',  count_key: 'pending_review', icon: Clock,        color: 'bg-amber-100 text-amber-800' },
@@ -26,6 +27,7 @@ export default function AdminBrokersPage() {
   const [subtab, setSubtab] = useState('pending_review');
   const [brokers, setBrokers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [auditBroker, setAuditBroker] = useState(null);
 
   const _token = () => localStorage.getItem('access_token') || localStorage.getItem('token');
 
@@ -135,6 +137,16 @@ export default function AdminBrokersPage() {
                   </div>
                 </div>
                 <div className="flex gap-2 flex-wrap">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setAuditBroker(b)}
+                    data-testid={`admin-broker-audit-${b.id}`}
+                    title={lang === 'fr' ? 'Inspecter ce courtier' : 'Inspect this broker'}
+                  >
+                    <Eye className="h-3.5 w-3.5 mr-1" />
+                    {lang === 'fr' ? 'Audit' : 'Audit'}
+                  </Button>
                   {subtab === 'pending_review' && (
                     <>
                       <Button size="sm" onClick={() => handleAction(b.id, 'approve')} data-testid={`admin-broker-approve-${b.id}`}>
@@ -167,6 +179,14 @@ export default function AdminBrokersPage() {
           </Card>
         ))}
       </div>
+
+      {/* iter226 Task 2 — Admin Broker Audit Drawer */}
+      <AdminBrokerAuditDrawer
+        open={!!auditBroker}
+        broker={auditBroker}
+        lang={lang}
+        onClose={() => setAuditBroker(null)}
+      />
     </div>
   );
 }

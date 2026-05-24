@@ -98,7 +98,34 @@ async def apply_to_become_broker(payload: BrokerCreate, current_user: User = Dep
         })
 
     doc = make_broker_doc(user_id=current_user.id, payload=payload)
+
+    # iter226 Task 1 — Promote any pending liability signature parked on
+    # the user record onto the new broker doc + retag audit row.
+    db_user = await db.users.find_one(
+        {"id": current_user.id},
+        {"_id": 0, "pending_broker_liability_signature": 1, "pending_broker_liability_signed_at": 1},
+    ) or {}
+    pending_sig = db_user.get("pending_broker_liability_signature")
+    if pending_sig:
+        doc["liability_agreement"]            = pending_sig
+        doc["liability_agreement_signed"]     = True
+        doc["liability_agreement_signed_at"]  = db_user.get("pending_broker_liability_signed_at") or pending_sig.get("signed_at")
+
     await db.brokers.insert_one(doc)
+
+    # Backfill broker_id on the audit row(s) we wrote during the wizard
+    if pending_sig:
+        try:
+            await db.broker_legal_audit.update_many(
+                {"user_id": current_user.id, "broker_id": None},
+                {"$set": {"broker_id": doc["id"], "stage": "promoted_to_broker"}},
+            )
+            await db.users.update_one(
+                {"id": current_user.id},
+                {"$unset": {"pending_broker_liability_signature": "", "pending_broker_liability_signed_at": ""}},
+            )
+        except Exception as e:
+            logger.warning("pending liability promotion failed: %s", e)
 
     # Bind broker_id on the user record
     await db.users.update_one(
@@ -611,11 +638,18 @@ async def sign_broker_liability_agreement(
     request: Request,
     current_user: User = Depends(get_current_user),
 ):
-    db = get_db()
-    broker = await db.brokers.find_one({"user_id": current_user.id}, {"_id": 0, "id": 1, "legal_business_name": 1})
-    if not broker:
-        raise HTTPException(status_code=404, detail={"error": "not_a_broker"})
+    """Sign the broker liability agreement.
 
+    iter226 Task 1 — PERMISSIVE: any authenticated user can sign during
+    the onboarding wizard, even before a broker record exists. The
+    signature is always logged to `broker_legal_audit` keyed by user_id;
+    if a broker record exists for this user, the signature is ALSO stamped
+    onto the broker doc so the apply flow can pick it up.
+    """
+    db = get_db()
+
+    # Validate gates BEFORE any role check so the wizard surfaces the
+    # right error message regardless of broker state.
     if not (payload.accepted_section_1 and payload.accepted_section_2 and payload.accepted_section_3):
         raise HTTPException(status_code=400, detail={
             "error":      "all_three_sections_required",
@@ -630,6 +664,13 @@ async def sign_broker_liability_agreement(
         })
     if not payload.signature_full_name.strip():
         raise HTTPException(status_code=422, detail={"error": "signature_required"})
+
+    # Permissive — broker record is OPTIONAL. Wizard applicants don't
+    # have one yet; existing brokers do.
+    broker = await db.brokers.find_one(
+        {"user_id": current_user.id},
+        {"_id": 0, "id": 1, "legal_business_name": 1},
+    )
 
     signature_doc = {
         "signature_full_name":  payload.signature_full_name.strip(),
@@ -646,29 +687,47 @@ async def sign_broker_liability_agreement(
         "agreement_version":    "v1-iter225",
     }
 
-    await db.brokers.update_one(
-        {"id": broker["id"]},
-        {"$set": {
-            "liability_agreement":          signature_doc,
-            "liability_agreement_signed":   True,
-            "liability_agreement_signed_at": signature_doc["signed_at"],
-            "updated_at":                   _utcnow(),
-        }},
-    )
+    # If broker record already exists, stamp it.
+    if broker:
+        await db.brokers.update_one(
+            {"id": broker["id"]},
+            {"$set": {
+                "liability_agreement":          signature_doc,
+                "liability_agreement_signed":   True,
+                "liability_agreement_signed_at": signature_doc["signed_at"],
+                "updated_at":                   _utcnow(),
+            }},
+        )
+    else:
+        # Pending applicant — park the signature on the user record so
+        # apply_to_become_broker can promote it onto the broker doc.
+        await db.users.update_one(
+            {"id": current_user.id},
+            {"$set": {
+                "pending_broker_liability_signature":  signature_doc,
+                "pending_broker_liability_signed_at": signature_doc["signed_at"],
+            }},
+        )
 
-    # Audit log
+    # Audit log — always written, keyed by user_id and broker_id (if any).
     try:
         await db.broker_legal_audit.insert_one({
             "id":        str(__import__("uuid").uuid4()),
-            "broker_id": broker["id"],
+            "broker_id": broker["id"] if broker else None,
+            "user_id":   current_user.id,
             "kind":      "liability_agreement",
+            "stage":     "approved_broker" if broker else "pending_applicant",
             "details":   signature_doc,
             "at":        signature_doc["signed_at"],
         })
     except Exception as e:
         logger.warning("broker_legal_audit insert failed: %s", e)
 
-    return {"success": True, "signed_at": signature_doc["signed_at"]}
+    return {
+        "success":   True,
+        "signed_at": signature_doc["signed_at"],
+        "stage":     "approved_broker" if broker else "pending_applicant",
+    }
 
 
 # ── iter225 Task 4 — Custom Broker-Buyer Contract Terms ────────────────
@@ -1122,6 +1181,259 @@ async def admin_suspend_broker(broker_id: str, reason: str = Body("", embed=True
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail={"error": "broker_not_found"})
     return {"success": True}
+
+
+# ── iter226 Task 2 — Admin Broker Audit & Activity Tracking ────────────
+@brokers_router.get("/admin/brokers/{broker_id}/relationships")
+async def admin_get_broker_relationships(broker_id: str, current_user: User = Depends(require_admin)):
+    """Admin compliance view — every buyer link on this broker license.
+
+    Returns relationships enriched with:
+      * Stripe escrow status ($500 hold / captured / refunded with the
+        most recent refund_result blob if available).
+      * Custom-terms acceptance timestamp + the EXACT signed HTML version
+        of the broker's contract at acceptance time (or current if no
+        snapshot was stored).
+      * Buyer profile basics + bid count on this broker license.
+    """
+    db = get_db()
+    broker = await db.brokers.find_one(
+        {"id": broker_id},
+        {"_id": 0, "id": 1, "legal_business_name": 1, "operating_province": 1,
+         "verification_status": 1, "broker_license_number": 1,
+         "custom_terms_html": 1, "custom_terms_plain": 1, "custom_terms_enabled": 1,
+         "custom_terms_updated_at": 1},
+    )
+    if not broker:
+        raise HTTPException(status_code=404, detail={"error": "broker_not_found"})
+
+    rels: List[Dict[str, Any]] = []
+    async for r in db.broker_buyer_relationships.find({"broker_id": broker_id}, {"_id": 0}):
+        buyer = await db.users.find_one(
+            {"id": r["buyer_user_id"]},
+            {"_id": 0, "email": 1, "full_name": 1, "name": 1, "province": 1, "phone": 1},
+        ) or {}
+        bid_count = await db.broker_bids.count_documents({
+            "broker_id":     broker_id,
+            "buyer_user_id": r["buyer_user_id"],
+        })
+        # Most recent refund result (if stored on rel) — surfaces Stripe action history.
+        escrow = {
+            "deposit_amount_cad":              r.get("deposit_amount_cad"),
+            "deposit_status":                  r.get("deposit_status"),
+            "deposit_stripe_payment_intent_id": r.get("deposit_stripe_payment_intent_id"),
+            "deposit_held_at":                 r.get("deposit_held_at"),
+            "deposit_released_at":             r.get("deposit_released_at"),
+            "deposit_refund_result":           r.get("deposit_refund_result"),
+        }
+        # Custom terms snapshot — we serve the broker's current HTML
+        # (acceptance time is stamped on the relationship).
+        custom_terms_view = {
+            "broker_enabled":             bool(broker.get("custom_terms_enabled", False)),
+            "broker_terms_updated_at":    broker.get("custom_terms_updated_at"),
+            "broker_terms_html":          broker.get("custom_terms_html") or "",
+            "broker_terms_plain":         broker.get("custom_terms_plain") or "",
+            "accepted_at":                r.get("custom_terms_accepted_at"),
+            "acceptance":                 r.get("custom_terms_acceptance"),
+        }
+        rels.append({
+            "relationship_id":           r["id"],
+            "status":                    r.get("status"),
+            "can_bid":                   r.get("can_bid"),
+            "max_bid_amount_cad":        r.get("max_bid_amount_cad"),
+            "buyer_user_id":             r["buyer_user_id"],
+            "buyer_email":               buyer.get("email"),
+            "buyer_full_name":           buyer.get("full_name") or buyer.get("name"),
+            "buyer_province":            buyer.get("province"),
+            "buyer_phone":               buyer.get("phone"),
+            "bid_count":                 bid_count,
+            "rejection_reason":          r.get("rejection_reason"),
+            "suspended_reason":          r.get("suspended_reason"),
+            "created_at":                r.get("created_at"),
+            "updated_at":                r.get("updated_at"),
+            "escrow":                    escrow,
+            "custom_terms":              custom_terms_view,
+        })
+
+    # Aggregate counters
+    counts = {
+        "total":      len(rels),
+        "active":     sum(1 for r in rels if r["status"] == "active"),
+        "pending":    sum(1 for r in rels if r["status"] == "pending"),
+        "terminated": sum(1 for r in rels if r["status"] == "terminated"),
+        "rejected":   sum(1 for r in rels if r["status"] == "rejected"),
+        "suspended":  sum(1 for r in rels if r["status"] == "suspended"),
+        "deposits_held":     sum(1 for r in rels if r["escrow"].get("deposit_status") == "held"),
+        "deposits_refunded": sum(1 for r in rels if r["escrow"].get("deposit_status") == "refunded"),
+        "deposits_released": sum(1 for r in rels if r["escrow"].get("deposit_status") == "released"),
+    }
+    return {
+        "broker": {
+            "id":                  broker["id"],
+            "legal_business_name": broker.get("legal_business_name"),
+            "operating_province":  broker.get("operating_province"),
+            "verification_status": broker.get("verification_status"),
+            "broker_license_number": broker.get("broker_license_number"),
+        },
+        "relationships": rels,
+        "counts":        counts,
+        "count":         len(rels),
+    }
+
+
+@brokers_router.get("/admin/brokers/{broker_id}/activity-log")
+async def admin_get_broker_activity_log(
+    broker_id: str,
+    limit:     int = Query(500, ge=1, le=2000),
+    current_user: User = Depends(require_admin),
+):
+    """Admin platform footprint telemetry for a single broker.
+
+    Aggregates events from 6 collections into a single sorted timeline:
+      * broker_legal_audit          → liability + contract signatures
+      * broker_bids                 → every bid placed under their licence
+      * broker_buyer_relationships  → buyer link create/approve/terminate
+      * broker_invoices             → invoice generated / paid / released
+      * broker_subscription_audit   → admin subscription overrides
+      * brokers                     → license / settings modifications (synthetic events)
+    """
+    db = get_db()
+    broker = await db.brokers.find_one(
+        {"id": broker_id},
+        {"_id": 0, "id": 1, "user_id": 1, "legal_business_name": 1,
+         "verification_status": 1, "created_at": 1, "verified_at": 1,
+         "suspended_at": 1, "liability_agreement_signed_at": 1,
+         "custom_terms_updated_at": 1, "subscription_status": 1,
+         "subscription_expires_at": 1, "subscription_updated_at": 1, "updated_at": 1},
+    )
+    if not broker:
+        raise HTTPException(status_code=404, detail={"error": "broker_not_found"})
+
+    events: List[Dict[str, Any]] = []
+
+    def push(kind: str, at, **kwargs):
+        if not at:
+            return
+        events.append({"kind": kind, "at": at, **kwargs})
+
+    # Account lifecycle synthetics
+    push("broker_application_submitted", broker.get("created_at"), severity="info",
+         message="Broker application submitted.")
+    if broker.get("verified_at"):
+        push("broker_approved", broker.get("verified_at"), severity="ok",
+             message="Broker approved by admin.")
+    if broker.get("suspended_at"):
+        push("broker_suspended", broker.get("suspended_at"), severity="warn",
+             message="Broker suspended.")
+    if broker.get("liability_agreement_signed_at"):
+        push("liability_signed", broker.get("liability_agreement_signed_at"), severity="ok",
+             message="3-tier liability agreement digitally signed.")
+    if broker.get("custom_terms_updated_at"):
+        push("custom_terms_updated", broker.get("custom_terms_updated_at"), severity="info",
+             message="Custom broker-buyer contract updated.")
+
+    # Legal audit rows (signatures + contract acceptances) — include broker AND user-keyed rows
+    async for row in db.broker_legal_audit.find(
+        {"$or": [{"broker_id": broker_id}, {"user_id": broker.get("user_id")}]},
+        {"_id": 0},
+    ).sort("at", -1).limit(limit):
+        push(f"legal:{row.get('kind', 'unknown')}", row.get("at"),
+             severity="ok",
+             details={
+                 "stage":                row.get("stage"),
+                 "signature_full_name":  (row.get("details") or {}).get("signature_full_name"),
+                 "signed_ip":            (row.get("details") or {}).get("signed_ip"),
+                 "signed_user_agent":    (row.get("details") or {}).get("signed_user_agent"),
+                 "agreement_version":    (row.get("details") or {}).get("agreement_version"),
+                 "locale":               (row.get("details") or {}).get("locale"),
+             },
+             message="Legal signature recorded.")
+
+    # Bids placed
+    async for bid in db.broker_bids.find({"broker_id": broker_id}, {"_id": 0}).sort("placed_at", -1).limit(limit):
+        push("bid_placed", bid.get("placed_at"),
+             severity="info",
+             details={
+                 "vehicle_listing_id": bid.get("vehicle_listing_id"),
+                 "buyer_user_id":      bid.get("buyer_user_id"),
+                 "bid_amount_cad":     bid.get("bid_amount_cad"),
+                 "status":             bid.get("status"),
+                 "ip_address":         bid.get("ip_address"),
+                 "user_agent":         bid.get("user_agent"),
+             },
+             message=f"Bid ${float(bid.get('bid_amount_cad') or 0):.2f} on listing {bid.get('vehicle_listing_id')}.")
+
+    # Relationships — events on create, status change, escrow change
+    async for r in db.broker_buyer_relationships.find({"broker_id": broker_id}, {"_id": 0}):
+        push("relationship_created", r.get("created_at"),
+             severity="info",
+             details={"buyer_user_id": r.get("buyer_user_id"), "status": r.get("status"), "deposit_status": r.get("deposit_status")},
+             message=f"Buyer linkage created (buyer {r.get('buyer_user_id')}).")
+        if r.get("deposit_held_at"):
+            push("deposit_held", r.get("deposit_held_at"),
+                 severity="info",
+                 details={"buyer_user_id": r.get("buyer_user_id"), "pi_id": r.get("deposit_stripe_payment_intent_id"), "amount_cad": r.get("deposit_amount_cad")},
+                 message=f"$500 escrow held (PI {r.get('deposit_stripe_payment_intent_id')}).")
+        if r.get("deposit_released_at"):
+            push("deposit_released_or_refunded", r.get("deposit_released_at"),
+                 severity="ok" if r.get("deposit_status") in ("refunded", "released") else "info",
+                 details={"buyer_user_id": r.get("buyer_user_id"), "deposit_status": r.get("deposit_status"), "refund_result": r.get("deposit_refund_result")},
+                 message=f"Escrow {r.get('deposit_status')}.")
+        if r.get("custom_terms_accepted_at"):
+            push("custom_terms_accepted", r.get("custom_terms_accepted_at"),
+                 severity="ok",
+                 details={"buyer_user_id": r.get("buyer_user_id"), "acceptance": r.get("custom_terms_acceptance")},
+                 message=f"Buyer accepted custom broker contract.")
+
+    # Invoices
+    async for inv in db.broker_invoices.find({"broker_id": broker_id}, {"_id": 0}).sort("created_at", -1).limit(limit):
+        push("invoice_generated", inv.get("created_at"),
+             severity="info",
+             details={"invoice_id": inv.get("id"), "buyer_user_id": inv.get("buyer_user_id"),
+                      "hammer_price_cad": inv.get("hammer_price_cad"), "total_cad": inv.get("total_cad")},
+             message=f"Invoice {inv.get('invoice_number')} generated.")
+        if inv.get("hammer_payment_confirmed_at"):
+            push("invoice_marked_paid", inv.get("hammer_payment_confirmed_at"),
+                 severity="ok",
+                 details={"invoice_id": inv.get("id"), "method": inv.get("hammer_payment_method")},
+                 message=f"Invoice {inv.get('invoice_number')} marked paid.")
+        if inv.get("released_at"):
+            push("invoice_vehicle_released", inv.get("released_at"),
+                 severity="ok",
+                 details={"invoice_id": inv.get("id"), "pickup_code": inv.get("pickup_code")},
+                 message=f"Vehicle released — invoice {inv.get('invoice_number')}.")
+
+    # Subscription overrides by admin
+    async for s in db.broker_subscription_audit.find({"broker_id": broker_id}, {"_id": 0}).sort("at", -1).limit(limit):
+        push("subscription_override", s.get("at"),
+             severity="warn",
+             details={"admin_email": s.get("admin_email"), "changes": s.get("changes"), "note": s.get("note")},
+             message="Admin updated subscription.")
+
+    # Sort newest first; serializable timestamps
+    def _ts(x):
+        v = x.get("at")
+        if hasattr(v, "isoformat"):
+            return v.isoformat()
+        return str(v) if v is not None else ""
+    events.sort(key=_ts, reverse=True)
+    events = events[:limit]
+    # Normalize datetimes for JSON
+    for e in events:
+        v = e.get("at")
+        if hasattr(v, "isoformat"):
+            e["at"] = v
+
+    return {
+        "broker": {
+            "id":                  broker["id"],
+            "legal_business_name": broker.get("legal_business_name"),
+            "verification_status": broker.get("verification_status"),
+        },
+        "events":  events,
+        "count":   len(events),
+    }
+
 
 
 # ── 5. Fee preview endpoint (public, no auth) ──────────────────────────

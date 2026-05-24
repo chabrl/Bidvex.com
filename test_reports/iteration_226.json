@@ -1,0 +1,32 @@
+{
+  "summary": "iter226 — Permissive Sign-Liability + Admin Audit Ecosystem: backend and frontend both fully validated. 9/9 pytest tests pass (Task 1 permissive signing + all gates; Task 2 relationships/activity-log endpoints with auth, 404, and shape assertions). End-to-end frontend test against /admin/brokers confirms the new Audit button opens the AdminBrokerAuditDrawer with 3 tabs, refresh + close + backdrop-close all behave correctly and live data renders (8 KPI tiles, relationship card with escrow ledger, legal-agreements sections, activity-log timeline).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/admin/brokers/{id}/activity-log?limit=3000", "issue": "Limits above 2000 return 422 (FastAPI validation) instead of being clamped to 2000. Functionally enforces the cap, but the brief said 'cap 2000' which is usually clamp, not reject. Acceptable for launch; consider clamping in a future iteration."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter226_permissive_signing_and_admin_audit.py",
+    "/app/test_reports/pytest/iter226_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "AdminBrokerAuditDrawer renders correctly with all required data-testid hooks (admin-broker-audit-{id}, admin-broker-audit-drawer, audit-tab-deals/legal/activity, audit-refresh, audit-close).",
+    "Backend permissive signing now returns stage='pending_applicant' for non-broker users while still enforcing all 3 original gates (scroll, 3 sections, signature).",
+    "Activity-log limit guard uses FastAPI Query(le=2000) which rejects with 422 above 2000 instead of clamping; minor and not launch-blocking."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "Admin charbel911@gmail.com / Anderosli123!@#  + buyer iter225buyer@bidvex.com / TestBuyer225!. Admin login rate-limits ~60s after rapid attempts; pytest skips on rate-limit and passes on retry.",
+  "seed_data_creation": "None — used existing approved broker 38429c59-09e2-4d9f-9f02-3fc6f3e470df (9414-0597 Québec inc.) with 1 pending buyer relationship (Alex Boulanger, $500 deposit, PI pi_3TaPuoBd6Wtvh7hs1F8KthPK).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All iter226 tests in /app/backend/tests/test_iter226_permissive_signing_and_admin_audit.py — 9/9 pass when admin login is not rate-limited. If you see SKIP on admin tests, wait 60s and re-run only the admin tests. Frontend Audit drawer is on /admin/brokers — must click 'Approuvés' (admin-brokers-subtab-approved) first since Pending is empty. Live preview broker_id with data: 38429c59-09e2-4d9f-9f02-3fc6f3e470df.",
+  "rca_of_the_issue": "N/A — no bugs found. iter226 is launch-ready."
+}
