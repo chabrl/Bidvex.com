@@ -1,6 +1,43 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: iter227 — CRITICAL ESCALATION REMEDIATION (Feb 24, 2026) ✅ 4 FIXES
+## Latest: iter228 — BUYER-BROKER ACTIVE PORTAL & TERMINATION FLOW (Feb 24, 2026) ✅ ZERO-CREDIT REMEDIATION
+
+Comprehensive "My Active Broker Partnership" panel + mutual termination engine with obligation gate + dual SendGrid emails + automatic Stripe escrow refund.
+
+### What was broken
+The directory page `/brokers` showed a generic "Request Partnership" CTA even when the buyer was already bound. Buyers had **zero visibility** into their active broker, jurisdiction, fee structure, signed terms, live bids, purchases — and **no way to resign** themselves (only the broker could terminate).
+
+### What ships in iter228
+**Backend** (`routes/brokers.py`):
+- NEW `GET /api/broker-relationships/my-active-broker` — single-roundtrip payload: `{relationship, broker (safe-projected jurisdiction/license/fee/signed-terms), active_bids (live broker_bids on un-ended listings), purchases (settled invoices), termination {can_terminate, block_reasons[], active_bid_count, pending_invoice_count}}`. Returns `{data: null}` for unbound buyers.
+- NEW `POST /api/broker-relationships/{rel_id}/buyer-terminate` — Buyer-initiated resign. **GATE**: 409 `cannot_terminate_with_open_obligations` with bilingual messages if any active broker_bids on un-ended listings OR any `broker_invoices` with `hammer_payment_confirmed_at = None`. On success: status=`terminated`, `terminated_by="buyer"`, auto refund/release the $500 Stripe escrow via `refund_or_release_deposit`, unbind buyer (`bound_broker_id=None`, `can_bid_on_vehicles=False`), insert `broker_legal_audit` row, dispatch SendGrid emails to BOTH buyer & broker (best-effort; non-blocking on failure).
+
+**Frontend** (new `components/broker/MyActiveBrokerPanel.jsx` + `pages/BrokerDirectoryPage.jsx`):
+- New `MyActiveBrokerPanel` component renders ONLY when `data` is non-null. Branded gradient header with "My Active Broker Partnership" + ACTIVE badge. 3 tabs: **Overview** (jurisdiction badges, license #, registration #, verified-on date, operational checkmark, fee block with bold `3.00%` or `$500 fixed` display, agreed bid cap, deposit status block, embedded scrollable `dangerouslySetInnerHTML` view of signed broker custom terms with signed-on timestamp); **Active Bids** (per-bid card with vehicle thumbnail, our-bid vs current-bid, ends-at countdown, "Top Bid" / "Outbid" badge, link to vehicle); **Purchases** (table: vehicle thumbnail + title + VIN, hammer/commission/total, payment status `Paid`/`Pending` badge, release date).
+- **End Partnership** block at the bottom of every tab — shows obligations list + "Cannot terminate while bids active or invoices pending" error if blocked; otherwise green "no outstanding obligations" message + **Resign From Broker** button → confirm dialog → POST `/buyer-terminate` → success alert + auto-reload.
+- `BrokerDirectoryPage.jsx` now fetches `my-active-broker` on mount; when an active partnership exists: panel renders at top, the directory title flips to "Other Brokers" with "you already have an active partnership" subtitle, every "Request Partnership" CTA on the cards becomes `disabled` with hover-title "End your active partnership first" and label "Already partnered with a broker".
+
+### QA / Verification
+- 5 new pytest tests in `tests/test_iter228_active_broker_panel_and_termination.py` — all pass.
+- Live preview screenshot with seeded active relationship confirms: panel header + ACTIVE badge, 3 tabs, jurisdiction badge, license/registration numbers, "Operational & verified" check, 3.00% commission block, $500 deposit "held" badge, "End Partnership" section + clickable "Resign From Broker" button, AND 2 directory cards below with disabled "Already partnered" CTAs.
+- Combined broker suite (iter225+226+227+228): **18 pass, 12 graceful skip, 0 fail.**
+
+### Files Changed
+**Backend**: `routes/brokers.py` (1 new GET endpoint + 1 new POST endpoint with email dispatch).
+**Frontend**: NEW `components/broker/MyActiveBrokerPanel.jsx` (530 lines, 3 tabs + termination block); `pages/BrokerDirectoryPage.jsx` (panel integration + disabled-CTA logic + flipped title/subtitle).
+**Tests**: NEW `tests/test_iter228_active_broker_panel_and_termination.py` (5 tests).
+
+### Action items (user — production deploy required)
+1. **Save to GitHub → redeploy** preview → production.
+2. Smoke test as a buyer on bidvex.com:
+   - Visit `/brokers` while bound → see the panel + disabled CTAs.
+   - Click "Resign From Broker" → confirm dialog → confirm → emails arrive to both parties + Stripe deposit refunded.
+   - With an active bid open → "Resign" should show the bilingual block reason.
+
+---
+
+
+## Previous: iter227 — CRITICAL ESCALATION REMEDIATION (Feb 24, 2026) ✅ 4 FIXES
 
 Four launch-blocking production bugs reported and fixed in preview. Root-cause-fix only, no scope creep.
 

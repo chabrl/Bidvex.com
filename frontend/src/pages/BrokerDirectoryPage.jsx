@@ -16,6 +16,7 @@ import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../components/ui/select';
 import { Handshake, MapPin, ShieldCheck, Banknote, Star, CheckCircle2 } from 'lucide-react';
+import MyActiveBrokerPanel from '../components/broker/MyActiveBrokerPanel';
 
 const PROVINCES = [
   { code: 'ALL', name_en: 'All Provinces',     name_fr: 'Toutes provinces' },
@@ -44,6 +45,29 @@ export default function BrokerDirectoryPage() {
   const [brokers, setBrokers] = useState([]);
   const [province, setProvince] = useState('ALL');
   const [loading, setLoading] = useState(true);
+  // iter228 — if the buyer already has an active partnership, hide the
+  // directory and show the management panel exclusively.
+  const [hasActivePartnership, setHasActivePartnership] = useState(false);
+
+  const _token = () => localStorage.getItem('access_token') || localStorage.getItem('token');
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const tok = _token();
+      if (!tok) { setHasActivePartnership(false); return; }
+      try {
+        const r = await axios.get(`${API_BASE}/broker-relationships/my-active-broker`, {
+          headers: { Authorization: `Bearer ${tok}` },
+        });
+        if (!cancelled) {
+          const rel = r.data?.data?.relationship;
+          setHasActivePartnership(rel && ['active', 'approved'].includes(rel.status));
+        }
+      } catch { if (!cancelled) setHasActivePartnership(false); }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -62,16 +86,25 @@ export default function BrokerDirectoryPage() {
 
   return (
     <div className="container mx-auto max-w-6xl py-8 px-4">
+      {/* iter228 — My Active Broker Partnership panel (rendered ONLY when bound) */}
+      <MyActiveBrokerPanel lang={lang} />
+
       <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
         <div>
           <h1 className="text-3xl font-bold mb-1" data-testid="broker-directory-title">
             <Handshake className="inline-block h-7 w-7 mr-2 -mt-1" />
-            {lang === 'fr' ? 'Annuaire des courtiers' : 'Broker Directory'}
+            {hasActivePartnership
+              ? (lang === 'fr' ? 'Autres courtiers' : 'Other Brokers')
+              : (lang === 'fr' ? 'Annuaire des courtiers' : 'Broker Directory')}
           </h1>
           <p className="text-slate-600 dark:text-slate-300">
-            {lang === 'fr'
-              ? 'Partenariat avec un courtier agréé pour enchérir sur des véhicules dans les provinces réglementées.'
-              : 'Partner with a licensed broker to bid on vehicles in regulated provinces.'}
+            {hasActivePartnership
+              ? (lang === 'fr'
+                  ? 'Vous avez déjà un partenariat actif. Pour changer, vous devrez d\'abord mettre fin au courant.'
+                  : 'You already have an active partnership. To switch, end your current one first.')
+              : (lang === 'fr'
+                  ? 'Partenariat avec un courtier agréé pour enchérir sur des véhicules dans les provinces réglementées.'
+                  : 'Partner with a licensed broker to bid on vehicles in regulated provinces.')}
           </p>
         </div>
         <Select value={province} onValueChange={setProvince}>
@@ -138,11 +171,17 @@ export default function BrokerDirectoryPage() {
                 )}
               </div>
               <Button
-                className="w-full bg-gradient-to-r from-[#1E3A8A] to-[#06B6D4] text-white"
+                className="w-full bg-gradient-to-r from-[#1E3A8A] to-[#06B6D4] text-white disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={() => navigate(`/brokers/${b.id}/request`)}
+                disabled={hasActivePartnership}
+                title={hasActivePartnership
+                  ? (lang === 'fr' ? 'Mettez fin à votre partenariat actif d\'abord' : 'End your active partnership first')
+                  : ''}
                 data-testid={`broker-request-${b.id}`}
               >
-                {lang === 'fr' ? 'Demander un partenariat →' : 'Request Partnership →'}
+                {hasActivePartnership
+                  ? (lang === 'fr' ? 'Déjà lié à un courtier' : 'Already partnered with a broker')
+                  : (lang === 'fr' ? 'Demander un partenariat →' : 'Request Partnership →')}
               </Button>
             </CardContent>
           </Card>

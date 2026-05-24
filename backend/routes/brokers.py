@@ -591,6 +591,138 @@ async def get_my_broker_binding(current_user: User = Depends(get_current_user)):
     return {"data": {"relationship": rel, "broker": _exclude_id(broker)}}
 
 
+# ── iter228 — Full "My Active Broker" panel data ────────────────────────
+@brokers_router.get("/broker-relationships/my-active-broker")
+async def get_my_active_broker_full(current_user: User = Depends(get_current_user)):
+    """Comprehensive buyer-side view of an active broker partnership.
+
+    Returns everything the buyer-side `My Active Broker` panel needs in
+    one round-trip: relationship + broker (jurisdiction, license, fee
+    structure, signed terms snapshot) + live activity (active bids,
+    upcoming lots, purchases) + termination eligibility gate.
+    """
+    db = get_db()
+    rel = await db.broker_buyer_relationships.find_one(
+        {"buyer_user_id": current_user.id, "status": {"$in": ["pending", "approved", "active"]}},
+        {"_id": 0},
+    )
+    if not rel:
+        return {"data": None}
+
+    broker = await db.brokers.find_one({"id": rel["broker_id"]}, {"_id": 0}) or {}
+    # Mask + project safe broker fields for buyer consumption
+    safe_broker = {
+        "id":                      broker.get("id"),
+        "legal_business_name":     broker.get("legal_business_name"),
+        "operating_province":      broker.get("operating_province"),
+        "regulatory_body":         broker.get("regulatory_body"),
+        "broker_license_number":   broker.get("broker_license_number"),
+        "corporate_registration_number": broker.get("corporate_registration_number"),
+        "verification_status":     broker.get("verification_status"),
+        "verified_at":             broker.get("verified_at"),
+        "created_at":              broker.get("created_at"),
+        "fee_structure":           broker.get("fee_structure"),
+        "qc_anq_number":           broker.get("qc_anq_number"),
+        "qc_opc_number":           broker.get("qc_opc_number"),
+        "on_omvic_number":         broker.get("on_omvic_number"),
+        "bc_vsa_number":           broker.get("bc_vsa_number"),
+        "ab_amvic_number":         broker.get("ab_amvic_number"),
+        "rating_avg":              float(broker.get("rating_avg") or 0),
+        "rating_count":            int(broker.get("rating_count") or 0),
+        "custom_terms_html":       broker.get("custom_terms_html") or "",
+        "custom_terms_plain":      broker.get("custom_terms_plain") or "",
+        "custom_terms_enabled":    bool(broker.get("custom_terms_enabled", False)),
+        "custom_terms_updated_at": broker.get("custom_terms_updated_at"),
+    }
+
+    # Live active bids — broker_bids placed for THIS buyer that are still
+    # winning/placed on listings not yet ended.
+    active_bids: List[Dict[str, Any]] = []
+    async for bid in db.broker_bids.find(
+        {"broker_id": broker.get("id"), "buyer_user_id": current_user.id,
+         "status": {"$in": ["placed", "winning", "won"]}},
+        {"_id": 0},
+    ).sort("placed_at", -1).limit(50):
+        listing = await db.vehicle_listings.find_one(
+            {"id": bid.get("vehicle_listing_id")},
+            {"_id": 0, "id": 1, "title": 1, "make": 1, "model": 1, "year": 1,
+             "current_bid": 1, "highest_bidder_id": 1, "ends_at": 1, "status": 1,
+             "vin": 1, "images": 1},
+        ) or {}
+        if (listing.get("status") or "").lower() in ("ended", "completed", "won", "sold", "closed"):
+            continue
+        active_bids.append({
+            "bid_id":            bid.get("id"),
+            "vehicle_listing_id": bid.get("vehicle_listing_id"),
+            "bid_amount_cad":    float(bid.get("bid_amount_cad") or 0),
+            "placed_at":         bid.get("placed_at"),
+            "status":            bid.get("status"),
+            "listing": {
+                "id":            listing.get("id"),
+                "title":         listing.get("title") or f"{listing.get('year', '')} {listing.get('make', '')} {listing.get('model', '')}".strip(),
+                "current_bid":   float(listing.get("current_bid") or 0),
+                "ends_at":       listing.get("ends_at"),
+                "image":         (listing.get("images") or [None])[0],
+                "we_are_top":    listing.get("highest_bidder_id") == current_user.id,
+            },
+        })
+
+    # Purchased inventory — broker_invoices for this buyer
+    purchases: List[Dict[str, Any]] = []
+    async for inv in db.broker_invoices.find(
+        {"broker_id": broker.get("id"), "buyer_user_id": current_user.id},
+        {"_id": 0},
+    ).sort("created_at", -1):
+        listing = await db.vehicle_listings.find_one(
+            {"id": inv.get("vehicle_listing_id")},
+            {"_id": 0, "title": 1, "make": 1, "model": 1, "year": 1, "vin": 1, "images": 1},
+        ) or {}
+        purchases.append({
+            "invoice_id":         inv.get("id"),
+            "invoice_number":     inv.get("invoice_number"),
+            "vehicle_listing_id": inv.get("vehicle_listing_id"),
+            "vin":                listing.get("vin"),
+            "vehicle_title":      listing.get("title") or f"{listing.get('year', '')} {listing.get('make', '')} {listing.get('model', '')}".strip(),
+            "image":              (listing.get("images") or [None])[0],
+            "hammer_price_cad":   float(inv.get("hammer_price_cad") or 0),
+            "broker_fee_cad":     float(inv.get("broker_fee_cad") or 0),
+            "total_cad":          float(inv.get("total_cad") or 0),
+            "payment_status":     "paid" if inv.get("hammer_payment_confirmed_at") else "pending",
+            "released":           bool(inv.get("released_at")),
+            "released_at":        inv.get("released_at"),
+            "created_at":         inv.get("created_at"),
+        })
+
+    # Termination eligibility gate
+    blocking_bids   = sum(1 for b in active_bids)
+    pending_invoices = await db.broker_invoices.count_documents({
+        "broker_id":     broker.get("id"),
+        "buyer_user_id": current_user.id,
+        "hammer_payment_confirmed_at": None,
+    })
+    can_terminate = blocking_bids == 0 and pending_invoices == 0
+    block_reasons = []
+    if blocking_bids:
+        block_reasons.append({"code": "active_bids",     "count": blocking_bids})
+    if pending_invoices:
+        block_reasons.append({"code": "pending_invoices", "count": pending_invoices})
+
+    return {
+        "data": {
+            "relationship": rel,
+            "broker":       safe_broker,
+            "active_bids":  active_bids,
+            "purchases":    purchases,
+            "termination": {
+                "can_terminate":   can_terminate,
+                "block_reasons":   block_reasons,
+                "active_bid_count": blocking_bids,
+                "pending_invoice_count": pending_invoices,
+            },
+        }
+    }
+
+
 @brokers_router.get("/broker-relationships/my-buyers")
 async def get_my_buyers(current_user: User = Depends(get_current_user)):
     db = get_db()
@@ -1023,6 +1155,159 @@ async def terminate_relationship(rel_id: str, current_user: User = Depends(get_c
         {"$set": {"bound_broker_id": None, "broker_binding_status": "none", "can_bid_on_vehicles": False}},
     )
     return {"success": True, "refund": refund_result}
+
+
+
+# ── iter228 — Buyer-initiated partnership termination ──────────────────
+@brokers_router.post("/broker-relationships/{rel_id}/buyer-terminate")
+async def buyer_terminate_relationship(
+    rel_id:       str,
+    current_user: User = Depends(get_current_user),
+):
+    """Buyer resigns from the broker partnership.
+
+    Gate: refuses if any outstanding active broker_bids OR unsettled
+    broker_invoices. On success: status='terminated', un-bind buyer,
+    refund/release the $500 Stripe escrow, dispatch SendGrid emails to
+    BOTH parties.
+    """
+    db = get_db()
+    rel = await db.broker_buyer_relationships.find_one({"id": rel_id}, {"_id": 0})
+    if not rel:
+        raise HTTPException(status_code=404, detail={"error": "relationship_not_found"})
+    if rel["buyer_user_id"] != current_user.id:
+        raise HTTPException(status_code=403, detail={"error": "not_your_relationship"})
+    if rel.get("status") in ("terminated", "rejected"):
+        raise HTTPException(status_code=400, detail={
+            "error": "already_terminated", "current_status": rel.get("status"),
+        })
+
+    broker_id = rel["broker_id"]
+
+    active_bid_count = 0
+    async for bid in db.broker_bids.find(
+        {"broker_id": broker_id, "buyer_user_id": current_user.id,
+         "status": {"$in": ["placed", "winning", "won"]}},
+        {"_id": 0, "vehicle_listing_id": 1, "status": 1},
+    ):
+        listing = await db.vehicle_listings.find_one(
+            {"id": bid.get("vehicle_listing_id")},
+            {"_id": 0, "status": 1},
+        ) or {}
+        if (listing.get("status") or "").lower() not in ("ended", "completed", "won", "sold", "closed"):
+            active_bid_count += 1
+
+    pending_invoice_count = await db.broker_invoices.count_documents({
+        "broker_id":     broker_id,
+        "buyer_user_id": current_user.id,
+        "hammer_payment_confirmed_at": None,
+    })
+
+    if active_bid_count > 0 or pending_invoice_count > 0:
+        raise HTTPException(status_code=409, detail={
+            "error":      "cannot_terminate_with_open_obligations",
+            "message_en": "Cannot terminate partnership while bids are active or invoices are pending settlement.",
+            "message_fr": "Impossible de mettre fin au partenariat tant que des enchères sont actives ou que des factures sont en attente de règlement.",
+            "active_bid_count":     active_bid_count,
+            "pending_invoice_count": pending_invoice_count,
+        })
+
+    refund_result: Dict[str, Any] = {"action": "noop"}
+    pi_id = rel.get("deposit_stripe_payment_intent_id")
+    if pi_id and rel.get("deposit_status") in ("held", "captured", "pending"):
+        try:
+            from services.broker_deposit_service import refund_or_release_deposit
+            refund_result = refund_or_release_deposit(pi_id)
+        except Exception as e:
+            logger.warning("buyer-terminate refund failed: %s", e)
+            refund_result = {"action": "error", "error": str(e)}
+    deposit_status = "refunded" if refund_result.get("action") == "refunded" else "released"
+
+    await db.broker_buyer_relationships.update_one(
+        {"id": rel_id},
+        {"$set": {
+            "status":                "terminated",
+            "can_bid":               False,
+            "deposit_status":        deposit_status,
+            "deposit_released_at":   _utcnow(),
+            "deposit_refund_result": refund_result,
+            "terminated_at":         _utcnow(),
+            "terminated_by":         "buyer",
+            "updated_at":            _utcnow(),
+        }},
+    )
+    await db.users.update_one(
+        {"id": current_user.id},
+        {"$set": {"bound_broker_id": None, "broker_binding_status": "none", "can_bid_on_vehicles": False}},
+    )
+
+    try:
+        await db.broker_legal_audit.insert_one({
+            "id":        str(__import__("uuid").uuid4()),
+            "broker_id": broker_id,
+            "user_id":   current_user.id,
+            "kind":      "buyer_terminated_partnership",
+            "details":   {"relationship_id": rel_id, "refund_result": refund_result},
+            "at":        _utcnow(),
+        })
+    except Exception as e:
+        logger.warning("buyer-terminate audit insert failed: %s", e)
+
+    broker_doc = await db.brokers.find_one({"id": broker_id}, {"_id": 0, "legal_business_name": 1, "user_id": 1}) or {}
+    broker_user = await db.users.find_one({"id": broker_doc.get("user_id")}, {"_id": 0, "email": 1, "full_name": 1, "name": 1}) or {}
+    broker_email = broker_user.get("email")
+    broker_name  = broker_doc.get("legal_business_name") or "your brokerage"
+    buyer_email  = current_user.email
+    buyer_name   = getattr(current_user, "full_name", None) or buyer_email
+
+    try:
+        from services.email_notifications import send_email
+        if buyer_email:
+            await send_email(
+                buyer_email,
+                f"Partnership with {broker_name} ended — $500 deposit refund initiated",
+                f"""
+                <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#1e293b">
+                  <h2 style="color:#1E3A8A;margin:0 0 12px">Partnership Terminated</h2>
+                  <p>Hello {buyer_name},</p>
+                  <p>You've successfully ended your broker partnership with <strong>{broker_name}</strong> on BidVex.</p>
+                  <ul>
+                    <li>Your $500 refundable deposit is being <strong>{deposit_status}</strong> via Stripe.</li>
+                    <li>You are no longer able to place bids under this broker's licence.</li>
+                    <li>You're free to partner with another broker at any time from <a href="https://bidvex.com/brokers">bidvex.com/brokers</a>.</li>
+                  </ul>
+                  <p style="color:#64748b;font-size:12px;margin-top:24px">If you didn't initiate this action, contact support@bidvex.com immediately.</p>
+                </div>
+                """,
+            )
+        if broker_email:
+            await send_email(
+                broker_email,
+                f"Buyer {buyer_email} has ended their partnership with you",
+                f"""
+                <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#1e293b">
+                  <h2 style="color:#1E3A8A;margin:0 0 12px">Buyer Partnership Ended</h2>
+                  <p>Hello,</p>
+                  <p>Buyer <strong>{buyer_name}</strong> (<a href="mailto:{buyer_email}">{buyer_email}</a>) has formally ended their partnership with <strong>{broker_name}</strong>.</p>
+                  <ul>
+                    <li>No active bids or pending invoices remained when termination was approved.</li>
+                    <li>The buyer's $500 deposit is being <strong>{deposit_status}</strong> via Stripe.</li>
+                    <li>The relationship is now status <code>terminated</code> in your dashboard ledger.</li>
+                  </ul>
+                  <p style="color:#64748b;font-size:12px;margin-top:24px">View the full audit trail at <a href="https://bidvex.com/broker/dashboard">bidvex.com/broker/dashboard</a>.</p>
+                </div>
+                """,
+            )
+    except Exception as e:
+        logger.warning("buyer-terminate emails failed (non-fatal): %s", e)
+
+    return {
+        "success":        True,
+        "refund":         refund_result,
+        "deposit_status": deposit_status,
+        "message_en":     "Partnership terminated. Your $500 deposit refund has been initiated.",
+        "message_fr":     "Partenariat résilié. Le remboursement de votre dépôt de 500 $ a été initié.",
+    }
 
 
 @brokers_router.post("/broker-relationships/{rel_id}/suspend")
