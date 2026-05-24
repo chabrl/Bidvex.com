@@ -507,6 +507,275 @@ async def get_my_buyers(current_user: User = Depends(get_current_user)):
     return {"data": rows, "count": len(rows)}
 
 
+# ── iter225 Task 1 — Buyer Reconciliation Ledger ──────────────────────
+@brokers_router.get("/broker-relationships/buyer-ledger")
+async def broker_buyer_ledger(current_user: User = Depends(get_current_user)):
+    """Per-buyer reconciliation matrix.
+
+    For each managed buyer, returns Active / Won / Lost auction counts
+    based on the broker_bids audit trail joined with vehicle_listings
+    status. Drives the Reconciliation tab on the Broker Dashboard.
+    """
+    db = get_db()
+    broker = await db.brokers.find_one({"user_id": current_user.id}, {"_id": 0, "id": 1})
+    if not broker:
+        raise HTTPException(status_code=404, detail={"error": "not_a_broker"})
+
+    # Hydrate the buyer roster from approved/active relationships first
+    rels: List[Dict[str, Any]] = []
+    async for r in db.broker_buyer_relationships.find(
+        {"broker_id": broker["id"]},
+        {"_id": 0, "id": 1, "buyer_user_id": 1, "status": 1, "deposit_status": 1,
+         "created_at": 1, "max_bid_amount_cad": 1, "custom_terms_accepted_at": 1},
+    ):
+        rels.append(r)
+
+    rows: List[Dict[str, Any]] = []
+    for rel in rels:
+        buyer_id = rel["buyer_user_id"]
+        # Pull buyer profile
+        u = await db.users.find_one(
+            {"id": buyer_id},
+            {"_id": 0, "email": 1, "full_name": 1, "name": 1, "province": 1},
+        ) or {}
+
+        # Walk every bid this buyer placed UNDER THIS BROKER
+        active = won = lost = 0
+        total_bid_amount = 0.0
+        last_bid_at = None
+        async for bid in db.broker_bids.find(
+            {"broker_id": broker["id"], "buyer_user_id": buyer_id},
+            {"_id": 0, "vehicle_listing_id": 1, "bid_amount_cad": 1, "status": 1, "placed_at": 1},
+        ):
+            total_bid_amount += float(bid.get("bid_amount_cad") or 0)
+            if last_bid_at is None or (bid.get("placed_at") and bid["placed_at"] > last_bid_at):
+                last_bid_at = bid.get("placed_at")
+            listing = await db.vehicle_listings.find_one(
+                {"id": bid["vehicle_listing_id"]},
+                {"_id": 0, "status": 1, "highest_bidder_id": 1},
+            ) or {}
+            l_status = (listing.get("status") or "").lower()
+            ended = l_status in ("ended", "completed", "won", "sold", "closed")
+            our_top = listing.get("highest_bidder_id") == buyer_id and bid.get("status") in ("placed", "winning", "won")
+            if not ended:
+                # Auction still live — count once per listing
+                active += 1
+            else:
+                if our_top:
+                    won += 1
+                else:
+                    lost += 1
+
+        rows.append({
+            "relationship_id":         rel["id"],
+            "buyer_user_id":           buyer_id,
+            "buyer_email":             u.get("email"),
+            "buyer_full_name":         u.get("full_name") or u.get("name"),
+            "buyer_province":          u.get("province"),
+            "status":                  rel.get("status"),
+            "deposit_status":          rel.get("deposit_status"),
+            "max_bid_amount_cad":      rel.get("max_bid_amount_cad"),
+            "custom_terms_accepted_at": rel.get("custom_terms_accepted_at"),
+            "since":                   rel.get("created_at"),
+            "active_auctions":         active,
+            "won_auctions":            won,
+            "lost_auctions":           lost,
+            "total_bid_count":         active + won + lost,
+            "total_bid_amount_cad":    round(total_bid_amount, 2),
+            "last_bid_at":             last_bid_at,
+        })
+
+    totals = {
+        "buyers":        len(rows),
+        "active":        sum(r["active_auctions"] for r in rows),
+        "won":           sum(r["won_auctions"]    for r in rows),
+        "lost":          sum(r["lost_auctions"]   for r in rows),
+        "total_bid_cad": round(sum(r["total_bid_amount_cad"] for r in rows), 2),
+    }
+    return {"data": rows, "totals": totals, "count": len(rows)}
+
+
+# ── iter225 Task 3 — Broker Liability Agreement (digital signature) ───
+class _LiabilitySignIn(BaseModel):
+    signature_full_name: str
+    accepted_section_1:  bool   # Liability Acceptance
+    accepted_section_2:  bool   # Platform Immunity
+    accepted_section_3:  bool   # Data / Audit Consent
+    scrolled_to_bottom:  bool
+    locale:              Optional[str] = "en"
+
+
+@brokers_router.post("/brokers/sign-liability")
+async def sign_broker_liability_agreement(
+    payload: _LiabilitySignIn,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+):
+    db = get_db()
+    broker = await db.brokers.find_one({"user_id": current_user.id}, {"_id": 0, "id": 1, "legal_business_name": 1})
+    if not broker:
+        raise HTTPException(status_code=404, detail={"error": "not_a_broker"})
+
+    if not (payload.accepted_section_1 and payload.accepted_section_2 and payload.accepted_section_3):
+        raise HTTPException(status_code=400, detail={
+            "error":      "all_three_sections_required",
+            "message_en": "You must accept all three sections of the liability agreement.",
+            "message_fr": "Vous devez accepter les trois sections de l'accord de responsabilité.",
+        })
+    if not payload.scrolled_to_bottom:
+        raise HTTPException(status_code=400, detail={
+            "error":      "scroll_required",
+            "message_en": "You must scroll through the entire agreement before signing.",
+            "message_fr": "Vous devez faire défiler l'intégralité de l'accord avant de signer.",
+        })
+    if not payload.signature_full_name.strip():
+        raise HTTPException(status_code=422, detail={"error": "signature_required"})
+
+    signature_doc = {
+        "signature_full_name":  payload.signature_full_name.strip(),
+        "accepted_section_1":   True,
+        "accepted_section_2":   True,
+        "accepted_section_3":   True,
+        "scrolled_to_bottom":   True,
+        "signed_at":            _utcnow(),
+        "signed_ip":            request.client.host if request.client else None,
+        "signed_user_agent":    request.headers.get("user-agent"),
+        "locale":               payload.locale,
+        "user_id":              current_user.id,
+        "user_email":           current_user.email,
+        "agreement_version":    "v1-iter225",
+    }
+
+    await db.brokers.update_one(
+        {"id": broker["id"]},
+        {"$set": {
+            "liability_agreement":          signature_doc,
+            "liability_agreement_signed":   True,
+            "liability_agreement_signed_at": signature_doc["signed_at"],
+            "updated_at":                   _utcnow(),
+        }},
+    )
+
+    # Audit log
+    try:
+        await db.broker_legal_audit.insert_one({
+            "id":        str(__import__("uuid").uuid4()),
+            "broker_id": broker["id"],
+            "kind":      "liability_agreement",
+            "details":   signature_doc,
+            "at":        signature_doc["signed_at"],
+        })
+    except Exception as e:
+        logger.warning("broker_legal_audit insert failed: %s", e)
+
+    return {"success": True, "signed_at": signature_doc["signed_at"]}
+
+
+# ── iter225 Task 4 — Custom Broker-Buyer Contract Terms ────────────────
+class _CustomTermsIn(BaseModel):
+    custom_terms_html:   Optional[str] = None
+    custom_terms_plain:  Optional[str] = None
+    enabled:             bool = True
+
+
+@brokers_router.patch("/brokers/custom-terms")
+async def update_broker_custom_terms(payload: _CustomTermsIn, current_user: User = Depends(get_current_user)):
+    db = get_db()
+    broker = await db.brokers.find_one({"user_id": current_user.id}, {"_id": 0, "id": 1})
+    if not broker:
+        raise HTTPException(status_code=404, detail={"error": "not_a_broker"})
+    # Strip leading/trailing whitespace; very large terms are capped at 50,000 chars
+    html  = (payload.custom_terms_html  or "").strip()
+    plain = (payload.custom_terms_plain or "").strip()
+    if len(html) > 50000 or len(plain) > 50000:
+        raise HTTPException(status_code=413, detail={"error": "terms_too_long_max_50000_chars"})
+    await db.brokers.update_one(
+        {"id": broker["id"]},
+        {"$set": {
+            "custom_terms_html":        html,
+            "custom_terms_plain":       plain,
+            "custom_terms_enabled":     bool(payload.enabled),
+            "custom_terms_updated_at":  _utcnow(),
+            "updated_at":               _utcnow(),
+        }},
+    )
+    return {"success": True}
+
+
+@brokers_router.get("/brokers/{broker_id}/custom-terms")
+async def get_broker_custom_terms(broker_id: str):
+    """Public — buyers fetching the contract before linking. Returns the
+    broker's html/plain terms or empty strings if not configured."""
+    db = get_db()
+    b = await db.brokers.find_one(
+        {"id": broker_id, "verification_status": "approved"},
+        {"_id": 0, "id": 1, "legal_business_name": 1, "custom_terms_html": 1,
+         "custom_terms_plain": 1, "custom_terms_enabled": 1, "custom_terms_updated_at": 1},
+    )
+    if not b:
+        raise HTTPException(status_code=404, detail={"error": "broker_not_found"})
+    return {
+        "broker_id":               b["id"],
+        "broker_name":             b.get("legal_business_name"),
+        "custom_terms_html":       b.get("custom_terms_html") or "",
+        "custom_terms_plain":      b.get("custom_terms_plain") or "",
+        "enabled":                 bool(b.get("custom_terms_enabled", False)),
+        "custom_terms_updated_at": b.get("custom_terms_updated_at"),
+    }
+
+
+class _AcceptCustomTermsIn(BaseModel):
+    accepted:        bool
+    signature_text:  Optional[str] = None
+    locale:          Optional[str] = "en"
+
+
+@brokers_router.post("/broker-relationships/{rel_id}/accept-custom-terms")
+async def accept_custom_terms(
+    rel_id:       str,
+    payload:      _AcceptCustomTermsIn,
+    request:      Request,
+    current_user: User = Depends(get_current_user),
+):
+    """Buyer endpoint — stores the buyer's acceptance of a broker's
+    custom contract on the relationship doc. Required before any bid
+    can be placed if the broker has `custom_terms_enabled=True`.
+    """
+    if not payload.accepted:
+        raise HTTPException(status_code=400, detail={
+            "error":      "acceptance_required",
+            "message_en": "You must accept the broker's custom contract to proceed.",
+            "message_fr": "Vous devez accepter le contrat personnalisé du courtier pour continuer.",
+        })
+
+    db = get_db()
+    rel = await db.broker_buyer_relationships.find_one({"id": rel_id}, {"_id": 0})
+    if not rel:
+        raise HTTPException(status_code=404, detail={"error": "relationship_not_found"})
+    if rel["buyer_user_id"] != current_user.id:
+        raise HTTPException(status_code=403, detail={"error": "not_your_relationship"})
+
+    now = _utcnow()
+    acceptance = {
+        "accepted_at":       now,
+        "signature_text":    (payload.signature_text or "").strip() or None,
+        "accepted_ip":       request.client.host if request.client else None,
+        "accepted_user_agent": request.headers.get("user-agent"),
+        "locale":            payload.locale,
+    }
+    await db.broker_buyer_relationships.update_one(
+        {"id": rel_id},
+        {"$set": {
+            "custom_terms_accepted_at": now,
+            "custom_terms_acceptance":  acceptance,
+            "updated_at":               now,
+        }},
+    )
+    return {"success": True, "accepted_at": now}
+
+
+
+
 async def _require_broker_owns_relationship(db, rel_id: str, user_id: str) -> Dict[str, Any]:
     rel = await db.broker_buyer_relationships.find_one({"id": rel_id}, {"_id": 0})
     if not rel:
@@ -539,25 +808,29 @@ async def approve_buyer(rel_id: str, current_user: User = Depends(get_current_us
 async def reject_buyer(rel_id: str, reason: str = Body("", embed=True), current_user: User = Depends(get_current_user)):
     db = get_db()
     rel = await _require_broker_owns_relationship(db, rel_id, current_user.id)
-    # Release the deposit hold
+    # iter225 Task 5 — auto refund/release the $500 escrow deposit
     pi_id = rel.get("deposit_stripe_payment_intent_id")
+    refund_result: Dict[str, Any] = {"action": "noop"}
     if pi_id:
         try:
-            from services.broker_deposit_service import release_deposit
-            release_deposit(pi_id)
+            from services.broker_deposit_service import refund_or_release_deposit
+            refund_result = refund_or_release_deposit(pi_id)
         except Exception as e:
-            logger.warning("release_deposit on reject failed: %s", e)
+            logger.warning("refund_or_release on reject failed: %s", e)
+            refund_result = {"action": "error", "error": str(e)}
+    deposit_status = "refunded" if refund_result.get("action") == "refunded" else "released"
     await db.broker_buyer_relationships.update_one(
         {"id": rel_id},
         {"$set": {
-            "status":              "rejected",
-            "deposit_status":      "released",
-            "deposit_released_at": _utcnow(),
-            "updated_at":          _utcnow(),
-            "rejection_reason":    reason,
+            "status":               "rejected",
+            "deposit_status":       deposit_status,
+            "deposit_released_at":  _utcnow(),
+            "deposit_refund_result": refund_result,
+            "updated_at":           _utcnow(),
+            "rejection_reason":     reason,
         }},
     )
-    return {"success": True}
+    return {"success": True, "refund": refund_result}
 
 
 @brokers_router.patch("/broker-relationships/{rel_id}/bid-limit")
@@ -596,24 +869,28 @@ async def release_deposit_endpoint(rel_id: str, current_user: User = Depends(get
 async def terminate_relationship(rel_id: str, current_user: User = Depends(get_current_user)):
     db = get_db()
     rel = await _require_broker_owns_relationship(db, rel_id, current_user.id)
-    # Release the deposit if still held
+    # iter225 Task 5 — auto refund (if captured) or release (if still held) the $500 escrow
     pi_id = rel.get("deposit_stripe_payment_intent_id")
-    if pi_id and rel.get("deposit_status") == "held":
+    refund_result: Dict[str, Any] = {"action": "noop"}
+    if pi_id and rel.get("deposit_status") in ("held", "captured", "pending"):
         try:
-            from services.broker_deposit_service import release_deposit
-            release_deposit(pi_id)
+            from services.broker_deposit_service import refund_or_release_deposit
+            refund_result = refund_or_release_deposit(pi_id)
         except Exception as e:
-            logger.warning("release on terminate failed: %s", e)
+            logger.warning("refund_or_release on terminate failed: %s", e)
+            refund_result = {"action": "error", "error": str(e)}
+    deposit_status = "refunded" if refund_result.get("action") == "refunded" else "released"
     await db.broker_buyer_relationships.update_one(
         {"id": rel_id},
-        {"$set": {"status": "terminated", "can_bid": False, "deposit_status": "released",
-                  "deposit_released_at": _utcnow(), "updated_at": _utcnow()}},
+        {"$set": {"status": "terminated", "can_bid": False, "deposit_status": deposit_status,
+                  "deposit_released_at": _utcnow(), "deposit_refund_result": refund_result,
+                  "updated_at": _utcnow()}},
     )
     await db.users.update_one(
         {"id": rel["buyer_user_id"]},
         {"$set": {"bound_broker_id": None, "broker_binding_status": "none", "can_bid_on_vehicles": False}},
     )
-    return {"success": True}
+    return {"success": True, "refund": refund_result}
 
 
 @brokers_router.post("/broker-relationships/{rel_id}/suspend")
@@ -664,6 +941,15 @@ async def place_bid_via_broker(
             "error": "broker_not_active",
             "message_en": "Your broker is no longer authorized to place bids on your behalf.",
             "message_fr": "Votre courtier n'est plus autorisé à enchérir en votre nom.",
+        })
+
+    # 2b. iter225 Task 4 — If broker has custom contract enabled, buyer must have accepted it
+    if broker.get("custom_terms_enabled") and not rel.get("custom_terms_accepted_at"):
+        raise HTTPException(status_code=403, detail={
+            "error": "custom_terms_acceptance_required",
+            "message_en": "You must review and accept your broker's custom contract before bidding.",
+            "message_fr": "Vous devez consulter et accepter le contrat personnalisé de votre courtier avant d'enchérir.",
+            "broker_id": broker["id"],
         })
 
     # 3. Bid limit check

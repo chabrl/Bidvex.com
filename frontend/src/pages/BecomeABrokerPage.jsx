@@ -27,9 +27,10 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../components/ui/select';
 import { Alert, AlertDescription } from '../components/ui/alert';
+import BrokerLiabilityAgreementModal from '../components/broker/BrokerLiabilityAgreementModal';
 import {
   CheckCircle2, ChevronRight, ChevronLeft, AlertTriangle,
-  Upload, FileText, FileImage, X, Loader2, Sparkles,
+  Upload, FileText, FileImage, X, Loader2, Sparkles, Scale, ShieldCheck,
 } from 'lucide-react';
 
 const PROVINCES = [
@@ -131,6 +132,13 @@ export default function BecomeABrokerPage() {
     broker_license_number: '',
     permit_type:         'broker',
 
+    // iter225 Task 2 — Dynamic Provincial Registration fields
+    qc_anq_number:       '',
+    qc_opc_number:       '',
+    on_omvic_number:     '',
+    bc_vsa_number:       '',
+    ab_amvic_number:     '',
+
     fee_type:            'fixed',     // fixed | percentage
     fixed_amount_cad:    500,
     percentage_rate:     0.03,        // 3%
@@ -140,6 +148,10 @@ export default function BecomeABrokerPage() {
 
     legal_confirmed:     false,
   });
+
+  // iter225 Task 3 — Liability agreement gating
+  const [liabilityModalOpen, setLiabilityModalOpen] = useState(false);
+  const [liabilitySigned, setLiabilitySigned]       = useState(false);
 
   // Step 2 — document upload state
   const [licenseFile,      setLicenseFile]      = useState(null);
@@ -189,13 +201,21 @@ export default function BecomeABrokerPage() {
   const goBack = () => setStep(s => Math.max(1, s - 1));
 
   const canAdvance = () => {
-    if (step === 1) return form.legal_business_name && form.corporate_registration_number && form.broker_license_number;
+    if (step === 1) {
+      if (!(form.legal_business_name && form.corporate_registration_number && form.broker_license_number)) return false;
+      // iter225 Task 2 — Province-specific license fields are required (bilingual gate)
+      if (form.operating_province === 'QC' && !(form.qc_anq_number.trim() || form.qc_opc_number.trim())) return false;
+      if (form.operating_province === 'ON' && !form.on_omvic_number.trim()) return false;
+      if (form.operating_province === 'BC' && !form.bc_vsa_number.trim()) return false;
+      if (form.operating_province === 'AB' && !form.ab_amvic_number.trim()) return false;
+      return true;
+    }
     if (step === 2) return true;  // Docs always optional
     if (step === 3) {
       if (form.fee_type === 'fixed') return Number(form.fixed_amount_cad) > 0;
       return Number(form.percentage_rate) > 0;
     }
-    if (step === 4) return form.legal_confirmed;
+    if (step === 4) return form.legal_confirmed && liabilitySigned;
     return true;
   };
 
@@ -243,6 +263,12 @@ export default function BecomeABrokerPage() {
         license_document_url:          docUrls.license_document_url || null,
         registration_document_url:     docUrls.registration_document_url || null,
         additional_documents:          docUrls.additional_documents || [],
+        // iter225 Task 2 — Dynamic Provincial Registration
+        qc_anq_number:   form.qc_anq_number.trim()  || null,
+        qc_opc_number:   form.qc_opc_number.trim()  || null,
+        on_omvic_number: form.on_omvic_number.trim() || null,
+        bc_vsa_number:   form.bc_vsa_number.trim()  || null,
+        ab_amvic_number: form.ab_amvic_number.trim() || null,
         fee_structure: {
           type:              form.fee_type,
           fixed_amount_cad:  Number(form.fixed_amount_cad) || 0,
@@ -362,6 +388,10 @@ export default function BecomeABrokerPage() {
                 <Label>{lang === 'fr' ? 'Numéro de permis' : 'Broker / Dealer License #'} *</Label>
                 <Input value={form.broker_license_number} onChange={(e) => set('broker_license_number', e.target.value)} data-testid="broker-license-number" />
               </div>
+
+              {/* iter225 Task 2 — Dynamic Provincial Registration Fields */}
+              <ProvincialLicenseFields province={form.operating_province} form={form} set={set} lang={lang} />
+
               <div>
                 <Label>{lang === 'fr' ? 'Type de permis' : 'Permit Type'} *</Label>
                 <Select value={form.permit_type} onValueChange={(v) => set('permit_type', v)}>
@@ -525,6 +555,45 @@ export default function BecomeABrokerPage() {
                     : `I confirm I hold a valid commercial broker / dealer permit in ${province.name_en} and am legally authorized to act as a broker for vehicle transactions under ${province.regulator} regulations.`}
                 </AlertDescription>
               </Alert>
+
+              {/* iter225 Task 3 — 3-Tier Liability Agreement with forced scroll */}
+              <div
+                className={`rounded-lg border-2 p-4 ${liabilitySigned
+                  ? 'border-emerald-300 bg-emerald-50 dark:bg-emerald-950/30'
+                  : 'border-rose-300 bg-rose-50 dark:bg-rose-950/30'}`}
+                data-testid="broker-liability-block"
+              >
+                <div className="flex items-start gap-3 mb-3">
+                  <Scale className={`w-5 h-5 mt-0.5 flex-shrink-0 ${liabilitySigned ? 'text-emerald-600' : 'text-rose-600'}`} />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-sm">
+                      {lang === 'fr' ? 'Accord de responsabilité du courtier (obligatoire)' : 'Broker Liability Agreement (required)'}
+                    </p>
+                    <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+                      {lang === 'fr'
+                        ? '3 sections juridiques. Doit être défilé à 100 % et signé numériquement avant de soumettre la demande.'
+                        : 'Three legal sections. Must be scrolled 100% and digitally signed before you can submit your application.'}
+                    </p>
+                  </div>
+                </div>
+                {liabilitySigned ? (
+                  <div className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-300 font-medium" data-testid="liability-signed-badge">
+                    <ShieldCheck className="w-4 h-4" />
+                    {lang === 'fr' ? 'Accord signé numériquement' : 'Agreement digitally signed'}
+                  </div>
+                ) : (
+                  <Button
+                    onClick={() => setLiabilityModalOpen(true)}
+                    type="button"
+                    className="w-full bg-gradient-to-r from-rose-600 to-amber-600 text-white hover:opacity-90"
+                    data-testid="open-liability-modal"
+                  >
+                    <Scale className="w-4 h-4 mr-2" />
+                    {lang === 'fr' ? 'Lire et signer l\'accord' : 'Read & Sign Agreement'}
+                  </Button>
+                )}
+              </div>
+
               <label className="flex items-start gap-3 cursor-pointer">
                 <input type="checkbox" checked={form.legal_confirmed}
                        onChange={(e) => set('legal_confirmed', e.target.checked)}
@@ -563,6 +632,122 @@ export default function BecomeABrokerPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* iter225 Task 3 — Liability Agreement Modal */}
+      <BrokerLiabilityAgreementModal
+        open={liabilityModalOpen}
+        lang={lang}
+        onClose={() => setLiabilityModalOpen(false)}
+        onSigned={() => { setLiabilitySigned(true); }}
+      />
+    </div>
+  );
+}
+
+// iter225 Task 2 — Dynamic Provincial Registration Fields component
+function ProvincialLicenseFields({ province, form, set, lang }) {
+  if (province === 'QC') {
+    return (
+      <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 p-4 space-y-3" data-testid="provincial-fields-qc">
+        <p className="text-xs font-semibold uppercase tracking-wider text-blue-700 dark:text-blue-300">
+          {lang === 'fr' ? 'Inscriptions requises au Québec' : 'Required Quebec Registrations'}
+        </p>
+        <div>
+          <Label>{lang === 'fr' ? 'Numéro d\'inscription ANQ (Autorité des marchés publics — véhicules)' : 'ANQ Registration # (Autorité des marchés publics — vehicles)'} *</Label>
+          <Input
+            value={form.qc_anq_number}
+            onChange={(e) => set('qc_anq_number', e.target.value)}
+            placeholder="ANQ-XXXX-XXXX"
+            data-testid="qc-anq-number"
+          />
+        </div>
+        <div>
+          <Label>{lang === 'fr' ? 'Numéro de permis OPC (Office de la protection du consommateur)' : 'OPC Permit # (Office de la protection du consommateur)'} *</Label>
+          <Input
+            value={form.qc_opc_number}
+            onChange={(e) => set('qc_opc_number', e.target.value)}
+            placeholder="OPC-XXXXXX"
+            data-testid="qc-opc-number"
+          />
+        </div>
+        <p className="text-[11px] text-slate-500">
+          {lang === 'fr'
+            ? 'Au moins un des deux numéros est obligatoire pour exploiter au Québec.'
+            : 'At least one of the two numbers is required to operate in Quebec.'}
+        </p>
+      </div>
+    );
+  }
+  if (province === 'ON') {
+    return (
+      <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 p-4 space-y-3" data-testid="provincial-fields-on">
+        <p className="text-xs font-semibold uppercase tracking-wider text-blue-700 dark:text-blue-300">
+          {lang === 'fr' ? 'Inscription requise en Ontario' : 'Required Ontario Registration'}
+        </p>
+        <div>
+          <Label>{lang === 'fr' ? 'Numéro de registraire OMVIC' : 'OMVIC Registrant #'} *</Label>
+          <Input
+            value={form.on_omvic_number}
+            onChange={(e) => set('on_omvic_number', e.target.value)}
+            placeholder="OMVIC-1234567"
+            data-testid="on-omvic-number"
+          />
+        </div>
+        <p className="text-[11px] text-slate-500">
+          {lang === 'fr'
+            ? 'Tous les courtiers automobiles doivent être inscrits auprès de l\'OMVIC en Ontario.'
+            : 'All vehicle brokers must be registered with OMVIC in Ontario.'}
+        </p>
+      </div>
+    );
+  }
+  if (province === 'BC') {
+    return (
+      <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 p-4 space-y-3" data-testid="provincial-fields-bc">
+        <p className="text-xs font-semibold uppercase tracking-wider text-blue-700 dark:text-blue-300">
+          {lang === 'fr' ? 'Inscription requise en C.-B.' : 'Required British Columbia Registration'}
+        </p>
+        <div>
+          <Label>{lang === 'fr' ? 'Numéro d\'inscription VSA (Vehicle Sales Authority)' : 'VSA Registration # (Vehicle Sales Authority)'} *</Label>
+          <Input
+            value={form.bc_vsa_number}
+            onChange={(e) => set('bc_vsa_number', e.target.value)}
+            placeholder="VSA-XXXXX"
+            data-testid="bc-vsa-number"
+          />
+        </div>
+        <p className="text-[11px] text-slate-500">
+          {lang === 'fr'
+            ? 'Les courtiers doivent être inscrits auprès de la VSA en Colombie-Britannique.'
+            : 'Brokers must be registered with the VSA in British Columbia.'}
+        </p>
+      </div>
+    );
+  }
+  if (province === 'AB') {
+    return (
+      <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 p-4 space-y-3" data-testid="provincial-fields-ab">
+        <p className="text-xs font-semibold uppercase tracking-wider text-blue-700 dark:text-blue-300">
+          {lang === 'fr' ? 'Inscription requise en Alberta' : 'Required Alberta Registration'}
+        </p>
+        <div>
+          <Label>{lang === 'fr' ? 'Numéro d\'industrie AMVIC' : 'AMVIC Business #'} *</Label>
+          <Input
+            value={form.ab_amvic_number}
+            onChange={(e) => set('ab_amvic_number', e.target.value)}
+            placeholder="AMVIC-XXXX"
+            data-testid="ab-amvic-number"
+          />
+        </div>
+      </div>
+    );
+  }
+  // Other provinces — no additional fields, the standard broker_license_number above is enough
+  return (
+    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 p-3 text-xs text-slate-500" data-testid="provincial-fields-generic">
+      {lang === 'fr'
+        ? 'Aucune inscription provinciale supplémentaire requise au-delà du numéro de permis ci-dessus.'
+        : 'No additional provincial registration required beyond the broker / dealer license above.'}
     </div>
   );
 }

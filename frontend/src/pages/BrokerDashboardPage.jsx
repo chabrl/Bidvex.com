@@ -19,14 +19,17 @@ import { Alert, AlertDescription } from '../components/ui/alert';
 import {
   LayoutDashboard, Users, Car, ClipboardList, DollarSign, Settings,
   AlertTriangle, CheckCircle2, Clock, XCircle, ShieldCheck,
+  BookOpenCheck, FileEdit, Save,
 } from 'lucide-react';
 
 const TABS = [
   { id: 'overview',  icon: LayoutDashboard, label_en: 'Overview',     label_fr: 'Vue d\'ensemble' },
   { id: 'buyers',    icon: Users,           label_en: 'My Buyers',    label_fr: 'Mes acheteurs' },
+  { id: 'ledger',    icon: BookOpenCheck,   label_en: 'Reconciliation', label_fr: 'Réconciliation' },
   { id: 'deals',     icon: Car,             label_en: 'Active Deals', label_fr: 'Affaires actives' },
   { id: 'pipeline',  icon: ClipboardList,   label_en: 'Pipeline',     label_fr: 'Pipeline' },
   { id: 'revenue',   icon: DollarSign,      label_en: 'Revenue',      label_fr: 'Revenus' },
+  { id: 'contract',  icon: FileEdit,        label_en: 'Custom Terms', label_fr: 'Contrat sur mesure' },
   { id: 'settings',  icon: Settings,        label_en: 'Settings',     label_fr: 'Paramètres' },
 ];
 
@@ -50,6 +53,7 @@ export default function BrokerDashboardPage() {
   const [broker, setBroker]     = useState(null);
   const [tab, setTab]           = useState('overview');
   const [buyers, setBuyers]     = useState([]);
+  const [subscription, setSubscription] = useState(null);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState(null);
 
@@ -295,9 +299,11 @@ export default function BrokerDashboardPage() {
             </section>
           )}
 
+          {tab === 'ledger'   && <BrokerReconciliationTab lang={lang} />}
           {tab === 'deals'    && <BrokerActiveDealsTab lang={lang} />}
           {tab === 'pipeline' && <BrokerPipelineTab lang={lang} />}
           {tab === 'revenue'  && <BrokerRevenueTab lang={lang} broker={broker} />}
+          {tab === 'contract' && <BrokerCustomTermsTab lang={lang} broker={broker} onSaved={loadBroker} />}
           {tab === 'settings' && <BrokerSettingsTab lang={lang} broker={broker} onSaved={loadBroker} />}
         </main>
       </div>
@@ -821,4 +827,251 @@ function BrokerSettingsTab({ lang, broker, onSaved }) {
     </section>
   );
 }
+
+// ── iter225 Task 1 — Buyer Reconciliation Matrix Tab ──────────────────
+function BrokerReconciliationTab({ lang }) {
+  const [data, setData]       = React.useState({ rows: [], totals: null });
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError]     = React.useState(null);
+  const [q, setQ]             = React.useState('');
+  const _token = () => localStorage.getItem('access_token') || localStorage.getItem('token');
+
+  const load = React.useCallback(async () => {
+    setLoading(true); setError(null);
+    try {
+      const r = await axios.get(`${API_BASE}/broker-relationships/buyer-ledger`, {
+        headers: { Authorization: `Bearer ${_token()}` },
+      });
+      setData({ rows: r.data?.data || [], totals: r.data?.totals || null });
+    } catch (e) {
+      setError(e?.response?.data?.detail?.error || 'failed_to_load_ledger');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+  React.useEffect(() => { load(); const i = setInterval(load, 60000); return () => clearInterval(i); }, [load]);
+
+  const filtered = (data.rows || []).filter(r => {
+    if (!q.trim()) return true;
+    const needle = q.toLowerCase();
+    return (
+      (r.buyer_email     || '').toLowerCase().includes(needle) ||
+      (r.buyer_full_name || '').toLowerCase().includes(needle)
+    );
+  });
+
+  if (loading) return <div className="text-center text-slate-500 py-12">Loading…</div>;
+  if (error)   return <div className="text-center text-rose-500 py-12" data-testid="ledger-error">{String(error)}</div>;
+
+  return (
+    <section className="space-y-4" data-testid="broker-reconciliation">
+      <div className="flex items-start justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="text-xl font-semibold">{lang === 'fr' ? 'Matrice de réconciliation' : 'Reconciliation Matrix'}</h2>
+          <p className="text-xs text-slate-500">
+            {lang === 'fr'
+              ? 'Ledger isolé : pour chaque acheteur géré, voyez ses enchères actives, gagnées et perdues.'
+              : 'Isolated ledger: for every managed buyer, see their Active, Won, and Lost auctions.'}
+          </p>
+        </div>
+        <input
+          type="text"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder={lang === 'fr' ? 'Filtrer par e-mail / nom…' : 'Filter by email / name…'}
+          className="px-3 py-2 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm w-full sm:w-64"
+          data-testid="ledger-filter-input"
+        />
+      </div>
+
+      {data.totals && (
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3" data-testid="ledger-totals">
+          <KPI label={lang === 'fr' ? 'Acheteurs' : 'Buyers'} value={data.totals.buyers} testid="ledger-kpi-buyers" />
+          <KPI label={lang === 'fr' ? 'Actives' : 'Active'} value={data.totals.active} testid="ledger-kpi-active" />
+          <KPI label={lang === 'fr' ? 'Gagnées' : 'Won'} value={data.totals.won} testid="ledger-kpi-won" />
+          <KPI label={lang === 'fr' ? 'Perdues' : 'Lost'} value={data.totals.lost} testid="ledger-kpi-lost" />
+          <KPI label={lang === 'fr' ? 'Total enchéri (CAD)' : 'Total Bid (CAD)'} value={_fmt(data.totals.total_bid_cad)} testid="ledger-kpi-amount" />
+        </div>
+      )}
+
+      {filtered.length === 0 ? (
+        <Card data-testid="ledger-empty"><CardContent className="p-8 text-center text-slate-500">
+          {lang === 'fr' ? 'Aucun acheteur correspondant.' : 'No matching buyers.'}
+        </CardContent></Card>
+      ) : (
+        <Card><CardContent className="p-0 overflow-x-auto">
+          <table className="w-full text-sm" data-testid="ledger-table">
+            <thead>
+              <tr className="text-left text-xs text-slate-500 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+                <th className="py-2 px-3">{lang === 'fr' ? 'Acheteur' : 'Buyer'}</th>
+                <th className="px-3">{lang === 'fr' ? 'Statut' : 'Status'}</th>
+                <th className="px-3">{lang === 'fr' ? 'Dépôt' : 'Deposit'}</th>
+                <th className="px-3 text-center text-amber-700">{lang === 'fr' ? 'Actives' : 'Active'}</th>
+                <th className="px-3 text-center text-emerald-700">{lang === 'fr' ? 'Gagnées' : 'Won'}</th>
+                <th className="px-3 text-center text-rose-700">{lang === 'fr' ? 'Perdues' : 'Lost'}</th>
+                <th className="px-3 text-right">{lang === 'fr' ? 'Total $' : 'Total $'}</th>
+                <th className="px-3">{lang === 'fr' ? 'Contrat' : 'Contract'}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((r) => (
+                <tr key={r.relationship_id} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40" data-testid={`ledger-row-${r.relationship_id}`}>
+                  <td className="py-3 px-3">
+                    <div className="font-medium text-slate-900 dark:text-white">{r.buyer_full_name || r.buyer_email}</div>
+                    <div className="text-[11px] text-slate-500">{r.buyer_email}</div>
+                  </td>
+                  <td className="px-3"><Badge className="bg-slate-100 text-slate-700">{r.status}</Badge></td>
+                  <td className="px-3"><Badge variant="outline">{r.deposit_status}</Badge></td>
+                  <td className="px-3 text-center font-mono font-semibold text-amber-700" data-testid={`ledger-active-${r.relationship_id}`}>{r.active_auctions}</td>
+                  <td className="px-3 text-center font-mono font-semibold text-emerald-700" data-testid={`ledger-won-${r.relationship_id}`}>{r.won_auctions}</td>
+                  <td className="px-3 text-center font-mono font-semibold text-rose-700" data-testid={`ledger-lost-${r.relationship_id}`}>{r.lost_auctions}</td>
+                  <td className="px-3 text-right font-mono">{_fmt(r.total_bid_amount_cad)}</td>
+                  <td className="px-3">
+                    {r.custom_terms_accepted_at ? (
+                      <span className="inline-flex items-center gap-1 text-emerald-700 text-[11px]">
+                        <CheckCircle2 className="w-3 h-3" />
+                        {lang === 'fr' ? 'Accepté' : 'Accepted'}
+                      </span>
+                    ) : (
+                      <span className="text-[11px] text-slate-400">—</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </CardContent></Card>
+      )}
+    </section>
+  );
+}
+
+// ── iter225 Task 4 — Custom Broker-Buyer Contract Editor Tab ───────────
+function BrokerCustomTermsTab({ lang, broker, onSaved }) {
+  const initialHtml = broker?.custom_terms_html || '';
+  const [html, setHtml]       = React.useState(initialHtml);
+  const [enabled, setEnabled] = React.useState(Boolean(broker?.custom_terms_enabled));
+  const [saving, setSaving]   = React.useState(false);
+  const [msg, setMsg]         = React.useState(null);
+  const editorRef = React.useRef(null);
+
+  React.useEffect(() => {
+    if (editorRef.current && editorRef.current.innerHTML !== initialHtml) {
+      editorRef.current.innerHTML = initialHtml;
+    }
+  }, []);  // eslint-disable-line
+
+  const cmd = (action, value = null) => {
+    document.execCommand(action, false, value);
+    if (editorRef.current) {
+      setHtml(editorRef.current.innerHTML);
+    }
+  };
+
+  const onInput = (e) => setHtml(e.currentTarget.innerHTML);
+
+  const save = async () => {
+    setSaving(true); setMsg(null);
+    try {
+      const token = localStorage.getItem('access_token') || localStorage.getItem('token');
+      const tmp = document.createElement('div');
+      tmp.innerHTML = html;
+      const plain = (tmp.textContent || tmp.innerText || '').trim();
+      await axios.patch(`${API_BASE}/brokers/custom-terms`, {
+        custom_terms_html: html,
+        custom_terms_plain: plain,
+        enabled,
+      }, { headers: { Authorization: `Bearer ${token}` } });
+      setMsg({ kind: 'ok', text: lang === 'fr' ? '✅ Enregistré' : '✅ Saved' });
+      if (onSaved) onSaved();
+    } catch (e) {
+      setMsg({ kind: 'err', text: e?.response?.data?.detail?.error || 'Save failed' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <section className="space-y-4" data-testid="broker-custom-terms-tab">
+      <div>
+        <h2 className="text-xl font-semibold">{lang === 'fr' ? 'Contrat sur mesure courtier-acheteur' : 'Custom Broker-Buyer Contract'}</h2>
+        <p className="text-xs text-slate-500 mt-1 max-w-2xl">
+          {lang === 'fr'
+            ? 'Rédigez les conditions qui s\'appliquent aux acheteurs qui se lient à vous. Lorsque cette option est activée, les acheteurs doivent accepter explicitement ce contrat avant de pouvoir enchérir sous votre licence.'
+            : 'Draft the rules that apply to buyers linked to you. When enabled, buyers must explicitly accept this contract before they can bid under your license.'}
+        </p>
+      </div>
+
+      <Card><CardContent className="p-4 space-y-3">
+        <label className="flex items-center gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={enabled}
+            onChange={(e) => setEnabled(e.target.checked)}
+            className="h-5 w-5 accent-amber-600"
+            data-testid="custom-terms-enabled-toggle"
+          />
+          <span className="text-sm font-medium">
+            {lang === 'fr'
+              ? 'Exiger que chaque acheteur accepte ce contrat avant d\'enchérir'
+              : 'Require every buyer to accept this contract before bidding'}
+          </span>
+        </label>
+
+        <div className="flex flex-wrap items-center gap-1 px-2 py-1.5 border border-slate-200 dark:border-slate-700 rounded-t-md bg-slate-50 dark:bg-slate-800">
+          <button type="button" onClick={() => cmd('bold')} className="px-2 py-1 text-xs font-bold rounded hover:bg-slate-200 dark:hover:bg-slate-700" data-testid="rte-bold">B</button>
+          <button type="button" onClick={() => cmd('italic')} className="px-2 py-1 text-xs italic rounded hover:bg-slate-200 dark:hover:bg-slate-700" data-testid="rte-italic">I</button>
+          <button type="button" onClick={() => cmd('underline')} className="px-2 py-1 text-xs underline rounded hover:bg-slate-200 dark:hover:bg-slate-700" data-testid="rte-underline">U</button>
+          <span className="w-px h-4 bg-slate-300 dark:bg-slate-600 mx-1" />
+          <button type="button" onClick={() => cmd('formatBlock', 'H3')} className="px-2 py-1 text-xs rounded hover:bg-slate-200 dark:hover:bg-slate-700" data-testid="rte-h3">H3</button>
+          <button type="button" onClick={() => cmd('formatBlock', 'P')} className="px-2 py-1 text-xs rounded hover:bg-slate-200 dark:hover:bg-slate-700" data-testid="rte-p">P</button>
+          <button type="button" onClick={() => cmd('insertUnorderedList')} className="px-2 py-1 text-xs rounded hover:bg-slate-200 dark:hover:bg-slate-700" data-testid="rte-ul">• List</button>
+          <button type="button" onClick={() => cmd('insertOrderedList')} className="px-2 py-1 text-xs rounded hover:bg-slate-200 dark:hover:bg-slate-700" data-testid="rte-ol">1. List</button>
+          <span className="w-px h-4 bg-slate-300 dark:bg-slate-600 mx-1" />
+          <button
+            type="button"
+            onClick={() => {
+              const url = window.prompt(lang === 'fr' ? 'Lien :' : 'Link URL:');
+              if (url) cmd('createLink', url);
+            }}
+            className="px-2 py-1 text-xs rounded hover:bg-slate-200 dark:hover:bg-slate-700"
+            data-testid="rte-link"
+          >
+            🔗
+          </button>
+          <button type="button" onClick={() => cmd('removeFormat')} className="px-2 py-1 text-xs rounded hover:bg-slate-200 dark:hover:bg-slate-700" data-testid="rte-clear">↺</button>
+        </div>
+
+        <div
+          ref={editorRef}
+          contentEditable
+          suppressContentEditableWarning
+          onInput={onInput}
+          className="min-h-[280px] max-h-[480px] overflow-y-auto px-4 py-3 border-x border-b border-slate-200 dark:border-slate-700 rounded-b-md bg-white dark:bg-slate-900 prose prose-sm dark:prose-invert max-w-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+          data-testid="custom-terms-editor"
+        />
+        <p className="text-[11px] text-slate-500">
+          {lang === 'fr'
+            ? 'Maximum 50 000 caractères. Le contenu HTML est conservé tel quel ; rédigez clairement.'
+            : 'Maximum 50,000 characters. HTML is preserved verbatim; keep the wording clear and legally precise.'}
+        </p>
+        {msg && (
+          <div className={msg.kind === 'ok' ? 'text-emerald-600 text-sm' : 'text-rose-600 text-sm'} data-testid="custom-terms-msg">{msg.text}</div>
+        )}
+        <div className="flex justify-end">
+          <Button
+            onClick={save}
+            disabled={saving}
+            className="bg-gradient-to-r from-amber-500 to-orange-500 text-white"
+            data-testid="custom-terms-save"
+          >
+            <Save className="w-4 h-4 mr-1.5" />
+            {saving ? '…' : (lang === 'fr' ? 'Enregistrer le contrat' : 'Save Contract')}
+          </Button>
+        </div>
+      </CardContent></Card>
+    </section>
+  );
+}
+
 

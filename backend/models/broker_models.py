@@ -70,6 +70,13 @@ class BrokerCreate(BaseModel):
     fee_structure:              BrokerFeeStructure
     default_deposit_amount_cad: float = 500.0
 
+    # iter225 Task 2 — Dynamic provincial license fields
+    qc_anq_number:              Optional[str] = None  # QC: Autorité des marchés publics (vehicles)
+    qc_opc_number:              Optional[str] = None  # QC: Office de la protection du consommateur
+    on_omvic_number:            Optional[str] = None  # ON: OMVIC
+    bc_vsa_number:              Optional[str] = None  # BC: Vehicle Sales Authority
+    ab_amvic_number:            Optional[str] = None  # AB: AMVIC
+
 
 class BrokerOut(BaseModel):
     id:                          str
@@ -130,6 +137,24 @@ def make_broker_doc(*, user_id: str, payload: BrokerCreate) -> Dict[str, Any]:
 
         "fee_structure":               payload.fee_structure.dict(),
         "default_deposit_amount_cad":  float(payload.default_deposit_amount_cad),
+
+        # iter225 Task 2 — Provincial license numbers (optional, set based on operating_province)
+        "qc_anq_number":               (payload.qc_anq_number   or "").strip() or None,
+        "qc_opc_number":               (payload.qc_opc_number   or "").strip() or None,
+        "on_omvic_number":             (payload.on_omvic_number or "").strip() or None,
+        "bc_vsa_number":               (payload.bc_vsa_number   or "").strip() or None,
+        "ab_amvic_number":             (payload.ab_amvic_number or "").strip() or None,
+
+        # iter225 Task 3 — Liability agreement (signed inline during apply or later)
+        "liability_agreement":           None,
+        "liability_agreement_signed":    False,
+        "liability_agreement_signed_at": None,
+
+        # iter225 Task 4 — Custom broker-buyer contract (set later from dashboard)
+        "custom_terms_html":           None,
+        "custom_terms_plain":          None,
+        "custom_terms_enabled":        False,
+        "custom_terms_updated_at":     None,
 
         "total_buyers_managed":        0,
         "total_deals_completed":       0,
@@ -203,6 +228,10 @@ def make_relationship_doc(
         "kyc_verified":                    False,
         "kyc_documents":                   [],
         "kyc_verified_at":                 None,
+
+        # iter225 Task 4 — Buyer's acknowledgment of broker's custom contract
+        "custom_terms_accepted_at":        None,
+        "custom_terms_acceptance":         None,
 
         "created_at":                      now,
         "updated_at":                      now,

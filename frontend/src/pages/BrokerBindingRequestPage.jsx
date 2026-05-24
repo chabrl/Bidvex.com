@@ -35,8 +35,9 @@ import {
 } from '../components/ui/select';
 import {
   ShieldCheck, Lock, AlertTriangle, CheckCircle2, ChevronLeft,
-  CircleDollarSign, CreditCard,
+  CircleDollarSign, CreditCard, BadgeCheck,
 } from 'lucide-react';
+import BuyerCustomTermsModal from '../components/broker/BuyerCustomTermsModal';
 
 const _fmt = (n) =>
   (n == null || Number.isNaN(Number(n)))
@@ -69,6 +70,25 @@ export default function BrokerBindingRequestPage() {
   const [submitting, setSubmit] = useState(false);
   const [error, setError]       = useState(null);
   const [success, setSuccess]   = useState(false);
+  // iter225 Task 4 — Custom Terms gating
+  const [customTerms, setCustomTerms]       = useState(null);
+  const [termsAccepted, setTermsAccepted]   = useState(false);
+  const [termsSignature, setTermsSignature] = useState(null);
+  const [termsModalOpen, setTermsModalOpen] = useState(false);
+
+  // Load broker custom terms in parallel so we know whether to gate the deposit click
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await axios.get(`${API_BASE}/brokers/${broker_id}/custom-terms`);
+        if (!cancelled) setCustomTerms(r.data);
+      } catch (e) {
+        if (!cancelled) setCustomTerms({ enabled: false });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [broker_id]);
 
   // ─── Load broker + initial fee preview ──────────────────────
   useEffect(() => {
@@ -100,8 +120,16 @@ export default function BrokerBindingRequestPage() {
     return () => { cancelled = true; };
   }, [broker_id, province]);
 
+  const needsCustomTerms = !!(customTerms?.enabled && (customTerms.custom_terms_html?.trim() || customTerms.custom_terms_plain?.trim()));
+  const canAuthorize = !needsCustomTerms || termsAccepted;
+
   // ─── Authorize $500 hold ────────────────────────────────────
   const authorizeDeposit = async () => {
+    // iter225 Task 4 — if broker has custom terms enabled, force the modal first
+    if (needsCustomTerms && !termsAccepted) {
+      setTermsModalOpen(true);
+      return;
+    }
     setSubmit(true); setError(null);
     try {
       const token = localStorage.getItem('access_token') || localStorage.getItem('token');
@@ -111,6 +139,18 @@ export default function BrokerBindingRequestPage() {
         { headers: { Authorization: `Bearer ${token}` } },
       );
       if (r.data?.success) {
+        // iter225 Task 4 — Post acceptance against the new relationship_id
+        if (needsCustomTerms && termsSignature && r.data?.relationship_id) {
+          try {
+            await axios.post(
+              `${API_BASE}/broker-relationships/${r.data.relationship_id}/accept-custom-terms`,
+              { accepted: true, signature_text: termsSignature, locale: lang },
+              { headers: { Authorization: `Bearer ${token}` } },
+            );
+          } catch (e) {
+            console.error('[custom-terms-accept] post-failed', e);
+          }
+        }
         setSuccess(true);
         setTimeout(() => navigate('/account?tab=broker'), 2000);
       }
@@ -255,16 +295,19 @@ export default function BrokerBindingRequestPage() {
           <div className="bg-slate-50 dark:bg-slate-800 px-5 py-3 border-t border-slate-200 dark:border-slate-700">
             <Row
               label={
-                <span className="flex items-center gap-1.5">
+                <span className="flex items-center gap-1.5 flex-wrap">
                   <Lock className="h-3.5 w-3.5" />
                   {lang === 'fr' ? 'Caution de sécurité (remboursable)' : 'Security Deposit (refundable)'}
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-500 text-white text-[9px] font-bold uppercase tracking-wide" data-testid="refundable-badge-fee-row">
+                    {lang === 'fr' ? '100 %' : '100%'}
+                  </span>
                 </span>
               }
               value={_fmt(depositAmount)}
               testId="fee-row-deposit"
             />
             <p className="text-[11px] text-slate-500 mt-0.5">
-              {lang === 'fr' ? 'Libérée après la remise du véhicule' : 'Released after vehicle handoff'}
+              {lang === 'fr' ? 'Garantie 100 % remboursable — libérée à la résiliation du partenariat ou à la remise du véhicule.' : '100% refundable guarantee — released on partnership termination or vehicle handoff.'}
             </p>
           </div>
 
@@ -286,20 +329,66 @@ export default function BrokerBindingRequestPage() {
       {/* ── Deposit notice ─────────────────────────────────────── */}
       <Card className="border-2 border-amber-300 bg-amber-50 dark:bg-amber-950/30 mb-4">
         <CardContent className="p-5 space-y-3">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <CircleDollarSign className="h-5 w-5 text-amber-600" />
             <h2 className="font-semibold">{lang === 'fr' ? 'Dépôt de garantie requis' : 'Security Deposit Required'}</h2>
+            {/* iter225 Task 5 — 100% Refundable Guarantee badge */}
+            <span
+              className="ml-auto inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500 text-white text-[11px] font-bold tracking-wide shadow"
+              data-testid="refundable-badge-header"
+            >
+              <BadgeCheck className="w-3.5 h-3.5" />
+              {lang === 'fr' ? '100 % REMBOURSABLE' : '100% REFUNDABLE'}
+            </span>
           </div>
           <p className="text-sm text-slate-700 dark:text-slate-200">
             {lang === 'fr'
               ? `Un dépôt remboursable de ${depositAmount} $ CAD est requis pour s'associer à un courtier. Ce dépôt est conservé de manière sécurisée via Stripe et vérifie votre engagement en tant qu'acheteur sérieux. Il sera remboursé intégralement à la fin de notre partenariat, sauf si vous remportez un véhicule et ne complétez pas le paiement.`
               : `A refundable deposit of $${depositAmount} CAD is required to partner with a broker. This deposit is held securely via Stripe and verifies your commitment as a serious buyer. It is fully refunded when our partnership ends, unless you win a vehicle and fail to complete payment.`}
           </p>
-          <div className="text-lg font-bold">
-            {lang === 'fr' ? 'Montant du dépôt' : 'Deposit Amount'}: ${depositAmount.toFixed(2)} CAD
+          {/* iter225 Task 5 — 3-row guarantee block */}
+          <ul className="text-xs text-slate-700 dark:text-slate-200 space-y-1 pl-1">
+            <li className="flex items-start gap-2"><BadgeCheck className="w-3.5 h-3.5 text-emerald-600 mt-0.5 flex-shrink-0" /> {lang === 'fr' ? 'Aucun frais aujourd\'hui — la carte est seulement bloquée.' : 'No charge today — card is only authorized (held).'}</li>
+            <li className="flex items-start gap-2"><BadgeCheck className="w-3.5 h-3.5 text-emerald-600 mt-0.5 flex-shrink-0" /> {lang === 'fr' ? 'Remboursé automatiquement via Stripe à la fin du partenariat.' : 'Automatically refunded via Stripe when the partnership ends.'}</li>
+            <li className="flex items-start gap-2"><BadgeCheck className="w-3.5 h-3.5 text-emerald-600 mt-0.5 flex-shrink-0" /> {lang === 'fr' ? 'Traité par Stripe — BidVex ne conserve jamais votre carte.' : 'Processed by Stripe — BidVex never stores your card.'}</li>
+          </ul>
+          <div className="text-lg font-bold flex items-center gap-2 flex-wrap">
+            <span>{lang === 'fr' ? 'Montant du dépôt' : 'Deposit Amount'}: ${depositAmount.toFixed(2)} CAD</span>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold uppercase" data-testid="refundable-badge-amount">
+              {lang === 'fr' ? 'Garantie 100 %' : '100% Guarantee'}
+            </span>
           </div>
         </CardContent>
       </Card>
+
+      {/* iter225 Task 4 — Custom Contract banner (if broker has one) */}
+      {needsCustomTerms && (
+        <Card className={`border-2 mb-4 ${termsAccepted ? 'border-emerald-300 bg-emerald-50 dark:bg-emerald-950/30' : 'border-amber-300 bg-amber-50 dark:bg-amber-950/30'}`} data-testid="broker-custom-contract-banner">
+          <CardContent className="p-4 flex items-start gap-3 flex-wrap">
+            <CircleDollarSign className={`w-5 h-5 flex-shrink-0 ${termsAccepted ? 'text-emerald-600' : 'text-amber-600'}`} />
+            <div className="flex-1 min-w-[200px]">
+              <p className="font-semibold text-sm">
+                {lang === 'fr' ? 'Contrat sur mesure du courtier' : "Broker's Custom Contract"}
+              </p>
+              <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+                {termsAccepted
+                  ? (lang === 'fr' ? 'Vous avez accepté le contrat personnalisé du courtier.' : "You've accepted the broker's custom contract.")
+                  : (lang === 'fr' ? 'Vous devez consulter et accepter le contrat avant d\'autoriser le dépôt.' : 'You must review & accept the contract before authorizing the deposit.')}
+              </p>
+            </div>
+            {!termsAccepted ? (
+              <Button onClick={() => setTermsModalOpen(true)} variant="outline" className="border-amber-400 text-amber-700 hover:bg-amber-100" data-testid="open-custom-terms">
+                {lang === 'fr' ? 'Lire le contrat' : 'Read Contract'}
+              </Button>
+            ) : (
+              <span className="inline-flex items-center gap-1 text-emerald-700 text-sm font-medium">
+                <CheckCircle2 className="w-4 h-4" />
+                {lang === 'fr' ? 'Accepté' : 'Accepted'}
+              </span>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {error && (
         <Alert variant="destructive" className="mb-4">
@@ -310,14 +399,16 @@ export default function BrokerBindingRequestPage() {
 
       <Button
         onClick={authorizeDeposit}
-        disabled={submitting}
+        disabled={submitting || !canAuthorize}
         className="w-full bg-gradient-to-r from-[#1E3A8A] to-[#06B6D4] text-white"
         data-testid="broker-authorize-deposit"
       >
         <ShieldCheck className="h-5 w-5 mr-2" />
         {submitting
           ? (lang === 'fr' ? 'En cours...' : 'Processing...')
-          : (lang === 'fr' ? `Autoriser le dépôt — vous ne serez pas débité maintenant` : `Authorize Deposit — You won't be charged now`)}
+          : !canAuthorize
+            ? (lang === 'fr' ? 'Acceptez d\'abord le contrat du courtier' : 'Accept the broker contract first')
+            : (lang === 'fr' ? `Autoriser le dépôt — 100 % remboursable, vous ne serez pas débité maintenant` : `Authorize Deposit — 100% Refundable, no charge today`)}
       </Button>
 
       <p className="text-xs text-center text-slate-500 mt-3 flex items-center justify-center gap-1.5">
@@ -326,6 +417,20 @@ export default function BrokerBindingRequestPage() {
           ? 'BidVex ne stocke pas vos informations de carte. Tout le traitement des paiements est géré par Stripe.'
           : 'BidVex does not store your card information. All payment processing is handled by Stripe.'}
       </p>
+
+      {/* iter225 Task 4 — Buyer Custom Terms Modal */}
+      <BuyerCustomTermsModal
+        open={termsModalOpen}
+        brokerId={broker_id}
+        relationshipId={null /* not yet created — will accept post-creation */}
+        lang={lang}
+        onClose={() => setTermsModalOpen(false)}
+        onAccepted={(result) => {
+          setTermsAccepted(true);
+          setTermsSignature(result?.signature_text || null);
+          setTermsModalOpen(false);
+        }}
+      />
     </div>
   );
 }
