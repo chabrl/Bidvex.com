@@ -1,6 +1,52 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: iter225 — MASTER BROKER PORTAL UPGRADE (Feb 24, 2026) ✅ 5 TASKS
+## Latest: iter226 — LAUNCH-READY: PERMISSIVE SIGNING + ADMIN AUDIT ECOSYSTEM (Feb 24, 2026) ✅ 2 TASKS
+
+Critical onboarding fix unblocks pending-applicant flow + complete admin compliance oversight of every broker license.
+
+### Task 1 — Permissive Liability Signing for Pending Applicants ✅
+**Files**: `backend/routes/brokers.py::sign_broker_liability_agreement` (rewritten), `apply_to_become_broker` (promotion logic added).
+- ROOT CAUSE: Endpoint hard-required `current_user` to already be an approved broker, returning `400 not_a_broker`, blocking 100% of the wizard's Step 4.
+- FIX: Removed the broker check. ANY authenticated user can now sign. Validation gates (scroll, 3 sections, signature) STILL enforced — only the role check was dropped.
+- If broker doc exists → stamp `liability_agreement` directly. Otherwise → park `pending_broker_liability_signature` on the user doc; `apply_to_become_broker` then promotes it onto the new broker doc and back-fills `broker_legal_audit.broker_id`.
+- Audit row ALWAYS written (keyed by `user_id`); response surfaces `stage` so frontend can show the right toast.
+
+### Task 2 — Admin Broker Audit Ecosystem ✅
+**Backend** (`backend/routes/brokers.py`):
+- NEW `GET /api/admin/brokers/{id}/relationships` — every buyer link enriched with escrow ledger (PI ID, status, held/released timestamps, refund_result) + custom-terms acceptance snapshot (broker's signed HTML, accepted_at, IP/UA, signature_text). Returns `counts` map with 9 keys including `deposits_held/refunded/released`.
+- NEW `GET /api/admin/brokers/{id}/activity-log?limit=500` — unified timeline merged from 6 collections: `broker_legal_audit`, `broker_bids`, `broker_buyer_relationships`, `broker_invoices`, `broker_subscription_audit`, `brokers` (synthetic events for application_submitted/approved/suspended/liability_signed/custom_terms_updated). Each event has `kind`, `at`, `severity`, `details`, `message`. Sorted newest-first.
+- Both endpoints `require_admin` — 401 for unauthed, 403 for non-admin, 404 for unknown broker.
+
+**Frontend** (`frontend/src/components/admin/AdminBrokerAuditDrawer.jsx` NEW + `pages/admin/AdminBrokersPage.jsx` integration):
+- New `Audit` button (data-testid `admin-broker-audit-{id}`, `Eye` icon) on every broker row in all 4 subtabs.
+- Right-slide drawer (max-w-5xl) with bilingual EN/FR header + Refresh + Close buttons. 3 tabs:
+  * **Deals & Escrow** — 8 KPI tiles (Total/Active/Pending/Terminated/Rejected/Held/Refunded/Released) + per-relationship cards with status/escrow badges, full ledger box (Amount + PI ID + Held at + Released at + Stripe refund_result.action), and bid cap + rejection/suspension reasons.
+  * **Signed Legal Agreements** — every liability signature with font-serif italic name + IP + UA + version + locale + stage timestamps. Custom-contract acceptances with click-to-reveal signed HTML body (`dangerouslySetInnerHTML`).
+  * **Activity Log** — color-coded timeline table (ok/warn/info/error severity backgrounds) with expandable `<details>` JSON pretty-prints for full event payloads.
+
+### Verification (Backend 100% / Frontend 100%)
+- 6 new pytest tests in `tests/test_iter226_permissive_signing_and_admin_audit.py` (plus 3 conditionally-skipped tests that pass when admin login isn't rate-limited).
+- Manual curl ✓ Confirmed: `POST /brokers/sign-liability` as non-broker buyer returns `{success: true, stage: "pending_applicant", signed_at: "..."}` (was `400 not_a_broker` before iter226).
+- Manual curl ✓ Confirmed: `GET /admin/brokers/{id}/activity-log` for live preview broker returns 3 events with correct `kind` / `at` / `severity` / `details` / `message`.
+- Live screenshot ✓ Confirmed: Drawer renders 8 KPI tiles + relationship card with escrow ledger + 3 tab buttons on the live `9414-0597 Québec inc.` broker on preview.
+
+### Files Changed
+**Backend**: `routes/brokers.py` (sign-liability rewritten permissive; apply_to_become_broker promotes pending sig; 2 NEW admin endpoints).
+**Frontend**: NEW `components/admin/AdminBrokerAuditDrawer.jsx` (3-tab drawer); `pages/admin/AdminBrokersPage.jsx` (Audit button + drawer wiring + `auditBroker` state).
+**Tests**: NEW `tests/test_iter226_permissive_signing_and_admin_audit.py` (9 tests).
+
+### Action items (user)
+1. **Save to GitHub → redeploy** preview → production for tomorrow's launch.
+2. Walk-through smoke test: log in as a buyer → `/become-a-broker` → Step 1 fill QC license + ANQ + OPC → Step 2 (skip docs) → Step 3 (any fee) → Step 4 → click `Read & Sign Agreement` → scroll to bottom → tick all 3 sections → sign → submit. Should no longer hit "not_a_broker".
+3. As admin → `/admin/brokers` → Approved tab → click `Audit` on any broker → walk all 3 tabs.
+
+### Minor follow-up (non-blocking)
+- `activity-log?limit=N` rejects N>2000 with 422 instead of clamping. Acceptable but cosmetic.
+
+---
+
+
+## Previous: iter225 — MASTER BROKER PORTAL UPGRADE (Feb 24, 2026) ✅ 5 TASKS
 
 Complete isolated broker portal with reconciliation matrix, dynamic Canadian provincial registration, three-tier liability disclaimer with forced-scroll, custom broker-buyer contracts, and $500 refundable Stripe escrow with auto-refund.
 
