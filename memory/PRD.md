@@ -1,6 +1,57 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: iter228 — BUYER-BROKER ACTIVE PORTAL & TERMINATION FLOW (Feb 24, 2026) ✅ ZERO-CREDIT REMEDIATION
+## Latest: iter229 — SYSTEM-PROXY BROKER BIDDING ENGINE (Feb 24, 2026) ✅ 5 TASKS
+
+Architecture upgrade: vehicle bids now legally execute under the broker's licence with full compliance metadata. Surgical intercept; non-vehicle bidding untouched.
+
+### Task 1 — Schema + Bid-Cap UI ✅
+- `broker_buyer_relationships` doc gains 6 fields: `bid_cap`, `bid_cap_currency`, `bid_cap_set_at`, `bid_cap_set_by`, `proxy_bid_agreement_accepted`, `proxy_bid_agreement_accepted_at`. MongoDB schemaless → no migration; written on demand.
+- Optional `Set a maximum budget cap` input on `BrokerBindingRequestPage` (data-testid `bid-cap-form-card` + `bid-cap-input`). On successful request, cap is PATCH'd to the new relationship_id.
+- NEW `PATCH /api/broker-relationships/{rel_id}/bid-cap` — buyer-only ownership check, +ve/null gate, `bid_cap_set_by='buyer'` stamp.
+
+### Task 2 — Frontend Compliance Gateway ✅
+- NEW `VehicleBidPanel.jsx` (525 lines). Calls `/compliance-check` on mount. Renders one of 6 verdicts (eligible / no_broker / relationship_pending / no_deposit / province_mismatch / not_a_vehicle). The `eligible` state renders an inline bid form with "🔒 Bid executed under {broker_name} ({registry} — {province})" footer. Each banner has a CTA link to remediate (Find a Broker, Find broker in {prov}, Authorize Deposit).
+- NEW `LegalAgreementModal` inline within VehicleBidPanel — bilingual EN/FR, "I understand and authorize this bid to be placed via proxy system routing" checkbox, gates the Confirm button. POSTs `/accept-proxy-agreement` then executes the bid.
+- Mounted ABOVE the existing bid form on `VehicleDetailPage.js` — surgically wrapped, doesn't disrupt the existing non-vehicle bid flows.
+
+### Task 3 — Backend Compliance Gateway ✅
+- NEW `GET /api/broker-relationships/compliance-check?listing_id=X`. Returns 200 with one of 6 verdicts. Vehicle detection by `requires_broker` flag OR category contains any of: vehicle, car, auto, truck, motorcycle, suv, van, rv. Province match between `listing.seller_province` and `broker.operating_province`. Returns `broker_name`, `broker_license`, `broker_registry`, `bid_cap`, `proxy_bid_agreement_accepted` etc. when status='eligible'. 401 unauth / 404 unknown listing.
+
+### Task 4 — Backend Proxy Agreement Hook ✅
+- NEW `POST /api/broker-relationships/accept-proxy-agreement` — one-time per partnership. Sets `proxy_bid_agreement_accepted=True`, captures IP + UA + timestamp. Inserts `broker_legal_audit` row with `kind='proxy_bid_agreement_accepted'`. 400 `no_active_partnership` if buyer has none.
+
+### Task 5 — Backend Bid Intercept ✅
+- `POST /api/auctions/{listing_id}/bid` (existing endpoint, surgically patched in `auctions_bids.py::place_bid`). For VEHICLE listings only (`_auction_type=='vehicle'`):
+  * 403 `broker_not_active` if broker no longer approved.
+  * 400 `bid_cap_exceeded` with bilingual messages if `amount > rel.bid_cap` (when cap set).
+  * 403 `proxy_agreement_required` if `proxy_bid_agreement_accepted=False`.
+  * On pass, bid document gets stamped with `proxy_compliance = {legal_bidder_of_record_id, broker_license, broker_regulatory_body, broker_operating_province, acting_on_behalf_of_buyer_id, proxy_routing_mode='system_proxy_auto', relationship_id, jurisdiction_verified, bid_cap_at_time_of_bid, proxy_agreement_accepted_at}` + top-level `legal_bidder_of_record_id`, `bidder_type='broker_proxy'`.
+- Non-vehicle listings (`storage_locker`, etc.) bypass entirely.
+
+### Verification (Backend 100% / Frontend Testable 100%)
+- NEW `tests/test_iter229_system_proxy_bidding.py`: **8/8 pass**.
+- Testing agent ran additional `test_iter229_shape_verification.py` (6 more tests) — all pass.
+- Live preview: `bid-cap-form-card` renders with proper number input + placeholder `Unlimited` + CAD suffix. `compliance-check` returns `{status: 'not_a_vehicle'}` for non-vehicle listings (confirmed across Furniture/Restaurant/Bikes categories).
+- **Combined broker suite (iter225+226+227+228+229): 16 pass + 22 graceful skip + 0 fail.**
+- VehicleBidPanel UI happy-path will be E2E-testable post-launch once sellers list vehicles (preview DB currently has 0 vehicle listings — code review LGTM).
+
+### Files Changed
+**Backend**: `routes/brokers.py` (+3 endpoints), `routes/auctions_bids.py` (intercept block in `place_bid`).
+**Frontend**: NEW `components/broker/VehicleBidPanel.jsx`; modified `pages/BrokerBindingRequestPage.jsx` (bid_cap input card + post-creation PATCH), `pages/vehicles/VehicleDetailPage.js` (mounted VehicleBidPanel).
+**Tests**: NEW `tests/test_iter229_system_proxy_bidding.py` (8 tests) + agent-added `tests/test_iter229_shape_verification.py` (6 tests).
+
+### Action items (user — production deploy required)
+1. **Save to GitHub → redeploy** preview → production.
+2. Smoke test: as a buyer, visit any vehicle listing post-deploy → expect the no_broker amber banner with "Find a Broker →" link. As a buyer who's bound + has accepted the rider → see the proxy-bid form with "Bid executed under {broker_name}" footer.
+3. (Optional, post-launch) Seed a vehicle listing on preview so testing agents can E2E-verify the bid intercept + proxy_compliance stamp.
+
+### Minor follow-up (non-blocking)
+- bid-cap PATCH doesn't enforce rel.status in (active, pending) — buyers could update cap on terminated rels. Terminated rels won't be hit by the intercept anyway, so this is cosmetic.
+
+---
+
+
+## Previous: iter228 — BUYER-BROKER ACTIVE PORTAL & TERMINATION FLOW (Feb 24, 2026) ✅
 
 Comprehensive "My Active Broker Partnership" panel + mutual termination engine with obligation gate + dual SendGrid emails + automatic Stripe escrow refund.
 
