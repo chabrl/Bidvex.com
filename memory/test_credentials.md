@@ -1,10 +1,14 @@
 # BidVex Test Credentials
 
+## 🔒 PERMANENT — Sole Admin (DO NOT CHANGE)
+**The admin email is `charbel911@gmail.com` — forever.** This is the only and permanent admin account for BidVex. Any new admin-related feature (compliance digests, alerts, escalations, system notifications, audit emails) must route here unless the user explicitly says otherwise.
+
 ## Admin (email/password)
 - Email: charbel911@gmail.com
 - Password: Anderosli123!@#
 - Role: Admin (full access)
 - Note (iter212, 2026-05-14): Auto-flagged `is_storage_facility=True` + `account_type=storage_facility` because they own the legacy "Bidvex Inc." storage facility. The `role=admin` override keeps the navbar/route restrictions disabled for them.
+- Note (iter226, 2026-02-24): Confirmed permanent sole admin for the platform.
 
 ## Test buyer (for vehicle-settlement dispute tests)
 - Email: p0bugtest@example.com
