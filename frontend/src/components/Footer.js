@@ -151,8 +151,8 @@ const Footer = () => {
             </h3>
             <address className="not-italic text-xs leading-relaxed mb-3 text-gray-400">
               <strong className="text-gray-200">BidVex Inc.</strong><br />
-              555 Rue King Ouest, Suite 200<br />
-              Sherbrooke (Québec) J1H 1R8<br />
+              761 Rue Chalifoux<br />
+              Sherbrooke (Québec) J1G 0A8<br />
               Canada
             </address>
             <ul className="space-y-1.5 text-sm">

@@ -49,8 +49,8 @@ export default function ContactUsPage() {
           </h2>
           <address className="not-italic text-sm text-slate-700 dark:text-slate-200 leading-relaxed">
             BidVex Inc.<br />
-            555 Rue King Ouest, Suite 200<br />
-            Sherbrooke (Québec) J1H 1R8<br />
+            761 Rue Chalifoux<br />
+            Sherbrooke (Québec) J1G 0A8<br />
             Canada
           </address>
           <p className="text-xs text-slate-500 mt-2">{t.hq_hours}</p>
