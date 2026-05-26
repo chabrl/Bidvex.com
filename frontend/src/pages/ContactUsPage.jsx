@@ -67,9 +67,18 @@ export default function ContactUsPage() {
               </h3>
               <p className="text-xs text-slate-500 mb-2">{team.description}</p>
               <div className="space-y-1 text-sm">
-                <a href={`mailto:${team.email}`} className="flex items-center gap-2 text-blue-600 hover:underline" data-testid={`contact-team-email-${team.id}`}>
+                <a
+                  href={`mailto:${team.email}${team.subjectLine ? `?subject=${encodeURIComponent(team.subjectLine)}` : ''}`}
+                  className="flex items-center gap-2 text-blue-600 hover:underline"
+                  data-testid={`contact-team-email-${team.id}`}
+                >
                   <Mail className="w-3.5 h-3.5" />
                   {team.email}
+                  {team.subjectLine && (
+                    <span className="text-[10px] text-slate-400 font-normal ml-1">
+                      ({lang === 'fr' ? 'Objet' : 'Subject'}: {team.subjectLine})
+                    </span>
+                  )}
                 </a>
                 {team.phone && (
                   <a href={`tel:${team.phone.replace(/[^+\d]/g, '')}`} className="flex items-center gap-2 text-blue-600 hover:underline" data-testid={`contact-team-phone-${team.id}`}>
@@ -114,17 +123,22 @@ const COPY = {
     response_resolutions: 'Dispute Resolutions: written decision within 15 business days of complete claim submission',
     teams: [
       { id: 'support',     title: 'Customer Support',         description: 'Account, bidding, payment, technical issues.',
-        icon: Mail,        email: 'support@bidvex.com',       phone: '+1 (819) 888-4444' },
+        icon: Mail,        email: 'support@bidvex.com',       phone: '+1 514 949 0038' },
       { id: 'resolutions', title: 'Dispute Resolutions',      description: 'Refund claims, lot disputes, broker complaints.',
-        icon: ShieldAlert, email: 'disputes@bidvex.com',      phone: '+1 (819) 888-4445' },
+        icon: ShieldAlert, email: 'support@bidvex.com',       phone: '+1 514 949 0038',
+        subjectLine: 'Dispute Resolution' },
       { id: 'legal',       title: 'Legal & Compliance',       description: 'Subpoenas, regulator requests, privacy access.',
-        icon: Scale,       email: 'legal@bidvex.com',         phone: null },
+        icon: Scale,       email: 'support@bidvex.com',       phone: null,
+        subjectLine: 'Legal & Compliance' },
       { id: 'brokers',     title: 'Broker & Dealer Inbox',    description: 'Onboarding, licence verification, payouts.',
-        icon: Handshake,   email: 'brokers@bidvex.com',       phone: null },
+        icon: Handshake,   email: 'support@bidvex.com',       phone: null,
+        subjectLine: 'Broker & Dealer' },
       { id: 'press',       title: 'Press & Partnerships',     description: 'Media, press releases, B2B partnerships.',
-        icon: Newspaper,   email: 'press@bidvex.com',         phone: null },
+        icon: Newspaper,   email: 'support@bidvex.com',       phone: null,
+        subjectLine: 'Press & Partnerships' },
       { id: 'admin',       title: 'Administrative Office',    description: 'Direct line to the BidVex executive office.',
-        icon: Building2,   email: 'charbel911@gmail.com',     phone: null },
+        icon: Building2,   email: 'support@bidvex.com',       phone: null,
+        subjectLine: 'Administrative Office' },
     ],
   },
   fr: {
@@ -143,17 +157,22 @@ const COPY = {
     response_resolutions: 'Résolution des différends : décision écrite sous 15 jours ouvrables suivant la soumission complète de la réclamation',
     teams: [
       { id: 'support',     title: 'Service à la clientèle',   description: 'Compte, enchères, paiement, problèmes techniques.',
-        icon: Mail,        email: 'support@bidvex.com',       phone: '+1 (819) 888-4444' },
+        icon: Mail,        email: 'support@bidvex.com',       phone: '+1 514 949 0038' },
       { id: 'resolutions', title: 'Résolutions de différends', description: 'Réclamations de remboursement, litiges de lots, plaintes contre courtiers.',
-        icon: ShieldAlert, email: 'disputes@bidvex.com',      phone: '+1 (819) 888-4445' },
+        icon: ShieldAlert, email: 'support@bidvex.com',       phone: '+1 514 949 0038',
+        subjectLine: 'Résolution de différend' },
       { id: 'legal',       title: 'Juridique et conformité',  description: 'Assignations, demandes réglementaires, accès aux renseignements personnels.',
-        icon: Scale,       email: 'legal@bidvex.com',         phone: null },
+        icon: Scale,       email: 'support@bidvex.com',       phone: null,
+        subjectLine: 'Juridique et conformité' },
       { id: 'brokers',     title: 'Boîte courtiers',          description: 'Intégration, vérification de licence, versements.',
-        icon: Handshake,   email: 'brokers@bidvex.com',       phone: null },
+        icon: Handshake,   email: 'support@bidvex.com',       phone: null,
+        subjectLine: 'Courtiers et concessionnaires' },
       { id: 'press',       title: 'Presse et partenariats',   description: 'Médias, communiqués de presse, partenariats B2B.',
-        icon: Newspaper,   email: 'press@bidvex.com',         phone: null },
+        icon: Newspaper,   email: 'support@bidvex.com',       phone: null,
+        subjectLine: 'Presse et partenariats' },
       { id: 'admin',       title: 'Bureau administratif',     description: 'Ligne directe au bureau exécutif de BidVex.',
-        icon: Building2,   email: 'charbel911@gmail.com',     phone: null },
+        icon: Building2,   email: 'support@bidvex.com',       phone: null,
+        subjectLine: 'Bureau administratif' },
     ],
   },
 };

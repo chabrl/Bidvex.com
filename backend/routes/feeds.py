@@ -248,6 +248,67 @@ def _items_to_csv(items: List[Dict[str, Any]]) -> str:
     return buf.getvalue()
 
 
+# ── iter231 — Google Merchant Center XML feed ─────────────────────────
+@router.get("/google")
+async def get_google_merchant_feed(
+    request:  Request,
+    response: Response,
+    limit:    int = Query(FEED_DEFAULT_LIMIT, ge=1, le=FEED_MAX_ITEMS_PER_REQUEST),
+    offset:   int = Query(0, ge=0),
+    province: Optional[str] = None,
+    category: Optional[str] = None,
+    type:     Optional[str] = Query(None, description="marketplace|lots|vehicle|storage"),
+):
+    """Public Google Merchant Center catalog feed (RSS 2.0 XML).
+
+    Mounted at `GET /api/feeds/google`. Plug this URL directly into
+    Merchant Center → Products → Data sources → "Add feed" → Schedule fetch
+    → set frequency to **Hourly**.
+
+    Strategy:
+      • `<g:price>`        = live current_bid (NEVER buy_now / sale_price)
+      • `<g:price_type>`   = "auction" (custom Merchant Center attribute)
+      • `<g:availability>` = "in_stock" while active, "out_of_stock" ended
+      • `<g:id>`           = canonical listing.id UUID — matches Meta Pixel
+                             content_ids[0] and Schema.org JSON-LD @id 1:1
+      • `<g:identifier_exists>` = "no" (auction lots have no GTIN/MPN)
+
+    Items are pulled from the same `_build_feed_items` builder as the Meta
+    CSV feed, so price + availability + exclusion logic stays a single
+    source of truth across BOTH external catalogs.
+    """
+    _check_rate_limit(request.client.host if request.client else "anon")
+
+    from services.google_feed_mapper import build_google_feed_xml
+
+    key = make_cache_key(province, category, type, limit, offset)
+    async def _builder():
+        return await _build_feed_items(province, category, type, limit, offset)
+
+    items, was_hit, exclusions = await feed_cache.get_or_build(key, _builder)
+    seed_padded = bool(exclusions.get("seed_items_padded", 0))
+
+    xml_body = build_google_feed_xml(items)
+
+    logger.info(
+        "Google Merchant feed served: %d items, cache=%s, seed_padded=%s",
+        len(items), "HIT" if was_hit else "MISS", seed_padded,
+    )
+
+    return Response(
+        content=xml_body,
+        media_type="application/xml; charset=utf-8",
+        headers={
+            "Cache-Control":               "public, max-age=900",
+            "Access-Control-Allow-Origin": "*",
+            "X-Feed-Cache":                "HIT" if was_hit else "MISS",
+            "X-Seed-Padded":               "true" if seed_padded else "false",
+            "X-Feed-Item-Count":           str(len(items)),
+            "Content-Disposition":         'inline; filename="bidvex-google-catalog.xml"',
+        },
+    )
+
+
 # ── Public feed endpoint ─────────────────────────────────────────────
 @router.get("/facebook-local")
 async def get_facebook_local_feed(
