@@ -1,6 +1,63 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: iter229 — SYSTEM-PROXY BROKER BIDDING ENGINE (Feb 24, 2026) ✅ 5 TASKS
+## Latest: iter232 — HQ ADDRESS HOTFIX + FULL REGRESSION VALIDATION (Feb 25, 2026) ✅
+
+User-supplied just-in-time correction prior to production deploy: corporate HQ address updated from `555 Rue King Ouest, Suite 200, Sherbrooke (Québec) J1H 1R8` to the verified **`761 Rue Chalifoux, Sherbrooke (Québec) J1G 0A8`** across both `frontend/src/components/Footer.js` (corporate column block) and `frontend/src/pages/ContactUsPage.jsx` (HQ block). Grep confirms zero stale `555 Rue King` or `J1H 1R8` strings anywhere in `/app/frontend/src` or `/app/backend`.
+
+### Final regression pass (testing_agent_v3_fork — iteration_232.json)
+- Backend pytest: **235/236 PASS** across `test_iter231_google_merchant_feed.py`, `test_meta_pixel_funnel.py`, `test_iter218_meta_pixel_integration.py`, `test_phase5_facebook_feed.py`, `test_iter229_system_proxy_bidding.py`, `test_iter228_active_broker_panel_and_termination.py`, `test_iter227_critical_remediation.py`. The 1 stale-but-expected failure is environmental (preview catalog now has 5 real listings → seed padding correctly skipped — cosmetic, NOT a code regression).
+- Live `/api/feeds/google` validated: RSS 2.0 + `xmlns:g` namespace, every `<g:id>` = raw listing UUID (no `BIDVEX-` prefix), `<g:price_type>auction</g:price_type>`, `<g:availability>in_stock</g:availability>`, `<g:identifier_exists>no</g:identifier_exists>`, filters `?province`, `?limit` honored, `X-Feed-Cache: MISS` custom header surviving.
+- Live `/api/feeds/facebook-local` (CSV + `?format=json`) + `/meta` health endpoint: 200, raw UUID IDs.
+- Frontend routes verified: `/refund-policy` ✓, `/contact-us` ✓, redirects `/refunds`, `/returns`, `/contact` ✓, footer columns/links ✓ on `/marketplace`, payment-success page ✓.
+- Source wiring of `useMetaPixelTracking` (Vehicle:202, Storage:40, MultiLot:59, PaymentSuccess:23) + `ListingJsonLd` AggregateOffer/Offer branching: clean, no duplicate fbq emitters, no console errors.
+- Detail-page JSON-LD content not visually verified in preview (DB has 0 vehicles/storage/multi-item listings); source is correct → recommend Google Rich Results Test against any real bidvex.com vehicle once deployed.
+
+### Cosmetic follow-ups (non-blocking deploy)
+- `test_phase5_facebook_feed.py::test_csv_contains_seed_rows_in_unfiltered_feed` — refactor to conditionally assert seed rows only when `seed_padded > 0`.
+- Confirm origin `Cache-Control: public, max-age=900` on `/api/feeds/google` survives Cloudflare egress on production (preview ingress overrides it to `no-store`).
+
+### Files Changed (iter232)
+- `frontend/src/components/Footer.js` (corporate address block)
+- `frontend/src/pages/ContactUsPage.jsx` (HQ block)
+
+### Action items (user)
+1. **Save to GitHub → redeploy** preview → production for tomorrow's launch.
+2. Run **Google Rich Results Test** (https://search.google.com/test/rich-results) against any vehicle listing on `https://bidvex.com/vehicles/<id>` to confirm AggregateOffer parses.
+3. In **Google Merchant Center → Products → Data sources → Add feed**, plug in `https://bidvex.com/api/feeds/google` (hourly fetch). Resubmit for "Misrepresentation" reinstatement review.
+4. In **Meta Commerce Manager → Data Sources → Data Feeds → Fetch Now** so catalog re-ingests with the locked raw-UUID IDs aligned to Pixel `content_ids`.
+
+---
+
+
+## Previous: iter231 — GOOGLE MERCHANT XML FEED + LOCKED CONTACT INFO (Feb 25, 2026) ✅
+
+- NEW `backend/services/google_feed_mapper.py` — `build_google_feed_xml(items)` + `meta_item_to_google_xml(item)`. Reuses Meta-shaped item dicts so price/availability/exclusion logic stays a single source of truth. Emits `<g:id>` = raw listing UUID, `<g:price>` = current_bid CAD, `<g:price_type>auction</g:price_type>`, `<g:availability>` = `in_stock` / `out_of_stock`, `<g:identifier_exists>no</g:identifier_exists>`, `<g:condition>` whitelisted (new/used/refurbished), plus optional `<g:shipping>` block with origin region + `0.00 CAD` default shipping.
+- NEW `GET /api/feeds/google` in `backend/routes/feeds.py` — public, rate-limited, returns `application/xml; charset=utf-8` with `Cache-Control: public, max-age=900`, `X-Feed-Cache: HIT|MISS`, `X-Seed-Padded`, `X-Feed-Item-Count`, `Content-Disposition: inline; filename="bidvex-google-catalog.xml"`. Honours `?province`, `?category`, `?type`, `?limit`, `?offset` query params.
+- LOCKED official contact info across newly created compliance UI:
+  * `Footer.js` — `mailto:support@bidvex.com` + `tel:+15149490038` (no placeholders, no Trustpilot/legacy emails). All 4 footer columns now expose `data-testid` markers.
+  * `RefundPolicyPage.jsx` — bilingual 6-section policy (auction nature, binding bids, no hammer refund, $500 deposit, dispute procedure, title transfer) with contact line wiring `support@bidvex.com` + `+1 514 949 0038`.
+  * `ContactUsPage.jsx` — Legal entity block + HQ address + 6 team cards (support/resolutions/legal/brokers/press/admin) all routing to `support@bidvex.com` with subject discriminator.
+- NEW `backend/tests/test_iter231_google_merchant_feed.py` — backend pytest suite (XML shape, RSS 2.0 envelope, namespace, item count, price/availability fields, cache headers, query-param filters). All pass.
+
+---
+
+
+## Previous: iter230 — META PIXEL HOOK + JSON-LD + COMPLIANCE PAGES (Feb 25, 2026) ✅
+
+- NEW `frontend/src/hooks/useMetaPixelTracking.js` — single reusable hook exporting `trackViewContent`, `trackAddToCart`, `trackBidSubmitted` (InitiateCheckout), `trackWatchlistAdd`, `trackPurchase`. Encapsulates catalog-aligned payloads (`content_ids: [listing.id]`, `content_type`, `value`, `currency: 'CAD'`) and FE↔BE event_id dedup parity. One supported entry-point so detail-page call sites can no longer drift.
+- NEW `frontend/src/components/seo/ListingJsonLd.jsx` — Schema.org Product/Vehicle node with **AggregateOffer** when both `starting_price` and `current_bid` exist and differ (uses `lowPrice` / `highPrice` / `offerCount`), single Offer otherwise. `@id` + `sku` = raw listing UUID — 1:1 alignment with catalog feed + Pixel `content_ids`. Drops in once per detail page.
+- NEW `frontend/src/pages/RefundPolicyPage.jsx` + `frontend/src/pages/ContactUsPage.jsx` + 4-column `frontend/src/components/Footer.js` rebuild — see iter231 for the locked-in contact info enforcement.
+- Detail-page hot wires (each adds 1 hook call + JSON-LD mount):
+  * `pages/vehicles/VehicleDetailPage.js` (routeHint `vehicle`)
+  * `pages/storage/StorageAuctionDetail.js` (routeHint `storage`)
+  * `pages/MultiItemListingDetailPage.js` (routeHint `multi_lot`)
+  * `pages/PaymentSuccessPage.js` (trackPurchase consumer)
+- Routes wired in `App.js`: `/refund-policy`, `/contact-us`, redirects `/refunds`, `/returns`, `/contact`.
+
+---
+
+
+## Previous: iter229 — SYSTEM-PROXY BROKER BIDDING ENGINE (Feb 24, 2026) ✅ 5 TASKS
 
 Architecture upgrade: vehicle bids now legally execute under the broker's licence with full compliance metadata. Surgical intercept; non-vehicle bidding untouched.
 
