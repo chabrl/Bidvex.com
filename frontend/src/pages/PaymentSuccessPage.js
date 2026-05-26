@@ -8,6 +8,7 @@ import { Button } from '../components/ui/button';
 import { CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { formatCurrency } from '../utils/currencyFormatter';
+import { useMetaPixelTracking } from '../hooks/useMetaPixelTracking';
 
 const API = API_BASE;
 
@@ -18,6 +19,8 @@ const PaymentSuccessPage = () => {
   const [status, setStatus] = useState('processing');
   const [paymentInfo, setPaymentInfo] = useState(null);
   const sessionId = searchParams.get('session_id');
+  // iter230 — centralized Meta Pixel tracking hook
+  const { trackPurchase } = useMetaPixelTracking();
 
   useEffect(() => {
     if (sessionId) {
@@ -68,23 +71,21 @@ const PaymentSuccessPage = () => {
               data.listing_type ||
               meta.listing_type ||
               (meta.multi_item_listing_id ? 'multi_lot' : 'marketplace');
-            const totalCharged = (data.amount_total || 0) / 100;
-            const eventId = data.meta_purchase_event_id || meta.meta_purchase_event_id;
+            const finalWinningPrice = (data.amount_total || 0) / 100;
+            // Stripe Checkout session id (cs_...) is folded into the event_id
+            // so the backend CAPI fires the same id and Meta dedupes the pair.
+            const stripeSessionId = data.session_id || sessionId || data.meta_purchase_event_id;
             if (listingId) {
-              import('../utils/metaPixel').then(({ trackPurchase }) => {
-                trackPurchase({
-                  listingId,
-                  listingType,
-                  totalCharged,
-                  eventId,
-                  title: data.listing_title || meta.listing_title,
-                  category: data.listing_category || meta.listing_category,
-                });
-              }).catch((pixelErr) => {
-                console.debug('[PaymentSuccessPage] Purchase pixel emit failed:', pixelErr);
+              trackPurchase({
+                listingId,
+                listingType,
+                finalWinningPrice,
+                stripeSessionId,
+                title:    data.listing_title    || meta.listing_title,
+                category: data.listing_category || meta.listing_category,
               });
             }
-          } catch (e) { /* silent */ }
+          } catch (e) { /* silent — pixel must never block the success flow */ }
           return;
         } else if (data.status === 'expired') {
           setStatus('expired');

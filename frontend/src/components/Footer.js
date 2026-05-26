@@ -138,58 +138,126 @@ const Footer = () => {
   };
 
   return (
-    <footer className="bg-gray-900 text-gray-300 py-8 mt-20" style={{ minHeight: '220px' }}>
+    <footer className="bg-gray-900 text-gray-300 pt-12 pb-6 mt-20" style={{ minHeight: '320px' }} data-testid="site-footer">
       <div className="max-w-7xl mx-auto px-4">
-        {/* Essential Links - Dynamic */}
-        <div className="flex flex-wrap justify-center items-center gap-6 mb-6">
-          {renderLink('how_it_works', 'How It Works', '/how-it-works')}
-          <span className="text-gray-600">|</span>
-          {renderLink('about', 'About Us', '/about')}
-          <span className="text-gray-600">|</span>
-          {renderLink('community', 'Community', '/community')}
-          <span className="text-gray-600">|</span>
-          {renderLink('privacy_policy', 'Privacy Policy', '/privacy-policy')}
-          <span className="text-gray-600">|</span>
-          {renderLink('terms_of_service', 'Terms of Service', '/terms-of-service')}
-          <span className="text-gray-600">|</span>
-          {/* iter214 P5 — Prohibited items public page */}
-          {renderLink(
-            'prohibited_items',
-            language === 'fr' ? 'Articles interdits' : 'Prohibited Items',
-            language === 'fr' ? '/articles-interdits' : '/prohibited-items',
+
+        {/* iter231 — 4-column compliance footer (Google Merchant transparency) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-8">
+
+          {/* Corporate Info */}
+          <div data-testid="footer-col-corporate">
+            <h3 className="text-white font-bold mb-3 text-sm uppercase tracking-wider">
+              {language === 'fr' ? 'Entreprise' : 'Corporate'}
+            </h3>
+            <address className="not-italic text-xs leading-relaxed mb-3 text-gray-400">
+              <strong className="text-gray-200">BidVex Inc.</strong><br />
+              555 Rue King Ouest, Suite 200<br />
+              Sherbrooke (Québec) J1H 1R8<br />
+              Canada
+            </address>
+            <ul className="space-y-1.5 text-sm">
+              <li><Link to="/contact-us" className="hover:text-white transition-colors" data-testid="footer-contact-us">
+                {language === 'fr' ? 'Nous joindre' : 'Contact Us'}
+              </Link></li>
+              <li>{renderLink('about', language === 'fr' ? 'À propos' : 'About Us', '/about')}</li>
+              <li>{renderLink('community', language === 'fr' ? 'Communauté' : 'Community', '/community')}</li>
+              <li><a href="mailto:press@bidvex.com" className="hover:text-white transition-colors text-sm">
+                {language === 'fr' ? 'Presse' : 'Press'}
+              </a></li>
+            </ul>
+          </div>
+
+          {/* Legal Policies */}
+          <div data-testid="footer-col-legal">
+            <h3 className="text-white font-bold mb-3 text-sm uppercase tracking-wider">
+              {language === 'fr' ? 'Politiques légales' : 'Legal Policies'}
+            </h3>
+            <ul className="space-y-1.5 text-sm">
+              <li>{renderLink('terms_of_service', language === 'fr' ? 'Conditions générales' : 'Terms of Service', '/terms-of-service')}</li>
+              <li>{renderLink('privacy_policy', language === 'fr' ? 'Politique de confidentialité' : 'Privacy Policy', '/privacy-policy')}</li>
+              <li><Link to="/refund-policy" className="hover:text-white transition-colors text-sm" data-testid="footer-refund-policy">
+                {language === 'fr' ? 'Politique de remboursement' : 'Refund & Return Policy'}
+              </Link></li>
+              <li>{renderLink(
+                'prohibited_items',
+                language === 'fr' ? 'Articles interdits' : 'Prohibited Items',
+                language === 'fr' ? '/articles-interdits' : '/prohibited-items',
+              )}</li>
+              <li><button onClick={resetConsent} className="hover:text-white transition-colors text-sm" data-testid="footer-cookie-settings">
+                {t('footer.cookieSettings', language === 'fr' ? 'Paramètres des témoins' : 'Cookie Settings')}
+              </button></li>
+            </ul>
+          </div>
+
+          {/* Marketplace Tools */}
+          <div data-testid="footer-col-marketplace">
+            <h3 className="text-white font-bold mb-3 text-sm uppercase tracking-wider">
+              {language === 'fr' ? 'Marketplace' : 'Marketplace'}
+            </h3>
+            <ul className="space-y-1.5 text-sm">
+              <li>{renderLink('how_it_works', language === 'fr' ? 'Comment ça marche' : 'How It Works', '/how-it-works')}</li>
+              <li><Link to={language === 'fr' ? '/devenir-courtier' : '/become-a-broker'} className="hover:text-white transition-colors text-sm" data-testid="footer-become-a-broker">
+                {language === 'fr' ? 'Devenir courtier' : 'Become a Broker'}
+              </Link></li>
+              <li><Link to={language === 'fr' ? '/courtiers' : '/brokers'} className="hover:text-white transition-colors text-sm" data-testid="footer-broker-directory">
+                {language === 'fr' ? 'Répertoire des courtiers' : 'Broker Directory'}
+              </Link></li>
+              <li><Link to="/vehicles" className="hover:text-white transition-colors text-sm" data-testid="footer-vehicles-link">
+                {language === 'fr' ? 'Encans de véhicules' : 'Vehicle Auctions'}
+              </Link></li>
+              <li><Link to="/storage-auctions" className="hover:text-white transition-colors text-sm" data-testid="footer-storage-link">
+                {language === 'fr' ? 'Encans d\'entreposage' : 'Storage Auctions'}
+              </Link></li>
+            </ul>
+          </div>
+
+          {/* Support */}
+          <div data-testid="footer-col-support">
+            <h3 className="text-white font-bold mb-3 text-sm uppercase tracking-wider">
+              {language === 'fr' ? 'Support' : 'Support'}
+            </h3>
+            <ul className="space-y-1.5 text-sm">
+              <li><a href="mailto:support@bidvex.com" className="hover:text-white transition-colors flex items-center gap-1.5" data-testid="footer-email-support">
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                support@bidvex.com
+              </a></li>
+              <li><a href="tel:+18198884444" className="hover:text-white transition-colors flex items-center gap-1.5" data-testid="footer-phone-support">
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                +1 (819) 888-4444
+              </a></li>
+              <li><a href="mailto:disputes@bidvex.com" className="hover:text-white transition-colors" data-testid="footer-disputes">
+                {language === 'fr' ? 'Résolution des différends' : 'Dispute Resolutions'}
+              </a></li>
+              <li><a href="mailto:legal@bidvex.com" className="hover:text-white transition-colors" data-testid="footer-legal-inbox">
+                {language === 'fr' ? 'Juridique et conformité' : 'Legal & Compliance'}
+              </a></li>
+              <li><a href="mailto:brokers@bidvex.com" className="hover:text-white transition-colors" data-testid="footer-brokers-inbox">
+                {language === 'fr' ? 'Boîte courtiers' : 'Broker Inbox'}
+              </a></li>
+            </ul>
+          </div>
+        </div>
+
+        {/* Compliance microdata strip — visible & crawlable by Google trust signals */}
+        <div className="border-t border-gray-800 pt-4 pb-2 text-[11px] text-gray-500 leading-relaxed text-center" data-testid="footer-compliance-strip">
+          {language === 'fr' ? (
+            <>
+              BidVex Inc. — Société constituée fédéralement au Canada · Numéro de société 1175252874 · Siège social à Sherbrooke (Québec).
+              Plateforme d'encans en ligne. Les véhicules sont vendus par l'entremise de courtiers licenciés (SAAQ/OPC, OMVIC, AMVIC, VSA).
+              Toutes les ventes sont fermes, « tel quel, où il se trouve ».
+            </>
+          ) : (
+            <>
+              BidVex Inc. — Federally incorporated in Canada · Corporation Number 1175252874 · Headquartered in Sherbrooke, Québec.
+              Online auction marketplace. Vehicles sold through licensed brokers (SAAQ/OPC, OMVIC, AMVIC, VSA).
+              All sales final, &ldquo;as-is, where-is&rdquo;.
+            </>
           )}
-          <span className="text-gray-600">|</span>
-          {renderLink('support', 'Contact Support', 'mailto:support@bidvex.com')}
-          <span className="text-gray-600">|</span>
-          {/* iter217 Phase 5 Hotfix v5b — Broker Ecosystem entry points */}
-          <Link
-            to={language === 'fr' ? '/devenir-courtier' : '/become-a-broker'}
-            className="hover:text-white transition-colors text-sm"
-            data-testid="footer-become-a-broker"
-          >
-            {language === 'fr' ? 'Devenir courtier' : 'Become a Broker'}
-          </Link>
-          <span className="text-gray-600">|</span>
-          <Link
-            to={language === 'fr' ? '/courtiers' : '/brokers'}
-            className="hover:text-white transition-colors text-sm"
-            data-testid="footer-broker-directory"
-          >
-            {language === 'fr' ? 'Répertoire des courtiers' : 'Broker Directory'}
-          </Link>
-          <span className="text-gray-600">|</span>
-          <button
-            onClick={resetConsent}
-            className="hover:text-white transition-colors text-sm"
-            data-testid="footer-cookie-settings"
-          >
-            {t('footer.cookieSettings', language === 'fr' ? 'Parametres des temoins' : 'Cookie Settings')}
-          </button>
         </div>
 
         {/* Social Media Icons */}
         {socialLinks && SOCIAL_PLATFORM_CONFIG.some(p => socialLinks[p.key]) && (
-          <div className="flex justify-center items-center gap-4 mb-6" data-testid="footer-social-links">
+          <div className="flex justify-center items-center gap-4 my-4" data-testid="footer-social-links">
             {SOCIAL_PLATFORM_CONFIG.map(({ key, label, Icon }) =>
               socialLinks[key] ? (
                 <a
@@ -209,7 +277,7 @@ const Footer = () => {
         )}
 
         {/* Copyright & Language Selector */}
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-6 border-t border-gray-800">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-4 border-t border-gray-800">
           <p className="text-sm text-center md:text-left" data-testid="footer-copyright">
             &copy; {new Date().getFullYear()} BidVex Inc. {t('footer.allRightsReserved', 'All rights reserved')}.
           </p>

@@ -35,6 +35,8 @@ import BidErrorGuide from '../components/BidErrorGuide';
 import VerificationRequiredModal from '../components/VerificationRequiredModal';
 import PrivateSaleBadge, { BusinessSellerBadge, SellerAccountBadge } from '../components/PrivateSaleBadge';
 import PublicBidHistory from '../components/PublicBidHistory';
+import ListingJsonLd from '../components/seo/ListingJsonLd';
+import { useMetaPixelTracking } from '../hooks/useMetaPixelTracking';
 import ListingPromotionModal from '../components/ListingPromotionModal';
 import { HighStakesIndicator, HighStakesTimer, getHighStakesCardStyles, isHighStakes } from '../components/HighStakesBidCard';
 import { TrustScoreDisplay, TrustBadge } from '../components/SellerTrustScore';
@@ -52,6 +54,9 @@ const MultiItemListingDetailPage = () => {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { formatPrice, currency } = useCurrency();
+  // iter230 — centralized Meta Pixel tracking hook
+  const { trackViewContent, trackAddToCart, trackBidSubmitted } =
+    useMetaPixelTracking({ routeHint: 'multi_lot' });
   const [listing, setListing] = useState(null);
   const [loading, setLoading] = useState(true);
   const [bidAmounts, setBidAmounts] = useState({});
@@ -198,12 +203,8 @@ const MultiItemListingDetailPage = () => {
         setSelectedLot(response.data.lots[0]);
       }
 
-      // Meta Pixel ViewContent — dedupe-safe per (listing, session)
-      import('../utils/metaPixel').then(({ trackViewContent }) => {
-        trackViewContent(response.data, { routeHint: 'multi_lot' });
-      }).catch((pixelErr) => {
-        console.debug('[MultiItemListingDetailPage] ViewContent pixel emit failed:', pixelErr);
-      });
+      // Meta Pixel ViewContent — dedupe-safe per (listing, session).
+      trackViewContent({ listing: response.data });
 
       // Fetch seller info for tax status badge
       if (response.data.seller_id) {
@@ -291,19 +292,8 @@ const MultiItemListingDetailPage = () => {
       }
     }
 
-    // Meta Pixel AddToCart — intent signal fired BEFORE the actual POST.
-    // Dedup-safe per (listing, session). Uses parent listing_id so the
-    // content_id matches the Meta Catalog feed 1:1 (BIDVEX-LOT-<listing_id>).
-    try {
-      const { trackAddToCart } = await import('../utils/metaPixel');
-      trackAddToCart({
-        listing,
-        bidAmount,
-        routeHint: 'multi_lot',
-      });
-    } catch (pixelErr) {
-      console.debug('[MultiItemListingDetailPage] AddToCart pixel emit failed:', pixelErr);
-    }
+    // Meta Pixel AddToCart — bid intent (parent-scoped content_id matches catalog 1:1).
+    trackAddToCart({ listing, bidAmount });
 
     try {
       await axios.post(
@@ -312,20 +302,9 @@ const MultiItemListingDetailPage = () => {
         { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
       );
       toast.success('Bid placed successfully!');
-      // Meta Pixel InitiateCheckout — every successful bid is a distinct
-      // funnel-commit signal. Carries the lot_number in `contents` for
-      // attribution while keeping content_ids parent-scoped for catalog match.
-      try {
-        const { trackInitiateCheckout } = await import('../utils/metaPixel');
-        trackInitiateCheckout({
-          listing,
-          bidAmount,
-          lotNumber,
-          routeHint: 'multi_lot',
-        });
-      } catch (pixelErr) {
-        console.debug('[MultiItemListingDetailPage] InitiateCheckout pixel emit failed:', pixelErr);
-      }
+      // Meta Pixel InitiateCheckout — fires on every successful bid commit.
+      // lotNumber is carried in `contents[]` while content_ids stay parent-scoped.
+      trackBidSubmitted({ listing, bidAmount, lotNumber });
       fetchListing();
       setBidAmounts({ ...bidAmounts, [lotNumber]: '' });
     } catch (error) {
@@ -441,6 +420,7 @@ const MultiItemListingDetailPage = () => {
 
   return (
     <div className="min-h-screen py-8 px-4">
+      <ListingJsonLd listing={listing} canonicalUrl={`https://bidvex.com/multi-item-listing/${listing.id}`} />
       <div className="max-w-7xl mx-auto">
         {/* Preview Mode Banner */}
         {isPreviewMode && (

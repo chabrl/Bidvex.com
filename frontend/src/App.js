@@ -64,6 +64,8 @@ const SellerProfilePage = lazy(() => import('./pages/SellerProfilePage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'));
 const TermsOfServicePage = lazy(() => import('./pages/TermsOfServicePage'));
+const RefundPolicyPage = lazy(() => import('./pages/RefundPolicyPage'));
+const ContactUsPage = lazy(() => import('./pages/ContactUsPage'));
 const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
 
 // ── Storage Unit Auctions (iteration 169) ──
@@ -495,6 +497,11 @@ const App = () => {
           <Route path="/privacy" element={<Navigate to="/privacy-policy" replace />} />
           <Route path="/terms-of-service" element={<TermsOfServicePage />} />
           <Route path="/terms" element={<Navigate to="/terms-of-service" replace />} />
+          <Route path="/refund-policy" element={<RefundPolicyPage />} />
+          <Route path="/refunds" element={<Navigate to="/refund-policy" replace />} />
+          <Route path="/returns" element={<Navigate to="/refund-policy" replace />} />
+          <Route path="/contact-us" element={<ContactUsPage />} />
+          <Route path="/contact" element={<Navigate to="/contact-us" replace />} />
           <Route path="/legal" element={<LegalPage />} />
           {/* iter214 P5 — Bilingual prohibited-items page */}
           <Route path="/prohibited-items" element={<ProhibitedItemsPage />} />

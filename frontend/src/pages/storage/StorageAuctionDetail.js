@@ -26,6 +26,8 @@ import ListingPromotionModal from '../../components/ListingPromotionModal';
 // Phase 6.3 — new bidding suite components
 import StorageBiddingPanel from '../../components/storage/StorageBiddingPanel';
 import StorageAuctionClock from '../../components/storage/StorageAuctionClock';
+import ListingJsonLd from '../../components/seo/ListingJsonLd';
+import { useMetaPixelTracking } from '../../hooks/useMetaPixelTracking';
 import { TrendingUp } from 'lucide-react';
 
 const API = API_BASE;
@@ -33,6 +35,9 @@ const API = API_BASE;
 const StorageAuctionDetail = () => {
   const { id } = useParams();
   const { token, user } = useAuth();
+  // iter230 — centralized Meta Pixel tracking hook
+  const { trackViewContent, trackAddToCart, trackBidSubmitted } =
+    useMetaPixelTracking({ routeHint: 'storage' });
   const { t, i18n } = useTranslation();
   const isFr = (i18n.language || '').startsWith('fr');
 
@@ -61,12 +66,7 @@ const StorageAuctionDetail = () => {
       setHistory(h.data?.bids || []);
       setPricing(p.data);
       // Meta Pixel ViewContent — dedupe-safe per (listing, session).
-      try {
-        const { trackViewContent } = await import('../../utils/metaPixel');
-        trackViewContent(a.data, { routeHint: 'storage' });
-      } catch (pixelErr) {
-        console.debug('[StorageAuctionDetail] ViewContent pixel emit failed:', pixelErr);
-      }
+      trackViewContent({ listing: a.data });
     } catch (err) {
       toast.error(t('storage.detail.auctionNotFound'));
     } finally {
@@ -92,19 +92,8 @@ const StorageAuctionDetail = () => {
       toast.error(t('storage.detail.signInToPlaceABid'));
       return;
     }
-    // Meta Pixel AddToCart — intent signal fired BEFORE the POST so it
-    // captures users who attempt to bid even if their bid eventually fails.
-    // Dedup-safe per (listing, session). content_id = BIDVEX-STO-<listing_id>.
-    try {
-      const { trackAddToCart } = await import('../../utils/metaPixel');
-      trackAddToCart({
-        listing: auction || { id, listing_type: 'storage' },
-        bidAmount: amt,
-        routeHint: 'storage',
-      });
-    } catch (pixelErr) {
-      console.debug('[StorageAuctionDetail] AddToCart pixel emit failed:', pixelErr);
-    }
+    // Meta Pixel AddToCart — bid intent (dedupe-safe per session).
+    trackAddToCart({ listing: auction || { id, listing_type: 'storage' }, bidAmount: amt });
     setSubmittingBid(true);
     try {
       const res = await axios.post(
@@ -117,19 +106,8 @@ const StorageAuctionDetail = () => {
           ? (isFr ? `Vous êtes en tête à ${res.data.current_bid} $` : `You are winning at $${res.data.current_bid}`)
           : (t('storage.detail.bidPlacedYouVeBeenOutbidByAnExistingProx'))
       );
-      // Meta Pixel InitiateCheckout — every successful bid submission fires
-      // a distinct InitiateCheckout for funnel optimization. content_id
-      // matches the catalog feed schema (BIDVEX-STO-<listing_id>).
-      try {
-        const { trackInitiateCheckout } = await import('../../utils/metaPixel');
-        trackInitiateCheckout({
-          listing: auction || { id, listing_type: 'storage' },
-          bidAmount: amt,
-          routeHint: 'storage',
-        });
-      } catch (pixelErr) {
-        console.debug('[StorageAuctionDetail] InitiateCheckout pixel emit failed:', pixelErr);
-      }
+      // Meta Pixel InitiateCheckout — every successful bid commit.
+      trackBidSubmitted({ listing: auction || { id, listing_type: 'storage' }, bidAmount: amt });
       if (res.data.soft_close_extended) {
         toast.info(t('storage.detail.auctionExtendedBy2MinutesSoftClose'));
         // Phase 6.3 — trigger the clock's flash banner.
@@ -169,6 +147,7 @@ const StorageAuctionDetail = () => {
 
   return (
     <div className="min-h-screen bg-sky-50 dark:bg-slate-900 py-6" data-testid="storage-auction-detail">
+      <ListingJsonLd listing={auction} canonicalUrl={`https://bidvex.com/storage-auctions/${auction.id}`} />
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <Link to="/storage-auctions/browse" className="text-sm text-blue-600 hover:underline">
           ← {t('storage.detail.backToAuctions')}

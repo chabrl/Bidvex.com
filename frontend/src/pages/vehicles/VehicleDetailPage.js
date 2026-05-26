@@ -9,6 +9,8 @@ import ErrorBoundary from '../../components/ErrorBoundary';
 import React, { useState, useEffect, useCallback } from 'react';
 import SafeImage from '../../components/SafeImage';
 import VehicleBidPanel from '../../components/broker/VehicleBidPanel';
+import ListingJsonLd from '../../components/seo/ListingJsonLd';
+import { useMetaPixelTracking } from '../../hooks/useMetaPixelTracking';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
@@ -195,6 +197,9 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
   const { user, token } = useAuth();
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
+  // iter230 — centralized Meta Pixel tracking (replaces scattered dynamic imports)
+  const { trackViewContent, trackAddToCart, trackBidSubmitted } =
+    useMetaPixelTracking({ routeHint: 'vehicle' });
   const [bidAmount, setBidAmount] = useState('');
   const [bidding, setBidding] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
@@ -284,18 +289,9 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
       return;
     }
 
-    // Meta Pixel AddToCart — intent signal fired BEFORE deposit/bid POST.
-    // Dedup-safe per (listing, session). content_id = BIDVEX-VEH-<vehicle_id>.
-    try {
-      const { trackAddToCart } = await import('../../utils/metaPixel');
-      trackAddToCart({
-        listing: vehicle,
-        bidAmount: amount,
-        routeHint: 'vehicle',
-      });
-    } catch (pixelErr) {
-      console.debug('[VehicleDetailPage] AddToCart pixel emit failed:', pixelErr);
-    }
+    // Meta Pixel AddToCart — bid intent. Routes through useMetaPixelTracking
+    // so content_ids[0] is always the canonical listing.id UUID.
+    trackAddToCart({ listing: vehicle, bidAmount: amount });
 
     setBidding(true);
     try {
@@ -325,18 +321,8 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
       });
       
       toast.success(`Bid placed: ${formatPrice(amount, vehicle?.currency)}`);
-      // Meta Pixel InitiateCheckout — every successful bid emits a distinct
-      // InitiateCheckout. Catalog match via canonical BIDVEX-VEH-<id>.
-      try {
-        const { trackInitiateCheckout } = await import('../../utils/metaPixel');
-        trackInitiateCheckout({
-          listing: vehicle,
-          bidAmount: amount,
-          routeHint: 'vehicle',
-        });
-      } catch (pixelErr) {
-        console.debug('[VehicleDetailPage] InitiateCheckout pixel emit failed:', pixelErr);
-      }
+      // Meta Pixel InitiateCheckout — fires on every successful bid commit.
+      trackBidSubmitted({ listing: vehicle, bidAmount: amount });
       onBidPlaced?.(response.data);
       // iter202 Phase B — auto-set the next bid amount using +$100 vehicle increment
       setBidAmount((amount + 100).toString());
@@ -907,13 +893,8 @@ const VehicleDetailPage = () => {
       const response = await axios.get(`${API}/vehicles/${id}`);
       setVehicle(response.data);
       setSeller(response.data.seller);
-      // Meta Pixel ViewContent — dedupe-safe per (listing, session)
-      try {
-        const { trackViewContent } = await import('../../utils/metaPixel');
-        trackViewContent(response.data, { routeHint: 'vehicle' });
-      } catch (pixelErr) {
-        console.debug('[VehicleDetailPage] ViewContent pixel emit failed:', pixelErr);
-      }
+      // Meta Pixel ViewContent — dedupe-safe per (listing, session).
+      trackViewContent({ listing: response.data });
     } catch (err) {
       setError(err.response?.data?.detail || 'Vehicle not found');
     } finally {
@@ -954,6 +935,8 @@ const VehicleDetailPage = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950" data-testid="vehicle-detail-page">
+      {/* iter231 — Schema.org Vehicle JSON-LD for Google Merchant + crawl alignment */}
+      <ListingJsonLd listing={vehicle} canonicalUrl={`https://bidvex.com/vehicles/${vehicle.id}`} />
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 border-b">
         <div className="max-w-7xl mx-auto px-4 py-4">
