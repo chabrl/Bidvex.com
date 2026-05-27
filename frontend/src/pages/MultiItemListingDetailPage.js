@@ -10,6 +10,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge';
 import { toast } from 'sonner';
 import { formatCurrency } from '../utils/currencyFormatter';
+// iter233 — Display-only "Lot price × Quantity" multiplier helper.
+import { computeDisplayPrice } from '../utils/priceUtils';
 import { 
   Package, Clock, MapPin, User, Calendar, 
   ArrowLeft, Gavel, AlertCircle, TrendingUp,
@@ -1253,16 +1255,67 @@ const MultiItemListingDetailPage = () => {
                         <p className="text-muted-foreground mb-4 line-clamp-2">{getLocalized(lot, 'description')}</p>
 
                         {/* Simplified Price Display - Clean & Professional */}
-                        <div className="grid grid-cols-2 gap-4 mb-4">
-                          <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                            <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">{t('listingDetail.openingBid', 'Opening Bid')}</p>
-                            <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{formatCurrency(lot.starting_price)}</p>
-                          </div>
-                          <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-                            <p className="text-xs text-green-700 dark:text-green-400 uppercase tracking-wide mb-1">{t('listingDetail.currentBid', 'Current Bid')}</p>
-                            <p className="text-xl font-bold text-green-600 dark:text-green-400">{formatCurrency(lot.current_price)}</p>
-                          </div>
-                        </div>
+                        {(() => {
+                          // iter233 — Per-lot display multiplier. Renders a "Lot total"
+                          // tile + per-unit subtext when `price_multiplied_by_quantity`
+                          // is set on this lot AND quantity > 1.
+                          const lotDp = computeDisplayPrice({
+                            ...lot,
+                            current_bid: lot.current_price ?? lot.current_bid ?? null,
+                          });
+                          const lotIsFr = i18n.language?.startsWith('fr');
+                          if (lotDp.isMultiplied) {
+                            const startingTotal = (Number(lot.starting_price) || 0) * lotDp.quantity;
+                            return (
+                              <>
+                                <div className="grid grid-cols-2 gap-4 mb-2">
+                                  <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">
+                                      {lotIsFr ? `Total de départ (× ${lotDp.quantity} unités)` : `Starting Total (× ${lotDp.quantity} units)`}
+                                    </p>
+                                    <p className="text-xl font-bold text-slate-900 dark:text-slate-100" data-testid={`lot-${lot.lot_number}-starting-total`}>
+                                      {formatCurrency(startingTotal)}
+                                    </p>
+                                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                      ({formatCurrency(lot.starting_price)} {lotIsFr ? 'par unité' : 'per unit'})
+                                    </p>
+                                  </div>
+                                  <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                                    <p className="text-xs text-green-700 dark:text-green-400 uppercase tracking-wide mb-1">
+                                      {lotIsFr ? `Offre totale (× ${lotDp.quantity} unités)` : `Total Bid (× ${lotDp.quantity} units)`}
+                                    </p>
+                                    <p className="text-xl font-bold text-green-600 dark:text-green-400" data-testid={`lot-${lot.lot_number}-display-price`}>
+                                      {formatCurrency(lotDp.totalPrice)}
+                                    </p>
+                                    <p className="text-[11px] text-green-700 dark:text-green-400 mt-0.5" data-testid={`lot-${lot.lot_number}-unit-price-subtext`}>
+                                      ({formatCurrency(lotDp.unitPrice)} {lotIsFr ? 'par unité' : 'per unit'})
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="mb-4 flex items-center gap-2" data-testid={`lot-${lot.lot_number}-multiplier-badge`}>
+                                  <Badge className="bg-amber-100 text-amber-800 border border-amber-300 hover:bg-amber-200 text-[10px] font-semibold uppercase tracking-wider">
+                                    {lotIsFr ? 'Prix lot × Qté' : 'Lot Price × Qty'}
+                                  </Badge>
+                                  <span className="text-xs text-slate-500">
+                                    {lotIsFr ? 'Vous enchérissez au prix unitaire.' : 'You bid the per-unit price.'}
+                                  </span>
+                                </div>
+                              </>
+                            );
+                          }
+                          return (
+                            <div className="grid grid-cols-2 gap-4 mb-4">
+                              <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                                <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">{t('listingDetail.openingBid', 'Opening Bid')}</p>
+                                <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{formatCurrency(lot.starting_price)}</p>
+                              </div>
+                              <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                                <p className="text-xs text-green-700 dark:text-green-400 uppercase tracking-wide mb-1">{t('listingDetail.currentBid', 'Current Bid')}</p>
+                                <p className="text-xl font-bold text-green-600 dark:text-green-400">{formatCurrency(lot.current_price)}</p>
+                              </div>
+                            </div>
+                          );
+                        })()}
 
                         {/* Fee Information - Expanded on Click */}
                         <details className="mb-4">
@@ -1490,6 +1543,41 @@ const MultiItemListingDetailPage = () => {
 
                         {!isPreviewMode && !auctionEnded && (
                           <div className="space-y-3 mt-4">
+                            {/* iter233 — Display-only "Lot price × Quantity" info callout.
+                                Renders only when this lot's price_multiplied_by_quantity flag is set AND quantity > 1. */}
+                            {(() => {
+                              const calloutDp = computeDisplayPrice({
+                                ...lot,
+                                current_bid: lot.current_price ?? lot.current_bid ?? null,
+                              });
+                              if (!calloutDp.isMultiplied) return null;
+                              const calloutFr = i18n.language?.startsWith('fr');
+                              return (
+                                <div
+                                  className="flex items-start gap-2 p-3 border border-blue-300 bg-blue-50 rounded-md text-xs leading-relaxed"
+                                  style={{ borderRadius: 6 }}
+                                  data-testid={`lot-${lot.lot_number}-price-multiplier-callout`}
+                                >
+                                  <Info className="h-4 w-4 mt-0.5 flex-shrink-0 text-blue-600" />
+                                  <p className="text-blue-900">
+                                    {calloutFr ? (
+                                      <>
+                                        Ce lot contient <strong>{calloutDp.quantity} unités</strong>. La valeur totale affichée
+                                        reflète l'offre actuelle multipliée par la quantité ({formatCurrency(calloutDp.unitPrice)} × {calloutDp.quantity}).
+                                        Vous enchérissez au prix unitaire.
+                                      </>
+                                    ) : (
+                                      <>
+                                        This lot contains <strong>{calloutDp.quantity} units</strong>. The total lot value shown
+                                        reflects the current bid multiplied by the quantity ({formatCurrency(calloutDp.unitPrice)} × {calloutDp.quantity}).
+                                        You are bidding the per-unit price.
+                                      </>
+                                    )}
+                                  </p>
+                                </div>
+                              );
+                            })()}
+
                             {/* iter217 — Deposit notice (i18n-conditional rendering, no raw EN:/FR:) */}
                             {listing.requires_deposit && listing.deposit_amount > 0 ? (
                               <div className="p-3 bg-amber-50 border border-amber-300 rounded-md text-xs leading-relaxed" data-testid="multi-bid-deposit-required-notice">

@@ -101,6 +101,16 @@ const CreateListingPage = () => {
   // FEATURE PATCH v9 / Feature 4 — Quantity & per-unit hammer multiplier
   const [quantity, setQuantity] = useState(1);
   const [multiplyHammerByQuantity, setMultiplyHammerByQuantity] = useState(false);
+  // iter233 — Display-only "Lot price × Quantity" toggle.
+  const [priceMultipliedByQuantity, setPriceMultipliedByQuantity] = useState(false);
+
+  // iter233 — When quantity drops to 1, automatically uncheck the display
+  // multiplier so old state doesn't leak into the submitted payload.
+  useEffect(() => {
+    if (Math.max(1, parseInt(quantity, 10) || 1) <= 1 && priceMultipliedByQuantity) {
+      setPriceMultipliedByQuantity(false);
+    }
+  }, [quantity, priceMultipliedByQuantity]);
 
   // Phase 6.0 / Task 4 — Storage Locker / Abandoned Unit
   const [isStorageLocker, setIsStorageLocker] = useState(false);
@@ -261,6 +271,10 @@ const CreateListingPage = () => {
         multiply_hammer_by_quantity: !isStorageLocker
           && (Math.max(1, parseInt(quantity) || 1) > 1)
           && !!multiplyHammerByQuantity,
+        // iter233 — Display-only "Lot price × Quantity" toggle.
+        price_multiplied_by_quantity: !isStorageLocker
+          && (Math.max(1, parseInt(quantity) || 1) > 1)
+          && !!priceMultipliedByQuantity,
         // Convert percent → rate (e.g. 15 → 0.15), null if blank (org default applies server-side)
         buyers_premium_rate: buyersPremiumPercent !== '' ? parseFloat(buyersPremiumPercent) / 100 : null,
         payment_method: paymentMethod,
@@ -273,6 +287,10 @@ const CreateListingPage = () => {
         multiply_hammer_by_quantity: !isStorageLocker
           && (Math.max(1, parseInt(quantity) || 1) > 1)
           && !!multiplyHammerByQuantity,
+        // iter233 — Display-only "Lot price × Quantity" toggle.
+        price_multiplied_by_quantity: !isStorageLocker
+          && (Math.max(1, parseInt(quantity) || 1) > 1)
+          && !!priceMultipliedByQuantity,
         // Phase 6.0 / Task 4 — Storage Locker
         listing_type: isStorageLocker ? 'storage_locker' : null,
         storage_metadata: isStorageLocker ? {
@@ -826,6 +844,26 @@ const CreateListingPage = () => {
                       <span className="font-medium text-sm">{t('createListing.multiplyHammerLabel', 'Multiply hammer price by quantity')}</span>
                       <p className="text-xs text-muted-foreground mt-0.5">
                         {t('createListing.multiplyHammerHelp', 'When enabled, the winning bid is treated as a per-unit price. All platform & broker fees calculate against the full base amount (hammer × quantity).')}
+                      </p>
+                    </div>
+                  </label>
+                )}
+                {/* iter233 — Display-only "Lot price × Quantity" toggle. Renders only when qty > 1. */}
+                {parseInt(quantity) > 1 && (
+                  <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${priceMultipliedByQuantity ? 'border-amber-500 bg-amber-50' : 'border-slate-200 hover:border-slate-300'}`}>
+                    <input
+                      type="checkbox"
+                      checked={priceMultipliedByQuantity}
+                      onChange={(e) => setPriceMultipliedByQuantity(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 accent-amber-600 cursor-pointer"
+                      data-testid="price-multiplied-by-quantity-toggle"
+                    />
+                    <div>
+                      <span className="font-medium text-sm">
+                        {t('createListing.priceMultipliedLabel', 'Multiply listed price by quantity')}
+                      </span>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {t('createListing.priceMultipliedHelp', 'Check this if the price shown to buyers should reflect the total value of all units in this lot.')}
                       </p>
                     </div>
                   </label>

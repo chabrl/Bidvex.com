@@ -335,6 +335,9 @@ async def create_listing(
         qty, multiplier = storage_quantity_policy(listing_data.quantity)
         listing_data.quantity = qty
         listing_data.multiply_hammer_by_quantity = multiplier
+        # iter233 — Storage lockers sell as a single absolute lot block, so
+        # the display multiplier never applies regardless of seller input.
+        listing_data.price_multiplied_by_quantity = False
 
     client_ip = request.client.host if request else "unknown"
     user_agent = request.headers.get("user-agent", "unknown") if request else "unknown"
@@ -365,6 +368,8 @@ async def create_listing(
         # FEATURE PATCH v9 / Feature 4 — quantity field
         quantity=max(1, int(listing_data.quantity or 1)),
         multiply_hammer_by_quantity=bool(listing_data.multiply_hammer_by_quantity) and max(1, int(listing_data.quantity or 1)) > 1,
+        # iter233 — Display-only "Lot price × Quantity" toggle.
+        price_multiplied_by_quantity=bool(listing_data.price_multiplied_by_quantity) and max(1, int(listing_data.quantity or 1)) > 1,
         # Phase 6.0 / Task 3 — Storage Locker support
         listing_type=listing_data.listing_type or None,
         storage_metadata=listing_data.storage_metadata,
@@ -1044,6 +1049,10 @@ async def create_multi_item_listing(
         requires_deposit=bool(listing_data.requires_deposit),
         deposit_amount=float(listing_data.deposit_amount) if (listing_data.requires_deposit and listing_data.deposit_amount) else None,
         deposit_type=(listing_data.deposit_type or "fixed") if listing_data.requires_deposit else None,
+        # iter233 — Display-only "Lot price × Quantity" toggle (listing-level).
+        quantity=max(1, int(listing_data.quantity or 1)),
+        multiply_hammer_by_quantity=bool(listing_data.multiply_hammer_by_quantity) and max(1, int(listing_data.quantity or 1)) > 1,
+        price_multiplied_by_quantity=bool(listing_data.price_multiplied_by_quantity) and max(1, int(listing_data.quantity or 1)) > 1,
     )
 
     listing_dict = listing.model_dump()

@@ -71,7 +71,9 @@ const CreateMultiItemListing = () => {
     images: [],
     pricing_mode: 'multiplied', // fixed or multiplied
     buy_now_enabled: false,
-    buy_now_price: ''
+    buy_now_price: '',
+    // iter233 — Display-only "Lot price × Quantity" toggle (per lot).
+    price_multiplied_by_quantity: false,
   }]);
 
   // Step 5: Promotion Selection
@@ -196,6 +198,11 @@ const CreateMultiItemListing = () => {
   const handleLotChange = (index, field, value) => {
     const updatedLots = [...lots];
     updatedLots[index][field] = value;
+    // iter233 — When quantity is reduced to 1, automatically uncheck the
+    // display multiplier so an old state can't leak into the submitted payload.
+    if (field === 'quantity' && (parseInt(value, 10) || 1) <= 1) {
+      updatedLots[index].price_multiplied_by_quantity = false;
+    }
     setLots(updatedLots);
     validateLot(index, updatedLots[index]);
   };
@@ -215,7 +222,9 @@ const CreateMultiItemListing = () => {
       condition: 'good',
       images: [],
       buy_now_enabled: false,
-      buy_now_price: ''
+      buy_now_price: '',
+      // iter233 — Display-only "Lot price × Quantity" toggle (per lot).
+      price_multiplied_by_quantity: false,
     }]);
   };
 
@@ -243,6 +252,8 @@ const CreateMultiItemListing = () => {
       images: [],
       pricing_mode: 'multiplied',
       buy_now_enabled: false,
+      // iter233 — Display-only "Lot price × Quantity" toggle (per lot).
+      price_multiplied_by_quantity: false,
       buy_now_price: ''
     }));
     
@@ -1177,6 +1188,29 @@ const CreateMultiItemListing = () => {
                     />
                     {validationErrors[actualIndex]?.quantity && (
                       <p className="text-red-500 text-xs">{validationErrors[actualIndex].quantity}</p>
+                    )}
+                    {/* iter233 — Display-only "Lot price × Quantity" toggle. Renders only when this lot's qty > 1. */}
+                    {parseInt(lot.quantity, 10) > 1 && (
+                      <label
+                        className={`flex items-start gap-2 p-2 rounded-md border cursor-pointer transition-colors text-xs ${lot.price_multiplied_by_quantity ? 'border-amber-500 bg-amber-50' : 'border-slate-200 hover:border-slate-300'}`}
+                        data-testid={`lot-${actualIndex}-price-multiplier-wrapper`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={!!lot.price_multiplied_by_quantity}
+                          onChange={(e) => handleLotChange(actualIndex, 'price_multiplied_by_quantity', e.target.checked)}
+                          className="mt-0.5 w-3.5 h-3.5 accent-amber-600 cursor-pointer"
+                          data-testid={`lot-${actualIndex}-price-multiplier-toggle`}
+                        />
+                        <div>
+                          <span className="font-medium">
+                            {t('createListing.priceMultipliedLabel', 'Multiply listed price by quantity')}
+                          </span>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">
+                            {t('createListing.priceMultipliedHelp', 'Check this if the price shown to buyers should reflect the total value of all units in this lot.')}
+                          </p>
+                        </div>
+                      </label>
                     )}
                   </div>
                 </div>

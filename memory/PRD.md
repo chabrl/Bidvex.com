@@ -1,6 +1,49 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: iter232 — HQ ADDRESS HOTFIX + FULL REGRESSION VALIDATION (Feb 25, 2026) ✅
+## Latest: iter233 — PRICE × QUANTITY DISPLAY MULTIPLIER + AUDIT (Feb 26, 2026) ✅
+
+Two-task drop on top of iter232:
+
+### Task A — Production payments audit (deliverable: `/app/memory/AUDIT_iter233_payments_infrastructure.md`)
+- End-to-end mapping of all subscription, marketplace, auction, hammer-price, and broker-deposit subsystems.
+- Verified `capture_method=manual` broker holding deposit is fully wired (buyer→broker via saved card, `release_deposit`/`capture_deposit`/`refund_or_release_deposit` all production-ready). **No code changes required.**
+- Verified vehicle hammer is correctly **OFF-STRIPE** (`vehicle_settlement.py` ALLOWED_SETTLEMENT_METHODS = {bank_wire, cheque, cash, certified_draft, financing, other} — no `stripe` value).
+- 14 Stripe webhooks handled, 186 MongoDB collections inventoried, idempotency table confirmed.
+
+### Task B — `price_multiplied_by_quantity` display-only multiplier
+**Backend (`backend/models/auction_models.py` + `backend/routes/listings.py`):**
+- Added `price_multiplied_by_quantity: bool = False` to 5 Pydantic models: `ListingCreate`, `Listing`, `Lot`, `MultiItemListingCreate`, `MultiItemListing`. Legacy DB docs default to `False` via Pydantic.
+- `POST /api/listings` and `POST /api/multi-item-listings` thread the field into the doc, gated by `quantity > 1`. Storage-locker forcing also clears the flag.
+- NEW `backend/tests/test_iter233_price_multiplied_by_quantity.py` — **7/7 PASS**. Combined with iter220 + v9 regression = **24/24 PASS**.
+
+**Frontend:**
+- NEW `frontend/src/utils/priceUtils.js` exports `computeDisplayPrice(listing)` returning `{totalPrice, unitPrice, isMultiplied, quantity, multiplier}` per spec. Plus `formatCurrency` + `resolveDisplayPriceLabel` helpers.
+- `frontend/src/pages/CreateListingPage.js` — New state `priceMultipliedByQuantity`, amber checkbox rendered only when qty>1, auto-uncheck `useEffect` when qty drops to 1, threaded into both payload-emission sites with `data-testid="price-multiplied-by-quantity-toggle"`.
+- `frontend/src/pages/CreateMultiItemListing.js` — Per-lot `price_multiplied_by_quantity` field on each lot row + auto-clear in `handleLotChange` when qty→1 + amber checkbox UI right under the lot's quantity input with `data-testid="lot-{idx}-price-multiplier-toggle"`.
+- `frontend/src/components/FlattenedMarketplace.js` (marketplace card / ItemCard) — Pricing block now computes via `computeDisplayPrice`. When multiplied: shows total price + "Total Bid (× N units)" / "Total Price (× N units)" / "Starting Total (× N units)" label + "({unitPrice} per unit)" muted subtext + amber **"Lot Price × Qty"** Badge. Bilingual EN/FR. Testids: `card-display-price`, `card-price-label`, `card-unit-price-subtext`, `card-lot-multiplier-badge`.
+- `frontend/src/pages/MultiItemListingDetailPage.js` — Per-lot pricing tiles flip to "Starting Total / Total Bid (× N units)" + per-unit subtext + amber badge when set. Above the bid input, a bilingual blue info callout renders: *"This lot contains N units. The total lot value shown reflects the current bid multiplied by the quantity ({unitPrice} × N). You are bidding the per-unit price."* (FR mirror) with `data-testid="lot-{lotNumber}-price-multiplier-callout"`.
+
+**Bidding logic untouched** — buyers always bid per-unit. Multiplier is strictly display-side math. Existing `multiply_hammer_by_quantity` (iter220, checkout-side) is independent and continues to drive Stripe math; the new flag is purely UI presentation.
+
+### QA Checklist (all ✅)
+- [x] `price_multiplied_by_quantity` defaults to False on every Pydantic model.
+- [x] Legacy MongoDB docs (no field) load with False via Pydantic default.
+- [x] Both single and multi-item create flows submit the new field.
+- [x] Marketplace card shows total + unit + amber badge ONLY when set + qty>1.
+- [x] Multi-lot detail page shows blue info callout in EN/FR.
+- [x] Storage lockers force the flag off (no display multiplier on retail abandoned units).
+- [x] Quantity reduced to 1 → state auto-clears (both forms).
+- [x] Zero regressions: 24/24 backend tests pass (iter233 + v9 + iter220).
+- [x] Lint clean on all 5 modified frontend files + new util.
+
+### Files changed (iter233 — Task B)
+**Backend**: `models/auction_models.py`, `routes/listings.py`, NEW `tests/test_iter233_price_multiplied_by_quantity.py`.
+**Frontend**: NEW `utils/priceUtils.js`; modified `pages/CreateListingPage.js`, `pages/CreateMultiItemListing.js`, `components/FlattenedMarketplace.js`, `pages/MultiItemListingDetailPage.js`.
+
+---
+
+
+## Previous: iter232 — HQ ADDRESS HOTFIX + FULL REGRESSION VALIDATION (Feb 25, 2026) ✅
 
 User-supplied just-in-time correction prior to production deploy: corporate HQ address updated from `555 Rue King Ouest, Suite 200, Sherbrooke (Québec) J1H 1R8` to the verified **`761 Rue Chalifoux, Sherbrooke (Québec) J1G 0A8`** across both `frontend/src/components/Footer.js` (corporate column block) and `frontend/src/pages/ContactUsPage.jsx` (HQ block). Grep confirms zero stale `555 Rue King` or `J1H 1R8` strings anywhere in `/app/frontend/src` or `/app/backend`.
 

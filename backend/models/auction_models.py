@@ -32,6 +32,11 @@ class ListingCreate(BaseModel):
     # FEATURE PATCH v9 / Feature 4 — Quantity field for all listings
     quantity: int = 1
     multiply_hammer_by_quantity: bool = False
+    # iter233 — Display-only "Lot price × Quantity" toggle (separate from
+    # checkout-side multiply_hammer_by_quantity). When True AND quantity > 1,
+    # marketplace cards and multi-lot rows render the *total* lot value while
+    # bids continue to be placed at the per-unit price.
+    price_multiplied_by_quantity: bool = False
     # Phase 6.0 / Task 3 — Storage Locker / Abandoned Unit
     listing_type: Optional[str] = None
     storage_metadata: Optional[Dict[str, Any]] = None
@@ -89,6 +94,8 @@ class Listing(BaseModel):
     # FEATURE PATCH v9 / Feature 4 — Quantity field
     quantity: int = 1
     multiply_hammer_by_quantity: bool = False
+    # iter233 — Display-only "Lot price × Quantity" toggle.
+    price_multiplied_by_quantity: bool = False
     custom_buyer_premium_rate: Optional[float] = None
     is_partner_listing: bool = False
     # LEGACY: opc_permit → migrated to dealer_license_* (iter201).
@@ -207,6 +214,8 @@ class Lot(BaseModel):
     quantity: int
     # FEATURE PATCH v9 / Feature 4 — lot-level "multiply hammer by quantity" opt-in
     multiply_hammer_by_quantity: bool = False
+    # iter233 — Display-only "Lot price × Quantity" toggle (per lot).
+    price_multiplied_by_quantity: bool = False
     starting_price: float
     current_price: float
     condition: str
@@ -258,6 +267,8 @@ class MultiItemListingCreate(BaseModel):
     # FEATURE PATCH v9 / Feature 4 — Listing-level quantity (lots can override at lot level)
     quantity: int = 1
     multiply_hammer_by_quantity: bool = False
+    # iter233 — Display-only "Lot price × Quantity" toggle.
+    price_multiplied_by_quantity: bool = False
     auction_terms_en: Optional[str] = None
     auction_terms_fr: Optional[str] = None
     agreement_accepted: bool = False
@@ -316,6 +327,8 @@ class MultiItemListing(BaseModel):
     # FEATURE PATCH v9 / Feature 4
     quantity: int = 1
     multiply_hammer_by_quantity: bool = False
+    # iter233 — Display-only "Lot price × Quantity" toggle.
+    price_multiplied_by_quantity: bool = False
     payment_method: Optional[str] = None
     requires_deposit: bool = False
     deposit_amount: Optional[float] = None

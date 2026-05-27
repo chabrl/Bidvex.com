@@ -39,6 +39,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCurrency } from '../utils/currencyFormatter';
+// iter233 — Display-only "Lot price × Quantity" multiplier helper.
+import { computeDisplayPrice } from '../utils/priceUtils';
 import { SellerAccountBadge } from './PrivateSaleBadge';
 import CurrencyBadge from './CurrencyBadge';
 import { getLocalized } from '../utils/localization';
@@ -816,13 +818,58 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
 
         {/* Pricing */}
         <div className="space-y-1">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t('marketplace.currentBid')}</span>
-            <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">
-              {formatCurrency(item.current_price || item.starting_price || 0, item.currency)}
-              <CurrencyBadge currency={item.currency || 'CAD'} size="xs" className="ml-1.5 align-middle" testid="listing-currency-badge" />
-            </span>
-          </div>
+          {(() => {
+            // iter233 — Compute display total when `price_multiplied_by_quantity` is set
+            // on the listing/lot. Falls back to per-unit price when not multiplied.
+            const dp = computeDisplayPrice({
+              ...item,
+              hammer_price: item.hammer_price ?? item.final_hammer_price ?? null,
+              current_bid: item.current_price ?? item.current_bid ?? null,
+              starting_price: item.starting_price ?? null,
+            });
+            const statusLower = (item.status || '').toLowerCase();
+            const isEnded = ['ended', 'sold', 'closed', 'completed'].includes(statusLower);
+            const hasBids = Number(item.current_price ?? item.current_bid ?? 0) > 0;
+            let label;
+            if (isEnded) {
+              label = isFrench ? 'Prix total' : 'Total Price';
+            } else if (hasBids) {
+              label = isFrench ? 'Offre totale' : 'Total Bid';
+            } else {
+              label = isFrench ? 'Total de départ' : 'Starting Total';
+            }
+            const labelWithQty = dp.isMultiplied
+              ? `${label} (× ${dp.quantity}${isFrench ? ' unités' : ' units'})`
+              : t('marketplace.currentBid');
+
+            return (
+              <>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider" data-testid="card-price-label">
+                    {labelWithQty}
+                  </span>
+                  <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent" data-testid="card-display-price">
+                    {formatCurrency(dp.totalPrice, item.currency)}
+                    <CurrencyBadge currency={item.currency || 'CAD'} size="xs" className="ml-1.5 align-middle" testid="listing-currency-badge" />
+                  </span>
+                </div>
+                {dp.isMultiplied && (
+                  <>
+                    <div className="flex items-center justify-end" data-testid="card-unit-price-subtext">
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                        ({formatCurrency(dp.unitPrice, item.currency)} {isFrench ? 'par unité' : 'per unit'})
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-end pt-0.5" data-testid="card-lot-multiplier-badge">
+                      <Badge className="bg-amber-100 text-amber-800 border border-amber-300 hover:bg-amber-200 text-[10px] font-semibold uppercase tracking-wider">
+                        {isFrench ? 'Prix lot × Qté' : 'Lot Price × Qty'}
+                      </Badge>
+                    </div>
+                  </>
+                )}
+              </>
+            );
+          })()}
 
           {item.buy_now_enabled && item.buy_now_price && (
             <div className="flex items-center justify-between text-sm">
