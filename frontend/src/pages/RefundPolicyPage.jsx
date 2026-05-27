@@ -51,7 +51,7 @@ export default function RefundPolicyPage() {
             {t.contact_body}{' '}
             <a href="mailto:support@bidvex.com?subject=Dispute%20Resolution" className="text-blue-600 hover:underline">support@bidvex.com</a>
             {' · '}
-            <a href="tel:+15149490038" className="text-blue-600 hover:underline">+1 514 949 0038</a>
+            <a href="tel:+14506343099" className="text-blue-600 hover:underline">+1 (450) 634-3099</a>
           </p>
         </CardContent>
       </Card>

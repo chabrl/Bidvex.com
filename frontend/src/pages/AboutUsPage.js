@@ -348,7 +348,7 @@ const AboutUsPage = () => {
               { label: t.credCompany, value: 'Bidvex Inc.', icon: Building2 },
               { label: t.credFederal, value: '706766367', icon: CheckCircle },
               { label: t.credNeq, value: '1181780744', icon: ShieldCheck },
-              { label: t.credPhone, value: '+1 514 949 0038', icon: Phone },
+              { label: t.credPhone, value: '+1 (450) 634-3099', icon: Phone },
               { label: t.credEmail, value: 'info@bidvex.com', icon: Mail },
             ].map((item, idx) => {
               const Icon = item.icon;

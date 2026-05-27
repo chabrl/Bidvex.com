@@ -123,9 +123,9 @@ const COPY = {
     response_resolutions: 'Dispute Resolutions: written decision within 15 business days of complete claim submission',
     teams: [
       { id: 'support',     title: 'Customer Support',         description: 'Account, bidding, payment, technical issues.',
-        icon: Mail,        email: 'support@bidvex.com',       phone: '+1 514 949 0038' },
+        icon: Mail,        email: 'support@bidvex.com',       phone: '+1 (450) 634-3099' },
       { id: 'resolutions', title: 'Dispute Resolutions',      description: 'Refund claims, lot disputes, broker complaints.',
-        icon: ShieldAlert, email: 'support@bidvex.com',       phone: '+1 514 949 0038',
+        icon: ShieldAlert, email: 'support@bidvex.com',       phone: '+1 (450) 634-3099',
         subjectLine: 'Dispute Resolution' },
       { id: 'legal',       title: 'Legal & Compliance',       description: 'Subpoenas, regulator requests, privacy access.',
         icon: Scale,       email: 'support@bidvex.com',       phone: null,
@@ -157,9 +157,9 @@ const COPY = {
     response_resolutions: 'Résolution des différends : décision écrite sous 15 jours ouvrables suivant la soumission complète de la réclamation',
     teams: [
       { id: 'support',     title: 'Service à la clientèle',   description: 'Compte, enchères, paiement, problèmes techniques.',
-        icon: Mail,        email: 'support@bidvex.com',       phone: '+1 514 949 0038' },
+        icon: Mail,        email: 'support@bidvex.com',       phone: '+1 (450) 634-3099' },
       { id: 'resolutions', title: 'Résolutions de différends', description: 'Réclamations de remboursement, litiges de lots, plaintes contre courtiers.',
-        icon: ShieldAlert, email: 'support@bidvex.com',       phone: '+1 514 949 0038',
+        icon: ShieldAlert, email: 'support@bidvex.com',       phone: '+1 (450) 634-3099',
         subjectLine: 'Résolution de différend' },
       { id: 'legal',       title: 'Juridique et conformité',  description: 'Assignations, demandes réglementaires, accès aux renseignements personnels.',
         icon: Scale,       email: 'support@bidvex.com',       phone: null,
