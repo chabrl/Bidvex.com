@@ -28,6 +28,27 @@ def test_system_instruction_matches_user_spec():
     assert "Daily Traffic Overview" in WATCHDOG_SYSTEM_INSTRUCTION
     assert "Flagged Suspicious Activity" in WATCHDOG_SYSTEM_INSTRUCTION
     assert "Watchdog Action Items" in WATCHDOG_SYSTEM_INSTRUCTION
+    # iter235 — anti-hallucination + identity guardrails MUST be present.
+    assert "Identity Limits" in WATCHDOG_SYSTEM_INSTRUCTION
+    assert "BidVex AI Core" in WATCHDOG_SYSTEM_INSTRUCTION
+    assert 'Never introduce yourself as "Master Concierge"' in WATCHDOG_SYSTEM_INSTRUCTION
+    assert "Broker System Setup" in WATCHDOG_SYSTEM_INSTRUCTION
+    assert "licensed brokers to register on the platform" in WATCHDOG_SYSTEM_INSTRUCTION
+    assert "Strict Information Adherence" in WATCHDOG_SYSTEM_INSTRUCTION
+    assert "Never invent fee numbers" in WATCHDOG_SYSTEM_INSTRUCTION
+    assert "partners@bidvex.ca" in WATCHDOG_SYSTEM_INSTRUCTION  # the banned example must be present
+    # And the model should NOT be authorised to claim the Master Concierge persona.
+    # (lower-cased substring search; if any future edit re-adds it as a positive identity,
+    # this check still passes because the banned phrase remains inside the negative rule,
+    # but a stricter regex covers an "Identity: ... Master Concierge" positive assignment.)
+    import re
+    forbidden_identity = re.compile(
+        r"Identity\s*:\s*[^\n]*Master Concierge",
+        flags=re.IGNORECASE,
+    )
+    assert not forbidden_identity.search(WATCHDOG_SYSTEM_INSTRUCTION), (
+        "Master Concierge persona must NOT be assigned as a positive identity."
+    )
 
 
 def test_build_generation_config_locks_invariants():
