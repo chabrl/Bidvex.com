@@ -165,6 +165,9 @@ async def lifespan(app):
         await ensure_payment_charges_indexes(db)
         await ensure_refund_queue_indexes(db)
         await ensure_email_blast_queue_indexes(db)
+        # iter236 Mission 2 — 2dsphere index on listings.location.coordinates
+        from routes.geo_search import ensure_2dsphere_index
+        await ensure_2dsphere_index()
     except Exception as e:        logger.warning(f"Strict payment indexes registration failed (non-fatal): {e}")
 
     # ── iter212 — Grandfather existing storage facilities ──
@@ -676,6 +679,8 @@ try:
         ("routes.ai_chat", "ai_chat_router", "set_ai_chat_db", False),
         # iter234 — Direct google-genai (Gemini 2.5 Flash) streaming chat + watchdog
         ("routes.genai_chat", "genai_chat_router", "set_genai_chat_db", False),
+        # iter236 Mission 2 — Geo-aware listings search (lat/lng/radius + city).
+        ("routes.geo_search", "geo_router", "set_geo_db", False),
         ("routes.fees", "fees_router", None, False),
         ("routes.notifications", "notifications_router", None, False),
         ("routes.watchlist", "watchlist_router", None, False),

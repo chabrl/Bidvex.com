@@ -180,6 +180,58 @@ const AIAssistant = () => {
   const originalTitleRef = useRef(typeof document !== 'undefined' ? document.title : 'BidVex');
   const acknowledgmentIdRef = useRef(0);
 
+  // iter236 Mission 3 — Resolve & persist current listing UUID for the chat
+  // session. Priority: explicit prop → URL pathname patterns. Re-resolved
+  // when the route changes (mount + pathname change). Persists in local
+  // state for the duration of the chat so each message ships the same ID.
+  const resolveListingIdFromUrl = () => {
+    if (typeof window === 'undefined') return null;
+    const path = window.location.pathname || '';
+    // Patterns supported by router: /listing/:id, /lots/:id, /vehicle-auctions/:id,
+    // /vehicles/:id, /storage-auctions/:id, /multi-item-listing/:id, /auction/:id, /lot/:id, /item/:id
+    const m = path.match(
+      /\/(?:listing|lots|vehicle-auctions|vehicles|storage-auctions|multi-item-listing|auction|lot|item)\/([a-zA-Z0-9_-]{4,})/
+    );
+    return m ? m[1] : null;
+  };
+  const [listingIdForChat, setListingIdForChat] = useState(() => resolveListingIdFromUrl());
+  useEffect(() => {
+    const onLoc = () => setListingIdForChat(resolveListingIdFromUrl());
+    window.addEventListener('popstate', onLoc);
+    window.addEventListener('hashchange', onLoc);
+    // Re-resolve once per chat open (React Router pushState).
+    if (isOpen) onLoc();
+    return () => {
+      window.removeEventListener('popstate', onLoc);
+      window.removeEventListener('hashchange', onLoc);
+    };
+  }, [isOpen]);
+
+  // iter236 Mission 3 — On open, if we have a listing_id, fire a SILENT
+  // priming request (no UI message inserted) so Gemini already has the
+  // listing + comparables context before the user types anything.
+  const silentPrimedRef = useRef(new Set());
+  useEffect(() => {
+    if (!isOpen || !listingIdForChat) return;
+    if (silentPrimedRef.current.has(listingIdForChat)) return;
+    silentPrimedRef.current.add(listingIdForChat);
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 12000);
+    fetch(`${backendUrl}/chat/stream`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: ctrl.signal,
+      body: JSON.stringify({
+        message: `The user is currently viewing listing ID ${listingIdForChat}. Analyze the context and be ready to assist.`,
+        listing_id: listingIdForChat,
+        google_search: false,
+      }),
+    })
+      .then((res) => res.body && res.body.getReader().read())  // drain first chunk then drop
+      .catch(() => undefined)
+      .finally(() => clearTimeout(tid));
+  }, [isOpen, listingIdForChat, backendUrl]);
+
   // iter214 P4 — Request browser-notification permission when chat opens
   // (NOT on page load, per UX spec).
   useEffect(() => {
@@ -312,11 +364,12 @@ const AIAssistant = () => {
 
     const buildBody = () => JSON.stringify({
       // iter235 — Direct google-genai streaming endpoint (/api/chat/stream)
-      // expects { message, extra_context, google_search }. Pass recent chat
-      // history + UI language as runtime context so the server can ground
-      // the response without changing the locked system instruction.
+      // expects { message, extra_context, google_search, listing_id }.
+      // iter236 Mission 3 — Always forward listing_id so the backend can
+      // inject current_viewed_listing + market_comparables when present.
       message: userMessage,
       google_search: true,
+      listing_id: listingIdForChat || null,
       extra_context: [
         `Active UI language: ${lang === 'fr' ? 'French (fr)' : 'English (en)'}.`,
         'Recent conversation (most recent last):',

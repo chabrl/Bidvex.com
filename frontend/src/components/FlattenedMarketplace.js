@@ -42,8 +42,9 @@ import { formatCurrency } from '../utils/currencyFormatter';
 // iter233 — Display-only "Lot price × Quantity" multiplier helper.
 import { computeDisplayPrice } from '../utils/priceUtils';
 import { SellerAccountBadge } from './PrivateSaleBadge';
-import CurrencyBadge from './CurrencyBadge';
 import { getLocalized } from '../utils/localization';
+// iter236 Mission 2 — Map & radius search panel (lazy-loadable but cheap).
+import MapSearchPanel from './MapSearchPanel';
 import { useCategories } from '../hooks/useCategories';
 import { useMarketplaceItems } from '../hooks/useMarketplaceItems';
 import { SellerRatingInline } from './SellerReputation';
@@ -169,11 +170,39 @@ const FlattenedMarketplace = ({
     refetch: refetchItems,
   } = useMarketplaceItems(debouncedFilters, limit);
 
+  // iter236 Mission 2 — Map-based geo filter state.
+  // When `geoFilter` is non-null, override the cached `items` list with a
+  // dedicated /api/marketplace/items/geo fetch. Stays decoupled from the
+  // primary cached endpoint so geo doesn't pollute the warm cache.
+  const [mapOpen, setMapOpen] = useState(false);
+  const [geoFilter, setGeoFilter] = useState(null); // {lat,lng,radius_km} | null
+  const [geoItems, setGeoItems] = useState(null);   // null = pass-through
+
+  const backendUrl = process.env.REACT_APP_BACKEND_URL
+    ? `${process.env.REACT_APP_BACKEND_URL}/api`
+    : '/api';
+
+  useEffect(() => {
+    if (!geoFilter) {
+      setGeoItems(null);
+      return undefined;
+    }
+    const ctrl = new AbortController();
+    const url = `${backendUrl}/marketplace/items/geo?lat=${geoFilter.lat}&lng=${geoFilter.lng}&radius_km=${geoFilter.radius_km}&limit=60`;
+    fetch(url, { signal: ctrl.signal })
+      .then((r) => (r.ok ? r.json() : { items: [] }))
+      .then((d) => setGeoItems(d.items || []))
+      .catch(() => undefined);
+    return () => ctrl.abort();
+  }, [geoFilter, backendUrl]);
+
   // Flatten pages into a single items array
   const allItems = (marketplaceData?.pages ?? []).flatMap((page) => page.items ?? []);
-  const items = filters.private_sales_only
+  const baseItems = filters.private_sales_only
     ? allItems.filter((item) => !item.seller_is_business)
     : allItems;
+  // iter236 Mission 2 — Geo override takes priority when map filter active.
+  const items = geoItems !== null ? geoItems : baseItems;
   const total = marketplaceData?.pages?.[0]?.total ?? 0;
   const hasMore = hasNextPage;
 
@@ -336,14 +365,37 @@ const FlattenedMarketplace = ({
         </div>
       )}
 
+      {/* iter236 Mission 2 — Map search toggle + panel */}
+      <div className="mb-2 flex items-center justify-end">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setMapOpen((o) => !o)}
+          className="text-xs"
+          data-testid="map-search-toggle-btn"
+        >
+          <MapPin className="h-3.5 w-3.5 mr-1" />
+          {mapOpen
+            ? (i18n.language?.startsWith('fr') ? 'Masquer la carte' : 'Hide Map')
+            : (i18n.language?.startsWith('fr') ? '📍 Recherche par carte' : '📍 Search by Map')}
+        </Button>
+      </div>
+      <MapSearchPanel
+        open={mapOpen}
+        onClose={() => setMapOpen(false)}
+        onGeoChange={setGeoFilter}
+        backendUrl={backendUrl}
+        isFrench={i18n.language?.startsWith('fr')}
+      />
+
       {/* Items Grid — iter220 Task 2: matches VehicleAuctionsPage breakpoints
           (sm:2 / lg:3 / xl:4) so wider workspaces (≥1280px) get 4 columns
           and tablets get 2 instead of jumping straight to 3. */}
       {loading && items.length === 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
-          {[...Array(8)].map((_, i) => (
-            <Card key={i} className="animate-pulse">
-              <div className="h-52 bg-gray-200 dark:bg-slate-700 rounded-t-lg"></div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 xl:gap-5" data-testid="marketplace-results-grid-loading">
+          {[...Array(6)].map((_, i) => (
+            <Card key={i} className="animate-pulse min-h-[420px]">
+              <div className="h-[200px] bg-gray-200 dark:bg-slate-700 rounded-t-lg"></div>
               <CardContent className="p-4 space-y-2">
                 <div className="h-4 bg-gray-200 dark:bg-slate-700 rounded"></div>
                 <div className="h-4 bg-gray-200 dark:bg-slate-700 rounded w-3/4"></div>
@@ -353,11 +405,11 @@ const FlattenedMarketplace = ({
           ))}
         </div>
       ) : items.length === 0 ? (
-        <div className="text-center py-16 bg-slate-50 dark:bg-slate-800 rounded-xl">
-          <Package className="h-16 w-16 text-slate-400 dark:text-slate-500 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold mb-2 text-slate-900 dark:text-white">{t('marketplace.noItemsFound')}</h3>
+        <div className="text-center py-16 bg-slate-50 dark:bg-slate-800 rounded-xl" data-testid="marketplace-empty-state">
+          <Search className="h-12 w-12 text-slate-400 dark:text-slate-500 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold mb-2 text-slate-900 dark:text-white">{t('marketplace.noItemsFound', 'No listings found')}</h3>
           <p className="text-slate-600 dark:text-slate-400 mb-4">
-            {t('marketplace.tryAdjusting')}
+            {t('marketplace.tryAdjusting', 'Try adjusting your filters or search terms.')}
           </p>
           <Button onClick={() => setFilters({
             search: '',
@@ -367,12 +419,12 @@ const FlattenedMarketplace = ({
             condition: '',
             sort: 'ending_soon',
             private_sales_only: false
-          })} className="bg-blue-600 text-white hover:bg-blue-700">
+          })} className="bg-blue-600 text-white hover:bg-blue-700" data-testid="marketplace-empty-clear-filters-btn">
             {t('marketplace.clearAllFilters')}
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 xl:gap-5" data-testid="marketplace-results-grid">
           {items.map((item) => (
             <ItemCard 
               key={item.id} 
@@ -661,14 +713,17 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
   const detailLink = getDetailLink(item);
 
   return (
-    <Card className="group hover:shadow-xl transition-all duration-300 overflow-hidden border-0 shadow-md flex flex-col" data-testid="marketplace-item-card">
-      {/* Image Container */}
+    <Card
+      className="group overflow-hidden flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-[0_2px_12px_rgba(0,0,0,0.08)] hover:shadow-[0_10px_28px_rgba(0,0,0,0.14)] transition-all duration-150 hover:-translate-y-[3px] min-h-[420px]"
+      data-testid="marketplace-item-card"
+    >
+      {/* Image Container — fixed 200px height per iter236 spec */}
       <Link
         to={detailLink}
         onClick={() => trackClick(item.id)}
         className="block"
       >
-        <div className="relative h-52 bg-slate-100 dark:bg-slate-800 overflow-hidden">
+        <div className="relative h-[200px] bg-slate-100 dark:bg-slate-800 overflow-hidden">
           {item.images?.[0] ? (
             <SafeImage
               src={item.images[0]}
@@ -767,49 +822,49 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
         </div>
       </Link>
 
-      <CardContent className="p-4 flex flex-col flex-1 gap-2.5" data-testid="item-card">
-        {/* Title */}
+      <CardContent className="px-4 py-[14px] flex flex-col flex-1 gap-2" data-testid="item-card">
+        {/* Title — 14px / 600 / 2-line clamp per iter236 spec */}
         <Link
           to={detailLink}
           onClick={() => trackClick(item.id)}
           className="block"
         >
-          <h3 
-            className="font-semibold text-base line-clamp-2 text-slate-900 dark:text-white hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors"
+          <h3
+            className="text-[14px] font-semibold leading-[1.35] line-clamp-2 text-slate-900 dark:text-white hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors mb-1"
             data-testid="item-title"
           >
             {getLocalized(item, 'title')}
           </h3>
         </Link>
 
-        {/* Seller Rating */}
-        <SellerRatingInline sellerId={item.seller_id} reputation={sellerRep} />
-
-        {/* Location */}
-        {item.city && (
-          <div className="flex items-center text-sm text-slate-500 dark:text-slate-400">
-            <MapPin className="h-3.5 w-3.5 mr-1 flex-shrink-0" />
-            <span className="truncate">{item.city}, {item.region}</span>
-          </div>
-        )}
-
-        {/* iter217 Phase 4 — Tax Savings Banner only for true Private Sales */}
-        {isPrivateSale && (
-          <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg px-3 py-1.5 text-xs">
-            <span className="font-medium text-green-700 dark:text-green-400">
-              {t('marketplace.noTaxOnItem')}
+        {/* Seller + location single line */}
+        <div className="flex items-center text-[12px] text-slate-500 dark:text-slate-400 gap-2">
+          <SellerRatingInline sellerId={item.seller_id} reputation={sellerRep} />
+          {item.city && (
+            <span className="inline-flex items-center gap-1 truncate">
+              <MapPin className="h-3 w-3 flex-shrink-0" />
+              <span className="truncate">{item.city}, {item.region}</span>
             </span>
+          )}
+        </div>
+
+        {/* Savings pill — Private Sale */}
+        {isPrivateSale && (
+          <div
+            className="w-full text-center rounded-md px-[10px] py-[5px] mt-1"
+            style={{ backgroundColor: '#e6f9f0', color: '#1a7a4a', fontSize: '11px', fontWeight: 600 }}
+            data-testid="card-savings-banner"
+          >
+            {t('marketplace.noTaxOnItem')}
           </div>
         )}
         {/* iter217 Phase 4 — Buyer's Premium hint on partner cards */}
         {isPartner && typeof item.buyer_premium_rate === 'number' && (
-          <div className="rounded-lg px-3 py-1.5 text-xs" style={{ background: '#eff6ff', border: '1px solid #bfdbfe' }}>
-            <span className="font-medium" style={{ color: '#1d4ed8' }}>
-              {t('marketplace.partnerBpHint', {
-                pct: (item.buyer_premium_rate * 100).toFixed(1).replace(/\.0$/, ''),
-                defaultValue: "Buyer's Premium: {{pct}}% — GST/QST applicable",
-              })}
-            </span>
+          <div className="rounded-md px-3 py-1 text-[11px] font-medium" style={{ background: '#eff6ff', border: '1px solid #bfdbfe', color: '#1d4ed8' }}>
+            {t('marketplace.partnerBpHint', {
+              pct: (item.buyer_premium_rate * 100).toFixed(1).replace(/\.0$/, ''),
+              defaultValue: "Buyer's Premium: {{pct}}% — GST/QST applicable",
+            })}
           </div>
         )}
 
@@ -838,20 +893,34 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
             } else {
               label = isFrench ? 'Total de départ' : 'Starting Total';
             }
-            const labelWithQty = dp.isMultiplied
+            const labelText = dp.isMultiplied
               ? `${label} (× ${dp.quantity}${isFrench ? ' unités' : ' units'})`
-              : t('marketplace.currentBid');
+              : (isFrench ? 'OFFRE ACTUELLE' : 'CURRENT BID');
 
             return (
               <>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider" data-testid="card-price-label">
-                    {labelWithQty}
+                <div className="flex items-baseline justify-between">
+                  <span
+                    className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-[0.5px]"
+                    data-testid="card-price-label"
+                  >
+                    {labelText}
                   </span>
-                  <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent" data-testid="card-display-price">
-                    {formatCurrency(dp.totalPrice, item.currency)}
-                    <CurrencyBadge currency={item.currency || 'CAD'} size="xs" className="ml-1.5 align-middle" testid="listing-currency-badge" />
-                  </span>
+                  <div className="flex items-baseline gap-[6px]">
+                    <span
+                      className="text-[22px] font-extrabold text-[#0a1628] dark:text-white"
+                      data-testid="card-display-price"
+                    >
+                      {formatCurrency(dp.totalPrice, item.currency)}
+                    </span>
+                    <span
+                      className="inline-block text-[10px] rounded text-[#4a5568] dark:text-slate-300"
+                      style={{ backgroundColor: '#e8ecf2', padding: '2px 6px' }}
+                      data-testid="listing-currency-badge"
+                    >
+                      {item.currency || 'CAD'}
+                    </span>
+                  </div>
                 </div>
                 {dp.isMultiplied && (
                   <>
@@ -872,9 +941,9 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
           })()}
 
           {item.buy_now_enabled && item.buy_now_price && (
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-slate-600 dark:text-slate-400">{t('marketplace.buyNowLabel')}</span>
-              <span className="font-semibold text-green-600 dark:text-green-400">
+            <div className="flex items-center justify-between mt-1 mb-3" data-testid="card-buy-now-row">
+              <span className="text-[12px] text-slate-500 dark:text-slate-400">{t('marketplace.buyNowLabel')}</span>
+              <span className="text-[13px] font-semibold" style={{ color: '#2d6be4' }}>
                 {formatCurrency(item.buy_now_price)}
               </span>
             </div>
@@ -895,20 +964,16 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
           </div>
         )}
 
-        {/* iter221 Task 1 — Action row: primary CTA (`flex-1`) + fixed 44×44
-            icon-only secondary. Previous layout used `flex-1` on both, which
-            squished the icon button at narrow widths (4-col xl breakpoint)
-            and caused the label-truncation defect in production capture
-            image_33526f.jpg. Defensive flex row + `mt-auto` pins it to the
-            card bottom regardless of body length. */}
+        {/* iter236 — Action row: full-flex Quick Bid + 40×40 circular Eye/Watch button. */}
         <div
-          className="flex items-center gap-2 w-full mt-auto pt-1"
+          className="flex items-center w-full mt-auto pt-1"
           data-testid="marketplace-card-actions"
         >
           <Button
             onClick={(e) => onQuickBid(item, e)}
             size="sm"
-            className="flex-1 min-w-0 bg-gradient-to-r from-blue-600 to-cyan-500 text-white hover:from-blue-700 hover:to-cyan-600 h-[44px] text-sm"
+            className="flex-1 min-w-0 h-[40px] rounded-lg text-white font-bold text-[13px]"
+            style={{ background: 'linear-gradient(135deg, #2d6be4, #1a4fc4)', border: 'none' }}
             data-testid="quick-bid-btn"
           >
             <Zap className="h-3.5 w-3.5 mr-1 flex-shrink-0" />
@@ -918,7 +983,8 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
             to={detailLink}
             aria-label={t('common.view')}
             title={t('common.view')}
-            className="flex-shrink-0 min-w-[44px] h-[44px] inline-flex items-center justify-center rounded-md border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+            className="ml-2 flex-shrink-0 w-10 h-10 inline-flex items-center justify-center rounded-full text-slate-500 hover:text-[#2d6be4] hover:border-[#2d6be4] transition-colors"
+            style={{ border: '1.5px solid #e2e8f0' }}
             data-testid="view-item-btn"
           >
             <Eye className="h-4 w-4" />

@@ -1,0 +1,65 @@
+{
+  "summary": "iter236 3-mission bundle verified end-to-end. PYTEST: 52/52 PASS (offline) + 6/6 PASS (live HTTP). FRONTEND: Marketplace card layout PASS (3-col grid, card-display-price/card-price-label/quick-bid-btn/view-item-btn all rendered ×5). Map panel toggle PASS (mounts map-search-panel + container + radius-slider + info-banner; slider min=10/max=500/step=10/value=50; banner says 'Showing listings within 50 km of your selected location'). AIAssistant PASS — widget header reads 'BidVex AI Core' (no 'Master Concierge'), input present, send fires POST /api/chat/stream with X-GenAI-Model=gemini-2.5-flash + Transfer-Encoding: chunked + Content-Type: text/plain. Streaming verified at byte-level: 581 byte arrivals over 0.249s span (real chunked delivery — iter234 GZipMiddleware bug appears resolved on text/plain stream path since content-encoding is no longer applied to /api/chat/stream by ingress). WATCHDOG instruction contains all Section 5 markers AND retains iter235 anti-hallucination locks. Backend anti-hallucination: real-listing chat reply did not invent '$100 fee' or '3% fee'. KNOWN-AS-EXPECTED: catalog has 0 listings with location.coordinates → geo items=[] (preview limitation, not a bug). FINDINGS: (1) MapSearchPanel is NOT mounted on /lots page (only on /marketplace) — spec said both pages. (2) Lots page currently has 0 lots in preview catalog so lot-quick-view-btn / 200px image / 420px min-height could not be visually verified — data-dependent, not a code bug. (3) iter233 multiplier badge testids count=0 on visible cards because none of the 5 preview listings have price_multiplied_by_quantity=true (data-dependent, behaviour is locked by unit tests which all pass).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "POST /api/chat/stream",
+        "issue": "X-Accel-Buffering: no header set by route is missing from the public response (visible as None in browser network panel). Same iter234 finding — the route emits it; ingress/Cloudflare strips it. However, Transfer-Encoding: chunked IS preserved and byte-level streaming WAS verified (581 byte arrivals over 249ms), so end-user UX is fine; only the header advertisement is gone."
+      },
+      {
+        "endpoint": "POST /api/chat/stream (in-browser)",
+        "issue": "From Chromium devtools the response shows content-encoding=gzip on the SSE-like stream while raw Python/curl requests show no content-encoding. This is a UA-conditional re-compression at the edge. Doesn't break delivery (chunked transfer still works) but worth noting if anyone re-debugs the iter234 buffering issue."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Map/radius location search on Lots Auction page",
+        "issue": "Spec says 'new <MapSearchPanel/> on both Marketplace + Lots browse pages' but /app/frontend/src/pages/LotsMarketplacePage.js does not import or render MapSearchPanel. Only FlattenedMarketplace.js (Marketplace) wires it up. Confirmed at runtime: map-search-toggle-btn count=0 on /lots. Marked MEDIUM per agent-to-agent note ('focus is the Marketplace card which is the live one').",
+        "affected_selectors": ["[data-testid='map-search-toggle-btn']", "[data-testid='map-search-panel']"]
+      },
+      {
+        "flow": "AI Assistant silent priming on listing detail",
+        "issue": "Could not verify the silent priming POST on a listing detail URL because the test clicked view-item-btn on /marketplace but the page stayed on /marketplace (the card link/handler may not navigate, or the test interaction did not trigger router push). When AI was opened, the first chat-stream POST body contained listing_id=null (no priming hit fired). Recommend manual verification or main agent self-test by visiting /listing/{id} directly and watching the Network tab. NOTE: When opened on /marketplace (no listing context), behaviour is correct (no spurious silent prime fires)."
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter236_geo_and_listing_context.py",
+    "/app/backend/tests/test_iter236_live_http.py",
+    "/app/test_reports/pytest/iter236_results.xml",
+    "/app/test_reports/pytest/iter236_live.xml"
+  ],
+  "action_items": [
+    "Mount <MapSearchPanel/> + map-search-toggle-btn in /app/frontend/src/pages/LotsMarketplacePage.js (mirror the wiring from FlattenedMarketplace.js lines ~370-390 — toggle state, geoFilter, panel mount). MEDIUM priority — spec'd in M2 but Marketplace is the primary live surface.",
+    "(Optional) Seed at least one preview listing with location.coordinates so the geo radius query returns >0 items for live-fire QA before shipping.",
+    "(Optional) Seed at least one preview lot listing so Lots page card layout (200px image, 420px min-height, lot-quick-view-btn) can be visually verified end-to-end.",
+    "(Carried over from iter234) Investigate why ingress strips X-Accel-Buffering: no. Streaming functionally works now (byte-level chunked delivery confirmed at 0.249s span / 581 arrivals), but the header advertisement is gone."
+  ],
+  "critical_code_review_comments": [
+    "services/chat_listing_context.py: clean builder; correctly uses 60-day window and projects only safe fields. ID-based lookup with multi_item_listings fallback is correct.",
+    "routes/geo_search.py: ensure_2dsphere_index is idempotent on listings + multi_item_listings, set_geo_db state is module-level (acceptable for single-process FastAPI). $geoWithin/$nearSphere fallback to case-insensitive city regex is sound.",
+    "components/MapSearchPanel.jsx: react-leaflet integration looks clean; debounced slider + invalidateSize on mount. Note: spec mentions 'react-hooks/exhaustive-deps' rule does not exist in CRA — confirmed, no compile crash present.",
+    "components/FlattenedMarketplace.js: the new 3-col grid + 200px image + savings pill + 40px gradient Quick Bid + 40px circular eye view button render correctly at 1920px. data-testids are all present.",
+    "pages/LotsMarketplacePage.js: missing MapSearchPanel mount — see action item.",
+    "components/AIAssistant.js: header text 'BidVex AI Core' confirmed; welcome message replaces 'Master Concierge' wording; listing_id field is included in the buildBody payload (verified — POST body contained 'listing_id' key)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter236_live_http.py (NEW — 6 live HTTP probes)"
+  ],
+  "success_rate": {
+    "backend_unit_pytest": "100% (52/52)",
+    "backend_live_http": "100% (6/6)",
+    "frontend": "85% (Marketplace + AI widget verified; Lots map panel missing + Lots cards unverifiable due to empty seed)"
+  },
+  "test_credentials": "Not exercised — none of the iter236 endpoints required auth on this pass.",
+  "seed_data_creation": "None.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "iter236 backend is fully clean (52/52 unit + 6/6 live HTTP). Marketplace UI verified. The only outstanding item is the MapSearchPanel missing on /lots — main agent can self-test after wiring it. iter234 stream-buffering bug is now functionally resolved at the chunked-transfer layer (X-Accel-Buffering header still gets stripped by ingress, but Transfer-Encoding: chunked + 581 byte arrivals over 249ms confirms real-time streaming). Live HTTP probe file at /app/backend/tests/test_iter236_live_http.py is reusable as a regression anchor.",
+  "rca_of_the_issue": "n/a — no critical bugs; one M2 wiring miss on /lots page (LotsMarketplacePage.js never imports MapSearchPanel)."
+}

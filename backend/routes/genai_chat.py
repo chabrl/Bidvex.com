@@ -44,6 +44,11 @@ class StreamChatBody(BaseModel):
     message: str = Field(..., min_length=1, max_length=8000)
     extra_context: Optional[str] = Field(None, max_length=4000)
     google_search: bool = True
+    # iter236 Mission 3 — Listing-aware context. When the frontend is on a
+    # listing detail page, it passes the listing UUID so the backend can
+    # build platform-context (current_viewed_listing + market_comparables)
+    # and inject it as a JSON block into the system instruction.
+    listing_id: Optional[str] = Field(None, max_length=120)
 
 
 # ----------------------------------------------------------------------------
@@ -57,9 +62,11 @@ async def post_chat_stream(body: StreamChatBody) -> StreamingResponse:
       message:       user's prompt (required)
       extra_context: optional runtime context appended to system instruction
       google_search: optional toggle (default true) — keeps the GoogleSearch tool on
+      listing_id:    optional UUID to inject current_viewed_listing + market_comparables
 
     Response: text/plain stream, one UTF-8 fragment per chunk.
     """
+    body = await _enrich_with_listing_context(body)
     return _stream(body)
 
 
@@ -68,6 +75,7 @@ async def get_chat_stream(
     message: str = Query(..., min_length=1, max_length=8000),
     extra_context: Optional[str] = Query(None, max_length=4000),
     google_search: bool = Query(True),
+    listing_id: Optional[str] = Query(None, max_length=120),
 ) -> StreamingResponse:
     """Same as POST but exposed via GET so it can be consumed by EventSource
     or plain `fetch()`-with-streaming clients that don't support body-on-GET."""
@@ -75,8 +83,31 @@ async def get_chat_stream(
         message=message,
         extra_context=extra_context,
         google_search=google_search,
+        listing_id=listing_id,
     )
+    body = await _enrich_with_listing_context(body)
     return _stream(body)
+
+
+async def _enrich_with_listing_context(body: StreamChatBody) -> StreamChatBody:
+    """iter236 Mission 3 — Fetch listing + comparables and merge into extra_context."""
+    if not body.listing_id or _db is None:
+        return body
+    try:
+        from services.chat_listing_context import build_chat_listing_context
+        ctx = await build_chat_listing_context(_db, body.listing_id)
+        if not ctx.get("current_viewed_listing") and not ctx.get("market_comparables"):
+            return body
+        import json as _json
+        block = (
+            "### PLATFORM CONTEXT (do not share raw JSON with user) ###\n"
+            f"{_json.dumps(ctx, default=str, indent=2)}"
+        )
+        merged = (body.extra_context.strip() + "\n\n" + block) if body.extra_context else block
+        body = body.model_copy(update={"extra_context": merged})
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[iter236-context] enrichment failed for listing {body.listing_id!r}: {e}")
+    return body
 
 
 def _stream(body: StreamChatBody) -> StreamingResponse:

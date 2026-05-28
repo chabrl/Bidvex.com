@@ -101,13 +101,13 @@ const LotsMarketplacePage = () => {
     return (
       <Card
         key={listing.id}
-        className="group overflow-hidden hover:shadow-xl transition-all duration-300 border-slate-200 dark:border-slate-700"
+        className="group overflow-hidden flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-[0_2px_12px_rgba(0,0,0,0.08)] hover:shadow-[0_10px_28px_rgba(0,0,0,0.14)] transition-all duration-150 hover:-translate-y-[3px] min-h-[420px]"
         data-testid="listing-card"
       >
         <Link to={`/lots/${listing.id}`} className="block relative">
-          <div className="aspect-[4/3] overflow-hidden bg-slate-100 dark:bg-slate-800">
+          <div className="h-[200px] overflow-hidden bg-slate-100 dark:bg-slate-800">
             {imageUrl ? (
-              <SafeImage src={imageUrl} alt={getLocalized(listing, "title")} width={400} height={300} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+              <SafeImage src={imageUrl} alt={getLocalized(listing, "title")} width={400} height={200} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
                 <Package className="h-16 w-16" style={{ color: '#94a3b8' }} />
@@ -147,42 +147,63 @@ const LotsMarketplacePage = () => {
           </div>
         </Link>
 
-        <CardContent className="p-4" data-testid="listing-content">
+        <CardContent className="px-4 py-[14px] flex flex-col flex-1 gap-2" data-testid="listing-content">
           <Link to={`/lots/${listing.id}`}>
-            <h3 className="font-semibold text-lg mb-2 line-clamp-2 hover:text-cyan-600 transition-colors" style={{ color: '#1a1a1a', fontWeight: 600 }}>
+            <h3 className="text-[14px] font-semibold leading-[1.35] line-clamp-2 hover:text-cyan-600 transition-colors mb-1" style={{ color: '#1a1a1a' }}>
               {getLocalized(listing, "title")}
             </h3>
           </Link>
-          <div className="flex items-center gap-1 text-sm mb-3" style={{ color: '#6b7280' }}>
-            <MapPin className="h-4 w-4" style={{ color: '#6b7280' }} />
-            <span style={{ color: '#6b7280' }}>{listing.city}, {listing.region}</span>
-          </div>
-          {/* Seller Rating */}
-          <div className="mb-2">
+          <div className="flex items-center text-[12px] gap-2" style={{ color: '#6b7280' }}>
             <SellerRatingInline sellerId={listing.seller_id} reputation={sellerReps[listing.seller_id]} />
+            <span className="inline-flex items-center gap-1 truncate">
+              <MapPin className="h-3 w-3" />
+              <span className="truncate">{listing.city}, {listing.region}</span>
+            </span>
           </div>
           {isPrivateSale && (
-            <div className="rounded-lg px-3 py-2 text-xs mb-3" style={{ backgroundColor: '#dcfce7', border: '1px solid #86efac' }}>
-              <span style={{ color: '#15803d', fontWeight: 500 }}>{t('sellerBadge.privateSaveTax', 'Save ~15% on Taxes!')}</span>
+            <div
+              className="w-full text-center rounded-md px-[10px] py-[5px] mt-1"
+              style={{ backgroundColor: '#e6f9f0', color: '#1a7a4a', fontSize: '11px', fontWeight: 600 }}
+              data-testid="lot-card-savings-banner"
+            >
+              {t('sellerBadge.privateSaveTax', 'Save ~15% on Taxes!')}
             </div>
           )}
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-wider" style={{ color: '#9ca3af' }}>{t('marketplace.startingFrom', 'Starting from')}</p>
-              <p className="text-xl font-bold" style={{ background: 'linear-gradient(to right, #2563eb, #06b6d4)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>
+          <div className="flex-1" />
+          <div className="flex items-baseline justify-between">
+            <span
+              className="text-[10px] font-bold uppercase tracking-[0.5px]"
+              style={{ color: '#9ca3af' }}
+            >
+              {t('marketplace.startingFrom', 'Starting from')}
+            </span>
+            <div className="flex items-baseline gap-[6px]">
+              <span className="text-[22px] font-extrabold text-[#0a1628] dark:text-white">
                 {formatListingPrice(firstLot?.starting_price || 0, firstLot?.currency)}
-              </p>
+              </span>
+              <span
+                className="inline-block text-[10px] rounded text-[#4a5568] dark:text-slate-300"
+                style={{ backgroundColor: '#e8ecf2', padding: '2px 6px' }}
+              >
+                {firstLot?.currency || 'CAD'}
+              </span>
             </div>
-            <WishlistHeartButton auctionId={listing.id} wishlistCount={listing.wishlist_count || 0} />
           </div>
         </CardContent>
 
-        <CardFooter className="p-4 pt-0 flex gap-2">
-          <Link to={`/lots/${listing.id}`} className="flex-1">
-            <Button className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 text-white hover:from-blue-700 hover:to-cyan-600">
+        <CardFooter className="px-4 pb-[14px] pt-0 flex items-center w-full">
+          <Link to={`/lots/${listing.id}`} className="flex-1 min-w-0">
+            <Button
+              className="w-full h-[40px] rounded-lg text-white font-bold text-[13px]"
+              style={{ background: 'linear-gradient(135deg, #2d6be4, #1a4fc4)', border: 'none' }}
+              data-testid="lot-quick-view-btn"
+            >
               <Eye className="h-4 w-4 mr-2" /> {t('marketplace.viewAuction', 'View Auction')}
             </Button>
           </Link>
+          <div className="ml-2 flex-shrink-0">
+            <WishlistHeartButton auctionId={listing.id} wishlistCount={listing.wishlist_count || 0} />
+          </div>
         </CardFooter>
       </Card>
     );
