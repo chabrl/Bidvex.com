@@ -1,6 +1,48 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: iter233 — PRICE × QUANTITY DISPLAY MULTIPLIER + AUDIT (Feb 26, 2026) ✅
+## Latest: iter234 — DIRECT google-genai (Gemini 2.5 Flash) STREAMING CHAT + 24h WATCHDOG CRON (Feb 26, 2026) ✅
+
+Parallel direct google-genai SDK path (v2.6.0) alongside the existing litellm/EMERGENT_LLM_KEY pipeline in `services/ai_assistant_v2.py`. Two parallel features wired off the same client:
+
+### A) Streaming Chat — `POST/GET /api/chat/stream`
+- New module `services/genai_direct_client.py` constructs `genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))` with locked invariants: `model="gemini-2.5-flash"`, `ThinkingConfig(thinking_budget=-1)` (dynamic), `Tool(google_search=GoogleSearch())`, and the canonical 4-section system instruction (user-supplied: marketplace watchdog + fraud detector + bilingual customer support, EN/FR).
+- `services/genai_streaming_chat.py::stream_chat_chunks()` wraps `client.models.generate_content_stream()` → yields UTF-8 bytes.
+- `routes/genai_chat.py` exposes POST + GET variants; sync→async bridge via background-thread + asyncio.Queue so the event loop is never blocked.
+- Response headers: `Content-Type: text/plain; charset=utf-8`, `Cache-Control: no-store`, `X-GenAI-Model: gemini-2.5-flash`, `X-Accel-Buffering: no`.
+- **GZip exclusion (iter234 hotfix):** Subclassed `_ScopedGZipMiddleware` in `server.py` skips compression for paths starting with `/api/chat/stream` so the StreamingResponse is not buffered end-to-end. Live trace: 7 separate `Recv data` events spread across 670 ms for a 200-word prompt (real chunked transfer confirmed).
+
+### B) 24h Watchdog cron — daily 00:00 UTC
+- `services/genai_watchdog.py`:
+  - `fetch_activity_payload(db)` — pulls last-24h docs from 6 collections: `user_sessions`, `audit_logs`, `admin_logs`, `bids`, `payment_transactions`, `stripe_events`. Hard char budget 180k.
+  - `run_watchdog_analysis(payload)` — non-stream `client.models.generate_content()` returning markdown report.
+  - `send_watchdog_email(report)` — uses existing `services/email_notifications.send_email` (SendGrid) → **`charbel911@gmail.com`** (locked, env-overridable via `WATCHDOG_RECIPIENT_EMAIL`).
+  - `run_daily_watchdog_cycle(db)` — orchestrator. Blocking Gemini call is pushed to a worker thread via `asyncio.to_thread`.
+- Registered in `server.py` lifespan: `scheduler.add_job(run_daily_watchdog_cycle, CronTrigger(hour=0, minute=0, timezone="UTC"), id="genai_daily_watchdog", misfire_grace_time=3600)`.
+- Manual admin trigger: `POST /api/chat/watchdog/run-now` (now admin-gated — iter234 testing-agent fix).
+
+### Security hotfixes applied in this iteration
+- **GZipMiddleware buffering fix** — global compression was consuming the streaming generator end-to-end (testing-agent HIGH). Subclass exclusion deployed.
+- **Admin gate on `/chat/watchdog/run-now`** — endpoint was unauthenticated (testing-agent MEDIUM = cost/spam vector since each call hits live Gemini + SendGrid). Now requires admin JWT.
+- **Rotated GEMINI_API_KEY** — Google flagged the prior key as leaked (it had been auto-committed to git history). New key fingerprint `***lckYGQ` is in `/app/backend/.env`. **Future env auto-commits are blocked by `.gitignore` line 1041 (`*.env, backend/.env, frontend/.env`).** Historical git commits up to `e6c20c00` still contain the OLD leaked .env values — user should rotate `SENDGRID_API_KEY`, `STRIPE_SECRET_KEY`, `MONGO_URL` defensively and consider a one-time `git filter-repo` (or BFG) to scrub the .env paths from history before the next "Save to GitHub" event.
+
+### Validation
+- Pytest: 42/42 PASS across iter234 (13) + iter233 (7) + feature_patch_v9 (11) + iter231 Google Merchant (11).
+- Live HTTP smoke: diagnostics 200, streaming returns real chunked content ("2 3 5 7 11 13 17 19" from prime prompt + 200-word paragraph in 7 chunks), watchdog full cycle returns `delivery.status=sent, status_code=202` to `charbel911@gmail.com` in ~2.5 s.
+- Testing agent iteration_234.json: backend regression PASS overall, 1 HIGH bug closed (GZip), 1 MEDIUM closed (auth gate).
+
+### Files added/changed (iter234)
+**NEW**: `services/genai_direct_client.py`, `services/genai_streaming_chat.py`, `services/genai_watchdog.py`, `routes/genai_chat.py`, `tests/test_iter234_genai_direct_watchdog.py`.
+**MODIFIED**: `server.py` (router registration + cron + `_ScopedGZipMiddleware`), `requirements.txt` (`google-genai==1.70.0` → `2.6.0`), `backend/.env` (`GEMINI_API_KEY` rotated).
+
+### Key technical takeaways for next agent
+- Two parallel Gemini paths live side-by-side: `services/ai_assistant_v2.py` (litellm + `EMERGENT_LLM_KEY` proxy) is UNTOUCHED; `services/genai_direct_client.py` is the NEW direct SDK path. Do not merge them.
+- The streaming pattern (sync producer in thread + asyncio.Queue + async generator) is correct — do not "simplify" it to `async def` calling SDK directly (will re-block the loop).
+- Watchdog locked recipient is `charbel911@gmail.com` per platform admin rule. Override only via `WATCHDOG_RECIPIENT_EMAIL` env var.
+
+---
+
+
+## Previous: iter233 — PRICE × QUANTITY DISPLAY MULTIPLIER + AUDIT (Feb 26, 2026) ✅
 
 Two-task drop on top of iter232:
 

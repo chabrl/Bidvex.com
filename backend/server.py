@@ -274,7 +274,22 @@ async def api_health():
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=["*"])
 
-app.add_middleware(GZipMiddleware, minimum_size=500)
+# iter234 — GZip must NOT consume StreamingResponse generators end-to-end
+# (it would buffer the full Gemini stream before flushing, killing chunked UX).
+# Subclass to opt-out streaming paths.
+class _ScopedGZipMiddleware(GZipMiddleware):
+    _STREAM_PATH_PREFIXES = ("/api/chat/stream",)
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") == "http":
+            path = scope.get("path", "")
+            if any(path.startswith(p) for p in self._STREAM_PATH_PREFIXES):
+                # Skip compression for streaming routes — preserves chunked transfer.
+                await self.app(scope, receive, send)
+                return
+        await super().__call__(scope, receive, send)
+
+app.add_middleware(_ScopedGZipMiddleware, minimum_size=500)
 _cors_origins_env = os.environ.get("CORS_ORIGINS", "")
 _cors_origins = [o.strip() for o in _cors_origins_env.split(",") if o.strip()] if _cors_origins_env else ["*"]
 app.add_middleware(

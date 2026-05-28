@@ -14,8 +14,9 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, AsyncIterator, Dict, Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 
 from services.genai_direct_client import GEMINI_MODEL_ID
@@ -25,6 +26,7 @@ from services.genai_watchdog import run_daily_watchdog_cycle
 logger = logging.getLogger(__name__)
 
 genai_chat_router = APIRouter(tags=["GenAI Direct Chat"])
+_admin_security = HTTPBearer(auto_error=False)
 
 # Database handle is injected from server.py during lifespan startup.
 _db = None
@@ -141,7 +143,14 @@ async def chat_diagnostics() -> Dict[str, Any]:
 # On-demand admin trigger of the daily watchdog (mainly for the testing agent).
 # ----------------------------------------------------------------------------
 @genai_chat_router.post("/chat/watchdog/run-now")
-async def run_watchdog_now() -> Dict[str, Any]:
+async def run_watchdog_now(
+    credentials: HTTPAuthorizationCredentials = Depends(_admin_security),
+) -> Dict[str, Any]:
+    # iter234 — admin-only trigger (was unauthenticated; flagged by testing agent
+    # as a cost/spam vector since each call hits Gemini + sends an email).
+    from routes.admin import require_admin
+    await require_admin(credentials)
+
     if _db is None:
         raise HTTPException(status_code=503, detail="genai-chat db handle not initialised")
     started = datetime.now(timezone.utc)
