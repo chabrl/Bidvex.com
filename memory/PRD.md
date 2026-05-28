@@ -1,6 +1,46 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: iter234 — DIRECT google-genai (Gemini 2.5 Flash) STREAMING CHAT + 24h WATCHDOG CRON (Feb 26, 2026) ✅
+## Latest: iter236 — 3-MISSION BUNDLE: CARD OVERHAUL + GEO SEARCH + AI LISTING CONTEXT (Feb 28, 2026) ✅
+
+### Mission 1 — Listing card layout overhaul (3-col grid, 200px image, 22px price)
+- `frontend/src/components/FlattenedMarketplace.js` (ItemCard) + `frontend/src/pages/LotsMarketplacePage.js` (lot card) re-tuned per spec: 3-col grid (`xl:grid-cols-3`, gap 12/16/20), `min-h-[420px]`, `rounded-xl` + `shadow-[0_2px_12px_rgba(0,0,0,0.08)]`, hover `-translate-y-[3px]`. Card image fixed at **h-[200px]** with `object-cover`. Body padding 14px/16px. Title 14px/600 + 2-line clamp. Seller + city single line at 12px. Savings pill restyled (`#e6f9f0` / `#1a7a4a`, 11px 600). Price row: 10px/700 uppercase label + **22px / 800** total price + small `CAD` chip (`#e8ecf2` bg). Action row: full-flex **40px gradient Quick Bid** (`linear-gradient(135deg, #2d6be4, #1a4fc4)`) + **40×40 circular Eye/Watch** button (`1.5px solid #e2e8f0`). Empty state on `marketplace-empty-state` with Search icon + reset button.
+- iter233 `price_multiplied_by_quantity` rendering preserved verbatim (testids `card-lot-multiplier-badge`, `card-unit-price-subtext`).
+
+### Mission 2 — Map & radius location search
+- NEW `backend/routes/geo_search.py`:
+  - `GET /api/marketplace/items/geo` with `lat`, `lng`, `radius_km` (default 50), `city`, `category`, `province`, `limit`. `$geoNear` against `listings.location.coordinates` returns docs with `distance_km`. Graceful fallback to case-insensitive city regex when no coords.
+  - `POST /api/marketplace/items/ensure-geo-index` (idempotent admin trigger).
+  - `ensure_2dsphere_index()` registered in `server.py` lifespan on startup.
+- NEW `frontend/src/components/MapSearchPanel.jsx` — 320px collapsible panel, Leaflet/react-leaflet 1.9.4/5.0.0, geolocation → Montreal fallback, debounced radius slider 10→500km step 10 (default 50), draggable click-to-recenter, markers from `/api/marketplace/items/geo`.
+- Toggle button + panel mounted on BOTH `FlattenedMarketplace.js` AND `LotsMarketplacePage.js` (testids: `map-search-toggle-btn`, `map-search-panel`, `map-search-container`, `map-search-radius-slider`, `map-search-info-banner`).
+
+### Mission 3 — BidVex AI core upgrade (Smart Matchmaking + Bidding Insights)
+- NEW `backend/services/chat_listing_context.py` — `build_chat_listing_context(db, listing_id)` returns `{current_viewed_listing, market_comparables}`. Comparables = same category, status ∈ {ended/sold/closed/completed} in last 60 days ranked by `hammer_price DESC` first, then active fallback. Strips `_id`, ISO-stringifies datetimes.
+- `backend/routes/genai_chat.py::StreamChatBody` now accepts `listing_id`. New `_enrich_with_listing_context()` async hook fetches the context BEFORE entering the sync stream and injects it as `### PLATFORM CONTEXT (do not share raw JSON with user) ###\n{json}` into `extra_context`.
+- `backend/services/genai_direct_client.py::WATCHDOG_SYSTEM_INSTRUCTION` — Section 5 appended verbatim (Smart Matchmaking, Bidding Insights with EN/FR framing, Language Compliance). Anti-hallucination + identity locks from iter235 preserved.
+- `frontend/src/components/AIAssistant.js`:
+  - `listingIdForChat` state resolves from URL pattern `/(listing|lots|vehicles|vehicle-auctions|storage-auctions|multi-item-listing|auction|lot|item)/:id`.
+  - Silent priming POST fires on open IF a listing_id is present (chat history is not polluted).
+  - Every `/api/chat/stream` request now forwards `listing_id`.
+
+### Files added/changed
+**Backend NEW**: `routes/geo_search.py`, `services/chat_listing_context.py`, `tests/test_iter236_geo_and_listing_context.py`, `tests/test_iter236_live_http.py` (added by testing agent).
+**Backend MODIFIED**: `routes/genai_chat.py`, `services/genai_direct_client.py`, `server.py`.
+**Frontend NEW**: `components/MapSearchPanel.jsx`.
+**Frontend MODIFIED**: `components/FlattenedMarketplace.js`, `pages/LotsMarketplacePage.js`, `components/AIAssistant.js`.
+**Deps NEW**: `leaflet@1.9.4`, `react-leaflet@5.0.0` (yarn add).
+
+### Validation
+- **Pytest: 52/52 PASS** (10 new iter236 + 13 iter234 + 7 iter233 + 11 v9 + 11 iter231).
+- **Live HTTP: 6/6 PASS** (testing agent run, see `/app/test_reports/iteration_236.json`).
+- **Frontend smoke**: Marketplace renders 3-col layout, map toggle mounts panel + slider + banner, AIAssistant header reads "BidVex AI Core", stream returns chunked content (581 byte arrivals over 249ms — real streaming, iter234 buffering issue functionally resolved at the Transfer-Encoding layer).
+- **iter233 regression**: `price_multiplied_by_quantity` flow locked by unit tests; no DOM regressions on cards that have the flag.
+- **Known preview-only data limitations**: No listings carry `location.coordinates` in seed DB → geo queries correctly return `items: []`. Index + endpoint are ready; the moment a real listing carries the GeoJSON Point it will surface.
+
+---
+
+
+## Previous: iter234 — DIRECT google-genai (Gemini 2.5 Flash) STREAMING CHAT + 24h WATCHDOG CRON (Feb 26, 2026) ✅
 
 Parallel direct google-genai SDK path (v2.6.0) alongside the existing litellm/EMERGENT_LLM_KEY pipeline in `services/ai_assistant_v2.py`. Two parallel features wired off the same client:
 

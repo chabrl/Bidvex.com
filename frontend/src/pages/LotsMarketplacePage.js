@@ -22,15 +22,38 @@ import { LoadingTimeout } from '../components/LoadingTimeout';
 import { SellerAccountBadge } from '../components/PrivateSaleBadge';
 
 import FilterBar from '../components/FilterBar/FilterBar';
+// iter236 Mission 2 — Map & radius search panel on Lots Auction page.
+import MapSearchPanel from '../components/MapSearchPanel';
 
 const API = API_BASE;
 
 const LotsMarketplacePage = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState('grid');
   const [sidebarFilters, setSidebarFilters] = useState({});
+  // iter236 Mission 2 — geo state (mirrors FlattenedMarketplace wiring).
+  const [mapOpen, setMapOpen] = useState(false);
+  const [geoFilter, setGeoFilter] = useState(null);
+  const [geoListings, setGeoListings] = useState(null);
+  const backendUrl = process.env.REACT_APP_BACKEND_URL
+    ? `${process.env.REACT_APP_BACKEND_URL}/api`
+    : '/api';
+
+  useEffect(() => {
+    if (!geoFilter) {
+      setGeoListings(null);
+      return undefined;
+    }
+    const ctrl = new AbortController();
+    const url = `${backendUrl}/marketplace/items/geo?lat=${geoFilter.lat}&lng=${geoFilter.lng}&radius_km=${geoFilter.radius_km}&limit=60`;
+    fetch(url, { signal: ctrl.signal })
+      .then((r) => (r.ok ? r.json() : { items: [] }))
+      .then((d) => setGeoListings(d.items || []))
+      .catch(() => undefined);
+    return () => ctrl.abort();
+  }, [geoFilter, backendUrl]);
 
   // Fetch listings whenever sidebar filters change
   useEffect(() => {
@@ -304,10 +327,33 @@ const LotsMarketplacePage = () => {
               </div>
             </div>
 
+            {/* iter236 Mission 2 — Map search toggle + panel */}
+            <div className="mb-2 flex items-center justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setMapOpen((o) => !o)}
+                className="text-xs"
+                data-testid="map-search-toggle-btn"
+              >
+                <MapPin className="h-3.5 w-3.5 mr-1" />
+                {mapOpen
+                  ? (i18n.language?.startsWith('fr') ? 'Masquer la carte' : 'Hide Map')
+                  : (i18n.language?.startsWith('fr') ? '📍 Recherche par carte' : '📍 Search by Map')}
+              </Button>
+            </div>
+            <MapSearchPanel
+              open={mapOpen}
+              onClose={() => setMapOpen(false)}
+              onGeoChange={setGeoFilter}
+              backendUrl={backendUrl}
+              isFrench={i18n.language?.startsWith('fr')}
+            />
+
             {/* Listings Grid */}
             {loading ? (
               <LoadingTimeout rows={6} variant="cards" />
-            ) : listings.length === 0 ? (
+            ) : (geoListings !== null ? geoListings : listings).length === 0 ? (
               <Card className="p-12 text-center" data-testid="no-results">
                 <Package className="h-16 w-16 mx-auto mb-4" style={{ color: '#9ca3af' }} />
                 <h3 className="text-xl font-semibold mb-2" style={{ color: '#1a1a1a' }}>
@@ -319,10 +365,10 @@ const LotsMarketplacePage = () => {
               </Card>
             ) : (
               <div className={viewMode === 'grid'
-                ? 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4'
+                ? 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 xl:gap-5'
                 : 'flex flex-col gap-4'
-              }>
-                {listings.map(listing => renderListingCard(listing))}
+              } data-testid="lots-results-grid">
+                {(geoListings !== null ? geoListings : listings).map(listing => renderListingCard(listing))}
               </div>
             )}
           </div>
