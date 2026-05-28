@@ -140,3 +140,88 @@ def get_tax_rates_for_currency(currency: str) -> Dict[str, float]:
         return {"tax_rate_gst": 5.0, "tax_rate_qst": 9.975}
     else:
         return {"tax_rate_gst": 0.0, "tax_rate_qst": 0.0}
+
+from typing import Dict, Optional
+
+
+# Locked iter237 city → {lat, lng} table. Lowercase, accent-stripped keys.
+CITY_COORDS: Dict[str, Dict[str, float]] = {
+    "sherbrooke":     {"lat": 45.4042, "lng": -71.8929},
+    "montreal":       {"lat": 45.5017, "lng": -73.5673},
+    "quebec city":    {"lat": 46.8139, "lng": -71.2080},
+    "quebec":         {"lat": 46.8139, "lng": -71.2080},   # alias
+    "laval":          {"lat": 45.6066, "lng": -73.7124},
+    "gatineau":       {"lat": 45.4765, "lng": -75.7013},
+    "longueuil":      {"lat": 45.5315, "lng": -73.5185},
+    "saguenay":       {"lat": 48.4284, "lng": -71.0537},
+    "levis":          {"lat": 46.8032, "lng": -71.1756},
+    "trois-rivieres": {"lat": 46.3432, "lng": -72.5428},
+    "trois rivieres": {"lat": 46.3432, "lng": -72.5428},   # alias (no hyphen)
+    "drummondville":  {"lat": 45.8833, "lng": -72.4833},
+    "saint-jerome":   {"lat": 45.7749, "lng": -74.0001},
+    "saint jerome":   {"lat": 45.7749, "lng": -74.0001},   # alias
+    "granby":         {"lat": 45.4001, "lng": -72.7335},
+    "sorel-tracy":    {"lat": 46.0334, "lng": -73.1168},
+    "sorel tracy":    {"lat": 46.0334, "lng": -73.1168},   # alias
+    "toronto":        {"lat": 43.6532, "lng": -79.3832},
+    "ottawa":         {"lat": 45.4215, "lng": -75.6919},
+    "vancouver":      {"lat": 49.2827, "lng": -123.1207},
+    "calgary":        {"lat": 51.0447, "lng": -114.0719},
+    "edmonton":       {"lat": 53.5461, "lng": -113.4938},
+}
+
+
+def _normalise(city: Optional[str]) -> str:
+    if not city:
+        return ""
+    return (
+        city.strip()
+            .lower()
+            .replace("é", "e").replace("è", "e").replace("ê", "e")
+            .replace("à", "a").replace("â", "a")
+            .replace("ô", "o").replace("ï", "i").replace("î", "i")
+            .replace("ç", "c")
+    )
+
+
+def resolve_city_coords(city: Optional[str]) -> Optional[Dict[str, float]]:
+    """Return {'lat': float, 'lng': float} or None."""
+    key = _normalise(city)
+    return CITY_COORDS.get(key)
+
+
+def build_geo_point(
+    city: Optional[str],
+    *,
+    province: Optional[str] = None,
+) -> Optional[Dict]:
+    """Build a GeoJSON Point payload for the `geo` top-level field.
+
+    Returns:
+      {
+        "type": "Point",
+        "coordinates": [lng, lat],
+        "city": "<original city>",
+        "province": "<original province>" | "",
+      }
+    or None when the city is not in the lookup table — caller should
+    decide whether to write a sentinel `{type: None, coordinates: None}`
+    or skip the field entirely.
+
+    NOTE: iter237 — A separate top-level `geo` field is used (instead of
+    rewriting the existing `location: str` field) so the human-readable
+    address displays elsewhere in the UI remain untouched. The 2dsphere
+    index is on `geo` and all $geoWithin queries target `geo`.
+    """
+    resolved = resolve_city_coords(city)
+    if not resolved:
+        return None
+    return {
+        "type": "Point",
+        "coordinates": [resolved["lng"], resolved["lat"]],
+        "city": (city or "").strip(),
+        "province": (province or "").strip(),
+    }
+
+
+__all__ = ["CITY_COORDS", "resolve_city_coords", "build_geo_point"]

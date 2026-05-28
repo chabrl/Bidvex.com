@@ -414,6 +414,17 @@ async def create_listing(
         getattr(listing_data, "visible_content_tags", None)
     )
 
+    # iter237 — auto-populate GeoJSON Point from the city when known.
+    # The `geo` field is indexed by 2dsphere and consumed by /api/marketplace/items/geo.
+    # Falls back gracefully when the city isn't in the lookup table.
+    try:
+        from utils import build_geo_point
+        _geo = build_geo_point(listing_data.city, province=listing_data.region)
+        if _geo:
+            listing_dict["geo"] = _geo
+    except Exception as _e:  # noqa: BLE001
+        logger.warning(f"[iter237] geo enrichment skipped for new listing: {_e}")
+
     # LEGACY: opc_permit → migrated to dealer_license_* (iter201). Field kept for back-compat.
     # Dealer-certified seller check + buyer-premium rate
     seller_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0, "is_opc_certified": 1})

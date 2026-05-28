@@ -1,6 +1,65 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: iter236 — 3-MISSION BUNDLE: CARD OVERHAUL + GEO SEARCH + AI LISTING CONTEXT (Feb 28, 2026) ✅
+## Latest: iter237 — MAP SEARCH 0-RESULTS BUG: ROOT CAUSE FIX + GEOJSON BACKFILL (Feb 28, 2026) ✅
+
+**Symptom**: Marketplace sidebar showed 5 Sherbrooke listings (text-filter) but the Leaflet map panel returned 0 (geo-filter). All 4 hypothesised root causes diagnosed against the live DB; all applicable fixes shipped.
+
+### Diagnosis matrix
+| Root cause | Verdict | Evidence |
+|---|---|---|
+| **RC-1** — Existing listings have no coordinates | ✅ TRUE | 5/5 Sherbrooke listings had `location` as a STRING (`"Sherbrooke, QC, J1C 0J2"`) with zero geo data. |
+| **RC-2** — Coordinate format mismatch | ✅ TRUE | The `location` field is a *string*, not even a dict — `$set: {"location.type": "Point"}` would have failed. |
+| **RC-3** — 2dsphere index missing | ⚠️ PARTIAL | Old `location.coordinates` 2dsphere index existed but pointed at a path that no document populated. Added a new `geo` 2dsphere index. |
+| **RC-4** — Geo filter replaced instead of combined | ✅ TRUE | iter236 used `$geoNear` aggregation which DOES support `query:` merging, but the new `$geoWithin + $centerSphere` pattern (per spec) makes filter merge explicit and trivial. |
+
+### Schema-collision decision (key call-out for the user)
+The current Pydantic `Listing.location: str` model is consumed by ≥5 UI surfaces (e.g. `MultiItemListingDetailPage:1712`, `ListingsModeration:258`) as a human-readable address. Replacing it with a GeoJSON dict would break those displays. **DEVIATION FROM SPEC LETTER:** the GeoJSON Point is stored under a new top-level `geo` field. The 2dsphere index, `$geoWithin` queries, and frontend marker rendering all target `geo`. The `location: str` field is preserved verbatim. Reads correctly:
+```
+listing = {
+  "city": "Sherbrooke",
+  "location": "Sherbrooke, QC, J1C 0J2",          // string display, untouched
+  "geo": {                                         // NEW iter237 GeoJSON Point
+    "type": "Point",
+    "coordinates": [-71.8929, 45.4042],            // [lng, lat] per GeoJSON
+    "city": "Sherbrooke",
+    "province": "QC"
+  }
+}
+```
+
+### Files added/changed
+**Backend NEW**:
+- `utils.py` (appended `CITY_COORDS`, `resolve_city_coords`, `build_geo_point`)
+- `scripts/backfill_listing_geo.py` (one-time migration — ran successfully, 5 Sherbrooke listings tagged)
+- `tests/test_iter237_geojson_migration_and_geowithin.py` (9 tests)
+
+**Backend MODIFIED**:
+- `routes/geo_search.py` → switched to `$geoWithin + $centerSphere` on `geo` field; merged-not-replaced query builder; `geo.coordinates: {$exists: True, $ne: null}` guard; haversine `distance_km` computed client-side; index ensured on `geo` (sparse+background).
+- `routes/listings.py` → POST endpoint auto-populates `geo` on creation via `build_geo_point(city, province)`.
+
+**Frontend MODIFIED**:
+- `components/MapSearchPanel.jsx` → reads `m.geo.coordinates` (NOT `m.location.coordinates`); GeoJSON `[lng, lat]` reversed to Leaflet `[lat, lng]` per Fix 5a; null-guard per Fix 5b; new `<FitToBounds>` inner component auto-zooms to all returned markers per Fix 5c.
+- `components/FlattenedMarketplace.js` + `pages/LotsMarketplacePage.js` → `React.lazy` import of MapSearchPanel + local `<React.Suspense>` boundary so Leaflet's chunk never enters the marketplace's critical render path.
+- `pages/AdminDashboard.js:214` → removed unrecognised `// eslint-disable-next-line react-hooks/exhaustive-deps` comment that was breaking CRA compile (uncovered when restarting after iter237 — pre-existing latent bug).
+
+### Live verification
+- ✅ `GET /api/marketplace/items/geo?lat=45.4042&lng=-71.8929&radius_km=50` → **total=5**, all Sherbrooke listings, ordered by `distance_km`.
+- ✅ Mongo doc shape verified: `geo: {type: "Point", coordinates: [-71.8929, 45.4042], city, province}`.
+- ✅ All marketplace screenshots render the 3-col grid + "Hide Map" toggle + lazy-loaded Leaflet panel.
+- ✅ Pytest: **61/61 PASS** (9 new iter237 + 10 iter236 + 13 iter234 + 7 iter233 + 11 v9 + 11 iter231).
+- ✅ All API routes still 200 across `/api/categories`, `/api/marketplace/items`, `/api/marketplace/items/geo`, `/api/chat/diagnostics`.
+
+### Production migration step for the user
+The `geo` backfill ran against the **PREVIEW** Atlas cluster. To get production live the user needs to run the same script against the **production** DB after the next deploy:
+```
+cd /app/backend && python scripts/backfill_listing_geo.py
+```
+(Or — since preview & production share the same Atlas cluster in this setup — the production data is already migrated. Confirm by curl-ing `https://bidvex.com/api/marketplace/items/geo?lat=45.4042&lng=-71.8929&radius_km=50` after redeploy.)
+
+---
+
+
+## Previous: iter236 — 3-MISSION BUNDLE: CARD OVERHAUL + GEO SEARCH + AI LISTING CONTEXT (Feb 28, 2026) ✅
 
 ### Mission 1 — Listing card layout overhaul (3-col grid, 200px image, 22px price)
 - `frontend/src/components/FlattenedMarketplace.js` (ItemCard) + `frontend/src/pages/LotsMarketplacePage.js` (lot card) re-tuned per spec: 3-col grid (`xl:grid-cols-3`, gap 12/16/20), `min-h-[420px]`, `rounded-xl` + `shadow-[0_2px_12px_rgba(0,0,0,0.08)]`, hover `-translate-y-[3px]`. Card image fixed at **h-[200px]** with `object-cover`. Body padding 14px/16px. Title 14px/600 + 2-line clamp. Seller + city single line at 12px. Savings pill restyled (`#e6f9f0` / `#1a7a4a`, 11px 600). Price row: 10px/700 uppercase label + **22px / 800** total price + small `CAD` chip (`#e8ecf2` bg). Action row: full-flex **40px gradient Quick Bid** (`linear-gradient(135deg, #2d6be4, #1a4fc4)`) + **40×40 circular Eye/Watch** button (`1.5px solid #e2e8f0`). Empty state on `marketplace-empty-state` with Search icon + reset button.

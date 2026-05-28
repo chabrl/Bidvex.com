@@ -28,6 +28,7 @@ import {
   Circle,
   Popup,
   useMapEvents,
+  useMap,
 } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -49,6 +50,27 @@ function ClickToRecenter({ setCenter }) {
       setCenter([e.latlng.lat, e.latlng.lng]);
     },
   });
+  return null;
+}
+
+// iter237 Fix 5c — When the marker list changes, auto-fit the map to
+// include every blue pin so users immediately see all returned listings.
+function FitToBounds({ markers, center }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!map) return;
+    const coords = markers
+      .filter((m) => m?.geo?.coordinates?.length === 2)
+      .map((m) => [m.geo.coordinates[1], m.geo.coordinates[0]]); // [lat, lng]
+    if (coords.length === 0) return;
+    // Also include the search center so the user's anchor stays in view.
+    coords.push(center);
+    try {
+      map.fitBounds(coords, { padding: [40, 40], maxZoom: 12 });
+    } catch {
+      /* noop — bounds can be invalid on first frame */
+    }
+  }, [markers, center, map]);
   return null;
 }
 
@@ -87,7 +109,8 @@ const MapSearchPanel = ({
         const url = `${backendUrl}/marketplace/items/geo?lat=${filter.lat}&lng=${filter.lng}&radius_km=${filter.radius_km}&limit=60`;
         fetch(url)
           .then((r) => r.ok ? r.json() : { items: [] })
-          .then((d) => setMarkers((d.items || []).filter((it) => it?.location?.coordinates?.length === 2)))
+          // iter237 — markers now read from the GeoJSON `geo` field.
+          .then((d) => setMarkers((d.items || []).filter((it) => it?.geo?.coordinates?.length === 2)))
           .catch(() => setMarkers([]));
       }
     }, 400);
@@ -143,6 +166,7 @@ const MapSearchPanel = ({
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           <ClickToRecenter setCenter={setCenter} />
+          <FitToBounds markers={markers} center={center} />
           <Circle
             center={center}
             radius={radiusKm * 1000}
@@ -154,18 +178,21 @@ const MapSearchPanel = ({
               {center[0].toFixed(4)}, {center[1].toFixed(4)}
             </Popup>
           </Marker>
-          {markers.map((m) => (
-            <Marker
-              key={m.id}
-              position={[m.location.coordinates[1], m.location.coordinates[0]]}
-            >
-              <Popup>
-                <strong>{m.title}</strong><br />
-                {isFrench ? 'Offre actuelle' : 'Current bid'}: {m.current_price || m.starting_price || 0} {m.currency || 'CAD'}<br />
-                <a href={`/listing/${m.id}`}>{isFrench ? 'Voir l\'annonce' : 'View Listing'}</a>
-              </Popup>
-            </Marker>
-          ))}
+          {markers
+            .filter((m) => m?.geo?.coordinates?.length === 2 && m.geo.coordinates[0] !== null)
+            .map((m) => (
+              <Marker
+                key={m.id}
+                // iter237 — GeoJSON is [lng, lat]; Leaflet expects [lat, lng].
+                position={[m.geo.coordinates[1], m.geo.coordinates[0]]}
+              >
+                <Popup>
+                  <strong>{m.title}</strong><br />
+                  {isFrench ? 'Offre actuelle' : 'Current bid'}: {m.current_price || m.starting_price || 0} {m.currency || 'CAD'}<br />
+                  <a href={`/listing/${m.id}`}>{isFrench ? "Voir l'annonce" : 'View Listing →'}</a>
+                </Popup>
+              </Marker>
+            ))}
         </MapContainer>
       </div>
 

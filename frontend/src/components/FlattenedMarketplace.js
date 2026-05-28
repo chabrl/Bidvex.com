@@ -43,8 +43,9 @@ import { formatCurrency } from '../utils/currencyFormatter';
 import { computeDisplayPrice } from '../utils/priceUtils';
 import { SellerAccountBadge } from './PrivateSaleBadge';
 import { getLocalized } from '../utils/localization';
-// iter236 Mission 2 — Map & radius search panel (lazy-loadable but cheap).
-import MapSearchPanel from './MapSearchPanel';
+// iter236 Mission 2 — Map & radius search panel (lazy-loaded so Leaflet
+// CSS/JS doesn't enter the marketplace's critical render path).
+const MapSearchPanel = React.lazy(() => import('./MapSearchPanel'));
 import { useCategories } from '../hooks/useCategories';
 import { useMarketplaceItems } from '../hooks/useMarketplaceItems';
 import { SellerRatingInline } from './SellerReputation';
@@ -380,14 +381,17 @@ const FlattenedMarketplace = ({
             : (i18n.language?.startsWith('fr') ? '📍 Recherche par carte' : '📍 Search by Map')}
         </Button>
       </div>
-      <MapSearchPanel
-        open={mapOpen}
-        onClose={() => setMapOpen(false)}
-        onGeoChange={setGeoFilter}
-        backendUrl={backendUrl}
-        isFrench={i18n.language?.startsWith('fr')}
-      />
-
+      {mapOpen && (
+        <React.Suspense fallback={<div className="w-full mb-4 p-4 text-center text-xs text-slate-500">Loading map…</div>}>
+          <MapSearchPanel
+            open={mapOpen}
+            onClose={() => setMapOpen(false)}
+            onGeoChange={setGeoFilter}
+            backendUrl={backendUrl}
+            isFrench={i18n.language?.startsWith('fr')}
+          />
+        </React.Suspense>
+      )}
       {/* Items Grid — iter220 Task 2: matches VehicleAuctionsPage breakpoints
           (sm:2 / lg:3 / xl:4) so wider workspaces (≥1280px) get 4 columns
           and tablets get 2 instead of jumping straight to 3. */}

@@ -22,8 +22,9 @@ import { LoadingTimeout } from '../components/LoadingTimeout';
 import { SellerAccountBadge } from '../components/PrivateSaleBadge';
 
 import FilterBar from '../components/FilterBar/FilterBar';
-// iter236 Mission 2 — Map & radius search panel on Lots Auction page.
-import MapSearchPanel from '../components/MapSearchPanel';
+// iter236 Mission 2 — Map & radius search panel (lazy so Leaflet's chunk
+// only loads when the user actually clicks "Search by Map").
+const MapSearchPanel = React.lazy(() => import('../components/MapSearchPanel'));
 
 const API = API_BASE;
 
@@ -342,13 +343,17 @@ const LotsMarketplacePage = () => {
                   : (i18n.language?.startsWith('fr') ? '📍 Recherche par carte' : '📍 Search by Map')}
               </Button>
             </div>
-            <MapSearchPanel
-              open={mapOpen}
-              onClose={() => setMapOpen(false)}
-              onGeoChange={setGeoFilter}
-              backendUrl={backendUrl}
-              isFrench={i18n.language?.startsWith('fr')}
-            />
+            <React.Suspense fallback={<div className="w-full mb-4 p-4 text-center text-xs text-slate-500">Loading map…</div>}>
+              {mapOpen && (
+                <MapSearchPanel
+                  open={mapOpen}
+                  onClose={() => setMapOpen(false)}
+                  onGeoChange={setGeoFilter}
+                  backendUrl={backendUrl}
+                  isFrench={i18n.language?.startsWith('fr')}
+                />
+              )}
+            </React.Suspense>
 
             {/* Listings Grid */}
             {loading ? (

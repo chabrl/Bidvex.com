@@ -211,7 +211,6 @@ const AdminDashboard = () => {
       if (inferredPrimary) setPrimaryTab(inferredPrimary);
       setSecondaryTab(tab);
     } catch { /* noop */ }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   
   // Live Controls State
