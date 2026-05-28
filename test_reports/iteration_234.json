@@ -1,0 +1,51 @@
+{
+  "summary": "iter234 backend regression PASS overall, with 1 confirmed P1 streaming bug. Unit suite: 13/13 PASS. Regression suites (iter233 + feature_patch_v9 + iter220 + iter231): 35/35 PASS. Live HTTP probes: 6/8 PASS — diagnostics live, watchdog full cycle delivers (charbel911@gmail.com, stats covers all 6 collections), existing /api/ai-chat/message path uninjured, 422 validation works, GET/POST/extra_context streams all return content. FAILURES (both root-caused to the same issue): (1) X-Accel-Buffering response header is missing on the public URL — present at uvicorn (localhost:8001) but stripped at the Cloudflare/ingress layer; (2) two concurrent /api/chat/stream requests do NOT overlap in time. RCA: the global GZipMiddleware in server.py:277 is wrapping the StreamingResponse and buffering the ENTIRE generator before flushing — confirmed by local probe showing num_chunks=1 with content-encoding=gzip on a multi-line prompt. The endpoint returns data, but it is NOT actually streaming chunk-by-chunk; it is one-shot buffered. This breaks the real-time UX promise of /api/chat/stream and the iter234 spec line: 'streaming endpoint never blocks ... send TWO concurrent requests and verify both stream concurrently'.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "POST/GET /api/chat/stream",
+        "issue": "StreamingResponse is being buffered end-to-end by GZipMiddleware (server.py line 277, `app.add_middleware(GZipMiddleware, minimum_size=500)`). Localhost probe with a 20-line prime list prompt returned num_chunks=1 after 2.34s with content-encoding=gzip — no real-time chunking. Concurrent test confirmed: streams do not overlap. The endpoint functionally returns Gemini text, but the streaming contract is broken.",
+        "priority": "HIGH"
+      },
+      {
+        "endpoint": "POST/GET /api/chat/stream",
+        "issue": "X-Accel-Buffering: no header set by route is present at uvicorn (localhost:8001) but STRIPPED by the Cloudflare/ingress layer on the public URL. Less impactful than the gzip bug but is the second buffering vector noted by the user.",
+        "priority": "MEDIUM"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter234_genai_direct_watchdog.py",
+    "/app/backend/tests/test_iter234_live_http.py",
+    "/app/test_reports/pytest/iter234_results.xml",
+    "/app/test_reports/pytest/iter234_regression.xml",
+    "/app/test_reports/pytest/iter234_live.xml"
+  ],
+  "action_items": [
+    "Exclude /api/chat/stream from GZipMiddleware. Two clean options: (a) Replace the global add_middleware with a custom ASGI wrapper that skips paths starting with /api/chat/stream, or (b) Subclass GZipMiddleware and override `__call__` to short-circuit when scope['path'].startswith('/api/chat/stream'), or (c) Move the GZipMiddleware to a `Mount` that excludes /api/chat. Without this, the streaming endpoint will keep returning one-shot buffered responses regardless of route headers.",
+    "(Lower priority) Investigate why ingress strips `X-Accel-Buffering: no` — present at uvicorn, absent on the public URL. Likely needs to be re-emitted as a Cache-Control directive that Cloudflare honours, or the platform needs a streaming-route allowlist. Even after gzip exclusion, this header strip will still allow proxy buffering.",
+    "After both fixes: re-run /app/backend/tests/test_iter234_live_http.py — the two failing tests should flip to PASS."
+  ],
+  "critical_code_review_comments": [
+    "services/genai_direct_client.py: clean. Lazy singleton + key fingerprint rotation is correct; system instruction and ThinkingConfig(thinking_budget=-1) + GoogleSearch tool are locked as specified.",
+    "services/genai_streaming_chat.py + routes/genai_chat.py: producer→queue→async-yield bridge is correct in isolation. The functional streaming behaviour is being killed downstream by GZipMiddleware, not by this code.",
+    "routes/genai_chat.py:144 — /api/chat/watchdog/run-now is currently UNAUTHENTICATED. Anyone hitting the URL can trigger a watchdog run + email + Gemini call (= cost + spam vector). Recommend gating behind admin auth before going live (the curl probe in this test run executed it successfully with no credentials).",
+    "server.py line 277 `app.add_middleware(GZipMiddleware, minimum_size=500)` — global compression on a stack that now hosts a streaming endpoint is a known-bad pairing. Needs scoped exclusion."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter234_live_http.py (NEW — live HTTP probe suite)"
+  ],
+  "success_rate": {
+    "backend_unit": "100% (13/13)",
+    "backend_regression": "100% (35/35)",
+    "backend_live_http": "75% (6/8)"
+  },
+  "test_credentials": "Not exercised — none of the iter234 endpoints required auth on this test pass (see admin-gating note in code review).",
+  "seed_data_creation": "None.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "After main agent excludes /api/chat/stream from GZipMiddleware, re-run only tests/test_iter234_live_http.py. The two tests to watch are test_post_chat_stream_returns_chunks (asserts X-Accel-Buffering header AND non-buffered chunks) and test_two_concurrent_streams_overlap. Other 6 live tests are stable. The 13-test unit suite is offline-safe and remains the regression anchor.",
+  "rca_of_the_issue": "Root cause: starlette GZipMiddleware applied globally (server.py:277) consumes the StreamingResponse generator to completion before compressing+flushing, defeating chunked transfer. Reproduction: `curl -N -X POST http://localhost:8001/api/chat/stream -H 'Content-Type: application/json' -d '{\"message\":\"List 20 prime numbers\",\"google_search\":false}'` — response arrives as one gzip blob after Gemini finishes, not progressively. Mitigation: scope GZipMiddleware to exclude /api/chat/stream paths (custom dispatcher or path check inside a subclassed middleware). After that, the producer/queue bridge in routes/genai_chat.py:_stream will flush real chunks."
+}
