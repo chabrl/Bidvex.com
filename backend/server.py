@@ -123,6 +123,24 @@ async def lifespan(app):
     except Exception as e:
         logger.warning(f"Email automation registration failed (non-fatal): {e}")
 
+    # iter234 — Daily Watchdog: pull 24h MongoDB logs → Gemini 2.5 Flash analysis
+    # → SendGrid email to charbel911@gmail.com. Runs at 00:00 UTC every day.
+    try:
+        from apscheduler.triggers.cron import CronTrigger
+        from services.genai_watchdog import run_daily_watchdog_cycle
+
+        scheduler.add_job(
+            run_daily_watchdog_cycle,
+            CronTrigger(hour=0, minute=0, timezone="UTC"),
+            kwargs={"db": db},
+            id="genai_daily_watchdog",
+            replace_existing=True,
+            misfire_grace_time=3600,  # tolerate up to 1h scheduler downtime
+        )
+        logger.info("iter234 — Daily GenAI Watchdog cron registered (00:00 UTC)")
+    except Exception as e:
+        logger.warning(f"GenAI Watchdog cron registration failed (non-fatal): {e}")
+
     try:
         from lifecycle import (
             log_db_status, prewarm_caches, init_cloud_storage,
@@ -641,6 +659,8 @@ try:
     SELF_CONTAINED_ROUTERS = [
         ("routes.team", "team_router", "set_team_db", True),  # True = app-level
         ("routes.ai_chat", "ai_chat_router", "set_ai_chat_db", False),
+        # iter234 — Direct google-genai (Gemini 2.5 Flash) streaming chat + watchdog
+        ("routes.genai_chat", "genai_chat_router", "set_genai_chat_db", False),
         ("routes.fees", "fees_router", None, False),
         ("routes.notifications", "notifications_router", None, False),
         ("routes.watchlist", "watchlist_router", None, False),
