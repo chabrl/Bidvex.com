@@ -39,7 +39,7 @@ const AIAssistant = () => {
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
-      content: 'Welcome to BidVex! I am your Master Concierge, here to provide exceptional service. How may I assist you today?',
+      content: 'Welcome to BidVex! I am the BidVex AI Core, here to help with bidding, account questions, and platform guidance. How may I assist you today?',
       rich_content: null,
     },
   ]);
@@ -149,9 +149,8 @@ const AIAssistant = () => {
 
   useEffect(() => { scrollToBottom(); }, [messages]);
 
-  // iter211 — Self-heal degraded banner. Every 20s while in degraded state,
-  // ping the cheap diagnostic / messages-as-no-op endpoint and clear the
-  // banner if the service is actually responsive. Stops polling when healthy.
+  // iter235 — Self-heal degraded banner using the lightweight diagnostics
+  // endpoint of the new streaming chat path (no LLM call, no cost).
   useEffect(() => {
     if (!serviceDegraded || !isOpen) return undefined;
     let cancelled = false;
@@ -159,16 +158,14 @@ const AIAssistant = () => {
       try {
         const ctrl = new AbortController();
         const tid = setTimeout(() => ctrl.abort(), 6000);
-        const res = await fetch(`${backendUrl}/ai-chat/message`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+        const res = await fetch(`${backendUrl}/chat/diagnostics`, {
+          method: 'GET',
           signal: ctrl.signal,
-          body: JSON.stringify({ message: 'ping', language: 'en' }),
         });
         clearTimeout(tid);
         if (!cancelled && res.ok) {
           const data = await res.json().catch(() => null);
-          if (data && data.success !== false) setServiceDegraded(false);
+          if (data && data.gemini_api_key_present) setServiceDegraded(false);
         }
       } catch {
         // still degraded; loop again
@@ -314,59 +311,104 @@ const AIAssistant = () => {
     if (serviceDegraded) setServiceDegraded(false);
 
     const buildBody = () => JSON.stringify({
+      // iter235 — Direct google-genai streaming endpoint (/api/chat/stream)
+      // expects { message, extra_context, google_search }. Pass recent chat
+      // history + UI language as runtime context so the server can ground
+      // the response without changing the locked system instruction.
       message: userMessage,
-      chat_history: messages.slice(-10).map((m) => ({ role: m.role, content: m.content })),
-      language: lang,
+      google_search: true,
+      extra_context: [
+        `Active UI language: ${lang === 'fr' ? 'French (fr)' : 'English (en)'}.`,
+        'Recent conversation (most recent last):',
+        ...messages.slice(-10).map((m) => `- ${m.role}: ${(m.content || '').slice(0, 280)}`),
+      ].join('\n'),
     });
 
-    // iter211 — retry once on transient failure
-    const tryOnce = async (timeoutMs) => {
+    // iter235 — Streaming reader. Reads UTF-8 chunks from /api/chat/stream and
+    // progressively appends them to the assistant message. The ack message is
+    // converted in-place into the live streaming message as soon as the first
+    // chunk arrives so the user sees the "typing" effect immediately.
+    const streamOnce = async (timeoutMs) => {
       const headers = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
       const ctrl = new AbortController();
       const tid = setTimeout(() => ctrl.abort(), timeoutMs);
+      let assembled = '';
+      let convertedAck = false;
       try {
-        const res = await fetch(`${backendUrl}/ai-chat/message`, {
+        const res = await fetch(`${backendUrl}/chat/stream`, {
           method: 'POST', headers, signal: ctrl.signal, body: buildBody(),
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        if (data && data.success === false) throw new Error(data.error || 'LLM unavailable');
-        return data;
+        if (!res.body) throw new Error('No response body (streaming unsupported)');
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          const piece = decoder.decode(value, { stream: true });
+          if (!piece) continue;
+          assembled += piece;
+          // Replace the "searching…" ack on first real chunk; thereafter
+          // mutate the existing streaming bubble in place.
+          if (!convertedAck) {
+            convertedAck = true;
+            setMessages((prev) => {
+              const out = prev.filter((m) => !(m.ack && m.ackId === ackId));
+              return [
+                ...out,
+                { role: 'assistant', content: assembled, rich_content: null, streaming: true, streamId: ackId },
+              ];
+            });
+          } else {
+            setMessages((prev) => prev.map((m) =>
+              m.streamId === ackId ? { ...m, content: assembled } : m
+            ));
+          }
+        }
+        // Flush trailing decoder bytes
+        const tail = decoder.decode();
+        if (tail) {
+          assembled += tail;
+          setMessages((prev) => prev.map((m) =>
+            m.streamId === ackId ? { ...m, content: assembled } : m
+          ));
+        }
+        if (!assembled.trim()) throw new Error('empty stream');
+        return assembled;
       } finally {
         clearTimeout(tid);
       }
     };
 
     try {
-      let data;
+      let assembled;
       try {
-        data = await tryOnce(20000);
+        assembled = await streamOnce(45000);
       } catch (firstErr) {
         // eslint-disable-next-line no-console
-        console.warn('[AIAssistant] first attempt failed, retrying once:', firstErr?.message);
+        console.warn('[AIAssistant] first stream attempt failed, retrying once:', firstErr?.message);
         await new Promise((r) => setTimeout(r, 800));
-        data = await tryOnce(25000);
+        // Remove the partial (failed) streaming bubble before retrying.
+        setMessages((prev) => prev.filter((m) => m.streamId !== ackId));
+        assembled = await streamOnce(60000);
       }
       clearTimeout(stillProcessingTimer);
       setServiceDegraded(false);
-      // Replace the ack message with the real response (so we don't keep two)
-      setMessages((prev) => {
-        const out = prev.filter((m) => !(m.ack && m.ackId === ackId));
-        return [
-          ...out,
-          { role: 'assistant', content: data.message, rich_content: data.rich_content },
-        ];
-      });
-      // Fire multi-channel notification
-      fireResponseNotification(data.message, isFr);
+      // Finalize the streaming bubble (drop the streaming flag).
+      setMessages((prev) => prev.map((m) =>
+        m.streamId === ackId ? { ...m, streaming: false, streamId: undefined } : m
+      ));
+      fireResponseNotification(assembled, isFr);
     } catch (e) {
       // eslint-disable-next-line no-console
       console.error('[AIAssistant] both attempts failed:', e?.message);
       clearTimeout(stillProcessingTimer);
       setServiceDegraded(true);
       setMessages((prev) => {
-        const out = prev.filter((m) => !(m.ack && m.ackId === ackId));
+        // iter235 — also drop any partial streaming bubble produced by a failed retry.
+        const out = prev.filter((m) => !(m.ack && m.ackId === ackId) && m.streamId !== ackId);
         return [
           ...out,
           {
@@ -432,7 +474,7 @@ const AIAssistant = () => {
             touchAction: 'none',
           }}
           data-testid="ai-assistant-btn"
-          aria-label="Open BidVex Master Concierge — drag to reposition"
+          aria-label="Open BidVex AI Core — drag to reposition"
           title="Tap to chat. Drag to reposition."
         >
           <MessageCircle className="h-7 w-7 pointer-events-none" />
@@ -471,7 +513,7 @@ const AIAssistant = () => {
             {/* Header */}
             <div className="p-4 flex justify-between items-center bg-gradient-to-br from-[#1E3A8A] to-[#06B6D4] text-white flex-shrink-0">
               <div>
-                <h3 className="font-bold text-lg text-white">BidVex Master Concierge</h3>
+                <h3 className="font-bold text-lg text-white">BidVex AI Core</h3>
                 <p className="text-xs text-white/90">Your Luxury Auction Specialist</p>
               </div>
               <Button
