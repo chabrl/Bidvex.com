@@ -80,6 +80,10 @@ const MapSearchPanel = ({
   onGeoChange,
   backendUrl,
   isFrench = false,
+  // iter239 — Active filter context so the map markers stay in sync
+  // with whatever the FilterBar has selected in the grid below.
+  category = '',
+  province = '',
 }) => {
   const [center, setCenter] = useState(MONTREAL_CENTER);
   const [radiusKm, setRadiusKm] = useState(50);
@@ -106,7 +110,15 @@ const MapSearchPanel = ({
       try { onGeoChange && onGeoChange(filter); } catch { /* noop */ }
       // Fetch markers for the map overlay (capped at 60).
       if (backendUrl) {
-        const url = `${backendUrl}/marketplace/items/geo?lat=${filter.lat}&lng=${filter.lng}&radius_km=${filter.radius_km}&limit=60`;
+        const params = new URLSearchParams({
+          lat: String(filter.lat),
+          lng: String(filter.lng),
+          radius_km: String(filter.radius_km),
+          limit: '60',
+        });
+        if (category) params.set('category', category);
+        if (province) params.set('province', province);
+        const url = `${backendUrl}/marketplace/items/geo?${params.toString()}`;
         fetch(url)
           .then((r) => r.ok ? r.json() : { items: [] })
           // iter237 — markers now read from the GeoJSON `geo` field.
@@ -115,7 +127,7 @@ const MapSearchPanel = ({
       }
     }, 400);
     return () => debouncedRef.current && clearTimeout(debouncedRef.current);
-  }, [center, radiusKm, open, onGeoChange, backendUrl]);
+  }, [center, radiusKm, open, onGeoChange, backendUrl, category, province]);
 
   // Cleanup geo filter when panel closes.
   useEffect(() => {

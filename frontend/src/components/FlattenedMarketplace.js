@@ -209,13 +209,23 @@ const FlattenedMarketplace = ({
       return undefined;
     }
     const ctrl = new AbortController();
-    const url = `${BACKEND_URL}/marketplace/items/geo?lat=${geoFilter.lat}&lng=${geoFilter.lng}&radius_km=${geoFilter.radius_km}&limit=60`;
+    // iter239 — Sync the geo fetch with the active category & province
+    // filters so the map results honor what's selected in the FilterBar.
+    const params = new URLSearchParams({
+      lat: String(geoFilter.lat),
+      lng: String(geoFilter.lng),
+      radius_km: String(geoFilter.radius_km),
+      limit: '60',
+    });
+    if (debouncedFilters.category) params.set('category', debouncedFilters.category);
+    if (debouncedFilters.province) params.set('province', debouncedFilters.province);
+    const url = `${BACKEND_URL}/marketplace/items/geo?${params.toString()}`;
     fetch(url, { signal: ctrl.signal })
       .then((r) => (r.ok ? r.json() : { items: [] }))
       .then((d) => setGeoItems(d.items || []))
       .catch(() => undefined);
     return () => ctrl.abort();
-  }, [geoFilter]);
+  }, [geoFilter, debouncedFilters.category, debouncedFilters.province]);
 
   // Flatten pages into a single items array
   const allItems = (marketplaceData?.pages ?? []).flatMap((page) => page.items ?? []);
@@ -420,6 +430,10 @@ const FlattenedMarketplace = ({
             onGeoChange={setGeoFilter}
             backendUrl={BACKEND_URL}
             isFrench={i18n.language?.startsWith('fr')}
+            // iter239 — Sync the map marker overlay with active filters
+            // so the dots on the map mirror what's in the grid below.
+            category={debouncedFilters.category || ''}
+            province={debouncedFilters.province || ''}
           />
         </React.Suspense>
       )}
