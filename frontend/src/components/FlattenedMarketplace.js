@@ -45,6 +45,8 @@ import { SellerAccountBadge } from './PrivateSaleBadge';
 import { getLocalized } from '../utils/localization';
 // iter238 Mission 1.3 — Dismissible location banner shown for signed-in users without a city on file.
 import LocationBanner from './LocationBanner';
+// iter239 Mission 5 — Featured Listings carousel banner.
+import FeaturedListingsBanner from './FeaturedListingsBanner';
 // iter236 Mission 2 — Map & radius search panel (lazy-loaded so Leaflet
 // CSS/JS doesn't enter the marketplace's critical render path).
 const MapSearchPanel = React.lazy(() => import('./MapSearchPanel'));
@@ -181,9 +183,24 @@ const FlattenedMarketplace = ({
   const [geoFilter, setGeoFilter] = useState(null); // {lat,lng,radius_km} | null
   const [geoItems, setGeoItems] = useState(null);   // null = pass-through
 
+  // iter239 Mission 5 — Inline promoted-card injection at grid indices 3,8,18,28…
+  const [promotedInline, setPromotedInline] = useState([]);
+
+  // Positions in the grid where we splice a promoted card.
+  const PROMO_SLOTS = [3, 8, 18, 28, 38];
+
   const backendUrl = process.env.REACT_APP_BACKEND_URL
     ? `${process.env.REACT_APP_BACKEND_URL}/api`
     : '/api';
+
+  useEffect(() => {
+    const ctrl = new AbortController();
+    fetch(`${backendUrl}/promoted-listings?section=marketplace&limit=10`, { signal: ctrl.signal })
+      .then((r) => (r.ok ? r.json() : { items: [] }))
+      .then((d) => setPromotedInline(Array.isArray(d.items) ? d.items : []))
+      .catch(() => setPromotedInline([]));
+    return () => ctrl.abort();
+  }, [backendUrl]);
 
   useEffect(() => {
     if (!geoFilter) {
@@ -316,6 +333,9 @@ const FlattenedMarketplace = ({
       {/* iter238 Mission 1.3 — Dismissible location banner for users without a city on file. */}
       <LocationBanner />
 
+      {/* iter239 Mission 5 — Featured Listings horizontal snap-scroll carousel. */}
+      <FeaturedListingsBanner section="marketplace" limit={8} />
+
       {/* Header */}
       {showHeader && (
         <div className="mb-6">
@@ -371,40 +391,10 @@ const FlattenedMarketplace = ({
         </div>
       )}
 
-      {/* iter238 Mission 3.2 — Redesigned 5-pill quick filters (single-select). */}
-      <div className="mb-3 flex flex-wrap gap-2" data-testid="marketplace-quick-pills">
-        {[
-          { id: 'private_sales',   label: '🏷️ Private Sales',    fr: '🏷️ Ventes privées',     param: 'listing_type', value: 'private_sale' },
-          { id: 'verified_seller', label: '✅ Verified Seller',   fr: '✅ Vendeur vérifié',    param: 'seller_verified', value: 'true' },
-          { id: 'partners',        label: '🤝 Partners',          fr: '🤝 Partenaires',        param: 'seller_type',  value: 'partner' },
-          { id: 'lots_auction',    label: '📦 Lots Auction',      fr: '📦 Vente aux enchères', param: 'listing_type', value: 'lot_auction' },
-          { id: 'no_taxes',        label: '🔔 No Taxes',          fr: '🔔 Sans taxes',         param: 'no_tax',       value: 'true' },
-        ].map((pill) => {
-          const active = filters.quick_pill === pill.id;
-          return (
-            <button
-              key={pill.id}
-              type="button"
-              onClick={() => {
-                // iter238 — single-select toggle: clicking active deselects.
-                if (active) {
-                  setFilters((f) => {
-                    const next = { ...f, quick_pill: '' };
-                    delete next[pill.param];
-                    return next;
-                  });
-                } else {
-                  setFilters((f) => ({ ...f, quick_pill: pill.id, [pill.param]: pill.value }));
-                }
-              }}
-              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-150 border-[1.5px] ${active ? 'bg-[#2d6be4] text-white border-[#2d6be4]' : 'bg-white text-[#4a5568] border-[#e2e8f0] hover:border-[#2d6be4]'}`}
-              data-testid={`quick-pill-${pill.id}`}
-            >
-              {i18n.language?.startsWith('fr') ? pill.fr : pill.label}
-            </button>
-          );
-        })}
-      </div>
+      {/* iter239 — Duplicate quick-pill row removed. The 4 official pills
+          (Private Sales / Verified Seller / Partners / Lots Auction) are
+          now rendered exclusively by FilterBar above. No-Taxes pill
+          deprecated per user spec. */}
 
       {/* iter236 Mission 2 — Map search toggle + panel */}
       <div className="mb-2 flex items-center justify-end">
@@ -469,17 +459,44 @@ const FlattenedMarketplace = ({
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 xl:gap-5" data-testid="marketplace-results-grid">
-          {items.map((item) => (
-            <ItemCard 
-              key={item.id} 
-              item={item} 
-              onQuickBid={openQuickBid}
-              trackClick={trackClick}
-              isComparing={compareIds.includes(item.id)}
-              onToggleCompare={toggleCompare}
-              sellerRep={sellerReps[item.seller_id]}
-            />
-          ))}
+          {(() => {
+            // iter239 Mission 5 — Splice promoted listings into the grid at
+            // PROMO_SLOTS (3, 8, 18, 28, 38). Skips promos that are already
+            // present in `items` to avoid duplicate rendering.
+            const visibleIds = new Set(items.map((i) => i.id));
+            const promoQueue = promotedInline.filter((p) => !visibleIds.has(p.id));
+            const out = [];
+            let pIdx = 0;
+            items.forEach((item, idx) => {
+              if (PROMO_SLOTS.includes(idx) && pIdx < promoQueue.length) {
+                const promo = promoQueue[pIdx];
+                pIdx += 1;
+                out.push(
+                  <ItemCard
+                    key={`promo-${promo.id}`}
+                    item={{ ...promo, _is_promoted_inline: true }}
+                    onQuickBid={openQuickBid}
+                    trackClick={trackClick}
+                    isComparing={compareIds.includes(promo.id)}
+                    onToggleCompare={toggleCompare}
+                    sellerRep={sellerReps[promo.seller_id]}
+                  />
+                );
+              }
+              out.push(
+                <ItemCard
+                  key={item.id}
+                  item={item}
+                  onQuickBid={openQuickBid}
+                  trackClick={trackClick}
+                  isComparing={compareIds.includes(item.id)}
+                  onToggleCompare={toggleCompare}
+                  sellerRep={sellerReps[item.seller_id]}
+                />
+              );
+            });
+            return out;
+          })()}
         </div>
       )}
 
@@ -759,7 +776,7 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
   return (
     <Card
       className="group overflow-hidden flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-[0_2px_12px_rgba(0,0,0,0.08)] hover:shadow-[0_10px_28px_rgba(0,0,0,0.14)] transition-all duration-150 hover:-translate-y-[3px] min-h-[420px]"
-      data-testid="marketplace-item-card"
+      data-testid={item._is_promoted_inline ? 'marketplace-item-card-promoted' : 'marketplace-item-card'}
     >
       {/* Image Container — fixed 200px height per iter236 spec */}
       <Link

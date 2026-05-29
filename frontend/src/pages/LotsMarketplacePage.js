@@ -22,6 +22,8 @@ import { LoadingTimeout } from '../components/LoadingTimeout';
 import { SellerAccountBadge } from '../components/PrivateSaleBadge';
 
 import FilterBar from '../components/FilterBar/FilterBar';
+// iter239 Mission 5 — Featured Listings carousel.
+import FeaturedListingsBanner from '../components/FeaturedListingsBanner';
 // iter236 Mission 2 — Map & radius search panel (lazy so Leaflet's chunk
 // only loads when the user actually clicks "Search by Map").
 const MapSearchPanel = React.lazy(() => import('../components/MapSearchPanel'));
@@ -274,6 +276,8 @@ const LotsMarketplacePage = () => {
 
           {/* Main Content */}
           <div className="flex-1 min-w-0">
+            {/* iter239 Mission 5 — Featured Lots carousel. */}
+            <FeaturedListingsBanner section="lots" limit={8} />
             {/* New FilterBar — category dropdown hidden because sidebar owns it */}
             <FilterBar
               onFilterChange={(newFilters) => {

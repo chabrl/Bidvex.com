@@ -829,40 +829,10 @@ async def marketplace_filter_counts():
 
 
 # ========== PROMOTED LISTINGS ==========
+# iter239 — Legacy `/promoted-listings` endpoint moved to
+# `routes/promotions.py` with the new section-scoped semantics
+# (`?section=marketplace|lots|storage|vehicles|homepage`). The legacy
+# multi_item_listings-only handler was removed here to resolve a routing
+# collision; tests that asserted a 200 still pass because the new endpoint
+# answers on the same path with a richer shape (`{items, total, section}`).
 
-@marketplace_router.get("/promoted-listings")
-async def get_promoted_listings(limit: int = 12, tier: Optional[str] = None):
-    """Get promoted listings for homepage Hot Items carousel"""
-    db = get_db()
-    now = datetime.now(timezone.utc)
-    
-    query = {
-        "status": {"$in": ["active", "upcoming"]},
-        "is_promoted": True,
-        "is_demo": {"$ne": True},  # iter211 P4 — never show demo listings publicly
-        "$or": [
-            {"promotion_end": None},
-            {"promotion_end": {"$gte": now.isoformat()}}
-        ]
-    }
-    if tier:
-        query["promotion_tier"] = tier
-    
-    sort_order = [
-        ("promotion_tier", -1),
-        ("promotion_start", -1)
-    ]
-    
-    listings = await db.multi_item_listings.find(query, {"_id": 0}).sort(sort_order).limit(limit).to_list(limit)
-    
-    for listing in listings:
-        seller = await db.users.find_one({"id": listing.get("seller_id")}, {"_id": 0, "name": 1, "picture": 1})
-        listing["seller_name"] = seller.get("name") if seller else "Unknown Seller"
-        listing["seller_picture"] = seller.get("picture") if seller else None
-        
-        await db.multi_item_listings.update_one(
-            {"id": listing["id"]},
-            {"$inc": {"total_impressions": 1}}
-        )
-    
-    return {"listings": listings, "total": len(listings)}

@@ -29,6 +29,25 @@ async def get_notifications(limit: int = 15, current_user: User = Depends(get_cu
     return {"notifications": notifications, "unread_count": unread_count}
 
 
+@notifications_router.get("/notifications/unread-count")
+async def get_unread_count(current_user: User = Depends(get_current_user)):
+    """iter239 Mission 4 — Lightweight polling endpoint for the navbar bell
+    badge. Returns `{unread_count: int, ai_unread_count: int}` so the
+    frontend can drive the Bell indicator + the AI-chat history pulse
+    without re-downloading the full notification list every minute.
+    """
+    db = get_db()
+    unread_count = await db.notifications.count_documents({
+        "user_id": current_user.id, "read": False,
+    })
+    ai_unread_count = await db.ai_chat_sessions.count_documents({
+        "user_id": current_user.id,
+        "is_read": False,
+        "deleted_at": {"$exists": False},
+    })
+    return {"unread_count": unread_count, "ai_unread_count": ai_unread_count}
+
+
 @notifications_router.post("/notifications/mark-all-read")
 async def mark_all_notifications_read(current_user: User = Depends(get_current_user)):
     """Mark all notifications as read"""

@@ -2,7 +2,7 @@ import API_BASE from '../config';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { X, MessageCircle, Send, ShieldCheck, CreditCard, Package, HelpCircle, Mail, GripVertical } from 'lucide-react';
+import { X, MessageCircle, Send, ShieldCheck, CreditCard, Package, HelpCircle, Mail, GripVertical, History, Trash2, ChevronLeft } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -46,6 +46,18 @@ const AIAssistant = () => {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [serviceDegraded, setServiceDegraded] = useState(false);
+  // iter239 Mission 4 — Persistent chat history panel state.
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historySessions, setHistorySessions] = useState([]);
+  const [sessionId, setSessionId] = useState(() => {
+    try { return localStorage.getItem('bidvex.chat.session_id') || ''; } catch { return ''; }
+  });
+  const persistSessionId = useCallback((sid) => {
+    if (!sid) return;
+    try { localStorage.setItem('bidvex.chat.session_id', sid); } catch { /* ignore */ }
+    setSessionId(sid);
+  }, []);
   const messagesEndRef = useRef(null);
   const { token } = useAuth();
   const navigate = useNavigate();
@@ -330,6 +342,16 @@ const AIAssistant = () => {
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
 
+    // iter239 Mission 4 — Allocate a stable session_id at first send so
+    // every turn in this conversation lands on the same persisted doc.
+    let sid = sessionId;
+    if (!sid) {
+      sid = (typeof crypto !== 'undefined' && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : `sess-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+      persistSessionId(sid);
+    }
+
     const userMessage = input;
     const lang = (navigator.language || 'en').startsWith('fr') ? 'fr' : 'en';
     const isFr = lang === 'fr';
@@ -367,9 +389,13 @@ const AIAssistant = () => {
       // expects { message, extra_context, google_search, listing_id }.
       // iter236 Mission 3 — Always forward listing_id so the backend can
       // inject current_viewed_listing + market_comparables when present.
+      // iter239 Mission 4 — Forward session_id so the backend can up-sert
+      // the persistent ai_chat_sessions doc (anonymous users are ignored
+      // server-side).
       message: userMessage,
       google_search: true,
       listing_id: listingIdForChat || null,
+      session_id: sid || null,
       extra_context: [
         `Active UI language: ${lang === 'fr' ? 'French (fr)' : 'English (en)'}.`,
         'Recent conversation (most recent last):',
@@ -492,6 +518,102 @@ const AIAssistant = () => {
     }
   };
 
+  // iter239 Mission 4 — Chat history helpers.
+  const fetchHistory = useCallback(async () => {
+    if (!token) {
+      setHistorySessions([]);
+      return;
+    }
+    setHistoryLoading(true);
+    try {
+      const res = await fetch(`${backendUrl}/chat/history?page=1&per_page=20`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setHistorySessions(Array.isArray(data.sessions) ? data.sessions : []);
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn('[AIAssistant] fetchHistory failed:', e?.message);
+      setHistorySessions([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [backendUrl, token]);
+
+  const loadSession = useCallback(async (sid) => {
+    if (!token || !sid) return;
+    try {
+      const res = await fetch(`${backendUrl}/chat/history/${sid}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const msgs = Array.isArray(data.messages) ? data.messages : [];
+      setMessages(msgs.map((m) => ({
+        role: m.role,
+        content: m.content || '',
+        rich_content: null,
+      })));
+      persistSessionId(sid);
+      // Mark read silently.
+      fetch(`${backendUrl}/chat/mark-read/${sid}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      }).catch(() => undefined);
+      setHistoryOpen(false);
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn('[AIAssistant] loadSession failed:', e?.message);
+      toast.error('Could not load that conversation.');
+    }
+  }, [backendUrl, token, persistSessionId]);
+
+  const deleteSession = useCallback(async (sid) => {
+    if (!token || !sid) return;
+    try {
+      const res = await fetch(`${backendUrl}/chat/history/${sid}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setHistorySessions((prev) => prev.filter((s) => s.session_id !== sid));
+      if (sid === sessionId) {
+        // The active conversation was deleted — reset to a fresh chat.
+        try { localStorage.removeItem('bidvex.chat.session_id'); } catch { /* ignore */ }
+        setSessionId('');
+        setMessages([{
+          role: 'assistant',
+          content: 'Welcome to BidVex! I am the BidVex AI Core, here to help with bidding, account questions, and platform guidance. How may I assist you today?',
+          rich_content: null,
+        }]);
+      }
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn('[AIAssistant] deleteSession failed:', e?.message);
+      toast.error('Could not delete that conversation.');
+    }
+  }, [backendUrl, token, sessionId]);
+
+  const startNewChat = useCallback(() => {
+    try { localStorage.removeItem('bidvex.chat.session_id'); } catch { /* ignore */ }
+    setSessionId('');
+    setMessages([{
+      role: 'assistant',
+      content: 'Welcome to BidVex! I am the BidVex AI Core, here to help with bidding, account questions, and platform guidance. How may I assist you today?',
+      rich_content: null,
+    }]);
+    setHistoryOpen(false);
+  }, []);
+
+  // Auto-load history list when the panel opens.
+  useEffect(() => {
+    if (historyOpen && token) {
+      fetchHistory();
+    }
+  }, [historyOpen, token, fetchHistory]);
+
+
   const getActionIcon = (icon) => {
     const iconProps = { className: 'h-4 w-4 mr-2' };
     switch (icon) {
@@ -565,9 +687,25 @@ const AIAssistant = () => {
           >
             {/* Header */}
             <div className="p-4 flex justify-between items-center bg-gradient-to-br from-[#1E3A8A] to-[#06B6D4] text-white flex-shrink-0">
-              <div>
-                <h3 className="font-bold text-lg text-white">BidVex AI Core</h3>
-                <p className="text-xs text-white/90">Your Luxury Auction Specialist</p>
+              <div className="flex items-center gap-2">
+                {/* iter239 Mission 4 — History toggle. Only meaningful when logged in. */}
+                {token && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setHistoryOpen((v) => !v)}
+                    className="text-white hover:bg-white/20 rounded-full h-8 w-8"
+                    aria-label={historyOpen ? 'Close history' : 'Open history'}
+                    title={historyOpen ? 'Close history' : 'Conversation history'}
+                    data-testid="ai-assistant-history-toggle"
+                  >
+                    {historyOpen ? <ChevronLeft className="h-4 w-4" /> : <History className="h-4 w-4" />}
+                  </Button>
+                )}
+                <div>
+                  <h3 className="font-bold text-lg text-white">BidVex AI Core</h3>
+                  <p className="text-xs text-white/90">Your Luxury Auction Specialist</p>
+                </div>
               </div>
               <Button
                 variant="ghost"
@@ -580,6 +718,81 @@ const AIAssistant = () => {
                 <X className="h-5 w-5" />
               </Button>
             </div>
+
+            {/* iter239 Mission 4 — Slide-in history panel. Renders OVER the
+                messages region when toggled so the chat card stays the
+                same size on mobile. */}
+            {historyOpen && (
+              <div
+                className="absolute inset-x-0 top-[72px] bottom-[88px] bg-white dark:bg-slate-900 z-10 flex flex-col border-t border-gray-200 dark:border-gray-700"
+                data-testid="ai-assistant-history-panel"
+              >
+                <div className="px-4 py-3 flex items-center justify-between border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-slate-800">
+                  <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">Conversations</span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={startNewChat}
+                    className="h-7 text-xs"
+                    data-testid="ai-assistant-new-chat-btn"
+                  >
+                    + New Chat
+                  </Button>
+                </div>
+                <div className="flex-1 overflow-y-auto">
+                  {!token ? (
+                    <div className="p-6 text-center text-sm text-slate-500">
+                      Sign in to keep your conversation history.
+                    </div>
+                  ) : historyLoading ? (
+                    <div className="p-6 text-center text-sm text-slate-500" data-testid="ai-history-loading">
+                      Loading conversations…
+                    </div>
+                  ) : historySessions.length === 0 ? (
+                    <div className="p-6 text-center text-sm text-slate-500" data-testid="ai-history-empty">
+                      No previous conversations yet. Start chatting and your history will appear here.
+                    </div>
+                  ) : (
+                    <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+                      {historySessions.map((s) => {
+                        const isActive = s.session_id === sessionId;
+                        const updated = s.updated_at ? new Date(s.updated_at).toLocaleString() : '';
+                        return (
+                          <li
+                            key={s.session_id}
+                            className={`group p-3 flex items-start gap-3 hover:bg-gray-50 dark:hover:bg-slate-800 cursor-pointer ${
+                              isActive ? 'bg-cyan-50 dark:bg-cyan-900/20' : ''
+                            }`}
+                            onClick={() => loadSession(s.session_id)}
+                            data-testid={`ai-history-session-${s.session_id}`}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm text-slate-900 dark:text-slate-100 truncate">
+                                {s.preview || 'New conversation'}
+                              </p>
+                              <p className="text-xs text-slate-500 mt-0.5">{updated}</p>
+                              {!s.is_read && (
+                                <span className="inline-block mt-1 w-2 h-2 rounded-full bg-cyan-500" aria-label="unread" />
+                              )}
+                            </div>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 text-slate-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={(e) => { e.stopPropagation(); deleteSession(s.session_id); }}
+                              aria-label="Delete conversation"
+                              data-testid={`ai-history-delete-${s.session_id}`}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Degraded service banner */}
             {serviceDegraded && (

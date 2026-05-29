@@ -26,6 +26,9 @@ import { formatCurrency, formatPercent } from '../utils/currencyFormatter';
 import { LoadingTimeout } from '../components/LoadingTimeout';
 import InfoTip from '../components/InfoTip';
 import PendingAiReviewBanner from '../components/PendingAiReviewBanner';
+// iter239 Mission 5 — Seller "Promote" modal.
+import PromoteListingModal from '../components/PromoteListingModal';
+import { Sparkles } from 'lucide-react';
 
 const API = API_BASE;
 
@@ -44,6 +47,8 @@ const SellerDashboard = () => {
   const [dealerSubStatus, setDealerSubStatus] = useState(null);
   // HOTFIX v9.1 / Fix 3 — Filter tab selection for "Your Listings"
   const [listingsFilter, setListingsFilter] = useState('all'); // all|active|pending_review|draft|ended
+  // iter239 Mission 5 — Promote modal state.
+  const [promoteModalListing, setPromoteModalListing] = useState(null);
 
   useEffect(() => {
     fetchDashboard();
@@ -777,6 +782,20 @@ const SellerDashboard = () => {
                             >
                               {t('dashboard.seller.view')}
                             </Button>
+                            {/* iter239 Mission 5 — Seller "Promote" affordance for active listings. */}
+                            {listing.status === 'active' && (
+                              <Button
+                                size="sm"
+                                onClick={() => setPromoteModalListing(listing)}
+                                data-testid={`promote-listing-btn-${listing.id}`}
+                                className="w-full lg:w-auto bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600 border-0"
+                              >
+                                <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                                {listing.is_promoted
+                                  ? ((i18n.language || 'en').startsWith('fr') ? 'Renouveler' : 'Renew')
+                                  : ((i18n.language || 'en').startsWith('fr') ? 'Promouvoir' : 'Promote')}
+                              </Button>
+                            )}
                             <Button
                               size="sm"
                               variant="outline"
@@ -852,6 +871,14 @@ const SellerDashboard = () => {
         )}
       </div>
       
+      {/* iter239 Mission 5 — Promote modal */}
+      <PromoteListingModal
+        open={!!promoteModalListing}
+        onOpenChange={(v) => { if (!v) setPromoteModalListing(null); }}
+        listing={promoteModalListing}
+        onSuccess={() => { fetchDashboard(); }}
+      />
+
       {/* Deletion Request Modal */}
       {deletionRequestModal.open && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">

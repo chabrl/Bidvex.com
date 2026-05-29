@@ -96,6 +96,36 @@ async def send_email(
         return {"status": "error", "message": str(e)}
 
 
+async def send_unified_email(
+    email_type: str,
+    user: Dict[str, Any],
+    data: Optional[Dict[str, Any]] = None,
+    *,
+    lang: str = "en",
+    attachments: Optional[List[Dict]] = None,
+) -> Dict[str, Any]:
+    """iter239 Mission 6 — Canonical email dispatch using the unified
+    `build_email_payload()` mapping engine.
+
+    This is the new entry-point for ALL transactional emails. Pass the
+    `email_type` (e.g. `welcome`, `bid_placed`, `outbid`, `auction_won`,
+    `auction_ending_soon`, `voicemail`, `ai_suggestion`, `new_feature`,
+    `password_reset`, `onboarding_reminder`) plus the user + data context.
+
+    Legacy helpers (`send_welcome_email`, `send_bid_placed_email`, etc.)
+    were progressively migrated to delegate to this function during
+    iter239.
+    """
+    from services.email_templates import build_email_payload
+    payload = build_email_payload(email_type, user=user, data=data or {}, lang=lang)
+    return await send_email(
+        to_email=payload["to_email"],
+        subject=payload["subject"],
+        html_content=payload["html_content"],
+        attachments=attachments,
+    )
+
+
 # ===== EMAIL TEMPLATES =====
 
 def _section_label(auction_type: Optional[str] = None) -> Dict[str, str]:
@@ -800,74 +830,29 @@ async def send_bid_placed_email(
     is_leading: bool = True,
     auction_type: Optional[str] = None,
 ) -> Dict[str, Any]:
+    """iter239 Mission 6 — Refactored to route through `send_unified_email`.
+
+    Original signature preserved for backward-compat. `auction_type` is still
+    accepted but the unified BidVex template uses a single master layout.
+    The bidding context (lead/outbid messaging) is surfaced via
+    `secondary_info` rather than per-section custom HTML.
     """
-    Send confirmation email when user places a bid.
-    auction_type drives the email header/branding — marketplace / lots / storage / vehicle.
-    """
-    label = _section_label(auction_type)
-    status_color = "#10b981" if is_leading else "#f59e0b"
-    status_text = "You're in the lead!" if is_leading else "Your bid was placed"
-    status_message = (
-        "You are currently the highest bidder. We'll notify you if someone outbids you."
-        if is_leading else 
-        "Your bid has been recorded, but you're not currently in the lead."
+    _ = auction_type  # legacy arg, retained for callers
+    secondary = (
+        "✓ You are currently the highest bidder. We'll notify you if someone outbids you."
+        if is_leading else
+        "Your bid has been recorded, but you're not currently leading the auction."
     )
-    
-    content = f"""
-    <h2 style="margin: 0 0 20px 0; color: {status_color};">✓ Bid Confirmed</h2>
-    
-    <p style="color: #475569; line-height: 1.6;">
-        Hi {bidder_name},
-    </p>
-    
-    <p style="color: #475569; line-height: 1.6;">
-        Your bid has been successfully placed on:
-    </p>
-    
-    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 20px 0;"><tr><td style="background-color: #eff6ff; border: 2px solid #2563eb; border-radius: 8px; padding: 25px;">
-        <p style="margin: 0 0 15px 0; color: #1e40af; font-size: 18px; font-weight: bold;">
-            {listing_title}
-        </p>
-        <table width="100%" style="font-size: 14px; color: #1e293b;">
-            <tr>
-                <td style="padding: 6px 0;"><strong>Your Bid:</strong></td>
-                <td style="padding: 6px 0; text-align: right; font-size: 20px; color: #2563eb; font-weight: bold;">
-                    {_format_currency(bid_amount)}
-                </td>
-            </tr>
-            <tr>
-                <td style="padding: 6px 0;"><strong>Auction Ends:</strong></td>
-                <td style="padding: 6px 0; text-align: right; color: #dc2626;">
-                    {_format_date(auction_end_date)}
-                </td>
-            </tr>
-        </table>
-    </td></tr></table>
-    
-    <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="background-color: {'#d1fae5' if is_leading else '#fef3c7'}; border-radius: 8px; padding: 15px; margin: 20px 0; text-align: center;">        <p style="margin: 0; color: {'#065f46' if is_leading else '#92400e'}; font-size: 16px; font-weight: bold;">
-            {status_text}
-        </p>
-        <p style="margin: 8px 0 0 0; color: {'#065f46' if is_leading else '#92400e'}; font-size: 13px;">
-            {status_message}
-        </p></td></tr></table>
-    
-    <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 30px auto;">
-        <tr>
-            <td align="center" style="background-color: #2563eb; padding: 14px 30px; border-radius: 8px;">
-                <a href="{FRONTEND_URL}/listing/{listing_id}" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">View Auction</a>
-            </td>
-        </tr>
-    </table>
-    
-    <p style="color: #64748b; font-size: 13px; line-height: 1.6;">
-        <strong>Tip:</strong> Add this item to your watchlist to get notifications when the auction is about to end.
-    </p>
-    """
-    
-    return await send_email(
-        to_email=bidder_email,
-        subject=f"✓ Bid Confirmed: {_format_currency(bid_amount)} on {listing_title} — {label['name_en']}",
-        html_content=_base_template(content, "Bid Confirmed", auction_type=auction_type)
+    deadline_str = _format_date(auction_end_date) if auction_end_date else ""
+    return await send_unified_email(
+        "bid_placed",
+        user={"email": bidder_email, "first_name": bidder_name},
+        data={
+            "bid_amount": f"{float(bid_amount):,.2f}",
+            "listing_title": listing_title,
+            "listing_id": listing_id,
+            "secondary_info": f"{secondary}<br><strong>Auction ends:</strong> {deadline_str}" if deadline_str else secondary,
+        },
     )
 
 
@@ -946,68 +931,29 @@ async def send_outbid_email(
     auction_end_date: str,
     auction_type: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Send notification email when user is outbid (branded per section)."""
-    label = _section_label(auction_type)
-    suggested_bid = new_high_bid + 1  # Minimum increment
-    
-    content = f"""
-    <h2 style="margin: 0 0 20px 0; color: #dc2626;">🔔 You've Been Outbid!</h2>
-    
-    <p style="color: #475569; line-height: 1.6;">
-        Hi {user_name},
-    </p>
-    
-    <p style="color: #475569; line-height: 1.6;">
-        Someone has placed a higher bid on an item you're watching:
-    </p>
-    
-    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 20px 0;"><tr><td style="background-color: #fef2f2; border: 2px solid #dc2626; border-radius: 8px; padding: 25px;">
-        <p style="margin: 0 0 15px 0; color: #991b1b; font-size: 18px; font-weight: bold;">
-            {listing_title}
-        </p>
-        <table width="100%" style="font-size: 14px; color: #1e293b;">
-            <tr>
-                <td style="padding: 6px 0;"><strong>Your Bid:</strong></td>
-                <td style="padding: 6px 0; text-align: right; text-decoration: line-through; color: #94a3b8;">
-                    {_format_currency(their_bid)}
-                </td>
-            </tr>
-            <tr>
-                <td style="padding: 6px 0;"><strong>New High Bid:</strong></td>
-                <td style="padding: 6px 0; text-align: right; font-size: 20px; color: #dc2626; font-weight: bold;">
-                    {_format_currency(new_high_bid)}
-                </td>
-            </tr>
-            <tr>
-                <td style="padding: 6px 0;"><strong>Auction Ends:</strong></td>
-                <td style="padding: 6px 0; text-align: right; color: #f59e0b;">
-                    {_format_date(auction_end_date)}
-                </td>
-            </tr>
-        </table>
-    </td></tr></table>
-    
-    <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="background-color: #eff6ff; border-radius: 8px; padding: 15px; margin: 20px 0; text-align: center;">        <p style="margin: 0; color: #1e40af; font-size: 14px;">
-            <strong>Suggested next bid:</strong> {_format_currency(suggested_bid)} or higher
-        </p></td></tr></table>
-    
-    <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 30px auto;">
-        <tr>
-            <td align="center" style="background-color: #dc2626; padding: 14px 30px; border-radius: 8px;">
-                <a href="{FRONTEND_URL}/listing/{listing_id}" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">Bid Again Now</a>
-            </td>
-        </tr>
-    </table>
-    
-    <p style="color: #64748b; font-size: 13px; line-height: 1.6;">
-        Don't miss out! Place a higher bid to get back in the lead.
-    </p>
+    """iter239 Mission 6 — Refactored to route through `send_unified_email`.
+
+    Signature preserved for backward compatibility. `auction_type` retained
+    but the unified template uses a single master layout.
     """
-    
-    return await send_email(
-        to_email=user_email,
-        subject=f"🔔 Outbid: {listing_title} — {label['name_en']}",
-        html_content=_base_template(content, "You've Been Outbid", auction_type=auction_type)
+    _ = auction_type  # legacy arg, retained
+    suggested = new_high_bid + 1
+    deadline_str = _format_date(auction_end_date) if auction_end_date else ""
+    secondary = (
+        f"Your bid: <strike>{_format_currency(their_bid)}</strike>"
+        f"<br>Suggested next bid: <strong>{_format_currency(suggested)}</strong> or higher."
+    )
+    if deadline_str:
+        secondary += f"<br><strong>Auction ends:</strong> {deadline_str}"
+    return await send_unified_email(
+        "outbid",
+        user={"email": user_email, "first_name": user_name},
+        data={
+            "current_bid": f"{float(new_high_bid):,.2f}",
+            "listing_title": listing_title,
+            "listing_id": listing_id,
+            "secondary_info": secondary,
+        },
     )
 
 
@@ -1592,51 +1538,46 @@ def _storage_panel(title_en: str, title_fr: str, body_en: str, body_fr: str, cta
 
 
 async def send_storage_bid_placed_email(buyer: dict, auction: dict, bid_state: dict) -> bool:
+    """iter239 Mission 6 — Routes through `send_unified_email("bid_placed")`."""
     if not buyer or not buyer.get("email"):
         return False
-    a_id = (auction or {}).get("id", "")[:8]
+    a_id = (auction or {}).get("id", "")
     cur = bid_state.get("current_bid", 0)
     winning = bid_state.get("you_are_winning")
-    body_en = (
-        f"Your bid was placed on storage unit auction <strong>#{a_id}</strong>. "
-        f"Current leading bid: <strong>${cur:,.2f}</strong>. "
-        + ("You are currently winning. " if winning else "You are NOT currently winning — your maximum was outbid. ")
+    secondary = (
+        "You are currently winning the auction."
+        if winning else
+        "You are NOT currently winning — your maximum was outbid."
     )
-    body_fr = (
-        f"Votre offre a été placée sur l'enchère d'unité d'entreposage <strong>#{a_id}</strong>. "
-        f"Offre actuelle en tête : <strong>{cur:,.2f} $</strong>. "
-        + ("Vous êtes en tête. " if winning else "Vous N'êtes PAS en tête — votre maximum a été surenchéri. ")
+    result = await send_unified_email(
+        "bid_placed",
+        user={"email": buyer["email"], "first_name": buyer.get("name") or buyer.get("full_name") or ""},
+        data={
+            "bid_amount": f"{float(cur):,.2f}",
+            "listing_title": f"Storage Unit Auction #{a_id[:8]}",
+            "listing_id": a_id,
+            "secondary_info": secondary,
+        },
     )
-    return await send_email(
-        to_email=buyer["email"],
-        subject=f"Bid placed — Storage Auction #{a_id}",
-        html_content=_storage_panel("Bid placed", "Offre placée", body_en, body_fr,
-                                    cta_url=f"https://www.bidvex.com/storage-auctions/{auction.get('id','')}",
-                                    cta_en="View auction", cta_fr="Voir l'enchère"),
-    )
+    return result.get("status") in ("sent", "logged")
 
 
 async def send_storage_outbid_email(buyer: dict, auction: dict, new_current: float) -> bool:
+    """iter239 Mission 6 — Routes through `send_unified_email("outbid")`."""
     if not buyer or not buyer.get("email"):
         return False
-    a_id = (auction or {}).get("id", "")[:8]
-    body_en = (
-        f"You've been outbid on storage unit auction <strong>#{a_id}</strong>. "
-        f"The leading bid is now <strong>${new_current:,.2f}</strong>. "
-        f"Place a higher max bid to retake the lead."
+    a_id = (auction or {}).get("id", "")
+    result = await send_unified_email(
+        "outbid",
+        user={"email": buyer["email"], "first_name": buyer.get("name") or buyer.get("full_name") or ""},
+        data={
+            "current_bid": f"{float(new_current):,.2f}",
+            "listing_title": f"Storage Unit Auction #{a_id[:8]}",
+            "listing_id": a_id,
+            "secondary_info": "Place a higher max bid to retake the lead.",
+        },
     )
-    body_fr = (
-        f"Vous avez été surenchéri sur l'enchère d'unité d'entreposage <strong>#{a_id}</strong>. "
-        f"L'offre en tête est maintenant <strong>{new_current:,.2f} $</strong>. "
-        f"Placez une offre maximale plus élevée pour reprendre la tête."
-    )
-    return await send_email(
-        to_email=buyer["email"],
-        subject=f"⚠️ Outbid — Storage Auction #{a_id}",
-        html_content=_storage_panel("You've been outbid", "Vous avez été surenchéri", body_en, body_fr,
-                                    cta_url=f"https://www.bidvex.com/storage-auctions/{auction.get('id','')}",
-                                    cta_en="Bid again", cta_fr="Enchérir à nouveau"),
-    )
+    return result.get("status") in ("sent", "logged")
 
 
 async def send_storage_auction_won_email(buyer: dict, auction: dict, facility: dict, pricing: dict = None) -> bool:
@@ -1848,18 +1789,22 @@ async def send_storage_auction_sold_email(facility: dict, auction: dict, buyer: 
 
 
 async def send_storage_ending_soon_email(buyer: dict, auction: dict) -> bool:
+    """iter239 Mission 6 — Routes through `send_unified_email("auction_ending_soon")`."""
     if not buyer or not buyer.get("email"):
         return False
-    a_id = auction.get("id", "")[:8]
-    body_en = f"Auction <strong>#{a_id}</strong> ends in less than 1 hour. Place your final max bid now."
-    body_fr = f"L'enchère <strong>#{a_id}</strong> se termine dans moins d'une heure. Placez votre offre maximale finale maintenant."
-    return await send_email(
-        to_email=buyer["email"],
-        subject=f"⏰ Ending soon — Storage Auction #{a_id}",
-        html_content=_storage_panel("Ending soon", "Se termine bientôt", body_en, body_fr,
-                                    cta_url=f"https://www.bidvex.com/storage-auctions/{auction.get('id','')}",
-                                    cta_en="Bid now", cta_fr="Enchérir"),
+    a_id = auction.get("id", "")
+    result = await send_unified_email(
+        "auction_ending_soon",
+        user={"email": buyer["email"], "first_name": buyer.get("name") or buyer.get("full_name") or ""},
+        data={
+            "listing_title": f"Storage Unit Auction #{a_id[:8]}",
+            "listing_id": a_id,
+            "time_remaining": "under 1 hour",
+            "current_bid": f"{float(auction.get('current_bid', 0)):,.2f}",
+            "secondary_info": "Place your final max bid now to stay in the lead.",
+        },
     )
+    return result.get("status") in ("sent", "logged")
 
 
 async def send_storage_facility_approved_email(facility: dict) -> bool:

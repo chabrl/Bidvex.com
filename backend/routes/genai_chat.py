@@ -22,11 +22,13 @@ from pydantic import BaseModel, Field
 from services.genai_direct_client import GEMINI_MODEL_ID
 from services.genai_streaming_chat import stream_chat_chunks
 from services.genai_watchdog import run_daily_watchdog_cycle
+from routes.chat_history import persist_chat_turn
 
 logger = logging.getLogger(__name__)
 
 genai_chat_router = APIRouter(tags=["GenAI Direct Chat"])
 _admin_security = HTTPBearer(auto_error=False)
+_stream_security = HTTPBearer(auto_error=False)
 
 # Database handle is injected from server.py during lifespan startup.
 _db = None
@@ -49,13 +51,32 @@ class StreamChatBody(BaseModel):
     # build platform-context (current_viewed_listing + market_comparables)
     # and inject it as a JSON block into the system instruction.
     listing_id: Optional[str] = Field(None, max_length=120)
+    # iter239 Mission 4 — Session continuity for persisted history. When set,
+    # the (user_id, session_id) pair is up-serted with the new turn; when
+    # absent and the request is authenticated, a fresh UUID is allocated.
+    session_id: Optional[str] = Field(None, max_length=64)
+
+
+async def _resolve_user_id(creds: Optional[HTTPAuthorizationCredentials]) -> Optional[str]:
+    """Best-effort JWT → user_id resolver. Anonymous requests return None."""
+    if not creds or not creds.credentials:
+        return None
+    try:
+        from routes.auth import _decode_jwt  # type: ignore
+        payload = _decode_jwt(creds.credentials)
+        return payload.get("sub") or payload.get("user_id")
+    except Exception:
+        return None
 
 
 # ----------------------------------------------------------------------------
 # Streaming endpoint — POST /api/chat/stream
 # ----------------------------------------------------------------------------
 @genai_chat_router.post("/chat/stream")
-async def post_chat_stream(body: StreamChatBody) -> StreamingResponse:
+async def post_chat_stream(
+    body: StreamChatBody,
+    creds: HTTPAuthorizationCredentials = Depends(_stream_security),
+) -> StreamingResponse:
     """Stream a Gemini 2.5 Flash response chunk-by-chunk to the client.
 
     Body:
@@ -63,11 +84,13 @@ async def post_chat_stream(body: StreamChatBody) -> StreamingResponse:
       extra_context: optional runtime context appended to system instruction
       google_search: optional toggle (default true) — keeps the GoogleSearch tool on
       listing_id:    optional UUID to inject current_viewed_listing + market_comparables
+      session_id:    optional chat session UUID; if absent a new session is created
 
     Response: text/plain stream, one UTF-8 fragment per chunk.
     """
     body = await _enrich_with_listing_context(body)
-    return _stream(body)
+    user_id = await _resolve_user_id(creds)
+    return _stream(body, user_id=user_id)
 
 
 @genai_chat_router.get("/chat/stream")
@@ -76,6 +99,8 @@ async def get_chat_stream(
     extra_context: Optional[str] = Query(None, max_length=4000),
     google_search: bool = Query(True),
     listing_id: Optional[str] = Query(None, max_length=120),
+    session_id: Optional[str] = Query(None, max_length=64),
+    creds: HTTPAuthorizationCredentials = Depends(_stream_security),
 ) -> StreamingResponse:
     """Same as POST but exposed via GET so it can be consumed by EventSource
     or plain `fetch()`-with-streaming clients that don't support body-on-GET."""
@@ -84,9 +109,11 @@ async def get_chat_stream(
         extra_context=extra_context,
         google_search=google_search,
         listing_id=listing_id,
+        session_id=session_id,
     )
     body = await _enrich_with_listing_context(body)
-    return _stream(body)
+    user_id = await _resolve_user_id(creds)
+    return _stream(body, user_id=user_id)
 
 
 async def _enrich_with_listing_context(body: StreamChatBody) -> StreamChatBody:
@@ -110,7 +137,7 @@ async def _enrich_with_listing_context(body: StreamChatBody) -> StreamChatBody:
     return body
 
 
-def _stream(body: StreamChatBody) -> StreamingResponse:
+def _stream(body: StreamChatBody, *, user_id: Optional[str] = None) -> StreamingResponse:
     async def aiter() -> AsyncIterator[bytes]:
         # Bridge the sync google-genai stream → async generator via a queue.
         # This pattern keeps FastAPI's event loop free while the blocking
@@ -118,6 +145,9 @@ def _stream(body: StreamChatBody) -> StreamingResponse:
         queue: asyncio.Queue = asyncio.Queue()
         loop = asyncio.get_running_loop()
         sentinel = object()
+        # iter239 Mission 4 — Accumulate streamed bytes so we can persist
+        # the full assistant turn after the iterator drains.
+        accumulator: list[bytes] = []
 
         def _producer() -> None:
             try:
@@ -141,7 +171,25 @@ def _stream(body: StreamChatBody) -> StreamingResponse:
             item = await queue.get()
             if item is sentinel:
                 break
+            accumulator.append(item)
             yield item
+
+        # iter239 Mission 4 — Persist the turn for authenticated users.
+        if user_id:
+            try:
+                assistant_text = b"".join(accumulator).decode("utf-8", errors="ignore").strip()
+                # Skip the iter236 silent priming probe ("The user is currently viewing listing ID …").
+                is_priming = body.message.startswith("The user is currently viewing listing ID")
+                if assistant_text and not is_priming:
+                    await persist_chat_turn(
+                        user_id=user_id,
+                        session_id=body.session_id,
+                        listing_id=body.listing_id,
+                        user_message=body.message,
+                        assistant_message=assistant_text,
+                    )
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"[iter239-mission4] persist_chat_turn failed: {e}")
 
     return StreamingResponse(
         aiter(),
@@ -150,6 +198,9 @@ def _stream(body: StreamChatBody) -> StreamingResponse:
             "Cache-Control": "no-store, no-transform",
             "X-Accel-Buffering": "no",  # disable proxy buffering for true streaming
             "X-GenAI-Model": GEMINI_MODEL_ID,
+            # iter239 — Surface the session_id (if explicitly set) so the FE
+            # can persist it client-side without an extra round-trip.
+            **({"X-Chat-Session-Id": body.session_id} if body.session_id else {}),
         },
     )
 
