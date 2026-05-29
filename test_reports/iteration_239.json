@@ -1,0 +1,71 @@
+{
+  "summary": "iter239 testing — 68/68 offline pytest pass across 6 iteration files; live HTTP regression added (5/7 pass, 2 fail). CRITICAL backend bug discovered: chat history + chat stream persistence are silently broken because `_resolve_user`/`_resolve_user_id` import a non-existent `_decode_jwt` from `routes.auth`. Frontend mostly aligned with spec: legacy pills removed, 4 official pills visible, AIAssistant history panel mounts correctly. Featured banner could not be visually verified (no promoted listings seeded).",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "/api/chat/history, /api/chat/history/{id}, /api/chat/mark-read/{id}, /api/chat/history/{id} DELETE, and /api/chat/stream persistence",
+        "issue": "All authenticated chat-history endpoints return 401 'auth required' even with a valid JWT. Root cause: `routes/chat_history.py::_resolve_user` and `routes/genai_chat.py::_resolve_user_id` both do `from routes.auth import _decode_jwt`, but `_decode_jwt` does NOT exist in routes/auth.py (verified via `python -c 'from routes.auth import _decode_jwt'` → ImportError). The bare `except Exception` swallows the ImportError and returns None, so every authenticated request is treated as anonymous. Consequence: (1) `persist_chat_turn` is silently skipped on every authenticated /api/chat/stream call → assistant turns are NEVER persisted to `ai_chat_sessions`; (2) the entire chat-history UI panel will always appear empty even after the user chats. The pytest in test_iter239_followup.py passes only because it tests anonymous/None branches, not the live JWT path.",
+        "priority": "CRITICAL"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "FilterBar TOGGLE_PILLS on /marketplace",
+        "issue": "The 4 pills (Private Sales, Verified Seller, Partners, Lots Auction) render visually but they LACK the data-testid='filter-pill-*' attributes. Tests targeting these testids will fail. Spec did not explicitly require these testids, but they're useful for automation.",
+        "selector": "[data-testid='filter-pill-private-sales'] etc.",
+        "priority": "LOW"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "AIAssistant history panel + chat persistence",
+        "issue": "UI mounts correctly (panel + empty state + new chat button), but because the backend `/api/chat/history*` returns 401 for every authenticated user, the panel will always show 'No previous conversations yet' even after the user sends multiple turns. Frontend swallows the 401 silently (caught in fetchHistory's try/catch). Same root cause as the backend critical bug above.",
+        "affected_selectors": ["[data-testid='ai-assistant-history-panel']", "[data-testid='ai-history-empty']"]
+      },
+      {
+        "flow": "Featured Listings banner on /marketplace and /lots",
+        "issue": "Could NOT visually verify a populated banner because no promoted listings are seeded in the DB. Banner correctly returns null when items=[] (verified — `[data-testid='featured-listings-banner']` absent). E1 should promote a listing manually (POST /api/listings/{id}/promote) and re-test the populated state.",
+        "affected_selectors": ["[data-testid='featured-listings-banner']"]
+      },
+      {
+        "flow": "Promote modal in /seller/dashboard",
+        "issue": "Not exercised. The provided test creds (charbel911@gmail.com) login worked but I did not navigate to seller dashboard nor click a Promote button. Suggest a follow-up pass once the chat-history bug is fixed.",
+        "affected_selectors": ["[data-testid='promote-listing-btn-*']", "[data-testid='promote-listing-modal']"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter239_live_http.py",
+    "/app/test_reports/pytest/iter239_results.xml",
+    "/app/test_reports/pytest/iter239_live.xml"
+  ],
+  "action_items": [
+    "FIX CRITICAL: routes/chat_history.py:_resolve_user and routes/genai_chat.py:_resolve_user_id reference a non-existent `routes.auth._decode_jwt`. Either (a) add a `_decode_jwt(token)` helper in routes/auth.py that does `jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])`, or (b) refactor both functions to use `Depends(get_current_user)` from `deps` (same pattern notifications.py uses successfully).",
+    "After fix, re-run /app/backend/tests/test_iter239_live_http.py — TestChatStreamPersistence::test_stream_still_text_plain_and_persists and test_history_get_and_delete_flow are currently failing.",
+    "(Optional) Add data-testid='filter-pill-private-sales' / -verified-seller / -partners / -lots-auction on FilterBar TOGGLE_PILLS for testability.",
+    "(Optional) Seed at least one promoted listing in dev so the FeaturedListingsBanner populated state can be visually verified on /marketplace and /lots.",
+    "(Optional) Run a seller-account end-to-end test of the Promote modal once the chat-history bug is fixed."
+  ],
+  "critical_code_review_comments": [
+    "Both `_resolve_user` and `_resolve_user_id` have an over-broad `except Exception: return None` that masks the ImportError of `_decode_jwt`. This makes the bug invisible in logs. Recommend logging the exception via `logger.exception(...)` for any auth-resolution failure that isn't a clearly-anonymous request, or use the centralized `get_current_user` dependency instead.",
+    "The frontend AIAssistant.fetchHistory similarly swallows the 401 in a try/catch and silently sets sessions=[] — when combined with the backend bug, users get a perfectly silent failure with zero diagnostic signal.",
+    "routes/chat_history.py is 276 lines and mostly fine; consider sharing a single auth helper between chat_history.py and genai_chat.py rather than duplicating the same broken _resolve_user pattern in two files."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter239_live_http.py (new — 7 live HTTP regression tests covering unread-count, promoted-listings, chat stream/persistence, history flow)"
+  ],
+  "success_rate": {
+    "backend": "97% (68/68 offline pytest pass + 5/7 live HTTP — 2 live failures both root-caused to the SAME _decode_jwt bug)",
+    "frontend": "85% (marketplace pills + AI history panel mount + login + FAB all verified; banner populated state and Promote modal not visually verified)"
+  },
+  "test_credentials": "Used charbel911@gmail.com / Anderosli123!@# from /app/memory/test_credentials.md (admin). The other listed test users (iter189buyer@test.com) return 401 'Invalid credentials' — they may have been wiped. Seller-specific creds not exercised this pass.",
+  "seed_data_creation": "None. No promoted listings exist in the preview DB — E1 should seed at least one via POST /api/listings/{id}/promote to visually verify FeaturedListingsBanner populated state.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "1) After E1 fixes the _decode_jwt issue, re-run `REACT_APP_BACKEND_URL=https://prod-verify-2.preview.emergentagent.com python -m pytest /app/backend/tests/test_iter239_live_http.py -v` — all 7 should pass. 2) To verify the populated FeaturedListingsBanner, first POST /api/listings/{listing_id}/promote with body {sections:['marketplace'], duration_days:7, tier:'featured'} using a seller's JWT, then load /marketplace and assert `[data-testid='featured-listings-banner']` is visible. 3) Promote modal flow (seller dashboard → orange Promote button → modal → submit → toast) was NOT exercised this iteration. 4) The pytest test suites in iter233/234/236/237/238/239 are all green offline and form the regression baseline.",
+  "rca of the issue": "Bug: authenticated /api/chat/* endpoints always return 401 + chat turns never persist. Reproduction: `curl -X POST $BASE/api/auth/login ...` → grab access_token → `curl $BASE/api/chat/history -H 'Authorization: Bearer <token>'` → 401 'auth required'. Root cause: `routes/chat_history.py` line 46 and `routes/genai_chat.py` line 65 both do `from routes.auth import _decode_jwt` — that symbol does not exist in routes/auth.py (verified via direct python import, raises ImportError). The bare `except Exception` swallows it and returns None, so the request is treated as anonymous. Mitigation: add a thin helper `def _decode_jwt(token: str) -> dict: return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])` to routes/auth.py — or swap both call sites to `Depends(get_current_user)` from deps (preferred — matches the pattern in notifications.py which works correctly)."
+}

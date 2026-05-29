@@ -58,6 +58,11 @@ import useMarketplaceSync from '../hooks/useMarketplaceSync';
 
 const API = API_BASE;
 
+// iter239 — Module-scope backend URL prevents accidental useEffect re-firing
+// when this value is included in dependency arrays (the literal would
+// recreate a new string per render under React Refresh).
+const BACKEND_URL = API_BASE;
+
 /**
  * FlattenedMarketplace - Item-Centric Discovery View
  * 
@@ -189,18 +194,14 @@ const FlattenedMarketplace = ({
   // Positions in the grid where we splice a promoted card.
   const PROMO_SLOTS = [3, 8, 18, 28, 38];
 
-  const backendUrl = process.env.REACT_APP_BACKEND_URL
-    ? `${process.env.REACT_APP_BACKEND_URL}/api`
-    : '/api';
-
   useEffect(() => {
     const ctrl = new AbortController();
-    fetch(`${backendUrl}/promoted-listings?section=marketplace&limit=10`, { signal: ctrl.signal })
+    fetch(`${BACKEND_URL}/promoted-listings?section=marketplace&limit=10`, { signal: ctrl.signal })
       .then((r) => (r.ok ? r.json() : { items: [] }))
       .then((d) => setPromotedInline(Array.isArray(d.items) ? d.items : []))
       .catch(() => setPromotedInline([]));
     return () => ctrl.abort();
-  }, [backendUrl]);
+  }, []);
 
   useEffect(() => {
     if (!geoFilter) {
@@ -208,13 +209,13 @@ const FlattenedMarketplace = ({
       return undefined;
     }
     const ctrl = new AbortController();
-    const url = `${backendUrl}/marketplace/items/geo?lat=${geoFilter.lat}&lng=${geoFilter.lng}&radius_km=${geoFilter.radius_km}&limit=60`;
+    const url = `${BACKEND_URL}/marketplace/items/geo?lat=${geoFilter.lat}&lng=${geoFilter.lng}&radius_km=${geoFilter.radius_km}&limit=60`;
     fetch(url, { signal: ctrl.signal })
       .then((r) => (r.ok ? r.json() : { items: [] }))
       .then((d) => setGeoItems(d.items || []))
       .catch(() => undefined);
     return () => ctrl.abort();
-  }, [geoFilter, backendUrl]);
+  }, [geoFilter]);
 
   // Flatten pages into a single items array
   const allItems = (marketplaceData?.pages ?? []).flatMap((page) => page.items ?? []);
