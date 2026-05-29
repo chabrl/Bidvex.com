@@ -418,7 +418,7 @@ const FlattenedMarketplace = ({
             open={mapOpen}
             onClose={() => setMapOpen(false)}
             onGeoChange={setGeoFilter}
-            backendUrl={backendUrl}
+            backendUrl={BACKEND_URL}
             isFrench={i18n.language?.startsWith('fr')}
           />
         </React.Suspense>
