@@ -56,10 +56,12 @@ const PROVINCE_OPTIONS = [
 ];
 
 const TOGGLE_PILLS = [
-  { key: "private_sales_only", icon: "👤", label_en: "Private Sales", label_fr: "Ventes privées", tooltip_en: "Show private seller listings only", tooltip_fr: "Annonces de vendeurs privés uniquement" },
-  { key: "zero_fee_only", icon: "🏷️", label_en: "0% Buyer Fee", label_fr: "0% frais acheteur", tooltip_en: "Partner listings — no buyer premium", tooltip_fr: "Annonces partenaires — aucuns frais" },
-  { key: "lots_auction", icon: "📦", label_en: "Lots Auction", label_fr: "Enchères par lot", tooltip_en: "Multi-item lot auctions only", tooltip_fr: "Enchères multi-articles uniquement" },
-  { key: "no_taxes", icon: "✅", label_en: "No Taxes", label_fr: "Sans taxes", tooltip_en: "Private sale — no QST/HST", tooltip_fr: "Vente privée — sans TVQ/TVH" },
+  // iter238 Mission 3 + iter239 cleanup — replaced the legacy 4-pill row
+  // (Private Sales / 0% Buyer Fee / Lots Auction / No Taxes) with 4 single-select pills.
+  { key: "private_sales", icon: "🏷️", label_en: "Private Sales",   label_fr: "Ventes privées",     tooltip_en: "Show private seller listings only",  tooltip_fr: "Annonces de vendeurs privés uniquement", param: "listing_type",     value: "private_sale" },
+  { key: "verified_seller", icon: "✅", label_en: "Verified Seller", label_fr: "Vendeur vérifié",    tooltip_en: "Identity-verified sellers only",     tooltip_fr: "Vendeurs vérifiés uniquement",            param: "seller_verified",  value: "true" },
+  { key: "partners",        icon: "🤝", label_en: "Partners",        label_fr: "Partenaires",        tooltip_en: "Partner-tier sellers only",          tooltip_fr: "Vendeurs partenaires uniquement",         param: "seller_type",      value: "partner" },
+  { key: "lots_auction",    icon: "📦", label_en: "Lots Auction",    label_fr: "Enchères par lot",   tooltip_en: "Multi-item lot auctions only",       tooltip_fr: "Enchères multi-articles uniquement",      param: "listing_type",     value: "lot_auction" },
 ];
 
 const FilterBar = ({ onFilterChange, pageContext = "marketplace", hideCategoryDropdown = false, sidebarCategoryChip = null, onClearSidebarCategory = null }) => {
