@@ -116,6 +116,17 @@ def create_access_token(data: dict) -> str:
     return jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
+def _decode_jwt(token: str) -> dict:
+    """iter239 — Pure helper that decodes a JWT access token to its payload.
+
+    Used by lightweight resolvers (e.g. `routes.chat_history._resolve_user`,
+    `routes.genai_chat._resolve_user_id`) that need to identify the caller
+    WITHOUT raising HTTPException when the token is missing or invalid.
+    Raises `jwt.PyJWTError` subclasses for callers that wrap in try/except.
+    """
+    return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+
+
 async def create_refresh_token(user_id: str) -> str:
     """Create a long-lived (30-day) refresh token, hash-stored in DB for revocation."""
     token = secrets.token_urlsafe(48)

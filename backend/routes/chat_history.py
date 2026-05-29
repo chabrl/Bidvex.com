@@ -49,7 +49,10 @@ async def _resolve_user(creds: Optional[HTTPAuthorizationCredentials]) -> Option
         if not user_id:
             return None
         return await _db.users.find_one({"id": user_id}, {"_id": 0, "id": 1, "email": 1, "first_name": 1, "last_name": 1})
-    except Exception:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001
+        # iter239 — Surface to logs so future regressions of the auth resolver
+        # don't go silent and turn every authenticated request anonymous.
+        logger.warning(f"[chat_history] _resolve_user failed: {type(e).__name__}: {e}")
         return None
 
 
@@ -211,7 +214,19 @@ async def list_sessions(
         s["preview"] = (msgs[0]["content"][:140] if msgs else "")
         s.pop("messages", None)
     total = await _db.ai_chat_sessions.count_documents(base_q)
-    return {"sessions": sessions, "total": total, "page": page, "per_page": per_page}
+    return {
+        "sessions": sessions,
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        # iter239 — Wrapped `pagination` block for richer client integrations.
+        "pagination": {
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+            "pages": (total + per_page - 1) // per_page if per_page else 1,
+        },
+    }
 
 
 @chat_history_router.get("/history/{session_id}")

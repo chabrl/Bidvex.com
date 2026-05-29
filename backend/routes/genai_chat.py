@@ -65,7 +65,10 @@ async def _resolve_user_id(creds: Optional[HTTPAuthorizationCredentials]) -> Opt
         from routes.auth import _decode_jwt  # type: ignore
         payload = _decode_jwt(creds.credentials)
         return payload.get("sub") or payload.get("user_id")
-    except Exception:
+    except Exception as e:  # noqa: BLE001
+        # iter239 — Surface the failure so a future regression doesn't go
+        # silent. Anonymous/expired tokens land here too, hence WARN not ERROR.
+        logger.warning(f"[GenAI Direct] _resolve_user_id failed: {type(e).__name__}: {e}")
         return None
 
 

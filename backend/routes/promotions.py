@@ -108,7 +108,9 @@ async def promote_listing(
     try:
         payload = _decode_jwt(creds.credentials)
         user_id = payload.get("sub") or payload.get("user_id")
-        is_admin = bool(payload.get("is_admin"))
+        # iter239 — Accept both `is_admin` boolean claim AND `role: "admin"`
+        # so admins minted under either token scheme can promote listings.
+        is_admin = bool(payload.get("is_admin")) or payload.get("role") == "admin"
     except Exception:
         raise HTTPException(status_code=401, detail="invalid token")
 

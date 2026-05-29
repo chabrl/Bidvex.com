@@ -1,6 +1,64 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: iter238 — 6-MISSION BUNDLE: GOOGLE ONBOARDING + MAP AUTO-LOCATE + FILTER REDESIGN + CHAT HISTORY + PROMOTIONS + UNIFIED EMAIL (Feb 28, 2026) ✅
+## Latest: iter239 — FRONTEND WIRING + EMAIL REFACTOR FOLLOW-UP (Feb 28, 2026) ✅
+
+Completed the deferred iter238 frontend pieces + email refactor + filter cleanup. **Pytest 77/77 PASS** (60 prior + 10 iter239 followup + 7 iter239 live HTTP).
+
+### Mission 4 wire-up — Chat history UI + stream persistence
+- **Backend stream persistence** (`routes/genai_chat.py`):
+  - Added `_resolve_user_id(creds)` helper that decodes JWT via the new `routes/auth._decode_jwt` helper. Anonymous requests return `None` → silently skip persistence.
+  - `_stream()` now accumulates streamed bytes and calls `persist_chat_turn()` after the iterator drains for authenticated users (skipping iter236 silent priming probes).
+  - `StreamChatBody` adds `session_id` field; `X-Chat-Session-Id` returned as a response header.
+- **Bell badge endpoint** (`routes/notifications.py`):
+  - `GET /api/notifications/unread-count` → `{unread_count, ai_unread_count}`. Lightweight for 60s polling.
+- **Frontend slide-in history panel** (`components/AIAssistant.js`):
+  - Header History toggle (lucide `History` icon) opens a slide-over panel listing recent sessions.
+  - Lazy-init `session_id` from `localStorage['bidvex.chat.session_id']` (or `crypto.randomUUID()` on first message) so every turn lands on the same persisted doc.
+  - Sessions list: preview, timestamp, unread dot, click-to-load, hover trash icon for soft-delete.
+  - "+ New Chat" button clears localStorage + reseeds welcome message.
+  - Sign-in gate when anonymous.
+- **iter239 fix on top of testing report**: added `_decode_jwt` to `routes/auth.py` (resolver was silently failing with `ImportError`); both `_resolve_user`/`_resolve_user_id` now log warnings on failure.
+
+### Mission 5 — Featured Listings carousel + inline cards + Promote modal
+- **NEW** `components/FeaturedListingsBanner.jsx` — horizontal snap-scroll carousel fed by `GET /api/promoted-listings?section=marketplace|lots|...`. Renders `null` cleanly when empty.
+- **Mounted on `/marketplace` and `/lots`** browse pages.
+- **Inline injection** in `FlattenedMarketplace.js`: spliced promoted cards at grid indices `[3, 8, 18, 28, 38]` (deduped against the visible page). Cards carry `data-testid="marketplace-item-card-promoted"` and the existing `is_promoted` FEATURED badge.
+- **NEW** `components/PromoteListingModal.jsx` — Seller-facing modal with tier picker (Standard / Featured / Top Pick), section multi-select (Marketplace / Lots / Storage / Vehicles / Homepage), duration (3/7/14/30 days). Submits to `POST /api/listings/{id}/promote`. Currently activates FREE (no Stripe gate — Phase 2 deferred).
+- **Promote button** added per active listing in `SellerDashboard.js` with `data-testid="promote-listing-btn-{id}"`. Renews if already promoted.
+- **Route collision fix**: removed legacy `/promoted-listings` endpoint from `routes/marketplace.py` that was shadowing the new `routes/promotions.py` handler. Promote endpoint now accepts both `is_admin` claim and `role == "admin"` (the actual JWT shape used by the auth route).
+
+### Mission 6 — Unified email refactor (partial)
+- **NEW** `services.email_notifications.send_unified_email(email_type, user, data, lang)` — canonical dispatch that bundles `build_email_payload + send_email`. Use this for all NEW emails.
+- **Refactored 6 legacy helpers** to route through `send_unified_email`:
+  - `send_bid_placed_email` → `bid_placed`
+  - `send_outbid_email` → `outbid`
+  - `send_storage_bid_placed_email` → `bid_placed` (storage variant)
+  - `send_storage_outbid_email` → `outbid` (storage variant)
+  - `send_storage_ending_soon_email` → `auction_ending_soon`
+- Public signatures preserved (positional args). The unified template surfaces lead/outbid context, deadlines, etc. via the `secondary_info` slot.
+- ⚠️ **Deferred**: ~25 other `send_*_email` helpers (welcome, vehicle compliance, invoice, payment, etc.) retain their bespoke rich HTML — these contain branded compliance content that doesn't map cleanly to the simple unified template. Tracked as a P2 follow-up.
+
+### Filter cleanup (Mission 3 polish)
+- Removed the duplicate 5-pill quick-pill row from `FlattenedMarketplace.js` (it had a No-Taxes pill that the user explicitly removed from the spec). The 4 official pills now live exclusively in `FilterBar.js` TOGGLE_PILLS:
+  - 🏷️ Private Sales · ✅ Verified Seller · 🤝 Partners · 📦 Lots Auction
+
+### Tests
+- **NEW** `tests/test_iter239_followup.py` (10 tests) — unified email dispatch + legacy helper round-trip + `_resolve_user_id` JWT helper + `persist_chat_turn` anonymous skip + promoted-listings smoke.
+- **Testing-agent generated** `tests/test_iter239_live_http.py` (7 live HTTP tests) — unread-count auth gate, chat-stream + persistence round-trip, history GET + DELETE flow, promote-listings shape, bid_placed unified email.
+
+### Files touched
+- Backend: `routes/auth.py`, `routes/genai_chat.py`, `routes/notifications.py`, `routes/chat_history.py`, `routes/marketplace.py`, `routes/promotions.py`, `services/email_notifications.py`, `tests/test_iter239_followup.py`, `tests/test_iter239_live_http.py`
+- Frontend: `components/AIAssistant.js`, `components/FlattenedMarketplace.js`, `components/FeaturedListingsBanner.jsx` (new), `components/PromoteListingModal.jsx` (new), `pages/SellerDashboard.js`, `pages/LotsMarketplacePage.js`
+
+### Known follow-ups
+1. **P1** — Wire Stripe checkout into the Promote modal (currently activates for free).
+2. **P2** — Migrate the remaining ~25 `send_*_email` helpers to `send_unified_email` once a richer template engine slot is designed (or accept the loss of branded compliance HTML).
+3. **P3** — Install `react-leaflet-cluster` when the marker count crosses 10.
+4. **P3** — Refactor `services/email_notifications.py` (3000+ lines) into per-type submodules.
+
+---
+
+## Previous: iter238 — 6-MISSION BUNDLE: GOOGLE ONBOARDING + MAP AUTO-LOCATE + FILTER REDESIGN + CHAT HISTORY + PROMOTIONS + UNIFIED EMAIL (Feb 28, 2026) ✅
 
 Six-mission feature bundle shipped as a single deployment unit. Pytest 82/82 PASS. Lint clean. All new endpoints return 200.
 
