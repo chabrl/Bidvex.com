@@ -681,6 +681,12 @@ try:
         ("routes.genai_chat", "genai_chat_router", "set_genai_chat_db", False),
         # iter236 Mission 2 — Geo-aware listings search (lat/lng/radius + city).
         ("routes.geo_search", "geo_router", "set_geo_db", False),
+        # iter238 Mission 1 — Onboarding endpoint (post-Google-signin wizard).
+        ("routes.onboarding", "onboarding_router", "set_onboarding_db", False),
+        # iter238 Mission 4 — AI chat history + proactive notifications.
+        ("routes.chat_history", "chat_history_router", "set_chat_history_db", False),
+        # iter238 Mission 5 — Promoted/featured listings + admin backfill.
+        ("routes.promotions", "promotions_router", "set_promotions_db", False),
         ("routes.fees", "fees_router", None, False),
         ("routes.notifications", "notifications_router", None, False),
         ("routes.watchlist", "watchlist_router", None, False),

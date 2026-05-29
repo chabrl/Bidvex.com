@@ -1,6 +1,94 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: iter237 — MAP SEARCH 0-RESULTS BUG: ROOT CAUSE FIX + GEOJSON BACKFILL (Feb 28, 2026) ✅
+## Latest: iter238 — 6-MISSION BUNDLE: GOOGLE ONBOARDING + MAP AUTO-LOCATE + FILTER REDESIGN + CHAT HISTORY + PROMOTIONS + UNIFIED EMAIL (Feb 28, 2026) ✅
+
+Six-mission feature bundle shipped as a single deployment unit. Pytest 82/82 PASS. Lint clean. All new endpoints return 200.
+
+### Mission 1 — Google Sign-In hotfix + first-time onboarding wizard
+- **False "no token received" toast SUPPRESSED**: `pages/GoogleAuthFinishPage.js` now waits 1500 ms before declaring failure; checks `getAuthToken()` first; treats `popup_closed_by_user` / `access_denied_by_user` as silent cancellations (not errors).
+- **POST-signin onboarding routing**: After OAuth success, calls `/api/onboarding/status` and forwards first-time users to `/onboarding` instead of `/marketplace`.
+- **3-step wizard** — NEW `pages/OnboardingPage.jsx`:
+  - Step 1: Set BidVex password (8+ chars / 1 upper / 1 digit, skippable).
+  - Step 2: Geolocate + Nominatim reverse-geocode to pre-fill city/province/postal; user can override.
+  - Step 3: Completion screen with "Go to Marketplace" CTA.
+- **Backend endpoints** (NEW `routes/onboarding.py`):
+  - `GET  /api/onboarding/status` → `{onboarding_complete, has_password, has_location}`
+  - `POST /api/onboarding/complete` → bcrypt-hashes password, writes `city`/`region`/`postal_code`/`geo`, flips `onboarding_complete=True`.
+- **LocationBanner** — NEW `components/LocationBanner.jsx` shown at the top of the marketplace for signed-in users with `onboarding_complete=true` but no `has_location`; dismiss persists for 7 days in localStorage.
+
+### Mission 2 — Map auto-locate + postal code precision + marker clustering scaffolding
+- **NEW** `services/geo_resolver.py`:
+  - `resolve_postal_code(postal)` — Nominatim postal → {lat,lng}, 1 RPS rate-limited via async lock, User-Agent set per Nominatim ToS.
+  - `resolve_listing_coordinates(db, listing_id)` — priority chain: geo already set → postal-code resolve → city-centroid fallback.
+  - `backfill_all(db, max=200)` — bulk back-fill.
+- **NEW** `POST /api/admin/backfill-coordinates` (in `routes/promotions.py`) — admin-gated trigger.
+- **Auto-locate on map open** (already present in `MapSearchPanel.jsx` from iter236; preserved). Falls back gracefully to Montreal when geolocation denied.
+- ⚠️ **Marker clustering** (`react-leaflet-cluster`): NOT YET INSTALLED — the package fans out to 7 transitive deps including `leaflet.markercluster@1.5.x` which may need a `--legacy-peer-deps` flag against react-leaflet 5.x. Deferred to a follow-up iteration since the current geo dataset (~5 markers) doesn't trigger the 10-marker threshold the spec mentions.
+
+### Mission 3 — Filter top-bar redesign (5-pill single-select)
+- In `components/FlattenedMarketplace.js`, NEW `data-testid="marketplace-quick-pills"` row above the map toggle:
+  - 🏷️ Private Sales → `listing_type=private_sale`
+  - ✅ Verified Seller → `seller_verified=true`
+  - 🤝 Partners → `seller_type=partner`
+  - 📦 Lots Auction → `listing_type=lot_auction`
+  - 🔔 No Taxes → `no_tax=true`
+- Single-select toggle (clicking active deselects). Active style: `bg-[#2d6be4] text-white`, inactive: `bg-white border-[1.5px]`.
+- Bilingual labels (FR translations included).
+- ⚠️ **Filter audit + map-grid sync**: not exhaustively done. Existing FilterBar and sidebar are wired and tested in iter233/iter237 (no regressions detected). The 5 new pills update `filters` state in FlattenedMarketplace's existing `setFilters` hook, which already debounces+refetches via `useMarketplaceItems`. Map+filter combination is already enforced server-side by the iter237 `$geoWithin` query merger.
+
+### Mission 4 — Persistent AI chat history + proactive notifications
+- NEW collection: `ai_chat_sessions` with fields `{user_id, session_id (UUID), listing_id, messages, created_at, updated_at, is_read, deleted_at}`.
+- NEW `routes/chat_history.py`:
+  - `GET /api/chat/history` (paginated, 20/page)
+  - `GET /api/chat/history/{session_id}` (full message list)
+  - `POST /api/chat/mark-read/{session_id}`
+  - `DELETE /api/chat/history/{session_id}` (soft-delete via `deleted_at`)
+- `persist_chat_turn()` helper — appends user→assistant message pair upserted into the session. Skipped for anonymous users.
+- `send_ai_notification(user_id, message, listing_id)` — posts to the user's most recent session as a proactive AI message (`is_proactive=True`), inserts into `notifications` collection (for the bell badge), and sends the `ai_suggestion` email via the unified template. 60-second dedup window against duplicate proactive messages.
+- ⚠️ **Frontend chat history panel UI** + **bell badge integration**: NOT YET BUILT in `AIAssistant.js`. The data + endpoints are live. Follow-up iteration should add the side panel + slide-in history.
+- ⚠️ **stream-end persistence**: `genai_chat.py` does NOT currently call `persist_chat_turn` after each stream completes. Backbone is in place — wire-up pending.
+
+### Mission 5 — Promoted / featured listings backend
+- Promotion fields on listing docs: `is_promoted`, `promotion_tier`, `promotion_sections`, `promotion_expires_at`, `promoted_at`.
+- NEW `routes/promotions.py`:
+  - `GET  /api/promoted-listings?section={marketplace|lots|storage|vehicles|homepage}&limit=8` — returns active, non-expired promoted listings sorted by `promoted_at DESC`.
+  - `POST /api/listings/{listing_id}/promote` — seller-or-admin gated, writes the 5 promotion fields with `now + duration_days`.
+  - `POST /api/admin/backfill-coordinates` — admin-only.
+- ⚠️ **Featured banner / inline promoted cards / seller "Promote" modal**: NOT YET BUILT on the frontend. Backend ready. The marketplace can call `GET /api/promoted-listings?section=marketplace&limit=8` and slot the returned items at indices 3, 8, 18, etc. once the UI lands.
+
+### Mission 6 — Unified email template
+- NEW `services/email_templates.py` exporting:
+  - `BIDVEX_EMAIL_TEMPLATE` — the locked master HTML (corporate footer `761 Rue Chalifoux, Sherbrooke (Québec) J1G 0A8`, support `support@bidvex.com`, English/French greeting+signature).
+  - `build_email_payload(email_type, user, data, lang="en")` — returns `{to_email, subject, html_content}` ready for `services.email_notifications.send_email(**payload)`.
+- 10 email types supported per spec: `welcome`, `bid_placed`, `outbid`, `auction_won`, `auction_ending_soon`, `voicemail`, `ai_suggestion`, `new_feature`, `password_reset`, `onboarding_reminder`.
+- ⚠️ **Mass refactor of every existing `sgMail.send()` callsite into `build_email_payload`** was DEFERRED to a follow-up iteration to keep this bundle shippable. New callsites (e.g. the iter238 AI-suggestion notification path) already use the helper. Existing legacy paths keep working through `services/email_notifications.send_email`.
+
+### Validation
+- **Pytest 82/82 PASS** (21 new iter238 + 9 iter237 + 10 iter236 + 13 iter234 + 7 iter233 + 11 v9 + 11 iter231).
+- **Live HTTP 5/5 PASS**: `/api/onboarding/status` (401 anon ok), `/api/chat/history` (401 anon ok), `/api/promoted-listings?section=marketplace&limit=4` (200), `/api/marketplace/items/geo?limit=2` (200), `/api/marketplace/items?limit=1` (200).
+- **Lint clean** across all 8 modified/new files.
+
+### Files added/changed (iter238)
+**Backend NEW**: `routes/onboarding.py`, `routes/chat_history.py`, `routes/promotions.py`, `services/email_templates.py`, `services/geo_resolver.py`, `tests/test_iter238_missions.py`.
+**Backend MODIFIED**: `server.py` (registered 3 new routers).
+**Frontend NEW**: `pages/OnboardingPage.jsx`, `components/LocationBanner.jsx`.
+**Frontend MODIFIED**: `pages/GoogleAuthFinishPage.js` (false-error suppression + onboarding routing), `components/FlattenedMarketplace.js` (5-pill bar + LocationBanner mount), `App.js` (registered `/onboarding` route).
+
+### What was DEFERRED (be explicit with the user)
+The 6-mission bundle was massive and intentionally scoped to ship a working backbone per mission. The following polish items did NOT make it in:
+1. `react-leaflet-cluster` marker clustering when >10 markers visible.
+2. AIAssistant chat-history side panel + bell badge unread count.
+3. `genai_chat.post_chat_stream` → `persist_chat_turn` write-back.
+4. Featured banner + inline promoted cards on marketplace grid.
+5. Seller "⭐ Promote" modal in the listing-management dashboard.
+6. Mass replacement of every legacy `sgMail.send()` callsite with `build_email_payload`.
+
+Each of these is a 1-2 iteration follow-up — backend is ready, frontend UI lacks.
+
+---
+
+
+## Previous: iter237 — MAP SEARCH 0-RESULTS BUG: ROOT CAUSE FIX + GEOJSON BACKFILL (Feb 28, 2026) ✅
 
 **Symptom**: Marketplace sidebar showed 5 Sherbrooke listings (text-filter) but the Leaflet map panel returned 0 (geo-filter). All 4 hypothesised root causes diagnosed against the live DB; all applicable fixes shipped.
 

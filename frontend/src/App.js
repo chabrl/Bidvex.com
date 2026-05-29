@@ -66,6 +66,7 @@ const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'));
 const TermsOfServicePage = lazy(() => import('./pages/TermsOfServicePage'));
 const RefundPolicyPage = lazy(() => import('./pages/RefundPolicyPage'));
 const ContactUsPage = lazy(() => import('./pages/ContactUsPage'));
+const OnboardingPage = lazy(() => import('./pages/OnboardingPage'));
 const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
 
 // ── Storage Unit Auctions (iteration 169) ──
@@ -498,6 +499,7 @@ const App = () => {
           <Route path="/terms-of-service" element={<TermsOfServicePage />} />
           <Route path="/terms" element={<Navigate to="/terms-of-service" replace />} />
           <Route path="/refund-policy" element={<RefundPolicyPage />} />
+          <Route path="/onboarding" element={<OnboardingPage />} />
           <Route path="/refunds" element={<Navigate to="/refund-policy" replace />} />
           <Route path="/returns" element={<Navigate to="/refund-policy" replace />} />
           <Route path="/contact-us" element={<ContactUsPage />} />

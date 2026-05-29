@@ -43,6 +43,8 @@ import { formatCurrency } from '../utils/currencyFormatter';
 import { computeDisplayPrice } from '../utils/priceUtils';
 import { SellerAccountBadge } from './PrivateSaleBadge';
 import { getLocalized } from '../utils/localization';
+// iter238 Mission 1.3 — Dismissible location banner shown for signed-in users without a city on file.
+import LocationBanner from './LocationBanner';
 // iter236 Mission 2 — Map & radius search panel (lazy-loaded so Leaflet
 // CSS/JS doesn't enter the marketplace's critical render path).
 const MapSearchPanel = React.lazy(() => import('./MapSearchPanel'));
@@ -311,6 +313,9 @@ const FlattenedMarketplace = ({
 
   return (
     <div className={`overflow-x-hidden ${variant === 'homepage' ? '' : variant === 'full' ? '' : 'container mx-auto px-4 py-8'}`}>
+      {/* iter238 Mission 1.3 — Dismissible location banner for users without a city on file. */}
+      <LocationBanner />
+
       {/* Header */}
       {showHeader && (
         <div className="mb-6">
@@ -365,6 +370,41 @@ const FlattenedMarketplace = ({
           />
         </div>
       )}
+
+      {/* iter238 Mission 3.2 — Redesigned 5-pill quick filters (single-select). */}
+      <div className="mb-3 flex flex-wrap gap-2" data-testid="marketplace-quick-pills">
+        {[
+          { id: 'private_sales',   label: '🏷️ Private Sales',    fr: '🏷️ Ventes privées',     param: 'listing_type', value: 'private_sale' },
+          { id: 'verified_seller', label: '✅ Verified Seller',   fr: '✅ Vendeur vérifié',    param: 'seller_verified', value: 'true' },
+          { id: 'partners',        label: '🤝 Partners',          fr: '🤝 Partenaires',        param: 'seller_type',  value: 'partner' },
+          { id: 'lots_auction',    label: '📦 Lots Auction',      fr: '📦 Vente aux enchères', param: 'listing_type', value: 'lot_auction' },
+          { id: 'no_taxes',        label: '🔔 No Taxes',          fr: '🔔 Sans taxes',         param: 'no_tax',       value: 'true' },
+        ].map((pill) => {
+          const active = filters.quick_pill === pill.id;
+          return (
+            <button
+              key={pill.id}
+              type="button"
+              onClick={() => {
+                // iter238 — single-select toggle: clicking active deselects.
+                if (active) {
+                  setFilters((f) => {
+                    const next = { ...f, quick_pill: '' };
+                    delete next[pill.param];
+                    return next;
+                  });
+                } else {
+                  setFilters((f) => ({ ...f, quick_pill: pill.id, [pill.param]: pill.value }));
+                }
+              }}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-150 border-[1.5px] ${active ? 'bg-[#2d6be4] text-white border-[#2d6be4]' : 'bg-white text-[#4a5568] border-[#e2e8f0] hover:border-[#2d6be4]'}`}
+              data-testid={`quick-pill-${pill.id}`}
+            >
+              {i18n.language?.startsWith('fr') ? pill.fr : pill.label}
+            </button>
+          );
+        })}
+      </div>
 
       {/* iter236 Mission 2 — Map search toggle + panel */}
       <div className="mb-2 flex items-center justify-end">
