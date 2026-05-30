@@ -128,7 +128,7 @@ const PageLoader = () => {
     return () => clearInterval(t);
   }, []);
 
-  if (elapsed >= 15) {
+  if (elapsed >= 25) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center" data-testid="page-loader-timeout">
         <div className="text-center space-y-4 max-w-sm">
@@ -153,7 +153,7 @@ const PageLoader = () => {
           <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-[#1E3A8A] border-r-[#06B6D4] animate-spin" />
         </div>
         <p className="text-sm text-muted-foreground font-medium tracking-wide">
-          {elapsed >= 8 ? 'Taking longer than usual... still loading' : 'Loading...'}
+          {elapsed >= 12 ? 'Taking longer than usual... still loading' : 'Loading...'}
         </p>
       </div>
     </div>

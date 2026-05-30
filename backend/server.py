@@ -888,6 +888,14 @@ async def create_critical_indexes(database):
         ("deposits", [("auction_id", 1), ("status", 1)], {"background": True}),
         # TTL — auto-deletes expired refresh tokens
         ("refresh_tokens", [("expires_at", 1)], {"expireAfterSeconds": 0, "background": True}),
+        # iter240 — Hot collections that had ZERO indexes before today.
+        # `ai_chat_sessions` is queried by (user_id, updated_at) on every
+        # history fetch and by (user_id, session_id) on every persist.
+        # `notifications` is sorted by (user_id, created_at DESC) on every
+        # navbar fetch. Adding these avoids COLLSCAN as both collections grow.
+        ("ai_chat_sessions", [("user_id", 1), ("updated_at", -1)], {"background": True}),
+        ("ai_chat_sessions", [("user_id", 1), ("session_id", 1)], {"unique": True, "background": True}),
+        ("notifications", [("user_id", 1), ("created_at", -1)], {"background": True}),
     ]
     ok = 0
     for coll, keys, opts in critical:
