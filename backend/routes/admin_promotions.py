@@ -97,6 +97,12 @@ class PromotionValidateRequest(BaseModel):
     listing_type: Optional[str] = "vehicles"
 
 
+class CouponActivationRequest(BaseModel):
+    """iter254 Mission 1 — Inbound payload for the B2B account-level
+    coupon activation (`POST /api/promotions/activate-to-account`)."""
+    coupon_code: str = Field(..., min_length=1, max_length=64)
+
+
 
 def _generate_coupon_code(prefix: str = "BIDVEX") -> str:
     """Generate a human-readable coupon: BIDVEX-<6 random alphanum>"""
@@ -442,6 +448,13 @@ class PartnerOutreachPayload(BaseModel):
     coupon_code: Optional[str] = Field(None, description="Override coupon code (defaults to promo.coupon_code)")
     recipient_emails: Optional[List[str]] = Field(None, description="If set, ONLY blast to these emails (smoke testing)")
     dry_run: bool = Field(False, description="When True, do not actually call SendGrid")
+    # iter254 Mission 3 — Forced language override. When set to "en" or
+    # "fr", every recipient gets that variant regardless of their
+    # `province` or `preferred_language`. None means auto-detect (default).
+    forced_lang: Optional[str] = Field(
+        None,
+        description="Optional language override: 'en' or 'fr'. None = auto-detect.",
+    )
 
 
 @admin_promotions_router.post("/admin/promotions/partner-outreach/send")
@@ -599,9 +612,13 @@ async def send_partner_outreach_blast(
     failed = 0
     fr_count = 0
     en_count = 0
+    # iter254 Mission 3 — Normalize the forced-language override once.
+    _forced = (payload.forced_lang or "").lower().strip() if payload.forced_lang else ""
+    forced_lang_norm = "fr" if _forced.startswith("fr") else ("en" if _forced.startswith("en") else None)
     results: List[Dict[str, Any]] = []
     for r in recipients:
-        lang = detect_partner_language(r)
+        # iter254 Mission 3 — Forced override wins over geo-detection.
+        lang = forced_lang_norm or detect_partner_language(r)
         if lang == "fr":
             fr_count += 1
             html_body = html_fr
@@ -622,6 +639,12 @@ async def send_partner_outreach_blast(
             })
             continue
         try:
+            # iter254 Mission 4 — Partner-program campaigns ship under
+            # the partners@bidvex.ca branded sender.
+            from services.email_notifications import (
+                B2B_PARTNER_FROM_EMAIL as _B2B_FROM,
+                B2B_PARTNER_FROM_NAME as _B2B_FROM_NAME,
+            )
             res = await send_unified_email(
                 "new_feature",
                 user={"email": r["email"], "first_name": r["first_name"]},
@@ -634,6 +657,9 @@ async def send_partner_outreach_blast(
                     "filename": pdf_filename,
                     "type": "application/pdf",
                 }],
+                from_email=_B2B_FROM,
+                from_name=_B2B_FROM_NAME,
+                reply_to=_B2B_FROM,
             )
             if res and res.get("status") in ("sent", "logged"):
                 sent += 1
@@ -667,6 +693,7 @@ async def send_partner_outreach_blast(
         "coupon_code": coupon_code,
         "recipient_count": len(recipients),
         "lang_breakdown": {"en": en_count, "fr": fr_count},
+        "forced_lang": forced_lang_norm,
         "sent": sent,
         "failed": failed,
         "dry_run": payload.dry_run,
@@ -1123,6 +1150,108 @@ async def validate_coupon_code(
     body["message_fr"] = msg_fr
     body["coupon_code"] = code
     return body
+
+
+
+@admin_promotions_router.post("/promotions/activate-to-account")
+async def activate_coupon_to_account(
+    payload: CouponActivationRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """iter254 Mission 1 — Persist a B2B coupon activation on the user's
+    account. After this call, every subsequent listing-creation /
+    checkout flow will see `user.partner_offer_active=True` and the
+    associated coupon code, so we can auto-apply the waiver on the next
+    transaction without making the partner re-paste the code.
+
+    Hard role-gate: regular buyers / `account_type="personal"` are
+    rejected with 403. Only Partners, Brokers, Vehicle Dealers, and
+    Storage Facilities can activate a coupon to their account.
+    """
+    db = get_db()
+    user_doc = await db.users.find_one(
+        {"id": current_user.id},
+        {"_id": 0, "id": 1, "email": 1, "account_type": 1, "is_partner": 1,
+         "is_storage_facility": 1, "role": 1, "province": 1, "preferred_language": 1},
+    )
+    if not user_doc:
+        raise HTTPException(404, "User not found")
+
+    # Role-gate: only B2B accounts.
+    is_b2b = (
+        user_doc.get("is_partner") is True
+        or user_doc.get("is_storage_facility") is True
+        or (user_doc.get("account_type") or "").lower() in {
+            "partner", "broker", "vehicle_dealer", "storage_facility"
+        }
+        or (user_doc.get("role") or "") in ("admin", "super_admin")
+    )
+    if not is_b2b:
+        raise HTTPException(
+            403, "Partner coupons are reserved for professional B2B accounts.",
+        )
+
+    code = (payload.coupon_code or "").strip().upper()
+    if not code:
+        raise HTTPException(400, "Coupon code is required.")
+
+    # Validate the coupon via the live runtime engine (same path used by
+    # `/promotions/validate`). We compute against a $499 listing_fee
+    # baseline so the math contract matches what the partner will see
+    # at checkout.
+    from services.promotion_runtime import compute_promotion_discount
+    import os as _os_local
+    base_fee = float(_os_local.environ.get("BIDVEX_PARTNER_ANNUAL_FEE_CAD", "499.0"))
+    discount = await compute_promotion_discount(
+        db=db,
+        user_id=current_user.id,
+        transaction_type="listing_fee",
+        listing_type="vehicles",
+        base_amount_cad=base_fee,
+        coupon_code=code,
+    )
+    if not getattr(discount, "applies", False):
+        return {
+            "activated": False,
+            "coupon_code": code,
+            "message_en": "Invalid or expired coupon code.",
+            "message_fr": "Code promo invalide ou expiré.",
+        }
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    await db.users.update_one(
+        {"id": current_user.id},
+        {"$set": {
+            "partner_offer_active": True,
+            "partner_offer_promotion_id": discount.promotion_id,
+            "partner_offer_coupon_code": code,
+            "partner_offer_activated_at": now_iso,
+            "partner_offer_is_full_waiver": bool(getattr(discount, "is_full_waiver", False)),
+            "partner_offer_discount_percent": float(getattr(discount, "discount_percent", 0)),
+        }},
+    )
+
+    is_full = bool(getattr(discount, "is_full_waiver", False))
+    if is_full:
+        msg_en = "Verified Partner Offer: 100% Free Listing Credit Applied"
+        msg_fr = "Offre partenaire vérifiée : crédit d'annonce gratuit à 100 % appliqué"
+    else:
+        pct = getattr(discount, "discount_percent", 0)
+        msg_en = f"Verified Partner Offer: {pct:.0f}% credit applied"
+        msg_fr = f"Offre partenaire vérifiée : crédit de {pct:.0f} % appliqué"
+
+    return {
+        "activated": True,
+        "coupon_code": code,
+        "promotion_id": discount.promotion_id,
+        "is_full_waiver": is_full,
+        "discount_percent": float(getattr(discount, "discount_percent", 0)),
+        "message_en": msg_en,
+        "message_fr": msg_fr,
+        "activated_at": now_iso,
+    }
+
+
 
 
 

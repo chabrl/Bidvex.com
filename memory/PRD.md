@@ -1,5 +1,66 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter254 — B2B CONSOLIDATION + FORCED LANG + EMAIL BRANDING (Mar 04, 2026) ✅
+
+Final consolidation sprint that finishes the B2B promotion experience: role-gated coupon activation card embedded on every B2B dashboard surface (Profile Settings, Broker Dashboard, Storage Dashboard — Partner Dashboard already shipped in iter253), a forced-language dropdown inside the Launch Broadcast modal that overrides geo-detection, and canonical outbound email branding constants (`partners@bidvex.ca` for B2B, `support@bidvex.com` for transactional). **Pytest 201/201 PASS** (191 prior + 10 new iter254).
+
+### Mission 1 — Role-gated B2B coupon activation
+- **Backend** — NEW `POST /api/promotions/activate-to-account` (`routes/admin_promotions.py:1132`). Hard role-gate at the endpoint: only callers with `is_partner=True` OR `is_storage_facility=True` OR `account_type ∈ {partner, broker, vehicle_dealer, storage_facility}` OR `role ∈ {admin, super_admin}` pass; everyone else gets `403 "Partner coupons are reserved for professional B2B accounts."` Coupon code is uppercased + trimmed, runs through `compute_promotion_discount`, and on success persists 6 new fields on the user record: `partner_offer_active`, `partner_offer_promotion_id`, `partner_offer_coupon_code`, `partner_offer_activated_at`, `partner_offer_is_full_waiver`, `partner_offer_discount_percent`. Returns locked English+French success/error messages (`"Verified Partner Offer: 100% Free Listing Credit Applied"` / `"Offre partenaire vérifiée : crédit d'annonce gratuit à 100 % appliqué"`).
+- **Frontend** — NEW `components/B2BCouponActivationCard.jsx` (~150 lines) with exported `isB2BUser(user)` helper. Renders an amber gradient card with a coupon input + "Activate Code" button (data-testid `b2b-coupon-input`, `b2b-coupon-activate-btn`). On activation success, swaps to an emerald "Verified Partner Offer" badge + active-state confirmation card (data-testid `b2b-coupon-active-state`). Hides entirely for non-B2B users via the role-gate guard. Mounted on:
+  * `pages/ProfileSettingsPage.js` — beside SubscriptionManagement.
+  * `pages/BrokerDashboardPage.jsx` — above the main tab grid.
+  * `pages/storage/StorageDashboard.js` — between header and verification banner.
+  * (`pages/PartnerDashboard.js` already has its iter253 checkout-flow coupon entry.)
+
+### Mission 2 — Inline checkout coupon (already shipped iter253)
+- No new code needed. The `PartnerDashboard.js` coupon entry block + summary ledger + dynamic "🚀 Launch Free Listing Live Now" button are already wired through `POST /api/promotions/validate` and `POST /api/partner/create-checkout` with `coupon_code` Stripe-bypass.
+
+### Mission 3 — Manual language selector for custom-list blasts
+- **Backend** — `PartnerOutreachPayload` (`routes/admin_promotions.py:401`) gained an optional `forced_lang: "en" | "fr" | None` field. Recipient routing loop now resolves `forced_lang` once with normalize+lowercase, then `lang = forced_lang_norm or detect_partner_language(r)` — explicit override always wins. Response surfaces `forced_lang` for the UI toast.
+- **Frontend** — Launch Broadcast Dialog (`pages/admin/PromotionManager.js`) now includes a Shadcn `Select` labeled "🌍 Document Language / Langue" with three options: `Automatic (Geo-detected)` (default), `Force English (EN)`, `Force French (FR)`. data-testids: `launch-lang-selector`, `launch-lang-auto`, `launch-lang-en`, `launch-lang-fr`. State (`launchLang`) resets to `'auto'` on every modal open. Helper paragraph dynamically updates to explain the active behaviour.
+
+### Mission 4 — Outbound email branding standardization
+- **NEW canonical constants** in `services/email_notifications.py`:
+  * `B2B_PARTNER_FROM_EMAIL = "partners@bidvex.ca"`, `B2B_PARTNER_FROM_NAME = "BidVex Partner Program"`
+  * `TRANSACTIONAL_FROM_EMAIL = "support@bidvex.com"`, `TRANSACTIONAL_FROM_NAME = "BidVex"`
+  * Global `FROM_EMAIL` default also updated from `noreply@bidvex.com` → `support@bidvex.com`.
+- **`send_email()`** extended with optional `from_email`/`from_name`/`reply_to` parameters propagated to SendGrid `Mail` headers. Threaded through `send_unified_email()` so any caller can stamp branded headers.
+- **Partner outreach blast** (`routes/admin_promotions.py::send_partner_outreach_blast`) now ships every per-recipient `send_unified_email` call with `from_email="partners@bidvex.ca"`, `from_name="BidVex Partner Program"`, `reply_to="partners@bidvex.ca"`.
+
+### Validation
+- NEW `tests/test_iter254_b2b_consolidation.py` — **10/10 PASS** covering:
+  1. `/promotions/activate-to-account` requires auth.
+  2. Non-B2B account (forged buyer JWT) → 403 with B2B rejection copy.
+  3. Admin/B2B activation persists 6 fields on user record + locked English/French success copy.
+  4. Invalid coupon → `activated=False` + locked error copy.
+  5. `forced_lang="fr"` routes ALL recipients to French (PDF filename `Guide-Evaluation-Programme-Partenaires.pdf`, subject `"Offre exclusive…"`).
+  6. `forced_lang="en"` routes ALL recipients to English.
+  7. `forced_lang=None` falls back to per-recipient `detect_partner_language` (back-compat).
+  8. Response surfaces `forced_lang` for UI toast.
+  9. Email branding constants match spec exactly.
+  10. `send_email()` propagates `from_email`/`from_name`/`reply_to` overrides (verified via logged-only fallback path).
+- **Full regression**: 55/55 PASS across iter247→iter254 (12 skips are admin login rate-limits in batched live-HTTP runs, all proven green in isolation).
+- Frontend lint clean on `B2BCouponActivationCard.jsx`, `PromotionManager.js`, `StorageDashboard.js`, `BrokerDashboardPage.jsx`, `ProfileSettingsPage.js`.
+
+### Files changed (iter254)
+**Backend MODIFIED**: `routes/admin_promotions.py` (`CouponActivationRequest` model + `activate-to-account` endpoint + `forced_lang` field on `PartnerOutreachPayload` + per-recipient `forced_lang_norm` resolver + `forced_lang` in response envelope + branded `from_email` on partner-outreach blast), `services/email_notifications.py` (canonical branding constants + `send_email`/`send_unified_email` accept `from_email`/`from_name`/`reply_to` overrides).
+**Backend NEW**: `tests/test_iter254_b2b_consolidation.py` (10 tests).
+**Frontend NEW**: `components/B2BCouponActivationCard.jsx`.
+**Frontend MODIFIED**: `pages/ProfileSettingsPage.js`, `pages/BrokerDashboardPage.jsx`, `pages/storage/StorageDashboard.js` (mount the card), `pages/admin/PromotionManager.js` (lang selector + `launchLang` state + payload binding).
+
+### Action items (user)
+1. **Save to GitHub → redeploy** preview → production.
+2. **Configure DNS/SendGrid Domain Authentication** for the new branded senders:
+   * `partners@bidvex.ca` (B2B campaigns) — SendGrid domain authentication for `bidvex.ca`.
+   * `support@bidvex.com` (transactional) — confirm existing SendGrid setup covers this sender.
+3. **QA the 4 missions** on prod:
+   * Profile Settings, Broker Dashboard, Storage Dashboard → confirm 🎫 card renders for B2B accounts only.
+   * Launch Broadcast modal → flip "Force French (FR)" → confirm dry-run response shows `lang_breakdown.fr == recipient_count`.
+   * Inbox → verify the next partner blast lands From `partners@bidvex.ca`.
+
+---
+
+
 ## Latest: iter253 — PARTNER COUPON INPUT + STRIPE-BYPASS WIRING (Mar 04, 2026) ✅
 
 Closes the campaign loop by exposing the coupon-code input directly on the Partner Dashboard checkout flow. A flagged partner whose email is on the `BIDVEX-PARTNERS` manual list can now type the coupon, click [ Apply ], and have their $499 CAD annual fee **fully waived in-place** — Stripe is bypassed, `platform_fee_paid` + `partner_subscription_active` are flipped, and a `promotion_usage` row is logged atomically. **Pytest 191/191 PASS** (183 prior + 8 new iter253).

@@ -21,6 +21,7 @@ import UserTierGrid from '../components/UserTierGrid';
 import PartnerLicenseCard from '../components/PartnerLicenseCard';
 import SubscriptionManagement from '../components/SubscriptionManagement';
 import PersonalizedSavingsCalculator from '../components/PersonalizedSavingsCalculator';
+import B2BCouponActivationCard from '../components/B2BCouponActivationCard';
 import PaymentTrustBox from '../components/PaymentTrustBox';
 import { useTranslation } from 'react-i18next';
 
@@ -771,6 +772,10 @@ const ProfileSettingsPage = () => {
 
                 {/* Subscription Management Panel */}
                 <SubscriptionManagement />
+
+                {/* iter254 Mission 1 — B2B Partner Program coupon
+                    activation. The component self-gates on B2B role. */}
+                <B2BCouponActivationCard />
 
                 {/* Show PartnerLicenseCard for partners, UserTierGrid for regular users */}
                 {user?.is_partner ? (

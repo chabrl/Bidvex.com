@@ -15,6 +15,7 @@ import {
 import StorageFooterBanner from './StorageFooterBanner';
 import PromoteAuctionModal from './PromoteAuctionModal';
 import StorageVerificationBanner from './StorageVerificationBanner';
+import B2BCouponActivationCard from '../../components/B2BCouponActivationCard';
 
 const API = API_BASE;
 
@@ -105,6 +106,11 @@ const StorageDashboard = () => {
               <Plus className="h-4 w-4 mr-1" /> {t('storage.dashboard.createNewAuction')}
             </Button>
           </Link>
+        </div>
+
+        {/* iter254 Mission 1 — B2B Partner Program coupon activation card. */}
+        <div className="mb-6">
+          <B2BCouponActivationCard />
         </div>
 
         {/* iter213 — Verification progress banner (hidden once verified) */}

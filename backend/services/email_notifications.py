@@ -12,8 +12,16 @@ logger = logging.getLogger(__name__)
 
 # Email configuration
 SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY")
-FROM_EMAIL = os.environ.get("SENDGRID_FROM_EMAIL", "noreply@bidvex.com")
+FROM_EMAIL = os.environ.get("SENDGRID_FROM_EMAIL", "support@bidvex.com")
 FROM_NAME = os.environ.get("SENDGRID_FROM_NAME", "BidVex")
+
+# iter254 Mission 4 — Canonical outbound branding constants.
+# Use these to override the From/Reply-To headers for branded paths
+# without polluting the global SENDGRID_FROM_EMAIL env default.
+B2B_PARTNER_FROM_EMAIL = "partners@bidvex.ca"
+B2B_PARTNER_FROM_NAME = "BidVex Partner Program"
+TRANSACTIONAL_FROM_EMAIL = "support@bidvex.com"
+TRANSACTIONAL_FROM_NAME = "BidVex"
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "https://www.bidvex.com")
 
 # Check if SendGrid is available
@@ -85,27 +93,45 @@ async def send_email(
     to_email: str,
     subject: str,
     html_content: str,
-    attachments: List[Dict] = None
+    attachments: List[Dict] = None,
+    from_email: Optional[str] = None,
+    from_name: Optional[str] = None,
+    reply_to: Optional[str] = None,
 ) -> Dict[str, Any]:
     """iter244 Mission 2 — Canonical low-level SendGrid dispatcher.
-
-    Public sender used internally by `send_unified_email()`. Legacy
-    helpers SHOULD call `send_unified_email()` instead of this directly,
-    but `send_email` remains as the bottom-of-stack physical send. Falls
-    back to logging if SendGrid is not available.
+    iter254 Mission 4 — Now accepts optional `from_email`/`from_name`/
+    `reply_to` overrides so individual outbound paths can stamp branded
+    headers (`partners@bidvex.ca` for B2B blasts, `support@bidvex.com`
+    for transactional). Defaults preserve the existing global FROM.
     """
     if not SENDGRID_AVAILABLE:
         logger.info(f"[EMAIL LOG] To: {to_email}, Subject: {subject}")
         logger.debug(f"[EMAIL CONTENT] {html_content[:500]}...")
-        return {"status": "logged", "message": "SendGrid not configured - email logged"}
+        return {
+            "status": "logged",
+            "message": "SendGrid not configured - email logged",
+            "from_email": from_email or FROM_EMAIL,
+            "from_name": from_name or FROM_NAME,
+            "reply_to": reply_to,
+        }
     
     try:
+        _from = from_email or FROM_EMAIL
+        _from_name = from_name or FROM_NAME
         message = Mail(
-            from_email=Email(FROM_EMAIL, FROM_NAME),
+            from_email=Email(_from, _from_name),
             to_emails=To(to_email),
             subject=subject,
             html_content=Content("text/html", html_content)
         )
+        if reply_to:
+            try:
+                from sendgrid.helpers.mail import ReplyTo as _ReplyTo
+                message.reply_to = _ReplyTo(reply_to)
+            except Exception:
+                # ReplyTo class import may differ between SendGrid SDK
+                # versions; fall back to setting the attribute directly.
+                message.reply_to = Email(reply_to)
         
         # Add attachments if any
         if attachments:
@@ -141,6 +167,9 @@ async def send_unified_email(
     *,
     lang: str = "en",
     attachments: Optional[List[Dict]] = None,
+    from_email: Optional[str] = None,
+    from_name: Optional[str] = None,
+    reply_to: Optional[str] = None,
 ) -> Dict[str, Any]:
     """iter239 Mission 6 — Canonical email dispatch using the unified
     `build_email_payload()` mapping engine.
@@ -155,17 +184,21 @@ async def send_unified_email(
       - `html_full_override`: send the HTML verbatim (no wrapping)
       - `body_html_override`: wrap inside BIDVEX header/footer chrome
       - `subject_override`:   override the registry's auto-derived subject
+
+    iter254 Mission 4 — Optional from_email/from_name/reply_to overrides
+    let callers stamp branded outbound headers (e.g. `partners@bidvex.ca`
+    for B2B blasts, `support@bidvex.com` for transactional).
     """
     from services.email_templates import build_email_payload
     payload = build_email_payload(email_type, user=user, data=data or {}, lang=lang)
-    # iter244 — Sentinel marker for the canonical inner call. Calling
-    # `send_email` here is intentional and must NOT be rewritten by the
-    # bulk migration sweep below.
     return await send_email(
         to_email=payload["to_email"],
         subject=payload["subject"],
         html_content=payload["html_content"],
         attachments=attachments,
+        from_email=from_email,
+        from_name=from_name,
+        reply_to=reply_to,
     )
 
 

@@ -16,6 +16,7 @@ import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Alert, AlertDescription } from '../components/ui/alert';
+import B2BCouponActivationCard from '../components/B2BCouponActivationCard';
 import {
   LayoutDashboard, Users, Car, ClipboardList, DollarSign, Settings,
   AlertTriangle, CheckCircle2, Clock, XCircle, ShieldCheck,
@@ -165,6 +166,12 @@ export default function BrokerDashboardPage() {
           </p>
         </div>
       </header>
+
+      {/* iter254 Mission 1 — B2B Partner Program coupon activation card.
+          Self-gates on the user's B2B role; non-B2B users see nothing. */}
+      <div className="mb-6">
+        <B2BCouponActivationCard />
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-6">
         {/* Sidebar */}

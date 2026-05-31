@@ -275,9 +275,13 @@ const PromotionManager = () => {
   // iter252 — Inbox QA toggle. When ON, the launch dispatches as a
   // self-preview to the admin instead of the live audience.
   const [launchTestSend, setLaunchTestSend] = useState(false);
+  // iter254 Mission 3 — Forced language override for the blast.
+  // 'auto' = use detect_partner_language(), 'en' / 'fr' = force.
+  const [launchLang, setLaunchLang] = useState('auto');
   const openLaunch = (promo) => {
     setLaunchTarget(promo);
     setLaunchTestSend(false);  // always default OFF when opening
+    setLaunchLang('auto');     // iter254 — reset language override
   };
   const confirmLaunchBroadcast = async () => {
     if (!launchTarget?.id) return;
@@ -300,6 +304,10 @@ const PromotionManager = () => {
           return;
         }
         body.recipient_emails = [adminEmail];
+      }
+      // iter254 Mission 3 — Forced-language override.
+      if (isPartnerCampaign && launchLang && launchLang !== 'auto') {
+        body.forced_lang = launchLang;
       }
       const res = await axios.post(endpoint, body, { headers });
       const data = res?.data || {};
@@ -838,6 +846,36 @@ const PromotionManager = () => {
                     : 'When enabled, the broadcast routes only to your admin email so you can preview the live render before firing to the real audience.'}
                 </p>
               </label>
+            </div>
+          )}
+
+          {/* iter254 Mission 3 — Document language selector */}
+          {launchTarget?.type === 'partner_launch_offer' && (
+            <div className="space-y-1.5" data-testid="launch-lang-selector-row">
+              <Label className="text-xs font-semibold text-slate-700">
+                🌍 Document Language / Langue
+              </Label>
+              <Select value={launchLang} onValueChange={setLaunchLang}>
+                <SelectTrigger className="h-9 text-xs" data-testid="launch-lang-selector">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto" data-testid="launch-lang-auto">
+                    Automatic (Geo-detected)
+                  </SelectItem>
+                  <SelectItem value="en" data-testid="launch-lang-en">
+                    Force English (EN)
+                  </SelectItem>
+                  <SelectItem value="fr" data-testid="launch-lang-fr">
+                    Force French (FR)
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-slate-500">
+                {launchLang === 'auto'
+                  ? 'Each recipient gets the variant matching their province + preferred_language.'
+                  : `All recipients will receive the ${launchLang === 'fr' ? 'French' : 'English'} variant regardless of their profile.`}
+              </p>
             </div>
           )}
           <DialogFooter className="gap-2 sm:gap-0">
