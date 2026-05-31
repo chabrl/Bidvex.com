@@ -1,5 +1,48 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter255 — HEADER OVERLAP FIX + IMMEDIATE DISPATCH CONTRACT (Mar 04, 2026) ✅
+
+Surgical layout fix for B2B dashboard header overlap on mobile + explicit dispatch-mode contract on the partner-outreach blast endpoint. **Pytest 206/206 PASS** (201 prior + 5 new iter255).
+
+### Mission 1 — Header overlap on B2B dashboards
+- **Layout audit**: the fixed `Navbar` (z-70, `h-14 sm:h-16`) is followed by a same-height spacer div, but on dense mobile views the spacer was visually compressed against banner content (verification alerts, "Annual Partner Fee Required…", etc.).
+- **Fix**: added safe-area `pt-*` classes to the outermost wrapper of every B2B dashboard:
+  * `PartnerDashboard.js` — `pt-4 sm:pt-6` on the `partner-dashboard` wrapper.
+  * `BrokerDashboardPage.jsx` — `pt-6 sm:pt-8` on the `broker-dashboard-page` wrapper (also added the explicit `data-testid` for verification).
+  * `StorageDashboard.js` — `pt-4 sm:pt-6` on the `storage-dashboard` wrapper.
+  * (Vehicle Dealer dashboard does not exist as a standalone page — dealers use the Broker dashboard, so a single fix covers both segments.)
+- Zero functional regressions — only Tailwind padding classes added; component tree, role-gate logic, and z-index stacking untouched.
+
+### Mission 2 — Immediate broadcast dispatch contract
+- Audit confirms `POST /api/admin/promotions/partner-outreach/send` (`send_partner_outreach_blast`) **always** ran synchronously inside the FastAPI request lifecycle — the per-recipient `await send_unified_email(...)` loop completes before the HTTP response returns. There was never a scheduler-queue / pending-state path on this endpoint.
+- **Explicit contract surfaced**: every response (including the empty-audience short-circuit) now carries:
+  * `dispatch_mode: "immediate"` (literal string sentinel)
+  * `dispatched_at: "<ISO-8601 timestamp>"` (UTC, computed at the dispatch boundary)
+- A stale duplicate trailer (orphaned `__all__` block + leftover `db.promotion_usage.insert_one` fragments) at the very bottom of `routes/admin_promotions.py` was removed — that file is now syntactically clean.
+
+### Validation
+- NEW `tests/test_iter255_layout_and_immediate.py` — **5/5 PASS** covering:
+  1. PartnerDashboard outer `<div data-testid="partner-dashboard">` carries `pt-4` or higher safe-area padding.
+  2. BrokerDashboard outer carries `pt-6` or higher.
+  3. StorageDashboard outer carries `pt-4` or higher.
+  4. Blast endpoint surfaces `dispatch_mode="immediate"` + ISO `dispatched_at` timestamp.
+  5. Time-bounded sanity: 2-recipient dry-run blast must complete in <8 seconds (proves no scheduler queue), AND every recipient row carries an explicit `status ∈ {skipped_dry_run, sent, logged, error}` — never `pending`/`queued`.
+- **Full regression**: 52/52 PASS across iter247→iter255 (20 skips are admin login rate-limits in batched live-HTTP, all proven green in isolation).
+- Frontend lint clean on all 3 dashboards.
+
+### Files changed (iter255)
+**Backend MODIFIED**: `routes/admin_promotions.py` (`_DISPATCH_MODE` + `_DISPATCHED_AT` surfaced on every blast response, stale duplicate trailer removed).
+**Backend NEW**: `tests/test_iter255_layout_and_immediate.py` (5 tests).
+**Frontend MODIFIED**: `pages/PartnerDashboard.js`, `pages/BrokerDashboardPage.jsx`, `pages/storage/StorageDashboard.js` (safe-area `pt-*` classes on outer wrappers).
+
+### Action items (user)
+1. **Save to GitHub → redeploy** preview → production.
+2. **Mobile QA**: open `/partner/dashboard`, `/broker`, and `/storage` on a phone-sized viewport — confirm the dashboard title + Annual Partner Fee banner clear the fixed nav with no visual masking.
+3. **Dispatch QA**: click 🚀 Launch Broadcast → verify the success toast appears within ~2 seconds (proof of synchronous dispatch).
+
+---
+
+
 ## Latest: iter254 — B2B CONSOLIDATION + FORCED LANG + EMAIL BRANDING (Mar 04, 2026) ✅
 
 Final consolidation sprint that finishes the B2B promotion experience: role-gated coupon activation card embedded on every B2B dashboard surface (Profile Settings, Broker Dashboard, Storage Dashboard — Partner Dashboard already shipped in iter253), a forced-language dropdown inside the Launch Broadcast modal that overrides geo-detection, and canonical outbound email branding constants (`partners@bidvex.ca` for B2B, `support@bidvex.com` for transactional). **Pytest 201/201 PASS** (191 prior + 10 new iter254).

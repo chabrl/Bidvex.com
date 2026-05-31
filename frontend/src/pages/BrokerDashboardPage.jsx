@@ -145,7 +145,7 @@ export default function BrokerDashboardPage() {
   const activeBuyers  = buyers.filter(b => b.status === 'active').length;
 
   return (
-    <div className="container mx-auto max-w-7xl py-6 px-4">
+    <div className="container mx-auto max-w-7xl py-6 px-4 pt-6 sm:pt-8" data-testid="broker-dashboard-page">
       <header className="flex items-start justify-between gap-4 mb-6 flex-wrap" data-testid="broker-dashboard-header">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold">{broker.legal_business_name}</h1>

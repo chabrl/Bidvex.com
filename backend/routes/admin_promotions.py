@@ -587,6 +587,12 @@ async def send_partner_outreach_blast(
                 "preferred_language": u.get("preferred_language") or u.get("language"),
             })
 
+    # iter255 Mission 2 — Immediate dispatch contract is the ONLY mode.
+    # Surfaced in EVERY response payload (including the early no-match
+    # short-circuit) so admins get atomic dispatch-confirmation.
+    _DISPATCH_MODE = "immediate"
+    _DISPATCHED_AT = datetime.now(timezone.utc).isoformat()
+
     if not recipients:
         return {
             "sent": 0,
@@ -596,6 +602,8 @@ async def send_partner_outreach_blast(
             "coupon_code": coupon_code,
             "subject": PARTNER_OUTREACH_EMAIL_SUBJECT,
             "dry_run": payload.dry_run,
+            "dispatch_mode": _DISPATCH_MODE,
+            "dispatched_at": _DISPATCHED_AT,
             "warning": "no_partner_users_matched",
         }
 
@@ -698,6 +706,8 @@ async def send_partner_outreach_blast(
         "failed": failed,
         "dry_run": payload.dry_run,
         "is_preview": bool(payload.recipient_emails),
+        "dispatch_mode": _DISPATCH_MODE,
+        "dispatched_at": _DISPATCHED_AT,
         "recipients": results,
     }
 
