@@ -311,6 +311,35 @@ async def preview_audience(
     return await _audience_preview(db, target_config)
 
 
+@admin_promotions_router.get("/promotions/preview-discount")
+async def preview_discount(
+    transaction_type: str,
+    base_amount_cad: float,
+    listing_type: Optional[str] = None,
+    coupon_code: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+):
+    """iter242 Mission 2 — Public preview endpoint.
+
+    Used by checkout pages to show "You'll pay $0.00 thanks to your
+    Free Partner Promotion!" BEFORE the user clicks "Pay" so they're
+    never surprised by a $0 transaction.
+
+    Returns the PromotionDiscount block (see services/promotion_runtime.py).
+    """
+    from services.promotion_runtime import compute_promotion_discount
+    db = get_db()
+    discount = await compute_promotion_discount(
+        db=db,
+        user_id=current_user.id,
+        transaction_type=transaction_type,
+        listing_type=listing_type,
+        base_amount_cad=base_amount_cad,
+        coupon_code=coupon_code,
+    )
+    return discount.to_dict()
+
+
 # ─── Public lookup (coupon code) ──────────────────────────────────────
 @admin_promotions_router.get("/promotions/lookup")
 async def lookup_coupon(

@@ -49,6 +49,10 @@ const PromoteListingModal = ({ open, onOpenChange, listing, onSuccess }) => {
   const [sections, setSections] = useState(['marketplace']);
   const [tier, setTier] = useState('standard');
   const [submitting, setSubmitting] = useState(false);
+  // iter242 Mission 2 — Coupon code support + discount preview state.
+  const [couponCode, setCouponCode] = useState('');
+  const [discount, setDiscount] = useState(null); // {applies, is_full_waiver, ...}
+  const [previewing, setPreviewing] = useState(false);
 
   // Duration is now fixed per-tier (Stripe pricing tied to duration).
   const activeTier = TIERS.find((x) => x.id === tier) || TIERS[1];
@@ -58,6 +62,41 @@ const PromoteListingModal = ({ open, onOpenChange, listing, onSuccess }) => {
     setSections((prev) =>
       prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
     );
+  };
+
+  // iter242 Mission 2 — Preview discount BEFORE redirecting to Stripe.
+  // The backend evaluates the coupon + active platform promotions and
+  // returns whether the listing-promotion fee will be waived (is_full_waiver).
+  const previewDiscount = async () => {
+    if (!listing?.id) return;
+    setPreviewing(true);
+    setDiscount(null);
+    try {
+      const basePrice = parseFloat(activeTier.price.replace(/[^0-9.]/g, '')) || 0;
+      const params = new URLSearchParams({
+        transaction_type: 'listing_promotion',
+        base_amount_cad: String(basePrice),
+        listing_type: (listing.listing_type || 'marketplace'),
+      });
+      if (couponCode.trim()) params.set('coupon_code', couponCode.trim().toUpperCase());
+      const res = await axios.get(
+        `${API_BASE}/promotions/preview-discount?${params.toString()}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setDiscount(res.data);
+      if (res.data?.is_full_waiver) {
+        toast.success(t('Coupon validated! This promotion will be FREE.', 'Coupon validé ! Cette promotion sera GRATUITE.'));
+      } else if (res.data?.applies) {
+        toast.success(t(`Coupon validated — ${res.data.discount_percent}% off.`, `Coupon validé — ${res.data.discount_percent}% de réduction.`));
+      } else {
+        toast.message(t('No promotion applies to this transaction.', 'Aucune promotion applicable.'));
+      }
+    } catch (e) {
+      const msg = e?.response?.data?.detail || 'Preview failed';
+      toast.error(typeof msg === 'string' ? msg : 'Preview failed');
+    } finally {
+      setPreviewing(false);
+    }
   };
 
   const handlePromote = async () => {
@@ -89,9 +128,26 @@ const PromoteListingModal = ({ open, onOpenChange, listing, onSuccess }) => {
           // Sections is recorded in metadata so the webhook can mirror it
           // onto the listing once the payment clears.
           sections,
+          // iter242 Mission 2 — Forward the coupon so the backend can match
+          // it against admin promotions and bypass Stripe when applicable.
+          coupon_code: couponCode.trim().toUpperCase() || undefined,
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
+      // iter242 Mission 2 — If the backend returned a "waived" flag, the
+      // listing was promoted in-place at $0.00 and Stripe was bypassed.
+      if (res?.data?.waived === true) {
+        toast.success(
+          t(
+            `🎉 Promotion activated for FREE! Saved $${res.data.saved_amount_cad?.toFixed?.(2) || '0.00'}.`,
+            `🎉 Promotion activée GRATUITEMENT ! Économie de ${res.data.saved_amount_cad?.toFixed?.(2) || '0.00'} $.`
+          )
+        );
+        onSuccess?.(res.data);
+        onOpenChange(false);
+        return;
+      }
+      // Standard Stripe redirect.
       const checkoutUrl = res?.data?.url || res?.data?.checkout_url;
       if (!checkoutUrl) throw new Error('Stripe checkout URL missing in response');
       // Open in same tab so Stripe → return_url redirects feel native.
@@ -179,6 +235,50 @@ const PromoteListingModal = ({ open, onOpenChange, listing, onSuccess }) => {
 
           {/* iter241 Mission 1 — Duration is now fixed per-tier, no manual override. */}
 
+          {/* iter242 Mission 2 — Coupon code field + zero-fee preview. */}
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
+              {t('Coupon code (optional)', 'Code promo (facultatif)')}
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={couponCode}
+                onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                placeholder="BIDVEX-XXXXXX"
+                className="flex-1 px-3 py-2 border-[1.5px] border-slate-200 rounded-md text-sm uppercase font-mono"
+                data-testid="promote-coupon-input"
+              />
+              <button
+                type="button"
+                onClick={previewDiscount}
+                disabled={previewing}
+                className="px-3 py-2 rounded-md border-[1.5px] border-slate-200 text-xs font-semibold hover:border-amber-400"
+                data-testid="promote-preview-coupon-btn"
+              >
+                {previewing ? t('Checking…', 'Vérification…') : t('Apply', 'Appliquer')}
+              </button>
+            </div>
+            {discount?.applies && (
+              <div
+                className={`mt-2 p-2 rounded-md text-xs ${discount.is_full_waiver
+                  ? 'bg-emerald-50 border border-emerald-200 text-emerald-900'
+                  : 'bg-blue-50 border border-blue-200 text-blue-900'}`}
+                data-testid="promote-discount-preview"
+              >
+                {discount.is_full_waiver
+                  ? t(
+                      '✅ Full waiver applied — this promotion will be activated for FREE.',
+                      '✅ Exonération complète — cette promotion sera activée GRATUITEMENT.'
+                    )
+                  : t(
+                      `Coupon applies — ${discount.discount_percent}% off ($${discount.discount_amount?.toFixed?.(2)}).`,
+                      `Coupon appliqué — ${discount.discount_percent}% de réduction (${discount.discount_amount?.toFixed?.(2)} $).`
+                    )}
+              </div>
+            )}
+          </div>
+
           {/* Summary */}
           <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 text-xs text-blue-900" data-testid="promote-summary">
             <p>
@@ -206,12 +306,16 @@ const PromoteListingModal = ({ open, onOpenChange, listing, onSuccess }) => {
             {submitting ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                {t('Redirecting to Stripe…', 'Redirection vers Stripe…')}
+                {discount?.is_full_waiver
+                  ? t('Activating…', 'Activation…')
+                  : t('Redirecting to Stripe…', 'Redirection vers Stripe…')}
               </>
             ) : (
               <>
                 <Sparkles className="h-4 w-4 mr-2" />
-                {t('Pay with Stripe', 'Payer avec Stripe')}
+                {discount?.is_full_waiver
+                  ? t('Activate FREE promotion', 'Activer la promotion GRATUITE')
+                  : t('Pay with Stripe', 'Payer avec Stripe')}
               </>
             )}
           </Button>

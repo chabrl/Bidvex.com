@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import logging
 import uuid
 import stripe
@@ -122,6 +122,92 @@ async def promote_listing(
     promo_config = PROMOTION_TIERS[tier]
     base_price_cad = round(promo_config["price_cents"] / 100, 2)   # e.g. $9.99
     boost_days = promo_config["duration_days"]
+
+    # iter242 Mission 2 — Promotion engine pre-flight. If an active admin
+    # promotion grants a full waiver on listing promotion fees, bypass
+    # Stripe entirely, activate the boost immediately, and record a $0.00
+    # audit row. The matched promotion's usage counter is bumped atomically.
+    from routes.admin_promotions import apply_active_promotions, record_promotion_usage
+    coupon_code = (data.get("coupon_code") or "").strip() or None
+    matched_promo = await apply_active_promotions(
+        db=db,
+        user_id=current_user.id,
+        transaction_type="listing_promotion",
+        listing_type=listing_type,
+        coupon_code=coupon_code,
+    )
+    waives_promotion = False
+    if matched_promo is not None:
+        # A waiver is granted when the promotion is type free_promotion_boost
+        # OR free_platform_fee with a "promotion" scope OR reduced_commission
+        # at >= 100%.
+        ptype = matched_promo.get("type")
+        cfg = matched_promo.get("config", {}) or {}
+        if ptype == "free_promotion_boost":
+            # Optional: gate by tier match if config specifies a credit_tier.
+            credit_tier = cfg.get("credit_tier")
+            if not credit_tier or credit_tier == tier:
+                waives_promotion = True
+        elif ptype == "free_platform_fee" and "promotion" in (cfg.get("scope") or []):
+            waives_promotion = True
+        elif ptype == "reduced_commission" and float(cfg.get("discount_percent", 0)) >= 100.0:
+            waives_promotion = True
+
+    if waives_promotion:
+        # ─── Zero-fee bypass ───────────────────────────────────────────
+        now = datetime.now(timezone.utc)
+        expires_at = now + timedelta(days=boost_days)
+        await coll.update_one(
+            {"id": listing_id},
+            {"$set": {
+                "is_promoted": True,
+                "promotion_tier": tier,
+                "promotion_tier_weight": {"basic": 1, "standard": 2, "premium": 3}.get(tier, 1),
+                "promoted_until": expires_at.isoformat(),
+                "promotion_end": expires_at.isoformat(),
+                "promotion_features": PROMOTION_FEATURES.get(
+                    listing_type, PROMOTION_FEATURES["marketplace"]
+                ).get(tier, []),
+                "promotion_waived_by": matched_promo.get("id"),
+                "promotion_waived_at": now.isoformat(),
+            }},
+        )
+        # Atomic counter bump + usage row.
+        await record_promotion_usage(
+            db=db,
+            promotion_id=matched_promo["id"],
+            user_id=current_user.id,
+            transaction_type="listing_promotion",
+            saved_amount=base_price_cad,
+        )
+        # Audit ledger record ($0.00).
+        await db.transactions.insert_one({
+            "id": str(uuid.uuid4()),
+            "user_id": current_user.id,
+            "listing_id": listing_id,
+            "type": "listing_promotion_waived",
+            "amount_cad": 0.0,
+            "currency": "CAD",
+            "tier": tier,
+            "promotion_id": matched_promo["id"],
+            "coupon_code": matched_promo.get("coupon_code"),
+            "metadata": {
+                "boost_days": boost_days,
+                "base_price_waived": base_price_cad,
+                "saved_amount": base_price_cad,
+            },
+            "created_at": now.isoformat(),
+        })
+        return {
+            "status": "promoted",
+            "waived": True,
+            "promotion_id": matched_promo["id"],
+            "coupon_code": matched_promo.get("coupon_code"),
+            "listing_id": listing_id,
+            "tier": tier,
+            "promoted_until": expires_at.isoformat(),
+            "saved_amount_cad": base_price_cad,
+        }
 
     # Full Canadian fee stack — GST + QST on base, then Stripe gross-up
     from decimal import Decimal as _D

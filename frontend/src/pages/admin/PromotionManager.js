@@ -1,242 +1,651 @@
-import API_BASE from '../../config';
-import React, { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
+/**
+ * iter242 Mission 1 — Admin Promotions Engine
+ *
+ * Replaces the legacy per-listing promotion manager with the new
+ * platform-wide offers control panel backed by `/api/admin/promotions`.
+ *
+ * Capabilities:
+ *   • Management table with status badges, usage counters, action buttons
+ *   • Multi-step create / edit dialog
+ *   • Auto-generated BIDVEX-XXXXXX coupon codes + custom override
+ *   • Target picker (all / tier / province / new_users / custom)
+ *   • Audience pre-flight preview before saving
+ *   • Pause / Activate / Duplicate / Delete / View Usage Report
+ */
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
+import { useAuth } from '../../contexts/AuthContext';
+import API_BASE from '../../config';
+import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
+import { Label } from '../../components/ui/label';
 import { Badge } from '../../components/ui/badge';
 import { Skeleton } from '../../components/ui/skeleton';
-import { AsyncButton } from '../../components/ui/async-button';
-import { ConfirmDialog } from '../../components/ui/confirm-dialog';
-import { toast } from 'sonner';
-import { TrendingUp, Trash2, Plus, Star, Search } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../../components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../components/ui/select';
+import { Textarea } from '../../components/ui/textarea';
+import {
+  Plus,
+  Copy,
+  Trash2,
+  Pause,
+  Play,
+  Sparkles,
+  Users,
+  RefreshCw,
+  Eye,
+  Wand2,
+} from 'lucide-react';
 
 const API = API_BASE;
 
+const PROMOTION_TYPES = [
+  { value: 'free_platform_fee',   label: 'Free Platform Fee',     blurb: 'Waive buyer premium or seller commission' },
+  { value: 'free_first_listing',  label: 'Free First Listing',    blurb: '0% commission on first listing per category' },
+  { value: 'reduced_commission',  label: 'Reduced Commission',    blurb: '% discount on platform commission' },
+  { value: 'free_promotion_boost',label: 'Free Promotion Boost',  blurb: 'Free promotion credit (basic / standard / premium)' },
+  { value: 'subscription_discount',label:'Subscription Discount', blurb: '% off subscription upgrade' },
+  { value: 'partner_launch_offer',label: 'Partner Launch Offer',  blurb: 'Bundle for new partner sign-ups' },
+];
+
+const TARGET_OPTIONS = [
+  { value: 'all',        label: 'All users' },
+  { value: 'tier',       label: 'Specific subscription tier' },
+  { value: 'province',   label: 'Specific province' },
+  { value: 'new_users',  label: 'New users (last N days)' },
+  { value: 'custom',     label: 'Manual user list' },
+];
+
+const STATUS_BADGE_STYLES = {
+  active:    'bg-green-100 text-green-800 border-green-300',
+  scheduled: 'bg-amber-100 text-amber-800 border-amber-300',
+  expired:   'bg-rose-100 text-rose-800 border-rose-300',
+  paused:    'bg-slate-200 text-slate-700 border-slate-300',
+  draft:     'bg-blue-100 text-blue-800 border-blue-300',
+  exhausted: 'bg-purple-100 text-purple-800 border-purple-300',
+};
+const STATUS_LABEL = {
+  active:    '🟢 Active',
+  scheduled: '🟡 Scheduled',
+  expired:   '🔴 Expired',
+  paused:    '⏸️ Paused',
+  draft:     '✏️ Draft',
+  exhausted: '✅ Exhausted',
+};
+
+const blankForm = () => ({
+  id: null,
+  name_en: '',
+  name_fr: '',
+  type: 'free_platform_fee',
+  coupon_code: '',
+  start_date: new Date().toISOString().slice(0, 10),
+  end_date: new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10),
+  max_uses: '',
+  uses_per_user: 1,
+  notify_users: false,
+  show_banner: false,
+  target_config: {
+    target: 'all',
+    target_tier: 'premium',
+    target_province: 'QC',
+    new_user_days: 30,
+    custom_user_ids: [],
+    custom_emails: [],
+  },
+  config: {
+    discount_percent: 50,
+    scope: ['all'],
+    credit_tier: 'basic',
+    credit_count: 1,
+  },
+});
+
 const PromotionManager = () => {
   const { token } = useAuth();
-  const headers = React.useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
-  const { t } = useTranslation();
-  const [promotions, setPromotions] = useState([]);
-  const [listings, setListings] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [showCreate, setShowCreate] = useState(false);
-  const [newPromotion, setNewPromotion] = useState({
-    listing_id: '',
-    promotion_type: 'featured',
-    end_date: ''
-  });
-  const [search, setSearch] = useState('');
-  const [confirm, setConfirm] = useState(null);
+  const headers = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
 
-  const fetchData = useCallback(async () => {
+  const [promotions, setPromotions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [form, setForm] = useState(blankForm());
+  const [editing, setEditing] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewResult, setPreviewResult] = useState(null);
+  const [usageOpen, setUsageOpen] = useState(null);
+  const [usageRows, setUsageRows] = useState([]);
+
+  const fetchPromotions = useCallback(async () => {
     setLoading(true);
     try {
-      const [promotionsRes, listingsRes] = await Promise.all([
-        axios.get(`${API}/admin/promotions`, { headers }).catch(() => ({ data: [] })),
-        axios.get(`${API}/admin/auctions?status=active`, { headers }).catch(() => ({ data: [] }))
-      ]);
-      setPromotions(Array.isArray(promotionsRes.data) ? promotionsRes.data : []);
-      setListings(Array.isArray(listingsRes.data) ? listingsRes.data : []);
-    } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to load promotions');
+      const res = await axios.get(`${API}/admin/promotions`, { headers });
+      setPromotions(res?.data?.items || []);
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || 'Failed to load promotions');
     } finally {
       setLoading(false);
     }
   }, [headers]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { fetchPromotions(); }, [fetchPromotions]);
 
-  const createPromotion = async () => {
-    if (!newPromotion.listing_id) {
-      toast.error('Please select a listing / Veuillez sélectionner une annonce');
-      throw new Error('validation');
-    }
-    if (!newPromotion.end_date) {
-      toast.error('End date is required / Date de fin requise');
-      throw new Error('validation');
-    }
-    if (new Date(newPromotion.end_date) <= new Date()) {
-      toast.error('End date must be in the future / La date de fin doit être future');
-      throw new Error('validation');
-    }
-    await axios.post(`${API}/admin/promotions/create`, newPromotion, { headers });
-    setShowCreate(false);
-    setNewPromotion({ listing_id: '', promotion_type: 'featured', end_date: '' });
-    await fetchData();
+  const openCreate = () => {
+    setForm(blankForm());
+    setEditing(false);
+    setPreviewResult(null);
+    setCreating(true);
   };
 
-  const deletePromotion = async (promotionId) => {
-    await axios.delete(`${API}/admin/promotions/${promotionId}`, { headers });
-    await fetchData();
+  const openEdit = (promo) => {
+    setForm({
+      id: promo.id,
+      name_en: promo.name_en || '',
+      name_fr: promo.name_fr || '',
+      type: promo.type,
+      coupon_code: promo.coupon_code || '',
+      start_date: (promo.start_date || '').slice(0, 10),
+      end_date: (promo.end_date || '').slice(0, 10),
+      max_uses: promo.max_uses ?? '',
+      uses_per_user: promo.uses_per_user || 1,
+      notify_users: !!promo.notify_users,
+      show_banner: !!promo.show_banner,
+      target_config: {
+        target: promo.target || promo.target_config?.target || 'all',
+        target_tier: promo.target_config?.target_tier || 'premium',
+        target_province: promo.target_config?.target_province || 'QC',
+        new_user_days: promo.target_config?.new_user_days || 30,
+        custom_user_ids: promo.target_config?.custom_user_ids || [],
+        custom_emails: promo.target_config?.custom_emails || [],
+      },
+      config: {
+        discount_percent: promo.config?.discount_percent ?? 50,
+        scope: promo.config?.scope || ['all'],
+        credit_tier: promo.config?.credit_tier || 'basic',
+        credit_count: promo.config?.credit_count || 1,
+      },
+    });
+    setEditing(true);
+    setPreviewResult(null);
+    setCreating(true);
   };
 
-  const featureListing = async (listingId, isFeatured) => {
-    await axios.put(`${API}/admin/listings/${listingId}/feature`,
-      { is_featured: !isFeatured }, { headers });
-    await fetchData();
+  const autoCoupon = () => {
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let suffix = '';
+    for (let i = 0; i < 6; i += 1) suffix += alphabet[Math.floor(Math.random() * alphabet.length)];
+    setForm((f) => ({ ...f, coupon_code: `BIDVEX-${suffix}` }));
   };
 
-  const filteredListings = listings.filter(l =>
-    !search || (l.title || '').toLowerCase().includes(search.toLowerCase())
-  );
+  const previewAudience = async () => {
+    setPreviewLoading(true);
+    setPreviewResult(null);
+    try {
+      const res = await axios.post(
+        `${API}/admin/promotions/preview-audience`,
+        form.target_config,
+        { headers },
+      );
+      setPreviewResult(res.data);
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || 'Preview failed');
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const savePromotion = async () => {
+    if (!form.name_en?.trim()) { toast.error('Promotion name (EN) is required'); return; }
+    setSubmitting(true);
+    try {
+      const payload = {
+        name_en: form.name_en,
+        name_fr: form.name_fr || form.name_en,
+        type: form.type,
+        target_config: form.target_config,
+        config: form.config,
+        coupon_code: form.coupon_code || undefined,
+        start_date: new Date(form.start_date).toISOString(),
+        end_date: new Date(form.end_date).toISOString(),
+        max_uses: form.max_uses === '' ? null : Number(form.max_uses),
+        uses_per_user: Number(form.uses_per_user) || 1,
+        notify_users: !!form.notify_users,
+        show_banner: !!form.show_banner,
+      };
+      if (editing && form.id) {
+        await axios.patch(`${API}/admin/promotions/${form.id}`, payload, { headers });
+        toast.success('Promotion updated');
+      } else {
+        await axios.post(`${API}/admin/promotions`, payload, { headers });
+        toast.success('Promotion created');
+      }
+      setCreating(false);
+      fetchPromotions();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || 'Save failed');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const togglePromotion = async (promo) => {
+    const target = promo.status === 'active' ? 'pause' : 'activate';
+    try {
+      await axios.post(`${API}/admin/promotions/${promo.id}/${target}`, {}, { headers });
+      toast.success(`Promotion ${target}d`);
+      fetchPromotions();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || `${target} failed`);
+    }
+  };
+
+  const duplicatePromotion = async (promo) => {
+    try {
+      await axios.post(`${API}/admin/promotions/${promo.id}/duplicate`, {}, { headers });
+      toast.success('Duplicate created (status: draft)');
+      fetchPromotions();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || 'Duplicate failed');
+    }
+  };
+
+  const deletePromotion = async (promo) => {
+    if (!window.confirm(`Delete "${promo.name_en}" permanently?`)) return;
+    try {
+      await axios.delete(`${API}/admin/promotions/${promo.id}`, { headers });
+      toast.success('Promotion deleted');
+      fetchPromotions();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || 'Delete failed');
+    }
+  };
+
+  const openUsage = async (promo) => {
+    setUsageOpen(promo);
+    setUsageRows([]);
+    try {
+      const res = await axios.get(`${API}/admin/promotions/${promo.id}/usage`, { headers });
+      setUsageRows(res?.data?.items || []);
+    } catch (e) {
+      toast.error('Could not load usage report');
+    }
+  };
 
   return (
-    <div className="space-y-6" data-testid="promotion-manager">
-      <div className="flex justify-between items-center">
+    <div className="space-y-4" data-testid="admin-promotions-engine">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold flex items-center gap-2">
-            <TrendingUp className="h-6 w-6" />Promotion Management
+          <h2 className="text-xl font-bold flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-amber-500" />
+            Admin Promotions Engine
           </h2>
-          <p className="text-muted-foreground">Feature listings and manage active promotions</p>
+          <p className="text-sm text-slate-500 mt-1">
+            Platform-wide offers & coupons. Backed by <code className="text-xs bg-slate-100 px-1 rounded">/api/admin/promotions</code>.
+          </p>
         </div>
-        <Button onClick={() => setShowCreate(s => !s)} className="gradient-button text-white border-0"
-          data-testid="promotion-create-toggle">
-          <Plus className="h-4 w-4 mr-2" />Create Promotion
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={fetchPromotions} data-testid="promotions-refresh-btn">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+          <Button onClick={openCreate} data-testid="promotions-new-btn" className="bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0">
+            <Plus className="h-4 w-4 mr-2" />
+            New Promotion
+          </Button>
+        </div>
       </div>
 
-      {showCreate && (
-        <Card className="border-2 border-primary" data-testid="promotion-create-form">
-          <CardHeader><CardTitle>{t("admin.createNewPromotion")}</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">Select Listing</label>
-              <select value={newPromotion.listing_id}
-                onChange={(e) => setNewPromotion({ ...newPromotion, listing_id: e.target.value })}
-                className="w-full px-3 py-2 border rounded-md"
-                data-testid="promotion-listing-select">
-                <option value="">Choose a listing...</option>
-                {listings.map(listing => (
-                  <option key={listing.id} value={listing.id}>{listing.title}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">Promotion Type</label>
-              <select value={newPromotion.promotion_type}
-                onChange={(e) => setNewPromotion({ ...newPromotion, promotion_type: e.target.value })}
-                className="w-full px-3 py-2 border rounded-md"
-                data-testid="promotion-type-select">
-                <option value="featured">{t("homepage.featured")}</option>
-                <option value="premium">Premium</option>
-                <option value="basic">Basic</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">End Date</label>
-              <Input type="datetime-local" value={newPromotion.end_date}
-                onChange={(e) => setNewPromotion({ ...newPromotion, end_date: e.target.value })}
-                data-testid="promotion-end-date" />
-            </div>
-            <div className="flex gap-2">
-              <AsyncButton onAction={createPromotion} className="gradient-button text-white border-0"
-                successMessage="Promotion created" loadingText="Creating…"
-                data-testid="promotion-submit-btn">
-                Create
-              </AsyncButton>
-              <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      <Card>
-        <CardHeader><CardTitle>Active Promotions ({promotions.length})</CardTitle></CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="space-y-2">
-              {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
-            </div>
-          ) : promotions.length > 0 ? (
-            <div className="space-y-2">
-              {promotions.map(promo => (
-                <div key={promo.id} className="flex justify-between items-center p-4 border rounded-lg"
-                  data-testid={`promotion-row-${promo.id}`}>
-                  <div>
-                    <p className="font-semibold">Listing ID: {promo.listing_id}</p>
-                    <p className="text-sm text-muted-foreground">Type: {promo.promotion_type}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Ends: {promo.end_date ? new Date(promo.end_date).toLocaleDateString() : '—'}
-                    </p>
-                    {typeof promo.usage_count === 'number' && (
-                      <p className="text-xs text-muted-foreground">
-                        Usage: {promo.usage_count}{promo.max_uses ? ` / ${promo.max_uses}` : ''}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex gap-2">
-                    <Badge className="gradient-bg text-white border-0">{promo.status || 'active'}</Badge>
-                    <Button size="sm" variant="destructive"
-                      data-testid={`promotion-delete-${promo.id}`}
-                      onClick={() => setConfirm({
-                        title: 'Delete this promotion?',
-                        description: `Promotion for listing ${promo.listing_id} will be permanently removed.`,
-                        variant: 'destructive',
-                        confirmText: 'Delete',
-                        onConfirm: () => deletePromotion(promo.id),
-                        successMessage: 'Promotion deleted',
-                      })}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-center text-muted-foreground py-8">
-              No active promotions<br />
-              <span className="text-xs">Aucune promotion active</span>
-            </p>
-          )}
-        </CardContent>
-      </Card>
-
+      {/* Table */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between gap-3">
-            <CardTitle>{t("admin.featureListingsManually")}</CardTitle>
-            <div className="relative w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input className="pl-9" placeholder="Search listings…"
-                value={search} onChange={(e) => setSearch(e.target.value)}
-                data-testid="feature-listings-search" />
-            </div>
-          </div>
+          <CardTitle className="text-sm">All Promotions ({promotions.length})</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="overflow-x-auto p-0">
           {loading ? (
-            <div className="space-y-2">
-              {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
+            <div className="p-4 space-y-2">
+              {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
             </div>
-          ) : filteredListings.length === 0 ? (
-            <p className="text-center text-muted-foreground py-8">No listings match your search.</p>
+          ) : promotions.length === 0 ? (
+            <div className="p-12 text-center text-sm text-slate-500" data-testid="promotions-empty-state">
+              No promotions yet. Click <strong>New Promotion</strong> to create your first offer.
+            </div>
           ) : (
-            <div className="space-y-2">
-              {filteredListings.slice(0, 20).map(listing => (
-                <div key={listing.id} className="flex justify-between items-center p-4 border rounded-lg">
-                  <div className="flex-1">
-                    <p className="font-semibold">{listing.title}</p>
-                    <p className="text-sm text-muted-foreground">${listing.current_price}</p>
-                  </div>
-                  <AsyncButton size="sm"
-                    variant={listing.is_featured ? 'default' : 'outline'}
-                    onAction={() => featureListing(listing.id, listing.is_featured)}
-                    successMessage={listing.is_featured ? 'Unfeatured' : 'Featured'}
-                    data-testid={`feature-listing-btn-${listing.id}`}>
-                    <Star className="h-4 w-4 mr-2" />
-                    {listing.is_featured ? 'Featured' : 'Feature'}
-                  </AsyncButton>
-                </div>
-              ))}
-            </div>
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 text-slate-600">
+                <tr>
+                  <th className="px-3 py-2 text-left">Name</th>
+                  <th className="px-3 py-2 text-left">Type</th>
+                  <th className="px-3 py-2 text-left">Target</th>
+                  <th className="px-3 py-2 text-left">Coupon</th>
+                  <th className="px-3 py-2 text-left">Uses</th>
+                  <th className="px-3 py-2 text-left">Period</th>
+                  <th className="px-3 py-2 text-left">Status</th>
+                  <th className="px-3 py-2 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {promotions.map((p) => (
+                  <tr key={p.id} className="border-t border-slate-100 hover:bg-slate-50" data-testid={`promotion-row-${p.id}`}>
+                    <td className="px-3 py-2 align-top">
+                      <div className="font-semibold text-slate-900">{p.name_en}</div>
+                      {p.name_fr && <div className="text-xs text-slate-500">{p.name_fr}</div>}
+                    </td>
+                    <td className="px-3 py-2 align-top">
+                      <Badge variant="outline" className="text-xs">{p.type}</Badge>
+                    </td>
+                    <td className="px-3 py-2 align-top text-xs text-slate-700">
+                      {p.target}
+                      {p.target_config?.target_tier && ` · ${p.target_config.target_tier}`}
+                      {p.target_config?.target_province && ` · ${p.target_config.target_province}`}
+                    </td>
+                    <td className="px-3 py-2 align-top">
+                      <code className="text-[11px] bg-slate-100 px-1.5 py-0.5 rounded font-mono">{p.coupon_code || '—'}</code>
+                    </td>
+                    <td className="px-3 py-2 align-top text-xs">
+                      <strong>{p.current_uses ?? 0}</strong>
+                      {p.max_uses ? ` / ${p.max_uses}` : ' / ∞'}
+                    </td>
+                    <td className="px-3 py-2 align-top text-xs">
+                      {(p.start_date || '').slice(0, 10)} → {(p.end_date || '').slice(0, 10)}
+                    </td>
+                    <td className="px-3 py-2 align-top">
+                      <Badge className={`text-xs ${STATUS_BADGE_STYLES[p.status] || ''}`} variant="outline">
+                        {STATUS_LABEL[p.status] || p.status}
+                      </Badge>
+                    </td>
+                    <td className="px-3 py-2 align-top text-right whitespace-nowrap">
+                      <div className="inline-flex gap-1">
+                        <Button size="icon" variant="ghost" title={p.status === 'active' ? 'Pause' : 'Activate'} onClick={() => togglePromotion(p)} data-testid={`promotion-toggle-${p.id}`}>
+                          {p.status === 'active' ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+                        </Button>
+                        <Button size="icon" variant="ghost" title="Edit" onClick={() => openEdit(p)} data-testid={`promotion-edit-${p.id}`}>
+                          <Wand2 className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button size="icon" variant="ghost" title="Duplicate" onClick={() => duplicatePromotion(p)} data-testid={`promotion-duplicate-${p.id}`}>
+                          <Copy className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button size="icon" variant="ghost" title="Usage report" onClick={() => openUsage(p)} data-testid={`promotion-usage-${p.id}`}>
+                          <Eye className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button size="icon" variant="ghost" title="Delete" onClick={() => deletePromotion(p)} className="hover:text-rose-600" data-testid={`promotion-delete-${p.id}`}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           )}
         </CardContent>
       </Card>
 
-      <ConfirmDialog state={confirm} onClose={() => setConfirm(null)} />
+      {/* Create/Edit dialog */}
+      <Dialog open={creating} onOpenChange={(v) => !v && setCreating(false)}>
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto" data-testid="promotion-form-dialog">
+          <DialogHeader>
+            <DialogTitle>{editing ? 'Edit Promotion' : 'Create Promotion'}</DialogTitle>
+            <DialogDescription>
+              Configure type, target audience, validity window, and coupon code.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {/* Names */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs font-semibold">Name (EN)</Label>
+                <Input value={form.name_en} onChange={(e) => setForm({ ...form, name_en: e.target.value })} placeholder="Free Partner Promotion" data-testid="promotion-name-en" />
+              </div>
+              <div>
+                <Label className="text-xs font-semibold">Name (FR)</Label>
+                <Input value={form.name_fr} onChange={(e) => setForm({ ...form, name_fr: e.target.value })} placeholder="Promotion Partenaire Gratuite" data-testid="promotion-name-fr" />
+              </div>
+            </div>
+
+            {/* Type */}
+            <div>
+              <Label className="text-xs font-semibold">Promotion Type</Label>
+              <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v })}>
+                <SelectTrigger data-testid="promotion-type-select"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {PROMOTION_TYPES.map((t) => (
+                    <SelectItem key={t.value} value={t.value} data-testid={`promotion-type-${t.value}`}>
+                      <div className="flex flex-col py-0.5">
+                        <span className="font-semibold">{t.label}</span>
+                        <span className="text-[10px] text-slate-500">{t.blurb}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Type-specific config */}
+            {(form.type === 'reduced_commission' || form.type === 'subscription_discount') && (
+              <div>
+                <Label className="text-xs font-semibold">Discount %</Label>
+                <Input type="number" min="1" max="100" value={form.config.discount_percent}
+                  onChange={(e) => setForm({ ...form, config: { ...form.config, discount_percent: Number(e.target.value) } })}
+                  data-testid="promotion-discount-percent"
+                />
+              </div>
+            )}
+            {form.type === 'free_promotion_boost' && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs font-semibold">Credit Tier</Label>
+                  <Select value={form.config.credit_tier} onValueChange={(v) => setForm({ ...form, config: { ...form.config, credit_tier: v } })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="basic">basic ($9.99)</SelectItem>
+                      <SelectItem value="standard">standard ($24.99)</SelectItem>
+                      <SelectItem value="premium">premium ($49.99)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs font-semibold">Credits</Label>
+                  <Input type="number" min="1" value={form.config.credit_count}
+                    onChange={(e) => setForm({ ...form, config: { ...form.config, credit_count: Number(e.target.value) } })}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Target */}
+            <div>
+              <Label className="text-xs font-semibold">Target Audience</Label>
+              <Select value={form.target_config.target} onValueChange={(v) => setForm({ ...form, target_config: { ...form.target_config, target: v } })}>
+                <SelectTrigger data-testid="promotion-target-select"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {TARGET_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value} data-testid={`promotion-target-${o.value}`}>{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {form.target_config.target === 'tier' && (
+              <div>
+                <Label className="text-xs font-semibold">Tier</Label>
+                <Select value={form.target_config.target_tier} onValueChange={(v) => setForm({ ...form, target_config: { ...form.target_config, target_tier: v } })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="standard">Standard</SelectItem>
+                    <SelectItem value="premium">Premium</SelectItem>
+                    <SelectItem value="vip_elite">VIP Elite</SelectItem>
+                    <SelectItem value="partner">Partner</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {form.target_config.target === 'province' && (
+              <div>
+                <Label className="text-xs font-semibold">Province</Label>
+                <Select value={form.target_config.target_province} onValueChange={(v) => setForm({ ...form, target_config: { ...form.target_config, target_province: v } })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="QC">Quebec</SelectItem>
+                    <SelectItem value="ON">Ontario</SelectItem>
+                    <SelectItem value="BC">British Columbia</SelectItem>
+                    <SelectItem value="AB">Alberta</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {form.target_config.target === 'new_users' && (
+              <div>
+                <Label className="text-xs font-semibold">New within last (days)</Label>
+                <Input type="number" min="1" value={form.target_config.new_user_days}
+                  onChange={(e) => setForm({ ...form, target_config: { ...form.target_config, new_user_days: Number(e.target.value) } })}
+                />
+              </div>
+            )}
+            {form.target_config.target === 'custom' && (
+              <div>
+                <Label className="text-xs font-semibold">User emails (one per line)</Label>
+                <Textarea rows={3}
+                  value={(form.target_config.custom_emails || []).join('\n')}
+                  onChange={(e) => setForm({
+                    ...form,
+                    target_config: {
+                      ...form.target_config,
+                      custom_emails: e.target.value.split(/\r?\n/).map((s) => s.trim()).filter(Boolean),
+                    },
+                  })}
+                  placeholder="partner1@example.com&#10;partner2@example.com"
+                />
+              </div>
+            )}
+
+            {/* Audience preview */}
+            <div className="border rounded-lg bg-slate-50 p-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-700">Pre-flight audience preview</span>
+                <Button size="sm" variant="outline" onClick={previewAudience} disabled={previewLoading} data-testid="promotion-preview-audience-btn">
+                  <Users className="h-3.5 w-3.5 mr-1.5" />
+                  {previewLoading ? 'Counting…' : 'Preview audience'}
+                </Button>
+              </div>
+              {previewResult && (
+                <div className="mt-2 text-xs text-slate-700" data-testid="promotion-preview-result">
+                  <strong>{previewResult.count ?? 0}</strong> eligible users.
+                  {previewResult.sample?.length > 0 && (
+                    <div className="mt-1 text-[11px] text-slate-500">
+                      Sample: {previewResult.sample.slice(0, 5).join(', ')}{previewResult.sample.length > 5 && '…'}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Coupon */}
+            <div>
+              <Label className="text-xs font-semibold">Coupon Code</Label>
+              <div className="flex gap-2">
+                <Input value={form.coupon_code} onChange={(e) => setForm({ ...form, coupon_code: e.target.value.toUpperCase() })} placeholder="Auto-generated if blank" data-testid="promotion-coupon-input" />
+                <Button type="button" variant="outline" onClick={autoCoupon} data-testid="promotion-coupon-autogen-btn">
+                  <Wand2 className="h-3.5 w-3.5 mr-1.5" />
+                  Auto
+                </Button>
+              </div>
+            </div>
+
+            {/* Validity */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs font-semibold">Start date</Label>
+                <Input type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} data-testid="promotion-start-date" />
+              </div>
+              <div>
+                <Label className="text-xs font-semibold">End date</Label>
+                <Input type="date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} data-testid="promotion-end-date" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs font-semibold">Max uses (total)</Label>
+                <Input type="number" min="0" value={form.max_uses} onChange={(e) => setForm({ ...form, max_uses: e.target.value })} placeholder="∞ unlimited" />
+              </div>
+              <div>
+                <Label className="text-xs font-semibold">Uses per user</Label>
+                <Input type="number" min="1" value={form.uses_per_user} onChange={(e) => setForm({ ...form, uses_per_user: e.target.value })} />
+              </div>
+            </div>
+
+            {/* Notification toggles */}
+            <div className="flex gap-4 pt-1">
+              <label className="text-xs flex items-center gap-1.5 cursor-pointer">
+                <input type="checkbox" checked={form.notify_users} onChange={(e) => setForm({ ...form, notify_users: e.target.checked })} data-testid="promotion-notify-users" />
+                Email broadcast on activation
+              </label>
+              <label className="text-xs flex items-center gap-1.5 cursor-pointer">
+                <input type="checkbox" checked={form.show_banner} onChange={(e) => setForm({ ...form, show_banner: e.target.checked })} data-testid="promotion-show-banner" />
+                Show platform banner
+              </label>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreating(false)} disabled={submitting}>Cancel</Button>
+            <Button onClick={savePromotion} disabled={submitting} data-testid="promotion-save-btn">
+              {submitting ? 'Saving…' : (editing ? 'Save changes' : 'Create promotion')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Usage report dialog */}
+      <Dialog open={!!usageOpen} onOpenChange={(v) => !v && setUsageOpen(null)}>
+        <DialogContent className="sm:max-w-xl max-h-[80vh] overflow-y-auto" data-testid="promotion-usage-dialog">
+          <DialogHeader>
+            <DialogTitle>Usage report — {usageOpen?.name_en}</DialogTitle>
+            <DialogDescription>
+              {usageOpen?.coupon_code} · {usageRows.length} redemption(s)
+            </DialogDescription>
+          </DialogHeader>
+          {usageRows.length === 0 ? (
+            <div className="py-6 text-center text-sm text-slate-500">No redemptions yet.</div>
+          ) : (
+            <table className="w-full text-xs">
+              <thead className="bg-slate-50 text-slate-600">
+                <tr>
+                  <th className="px-2 py-1.5 text-left">User</th>
+                  <th className="px-2 py-1.5 text-left">Tx Type</th>
+                  <th className="px-2 py-1.5 text-right">Saved (CAD)</th>
+                  <th className="px-2 py-1.5 text-left">When</th>
+                </tr>
+              </thead>
+              <tbody>
+                {usageRows.map((r) => (
+                  <tr key={r.id || r.used_at} className="border-t border-slate-100">
+                    <td className="px-2 py-1.5">{r.user_id?.slice(0, 8) || '—'}</td>
+                    <td className="px-2 py-1.5">{r.transaction_type || '—'}</td>
+                    <td className="px-2 py-1.5 text-right">${(r.saved_amount || 0).toFixed(2)}</td>
+                    <td className="px-2 py-1.5">{(r.used_at || '').slice(0, 16).replace('T', ' ')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
