@@ -137,6 +137,13 @@ _EMAIL_TYPES: Dict[str, Dict[str, Any]] = {
         "cta_label": "Complete Profile",
         "cta_url": f"{_PUBLIC_URL}/onboarding",
     },
+    "promotion_expired": {
+        "headline": "Your Promotion Has Expired ⏳",
+        "subheadline": "Renew to stay featured at the top of search.",
+        "body_html": "<strong>{listing_title}</strong> was promoted as <strong>{tier}</strong>. Click below to renew and keep the visibility boost going.",
+        "cta_label": "Renew Promotion",
+        "cta_url": f"{_PUBLIC_URL}/listing/{{listing_id}}",
+    },
 }
 
 

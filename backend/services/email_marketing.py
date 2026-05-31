@@ -15,7 +15,9 @@ from sendgrid.helpers.mail import (
     Mail, Email, To, Content, Personalization,
     TrackingSettings, ClickTracking, OpenTracking,
     SubscriptionTracking, Ganalytics,
-    CustomArg
+    CustomArg,
+    # iter241 Mission 6 — Attachment support for marketing campaigns.
+    Attachment, FileContent, FileName, FileType, Disposition,
 )
 
 logger = logging.getLogger(__name__)
@@ -192,47 +194,56 @@ class EmailMarketingService:
         filters: Dict[str, Any],
         manual_emails: List[str] = None,
         exclude_emails: List[str] = None,
-        include_external: bool = True
+        include_external: bool = True,
+        recipient_type: str = "segment",
     ) -> Dict[str, Any]:
         """
-        Build complete audience with advanced targeting:
-        
-        Final Audience = (Segmented Users + Manual Emails) - Exclusions - Suppressed
-        
-        Args:
-            filters: Standard segmentation filters
-            manual_emails: List of manually added email addresses
-            exclude_emails: List of emails to exclude
-            include_external: Whether to include non-registered emails
-            
-        Returns:
-            {
-                "segmented_users": [...],  # Users from DB
-                "manual_external": [...],   # Manual emails not in DB
-                "excluded": [...],          # Emails excluded
-                "suppressed": [...],        # Emails suppressed (unsubscribed/bounced)
-                "final_count": int,
-                "breakdown": {...}
-            }
+        iter241 Mission 5 — STRICT recipient_type gate.
+
+        recipient_type values and behaviour:
+          - "segment"      : ONLY the audience query (filters); manual_emails IGNORED.
+          - "custom_list"  : ONLY manual_emails; segment query IGNORED. **Pasted
+                             list never bleeds into other users.**
+          - "csv_upload"   : ONLY CSV-uploaded emails (passed in `manual_emails`);
+                             segment query IGNORED.
+          - "all_users"    : ONLY the segment query, ignoring manual_emails.
+
+        Unsubscribed + bounced emails are ALWAYS excluded regardless of type.
+
+        Final Audience semantics (per recipient_type):
+            segment    | all_users : segmented_users − exclusions − suppressed
+            custom_list| csv_upload: manual_emails    − exclusions − suppressed
         """
         manual_emails = manual_emails or []
         exclude_emails = exclude_emails or []
-        
+        recipient_type = (recipient_type or "segment").lower().strip()
+
+        # Validate
+        valid_types = {"segment", "custom_list", "csv_upload", "all_users"}
+        if recipient_type not in valid_types:
+            raise ValueError(
+                f"recipient_type must be one of {sorted(valid_types)}, got {recipient_type!r}"
+            )
+
         # Normalize all emails
         manual_emails = [e.strip().lower() for e in manual_emails if e and self.validate_email(e)]
         exclude_emails = [e.strip().lower() for e in exclude_emails if e and self.validate_email(e)]
         exclude_set = set(exclude_emails)
-        
-        # Get suppressed emails
+
+        # Get suppressed emails (unsubscribed + bounced + spam reports).
         suppressed_set = await self.get_suppressed_emails()
         
-        # Get segmented users from database
-        query = await self.build_audience_query(filters)
-        segmented_users = await self.db.users.find(
-            query,
-            {"_id": 0, "id": 1, "email": 1, "name": 1}
-        ).to_list(None)
-        
+        # iter241 Mission 5 — Only fetch the DB segment when recipient_type
+        # explicitly opts into segmentation. Pasted lists / CSV uploads must
+        # NEVER trigger an "all users" query.
+        segmented_users: List[Dict[str, Any]] = []
+        if recipient_type in ("segment", "all_users"):
+            query = await self.build_audience_query(filters)
+            segmented_users = await self.db.users.find(
+                query,
+                {"_id": 0, "id": 1, "email": 1, "name": 1}
+            ).to_list(None)
+
         # Build final recipient lists
         final_recipients = []
         excluded_list = []
@@ -259,39 +270,42 @@ class EmailMarketingService:
                     "source": "segmented"
                 })
         
-        # Process manual emails
+        # Process manual emails — iter241 Mission 5 — ONLY for custom_list /
+        # csv_upload modes. Other modes ignore manual_emails entirely so a
+        # half-typed paste in the UI can't accidentally trigger a mass send.
         manual_external = []
-        for email in manual_emails:
-            if email in exclude_set:
-                excluded_list.append({"email": email, "reason": "manually_excluded", "source": "manual"})
-            elif email in suppressed_set:
-                suppressed_list.append({"email": email, "reason": "suppressed", "source": "manual"})
-            elif email in segmented_emails:
-                # Already included from segmentation, skip to avoid duplicates
-                continue
-            else:
-                # Check if user exists in DB
-                existing_user = await self.db.users.find_one(
-                    {"email": {"$regex": f"^{email}$", "$options": "i"}},
-                    {"_id": 0, "id": 1, "name": 1, "email": 1}
-                )
-                
-                if existing_user:
-                    final_recipients.append({
-                        "email": email,
-                        "name": existing_user.get("name"),
-                        "user_id": existing_user.get("id"),
-                        "source": "manual_existing"
-                    })
-                elif include_external:
-                    manual_external.append(email)
-                    final_recipients.append({
-                        "email": email,
-                        "name": None,
-                        "user_id": None,
-                        "source": "manual_external"
-                    })
-        
+        if recipient_type in ("custom_list", "csv_upload"):
+            for email in manual_emails:
+                if email in exclude_set:
+                    excluded_list.append({"email": email, "reason": "manually_excluded", "source": "manual"})
+                elif email in suppressed_set:
+                    suppressed_list.append({"email": email, "reason": "suppressed", "source": "manual"})
+                elif email in segmented_emails:
+                    # Already included from segmentation, skip to avoid duplicates
+                    continue
+                else:
+                    # Check if user exists in DB
+                    existing_user = await self.db.users.find_one(
+                        {"email": {"$regex": f"^{email}$", "$options": "i"}},
+                        {"_id": 0, "id": 1, "name": 1, "email": 1}
+                    )
+
+                    if existing_user:
+                        final_recipients.append({
+                            "email": email,
+                            "name": existing_user.get("name"),
+                            "user_id": existing_user.get("id"),
+                            "source": "manual_existing"
+                        })
+                    elif include_external:
+                        manual_external.append(email)
+                        final_recipients.append({
+                            "email": email,
+                            "name": None,
+                            "user_id": None,
+                            "source": "manual_external"
+                        })
+
         return {
             "recipients": final_recipients,
             "excluded": excluded_list,
@@ -312,13 +326,15 @@ class EmailMarketingService:
         filters: Dict[str, Any],
         manual_emails: List[str] = None,
         exclude_emails: List[str] = None,
-        limit: int = 20
+        limit: int = 20,
+        recipient_type: str = "segment",
     ) -> Dict[str, Any]:
-        """Get preview of advanced audience with breakdown"""
+        """Get preview of advanced audience with breakdown."""
         audience = await self.build_advanced_audience(
             filters=filters,
             manual_emails=manual_emails,
-            exclude_emails=exclude_emails
+            exclude_emails=exclude_emails,
+            recipient_type=recipient_type,
         )
         
         # Limit preview
@@ -488,13 +504,15 @@ class EmailMarketingService:
         self,
         audience_filters: Dict[str, Any],
         manual_emails: List[str] = None,
-        exclude_emails: List[str] = None
+        exclude_emails: List[str] = None,
+        recipient_type: str = "segment",
     ) -> Dict[str, Any]:
         """Calculate final audience count with advanced targeting"""
         audience = await self.build_advanced_audience(
             filters=audience_filters,
             manual_emails=manual_emails or [],
-            exclude_emails=exclude_emails or []
+            exclude_emails=exclude_emails or [],
+            recipient_type=recipient_type,
         )
         return {
             "total": audience["final_count"],
@@ -515,22 +533,42 @@ class EmailMarketingService:
         from_name: Optional[str] = None,
         reply_to: Optional[str] = None,
         manual_emails: Optional[List[str]] = None,
-        exclude_emails: Optional[List[str]] = None
+        exclude_emails: Optional[List[str]] = None,
+        recipient_type: str = "segment",
+        attachments: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
-        """Create a new email campaign with advanced targeting support"""
+        """Create a new email campaign with advanced targeting support.
+
+        iter241 Mission 5 — `recipient_type` strictly controls how the
+        audience is assembled. iter241 Mission 6 — `attachments` is a list
+        of {filename, mime_type, storage_path, size_bytes} dicts that will
+        be attached to each outbound mail.
+        """
         now = datetime.now(timezone.utc)
-        
+
         # Parse and validate manual emails
         manual_emails = manual_emails or []
         exclude_emails = exclude_emails or []
-        
-        # Calculate advanced audience
+        recipient_type = (recipient_type or "segment").lower().strip()
+
+        # iter241 Mission 5 — Hard validation: custom_list / csv_upload MUST
+        # have at least one valid email. Reject the campaign creation at the
+        # service boundary so the admin cannot inadvertently send to no-one
+        # OR fall through to "all users" because the manual list was empty.
+        if recipient_type in ("custom_list", "csv_upload") and not manual_emails:
+            raise ValueError(
+                f"recipient_type={recipient_type!r} requires at least one valid email "
+                f"in manual_emails — campaign creation aborted."
+            )
+
+        # Calculate advanced audience with the strict gate.
         audience_result = await self.calculate_final_audience_count(
             audience_filters=audience_filters,
             manual_emails=manual_emails,
-            exclude_emails=exclude_emails
+            exclude_emails=exclude_emails,
+            recipient_type=recipient_type,
         )
-        
+
         campaign = {
             "id": str(uuid.uuid4()),
             "name": name,
@@ -540,6 +578,8 @@ class EmailMarketingService:
             "audience_filters": audience_filters,
             "manual_emails": manual_emails,
             "exclude_emails": exclude_emails,
+            "recipient_type": recipient_type,
+            "attachments": attachments or [],
             "audience_count": audience_result["total"],
             "audience_breakdown": audience_result["breakdown"],
             "from_email": from_email or MARKETING_FROM_EMAIL,
@@ -797,11 +837,14 @@ class EmailMarketingService:
         if not campaign:
             return {"status": "error", "message": "Campaign not found"}
         
-        # Use advanced audience builder to get final recipients
+        # iter241 Mission 5 — Read recipient_type stored on the campaign doc
+        # (defaults to "segment" for back-compat). The audience builder will
+        # strictly honor this when assembling recipients.
         audience = await self.build_advanced_audience(
             filters=campaign.get("audience_filters", {}),
             manual_emails=campaign.get("manual_emails", []),
-            exclude_emails=campaign.get("exclude_emails", [])
+            exclude_emails=campaign.get("exclude_emails", []),
+            recipient_type=campaign.get("recipient_type", "segment"),
         )
         
         recipients = audience["recipients"]
@@ -953,6 +996,28 @@ class EmailMarketingService:
             
             message.add_content(Content("text/plain", plain_content or "View this email in HTML"))
             message.add_content(Content("text/html", html_content))
+
+            # iter241 Mission 6 — Attach campaign attachments (up to 3 files,
+            # 5 MB each). Stored locally during admin upload; read once per
+            # send, base64-encoded inline. Errors are logged but never block
+            # the send.
+            for att in (campaign.get("attachments") or []):
+                try:
+                    import base64 as _b64
+                    storage_path = att.get("storage_path")
+                    if not storage_path or not os.path.exists(storage_path):
+                        continue
+                    with open(storage_path, "rb") as _fh:
+                        encoded = _b64.b64encode(_fh.read()).decode()
+                    sg_attachment = Attachment(
+                        FileContent(encoded),
+                        FileName(att.get("filename", "attachment")),
+                        FileType(att.get("mime_type", "application/octet-stream")),
+                        Disposition("attachment"),
+                    )
+                    message.add_attachment(sg_attachment)
+                except Exception as att_err:  # noqa: BLE001
+                    logger.warning(f"[CAMPAIGN ATTACHMENT] {att.get('filename')}: {att_err}")
             
             # SendGrid tracking: ALL OFF
             tracking = TrackingSettings()
@@ -1110,30 +1175,134 @@ class EmailMarketingService:
         logger.info(f"Processed webhook event: {event_type} for {email}")
     
     async def get_campaign_stats(self, campaign_id: str) -> Dict[str, Any]:
-        """Get detailed campaign statistics"""
+        """Get detailed campaign statistics.
+
+        iter241 Mission 4 — Hybrid source:
+          1. Aggregate the local `email_events` collection (populated by
+             SendGrid webhook events) which gives us per-day buckets.
+          2. If local stats look empty AND the campaign was sent < 60 min
+             ago, return a `loading=True` flag so the UI shows
+             "Stats updating… check back in a few minutes" instead of
+             "0% open rate" which looks like a bug.
+
+        Daily chart shape: `daily: [{date: 'YYYY-MM-DD', opens: N, clicks: N,
+        delivered: N}]` for 7 days starting at `sent_at`.
+        """
         campaign = await self.get_campaign(campaign_id)
         if not campaign:
             raise ValueError("Campaign not found")
-        
+
         stats = campaign.get("stats", {})
-        
-        # Calculate rates
-        total = stats.get("sent", 0) or 1  # Avoid division by zero
-        
+        total = max(stats.get("sent", 0) or stats.get("total_recipients", 0) or 0, 1)
+
+        # ---- Daily series from email_events (last 7 days from sent_at) ----
+        from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+        try:
+            sent_at_str = campaign.get("sent_at") or campaign.get("completed_at")
+            sent_at = _dt.fromisoformat(sent_at_str.replace("Z", "+00:00")) if sent_at_str else None
+        except Exception:
+            sent_at = None
+
+        daily = []
+        loading = False
+        local_total_events = 0
+        if sent_at is not None:
+            for i in range(7):
+                day_start = sent_at + _td(days=i)
+                day_end = day_start + _td(days=1)
+                pipeline = [
+                    {"$match": {
+                        "campaign_id": campaign_id,
+                        "timestamp": {"$gte": day_start.isoformat(), "$lt": day_end.isoformat()},
+                    }},
+                    {"$group": {"_id": "$event_type", "n": {"$sum": 1}}},
+                ]
+                try:
+                    rows = await self.db.email_events.aggregate(pipeline).to_list(50)
+                except Exception:
+                    rows = []
+                bucket = {r["_id"]: r["n"] for r in rows}
+                local_total_events += sum(bucket.values())
+                daily.append({
+                    "date": day_start.strftime("%Y-%m-%d"),
+                    "delivered": bucket.get("delivered", 0),
+                    "opens": bucket.get("open", 0) + bucket.get("opened", 0),
+                    "clicks": bucket.get("click", 0) + bucket.get("clicked", 0),
+                    "bounces": bucket.get("bounce", 0) + bucket.get("bounced", 0),
+                    "unsubscribes": bucket.get("unsubscribe", 0) + bucket.get("unsubscribed", 0),
+                })
+
+        # ---- Loading state: sent recently AND no webhook signal yet ----
+        if sent_at is not None:
+            age_min = (_dt.now(_tz.utc) - sent_at).total_seconds() / 60
+            sent_summary = stats.get("sent", 0)
+            if sent_summary > 0 and local_total_events == 0 and age_min < 60:
+                loading = True
+
+        # ---- Best-effort SendGrid Stats API fallback ----
+        # If local webhooks didn't fire but the campaign is older than 60 min
+        # we attempt a direct pull from /v3/stats. Errors are swallowed.
+        sendgrid_polled = False
+        if sent_at is not None and not loading and local_total_events == 0:
+            try:
+                api_key = os.environ.get("SENDGRID_API_KEY") or os.environ.get("SENDGRID_MARKETING_API_KEY")
+                if api_key:
+                    import httpx as _httpx
+                    end_date = (sent_at + _td(days=7)).strftime("%Y-%m-%d")
+                    start_date = sent_at.strftime("%Y-%m-%d")
+                    async with _httpx.AsyncClient(timeout=8.0) as client:
+                        r = await client.get(
+                            "https://api.sendgrid.com/v3/stats",
+                            params={
+                                "start_date": start_date,
+                                "end_date": end_date,
+                                "aggregated_by": "day",
+                            },
+                            headers={"Authorization": f"Bearer {api_key}"},
+                        )
+                        if r.status_code == 200:
+                            sendgrid_polled = True
+                            payload = r.json() or []
+                            # Map daily aggregates onto our daily series.
+                            sg_by_day = {p.get("date"): (p.get("stats", [{}])[0] or {}).get("metrics", {}) for p in payload}
+                            for row in daily:
+                                m = sg_by_day.get(row["date"], {})
+                                if m:
+                                    row.setdefault("opens", 0)
+                                    row.setdefault("clicks", 0)
+                                    row["delivered"] = m.get("delivered", row["delivered"])
+                                    row["opens"] = max(row["opens"], m.get("unique_opens", 0))
+                                    row["clicks"] = max(row["clicks"], m.get("unique_clicks", 0))
+                                    row["bounces"] = max(row.get("bounces", 0), m.get("bounces", 0))
+                                    row["unsubscribes"] = max(row.get("unsubscribes", 0), m.get("unsubscribes", 0))
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"[campaign-stats] SendGrid Stats API fallback failed: {e}")
+
         return {
             "campaign_id": campaign_id,
             "campaign_name": campaign["name"],
             "status": campaign["status"],
             "sent_at": campaign.get("sent_at"),
             "completed_at": campaign.get("completed_at"),
+            "loading": loading,
+            "loading_message": (
+                "Stats updating... check back in a few minutes."
+                if loading else None
+            ),
+            "data_source": (
+                "loading" if loading else
+                "sendgrid_stats_api" if sendgrid_polled else
+                "local_webhooks"
+            ),
             "stats": {
                 **stats,
                 "delivery_rate": round((stats.get("delivered", 0) / total) * 100, 2),
                 "open_rate": round((stats.get("opened", 0) / total) * 100, 2),
                 "click_rate": round((stats.get("clicked", 0) / total) * 100, 2),
                 "bounce_rate": round((stats.get("bounced", 0) / total) * 100, 2),
-                "unsubscribe_rate": round((stats.get("unsubscribed", 0) / total) * 100, 2)
-            }
+                "unsubscribe_rate": round((stats.get("unsubscribed", 0) / total) * 100, 2),
+            },
+            "daily": daily,
         }
     
     async def get_email_events(

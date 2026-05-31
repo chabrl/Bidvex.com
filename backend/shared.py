@@ -516,6 +516,12 @@ class AdvancedAudiencePreviewRequest(BaseModel):
     segment_type: Optional[str] = "all"
     filters: Optional[Dict] = None
     custom_query: Optional[Dict] = None
+    # iter241 Mission 5 — Forwarded to the audience builder so the preview
+    # respects the strict recipient_type gate.
+    audience_filters: Optional[Dict[str, Any]] = None
+    manual_emails: Optional[List[str]] = None
+    exclude_emails: Optional[List[str]] = None
+    recipient_type: Optional[str] = "segment"
 
 class CampaignCreateRequest(BaseModel):
     name: str
@@ -525,6 +531,14 @@ class CampaignCreateRequest(BaseModel):
     audience_filters: Optional[Dict[str, Any]] = None
     manual_emails: Optional[List[str]] = None
     exclude_emails: Optional[List[str]] = None
+    # iter241 Mission 5 — Explicit recipient_type gate. Values: "segment" |
+    # "custom_list" | "csv_upload" | "all_users".  Defaults to "segment" to
+    # keep older API callers behaving exactly as before.
+    recipient_type: Optional[str] = "segment"
+    # iter241 Mission 6 — Optional attachments saved via the
+    # /campaigns/{id}/attachments endpoint. List of {filename, mime_type,
+    # storage_path, size_bytes}.
+    attachments: Optional[List[Dict[str, Any]]] = None
     scheduled_at: Optional[str] = None
     from_email: Optional[str] = None
     from_name: Optional[str] = None
@@ -542,6 +556,7 @@ class CampaignUpdateRequest(BaseModel):
     audience_filters: Optional[Dict[str, Any]] = None
     manual_emails: Optional[List[str]] = None
     exclude_emails: Optional[List[str]] = None
+    recipient_type: Optional[str] = None
     scheduled_at: Optional[str] = None
     from_email: Optional[str] = None
     from_name: Optional[str] = None

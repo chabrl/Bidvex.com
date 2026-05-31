@@ -543,6 +543,20 @@ scheduler.add_job(
     lambda: safe_run("watchlist_expiry_alerts", run_watchlist_expiry_alerts()),
     trigger=IntervalTrigger(minutes=2), id='watchlist_expiry_alerts', replace_existing=True)
 
+# iter241 Mission 1 — Sweep expired listing promotions every hour.
+async def run_promotion_expiry_sweep():
+    try:
+        from services.promotion_expiry import expire_listing_promotions
+        stats = await expire_listing_promotions(db)
+        if stats.get("expired_count", 0) > 0:
+            logger.info(f"[promo-expiry] hourly sweep: {stats}")
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"Promotion expiry sweep failed: {e}")
+
+scheduler.add_job(
+    lambda: safe_run("promotion_expiry_sweep", run_promotion_expiry_sweep()),
+    trigger=IntervalTrigger(hours=1), id='promotion_expiry_sweep', replace_existing=True)
+
 # ─── Deposit refund queue worker (60s SLA — Spec Feature 2) ───
 async def run_deposit_refund_queue():
     from services.deposit_refund_queue import process_deposit_refund_queue
@@ -687,6 +701,10 @@ try:
         ("routes.chat_history", "chat_history_router", "set_chat_history_db", False),
         # iter238 Mission 5 — Promoted/featured listings + admin backfill.
         ("routes.promotions", "promotions_router", "set_promotions_db", False),
+        # iter241 Mission 7 — Admin Promotions & Offers Engine.
+        ("routes.admin_promotions", "admin_promotions_router", None, False),
+        # iter241 Mission 1 — Stripe checkout for promoted listings + email credits.
+        ("routes.payments_promotions", "promotions_sub_router", None, False),
         ("routes.fees", "fees_router", None, False),
         ("routes.notifications", "notifications_router", None, False),
         ("routes.watchlist", "watchlist_router", None, False),

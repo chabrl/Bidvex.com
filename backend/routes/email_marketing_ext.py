@@ -79,10 +79,14 @@ async def preview_advanced_audience(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Preview advanced audience with manual emails and exclusions
-    
+    Preview advanced audience with manual emails and exclusions.
+
+    iter241 Mission 5 — `recipient_type` field enforces strict gate:
+      - "segment" / "all_users": ONLY DB segment, manual_emails ignored
+      - "custom_list" / "csv_upload": ONLY manual_emails, no segment
+
     Returns:
-    - Final count after (Segmented + Manual) - Exclusions - Suppressed
+    - Final count after (Segmented OR Manual) - Exclusions - Suppressed
     - Breakdown by source
     - Preview of recipients
     - List of excluded/suppressed emails
@@ -91,15 +95,171 @@ async def preview_advanced_audience(
         raise HTTPException(status_code=403, detail="Admin access required")
     
     marketing = get_marketing_service(get_db())
-    
+
+    # Accept either `audience_filters` (canonical iter241) or the older
+    # `filters` field for back-compat.
+    filters = data.audience_filters if data.audience_filters is not None else (data.filters or {})
+
     result = await marketing.get_advanced_audience_preview(
-        filters=data.audience_filters,
+        filters=filters,
         manual_emails=data.manual_emails,
         exclude_emails=data.exclude_emails,
-        limit=20
+        limit=20,
+        recipient_type=(data.recipient_type or "segment"),
     )
-    
+
     return result
+
+
+@email_marketing_ext_router.post("/admin/marketing/campaigns/preview-recipients")
+async def preview_campaign_recipients(
+    data: AdvancedAudiencePreviewRequest,
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role not in ["admin", "super_admin"]:
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    marketing = get_marketing_service(get_db())
+    filters = data.audience_filters if data.audience_filters is not None else (data.filters or {})
+    result = await marketing.get_advanced_audience_preview(
+        filters=filters,
+        manual_emails=data.manual_emails,
+        exclude_emails=data.exclude_emails,
+        limit=10,
+        recipient_type=(data.recipient_type or "segment"),
+    )
+    # Return a smaller, UI-friendly shape.
+    return {
+        "recipient_type": data.recipient_type or "segment",
+        "total_recipients": result.get("count", 0),
+        "sample_emails": [r.get("email") for r in result.get("preview", [])],
+        "breakdown": result.get("breakdown", {}),
+        "excluded_count": result.get("excluded_count", 0),
+        "suppressed_count": result.get("suppressed_count", 0),
+    }
+
+
+# iter241 Mission 6 — Campaign attachment upload constants.
+_CAMPAIGN_ATTACHMENT_ROOT = "/app/backend/uploads/campaign_attachments"
+_ALLOWED_ATTACHMENT_TYPES = {
+    "application/pdf": "pdf",
+    "image/jpeg": "jpg",
+    "image/jpg": "jpg",
+    "image/png": "png",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+}
+_MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024  # 5 MB
+_MAX_ATTACHMENTS_PER_CAMPAIGN = 3
+
+
+@email_marketing_ext_router.post("/admin/marketing/campaigns/{campaign_id}/attachments")
+async def upload_campaign_attachment(
+    campaign_id: str,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+):
+    """iter241 Mission 6 — Attach a file to a campaign.
+
+    Validations:
+      - max 3 attachments per campaign
+      - PDF / JPG / PNG / DOCX only
+      - 5 MB per file
+    """
+    if current_user.role not in ["admin", "super_admin"]:
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    marketing = get_marketing_service(get_db())
+    campaign = await marketing.get_campaign(campaign_id)
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+
+    if campaign.get("status") not in ("draft", "scheduled", "DRAFT", "SCHEDULED"):
+        raise HTTPException(
+            status_code=400,
+            detail="Attachments can only be added to draft or scheduled campaigns",
+        )
+
+    existing = campaign.get("attachments") or []
+    if len(existing) >= _MAX_ATTACHMENTS_PER_CAMPAIGN:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Maximum {_MAX_ATTACHMENTS_PER_CAMPAIGN} attachments per campaign",
+        )
+
+    mime = (file.content_type or "").lower()
+    if mime not in _ALLOWED_ATTACHMENT_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type {mime!r}. Allowed: PDF, JPG, PNG, DOCX",
+        )
+
+    body = await file.read()
+    if len(body) > _MAX_ATTACHMENT_BYTES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File exceeds 5 MB limit ({len(body)} bytes)",
+        )
+
+    # Save to disk under /uploads/campaign_attachments/{campaign_id}/
+    safe_name = (file.filename or "attachment").replace("/", "_").replace("\\", "_")
+    target_dir = _os.path.join(_CAMPAIGN_ATTACHMENT_ROOT, campaign_id)
+    _os.makedirs(target_dir, exist_ok=True)
+    storage_path = _os.path.join(target_dir, f"{uuid.uuid4()}_{safe_name}")
+    with open(storage_path, "wb") as fh:
+        fh.write(body)
+
+    new_att = {
+        "id": str(uuid.uuid4()),
+        "filename": safe_name,
+        "mime_type": mime,
+        "size_bytes": len(body),
+        "storage_path": storage_path,
+        "uploaded_at": datetime.now(timezone.utc).isoformat(),
+    }
+    existing.append(new_att)
+    await get_db().email_campaigns.update_one(
+        {"id": campaign_id},
+        {"$set": {"attachments": existing, "updated_at": datetime.now(timezone.utc).isoformat()}},
+    )
+    return {"attachment": new_att, "total_attachments": len(existing)}
+
+
+@email_marketing_ext_router.delete("/admin/marketing/campaigns/{campaign_id}/attachments/{attachment_id}")
+async def delete_campaign_attachment(
+    campaign_id: str,
+    attachment_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """iter241 Mission 6 — Remove an attachment from a campaign."""
+    if current_user.role not in ["admin", "super_admin"]:
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    marketing = get_marketing_service(get_db())
+    campaign = await marketing.get_campaign(campaign_id)
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+
+    existing = campaign.get("attachments") or []
+    keep = [a for a in existing if a.get("id") != attachment_id]
+    removed = [a for a in existing if a.get("id") == attachment_id]
+    if not removed:
+        raise HTTPException(status_code=404, detail="Attachment not found")
+
+    # Best-effort file delete.
+    try:
+        sp = removed[0].get("storage_path")
+        if sp and _os.path.exists(sp):
+            _os.remove(sp)
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"Attachment file delete failed: {e}")
+
+    await get_db().email_campaigns.update_one(
+        {"id": campaign_id},
+        {"$set": {"attachments": keep, "updated_at": datetime.now(timezone.utc).isoformat()}},
+    )
+    return {"removed_id": attachment_id, "remaining": len(keep)}
+
+
 
 
 
@@ -242,9 +402,16 @@ async def create_campaign(
             from_name=data.from_name,
             reply_to=data.reply_to,
             manual_emails=data.manual_emails,
-            exclude_emails=data.exclude_emails
+            exclude_emails=data.exclude_emails,
+            recipient_type=data.recipient_type or "segment",
+            attachments=data.attachments,
         )
         return campaign
+    except ValueError as ve:
+        # iter241 Mission 5 — Strict-validation failure (empty custom list,
+        # bad recipient_type, etc) — bubble up as 400 instead of 500.
+        logger.warning(f"Campaign validation rejected: {ve}")
+        raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         logger.error(f"Failed to create campaign: {e}")
         raise HTTPException(status_code=500, detail=str(e))

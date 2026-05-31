@@ -31,13 +31,14 @@ const ALL_SECTIONS = [
   { id: 'homepage',    label_en: 'Homepage', label_fr: "Page d'accueil" },
 ];
 
+// iter241 Mission 1 — Pricing aligned with backend `PROMOTION_TIERS` in
+// services/pricing_config.py. The UI `tier` field maps 1:1 to the backend
+// `boost_tier` value sent in the Stripe checkout request body.
 const TIERS = [
-  { id: 'standard', label_en: 'Standard',  label_fr: 'Standard',  blurb_en: 'Featured tag + sort boost', blurb_fr: 'Étiquette + boost de tri' },
-  { id: 'featured', label_en: 'Featured',  label_fr: 'En vedette', blurb_en: 'Inline grid placement + carousel', blurb_fr: 'Carrousel + injection dans la grille' },
-  { id: 'top',      label_en: 'Top Pick',  label_fr: 'Top pick',  blurb_en: 'Top carousel slot + all sections', blurb_fr: 'Premier slot + toutes sections' },
+  { id: 'basic',    label_en: 'Basic',     label_fr: 'Basique',     price: '$9.99',  days: 7,  blurb_en: 'Featured badge + top of category',                            blurb_fr: "Badge + tête de catégorie" },
+  { id: 'standard', label_en: 'Featured',  label_fr: 'En vedette',  price: '$24.99', days: 14, blurb_en: 'Featured badge + top + homepage',                             blurb_fr: 'Badge + tête + page d’accueil' },
+  { id: 'premium',  label_en: 'Premium',   label_fr: 'Premium',     price: '$49.99', days: 30, blurb_en: 'Featured + top + homepage + email blast',                     blurb_fr: 'Badge + tête + page d’accueil + courriel' },
 ];
-
-const DURATIONS = [3, 7, 14, 30];
 
 const PromoteListingModal = ({ open, onOpenChange, listing, onSuccess }) => {
   const { i18n } = useTranslation();
@@ -46,9 +47,12 @@ const PromoteListingModal = ({ open, onOpenChange, listing, onSuccess }) => {
   const t = (en, fr) => (isFr ? fr : en);
 
   const [sections, setSections] = useState(['marketplace']);
-  const [duration, setDuration] = useState(7);
-  const [tier, setTier] = useState('featured');
+  const [tier, setTier] = useState('standard');
   const [submitting, setSubmitting] = useState(false);
+
+  // Duration is now fixed per-tier (Stripe pricing tied to duration).
+  const activeTier = TIERS.find((x) => x.id === tier) || TIERS[1];
+  const duration = activeTier.days;
 
   const toggleSection = (id) => {
     setSections((prev) =>
@@ -64,22 +68,37 @@ const PromoteListingModal = ({ open, onOpenChange, listing, onSuccess }) => {
     }
     setSubmitting(true);
     try {
+      // iter241 Mission 1 — Route through Stripe Checkout. The backend
+      // creates a Checkout Session and returns a session URL; we redirect
+      // the seller to Stripe. On webhook completion the listing flips to
+      // promoted automatically (`routes/webhooks._handle_listing_promotion_paid`).
+      // The listing's primary listing_type drives the Stripe product label.
+      const lt = (listing.listing_type || '').toLowerCase();
+      const backend_lt =
+        lt === 'lot_auction' || lt === 'multi_item_listing' ? 'lots' :
+        lt === 'storage_locker' || lt === 'storage_auction' ? 'storage' :
+        lt === 'vehicle' || lt === 'vehicle_auction' ? 'vehicle' :
+        'marketplace';
       const res = await axios.post(
-        `${API_BASE}/listings/${listing.id}/promote`,
-        { sections, duration_days: duration, tier },
+        `${API_BASE}/promote-listing`,
+        {
+          listing_id: listing.id,
+          boost_tier: tier,
+          listing_type: backend_lt,
+          return_url: `${window.location.origin}/seller/dashboard?promo_session=1`,
+          // Sections is recorded in metadata so the webhook can mirror it
+          // onto the listing once the payment clears.
+          sections,
+        },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      toast.success(
-        t(
-          `Listing promoted until ${new Date(res.data.promotion_expires_at).toLocaleDateString()}`,
-          `Annonce promue jusqu'au ${new Date(res.data.promotion_expires_at).toLocaleDateString()}`
-        )
-      );
-      onSuccess?.(res.data);
-      onOpenChange(false);
+      const checkoutUrl = res?.data?.url || res?.data?.checkout_url;
+      if (!checkoutUrl) throw new Error('Stripe checkout URL missing in response');
+      // Open in same tab so Stripe → return_url redirects feel native.
+      window.location.href = checkoutUrl;
     } catch (e) {
-      const msg = e?.response?.data?.detail || e?.message || 'Failed to promote';
-      toast.error(typeof msg === 'string' ? msg : 'Promotion failed');
+      const msg = e?.response?.data?.detail || e?.message || 'Failed to start checkout';
+      toast.error(typeof msg === 'string' ? msg : 'Promotion checkout failed');
     } finally {
       setSubmitting(false);
     }
@@ -95,8 +114,8 @@ const PromoteListingModal = ({ open, onOpenChange, listing, onSuccess }) => {
           </DialogTitle>
           <DialogDescription>
             {t(
-              'Boost visibility across the BidVex network. Activates instantly — no payment required during early access.',
-              'Augmentez la visibilité sur le réseau BidVex. Activation immédiate — sans paiement durant l’accès anticipé.'
+              'Boost visibility across the BidVex network. Powered by Stripe — your card will be charged at the listed price + applicable taxes.',
+              'Augmentez la visibilité sur le réseau BidVex. Propulsé par Stripe — votre carte sera débitée du prix affiché + taxes applicables.'
             )}
           </DialogDescription>
         </DialogHeader>
@@ -123,7 +142,10 @@ const PromoteListingModal = ({ open, onOpenChange, listing, onSuccess }) => {
                   <div className="text-sm font-bold text-slate-900">
                     {isFr ? opt.label_fr : opt.label_en}
                   </div>
-                  <div className="text-[11px] text-slate-500">
+                  <div className="text-[11px] mt-0.5 font-semibold text-amber-700">
+                    {opt.price} · {opt.days}d
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-1">
                     {isFr ? opt.blurb_fr : opt.blurb_en}
                   </div>
                 </button>
@@ -155,38 +177,18 @@ const PromoteListingModal = ({ open, onOpenChange, listing, onSuccess }) => {
             </div>
           </div>
 
-          {/* Duration */}
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
-              {t('Duration (days)', 'Durée (jours)')}
-            </label>
-            <div className="flex gap-2">
-              {DURATIONS.map((d) => (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => setDuration(d)}
-                  className={`flex-1 py-2 rounded-md border-[1.5px] font-semibold text-sm transition-all ${
-                    duration === d
-                      ? 'bg-emerald-50 border-emerald-500 text-emerald-700'
-                      : 'bg-white border-slate-200 text-slate-700 hover:border-emerald-300'
-                  }`}
-                  data-testid={`promote-duration-${d}`}
-                >
-                  {d}d
-                </button>
-              ))}
-            </div>
-          </div>
+          {/* iter241 Mission 1 — Duration is now fixed per-tier, no manual override. */}
 
           {/* Summary */}
           <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 text-xs text-blue-900" data-testid="promote-summary">
             <p>
               <strong>{listing?.title || t('This listing', 'Cette annonce')}</strong>{' '}
               {t('will be promoted as', 'sera promu en tant que')}{' '}
-              <strong>{(TIERS.find((x) => x.id === tier) || TIERS[1])[isFr ? 'label_fr' : 'label_en']}</strong>{' '}
+              <strong>{activeTier[isFr ? 'label_fr' : 'label_en']}</strong>{' '}
               {t('for', 'pendant')} <strong>{duration}d</strong> {t('across', 'sur')}{' '}
-              <strong>{sections.length}</strong> {t('section(s)', 'section(s)')}.
+              <strong>{sections.length}</strong> {t('section(s)', 'section(s)')}{' '}
+              {t('— total', '— total')} <strong>{activeTier.price} CAD</strong>{' '}
+              <span className="text-blue-700">({t('plus tax + Stripe fee', 'plus taxes + frais Stripe')})</span>.
             </p>
           </div>
         </div>
@@ -204,12 +206,12 @@ const PromoteListingModal = ({ open, onOpenChange, listing, onSuccess }) => {
             {submitting ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                {t('Promoting…', 'Promotion…')}
+                {t('Redirecting to Stripe…', 'Redirection vers Stripe…')}
               </>
             ) : (
               <>
                 <Sparkles className="h-4 w-4 mr-2" />
-                {t('Activate promotion', 'Activer la promotion')}
+                {t('Pay with Stripe', 'Payer avec Stripe')}
               </>
             )}
           </Button>

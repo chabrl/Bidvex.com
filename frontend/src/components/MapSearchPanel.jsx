@@ -30,6 +30,9 @@ import {
   useMapEvents,
   useMap,
 } from 'react-leaflet';
+// iter241 Mission 3 — Cluster markers when count > 10 so dense areas
+// don't render a wall of overlapping pins.
+import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { MapPin, X } from 'lucide-react';
@@ -190,21 +193,41 @@ const MapSearchPanel = ({
               {center[0].toFixed(4)}, {center[1].toFixed(4)}
             </Popup>
           </Marker>
-          {markers
-            .filter((m) => m?.geo?.coordinates?.length === 2 && m.geo.coordinates[0] !== null)
-            .map((m) => (
-              <Marker
-                key={m.id}
-                // iter237 — GeoJSON is [lng, lat]; Leaflet expects [lat, lng].
-                position={[m.geo.coordinates[1], m.geo.coordinates[0]]}
-              >
-                <Popup>
-                  <strong>{m.title}</strong><br />
-                  {isFrench ? 'Offre actuelle' : 'Current bid'}: {m.current_price || m.starting_price || 0} {m.currency || 'CAD'}<br />
-                  <a href={`/listing/${m.id}`}>{isFrench ? "Voir l'annonce" : 'View Listing →'}</a>
-                </Popup>
-              </Marker>
-            ))}
+          {/* iter241 Mission 3 — Cluster when more than 10 markers. */}
+          {markers.length > 10 ? (
+            <MarkerClusterGroup chunkedLoading maxClusterRadius={60}>
+              {markers
+                .filter((m) => m?.geo?.coordinates?.length === 2 && m.geo.coordinates[0] !== null)
+                .map((m) => (
+                  <Marker
+                    key={m.id}
+                    position={[m.geo.coordinates[1], m.geo.coordinates[0]]}
+                  >
+                    <Popup>
+                      <strong>{m.title}</strong><br />
+                      {isFrench ? 'Offre actuelle' : 'Current bid'}: {m.current_price || m.starting_price || 0} {m.currency || 'CAD'}<br />
+                      <a href={`/listing/${m.id}`}>{isFrench ? "Voir l'annonce" : 'View Listing →'}</a>
+                    </Popup>
+                  </Marker>
+                ))}
+            </MarkerClusterGroup>
+          ) : (
+            markers
+              .filter((m) => m?.geo?.coordinates?.length === 2 && m.geo.coordinates[0] !== null)
+              .map((m) => (
+                <Marker
+                  key={m.id}
+                  // iter237 — GeoJSON is [lng, lat]; Leaflet expects [lat, lng].
+                  position={[m.geo.coordinates[1], m.geo.coordinates[0]]}
+                >
+                  <Popup>
+                    <strong>{m.title}</strong><br />
+                    {isFrench ? 'Offre actuelle' : 'Current bid'}: {m.current_price || m.starting_price || 0} {m.currency || 'CAD'}<br />
+                    <a href={`/listing/${m.id}`}>{isFrench ? "Voir l'annonce" : 'View Listing →'}</a>
+                  </Popup>
+                </Marker>
+              ))
+          )}
         </MapContainer>
       </div>
 
