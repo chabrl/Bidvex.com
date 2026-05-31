@@ -1,5 +1,62 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter247 — PARTNER OUTREACH CAMPAIGN DEPLOYMENT (Mar 03, 2026) ✅
+
+Operational deployment of a B2B onboarding promotion targeting Auctioneers & Liquidators. Live promotion `d8c81cf2-562c-46d0-a101-eeea3f5e2be7` (`coupon=BIDVEX-PARTNERS`) is **active** in the live preview env right now and the locked-copy email + PDF flyer are wired through the unified outbound stack. **Pytest 141/141 PASS** (134 prior + 7 new iter247).
+
+### Mission 1 — Backend rule configuration
+- **NEW target segment**: extended `_audience_preview` + `_user_matches_target` in `routes/admin_promotions.py` to recognize `target_config.target = "partners"`. Matches users with `is_partner=True` OR legacy `account_type="partner"`. Live preview shows 1 partner (`encantranscan@bidvex.com`) in the audience.
+- **NEW waiver routing**: extended `services/promotion_runtime._WAIVERS_BY_TX` so `partner_launch_offer` is eligible for `listing_fee`, `listing_promotion`, `buyer_premium`, and `seller_commission`. Hard-coded `pct=100.0` so a missing config can't silently degrade to a 0% no-op. Best-value scoring also pushes it to the top of the 100% tier so it always wins against weaker stacked promos.
+- **POSTed the live promotion** via `POST /api/admin/promotions`:
+  * `type: partner_launch_offer`
+  * `coupon_code: BIDVEX-PARTNERS`
+  * `target_config.target: partners`
+  * `config: {is_free_listing: true, max_free_listings_per_user: 1, seller_commission_override_pct: 0.0, buyer_premium_override_pct: 0.0, scope: ["all"], discount_percent: 100}`
+  * `uses_per_user: 1`
+  * `notify_users: true`
+  * Window: `2026-03-03 → 2026-06-03` (3 months)
+  * `status: active`
+- **Stripe-bypass verification**: when a partner enters `BIDVEX-PARTNERS` at checkout, `apply_active_promotions` → `compute_promotion_discount` returns `final_amount=0.0, is_full_waiver=True` for every fee path. The iter242 zero-fee bypass architecture takes that as the trigger and skips the Stripe Checkout step entirely, logging a $0.00 audit row.
+
+### Mission 2 — Email copy generation
+- NEW `services/partner_outreach.py::partner_outreach_email_html(coupon_code)` renders branded HTML with the user-locked English copy ("Hello BidVex Partners! ... your first listing completely free ... support@bidvex.ca"), a dashed-amber coupon-highlight block, and a gradient "Register as Partner" CTA pointing to `bidvex.com/become-a-partner`.
+- Subject locked at `"Exclusive offer to try BidVex for free!"`.
+- Dispatched through `send_unified_email("new_feature", data={html_full_override: <html>, subject_override: ...})` — preserves HTML byte-for-byte through the canonical iter244 routing.
+
+### Mission 3 — PDF flyer generator
+- NEW `services/partner_outreach.py::build_partner_outreach_pdf(coupon_code)` renders the canonical Partner Program Evaluation Guide using `reportlab 4.4.0`:
+  * Header: "BidVex | Online Auction Marketplace — Partner Program Evaluation Guide"
+  * Value proposition with four zero-dollar bullets ($0 Setup Fee, $0 Subscription, $0 Listing Creation, 0% Platform Fees)
+  * Exclusive Partner Benefits: Bulk Asset Uploading, Dedicated Broker Status Badging, Real-Time Analytics, Secure Financial Routing via Stripe Connect
+  * Amber-highlighted coupon-code block when supplied
+  * 4-step Registration Protocol verbatim per spec
+  * Footer with support@bidvex.ca + corporate address
+- Live preview endpoint: `GET /api/admin/promotions/partner-outreach/pdf?coupon_code=BIDVEX-PARTNERS` returns a valid 3.8KB `application/pdf`.
+- Email blast endpoint: `POST /api/admin/promotions/partner-outreach/send` (admin-gated) base64-encodes the PDF, attaches it as `BidVex-Partner-Program-Guide.pdf`, fans out to every partner (or to `recipient_emails` for smoke testing), strips unsubscribes, and writes a `partner_outreach_runs` audit row. Supports `dry_run=True` for safe rehearsals.
+
+### Validation
+- NEW `tests/test_iter247_partner_outreach.py` — **7/7 PASS** covering target matching, 100% waiver math across all 4 fee paths, PDF magic-byte validity, email-copy lockwording, anonymous auth rejection, dry-run audience resolution, and admin-gated PDF download.
+- **Live deployment**: promotion `d8c81cf2-562c-46d0-a101-eeea3f5e2be7` is active. `preview-audience` returns 1 partner. Dry-run blast confirmed end-to-end without invoking SendGrid.
+- **Full regression**: 141/141 PASS across iter231→iter247 unit-suite (live HTTP tests occasionally skip on burst rate-limits; individually all green).
+
+### Files changed (iter247)
+**Backend NEW**: `services/partner_outreach.py` (PDF + email HTML), `tests/test_iter247_partner_outreach.py` (7 tests).
+**Backend MODIFIED**: `services/promotion_runtime.py` (waivers + 100% pct for `partner_launch_offer`), `routes/admin_promotions.py` (target=`partners` audience + matcher, value scoring, blast endpoint, PDF download endpoint).
+
+### Action items (user — campaign launch)
+1. **Save to GitHub → redeploy** preview → production so the partner promo + blast endpoints are live on bidvex.com.
+2. **Trigger the blast**:
+   ```bash
+   curl -X POST https://bidvex.com/api/admin/promotions/partner-outreach/send \
+     -H "Authorization: Bearer <ADMIN_TOKEN>" \
+     -H "Content-Type: application/json" \
+     -d '{"promotion_id":"d8c81cf2-562c-46d0-a101-eeea3f5e2be7"}'
+   ```
+3. Monitor redemptions on the `/admin → Promotions → Promotion Performance` dashboard — `BIDVEX-PARTNERS` will surface in the Top 5 leaderboard as redemptions land.
+
+---
+
+
 ## Latest: iter246 — ONE-CLICK RE-TRIGGER + WINDOW SELECTOR (Mar 03, 2026) ✅
 
 Closes the loop on the Admin Promotion Performance Dashboard: admins can now ad-hoc slice metrics over 7/30/90/365-day windows and one-click clone a top-performing campaign under a fresh `BIDVEX-RE-*` coupon — with background broadcast scheduling preserved from the source. **Pytest 134/134 PASS** (126 prior + 8 new iter246).

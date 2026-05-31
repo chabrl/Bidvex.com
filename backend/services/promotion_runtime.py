@@ -48,10 +48,10 @@ class PromotionDiscount:
 
 # Map each transaction_type → which promotion types waive it.
 _WAIVERS_BY_TX = {
-    "listing_fee":         {"free_first_listing", "free_platform_fee"},
-    "listing_promotion":   {"free_promotion_boost", "free_platform_fee"},
-    "buyer_premium":       {"free_platform_fee"},
-    "seller_commission":   {"free_platform_fee", "reduced_commission", "free_first_listing"},
+    "listing_fee":         {"free_first_listing", "free_platform_fee", "partner_launch_offer"},
+    "listing_promotion":   {"free_promotion_boost", "free_platform_fee", "partner_launch_offer"},
+    "buyer_premium":       {"free_platform_fee", "partner_launch_offer"},
+    "seller_commission":   {"free_platform_fee", "reduced_commission", "free_first_listing", "partner_launch_offer"},
     "subscription_upgrade":{"subscription_discount", "free_platform_fee"},
 }
 
@@ -100,6 +100,12 @@ async def compute_promotion_discount(
 
     # Compute the discount percentage from the promotion config.
     if ptype in ("free_platform_fee", "free_first_listing", "free_promotion_boost"):
+        pct = 100.0
+    elif ptype == "partner_launch_offer":
+        # iter247 — partner_launch_offer always waives 100% of the
+        # eligible transaction (the "free 1st listing for partners"
+        # campaign). Hard-coded so a missing config.discount_percent
+        # can't silently degrade to a 0% no-op.
         pct = 100.0
     elif ptype in ("reduced_commission", "subscription_discount"):
         pct = float(cfg.get("discount_percent", 0))

@@ -96,6 +96,16 @@ async def _audience_preview(db, target_config: PromotionTargetConfig) -> Dict[st
     target = (target_config.target or "all").lower()
     if target == "all":
         pass
+    elif target == "partners":
+        # iter247 — Partners segment (Auctioneers + Liquidators).
+        # Matches users flagged via `is_partner=True` OR the legacy
+        # `account_type="partner"` field used by older partner-onboarding
+        # flows. `partner_verification_status="verified"` is implicit when
+        # `is_partner=True` is set by the verification webhook.
+        q["$or"] = [
+            {"is_partner": True},
+            {"account_type": "partner"},
+        ]
     elif target == "tier" and target_config.target_tier:
         q["subscription_tier"] = target_config.target_tier
     elif target == "province" and target_config.target_province:
@@ -382,6 +392,178 @@ async def re_trigger_promotion(
             clone["broadcast_scheduled"] = False
 
     return clone
+
+
+class PartnerOutreachPayload(BaseModel):
+    promotion_id: Optional[str] = Field(None, description="Promotion to anchor the coupon code on")
+    coupon_code: Optional[str] = Field(None, description="Override coupon code (defaults to promo.coupon_code)")
+    recipient_emails: Optional[List[str]] = Field(None, description="If set, ONLY blast to these emails (smoke testing)")
+    dry_run: bool = Field(False, description="When True, do not actually call SendGrid")
+
+
+@admin_promotions_router.post("/admin/promotions/partner-outreach/send")
+async def send_partner_outreach_blast(
+    payload: PartnerOutreachPayload,
+    current_user: User = Depends(get_current_user),
+):
+    """iter247 — One-shot blast for the Partner Program Outreach campaign.
+
+    Sends the locked English subject + body + PDF attachment to every
+    flagged partner user. Recipient set:
+      • Default: `users` collection where `is_partner=True` OR
+        `account_type=="partner"`.
+      • Override via `recipient_emails`.
+
+    For each recipient, the email is dispatched via
+    `send_unified_email("new_feature", data={html_full_override: ...})`
+    with the rendered PDF attached. Returns counters + per-recipient
+    delivery statuses.
+    """
+    _require_admin(current_user)
+    db = get_db()
+
+    from services.partner_outreach import (
+        PARTNER_OUTREACH_EMAIL_SUBJECT,
+        partner_outreach_email_html,
+        build_partner_outreach_pdf,
+    )
+    from services.email_notifications import send_unified_email
+    import base64 as _b64
+
+    coupon_code = payload.coupon_code
+    promo_doc = None
+    if payload.promotion_id:
+        promo_doc = await db.promotions.find_one(
+            {"id": payload.promotion_id}, {"_id": 0}
+        )
+        if promo_doc and not coupon_code:
+            coupon_code = promo_doc.get("coupon_code")
+
+    # Resolve recipients.
+    if payload.recipient_emails:
+        recipients = [
+            {"email": e, "first_name": "Partner", "id": None}
+            for e in payload.recipient_emails
+        ]
+    else:
+        cur = db.users.find(
+            {"$or": [{"is_partner": True}, {"account_type": "partner"}]},
+            {"_id": 0, "id": 1, "email": 1, "first_name": 1, "name": 1, "company_name": 1},
+        )
+        users = await cur.to_list(length=5000)
+        # Strip duplicates + unsubscribed.
+        unsubs_cur = db.email_unsubscribes.find({}, {"_id": 0, "email": 1})
+        unsub_set = {u["email"].lower() for u in await unsubs_cur.to_list(length=10000) if u.get("email")}
+        seen = set()
+        recipients = []
+        for u in users:
+            em = (u.get("email") or "").strip().lower()
+            if not em or em in seen or em in unsub_set:
+                continue
+            seen.add(em)
+            recipients.append({
+                "email": u.get("email"),
+                "first_name": u.get("first_name") or u.get("company_name") or u.get("name") or "Partner",
+                "id": u.get("id"),
+            })
+
+    if not recipients:
+        return {
+            "sent": 0,
+            "failed": 0,
+            "recipients": [],
+            "promotion_id": payload.promotion_id,
+            "coupon_code": coupon_code,
+            "subject": PARTNER_OUTREACH_EMAIL_SUBJECT,
+            "dry_run": payload.dry_run,
+            "warning": "no_partner_users_matched",
+        }
+
+    pdf_bytes = build_partner_outreach_pdf(coupon_code=coupon_code)
+    pdf_b64 = _b64.b64encode(pdf_bytes).decode("ascii")
+    html_body = partner_outreach_email_html(coupon_code=coupon_code)
+
+    sent = 0
+    failed = 0
+    results: List[Dict[str, Any]] = []
+    for r in recipients:
+        if payload.dry_run:
+            results.append({"email": r["email"], "status": "skipped_dry_run"})
+            continue
+        try:
+            res = await send_unified_email(
+                "new_feature",
+                user={"email": r["email"], "first_name": r["first_name"]},
+                data={
+                    "html_full_override": html_body,
+                    "subject_override": PARTNER_OUTREACH_EMAIL_SUBJECT,
+                },
+                attachments=[{
+                    "content": pdf_b64,
+                    "filename": "BidVex-Partner-Program-Guide.pdf",
+                    "type": "application/pdf",
+                }],
+            )
+            if res and res.get("status") in ("sent", "logged"):
+                sent += 1
+                results.append({"email": r["email"], "status": res.get("status")})
+            else:
+                failed += 1
+                results.append({"email": r["email"], "status": "error", "detail": str(res)[:200]})
+        except Exception as exc:  # noqa: BLE001
+            failed += 1
+            results.append({"email": r["email"], "status": "error", "detail": str(exc)[:200]})
+
+    # Audit row.
+    await db.partner_outreach_runs.insert_one({
+        "id": str(__import__("uuid").uuid4()),
+        "promotion_id": payload.promotion_id,
+        "coupon_code": coupon_code,
+        "recipient_count": len(recipients),
+        "sent": sent,
+        "failed": failed,
+        "dry_run": payload.dry_run,
+        "triggered_by": current_user.id,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+
+    return {
+        "subject": PARTNER_OUTREACH_EMAIL_SUBJECT,
+        "promotion_id": payload.promotion_id,
+        "coupon_code": coupon_code,
+        "recipient_count": len(recipients),
+        "sent": sent,
+        "failed": failed,
+        "dry_run": payload.dry_run,
+        "recipients": results,
+    }
+
+
+@admin_promotions_router.get("/admin/promotions/partner-outreach/pdf")
+async def download_partner_outreach_pdf(
+    coupon_code: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+):
+    """iter247 — Download the locked Partner Program Evaluation Guide PDF.
+
+    Admin-gated. Returns the canonical brochure used by the blast. Useful
+    for previewing the asset BEFORE pulling the trigger on the email
+    campaign.
+    """
+    _require_admin(current_user)
+    from fastapi.responses import StreamingResponse
+    from services.partner_outreach import build_partner_outreach_pdf
+
+    pdf_bytes = build_partner_outreach_pdf(coupon_code=coupon_code)
+    return StreamingResponse(
+        iter([pdf_bytes]),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": 'inline; filename="BidVex-Partner-Program-Guide.pdf"',
+            "Cache-Control": "private, no-store",
+        },
+    )
+
 
 
 
@@ -734,6 +916,8 @@ async def _user_matches_target(user: Dict[str, Any], promo: Dict[str, Any]) -> b
     target = (promo.get("target") or tc.get("target") or "all").lower()
     if target == "all":
         return True
+    if target == "partners":
+        return bool(user.get("is_partner")) or user.get("account_type") == "partner"
     if target == "tier":
         return user.get("subscription_tier") == tc.get("target_tier")
     if target == "province":
@@ -805,7 +989,7 @@ async def apply_active_promotions(
         if listing_type and "all" not in scope and listing_type not in scope:
             continue
         # Best-value scoring: higher discount_percent wins; "free" (100%) tops it.
-        if promo["type"] in ("free_platform_fee", "free_first_listing"):
+        if promo["type"] in ("free_platform_fee", "free_first_listing", "partner_launch_offer"):
             value = 100.0
         elif promo["type"] == "reduced_commission":
             value = float(cfg.get("discount_percent", 0))
