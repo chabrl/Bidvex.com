@@ -16,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Skeleton } from '../ui/skeleton';
 import { Button } from '../ui/button';
-import { TrendingUp, Users, DollarSign, RefreshCw, Trophy, Zap, X } from 'lucide-react';
+import { TrendingUp, Users, DollarSign, RefreshCw, Trophy, Zap, X, Briefcase, Mail } from 'lucide-react';
 import {
   ResponsiveContainer,
   LineChart,
@@ -171,6 +171,39 @@ const PromotionAnalyticsDashboard = () => {
     label: formatDayShort(row.date),
   }));
 
+  // iter249 Mission 2 — B2B Partner Acquisition ROI block.
+  const partnerRoi = data?.partner_roi || {};
+  // iter249 Mission 1 — Send-Preview-to-Self handler.
+  const { user } = useAuth();
+  const [previewSubmitting, setPreviewSubmitting] = useState(false);
+  const sendPreviewToSelf = async () => {
+    const adminEmail = user?.email || '';
+    if (!adminEmail) {
+      toast.error('Could not resolve your session email');
+      return;
+    }
+    setPreviewSubmitting(true);
+    try {
+      const res = await axios.post(
+        `${API}/admin/promotions/partner-outreach/send`,
+        { recipient_emails: [adminEmail] },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      if (res?.data?.is_preview) {
+        toast.success(
+          'Success! Check your inbox for the live email and PDF guide.',
+          { description: `Sent to ${adminEmail}` },
+        );
+      } else {
+        toast.success('Preview dispatched');
+      }
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || 'Send preview failed');
+    } finally {
+      setPreviewSubmitting(false);
+    }
+  };
+
   return (
     <div
       className="space-y-4 mb-6"
@@ -216,13 +249,24 @@ const PromotionAnalyticsDashboard = () => {
             <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
+          {/* iter249 Mission 1 — Self-preview blast */}
+          <Button
+            size="sm"
+            onClick={sendPreviewToSelf}
+            disabled={previewSubmitting}
+            className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white border-0 hover:opacity-90"
+            data-testid="send-preview-to-myself-btn"
+          >
+            <Mail className={`h-3.5 w-3.5 mr-1.5 ${previewSubmitting ? 'animate-pulse' : ''}`} />
+            {previewSubmitting ? 'Sending preview...' : '✉️ Send Preview to Myself'}
+          </Button>
         </div>
       </div>
 
       {/* KPI Strip */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
         {loading ? (
-          Array.from({ length: 3 }).map((_, i) => (
+          Array.from({ length: 4 }).map((_, i) => (
             <Skeleton key={i} className="h-[112px] w-full rounded-lg" data-testid={`kpi-skeleton-${i}`} />
           ))
         ) : (
@@ -250,6 +294,15 @@ const PromotionAnalyticsDashboard = () => {
               sublabel="Redemptions per unique user"
               accent="indigo"
               testid="kpi-conversion-lift"
+            />
+            {/* iter249 Mission 2 — B2B Partner Acquisition ROI */}
+            <KpiCard
+              icon={Briefcase}
+              label="B2B Partner Acquisition ROI"
+              value={`${(partnerRoi.partner_conversion_rate_pct ?? 0).toFixed(2)}%`}
+              sublabel={`${partnerRoi.partners_redeemed || 0} / ${partnerRoi.total_registered_partners || 0} partners · ${formatCAD(partnerRoi.projected_gmv_lift_cad || 0)} 90-day GMV`}
+              accent="indigo"
+              testid="kpi-b2b-partner-roi"
             />
           </>
         )}

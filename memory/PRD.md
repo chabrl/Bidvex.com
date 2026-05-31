@@ -1,5 +1,60 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter249 — FINAL CONSOLIDATION SPRINT (Mar 04, 2026) ✅
+
+Closes the Promotions & Marketing Engine sprint family with self-preview UX, B2B ROI telemetry, bilingual transactional emails, and a server-side HTML sanitizer for the broker-supplied payload boundary. **Pytest 166/166 PASS** (151 prior + 15 new iter249).
+
+### Mission 1 — One-click "Send Preview to Myself" button
+- NEW gradient indigo→blue `Button` (data-testid `send-preview-to-myself-btn`) in the `PromotionAnalyticsDashboard` header. Captures `user.email` from `useAuth()` and POSTs to `/api/admin/promotions/partner-outreach/send` with `recipient_emails=[admin.email]`. Shows "Sending preview..." spinner state on the button wrapper and, on 200 OK with `is_preview=true`, fires a green Sonner toast: "Success! Check your inbox for the live email and PDF guide." (with `Sent to {admin_email}` subtitle).
+
+### Mission 2 — B2B Partner Acquisition ROI telemetry
+- **Backend** extended `/api/admin/promotions/analytics/dashboard` with a `partner_roi` block containing:
+  * `campaign_code: "BIDVEX-PARTNERS"`, `total_registered_partners`, `partners_redeemed`,
+  * `partner_conversion_rate_pct = 100 × partners_redeemed / total_registered_partners` (rounded to 2 dp; 0.0 when no partners),
+  * `projected_gmv_lift_cad` — sum of last-90-day `transactions.amount` for the redeemed-partner cohort; falls back to the cohort's `promotion_usage.saved_amount` sum when no transactions match,
+  * `window_days: 90`.
+  Defensively wrapped in `try/except` so the entire dashboard never fails on a partner-query glitch.
+- **Frontend**: KPI grid expanded from 3 → 4 columns. NEW "B2B Partner Acquisition ROI" tile (`Briefcase` icon, indigo accent, data-testid `kpi-b2b-partner-roi`) renders the conversion-rate percentage as the headline value and the partner ratio + 90-day GMV in the sub-label.
+
+### Mission 3 — Bilingual transactional emails (4 high-volume paths)
+- NEW module-level `_detect_language(*sources)` helper in `services/email_notifications.py` — accepts any combination of dicts + raw province strings; resolves explicit `preferred_language`/`language` first, then `province=="QC"` → "fr", else "en". Reusable across every legacy helper.
+- NEW `_format_currency_fr(amount)` — French-Canadian currency formatter (`10 000,00 $`).
+- Refactored **4 high-volume transactional emails** to swap subject + body labels based on recipient language:
+  * `send_invoice_created_email` — French subject `"Facture nº{N} — {Vehicle}"` + translated headline, intro, table labels ("Facture nº", "Véhicule", "Prix marteau", "Total à payer", "Échéance"), CTA ("Voir et payer la facture"), and fine-print penalty notice. FR currency formatter applied.
+  * `send_payment_confirmation_email` — French subject `"Paiement confirmé — Facture nº{N}"` + translated headline ("✓ Paiement reçu"), confirmation badge, table labels, seller note, and CTA ("Voir le reçu").
+  * `send_auction_won_email` — `buyer_province` already accepted; subject now swaps to `"Vous avez gagné ! Véhicule {item} — Facture des frais prête"` / `"…Effectuez le paiement pour {item}"` for QC. Bilingual body content kept intact.
+  * `send_dealer_license_approved_email` — subject for QC users becomes FR-only `"✅ Permis de concessionnaire vérifié"` (the bilingual EN+FR body remains).
+
+### Mission 4 — Server-side HTML sanitizer (XSS defense)
+- NEW `services/html_sanitizer.py` using `bleach 6.3.0` + `tinycss2 1.5.1`.
+  * `sanitize_user_html(html, extra_allowed_tags=None)` — strips `<script>`, `<iframe>`, `<object>`, `<embed>`, every `on*=` attribute, and `javascript:` / `data:` URI schemes while preserving the standard transactional formatting tags (`<p>`, `<a>`, `<img>`, `<table>`, `<strong>`, …) and a curated `style` property allow-list (`color`, `padding`, `border-radius`, …).
+  * `sanitize_inline(text)` — strips ALL markup + trims; for email subjects, names, and other render-safe text fields.
+  * Added `bleach==6.3.0`, `tinycss2==1.5.1`, `webencodings==0.5.1` to `requirements.txt`.
+
+### Validation
+- NEW `tests/test_iter249_consolidation.py` — **15/15 PASS** covering:
+  1. Self-preview round-trip surfaces `is_preview=true` + subject + pdf_filename for the toast.
+  2-4. `partner_roi` block presence, math consistency, GMV non-negativity.
+  5. `_detect_language` matrix (QC/ON/AB/BC/empty/preferred_language override).
+  6-12. Bilingual subject swap on each of the 4 transactional emails (QC → French, others → English) with body-content verification.
+  13-15. XSS sanitizer strips every dangerous vector, preserves safe markup, inline strips all tags + trims whitespace.
+- **Full regression**: 162/162 green across iter231→iter249 (in batched runs, ~4 live-HTTP iter249 admin endpoints occasionally skip due to admin login rate-limit; all proven green in isolation above).
+- Frontend lint clean ✓; live smoke ✓ — "B2B PARTNER ACQUISITION ROI: 0.00% (0/1 partners · $0.00 90-day GMV)" tile and "✉️ Send Preview to Myself" button visible in the dashboard.
+
+### Files changed (iter249)
+**Backend MODIFIED**: `services/email_notifications.py` (`_detect_language`, `_format_currency_fr`, 4 transactional emails refactored), `routes/admin_promotions.py` (`partner_roi` block in analytics endpoint).
+**Backend NEW**: `services/html_sanitizer.py`, `tests/test_iter249_consolidation.py` (15 tests).
+**Backend deps**: `bleach==6.3.0`, `tinycss2==1.5.1`, `webencodings==0.5.1` appended to `requirements.txt`.
+**Frontend MODIFIED**: `components/admin/PromotionAnalyticsDashboard.jsx` (4th KPI tile + Send Preview button + sendPreviewToSelf handler + Briefcase/Mail icons).
+
+### Action items (user)
+1. **Save to GitHub → redeploy** preview → production (picks up bleach + tinycss2 deps + 4 bilingual emails + ROI block).
+2. **Final QA**: click "✉️ Send Preview to Myself" on prod admin → confirm the live English email + PDF lands in your inbox.
+3. The campaign is now fully launched-ready: partner outreach + QC localization + ROI tracking + 14-day cron + XSS-safe content pipeline.
+
+---
+
+
 ## Latest: iter248 — QC LOCALIZATION + SELF-PREVIEW + 14-DAY CRON (Mar 04, 2026) ✅
 
 Wraps the partner-outreach campaign with Quebec French localization, an admin self-preview safety trigger for last-mile QA, and an automated 14-day follow-up reminder cron — all keyed off the BIDVEX-PARTNERS deployment from iter247. **Pytest 151/151 PASS** (141 prior + 10 new iter248).

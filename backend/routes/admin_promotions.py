@@ -837,12 +837,93 @@ async def promotions_analytics_dashboard(
             "amount": bucket["amount"],
         })
 
+    # ── iter249 Mission 2 — B2B Partner Acquisition ROI block ────────
+    # Computes telemetry specific to the BIDVEX-PARTNERS campaign:
+    #   • total_registered_partners — distinct users flagged as partner.
+    #   • partners_redeemed         — distinct partner users with ≥1
+    #     promotion_usage row carrying coupon BIDVEX-PARTNERS.
+    #   • partner_conversion_rate_pct — 100 * partners_redeemed /
+    #     total_registered_partners (0.0 when no partners exist).
+    #   • projected_gmv_lift_cad — sum of 90-day `transactions.amount`
+    #     for the redeemed partner cohort. Falls back to the saved
+    #     promotion_usage amounts when no transactions collection rows
+    #     match.
+    partner_roi: Dict[str, Any] = {
+        "campaign_code": "BIDVEX-PARTNERS",
+        "total_registered_partners": 0,
+        "partners_redeemed": 0,
+        "partner_conversion_rate_pct": 0.0,
+        "projected_gmv_lift_cad": 0.0,
+        "window_days": 90,
+    }
+    try:
+        partner_filter = {"$or": [{"is_partner": True}, {"account_type": "partner"}]}
+        total_partners = await db.users.count_documents(partner_filter)
+        partner_roi["total_registered_partners"] = int(total_partners)
+
+        if total_partners > 0:
+            # Redeemed partner cohort.
+            redeemed_rows = await db.promotion_usage.aggregate([
+                {"$match": {"coupon_code": "BIDVEX-PARTNERS"}},
+                {"$group": {
+                    "_id": "$user_id",
+                    "saved_amount": {"$sum": {"$ifNull": ["$saved_amount", 0]}},
+                }},
+            ]).to_list(length=10000)
+            redeemer_ids = [r["_id"] for r in redeemed_rows if r.get("_id")]
+
+            # Filter down to those redeemer_ids that are actual partners.
+            partner_redeemer_ids: List[str] = []
+            if redeemer_ids:
+                async for u in db.users.find(
+                    {"$and": [partner_filter, {"id": {"$in": redeemer_ids}}]},
+                    {"_id": 0, "id": 1},
+                ):
+                    partner_redeemer_ids.append(u["id"])
+
+            partner_roi["partners_redeemed"] = len(partner_redeemer_ids)
+            partner_roi["partner_conversion_rate_pct"] = round(
+                100.0 * len(partner_redeemer_ids) / total_partners, 2,
+            )
+
+            # 90-day GMV lift — sum the transactions collection for the
+            # redeemed-partner cohort. Falls back to summing the
+            # promotion_usage saved_amount values if no `transactions`
+            # collection rows match.
+            gmv_lift = 0.0
+            if partner_redeemer_ids:
+                cutoff_90 = (datetime.now(timezone.utc) - _td(days=90)).isoformat()
+                try:
+                    txn_rows = await db.transactions.aggregate([
+                        {"$match": {
+                            "user_id": {"$in": partner_redeemer_ids},
+                            "created_at": {"$gte": cutoff_90},
+                        }},
+                        {"$group": {
+                            "_id": None,
+                            "gmv": {"$sum": {"$ifNull": ["$amount", 0]}},
+                        }},
+                    ]).to_list(length=1)
+                    if txn_rows:
+                        gmv_lift = float(txn_rows[0].get("gmv", 0) or 0)
+                except Exception:
+                    gmv_lift = 0.0
+                if gmv_lift <= 0.0:
+                    # Fallback: sum the saved_amount entries for these partners.
+                    for r in redeemed_rows:
+                        if r.get("_id") in partner_redeemer_ids:
+                            gmv_lift += float(r.get("saved_amount", 0) or 0)
+            partner_roi["projected_gmv_lift_cad"] = round(gmv_lift, 2)
+    except Exception as exc:  # noqa: BLE001 — defensive: never fail the dashboard
+        partner_roi["error"] = str(exc)[:200]
+
     return {
         "window_days": window_days,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "gross_metrics": gross,
         "top_campaigns": top_campaigns,
         "velocity_timeline": velocity_timeline,
+        "partner_roi": partner_roi,
     }
 
 

@@ -45,6 +45,42 @@ def _format_date(dt) -> str:
     return dt.strftime("%B %d, %Y at %I:%M %p")
 
 
+def _detect_language(*sources) -> str:
+    """iter249 Mission 3 — Resolve the recipient language from any of
+    the supplied source dicts/strings. Priority:
+      1. `preferred_language` / `language` field (any source).
+      2. `province` field (any source) — `"QC"` → French.
+      3. Default → English.
+
+    Each source can be a dict (user, invoice, etc.) or a raw province
+    string. The first non-empty signal wins.
+    """
+    for src in sources:
+        if not src:
+            continue
+        if isinstance(src, str):
+            if src.upper().strip() == "QC":
+                return "fr"
+            continue
+        pref = (src.get("preferred_language") or src.get("language")
+                or src.get("buyer_preferred_language")
+                or src.get("buyer_language") or "").lower().strip()
+        if pref:
+            return "fr" if pref.startswith("fr") else "en"
+        prov = (src.get("province") or src.get("buyer_province") or "").upper().strip()
+        if prov == "QC":
+            return "fr"
+    return "en"
+
+
+def _format_currency_fr(amount) -> str:
+    """Format amount as French-Canadian currency (`10 000,00 $`)."""
+    s = f"{float(amount):,.2f}"
+    return s.replace(",", " ").replace(".", ",") + " $"
+
+
+
+
 async def send_email(
     to_email: str,
     subject: str,
@@ -471,36 +507,57 @@ async def send_welcome_email(user_email: str, user_name: str) -> Dict[str, Any]:
     return result
 
 async def send_invoice_created_email(invoice: Dict[str, Any]) -> Dict[str, Any]:
-    """Send email when a new invoice is generated"""
+    """Send email when a new invoice is generated. iter249 — language-aware."""
+    lang = _detect_language(invoice)
+    is_fr = lang == "fr"
+    title = "Facture générée" if is_fr else "Invoice Generated"
+    intro = (
+        "Félicitations ! Votre enchère gagnante a été traitée. Voici les détails de votre facture :"
+        if is_fr else
+        "Congratulations! Your winning bid has been processed. Here are your invoice details:"
+    )
+    lbl_inv = "Facture nº :" if is_fr else "Invoice #:"
+    lbl_veh = "Véhicule :" if is_fr else "Vehicle:"
+    lbl_hammer = "Prix marteau :" if is_fr else "Hammer Price:"
+    lbl_total = "Total à payer :" if is_fr else "Total Due:"
+    lbl_due = "Échéance :" if is_fr else "Due Date:"
+    cta = "Voir et payer la facture" if is_fr else "View & Pay Invoice"
+    fine_print = (
+        "Le paiement est dû dans les 14 jours. Tout retard peut entraîner une pénalité mensuelle de 2 %."
+        if is_fr else
+        "Payment is due within 14 days. Late payments may incur a 2% monthly penalty."
+    )
+    fmt_money = _format_currency_fr if is_fr else _format_currency
+
     content = f"""
-    <h2 style="margin: 0 0 20px 0; color: #1e293b;">Invoice Generated</h2>
+    <h2 style="margin: 0 0 20px 0; color: #1e293b;">{title}</h2>
     
     <p style="color: #475569; line-height: 1.6;">
-        Congratulations! Your winning bid has been processed. Here are your invoice details:
+        {intro}
     </p>
     
     <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 20px 0;"><tr><td style="background-color: #f8fafc; border-radius: 8px; padding: 20px;">
         <table width="100%" style="font-size: 14px; color: #1e293b;">
             <tr>
-                <td style="padding: 8px 0;"><strong>Invoice #:</strong></td>
+                <td style="padding: 8px 0;"><strong>{lbl_inv}</strong></td>
                 <td style="padding: 8px 0; text-align: right;">{invoice.get('invoice_number', 'N/A')}</td>
             </tr>
             <tr>
-                <td style="padding: 8px 0;"><strong>Vehicle:</strong></td>
+                <td style="padding: 8px 0;"><strong>{lbl_veh}</strong></td>
                 <td style="padding: 8px 0; text-align: right;">{invoice.get('vehicle_title', 'N/A')}</td>
             </tr>
             <tr>
-                <td style="padding: 8px 0;"><strong>Hammer Price:</strong></td>
-                <td style="padding: 8px 0; text-align: right;">{_format_currency(invoice.get('hammer_price', 0))}</td>
+                <td style="padding: 8px 0;"><strong>{lbl_hammer}</strong></td>
+                <td style="padding: 8px 0; text-align: right;">{fmt_money(invoice.get('hammer_price', 0))}</td>
             </tr>
             <tr>
-                <td style="padding: 8px 0;"><strong>Total Due:</strong></td>
+                <td style="padding: 8px 0;"><strong>{lbl_total}</strong></td>
                 <td style="padding: 8px 0; text-align: right; font-size: 18px; color: #2563eb; font-weight: bold;">
-                    {_format_currency(invoice.get('total_amount', 0))}
+                    {fmt_money(invoice.get('total_amount', 0))}
                 </td>
             </tr>
             <tr>
-                <td style="padding: 8px 0;"><strong>Due Date:</strong></td>
+                <td style="padding: 8px 0;"><strong>{lbl_due}</strong></td>
                 <td style="padding: 8px 0; text-align: right; color: #f59e0b;">
                     {_format_date(invoice.get('due_at', invoice.get('payment_deadline')))}
                 </td>
@@ -511,71 +568,99 @@ async def send_invoice_created_email(invoice: Dict[str, Any]) -> Dict[str, Any]:
     <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 30px auto;">
         <tr>
             <td align="center" style="background-color: #2563eb; padding: 14px 30px; border-radius: 8px;">
-                <a href="{FRONTEND_URL}/vehicle-auctions/invoices/{invoice.get('id')}" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">View & Pay Invoice</a>
+                <a href="{FRONTEND_URL}/vehicle-auctions/invoices/{invoice.get('id')}" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">{cta}</a>
             </td>
         </tr>
     </table>
     
     <p style="color: #64748b; font-size: 13px; line-height: 1.6;">
-        Payment is due within 14 days. Late payments may incur a 2% monthly penalty.
+        {fine_print}
     </p>
     """
-    
+    subject = (
+        f"Facture nº{invoice.get('invoice_number')} — {invoice.get('vehicle_title')}"
+        if is_fr else
+        f"Invoice #{invoice.get('invoice_number')} - {invoice.get('vehicle_title')}"
+    )
     return await _send_via_unified(
         to_email=invoice.get('buyer_email'),
-        subject=f"Invoice #{invoice.get('invoice_number')} - {invoice.get('vehicle_title')}",
-        html_content=_base_template(content, "Invoice Generated")
+        subject=subject,
+        html_content=_base_template(content, title)
     )
 
 
 async def send_payment_confirmation_email(invoice: Dict[str, Any]) -> Dict[str, Any]:
-    """Send email when payment is received"""
+    """Send email when payment is received. iter249 — language-aware."""
+    lang = _detect_language(invoice)
+    is_fr = lang == "fr"
+    title = "✓ Paiement reçu" if is_fr else "✓ Payment Received"
+    intro = (
+        "Merci ! Votre paiement a été traité avec succès."
+        if is_fr else
+        "Thank you! Your payment has been successfully processed."
+    )
+    confirmed_lbl = "Paiement confirmé" if is_fr else "Payment Confirmed"
+    lbl_inv = "Facture nº :" if is_fr else "Invoice #:"
+    lbl_veh = "Véhicule :" if is_fr else "Vehicle:"
+    lbl_date = "Date de paiement :" if is_fr else "Payment Date:"
+    seller_note = (
+        "Le vendeur a été notifié et coordonnera la prise en charge ou la livraison du véhicule avec vous."
+        if is_fr else
+        "The seller has been notified and will coordinate vehicle pickup/delivery with you."
+    )
+    cta = "Voir le reçu" if is_fr else "View Receipt"
+    fmt_money = _format_currency_fr if is_fr else _format_currency
+
     content = f"""
-    <h2 style="margin: 0 0 20px 0; color: #10b981;">✓ Payment Received</h2>
+    <h2 style="margin: 0 0 20px 0; color: #10b981;">{title}</h2>
     
     <p style="color: #475569; line-height: 1.6;">
-        Thank you! Your payment has been successfully processed.
+        {intro}
     </p>
     
-    <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="background-color: #d1fae5; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center;">        <p style="margin: 0; color: #065f46; font-size: 14px;">Payment Confirmed</p>
+    <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="background-color: #d1fae5; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center;">        <p style="margin: 0; color: #065f46; font-size: 14px;">{confirmed_lbl}</p>
         <p style="margin: 10px 0 0 0; color: #065f46; font-size: 28px; font-weight: bold;">
-            {_format_currency(invoice.get('paid_amount', invoice.get('total_amount', 0)))}
+            {fmt_money(invoice.get('paid_amount', invoice.get('total_amount', 0)))}
         </p></td></tr></table>
     
     <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 20px 0;"><tr><td style="background-color: #f8fafc; border-radius: 8px; padding: 20px;">
         <table width="100%" style="font-size: 14px; color: #1e293b;">
             <tr>
-                <td style="padding: 8px 0;"><strong>Invoice #:</strong></td>
+                <td style="padding: 8px 0;"><strong>{lbl_inv}</strong></td>
                 <td style="padding: 8px 0; text-align: right;">{invoice.get('invoice_number', 'N/A')}</td>
             </tr>
             <tr>
-                <td style="padding: 8px 0;"><strong>Vehicle:</strong></td>
+                <td style="padding: 8px 0;"><strong>{lbl_veh}</strong></td>
                 <td style="padding: 8px 0; text-align: right;">{invoice.get('vehicle_title', 'N/A')}</td>
             </tr>
             <tr>
-                <td style="padding: 8px 0;"><strong>Payment Date:</strong></td>
+                <td style="padding: 8px 0;"><strong>{lbl_date}</strong></td>
                 <td style="padding: 8px 0; text-align: right;">{_format_date(invoice.get('paid_at', datetime.now(timezone.utc)))}</td>
             </tr>
         </table>
     </td></tr></table>
     
     <p style="color: #475569; line-height: 1.6;">
-        The seller has been notified and will coordinate vehicle pickup/delivery with you.
+        {seller_note}
     </p>
     
     <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 30px auto;">
         <tr>
             <td align="center" style="background-color: #f1f5f9; padding: 14px 30px; border-radius: 8px;">
-                <a href="{FRONTEND_URL}/vehicle-auctions/invoices/{invoice.get('id')}" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">View Receipt</a>
+                <a href="{FRONTEND_URL}/vehicle-auctions/invoices/{invoice.get('id')}" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">{cta}</a>
             </td>
         </tr>
     </table>
     """
-    
+    subject = (
+        f"Paiement confirmé — Facture nº{invoice.get('invoice_number')}"
+        if is_fr else
+        f"Payment Confirmed - Invoice #{invoice.get('invoice_number')}"
+    )
     return await _send_via_unified(
         to_email=invoice.get('buyer_email'),
-        subject=f"Payment Confirmed - Invoice #{invoice.get('invoice_number')}",
-        html_content=_base_template(content, "Payment Confirmed")
+        subject=subject,
+        html_content=_base_template(content, title)
     )
 
 
@@ -1340,11 +1425,22 @@ async def send_auction_won_email(
     </p>
     """
 
-    subject = (
-        f"You Won! Vehicle {item_name} — Fee Invoice Ready"
-        if is_vehicle
-        else f"You Won! Complete Payment for {item_name}"
-    )
+    # iter249 Mission 3 — Language-aware subject (auction_won already
+    # renders bilingual EN+FR bodies for vehicles; the subject now
+    # follows the recipient's language preference too).
+    _aw_lang = _detect_language(buyer_province)
+    if _aw_lang == "fr":
+        subject = (
+            f"Vous avez gagné ! Véhicule {item_name} — Facture des frais prête"
+            if is_vehicle
+            else f"Vous avez gagné ! Effectuez le paiement pour {item_name}"
+        )
+    else:
+        subject = (
+            f"You Won! Vehicle {item_name} — Fee Invoice Ready"
+            if is_vehicle
+            else f"You Won! Complete Payment for {item_name}"
+        )
 
     return await _send_via_unified(
         to_email=to_email,
@@ -2676,9 +2772,16 @@ async def send_dealer_license_approved_email(user: dict, license_doc: dict) -> b
         f"N° de permis : <strong>{license_no}</strong> ({jurisdiction})<br/>"
         f"Statut : <strong style='color:#059669;'>Approuvé</strong>"
     )
+    # iter249 Mission 3 — Language-aware subject (body already bilingual).
+    _dl_lang = _detect_language(user)
+    subject_dl = (
+        "✅ Permis de concessionnaire vérifié"
+        if _dl_lang == "fr"
+        else "✅ Dealer License Verified · Permis de concessionnaire vérifié"
+    )
     return await _send_via_unified(
         to_email=user["email"],
-        subject="✅ Dealer License Verified · Permis de concessionnaire vérifié",
+        subject=subject_dl,
         html_content=_storage_panel(
             "Dealer License Approved", "Permis de concessionnaire approuvé",
             body_en, body_fr,
