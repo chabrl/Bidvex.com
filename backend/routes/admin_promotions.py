@@ -492,12 +492,50 @@ async def send_partner_outreach_blast(
                 "preferred_language": user_doc.get("preferred_language") or user_doc.get("language"),
             })
     else:
-        cur = db.users.find(
-            {"$or": [{"is_partner": True}, {"account_type": "partner"}]},
-            {"_id": 0, "id": 1, "email": 1, "first_name": 1, "name": 1,
-             "company_name": 1, "province": 1, "preferred_language": 1, "language": 1},
-        )
-        users = await cur.to_list(length=5000)
+        # iter251 — Audience resolution now honours the promotion's own
+        # `target_config` when no explicit `recipient_emails` override is
+        # supplied. This is what makes the [🚀 Launch Broadcast] CTA
+        # actually fire to the manual list the admin typed into the
+        # Edit dialog.
+        target_cfg = (promo_doc or {}).get("target_config") or {}
+        target_type = (target_cfg.get("target") or "partners").lower()
+
+        if target_type == "custom" and (
+            target_cfg.get("custom_emails") or target_cfg.get("custom_user_ids")
+        ):
+            # Manual list path. Honors both custom_emails and custom_user_ids.
+            ids = target_cfg.get("custom_user_ids") or []
+            emails = [(e or "").strip().lower() for e in (target_cfg.get("custom_emails") or [])]
+            user_q: Dict[str, Any] = {}
+            clauses: List[Dict[str, Any]] = []
+            if ids:
+                clauses.append({"id": {"$in": ids}})
+            if emails:
+                clauses.append({"email": {"$in": emails}})
+            if clauses:
+                user_q["$or"] = clauses
+            users = await db.users.find(
+                user_q,
+                {"_id": 0, "id": 1, "email": 1, "first_name": 1, "name": 1,
+                 "company_name": 1, "province": 1, "preferred_language": 1,
+                 "language": 1},
+            ).to_list(length=10000)
+            # Hydrate any pure-email addresses that don't yet have a user record
+            # (cold outreach is the WHOLE POINT of the manual list).
+            known_emails = {(u.get("email") or "").lower() for u in users}
+            for em in emails:
+                if em and em not in known_emails:
+                    users.append({
+                        "id": None, "email": em, "first_name": "Partner",
+                        "name": "", "province": None, "preferred_language": None,
+                    })
+        else:
+            # Default: query all flagged partner users (original iter247 path).
+            users = await db.users.find(
+                {"$or": [{"is_partner": True}, {"account_type": "partner"}]},
+                {"_id": 0, "id": 1, "email": 1, "first_name": 1, "name": 1,
+                 "company_name": 1, "province": 1, "preferred_language": 1, "language": 1},
+            ).to_list(length=5000)
         # Strip duplicates + unsubscribed.
         unsubs_cur = db.email_unsubscribes.find({}, {"_id": 0, "email": 1})
         unsub_set = {u["email"].lower() for u in await unsubs_cur.to_list(length=10000) if u.get("email")}

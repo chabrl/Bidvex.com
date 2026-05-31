@@ -52,6 +52,8 @@ import {
   Eye,
   Wand2,
   Download,
+  Rocket,
+  X,
 } from 'lucide-react';
 
 const API = API_BASE;
@@ -266,6 +268,38 @@ const PromotionManager = () => {
     }
   };
 
+  // iter251 — Launch broadcast workflow.
+  const [launchTarget, setLaunchTarget] = useState(null);
+  const [launchSubmitting, setLaunchSubmitting] = useState(false);
+  const openLaunch = (promo) => setLaunchTarget(promo);
+  const confirmLaunchBroadcast = async () => {
+    if (!launchTarget?.id) return;
+    setLaunchSubmitting(true);
+    try {
+      // Partner-launch-offer promos route through the locked
+      // partner-outreach PDF blast endpoint. Every other promo type
+      // routes through the generic activation/broadcast pipeline.
+      const isPartnerCampaign = launchTarget.type === 'partner_launch_offer';
+      const endpoint = isPartnerCampaign
+        ? `${API}/admin/promotions/partner-outreach/send`
+        : `${API}/admin/promotions/${launchTarget.id}/activate`;
+      const body = isPartnerCampaign ? { promotion_id: launchTarget.id } : {};
+      const res = await axios.post(endpoint, body, { headers });
+      const data = res?.data || {};
+      const sent = data.sent ?? data.recipient_count ?? 0;
+      const failed = data.failed ?? 0;
+      toast.success(`Broadcast launched — ${sent} sent${failed ? `, ${failed} failed` : ''}`, {
+        description: `Coupon ${launchTarget.coupon_code} dispatched to the audience.`,
+      });
+      setLaunchTarget(null);
+      fetchPromotions();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || 'Launch failed');
+    } finally {
+      setLaunchSubmitting(false);
+    }
+  };
+
   const deletePromotion = async (promo) => {
     if (!window.confirm(`Delete "${promo.name_en}" permanently?`)) return;
     try {
@@ -403,6 +437,16 @@ const PromotionManager = () => {
                         </Button>
                         <Button size="icon" variant="ghost" title="Edit" onClick={() => openEdit(p)} data-testid={`promotion-edit-${p.id}`}>
                           <Wand2 className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          title="🚀 Launch Broadcast"
+                          onClick={() => openLaunch(p)}
+                          className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
+                          data-testid={`promotion-launch-${p.id}`}
+                        >
+                          <Rocket className="h-3.5 w-3.5" />
                         </Button>
                         <Button size="icon" variant="ghost" title="Duplicate" onClick={() => duplicatePromotion(p)} data-testid={`promotion-duplicate-${p.id}`}>
                           <Copy className="h-3.5 w-3.5" />
@@ -685,6 +729,81 @@ const PromotionManager = () => {
               </tbody>
             </table>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* iter251 — Launch Broadcast confirmation modal */}
+      <Dialog
+        open={!!launchTarget}
+        onOpenChange={(o) => { if (!o) setLaunchTarget(null); }}
+      >
+        <DialogContent className="max-w-md" data-testid="launch-broadcast-dialog">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Rocket className="h-4 w-4 text-indigo-600" />
+              Launch Broadcast Now
+            </DialogTitle>
+            <DialogDescription>
+              This will fire the campaign email <strong>immediately</strong> to the
+              audience defined by this promotion's target configuration.
+              Unsubscribed addresses are automatically excluded.
+            </DialogDescription>
+          </DialogHeader>
+          {launchTarget && (
+            <div className="bg-slate-50 border border-slate-200 rounded-md p-3 text-xs space-y-1.5">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Campaign</span>
+                <span className="text-slate-900 font-medium truncate ml-3">{launchTarget.name_en}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Coupon</span>
+                <code className="font-mono text-slate-900">{launchTarget.coupon_code}</code>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Target</span>
+                <span className="text-slate-900 font-medium">
+                  {launchTarget.target_config?.target || launchTarget.target || 'all'}
+                </span>
+              </div>
+              {launchTarget.target_config?.custom_emails?.length > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Manual list size</span>
+                  <span className="text-slate-900 font-medium">
+                    {launchTarget.target_config.custom_emails.length} email
+                    {launchTarget.target_config.custom_emails.length === 1 ? '' : 's'}
+                  </span>
+                </div>
+              )}
+              {launchTarget.type === 'partner_launch_offer' && (
+                <div className="mt-2 pt-2 border-t border-slate-200 text-[11px] text-indigo-700">
+                  ⓘ Partner Outreach blast — includes the locked English/French
+                  email body + Partner Program Evaluation Guide PDF flyer.
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setLaunchTarget(null)}
+              disabled={launchSubmitting}
+              data-testid="launch-broadcast-cancel"
+            >
+              <X className="h-3.5 w-3.5 mr-1.5" />
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={confirmLaunchBroadcast}
+              disabled={launchSubmitting}
+              className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white border-0"
+              data-testid="launch-broadcast-confirm"
+            >
+              <Rocket className={`h-3.5 w-3.5 mr-1.5 ${launchSubmitting ? 'animate-pulse' : ''}`} />
+              {launchSubmitting ? 'Launching…' : '🚀 Launch Broadcast'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

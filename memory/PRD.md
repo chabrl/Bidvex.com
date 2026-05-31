@@ -1,5 +1,58 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter251 — LAUNCH BROADCAST WIRING + MANUAL LIST AUDIENCE (Mar 04, 2026) ✅
+
+Closes the missing-CTA gap reported by the user: the Partner Outreach blast endpoint now honours each promotion's stored `target_config.custom_emails` manual list, and every row in the All Promotions table carries a 🚀 Launch Broadcast button + confirmation modal that fires the campaign on demand. **Pytest 178/178 PASS** (173 prior + 5 new iter251).
+
+### Backend — Manual-list audience resolution
+- `routes/admin_promotions.py::send_partner_outreach_blast` now reads the promo's `target_config` when no explicit `recipient_emails` override is supplied:
+  * `target == "custom"` + `custom_emails: [...]` → audience = exactly that manual list (cold emails get a default `first_name="Partner"` if no `users` row matches; matching users get their `province` + `preferred_language` hydrated so the language router still works).
+  * `target == "custom"` + `custom_user_ids: [...]` → audience = those user IDs.
+  * Anything else → original `is_partner=True OR account_type=="partner"` segment (back-compat preserved).
+  * Unsubscribed addresses are still stripped via `email_unsubscribes` regardless of path.
+
+### Frontend — 🚀 Launch Broadcast CTA
+- `PromotionManager.js`: every All-Promotions row carries a new `Rocket` icon button (data-testid `promotion-launch-{id}`) between Edit and Duplicate.
+- Clicking opens a Confirmation Dialog (data-testid `launch-broadcast-dialog`) showing Campaign / Coupon / Target / Manual list size, plus a special infobox for `partner_launch_offer` campaigns noting the locked English/French body + Partner Program PDF flyer attachment.
+- Confirm button (data-testid `launch-broadcast-confirm`) POSTs to `partner-outreach/send` (for `partner_launch_offer`) or `promotions/{id}/activate` (generic), shows `Launching…` spinner state, then surfaces a green toast `Broadcast launched — {sent} sent{, X failed}` with the coupon code in the subtitle.
+
+### Validation
+- NEW `tests/test_iter251_launch_broadcast.py` — **5/5 PASS** covering:
+  1. Manual `custom_emails` list of 3 cold addresses is correctly resolved end-to-end through the blast endpoint.
+  2. Unsubscribed addresses are stripped even when present in the manual list.
+  3. A manual-list email that IS a known user picks up province + preferred_language hydration (lang routing still works).
+  4. Cold-outreach emails (no user record) still get a stable recipient row with `first_name="Partner"`.
+  5. Back-compat: a `partner_launch_offer` promo with no `custom_emails` keeps the original `is_partner=True` segment query.
+- **Live HTTP verification** ✓ — Dry-run blast of `BIDVEX-PARTNERS` (which the user edited to target `info@sushicrepe.ca` via the Manual user list) now returns:
+  ```json
+  {"recipient_count": 1,
+   "recipients": [{"email": "info@sushicrepe.ca",
+                   "lang": "en",
+                   "pdf_filename": "BidVex-Partner-Program-Guide.pdf",
+                   "status": "skipped_dry_run"}]}
+  ```
+  (Previously this endpoint would have ignored the manual list and tried to send to `encantranscan@bidvex.com`.)
+- **UI smoke** ✓ — Screenshot confirms the 🚀 button is mounted in the Actions column and the modal renders with Campaign + Coupon + Target=`custom` + Manual list size=1 email + the PDF-flyer infobox.
+- **Full regression**: 44/44 PASS across iter247→iter251.
+
+### Files changed (iter251)
+**Backend MODIFIED**: `routes/admin_promotions.py` (`send_partner_outreach_blast` audience resolver: now reads `target_config.custom_emails` / `custom_user_ids` from the promo doc).
+**Backend NEW**: `tests/test_iter251_launch_broadcast.py` (5 tests).
+**Frontend MODIFIED**: `pages/admin/PromotionManager.js` (Rocket icon import, `launchTarget` state, `confirmLaunchBroadcast` handler, Rocket button in row actions, Launch Broadcast confirmation Dialog at bottom of component).
+
+### Action items (user)
+1. **Save to GitHub → redeploy** preview → production.
+2. On prod admin, open Promotions → click 🚀 on the BIDVEX-PARTNERS row → confirm — the locked English email + PDF flyer will be dispatched to `info@sushicrepe.ca`.
+3. The "Save changes" button in the Edit dialog continues to save without sending; the new 🚀 row button is the explicit send trigger.
+
+### Where the code lives (answer to user's questions)
+- **Manual list processing (backend)**: `routes/admin_promotions.py:455-510` — the new conditional inside `send_partner_outreach_blast` that branches on `target_config.target=="custom"`.
+- **Background dispatch (existing)**: `services/promotion_broadcast.py::_resolve_eligible_emails` (lines 78-88) already honoured `custom_emails` for the generic activation broadcast pipeline; iter251 brings the Partner Outreach PDF blast endpoint to parity.
+- **Launch Broadcast CTA (frontend)**: `pages/admin/PromotionManager.js` — `confirmLaunchBroadcast` handler + Rocket icon button in row actions + bottom-of-component Launch Broadcast Dialog.
+
+---
+
+
 ## Latest: iter250 — SURGICAL XSS LOCKDOWN SWEEP (Mar 04, 2026) ✅
 
 Closes the final XSS attack surface on the platform by wiring `sanitize_user_html()` + `sanitize_inline()` (shipped in iter249) into every broker/admin write boundary. Persistent XSS in listings, promotions, and email campaigns is now stripped at the storage gate — even a compromised admin session can no longer slip a `<script>` into a description, banner, or campaign body. **Pytest 173/173 PASS** (166 prior + 7 new iter250).
