@@ -304,6 +304,88 @@ async def duplicate_promotion(
     return doc
 
 
+@admin_promotions_router.post("/admin/promotions/{promo_id}/re-trigger")
+async def re_trigger_promotion(
+    promo_id: str,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+):
+    """iter246 Mission 2 — One-click re-launch of a high-performing promotion.
+
+    Clones the source promotion's full config, target_config, and
+    pricing fields under a NEW unique coupon code prefixed `BIDVEX-RE-`.
+    The new promotion is created `status="active"` with `current_uses=0`
+    and a duration matching the source's original span (re-anchored to
+    `now()`). If the source had `notify_users=True`, the broadcast is
+    scheduled on the background task pipeline so admins get an immediate
+    HTTP response.
+    """
+    _require_admin(current_user)
+    db = get_db()
+
+    source = await db.promotions.find_one({"id": promo_id}, {"_id": 0})
+    if not source:
+        raise HTTPException(404, "Promotion not found")
+
+    # Compute the source's original duration and re-anchor to now().
+    try:
+        s_dt = datetime.fromisoformat((source.get("start_date") or "").replace("Z", "+00:00"))
+        e_dt = datetime.fromisoformat((source.get("end_date") or "").replace("Z", "+00:00"))
+        duration = e_dt - s_dt
+        if duration.total_seconds() <= 0:
+            duration = _td(days=30)
+    except Exception:
+        duration = _td(days=30)
+
+    now_dt = datetime.now(timezone.utc)
+    now_iso = now_dt.isoformat()
+    new_end = (now_dt + duration).isoformat()
+
+    # Generate a fresh BIDVEX-RE- coupon and guarantee uniqueness.
+    import uuid as _uuid
+    new_coupon = _generate_coupon_code(prefix="BIDVEX-RE")
+    while await db.promotions.find_one({"coupon_code": new_coupon}, {"_id": 0, "id": 1}):
+        new_coupon = _generate_coupon_code(prefix="BIDVEX-RE")
+
+    clone: Dict[str, Any] = {
+        "id": str(_uuid.uuid4()),
+        "name_en": (source.get("name_en") or "Untitled Promotion") + " (re-trigger)",
+        "name_fr": (source.get("name_fr") or source.get("name_en") or "Promotion") + " (re-déclenchement)",
+        "type": source.get("type"),
+        "config": dict(source.get("config") or {}),
+        "target": source.get("target") or (source.get("target_config") or {}).get("target", "all"),
+        "target_config": dict(source.get("target_config") or {"target": "all"}),
+        "coupon_code": new_coupon,
+        "start_date": now_iso,
+        "end_date": new_end,
+        "max_uses": source.get("max_uses"),
+        "uses_per_user": source.get("uses_per_user") or 1,
+        "current_uses": 0,
+        "status": "active",
+        "notify_users": bool(source.get("notify_users")),
+        "show_banner": bool(source.get("show_banner")),
+        "created_by": current_user.id,
+        "created_at": now_iso,
+        "updated_at": now_iso,
+        "re_triggered_from": promo_id,
+    }
+    await db.promotions.insert_one(clone)
+    clone.pop("_id", None)
+
+    # Fire-and-forget broadcast if the source opted in.
+    if clone["notify_users"]:
+        try:
+            from services.promotion_broadcast import broadcast_promotion_activation
+            background_tasks.add_task(broadcast_promotion_activation, db, clone["id"])
+            clone["broadcast_scheduled"] = True
+        except Exception:
+            clone["broadcast_scheduled"] = False
+
+    return clone
+
+
+
+
 @admin_promotions_router.get("/admin/promotions/{promo_id}/usage")
 async def usage_report(
     promo_id: str,

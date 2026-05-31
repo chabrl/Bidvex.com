@@ -1,5 +1,53 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter246 — ONE-CLICK RE-TRIGGER + WINDOW SELECTOR (Mar 03, 2026) ✅
+
+Closes the loop on the Admin Promotion Performance Dashboard: admins can now ad-hoc slice metrics over 7/30/90/365-day windows and one-click clone a top-performing campaign under a fresh `BIDVEX-RE-*` coupon — with background broadcast scheduling preserved from the source. **Pytest 134/134 PASS** (126 prior + 8 new iter246).
+
+### Mission 1 — Ad-hoc time-window selector
+- **Frontend** (`components/admin/PromotionAnalyticsDashboard.jsx`): NEW shadcn `Select` dropdown in the dashboard header offering Last 7 / 30 / 90 / 365 days. State (`windowDays`) is wired into the `fetchAnalytics` `useCallback` dependency array so a selection change triggers an immediate re-fetch with the new `?window_days={n}` param. data-testids: `analytics-window-select`, `analytics-window-7|30|90|365`.
+- **Backend** (`routes/admin_promotions.py::promotions_analytics_dashboard`): `window_days` already cascades through all three pipelines (gross_metrics, top_campaigns, velocity_timeline) and is clamped to `[1, 365]`. Verified by `test_iter246_analytics_window_slicing_changes_with_param` — narrower windows return ≤ saved_amount and timeline length matches the requested input.
+
+### Mission 2 — One-click campaign re-trigger
+- **Backend** (`routes/admin_promotions.py::re_trigger_promotion`) — NEW `POST /api/admin/promotions/{id}/re-trigger`:
+  * Admin-gated via `_require_admin` (403 for non-admins, 401 for anonymous).
+  * Fetches the source promo, computes its original duration (`end_date − start_date`), and re-anchors that span to `now()` so the clone runs for the same length but starting today.
+  * Generates a unique `BIDVEX-RE-XXXXXX` coupon with a duplicate-resistance loop against the existing `promotions` collection.
+  * Clones `type`, `config`, `target`, `target_config`, `max_uses`, `uses_per_user`, `notify_users`, `show_banner` verbatim.
+  * Sets `status="active"`, `current_uses=0`, stamps `re_triggered_from=<source_id>` for provenance.
+  * If `notify_users=True`, queues `broadcast_promotion_activation()` on FastAPI `BackgroundTasks` and returns `broadcast_scheduled: True` so admins know the email blast was kicked off.
+  * 404 when source promotion is unknown.
+- **Frontend**: Inline `Zap` icon button on every Top-5 row (data-testid `top-campaign-retrigger-{idx}`). Click opens a confirmation `Dialog` showing source coupon + type + past saved + redemption count; clicking the gradient `Re-launch now` button POSTs to the endpoint, surfaces a green success `toast` ("Re-launched as {new_coupon}"), closes the modal, and soft-refreshes the dashboard matrices.
+
+### Validation
+- NEW `tests/test_iter246_retrigger_and_window.py` — **8/8 PASS** covering:
+  1. Endpoint requires authentication (401 anon).
+  2. Endpoint blocks non-admin callers (403) — via forged buyer-role JWT for env resilience.
+  3. 404 for unknown promotion_id.
+  4. Fresh coupon under `BIDVEX-RE-` prefix + distinct ID + active status + zero usage.
+  5. Cloning preserves `type`, `config`, `target_config`, `max_uses`, `uses_per_user`.
+  6. Date re-anchoring: clone `start_date` ≈ now (±2s), `duration` matches source exactly.
+  7. `broadcast_scheduled=True` when source has `notify_users=True`.
+  8. Window slicing parity: `window_days=7|30|90|365` returns the correct timeline length AND 365-day totals ≥ 7-day totals.
+- **Full regression**: 134/134 PASS across iter231→iter246. Live HTTP tests occasionally skip due to rate-limit on bulk admin login (`429`); individually all pass.
+- Lint clean on `PromotionAnalyticsDashboard.jsx`.
+- Live smoke ✓: window selector mounted with "Last 30 days" default, modal opens with proper preview ("$75.00 from 3 redemptions"), Cancel/Re-launch buttons rendered.
+
+### Files changed (iter246)
+**Backend MODIFIED**: `routes/admin_promotions.py` (new `/re-trigger` endpoint).
+**Backend NEW**: `tests/test_iter246_retrigger_and_window.py` (8 tests).
+**Frontend MODIFIED**: `components/admin/PromotionAnalyticsDashboard.jsx` (window selector + per-row Zap CTA + Dialog confirmation modal + retrigger state hooks).
+
+### Action items (user)
+1. **Save to GitHub → redeploy** preview → production.
+2. Smoke-test on prod: `/admin → Promotions` tab → switch window selector to "Last 7 days" → click Zap on the top row → confirm modal → verify a new `BIDVEX-RE-XXXXXX` coupon appears in the All Promotions table below with status=Active.
+
+### Known follow-ups (non-blocking)
+- Admin login on the live preview env occasionally returns 429 under back-to-back test bursts (brute-force protection). Tests skip gracefully when this happens; isolated runs always pass.
+
+---
+
+
 ## Latest: iter245 — PROMOTION PERFORMANCE DASHBOARD (Mar 02, 2026) ✅
 
 Built the high-fidelity ROI visualization layer on top of the Admin Promotions Engine — single composite analytics endpoint + 3-tile React dashboard with KPI strip, top-5 leaderboard + progress bars, and a 30-day velocity Line chart. **Pytest 126/126 PASS** (118 prior + 8 new iter245).

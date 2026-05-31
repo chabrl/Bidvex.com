@@ -16,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Skeleton } from '../ui/skeleton';
 import { Button } from '../ui/button';
-import { TrendingUp, Users, DollarSign, RefreshCw, Trophy } from 'lucide-react';
+import { TrendingUp, Users, DollarSign, RefreshCw, Trophy, Zap, X } from 'lucide-react';
 import {
   ResponsiveContainer,
   LineChart,
@@ -27,6 +27,21 @@ import {
   CartesianGrid,
   Legend,
 } from 'recharts';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../ui/select';
 
 const API = API_BASE;
 
@@ -89,7 +104,9 @@ const PromotionAnalyticsDashboard = () => {
   const { token } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [windowDays] = useState(30);
+  const [windowDays, setWindowDays] = useState(30);
+  const [retriggerTarget, setRetriggerTarget] = useState(null);
+  const [retriggerSubmitting, setRetriggerSubmitting] = useState(false);
 
   const fetchAnalytics = useCallback(async () => {
     if (!token) return;
@@ -112,6 +129,30 @@ const PromotionAnalyticsDashboard = () => {
   useEffect(() => {
     fetchAnalytics();
   }, [fetchAnalytics]);
+
+  // iter246 Mission 2 — Re-trigger flow.
+  const confirmRetrigger = async () => {
+    if (!retriggerTarget?.promotion_id) return;
+    setRetriggerSubmitting(true);
+    try {
+      const res = await axios.post(
+        `${API}/admin/promotions/${retriggerTarget.promotion_id}/re-trigger`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      toast.success(
+        `Re-launched as ${res?.data?.coupon_code || 'new coupon'}`,
+        { description: 'Active immediately under a fresh code.' }
+      );
+      setRetriggerTarget(null);
+      // Soft-refresh the dashboard matrices.
+      fetchAnalytics();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || 'Re-trigger failed');
+    } finally {
+      setRetriggerSubmitting(false);
+    }
+  };
 
   const gross = data?.gross_metrics || {};
   const topCampaigns = data?.top_campaigns || [];
@@ -136,7 +177,7 @@ const PromotionAnalyticsDashboard = () => {
       data-testid="promotion-analytics-dashboard"
     >
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h3 className="text-base font-bold flex items-center gap-2 text-slate-900">
             <TrendingUp className="h-4 w-4 text-indigo-600" />
@@ -146,16 +187,36 @@ const PromotionAnalyticsDashboard = () => {
             Live ROI from <code className="text-[10px] bg-slate-100 px-1 rounded">promotion_usage</code>
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={fetchAnalytics}
-          disabled={loading}
-          data-testid="promotion-analytics-refresh-btn"
-        >
-          <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* iter246 Mission 1 — Ad-hoc time-window selector */}
+          <Select
+            value={String(windowDays)}
+            onValueChange={(v) => setWindowDays(parseInt(v, 10))}
+          >
+            <SelectTrigger
+              className="h-9 w-[150px] text-xs"
+              data-testid="analytics-window-select"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7" data-testid="analytics-window-7">Last 7 days</SelectItem>
+              <SelectItem value="30" data-testid="analytics-window-30">Last 30 days</SelectItem>
+              <SelectItem value="90" data-testid="analytics-window-90">Last 90 days</SelectItem>
+              <SelectItem value="365" data-testid="analytics-window-365">Last 365 days</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={fetchAnalytics}
+            disabled={loading}
+            data-testid="promotion-analytics-refresh-btn"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* KPI Strip */}
@@ -226,8 +287,8 @@ const PromotionAnalyticsDashboard = () => {
                     className="border border-slate-100 rounded-md p-2.5 hover:bg-slate-50 transition-colors"
                     data-testid={`top-campaign-row-${idx}`}
                   >
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-2 min-w-0">
+                    <div className="flex items-center justify-between mb-1.5 gap-2">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
                         <span className="text-[10px] font-bold text-slate-400 w-4">
                           #{idx + 1}
                         </span>
@@ -238,9 +299,22 @@ const PromotionAnalyticsDashboard = () => {
                           {c.promotion_type}
                         </Badge>
                       </div>
-                      <span className="text-xs font-bold text-emerald-700 tabular-nums whitespace-nowrap">
-                        {formatCAD(c.saved_amount_cad)}
-                      </span>
+                      <div className="flex items-center gap-1.5 whitespace-nowrap">
+                        <span className="text-xs font-bold text-emerald-700 tabular-nums">
+                          {formatCAD(c.saved_amount_cad)}
+                        </span>
+                        {/* iter246 Mission 2 — Re-trigger CTA */}
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                          title="Clone & re-launch this campaign"
+                          onClick={() => setRetriggerTarget(c)}
+                          data-testid={`top-campaign-retrigger-${idx}`}
+                        >
+                          <Zap className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
@@ -344,6 +418,74 @@ const PromotionAnalyticsDashboard = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* iter246 Mission 2 — Re-trigger confirmation modal */}
+      <Dialog
+        open={!!retriggerTarget}
+        onOpenChange={(open) => {
+          if (!open) setRetriggerTarget(null);
+        }}
+      >
+        <DialogContent
+          className="max-w-md"
+          data-testid="retrigger-confirm-dialog"
+        >
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Zap className="h-4 w-4 text-amber-500" />
+              Re-launch Campaign
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to clone and re-launch this high-performing
+              campaign target group immediately under a new coupon code?
+            </DialogDescription>
+          </DialogHeader>
+          {retriggerTarget && (
+            <div className="bg-slate-50 border border-slate-200 rounded-md p-3 text-xs space-y-1.5">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Source coupon</span>
+                <code className="font-mono text-slate-900">
+                  {retriggerTarget.coupon_code}
+                </code>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Type</span>
+                <span className="text-slate-900">{retriggerTarget.promotion_type}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Past saved</span>
+                <span className="text-emerald-700 font-semibold tabular-nums">
+                  {formatCAD(retriggerTarget.saved_amount_cad)} from{' '}
+                  {retriggerTarget.redemption_count} redemption
+                  {retriggerTarget.redemption_count === 1 ? '' : 's'}
+                </span>
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setRetriggerTarget(null)}
+              disabled={retriggerSubmitting}
+              data-testid="retrigger-cancel-btn"
+            >
+              <X className="h-3.5 w-3.5 mr-1.5" />
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={confirmRetrigger}
+              disabled={retriggerSubmitting}
+              className="bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0"
+              data-testid="retrigger-confirm-btn"
+            >
+              <Zap className={`h-3.5 w-3.5 mr-1.5 ${retriggerSubmitting ? 'animate-pulse' : ''}`} />
+              {retriggerSubmitting ? 'Re-launching…' : 'Re-launch now'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
