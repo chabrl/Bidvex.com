@@ -51,10 +51,12 @@ async def send_email(
     html_content: str,
     attachments: List[Dict] = None
 ) -> Dict[str, Any]:
-    """
-    Send email via SendGrid
-    
-    Falls back to logging if SendGrid is not available
+    """iter244 Mission 2 — Canonical low-level SendGrid dispatcher.
+
+    Public sender used internally by `send_unified_email()`. Legacy
+    helpers SHOULD call `send_unified_email()` instead of this directly,
+    but `send_email` remains as the bottom-of-stack physical send. Falls
+    back to logging if SendGrid is not available.
     """
     if not SENDGRID_AVAILABLE:
         logger.info(f"[EMAIL LOG] To: {to_email}, Subject: {subject}")
@@ -112,16 +114,46 @@ async def send_unified_email(
     `auction_ending_soon`, `voicemail`, `ai_suggestion`, `new_feature`,
     `password_reset`, `onboarding_reminder`) plus the user + data context.
 
-    Legacy helpers (`send_welcome_email`, `send_bid_placed_email`, etc.)
-    were progressively migrated to delegate to this function during
-    iter239.
+    iter244 Mission 2 — Three optional override paths in `data` preserve
+    legacy compliance HTML byte-for-byte:
+      - `html_full_override`: send the HTML verbatim (no wrapping)
+      - `body_html_override`: wrap inside BIDVEX header/footer chrome
+      - `subject_override`:   override the registry's auto-derived subject
     """
     from services.email_templates import build_email_payload
     payload = build_email_payload(email_type, user=user, data=data or {}, lang=lang)
+    # iter244 — Sentinel marker for the canonical inner call. Calling
+    # `send_email` here is intentional and must NOT be rewritten by the
+    # bulk migration sweep below.
     return await send_email(
         to_email=payload["to_email"],
         subject=payload["subject"],
         html_content=payload["html_content"],
+        attachments=attachments,
+    )
+
+
+async def _send_via_unified(
+    *,
+    to_email: str,
+    subject: str,
+    html_content: str,
+    first_name: str = "",
+    attachments: Optional[List[Dict]] = None,
+) -> Dict[str, Any]:
+    """iter244 Mission 2 — Internal shim that routes a legacy "I already
+    have rich HTML" callsite through `send_unified_email()` with the
+    `html_full_override` passthrough. Every migrated legacy helper now
+    calls this instead of the raw `send_email()` so that we get a single
+    consolidated outbound path.
+    """
+    return await send_unified_email(
+        "new_feature",  # placeholder type — overridden by html_full_override
+        user={"email": to_email, "first_name": first_name},
+        data={
+            "html_full_override": html_content,
+            "subject_override": subject,
+        },
         attachments=attachments,
     )
 
@@ -429,7 +461,7 @@ async def send_welcome_email(user_email: str, user_name: str) -> Dict[str, Any]:
 </body>
 </html>"""
 
-    result = await send_email(
+    result = await _send_via_unified(
         to_email=user_email,
         subject="Welcome to the BidVex Ecosystem! / Bienvenue dans l'écosystème BidVex !",
         html_content=html
@@ -489,7 +521,7 @@ async def send_invoice_created_email(invoice: Dict[str, Any]) -> Dict[str, Any]:
     </p>
     """
     
-    return await send_email(
+    return await _send_via_unified(
         to_email=invoice.get('buyer_email'),
         subject=f"Invoice #{invoice.get('invoice_number')} - {invoice.get('vehicle_title')}",
         html_content=_base_template(content, "Invoice Generated")
@@ -540,7 +572,7 @@ async def send_payment_confirmation_email(invoice: Dict[str, Any]) -> Dict[str, 
     </table>
     """
     
-    return await send_email(
+    return await _send_via_unified(
         to_email=invoice.get('buyer_email'),
         subject=f"Payment Confirmed - Invoice #{invoice.get('invoice_number')}",
         html_content=_base_template(content, "Payment Confirmed")
@@ -596,7 +628,7 @@ async def send_invoice_overdue_email(invoice: Dict[str, Any], days_overdue: int)
     </table>
     """
     
-    return await send_email(
+    return await _send_via_unified(
         to_email=invoice.get('buyer_email'),
         subject=f"⚠️ OVERDUE: Invoice #{invoice.get('invoice_number')} - Action Required",
         html_content=_base_template(content, "Payment Overdue")
@@ -642,7 +674,7 @@ async def send_document_approved_email(
     </table>
     """
     
-    return await send_email(
+    return await _send_via_unified(
         to_email=user_email,
         subject=f"✓ Document Approved: {doc_name}",
         html_content=_base_template(content, "Document Approved")
@@ -692,7 +724,7 @@ async def send_document_rejected_email(
     </table>
     """
     
-    return await send_email(
+    return await _send_via_unified(
         to_email=user_email,
         subject=f"Action Required: {doc_name} - Re-upload Needed",
         html_content=_base_template(content, "Document Needs Attention")
@@ -743,7 +775,7 @@ async def send_seller_approved_email(
     </table>
     """
     
-    return await send_email(
+    return await _send_via_unified(
         to_email=user_email,
         subject="🎉 Your Seller Account is Approved!",
         html_content=_base_template(content, "Seller Account Approved")
@@ -811,7 +843,7 @@ async def send_auction_sold_email(
     </table>
     """
     
-    return await send_email(
+    return await _send_via_unified(
         to_email=seller_email,
         subject=f"🎉 Sold! {vehicle_title} - {_format_currency(final_price)}",
         html_content=_base_template(content, "Vehicle Sold")
@@ -914,7 +946,7 @@ async def send_seller_bid_received_email(
         <strong>Tip:</strong> Log in to your seller dashboard to follow live bid activity.
     </p>
     """
-    return await send_email(
+    return await _send_via_unified(
         to_email=seller_email,
         subject=f"🔔 New bid on your listing — {listing_title} | {label['name_en']}",
         html_content=_base_template(content, "New Bid Received", auction_type=auction_type),
@@ -1015,7 +1047,7 @@ async def send_subscription_reminder_email(
     </p>
     """
     
-    return await send_email(
+    return await _send_via_unified(
         to_email=user_email,
         subject=f"⏰ Your {plan_name} Subscription Expires in {days_remaining} Days",
         html_content=_base_template(content, "Subscription Reminder")
@@ -1068,7 +1100,7 @@ async def send_subscription_expired_email(
     </p>
     """
     
-    return await send_email(
+    return await _send_via_unified(
         to_email=user_email,
         subject=f"Your {plan_name} Subscription Has Expired",
         html_content=_base_template(content, "Subscription Expired")
@@ -1120,7 +1152,7 @@ async def send_subscription_upgraded_email(
     </table>
     """
     
-    return await send_email(
+    return await _send_via_unified(
         to_email=user_email,
         subject=f"🎉 Welcome to {plan_name}!",
         html_content=_base_template(content, "Subscription Updated")
@@ -1314,7 +1346,7 @@ async def send_auction_won_email(
         else f"You Won! Complete Payment for {item_name}"
     )
 
-    return await send_email(
+    return await _send_via_unified(
         to_email=to_email,
         subject=subject,
         html_content=_base_template(content, "Auction Won")
@@ -1369,7 +1401,7 @@ async def send_payment_reminder_email(
     </table>
     """
 
-    return await send_email(
+    return await _send_via_unified(
         to_email=winner_email,
         subject=f"Payment Reminder: {item_title} - {days_remaining} Days Left",
         html_content=_base_template(content, "Payment Reminder")
@@ -1439,7 +1471,7 @@ async def send_payment_overdue_email(
     </table>
     """
 
-    return await send_email(
+    return await _send_via_unified(
         to_email=winner_email,
         subject=f"OVERDUE: Payment Required for {item_title}",
         html_content=_base_template(content, "Payment Overdue")
@@ -1495,7 +1527,7 @@ async def send_review_request_email(
     </p>
     """
 
-    return await send_email(
+    return await _send_via_unified(
         to_email=buyer_email,
         subject=f"How was your purchase of {item_title}?",
         html_content=_base_template(content, "Leave a Review")
@@ -1733,7 +1765,7 @@ async def send_storage_auction_won_email(buyer: dict, auction: dict, facility: d
         f"Dépôt de nettoyage : <strong>{cleanup_deposit:.2f} $</strong> (remboursé après confirmation que l'unité est vide)."
     )
 
-    return bool(await send_email(
+    return bool(await _send_via_unified(
         to_email=buyer["email"],
         subject=f"🎉 You won — Storage Auction Unit #{unit}",
         html_content=_storage_panel(
@@ -1781,7 +1813,7 @@ async def send_storage_auction_sold_email(facility: dict, auction: dict, buyer: 
         f"Contactez le gagnant pour organiser le paiement et le ramassage. "
         f"Votre facture de commission BidVex (5 % + Stripe + taxes applicables) suivra séparément."
     )
-    return bool(await send_email(
+    return bool(await _send_via_unified(
         to_email=facility["email"],
         subject=f"✅ Sold — Storage Auction Unit #{unit}",
         html_content=_storage_panel("Auction sold", "Enchère vendue", body_en, body_fr),
@@ -1820,7 +1852,7 @@ async def send_storage_facility_approved_email(facility: dict) -> bool:
         f"Votre facilité a été vérifiée. Vous pouvez maintenant vous connecter et créer votre première enchère. "
         f"BidVex facture une commission fixe de 5% sur chaque vente réussie — les acheteurs ne paient aucun frais de plateforme."
     )
-    return await send_email(
+    return await _send_via_unified(
         to_email=facility["email"],
         subject="✅ Your BidVex Storage Facility account is approved",
         html_content=_storage_panel("Facility approved", "Facilité approuvée", body_en, body_fr,
@@ -1848,7 +1880,7 @@ async def send_storage_seller_commission_invoice(facility: dict, auction: dict, 
         f"• Taxe — {s['tax_label']} : {s['tax']:.2f} $<br/>"
         f"<strong>Total dû à BidVex : {s['total']:.2f} $</strong>"
     )
-    return await send_email(
+    return await _send_via_unified(
         to_email=facility["email"],
         subject=f"BidVex Commission Invoice — Storage Auction #{a_id}",
         html_content=_storage_panel("Commission invoice", "Facture de commission", body_en, body_fr),
@@ -1872,7 +1904,7 @@ async def send_storage_facility_registration_admin_alert(facility: dict) -> bool
         f"Units available: {facility.get('units_available',0)}"
     )
     body_fr = "Nouvelle facilité d'entreposage en attente de vérification."
-    return await send_email(
+    return await _send_via_unified(
         to_email=admin_email,
         subject=f"[Storage Facility] New registration — {facility.get('company_name','')}",
         html_content=_storage_panel("New facility registration", "Nouvelle facilité", body_en, body_fr,
@@ -1893,7 +1925,7 @@ async def send_storage_facility_pending_user_email(facility: dict) -> bool:
         "est en cours d'examen par notre équipe. Vous recevrez un courriel de confirmation "
         "dans 1 à 2 jours ouvrables une fois votre compte vérifié."
     )
-    return await send_email(
+    return await _send_via_unified(
         to_email=facility["email"],
         subject="Application received — BidVex Storage Auctions",
         html_content=_storage_panel("Application received", "Demande reçue", body_en, body_fr),
@@ -1946,7 +1978,7 @@ async def send_buyer_pickup_code_email(
       </div>
     </div>
     """
-    return await send_email(
+    return await _send_via_unified(
         to_email=buyer["email"],
         subject=f"🔑 Your pickup code · Votre code de collecte — {pickup_code}",
         html_content=html,
@@ -1997,7 +2029,7 @@ async def send_seller_pickup_instructions_email(
       </div>
     </div>
     """
-    return await send_email(
+    return await _send_via_unified(
         to_email=seller["email"],
         subject="✅ Item sold — pickup-code instructions · Article vendu — Instructions",
         html_content=html,
@@ -2074,7 +2106,7 @@ async def send_manual_subscription_active_email(
       </div>
     </div>
     """
-    return await send_email(
+    return await _send_via_unified(
         to_email=user["email"],
         subject="✅ Your annual subscription is active · Votre abonnement annuel est actif — BidVex",
         html_content=html,
@@ -2150,7 +2182,7 @@ async def send_auction_thread_opened_email(
       </div>
     </div>
     """
-    return await send_email(to_email=recipient["email"], subject=subject, html_content=html)
+    return await _send_via_unified(to_email=recipient["email"], subject=subject, html_content=html)
 
 
 
@@ -2167,7 +2199,7 @@ async def send_storage_facility_registration_verified_email(facility: dict) -> b
         f"Votre document d'enregistrement d'entreprise a été vérifié par BidVex. "
         f"Dès que le statut global de votre facilité sera approuvé, vous pourrez lister des unités."
     )
-    return await send_email(
+    return await _send_via_unified(
         to_email=facility["email"],
         subject="✅ Business registration verified — BidVex Storage Auctions",
         html_content=_storage_panel(
@@ -2197,7 +2229,7 @@ async def send_storage_facility_registration_rejected_email(facility: dict, reas
         f"Veuillez retourner à votre page d'inscription, téléverser un document corrigé "
         f"et le soumettre à nouveau. Nous examinerons le nouveau document sous 1 à 2 jours ouvrables."
     )
-    return await send_email(
+    return await _send_via_unified(
         to_email=facility["email"],
         subject="⚠️ Action required — Business registration not accepted",
         html_content=_storage_panel(
@@ -2257,7 +2289,7 @@ async def send_vehicle_deposit_captured_email(
         cta_en="View invoices",
         cta_fr="Voir les factures",
     )
-    return await send_email(
+    return await _send_via_unified(
         to_email=buyer["email"],
         subject=f"[BidVex] Bidding deposit captured · Dépôt saisi — Invoice {inv_no}",
         html_content=html,
@@ -2321,7 +2353,7 @@ async def send_seller_auction_sold_email(
         Votre paiement sera transféré sur votre compte Stripe connecté une fois que l'acheteur aura payé.
     </p>
     """
-    return await send_email(
+    return await _send_via_unified(
         to_email=seller_email,
         subject=f"Your auction ended — {listing_title} sold for {_format_currency(hammer_price)} | {label['name_en']}",
         html_content=_base_template(content, "Auction Ended — Item Sold", auction_type=auction_type),
@@ -2358,7 +2390,7 @@ async def send_seller_auction_no_bids_email(
         Vous pouvez la republier depuis votre tableau de bord vendeur.
     </p>
     """
-    return await send_email(
+    return await _send_via_unified(
         to_email=seller_email,
         subject=f"Your auction ended with no bids — {listing_title}",
         html_content=_base_template(content, "Auction Ended — No Bids", auction_type=auction_type),
@@ -2443,7 +2475,7 @@ async def send_promotion_confirmation_email(
         Bonjour {seller_name}, votre annonce {label['name_fr']} a été promue avec succès ({tier_label}, {boost_days} jours).
     </p>
     """
-    return await send_email(
+    return await _send_via_unified(
         to_email=seller_email,
         subject=f"✅ Your listing is now boosted — {listing_title} | {label['name_en']}",
         html_content=_base_template(content, "Listing Promoted", auction_type=_brand_type),
@@ -2480,7 +2512,7 @@ async def send_deposit_refunded_email(
     l’enchère <em>« {title} »</em> a été remboursé. Il apparaîtra sur votre relevé d’ici 5 à 7 jours ouvrables.</p>
     <p>— The BidVex Team / L’équipe BidVex</p>
     """
-    return await send_email(
+    return await _send_via_unified(
         to_email=user["email"],
         subject=f"Deposit refunded · Dépôt remboursé — ${amount:,.2f} {cur}",
         html_content=_base_template(content, "Deposit Refunded"),
@@ -2526,7 +2558,7 @@ async def send_charge_confirmation_email(
     ({label_fr}) pour l’enchère <em>« {title} »</em>.</p>
     <p>— The BidVex Team / L’équipe BidVex</p>
     """
-    return await send_email(
+    return await _send_via_unified(
         to_email=user["email"],
         subject=f"{label_en} · {label_fr} — ${amount:,.2f} {cur}",
         html_content=_base_template(content, label_en),
@@ -2557,7 +2589,7 @@ async def send_payout_confirmation_email(
     pour l’enchère <em>« {title} »</em> a été initié via Stripe Connect.</p>
     <p>— The BidVex Team / L’équipe BidVex</p>
     """
-    return await send_email(
+    return await _send_via_unified(
         to_email=seller["email"],
         subject=f"Sale payout · Paiement de vente — ${amount:,.2f} {cur}",
         html_content=_base_template(content, "Payout Initiated"),
@@ -2591,7 +2623,7 @@ async def send_promotion_expired_email(
     <a href="https://bidvex.com{renew_path}" style="color:#2563eb">renouvelez pour rester en vedette</a>.</p>
     <p>— The BidVex Team / L'équipe BidVex</p>
     """
-    return await send_email(
+    return await _send_via_unified(
         to_email=seller_email,
         subject=f"Your boost ended · Votre promotion est terminée — {listing_title}",
         html_content=_base_template(content, "Boost Ended"),
@@ -2617,7 +2649,7 @@ async def send_promotion_email_blast(
     <a href="https://bidvex.com{path}" style="color:#2563eb">voir l'enchère</a>.</p>
     <p>— The BidVex Team / L'équipe BidVex</p>
     """
-    return await send_email(
+    return await _send_via_unified(
         to_email=to_email,
         subject=f"Featured: {listing_title} — Don't Miss This Auction · En vedette : Ne manquez pas",
         html_content=_base_template(content, "Featured Auction"),
@@ -2644,7 +2676,7 @@ async def send_dealer_license_approved_email(user: dict, license_doc: dict) -> b
         f"N° de permis : <strong>{license_no}</strong> ({jurisdiction})<br/>"
         f"Statut : <strong style='color:#059669;'>Approuvé</strong>"
     )
-    return await send_email(
+    return await _send_via_unified(
         to_email=user["email"],
         subject="✅ Dealer License Verified · Permis de concessionnaire vérifié",
         html_content=_storage_panel(
@@ -2676,7 +2708,7 @@ async def send_dealer_license_rejected_email(user: dict, license_doc: dict, reas
         f"Raison : <em>{reason_fr}</em><br/><br/>"
         f"Vous pouvez soumettre à nouveau un permis corrigé à tout moment."
     )
-    return await send_email(
+    return await _send_via_unified(
         to_email=user["email"],
         subject="Dealer License Verification — Action Required · Action requise",
         html_content=_storage_panel(
@@ -2709,7 +2741,7 @@ async def send_dealer_license_expired_email(user: dict, license_doc: dict) -> bo
         f"N° de permis : <strong>{license_no}</strong><br/>"
         f"Expiré le : <strong>{expiry}</strong>"
     )
-    return await send_email(
+    return await _send_via_unified(
         to_email=user["email"],
         subject="⚠️ Dealer License Expired · Permis de concessionnaire expiré",
         html_content=_storage_panel(
@@ -2759,7 +2791,7 @@ async def send_new_message_email(
         f"<br/>Répondez directement dans BidVex pour garder votre conversation sécurisée."
     )
 
-    return await send_email(
+    return await _send_via_unified(
         to_email=recipient["email"],
         subject=f"💬 New message from {sender_name} · Nouveau message",
         html_content=_storage_panel(
@@ -2816,7 +2848,7 @@ async def send_listing_requires_action_email(
         f"En attendant, votre annonce est masquée du public mais conservée en tant que brouillon."
     )
 
-    return await send_email(
+    return await _send_via_unified(
         to_email=recipient["email"],
         subject="🛠️ Action required: update your BidVex vehicle listing · Mise à jour requise",
         html_content=_storage_panel(
@@ -2904,7 +2936,7 @@ async def send_buyer_verification_decision_email(
         cta_url = "https://bidvex.com/profile/verification"
         title_en, title_fr = "Buyer Verification Update", "Mise à jour de la vérification d'acheteur"
 
-    return await send_email(
+    return await _send_via_unified(
         to_email=recipient["email"],
         subject=subject,
         html_content=_storage_panel(
@@ -2921,7 +2953,7 @@ async def send_dealer_license_expiring_email(recipient: dict, days_until_expiry:
     """iter201 — Phase 3 / 3C — 30-day warning before dealer licence expires."""
     if not recipient or not recipient.get("email"):
         return False
-    return await send_email(
+    return await _send_via_unified(
         to_email=recipient["email"],
         subject=f"⚠️ Your dealer licence expires in {days_until_expiry} days — BidVex · Licence expire bientôt",
         html_content=_storage_panel(
@@ -2946,7 +2978,7 @@ async def send_seller_license_expired_email(recipient: dict, suspended_count: in
     """
     if not recipient or not recipient.get("email"):
         return False
-    return await send_email(
+    return await _send_via_unified(
         to_email=recipient["email"],
         subject="🚫 Your dealer licence has expired — listings suspended · Licence expirée",
         html_content=_storage_panel(

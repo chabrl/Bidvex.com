@@ -49,26 +49,26 @@ BidVex Canada &mdash; Admin Notification System</td></tr>
 
 
 async def _send_admin_raw(subject, html):
-    """Send raw HTML email to admin via SendGrid REST API."""
-    api_key = os.environ.get("SENDGRID_API_KEY", "")
-    if not api_key:
-        logger.warning("[ADMIN_EMAIL] No SendGrid API key")
-        return False
+    """iter244 Mission 2 — Send admin alert via the unified email pipeline.
+
+    Routes through `send_unified_email()` with `html_full_override` so the
+    rich admin HTML is preserved byte-for-byte while consolidating ALL
+    outbound mails into a single canonical send path.
+    """
     admin_email = _resolve_admin_email()
     try:
-        from sendgrid import SendGridAPIClient
-        from sendgrid.helpers.mail import Mail, Email, To, Content
-        sg = SendGridAPIClient(api_key)
-        msg = Mail(
-            from_email=Email(os.environ.get("SENDGRID_FROM_EMAIL", "noreply@bidvex.com"), "BidVex Canada"),
-            to_emails=To(admin_email, "BidVex Admin"),
-            subject=subject,
-            html_content=Content("text/html", html),
+        from services.email_notifications import send_unified_email
+        result = await send_unified_email(
+            "new_feature",
+            user={"email": admin_email, "first_name": "BidVex Admin"},
+            data={
+                "html_full_override": html,
+                "subject_override": subject,
+            },
         )
-        msg.reply_to = Email("support@bidvex.com", "BidVex Support")
-        response = sg.send(msg)
-        logger.info(f"[ADMIN_EMAIL] Sent to {admin_email}: subject='{subject}' status={response.status_code}")
-        return response.status_code in (200, 201, 202)
+        status = result.get("status") if isinstance(result, dict) else None
+        logger.info(f"[ADMIN_EMAIL] Sent to {admin_email}: subject='{subject}' status={status}")
+        return status in ("sent", "logged")
     except Exception as e:
         logger.error(f"[ADMIN_EMAIL] Failed to {admin_email}: {e}")
         return False

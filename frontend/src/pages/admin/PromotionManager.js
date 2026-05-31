@@ -50,6 +50,7 @@ import {
   RefreshCw,
   Eye,
   Wand2,
+  Download,
 } from 'lucide-react';
 
 const API = API_BASE;
@@ -283,6 +284,28 @@ const PromotionManager = () => {
       setUsageRows(res?.data?.items || []);
     } catch (e) {
       toast.error('Could not load usage report');
+    }
+  };
+
+  // iter244 Mission 3 — Trigger CSV download of the redemption log.
+  const exportUsageCsv = async (promo) => {
+    if (!promo?.id) return;
+    try {
+      const res = await axios.get(`${API}/admin/promotions/${promo.id}/usage.csv`, {
+        headers,
+        responseType: 'blob',
+      });
+      const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `promotion-${promo.coupon_code || promo.id}-usage.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || 'CSV export failed');
     }
   };
 
@@ -619,6 +642,20 @@ const PromotionManager = () => {
             <DialogDescription>
               {usageOpen?.coupon_code} · {usageRows.length} redemption(s)
             </DialogDescription>
+            {usageOpen && (
+              <div className="flex justify-end pt-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => exportUsageCsv(usageOpen)}
+                  data-testid="promotion-usage-export-csv-btn"
+                  disabled={usageRows.length === 0}
+                >
+                  <Download className="h-3.5 w-3.5 mr-1.5" />
+                  Export CSV
+                </Button>
+              </div>
+            )}
           </DialogHeader>
           {usageRows.length === 0 ? (
             <div className="py-6 text-center text-sm text-slate-500">No redemptions yet.</div>

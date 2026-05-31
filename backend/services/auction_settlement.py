@@ -45,6 +45,81 @@ def _to_cents(amount: float) -> int:
     return int(round(float(amount) * 100))
 
 
+
+# iter244 Mission 1 — Settlement-time promotion override.
+async def _apply_settlement_promotions(
+    *,
+    db,
+    winner_user_id: str,
+    seller_id: str,
+    buyer_premium_amount: float,
+    seller_commission_amount: float,
+    auction_id: str,
+    listing_type: str = "lots",
+) -> Dict[str, Any]:
+    """Apply active admin promotions to buyer_premium AND seller_commission
+    at the moment of bid settlement. Discount amounts are recorded
+    atomically via `record_promotion_usage()` so promotion counters reflect
+    real revenue impact.
+
+    Returns:
+        {
+          buyer_discount_amount: float,
+          seller_discount_amount: float,
+          buyer_promotion_id: str | None,
+          seller_promotion_id: str | None,
+          buyer_coupon_code: str | None,
+          seller_coupon_code: str | None,
+        }
+
+    Failures (e.g. transient DB error in the promotion lookup) are
+    swallowed and logged — settlement must NEVER block on a promotion
+    bookkeeping issue.
+    """
+    out: Dict[str, Any] = {
+        "buyer_discount_amount": 0.0,
+        "seller_discount_amount": 0.0,
+        "buyer_promotion_id": None,
+        "seller_promotion_id": None,
+        "buyer_coupon_code": None,
+        "seller_coupon_code": None,
+    }
+    try:
+        from services.promotion_runtime import apply_and_record_discount
+        # Buyer side.
+        bd = await apply_and_record_discount(
+            db=db,
+            user_id=winner_user_id,
+            transaction_type="buyer_premium",
+            base_amount_cad=float(buyer_premium_amount),
+            listing_type=listing_type,
+            transaction_id=auction_id,
+            record_usage=True,
+        )
+        if bd.applies:
+            out["buyer_discount_amount"] = float(bd.discount_amount)
+            out["buyer_promotion_id"] = bd.promotion_id
+            out["buyer_coupon_code"] = bd.coupon_code
+        # Seller side.
+        sd = await apply_and_record_discount(
+            db=db,
+            user_id=seller_id,
+            transaction_type="seller_commission",
+            base_amount_cad=float(seller_commission_amount),
+            listing_type=listing_type,
+            transaction_id=auction_id,
+            record_usage=True,
+        )
+        if sd.applies:
+            out["seller_discount_amount"] = float(sd.discount_amount)
+            out["seller_promotion_id"] = sd.promotion_id
+            out["seller_coupon_code"] = sd.coupon_code
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[settlement-promo] failed: {type(e).__name__}: {e}")
+    return out
+
+
+
 async def _get_default_pm(db, user_id: str) -> Optional[Dict[str, Any]]:
     """Find the user's default Stripe payment method on file."""
     pm = await db.payment_methods.find_one(
@@ -189,6 +264,23 @@ async def settle_cash_or_etransfer(
     buyer_commission = float(fee["buyer_premium"]) + float(fee["buyer_taxes"])
     seller_commission = float(fee["seller_commission"])
 
+    # iter244 Mission 1 — Apply active promotion overrides at settlement.
+    # Discounts are computed BEFORE deposit credits so the savings are
+    # always visible in the audit ledger. Promotion_id + discount metadata
+    # are appended to the charge-row metadata block below.
+    promo_meta = await _apply_settlement_promotions(
+        db=db,
+        winner_user_id=winner_user_id,
+        seller_id=seller_id,
+        buyer_premium_amount=float(fee["buyer_premium"]),
+        seller_commission_amount=seller_commission,
+        auction_id=auction_id,
+        listing_type=listing.get("listing_type") or "lots",
+    )
+    # Apply discounts.
+    buyer_commission = max(0.0, round(buyer_commission - promo_meta["buyer_discount_amount"], 2))
+    seller_commission = max(0.0, round(seller_commission - promo_meta["seller_discount_amount"], 2))
+
     # --- Deposit credit lookup (winner's deposit, if any) ---
     deposit_doc = await db.bidding_deposits.find_one(
         {"auction_id": auction_id, "user_id": winner_user_id, "status": {"$in": ["held", "authorized", "succeeded"]}},
@@ -246,6 +338,13 @@ async def settle_cash_or_etransfer(
                     "hammer_price": hammer_price,
                     "deposit_credit": deposit_amount,
                     "scenario": "cash_or_etransfer",
+                    # iter244 Mission 1 — Promotion metadata for ledger audit.
+                    "buyer_promotion_id": promo_meta.get("buyer_promotion_id"),
+                    "buyer_coupon_code": promo_meta.get("buyer_coupon_code"),
+                    "buyer_discount_amount": promo_meta.get("buyer_discount_amount", 0.0),
+                    "seller_promotion_id": promo_meta.get("seller_promotion_id"),
+                    "seller_coupon_code": promo_meta.get("seller_coupon_code"),
+                    "seller_discount_amount": promo_meta.get("seller_discount_amount", 0.0),
                 },
             )
         except DuplicateChargeBlocked as exc:
@@ -430,6 +529,19 @@ async def settle_stripe_full(
     buyer_total = float(fee["buyer_total_charged"])
     seller_payout = float(fee["seller_payout"])
 
+    # iter244 Mission 1 — Apply active promotion overrides at settlement.
+    promo_meta = await _apply_settlement_promotions(
+        db=db,
+        winner_user_id=winner_user_id,
+        seller_id=seller_id,
+        buyer_premium_amount=float(fee["buyer_premium"]),
+        seller_commission_amount=float(fee["seller_commission"]),
+        auction_id=auction_id,
+        listing_type=listing.get("listing_type") or "lots",
+    )
+    buyer_total = max(0.0, round(buyer_total - promo_meta["buyer_discount_amount"], 2))
+    seller_payout = round(seller_payout + promo_meta["seller_discount_amount"], 2)
+
     # Deposit credit
     deposit_doc = await db.bidding_deposits.find_one(
         {"auction_id": auction_id, "user_id": winner_user_id, "status": {"$in": ["held", "authorized"]}},
@@ -453,6 +565,13 @@ async def settle_stripe_full(
                 "buyer_total_before_deposit": buyer_total,
                 "deposit_credit": deposit_amount,
                 "scenario": "stripe_full",
+                # iter244 Mission 1 — Promotion metadata for ledger audit.
+                "buyer_promotion_id": promo_meta.get("buyer_promotion_id"),
+                "buyer_coupon_code": promo_meta.get("buyer_coupon_code"),
+                "buyer_discount_amount": promo_meta.get("buyer_discount_amount", 0.0),
+                "seller_promotion_id": promo_meta.get("seller_promotion_id"),
+                "seller_coupon_code": promo_meta.get("seller_coupon_code"),
+                "seller_discount_amount": promo_meta.get("seller_discount_amount", 0.0),
             },
         )
     except DuplicateChargeBlocked as exc:

@@ -1094,6 +1094,8 @@ async def get_my_subscription_status(
 class SubscriptionUpgradeRequest(BaseModel):
     tier: str = Field(..., description="Target tier: 'premium' or 'vip'")
     return_url: str = Field(..., description="URL to redirect after checkout")
+    # iter243 Mission 3 — Optional coupon for runtime fee override.
+    coupon_code: Optional[str] = Field(None, description="Optional coupon code to apply an admin promotion at checkout")
 
 
 @payments_router.post("/subscriptions/upgrade")
@@ -1103,30 +1105,74 @@ async def upgrade_subscription(
 ):
     """
     Create checkout session for subscription upgrade
-    
-    Args:
-        tier: Target subscription tier ('premium' or 'vip')
-        return_url: URL to redirect after checkout
-    
-    Returns:
-        Stripe Checkout URL for subscription payment
+
+    iter243 Mission 3 — When a `coupon_code` matches an active admin
+    promotion that grants a full waiver (e.g. 100% subscription_discount
+    or free_platform_fee), we bypass Stripe entirely, flip the user's
+    subscription_tier in-place, record the $0.00 ledger entry, and bump
+    the promotion usage counter atomically.
     """
     if not credentials:
         raise HTTPException(status_code=401, detail="Authentication required")
-    
+
     if request.tier.lower() not in ["premium", "vip"]:
         raise HTTPException(status_code=400, detail="Invalid tier. Must be 'premium' or 'vip'")
-    
+
     db = get_db()
     current_user = await _auth(credentials)
-    
+
+    # iter243 Mission 3 — Pre-flight: if the user supplied a coupon that
+    # grants a full waiver, complete the upgrade in-place at $0.00.
+    if request.coupon_code:
+        from services.promotion_fee_hooks import subscription_upgrade_hook
+        from services.subscription_service import SUBSCRIPTION_PRICES
+        base_cents = SUBSCRIPTION_PRICES.get(request.tier.lower(), {}).get("amount_cents", 0)
+        base_cad = base_cents / 100.0
+        hook = await subscription_upgrade_hook(
+            db=db,
+            user_id=current_user.id,
+            base_amount_cad=base_cad,
+            target_tier=request.tier.lower(),
+            coupon_code=request.coupon_code.strip().upper(),
+            record_usage=True,
+        )
+        if hook["is_full_waiver"]:
+            now = datetime.now(timezone.utc)
+            await db.users.update_one(
+                {"id": current_user.id},
+                {"$set": {
+                    "subscription_tier": request.tier.lower(),
+                    "subscription_upgraded_at": now.isoformat(),
+                    "subscription_waived_by": hook.get("promotion_id"),
+                }},
+            )
+            await db.transactions.insert_one({
+                "id": str(uuid.uuid4()),
+                "user_id": current_user.id,
+                "type": "subscription_upgrade_waived",
+                "amount_cad": 0.0,
+                "currency": "CAD",
+                "tier": request.tier.lower(),
+                "promotion_id": hook.get("promotion_id"),
+                "coupon_code": hook.get("coupon_code"),
+                "metadata": {"base_price_waived": base_cad, "saved_amount": hook.get("discount_amount", 0)},
+                "created_at": now.isoformat(),
+            })
+            return {
+                "status": "upgraded",
+                "waived": True,
+                "promotion_id": hook.get("promotion_id"),
+                "coupon_code": hook.get("coupon_code"),
+                "saved_amount_cad": hook.get("discount_amount", 0),
+            }
+
     result = await create_subscription_checkout(
         db=db,
         user_id=current_user.id,
         tier=request.tier.lower(),
         return_url=request.return_url
     )
-    
+
     return result
 
 

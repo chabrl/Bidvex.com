@@ -12,6 +12,8 @@ import { HelmetProvider } from 'react-helmet-async';
 
 // Shell components — kept eager (always visible on every page)
 import Navbar from './components/Navbar';
+// iter243 Mission 1 — Platform-wide promotional banner.
+import PromotionalBanner from './components/PromotionalBanner';
 import GlobalDealerFeeBanner from './components/GlobalDealerFeeBanner';
 import Footer from './components/Footer';
 import TrendyAnnouncementBar from './components/TrendyAnnouncementBar';
@@ -360,6 +362,8 @@ const App = () => {
           {/* iter214 P3 — Sticky site-wide dealer-fee banner (above the navbar) */}
           <GlobalDealerFeeBanner />
           <TrendyAnnouncementBar />
+          {/* iter243 Mission 1 — Platform-wide promotional banner stack. */}
+          <PromotionalBanner />
           <Navbar />
           <Suspense fallback={<PageLoader />}>
           <Routes>

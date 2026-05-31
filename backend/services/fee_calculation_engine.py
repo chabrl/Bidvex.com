@@ -261,6 +261,124 @@ def calculate_fees(
     return result
 
 
+async def calculate_fees_with_promotions(
+    *,
+    db,
+    user_id: str,
+    hammer_price: float,
+    category: str,
+    listing_type: str = "marketplace",
+    buyer_tier: str = "basic",
+    seller_tier: str = "basic",
+    coupon_code: Optional[str] = None,
+    record_usage: bool = False,
+) -> Dict[str, Any]:
+    """iter243 Mission 3 — Fee calculation with active-promotion overrides.
+
+    Wraps the sync `calculate_fees()` then applies up-to-two promotion
+    discounts:
+      - One for `buyer_premium` (matches the buyer's `user_id`).
+      - One for `seller_commission` (matches the seller's `user_id` —
+        callers must invoke this twice, once per side, OR pass the
+        seller_id separately. For simplicity here we apply ONLY the
+        buyer-side discount; seller-side is computed in a sister
+        function below.)
+
+    The returned dict contains:
+      - `base`: the raw FeeCalculationResult.to_dict()
+      - `buyer_discount`: PromotionDiscount block (or `{applies: False}`)
+      - `adjusted_buyer_premium`: post-discount buyer_premium
+      - `adjusted_buyer_total`: post-discount buyer_total
+      - `promotion_id` / `coupon_code`: for invoice metadata
+    """
+    from services.promotion_runtime import apply_and_record_discount
+
+    base = calculate_fees(
+        hammer_price=hammer_price,
+        category=category,
+        buyer_tier=buyer_tier,
+        seller_tier=seller_tier,
+    )
+
+    discount = await apply_and_record_discount(
+        db=db,
+        user_id=user_id,
+        transaction_type="buyer_premium",
+        base_amount_cad=float(base.buyer_premium),
+        listing_type=listing_type,
+        coupon_code=coupon_code,
+        record_usage=record_usage,
+    )
+
+    adj_buyer_premium = discount.final_amount if discount.applies else float(base.buyer_premium)
+    adj_buyer_total = float(base.buyer_total) - (float(base.buyer_premium) - adj_buyer_premium)
+
+    return {
+        "base": {
+            "buyer_premium": float(base.buyer_premium),
+            "buyer_total": float(base.buyer_total),
+            "seller_commission": float(base.seller_commission),
+            "seller_net_payout": float(base.seller_net_payout),
+            "bidvex_revenue": float(base.bidvex_revenue),
+        },
+        "buyer_discount": discount.to_dict(),
+        "adjusted_buyer_premium": round(adj_buyer_premium, 2),
+        "adjusted_buyer_total": round(max(0.0, adj_buyer_total), 2),
+        "promotion_id": discount.promotion_id,
+        "coupon_code": discount.coupon_code,
+        "discount_amount": discount.discount_amount,
+        "is_full_waiver": discount.is_full_waiver,
+    }
+
+
+async def calculate_seller_commission_with_promotions(
+    *,
+    db,
+    seller_id: str,
+    hammer_price: float,
+    category: str,
+    listing_type: str = "marketplace",
+    seller_tier: str = "basic",
+    coupon_code: Optional[str] = None,
+    record_usage: bool = False,
+) -> Dict[str, Any]:
+    """iter243 Mission 3 — Seller-side commission discount override."""
+    from services.promotion_runtime import apply_and_record_discount
+
+    base = calculate_fees(
+        hammer_price=hammer_price,
+        category=category,
+        seller_tier=seller_tier,
+    )
+
+    discount = await apply_and_record_discount(
+        db=db,
+        user_id=seller_id,
+        transaction_type="seller_commission",
+        base_amount_cad=float(base.seller_commission),
+        listing_type=listing_type,
+        coupon_code=coupon_code,
+        record_usage=record_usage,
+    )
+
+    adj_commission = discount.final_amount if discount.applies else float(base.seller_commission)
+    adj_payout = float(base.seller_net_payout) + (float(base.seller_commission) - adj_commission)
+
+    return {
+        "base": {
+            "seller_commission": float(base.seller_commission),
+            "seller_net_payout": float(base.seller_net_payout),
+        },
+        "seller_discount": discount.to_dict(),
+        "adjusted_seller_commission": round(adj_commission, 2),
+        "adjusted_seller_payout": round(adj_payout, 2),
+        "promotion_id": discount.promotion_id,
+        "coupon_code": discount.coupon_code,
+        "discount_amount": discount.discount_amount,
+        "is_full_waiver": discount.is_full_waiver,
+    }
+
+
 def calculate_vehicle_fees(
     hammer_price: float,
     buyer_tier: str = "basic"

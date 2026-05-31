@@ -156,23 +156,61 @@ def build_email_payload(
 ) -> Dict[str, Any]:
     """Return {'to_email', 'subject', 'html_content'} dict ready for
     `services.email_notifications.send_email(**payload)`.
+
+    iter244 Mission 2 — Three optional overrides preserved BYTE-FOR-BYTE
+    when present in `data`:
+      - `subject_override`     : skips template subject; uses verbatim
+      - `body_html_override`   : skips body/headline/cta/secondary;
+                                 wraps the supplied HTML inside the
+                                 BIDVEX header+footer chrome
+      - `html_full_override`   : COMPLETELY skips the BIDVEX template
+                                 wrapping; sends the supplied HTML as-is
+                                 (used for invoices + compliance docs
+                                 that ship their own header/footer)
     """
     user = user or {}
     data = data or {}
+
+    # iter244 — body_html_override / html_full_override path. These take
+    # precedence over the email_type registry and are how legacy compliance
+    # helpers preserve their exact production HTML.
+    html_full_override = data.get("html_full_override")
+    body_html_override = data.get("body_html_override")
+    subject_override = data.get("subject_override")
+    to_email = user.get("email") or data.get("to_email") or _SUPPORT_EMAIL
+
+    if html_full_override:
+        return {
+            "to_email": to_email,
+            "subject": subject_override or "BidVex",
+            "html_content": html_full_override,
+        }
+
     spec = _EMAIL_TYPES.get(email_type)
+    # Allow body_html_override even when email_type is unknown by mapping
+    # to a neutral "announcement" spec.
     if not spec:
-        raise ValueError(f"Unknown email_type {email_type!r}")
+        if body_html_override:
+            spec = _EMAIL_TYPES.get("new_feature", list(_EMAIL_TYPES.values())[0])
+        else:
+            raise ValueError(f"Unknown email_type {email_type!r}")
 
     # Personalisation
     first_name = (user.get("first_name") or user.get("name") or "there").strip()
-    to_email = user.get("email") or data.get("to_email") or _SUPPORT_EMAIL
+    # to_email computed above
 
     # Format dynamic placeholders inside body / CTA URL.
     fmt = {**user, **data}
-    try:
-        body_html = spec["body_html"].format(**fmt)
-    except (KeyError, IndexError):
-        body_html = spec["body_html"]  # leave unformatted on missing keys
+    # iter244 — When `body_html_override` is set, use it verbatim instead
+    # of the registry's templated body. This is the migration-safe path
+    # for legacy compliance helpers.
+    if body_html_override:
+        body_html = body_html_override
+    else:
+        try:
+            body_html = spec["body_html"].format(**fmt)
+        except (KeyError, IndexError):
+            body_html = spec["body_html"]  # leave unformatted on missing keys
     try:
         cta_url = spec.get("cta_url", "").format(**fmt)
     except (KeyError, IndexError):
@@ -216,7 +254,7 @@ def build_email_payload(
 
     return {
         "to_email": to_email,
-        "subject": headline.split(" - ")[0],
+        "subject": subject_override or headline.split(" - ")[0],
         "html_content": html_content,
     }
 

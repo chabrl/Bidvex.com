@@ -18,7 +18,7 @@ import string
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from deps import get_db, get_current_user, User
@@ -257,10 +257,26 @@ async def pause_promotion(
 @admin_promotions_router.post("/admin/promotions/{promo_id}/activate")
 async def activate_promotion(
     promo_id: str,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
 ):
+    """iter243 Mission 2 — Activate + (optionally) broadcast.
+
+    Sets status to `active` then fires a background email broadcast when
+    the promotion has `notify_users=True`. The broadcast is idempotent —
+    re-activating a promotion that's already been broadcast will not
+    re-send.
+    """
     _require_admin(current_user)
-    return await update_promotion(promo_id, PromotionUpdate(status="active"), current_user)
+    activated = await update_promotion(promo_id, PromotionUpdate(status="active"), current_user)
+    if activated and activated.get("notify_users"):
+        # Schedule the broadcast so the API returns immediately.
+        from services.promotion_broadcast import broadcast_promotion_activation
+        db = get_db()
+        background_tasks.add_task(broadcast_promotion_activation, db, promo_id)
+        # Surface to the admin caller that a broadcast was scheduled.
+        activated["broadcast_scheduled"] = True
+    return activated
 
 
 @admin_promotions_router.post("/admin/promotions/{promo_id}/duplicate")
@@ -301,6 +317,65 @@ async def usage_report(
     return {"items": rows, "total": len(rows)}
 
 
+@admin_promotions_router.get("/admin/promotions/{promo_id}/usage.csv")
+async def usage_report_csv(
+    promo_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """iter244 Mission 3 — Stream promotion-usage as a CSV download.
+
+    Columns (one row per redemption):
+        Redemption ID, Timestamp (ISO), User ID, User Email, Coupon Code,
+        Promotion Type, Saved Amount CAD
+    """
+    _require_admin(current_user)
+    import csv as _csv
+    import io as _io
+    from fastapi.responses import StreamingResponse
+
+    db = get_db()
+    promo = await db.promotions.find_one({"id": promo_id}, {"_id": 0})
+    if not promo:
+        raise HTTPException(404, "Promotion not found")
+
+    rows = await db.promotion_usage.find(
+        {"promotion_id": promo_id}, {"_id": 0}
+    ).sort("used_at", -1).to_list(length=10_000)
+
+    # Hydrate user emails in one batch.
+    user_ids = list({r.get("user_id") for r in rows if r.get("user_id")})
+    users = await db.users.find(
+        {"id": {"$in": user_ids}}, {"_id": 0, "id": 1, "email": 1}
+    ).to_list(length=len(user_ids) or 1)
+    email_map = {u["id"]: u.get("email", "") for u in users}
+
+    buf = _io.StringIO()
+    writer = _csv.writer(buf, quoting=_csv.QUOTE_MINIMAL)
+    writer.writerow([
+        "Redemption ID", "Timestamp", "User ID", "User Email",
+        "Coupon Code", "Promotion Type", "Saved Amount CAD",
+    ])
+    coupon = promo.get("coupon_code", "")
+    ptype = promo.get("type", "")
+    for r in rows:
+        writer.writerow([
+            r.get("id", ""),
+            r.get("used_at", ""),
+            r.get("user_id", ""),
+            email_map.get(r.get("user_id"), ""),
+            coupon,
+            ptype,
+            f"{float(r.get('saved_amount') or 0):.2f}",
+        ])
+    buf.seek(0)
+    filename = f"promotion-{(promo.get('coupon_code') or promo_id)}-usage.csv"
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @admin_promotions_router.post("/admin/promotions/preview-audience")
 async def preview_audience(
     target_config: PromotionTargetConfig,
@@ -338,6 +413,56 @@ async def preview_discount(
         coupon_code=coupon_code,
     )
     return discount.to_dict()
+
+
+@admin_promotions_router.get("/promotions/active-banners")
+async def active_banners(
+    current_user: User = Depends(get_current_user),
+):
+    """iter243 Mission 1 — Active promotional banners for the calling user.
+
+    Filters promotions with `status=active`, `show_banner=true`, within
+    the validity window, and matches the user's tier / province /
+    target_config eligibility. Returns localized fields ready for the
+    front-end banner component.
+    """
+    db = get_db()
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    base_query = {
+        "status": "active",
+        "show_banner": True,
+        "start_date": {"$lte": now_iso},
+        "end_date": {"$gte": now_iso},
+    }
+    cur = db.promotions.find(base_query, {"_id": 0}).sort("created_at", -1)
+    candidates = await cur.to_list(length=50)
+
+    # Hydrate user once for eligibility checks.
+    user = await db.users.find_one(
+        {"id": current_user.id},
+        {"_id": 0, "id": 1, "email": 1, "subscription_tier": 1, "province": 1, "created_at": 1},
+    )
+
+    banners: List[Dict[str, Any]] = []
+    for promo in candidates:
+        # Max uses gate
+        if promo.get("max_uses") and promo.get("current_uses", 0) >= promo["max_uses"]:
+            continue
+        if not await _user_matches_target(user, promo):
+            continue
+        banners.append({
+            "id": promo["id"],
+            "name_en": promo.get("name_en", ""),
+            "name_fr": promo.get("name_fr", promo.get("name_en", "")),
+            "type": promo.get("type"),
+            "coupon_code": promo.get("coupon_code"),
+            "end_date": promo.get("end_date"),
+            "discount_percent": (promo.get("config") or {}).get("discount_percent"),
+            "credit_tier": (promo.get("config") or {}).get("credit_tier"),
+        })
+
+    return {"banners": banners, "total": len(banners)}
 
 
 # ─── Public lookup (coupon code) ──────────────────────────────────────

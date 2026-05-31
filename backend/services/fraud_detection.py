@@ -670,16 +670,18 @@ Provide a brief fraud analysis summary with risk assessment and recommended acti
               </div>
             </div>"""
 
-            import sendgrid
-            from sendgrid.helpers.mail import Mail, Email, To, Content
-            sg = sendgrid.SendGridAPIClient(api_key=api_key)
-            mail = Mail(
-                from_email=Email(from_email_addr, from_name),
-                to_emails=To(to_email),
-                subject=subject,
-                html_content=Content("text/html", html),
+            import sendgrid  # noqa: F401 — kept import for back-compat
+            # iter244 Mission 2 — Route through canonical pipeline. The
+            # rich risk-alert HTML is preserved verbatim via html_full_override.
+            from services.email_notifications import send_unified_email
+            await send_unified_email(
+                "new_feature",
+                user={"email": to_email, "first_name": "Risk Officer"},
+                data={
+                    "html_full_override": html,
+                    "subject_override": subject,
+                },
             )
-            sg.client.mail.send.post(request_body=mail.get())
             logger.info(f"Risk alert email sent to {to_email} for flag {flag_id} ({conf_pct}% confidence)")
 
             # Log the alert in DB

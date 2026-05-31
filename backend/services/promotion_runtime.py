@@ -126,4 +126,54 @@ async def compute_promotion_discount(
     )
 
 
-__all__ = ["compute_promotion_discount", "PromotionDiscount"]
+async def apply_and_record_discount(
+    db,
+    user_id: str,
+    transaction_type: str,
+    base_amount_cad: float,
+    *,
+    listing_type: Optional[str] = None,
+    coupon_code: Optional[str] = None,
+    transaction_id: Optional[str] = None,
+    record_usage: bool = True,
+) -> PromotionDiscount:
+    """iter243 Mission 3 — Compute discount AND record usage atomically.
+
+    This is the canonical entry-point that the buyer_premium, seller_commission,
+    listing_fee, and subscription_upgrade paths should call. It:
+      1. Resolves the best applicable promotion (or returns no-op).
+      2. If a promotion matched AND `record_usage=True`, atomically bumps
+         `promotion.current_uses` and logs the redemption via
+         `record_promotion_usage()`.
+      3. Returns the discount block for the caller to slot into invoices /
+         Stripe metadata.
+
+    The caller is responsible for storing the returned `promotion_id` +
+    `discount_amount` in their invoice/ledger record.
+    """
+    from routes.admin_promotions import record_promotion_usage
+    discount = await compute_promotion_discount(
+        db=db,
+        user_id=user_id,
+        transaction_type=transaction_type,
+        listing_type=listing_type,
+        base_amount_cad=base_amount_cad,
+        coupon_code=coupon_code,
+    )
+    if discount.applies and record_usage and discount.promotion_id:
+        try:
+            await record_promotion_usage(
+                db=db,
+                promotion_id=discount.promotion_id,
+                user_id=user_id,
+                transaction_id=transaction_id,
+                transaction_type=transaction_type,
+                saved_amount=discount.discount_amount,
+            )
+        except Exception:
+            # Never let a usage-log failure break the underlying transaction.
+            pass
+    return discount
+
+
+__all__ = ["compute_promotion_discount", "apply_and_record_discount", "PromotionDiscount"]
