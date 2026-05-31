@@ -160,10 +160,12 @@ async def create_promotion(
     status = "scheduled" if start_dt > now_dt else "active"
 
     import uuid as _uuid
+    # iter250 — Sanitize broker-supplied HTML/text fields on promotion creation.
+    from services.html_sanitizer import sanitize_user_html, sanitize_inline
     promotion = {
         "id": str(_uuid.uuid4()),
-        "name_en": data.name_en,
-        "name_fr": data.name_fr or data.name_en,
+        "name_en": sanitize_inline(data.name_en),
+        "name_fr": sanitize_inline(data.name_fr or data.name_en),
         "type": data.type,
         "config": data.config,
         "target": data.target_config.target,
@@ -181,6 +183,19 @@ async def create_promotion(
         "created_at": now,
         "updated_at": now,
     }
+    # Banner HTML (if the admin supplied any) goes through the full HTML
+    # sanitizer to preserve formatting tags while stripping XSS vectors.
+    _banner_html = getattr(data, "banner_html_en", None) or getattr(data, "banner_html", None)
+    if _banner_html:
+        promotion["banner_html_en"] = sanitize_user_html(_banner_html)
+    _banner_html_fr = getattr(data, "banner_html_fr", None)
+    if _banner_html_fr:
+        promotion["banner_html_fr"] = sanitize_user_html(_banner_html_fr)
+    # Long-form description fields (when present on the model).
+    for _f in ("description_en", "description_fr"):
+        _val = getattr(data, _f, None)
+        if _val:
+            promotion[_f] = sanitize_user_html(_val)
     await db.promotions.insert_one(promotion)
     promotion.pop("_id", None)
     return promotion
@@ -233,6 +248,14 @@ async def update_promotion(
         update["target"] = data.target_config.target
     if "status" in update and update["status"] not in PROMOTION_STATUSES:
         raise HTTPException(400, f"status must be one of {sorted(PROMOTION_STATUSES)}")
+    # iter250 — Sanitize broker-supplied HTML/text fields on update path too.
+    from services.html_sanitizer import sanitize_user_html, sanitize_inline
+    for _f in ("name_en", "name_fr"):
+        if update.get(_f):
+            update[_f] = sanitize_inline(update[_f])
+    for _f in ("description_en", "description_fr", "banner_html_en", "banner_html_fr", "banner_html"):
+        if update.get(_f):
+            update[_f] = sanitize_user_html(update[_f])
     update["updated_at"] = datetime.now(timezone.utc).isoformat()
 
     r = await db.promotions.update_one({"id": promo_id}, {"$set": update})

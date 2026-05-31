@@ -383,6 +383,19 @@ async def create_listing(
     )
     listing_dict = listing.model_dump()
 
+    # iter250 — Sanitize broker-supplied HTML in description fields BEFORE
+    # persistence. Strips <script>, <iframe>, on*=, javascript:, … while
+    # preserving the standard transactional formatting tags.
+    from services.html_sanitizer import sanitize_user_html, sanitize_inline
+    for _f in ("description", "description_en", "description_fr"):
+        if listing_dict.get(_f):
+            listing_dict[_f] = sanitize_user_html(listing_dict[_f])
+    # Titles are render-safe text only — strip every tag.
+    for _f in ("title", "title_en", "title_fr"):
+        if listing_dict.get(_f):
+            listing_dict[_f] = sanitize_inline(listing_dict[_f])
+
+
     # Phase 6.3 Task 2 — Storage locker sanitization. The frontend hides the
     # condition / quantity / deposit / shipping / visit fields for
     # storage_locker, but defend-in-depth here too: strip any legacy values
@@ -800,6 +813,16 @@ async def update_listing(listing_id: str, updates: Dict[str, Any], current_user:
                       "title_en", "title_fr", "description_en", "description_fr"]
     update_data = {k: v for k, v in updates.items() if k in allowed_fields}
 
+    # iter250 — Sanitize broker-supplied HTML in description fields BEFORE
+    # persistence (UPDATE path).
+    from services.html_sanitizer import sanitize_user_html, sanitize_inline
+    for _f in ("description", "description_en", "description_fr"):
+        if update_data.get(_f):
+            update_data[_f] = sanitize_user_html(update_data[_f])
+    for _f in ("title", "title_en", "title_fr"):
+        if update_data.get(_f):
+            update_data[_f] = sanitize_inline(update_data[_f])
+
     # If title or description changed but no explicit translations, re-translate
     needs_retranslation = ("title" in update_data or "description" in update_data) and not ("title_en" in update_data and "title_fr" in update_data)
 
@@ -1118,6 +1141,26 @@ async def create_multi_item_listing(
     listing_dict = listing.model_dump()
 
     listing_dict = listing.model_dump()
+
+    # iter250 — Sanitize broker-supplied HTML on multi-item listings too.
+    from services.html_sanitizer import (
+        sanitize_user_html as _sanitize_html_mi,
+        sanitize_inline as _sanitize_text_mi,
+    )
+    for _f in ("description", "description_en", "description_fr"):
+        if listing_dict.get(_f):
+            listing_dict[_f] = _sanitize_html_mi(listing_dict[_f])
+    for _f in ("title", "title_en", "title_fr"):
+        if listing_dict.get(_f):
+            listing_dict[_f] = _sanitize_text_mi(listing_dict[_f])
+    # Lot-level descriptions also originate from broker input.
+    for _lot in listing_dict.get("lots", []) or []:
+        if isinstance(_lot, dict):
+            if _lot.get("description"):
+                _lot["description"] = _sanitize_html_mi(_lot["description"])
+            if _lot.get("title"):
+                _lot["title"] = _sanitize_text_mi(_lot["title"])
+
     listing_dict["agreement_metadata"] = agreement_metadata
     serialise_datetimes(listing_dict)
 

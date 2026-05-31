@@ -546,6 +546,18 @@ class EmailMarketingService:
         """
         now = datetime.now(timezone.utc)
 
+        # iter250 — Sanitize broker/admin-supplied HTML body BEFORE persistence.
+        # Strips <script>, on*=, javascript:, … while preserving the standard
+        # formatting tags + the merge tokens used by the renderer
+        # ({{name}}, {{email}}, {{unsubscribe_url}}, …).
+        from services.html_sanitizer import sanitize_user_html, sanitize_inline
+        if html_content:
+            html_content = sanitize_user_html(html_content)
+        if subject:
+            subject = sanitize_inline(subject)
+        if name:
+            name = sanitize_inline(name)
+
         # Parse and validate manual emails
         manual_emails = manual_emails or []
         exclude_emails = exclude_emails or []
@@ -660,7 +672,16 @@ class EmailMarketingService:
             updates["audience_breakdown"] = audience_result["breakdown"]
         
         updates["updated_at"] = datetime.now(timezone.utc).isoformat()
-        
+
+        # iter250 — Sanitize any broker-supplied HTML/text fields included
+        # in the update payload BEFORE persistence.
+        from services.html_sanitizer import sanitize_user_html, sanitize_inline
+        if updates.get("html_content"):
+            updates["html_content"] = sanitize_user_html(updates["html_content"])
+        for _f in ("subject", "name"):
+            if updates.get(_f):
+                updates[_f] = sanitize_inline(updates[_f])
+
         await self.campaigns.update_one(
             {"id": campaign_id},
             {"$set": updates}
