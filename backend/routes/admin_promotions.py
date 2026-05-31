@@ -424,8 +424,12 @@ async def send_partner_outreach_blast(
 
     from services.partner_outreach import (
         PARTNER_OUTREACH_EMAIL_SUBJECT,
+        PARTNER_OUTREACH_EMAIL_SUBJECT_FR,
         partner_outreach_email_html,
+        partner_outreach_email_html_fr,
         build_partner_outreach_pdf,
+        build_partner_outreach_pdf_fr,
+        detect_partner_language,
     )
     from services.email_notifications import send_unified_email
     import base64 as _b64
@@ -440,15 +444,35 @@ async def send_partner_outreach_blast(
             coupon_code = promo_doc.get("coupon_code")
 
     # Resolve recipients.
+    # iter248 Mission 2 — When `recipient_emails` is supplied, we honour
+    # it verbatim (admin "Send Preview to Myself"). The recipient's
+    # province is still looked up in the users collection so the
+    # preview matches what a real partner in QC would receive.
     if payload.recipient_emails:
-        recipients = [
-            {"email": e, "first_name": "Partner", "id": None}
-            for e in payload.recipient_emails
-        ]
+        recipients = []
+        for em in payload.recipient_emails:
+            em_norm = (em or "").strip()
+            if not em_norm:
+                continue
+            user_doc = await db.users.find_one(
+                {"email": em_norm},
+                {"_id": 0, "id": 1, "email": 1, "first_name": 1,
+                 "name": 1, "company_name": 1, "province": 1,
+                 "preferred_language": 1, "language": 1},
+            )
+            user_doc = user_doc or {}
+            recipients.append({
+                "email": em_norm,
+                "first_name": user_doc.get("first_name") or user_doc.get("company_name") or user_doc.get("name") or "Partner",
+                "id": user_doc.get("id"),
+                "province": user_doc.get("province"),
+                "preferred_language": user_doc.get("preferred_language") or user_doc.get("language"),
+            })
     else:
         cur = db.users.find(
             {"$or": [{"is_partner": True}, {"account_type": "partner"}]},
-            {"_id": 0, "id": 1, "email": 1, "first_name": 1, "name": 1, "company_name": 1},
+            {"_id": 0, "id": 1, "email": 1, "first_name": 1, "name": 1,
+             "company_name": 1, "province": 1, "preferred_language": 1, "language": 1},
         )
         users = await cur.to_list(length=5000)
         # Strip duplicates + unsubscribed.
@@ -465,6 +489,8 @@ async def send_partner_outreach_blast(
                 "email": u.get("email"),
                 "first_name": u.get("first_name") or u.get("company_name") or u.get("name") or "Partner",
                 "id": u.get("id"),
+                "province": u.get("province"),
+                "preferred_language": u.get("preferred_language") or u.get("language"),
             })
 
     if not recipients:
@@ -479,16 +505,40 @@ async def send_partner_outreach_blast(
             "warning": "no_partner_users_matched",
         }
 
-    pdf_bytes = build_partner_outreach_pdf(coupon_code=coupon_code)
-    pdf_b64 = _b64.b64encode(pdf_bytes).decode("ascii")
-    html_body = partner_outreach_email_html(coupon_code=coupon_code)
+    # iter248 Mission 1 — Pre-render BOTH language variants once so the
+    # per-recipient loop just picks the right cached pair.
+    pdf_en = build_partner_outreach_pdf(coupon_code=coupon_code)
+    pdf_fr = build_partner_outreach_pdf_fr(coupon_code=coupon_code)
+    pdf_en_b64 = _b64.b64encode(pdf_en).decode("ascii")
+    pdf_fr_b64 = _b64.b64encode(pdf_fr).decode("ascii")
+    html_en = partner_outreach_email_html(coupon_code=coupon_code)
+    html_fr = partner_outreach_email_html_fr(coupon_code=coupon_code)
 
     sent = 0
     failed = 0
+    fr_count = 0
+    en_count = 0
     results: List[Dict[str, Any]] = []
     for r in recipients:
+        lang = detect_partner_language(r)
+        if lang == "fr":
+            fr_count += 1
+            html_body = html_fr
+            pdf_b64 = pdf_fr_b64
+            subject = PARTNER_OUTREACH_EMAIL_SUBJECT_FR
+            pdf_filename = "Guide-Evaluation-Programme-Partenaires.pdf"
+        else:
+            en_count += 1
+            html_body = html_en
+            pdf_b64 = pdf_en_b64
+            subject = PARTNER_OUTREACH_EMAIL_SUBJECT
+            pdf_filename = "BidVex-Partner-Program-Guide.pdf"
+
         if payload.dry_run:
-            results.append({"email": r["email"], "status": "skipped_dry_run"})
+            results.append({
+                "email": r["email"], "lang": lang, "subject": subject,
+                "pdf_filename": pdf_filename, "status": "skipped_dry_run",
+            })
             continue
         try:
             res = await send_unified_email(
@@ -496,17 +546,17 @@ async def send_partner_outreach_blast(
                 user={"email": r["email"], "first_name": r["first_name"]},
                 data={
                     "html_full_override": html_body,
-                    "subject_override": PARTNER_OUTREACH_EMAIL_SUBJECT,
+                    "subject_override": subject,
                 },
                 attachments=[{
                     "content": pdf_b64,
-                    "filename": "BidVex-Partner-Program-Guide.pdf",
+                    "filename": pdf_filename,
                     "type": "application/pdf",
                 }],
             )
             if res and res.get("status") in ("sent", "logged"):
                 sent += 1
-                results.append({"email": r["email"], "status": res.get("status")})
+                results.append({"email": r["email"], "lang": lang, "status": res.get("status")})
             else:
                 failed += 1
                 results.append({"email": r["email"], "status": "error", "detail": str(res)[:200]})
@@ -522,6 +572,8 @@ async def send_partner_outreach_blast(
         "recipient_count": len(recipients),
         "sent": sent,
         "failed": failed,
+        "lang_en": en_count,
+        "lang_fr": fr_count,
         "dry_run": payload.dry_run,
         "triggered_by": current_user.id,
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -529,12 +581,15 @@ async def send_partner_outreach_blast(
 
     return {
         "subject": PARTNER_OUTREACH_EMAIL_SUBJECT,
+        "subject_fr": PARTNER_OUTREACH_EMAIL_SUBJECT_FR,
         "promotion_id": payload.promotion_id,
         "coupon_code": coupon_code,
         "recipient_count": len(recipients),
+        "lang_breakdown": {"en": en_count, "fr": fr_count},
         "sent": sent,
         "failed": failed,
         "dry_run": payload.dry_run,
+        "is_preview": bool(payload.recipient_emails),
         "recipients": results,
     }
 
@@ -542,24 +597,32 @@ async def send_partner_outreach_blast(
 @admin_promotions_router.get("/admin/promotions/partner-outreach/pdf")
 async def download_partner_outreach_pdf(
     coupon_code: Optional[str] = None,
+    lang: str = "en",
     current_user: User = Depends(get_current_user),
 ):
     """iter247 — Download the locked Partner Program Evaluation Guide PDF.
 
-    Admin-gated. Returns the canonical brochure used by the blast. Useful
-    for previewing the asset BEFORE pulling the trigger on the email
-    campaign.
+    iter248 — Pass `?lang=fr` to render the French Quebec guide
+    (`Guide-Evaluation-Programme-Partenaires.pdf`).
     """
     _require_admin(current_user)
     from fastapi.responses import StreamingResponse
-    from services.partner_outreach import build_partner_outreach_pdf
+    from services.partner_outreach import (
+        build_partner_outreach_pdf, build_partner_outreach_pdf_fr,
+    )
 
-    pdf_bytes = build_partner_outreach_pdf(coupon_code=coupon_code)
+    if (lang or "").lower().startswith("fr"):
+        pdf_bytes = build_partner_outreach_pdf_fr(coupon_code=coupon_code)
+        filename = "Guide-Evaluation-Programme-Partenaires.pdf"
+    else:
+        pdf_bytes = build_partner_outreach_pdf(coupon_code=coupon_code)
+        filename = "BidVex-Partner-Program-Guide.pdf"
+
     return StreamingResponse(
         iter([pdf_bytes]),
         media_type="application/pdf",
         headers={
-            "Content-Disposition": 'inline; filename="BidVex-Partner-Program-Guide.pdf"',
+            "Content-Disposition": f'inline; filename="{filename}"',
             "Cache-Control": "private, no-store",
         },
     )

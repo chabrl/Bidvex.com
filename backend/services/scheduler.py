@@ -1087,7 +1087,22 @@ def init_scheduler(database):
         replace_existing=True,
     )
 
-    logger.info("Scheduler initialized with 16 jobs")
+    # Job 17 (iter248): Partner outreach 14-day follow-up — daily at 10:00 UTC.
+    async def partner_outreach_followup_job():
+        if db_instance is None:
+            return
+        from services.partner_outreach import cron_partner_outreach_followup
+        return await cron_partner_outreach_followup(db_instance)
+
+    scheduler.add_job(
+        _tracked("partner_outreach_followup", partner_outreach_followup_job),
+        CronTrigger(hour=10, minute=0),
+        id="partner_outreach_followup",
+        name="iter248 — Partner Outreach 14-day Follow-up (daily)",
+        replace_existing=True,
+    )
+
+    logger.info("Scheduler initialized with 17 jobs")
     return scheduler
 
 

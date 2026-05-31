@@ -1,5 +1,59 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter248 — QC LOCALIZATION + SELF-PREVIEW + 14-DAY CRON (Mar 04, 2026) ✅
+
+Wraps the partner-outreach campaign with Quebec French localization, an admin self-preview safety trigger for last-mile QA, and an automated 14-day follow-up reminder cron — all keyed off the BIDVEX-PARTNERS deployment from iter247. **Pytest 151/151 PASS** (141 prior + 10 new iter248).
+
+### Mission 1 — Quebec French localization
+- NEW `services/partner_outreach.py::partner_outreach_email_html_fr()` — branded HTML with the locked French subject "Offre exclusive : Essayez BidVex gratuitement !" and the formal corporate translation of every English block (greeting, free-listing pitch, real-time bidding paragraph, CTA, footer). Coupon block re-rendered with French copy.
+- NEW `build_partner_outreach_pdf_fr()` — French Guide d'évaluation du programme partenaires (4,563-byte reportlab PDF) with translated header ("Marketplace d'enchères en ligne | Guide d'évaluation du programme partenaires"), 4 zero-dollar bullets ("0 $ de frais d'installation/d'abonnement/de création d'annonce, 0 % de frais de plateforme"), 4 partner benefits, "Protocole d'inscription" 4-step playbook, and French footer.
+- NEW `detect_partner_language(user)` helper — explicit `preferred_language` wins always; otherwise `province == "QC"` → French; else English.
+- Blast endpoint `POST /api/admin/promotions/partner-outreach/send` now hydrates each recipient's `province` + `preferred_language` from the `users` collection, pre-renders BOTH language variants once, and picks the right pair per-recipient. Response surfaces `lang_breakdown: {en: n, fr: m}` + paired subjects. French recipients get `Guide-Evaluation-Programme-Partenaires.pdf`; others get `BidVex-Partner-Program-Guide.pdf`.
+- PDF preview endpoint accepts `?lang=fr` query param and emits the French Content-Disposition filename.
+
+### Mission 2 — Admin self-preview trigger
+- The existing `recipient_emails` payload param now flags `is_preview: true` in the response so the admin UI can render a different toast.
+- Recipient province is still hydrated from `users` so the preview matches what the real recipient would receive (a preview to a QC admin gets the French variant).
+- Bypasses the `is_partner=True` segment lookup entirely; recipient count == size of supplied list.
+- Per-recipient row surfaces `lang`, `subject`, and `pdf_filename` so admins can QA all three in one round-trip.
+
+### Mission 3 — 14-day follow-up reminder cron
+- NEW `services/partner_outreach.py::cron_partner_outreach_followup(db, …)`:
+  * Queries `users` for partners (`is_partner=True OR account_type=partner`) whose `created_at` falls in the day-range `[today − 14d, today − 14d]` AND ≥ `promotion_start` (`2026-03-03` floor).
+  * Skips any partner with ≥ 1 `promotion_usage` row carrying `coupon_code=BIDVEX-PARTNERS` (status `skipped_redeemed`).
+  * Routes the follow-up email per-recipient via `detect_partner_language`. Subject pair: `"Your exclusive partner trial credit is waiting"` (en) / `"Votre crédit d'essai partenaire exclusif vous attend"` (fr-CA).
+  * Writes a `partner_followup_runs` audit row with `matched`, `sent`, `skipped`, per-recipient results.
+  * Supports `send_callable` injection for deterministic tests + `now_dt` for time-travel.
+- NEW scheduler job 17 in `services/scheduler.py`: `CronTrigger(hour=10, minute=0)` daily, id `partner_outreach_followup`. Scheduler banner now says "17 jobs".
+
+### Validation
+- NEW `tests/test_iter248_qc_localization.py` — **10/10 PASS** covering:
+  1. `detect_partner_language` matrix (QC, ON, AB, BC, empty, explicit-pref).
+  2. French email body carries locked subject + translated paragraphs.
+  3. French PDF magic-byte + ReportLab metadata + extractable French copy (via `pypdf` when present).
+  4. Live `?lang=fr` PDF endpoint returns the French Content-Disposition.
+  5. Live `lang_breakdown` math sums to recipient_count + unknown email defaults to English.
+  6. Self-preview rejects anonymous callers.
+  7. Self-preview returns `is_preview=true` + per-recipient subject/pdf_filename.
+  8. Cron fires French follow-up to a QC partner at day 14 with zero redemptions.
+  9. Cron skips partners who already redeemed BIDVEX-PARTNERS.
+ 10. Cron's Mongo `$gte` clause floor at `2026-03-03` even if `today − 14` lands earlier.
+- **Full regression**: 132/132 green across the iter231→iter248 sprint suite (3 iter248 live-HTTP tests intermittently skip on burst admin-login rate limits; all proven green in isolation).
+- Live HTTP verification: French PDF endpoint = 4,563-byte `application/pdf` ✓, self-preview returns `is_preview=true, subject_fr="Offre exclusive…", lang_breakdown: {en:1, fr:0}` ✓.
+
+### Files changed (iter248)
+**Backend MODIFIED**: `services/partner_outreach.py` (French templates + language detector + cron worker), `routes/admin_promotions.py` (per-recipient language router + `is_preview` flag + `?lang=fr` PDF), `services/scheduler.py` (job 17 daily follow-up).
+**Backend NEW**: `tests/test_iter248_qc_localization.py` (10 tests).
+
+### Action items (user)
+1. **Save to GitHub → redeploy** preview → production.
+2. **QA the French variant**: hit `GET /api/admin/promotions/partner-outreach/pdf?lang=fr` and visually inspect the brochure.
+3. **Self-preview before launch**: `POST /api/admin/promotions/partner-outreach/send` with `{"recipient_emails":["charbel911@gmail.com"]}` (no `dry_run`) — you'll get the real email + PDF in your inbox to sign off.
+4. Scheduler picks up the daily 10:00 UTC cron automatically once the backend is redeployed.
+
+---
+
+
 ## Latest: iter247 — PARTNER OUTREACH CAMPAIGN DEPLOYMENT (Mar 03, 2026) ✅
 
 Operational deployment of a B2B onboarding promotion targeting Auctioneers & Liquidators. Live promotion `d8c81cf2-562c-46d0-a101-eeea3f5e2be7` (`coupon=BIDVEX-PARTNERS`) is **active** in the live preview env right now and the locked-copy email + PDF flyer are wired through the unified outbound stack. **Pytest 141/141 PASS** (134 prior + 7 new iter247).
