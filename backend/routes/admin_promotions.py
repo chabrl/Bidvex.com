@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 import secrets
 import string
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta as _td
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
@@ -374,6 +374,151 @@ async def usage_report_csv(
         media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@admin_promotions_router.get("/admin/promotions/analytics/dashboard")
+async def promotions_analytics_dashboard(
+    current_user: User = Depends(get_current_user),
+    window_days: int = 30,
+):
+    """iter245 Mission 1 — Composite analytics for the Admin Promotion
+    Performance Dashboard.
+
+    Returns three blocks in a single round-trip:
+
+      gross_metrics: {
+        total_gmv_saved_cad: float       — Sum of saved_amount across
+                                           buyer_premium, seller_commission,
+                                           listing_fee, listing_promotion,
+                                           and subscription_upgrade events
+                                           in the last `window_days` days.
+        total_active_redemptions: int    — Count of promotion_usage rows.
+        unique_user_redeemers_count: int — Distinct user_id count.
+      }
+      top_campaigns: [
+        {coupon_code, promotion_type, name_en, redemption_count,
+         saved_amount_cad, percent_of_total}, ...  (top 5 by saved_amount)
+      ]
+      velocity_timeline: [
+        {date: "YYYY-MM-DD", uses: int, amount: float}, ...
+      ]  — One row per calendar day across the `window_days` window
+           (zero-filled for days with no redemptions).
+    """
+    _require_admin(current_user)
+    db = get_db()
+    window_days = max(1, min(int(window_days) if window_days is not None else 30, 365))
+    cutoff_dt = datetime.now(timezone.utc) - _td(days=window_days)
+    cutoff_iso = cutoff_dt.isoformat()
+
+    # ── Gross metrics — single aggregation, three counters. ──────────
+    gross_pipeline = [
+        {"$match": {"used_at": {"$gte": cutoff_iso}}},
+        {"$group": {
+            "_id": None,
+            "total_gmv_saved_cad": {
+                "$sum": {"$ifNull": ["$saved_amount", 0]}
+            },
+            "total_active_redemptions": {"$sum": 1},
+            "unique_user_ids": {"$addToSet": "$user_id"},
+        }},
+        {"$project": {
+            "_id": 0,
+            "total_gmv_saved_cad": 1,
+            "total_active_redemptions": 1,
+            "unique_user_redeemers_count": {"$size": "$unique_user_ids"},
+        }},
+    ]
+    gross_rows = await db.promotion_usage.aggregate(gross_pipeline).to_list(length=1)
+    if gross_rows:
+        gross = gross_rows[0]
+        gross["total_gmv_saved_cad"] = round(float(gross.get("total_gmv_saved_cad", 0)), 2)
+    else:
+        gross = {
+            "total_gmv_saved_cad": 0.0,
+            "total_active_redemptions": 0,
+            "unique_user_redeemers_count": 0,
+        }
+
+    # ── Top campaigns — group by promotion_id, sort by total saved. ──
+    top_pipeline = [
+        {"$match": {"used_at": {"$gte": cutoff_iso}}},
+        {"$group": {
+            "_id": "$promotion_id",
+            "saved_amount_cad": {"$sum": {"$ifNull": ["$saved_amount", 0]}},
+            "redemption_count": {"$sum": 1},
+        }},
+        {"$sort": {"saved_amount_cad": -1}},
+        {"$limit": 5},
+    ]
+    top_rows = await db.promotion_usage.aggregate(top_pipeline).to_list(length=5)
+
+    # Hydrate promotion metadata (coupon_code, type, name_en) for the top 5.
+    promo_ids = [r["_id"] for r in top_rows if r.get("_id")]
+    promos = await db.promotions.find(
+        {"id": {"$in": promo_ids}},
+        {"_id": 0, "id": 1, "coupon_code": 1, "type": 1, "name_en": 1},
+    ).to_list(length=len(promo_ids) or 1)
+    promo_map = {p["id"]: p for p in promos}
+
+    total_saved_for_pct = gross["total_gmv_saved_cad"] or 1.0
+    top_campaigns = []
+    for r in top_rows:
+        pid = r.get("_id")
+        meta = promo_map.get(pid, {})
+        saved = round(float(r.get("saved_amount_cad", 0)), 2)
+        top_campaigns.append({
+            "promotion_id": pid,
+            "coupon_code": meta.get("coupon_code") or "—",
+            "promotion_type": meta.get("type") or "unknown",
+            "name_en": meta.get("name_en") or "Untitled Promotion",
+            "redemption_count": int(r.get("redemption_count", 0)),
+            "saved_amount_cad": saved,
+            "percent_of_total": round(
+                (saved / total_saved_for_pct) * 100.0, 2
+            ) if total_saved_for_pct else 0.0,
+        })
+
+    # ── Velocity timeline — daily roll-up over the window. ───────────
+    # Mongo can $substr the ISO string to slice off "YYYY-MM-DD" (positions 0..10).
+    timeline_pipeline = [
+        {"$match": {"used_at": {"$gte": cutoff_iso}}},
+        {"$group": {
+            "_id": {"$substr": ["$used_at", 0, 10]},
+            "uses": {"$sum": 1},
+            "amount": {"$sum": {"$ifNull": ["$saved_amount", 0]}},
+        }},
+    ]
+    raw_timeline = await db.promotion_usage.aggregate(timeline_pipeline).to_list(length=window_days * 2)
+    timeline_map: Dict[str, Dict[str, Any]] = {
+        row["_id"]: {
+            "uses": int(row.get("uses", 0)),
+            "amount": round(float(row.get("amount", 0)), 2),
+        }
+        for row in raw_timeline
+    }
+
+    # Zero-fill every day in the window so the chart axis is dense.
+    velocity_timeline: List[Dict[str, Any]] = []
+    now_date = datetime.now(timezone.utc).date()
+    for offset in range(window_days - 1, -1, -1):
+        day = now_date - _td(days=offset)
+        key = day.isoformat()
+        bucket = timeline_map.get(key, {"uses": 0, "amount": 0.0})
+        velocity_timeline.append({
+            "date": key,
+            "uses": bucket["uses"],
+            "amount": bucket["amount"],
+        })
+
+    return {
+        "window_days": window_days,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "gross_metrics": gross,
+        "top_campaigns": top_campaigns,
+        "velocity_timeline": velocity_timeline,
+    }
+
+
 
 
 @admin_promotions_router.post("/admin/promotions/preview-audience")

@@ -1,5 +1,96 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter245 — PROMOTION PERFORMANCE DASHBOARD (Mar 02, 2026) ✅
+
+Built the high-fidelity ROI visualization layer on top of the Admin Promotions Engine — single composite analytics endpoint + 3-tile React dashboard with KPI strip, top-5 leaderboard + progress bars, and a 30-day velocity Line chart. **Pytest 126/126 PASS** (118 prior + 8 new iter245).
+
+### Mission 1 — Backend analytics aggregation
+- NEW `GET /api/admin/promotions/analytics/dashboard?window_days=30` (admin-gated) in `routes/admin_promotions.py`. Returns three blocks in a single round-trip via three optimized MongoDB aggregation pipelines:
+  * **gross_metrics**: `{ total_gmv_saved_cad, total_active_redemptions, unique_user_redeemers_count }` — single `$group` over `promotion_usage` using `$addToSet` for uniqueness.
+  * **top_campaigns** (top 5 by saved_amount DESC): groups by `promotion_id`, hydrates `coupon_code` / `promotion_type` / `name_en` via a single batched `promotions.find({id: {$in: [...]}})` lookup, plus a per-row `percent_of_total` ratio against the gross total.
+  * **velocity_timeline**: day-bucketed via `$substr: ["$used_at", 0, 10]` + Python-side zero-fill across the full window — `[{date: "YYYY-MM-DD", uses: int, amount: float}, ...]`. Length always equals `window_days`.
+- `window_days` clamped to `[1, 365]` (hard cap to keep aggregation responsive).
+
+### Mission 2 — Frontend dashboard component
+- NEW `components/admin/PromotionAnalyticsDashboard.jsx` mounted at the top of `PromotionManager.js`.
+- **KPI Strip** — 3 responsive cards with gradient accent bars: Total Saved GMV (CAD-formatted), Coupon Redemptions + unique user count, Conversion Lift (`redemptions / unique_users`). Loading state = 3 stacked skeletons.
+- **Top 5 Campaigns** — gradient progress bars (orange→amber) sized by `percent_of_total`, badge for `promotion_type`, monospace coupon code, redemption count + name_en footer.
+- **Redemption Velocity** — recharts `LineChart` with two series (`uses` in amber + `amount` in emerald), zero-filled X-axis, tooltip with CAD formatter, top legend, ResponsiveContainer for fluid sizing.
+- All elements carry `data-testid` markers: `promotion-analytics-dashboard`, `kpi-total-saved-gmv`, `kpi-total-redemptions`, `kpi-conversion-lift`, `top-campaigns-list`, `top-campaign-row-{idx}`, `top-campaign-bar-{idx}`, `velocity-chart-wrapper`, `promotion-analytics-refresh-btn`.
+
+### Validation
+- NEW `tests/test_iter245_promotion_analytics.py` — **8/8 PASS** covering auth gate, shape contract, timeline zero-fill, sort order, percent-math consistency, window clamping, metadata hydration, and an end-to-end seed-and-assert flow that inserts 3 × $25 usage rows then verifies the delta on the live endpoint.
+- **Full regression**: 126/126 PASS across iter231→iter245.
+- Live HTTP smoke ✓ — admin login → `/admin?secondary=promotions` renders the dashboard with `$394.86 saved GMV / 24 redemptions` from real `promotion_usage` data.
+- Lint clean on `PromotionAnalyticsDashboard.jsx` and `PromotionManager.js`.
+
+### Files changed (iter245)
+**Backend MODIFIED**: `routes/admin_promotions.py` (new analytics endpoint + `timedelta as _td` module import).
+**Backend NEW**: `tests/test_iter245_promotion_analytics.py` (8 tests).
+**Frontend NEW**: `components/admin/PromotionAnalyticsDashboard.jsx`.
+**Frontend MODIFIED**: `pages/admin/PromotionManager.js` (mounted the dashboard at the top).
+
+### Action items (user)
+1. **Save to GitHub → redeploy** preview → production.
+2. Smoke test post-deploy: log in to `/admin`, click Promotions tab, confirm the 3 KPI cards + top-5 leaderboard + 30-day velocity chart render with live data.
+
+---
+
+
+## Latest: iter244 — ADMIN PROMOTIONS WRAP-UP: SETTLEMENT INJECTION + LEGACY EMAIL MIGRATION + CSV EXPORT (Mar 01, 2026) ✅
+
+Closes out the Admin Promotions Engine by wiring the runtime fee overrides into the live bid-settlement path, consolidating every legacy outbound email through the unified dispatcher, and exposing a CSV-export pipeline for redemption reporting. **Pytest 118/118 PASS** across iter231 → iter244 (12 new iter244 tests + 106 prior).
+
+### Mission 1 — Live bid-settlement promotion injection
+- NEW `services.auction_settlement::_apply_settlement_promotions(db, winner_user_id, seller_id, buyer_premium_amount, seller_commission_amount, auction_id, listing_type)` — applies any active promotion against BOTH buyer_premium AND seller_commission at the moment of hammer close. Discounts are computed via `services.promotion_runtime.apply_and_record_discount(record_usage=True)` so the redemption row + `current_uses++` happen atomically inside one promotion bookkeeping pass.
+- Wired into the two settlement scenarios:
+  * **Scenario A (cash/etransfer)** — `_settle_cash_or_etransfer`: `buyer_commission = max(0, buyer_commission − buyer_discount)`, `seller_commission = max(0, seller_commission − seller_discount)`. Promo metadata (`buyer_promotion_id`, `buyer_coupon_code`, `buyer_discount_amount`, …) is embedded into the `payment_charges.metadata` block for ledger audit.
+  * **Scenario B (stripe full)** — `_settle_stripe_full`: `buyer_total -= buyer_discount`, `seller_payout += seller_discount` (savings shift to the seller). Same metadata stamped on the charge row.
+- Failure isolation: any exception in the promotion lookup is swallowed and logged — settlement MUST NEVER block on a promo bookkeeping issue.
+
+### Mission 2 — Legacy email migration COMPLETE
+- Every legacy `send_*_email` helper in `services/email_notifications.py` (47 helpers) now routes through a new `_send_via_unified()` shim which dispatches via `send_unified_email("new_feature", …, data={html_full_override: html, subject_override: subject})`. 
+- `build_email_payload()` in `services/email_templates.py` learned three optional override paths:
+  - `html_full_override` — emits the supplied HTML BYTE-FOR-BYTE (no template chrome). Used by every migrated legacy helper to preserve their bespoke branded markup.
+  - `body_html_override` — wraps the supplied body inside the BIDVEX header+footer template chrome.
+  - `subject_override` — bypasses the auto-derived subject.
+- **Grep guarantee**: `grep -c 'sg.send(' services/email_notifications.py` = **1** (the canonical `send_email()` bottom-of-stack physical dispatcher). All other SendGrid hits across the backend are in deliberately excluded files (`email_service.py` dynamic templates, `email_marketing.py` bulk worker, admin diagnostic test endpoints, partner onboarding two-shot).
+- See `services/emails/MIGRATION_TODO.md` for the complete 47-helper migration roster.
+
+### Mission 3 — Promotion Report CSV export
+- NEW `GET /api/admin/promotions/{promo_id}/usage.csv` in `routes/admin_promotions.py` — admin-gated, returns a `text/csv; charset=utf-8` body with 7 columns:
+  `Redemption ID | Timestamp | User ID | User Email | Coupon Code | Promotion Type | Saved Amount CAD`
+- Emails are hydrated in a single batched `users.find({id: {$in: [...]}, ...})` lookup.
+- `Content-Disposition: attachment; filename="promotion-{coupon_code}-usage.csv"` triggers browser download.
+- Admin UI (`pages/admin/PromotionManager.js`) gained an `[Export CSV]` button beside the existing Usage drill-down.
+
+### Validation
+- NEW `tests/test_iter244_settlements_and_emails.py` — **12/12 PASS** covering:
+  1-4: Mission 1 settlement-time discount math (no-op, full waiver, 50% off, swallow-on-error).
+  5-8: Mission 2 HTML preservation through `html_full_override` & `body_html_override` + `_send_via_unified` plumbing + the single-`sg.send` grep guarantee.
+  9-11: Mission 3 CSV export auth gate, header shape, 404 for unknown promo.
+  12: Regression — `send_bid_placed_email` still routes through `send_unified_email("bid_placed", …)`.
+- **Full regression**: 118/118 PASS across iter231→iter244 test suites.
+- Live HTTP smoke: `/api/promotions/active-banners` 401 ✓, `/api/admin/promotions/x/usage.csv` 401 ✓.
+
+### Files changed (iter244)
+**Backend MODIFIED**: `services/auction_settlement.py` (settlement promo injection — both scenarios), `services/email_templates.py` (body_html_override + html_full_override + subject_override paths), `services/email_notifications.py` (`_send_via_unified` shim + 47 helpers migrated), `routes/admin_promotions.py` (`/usage.csv` endpoint).
+**Backend NEW**: `tests/test_iter244_settlements_and_emails.py` (12 tests).
+**Frontend MODIFIED**: `pages/admin/PromotionManager.js` ([Export CSV] button — done in earlier iter244 turn).
+**Docs**: `services/emails/MIGRATION_TODO.md` — rewritten with the COMPLETE migration roster.
+
+### Action items (user)
+1. **Save to GitHub → redeploy** preview → production.
+2. Smoke-test post-deploy: on `/admin/promotions`, click `[Export CSV]` on any promo with redemptions — should download `promotion-{coupon}-usage.csv`.
+3. Confirm the next real hammer close in QC shows the buyer_discount metadata on its `payment_charges` row (`db.payment_charges.find_one({user_id: ..., metadata.buyer_promotion_id: {$ne: null}})`).
+
+### Known follow-ups (non-blocking)
+- 2 pre-existing failures in `tests/test_feature_patch_v9_live2.py` (`test_admin_update_end_time_*`) — environmental, seeded auction IDs no longer exist in preview DB. Not an iter244 regression.
+- `services/email_marketing.py` (bulk campaign worker) and `routes/{auth,admin,admin_config,partners}.py` retain direct SendGrid calls for architectural reasons (separate config namespace, diagnostic probes). Documented in `services/emails/MIGRATION_TODO.md`.
+
+---
+
+
 ## Latest: iter239 — FRONTEND WIRING + EMAIL REFACTOR FOLLOW-UP (Feb 28, 2026) ✅
 
 Completed the deferred iter238 frontend pieces + email refactor + filter cleanup. **Pytest 77/77 PASS** (60 prior + 10 iter239 followup + 7 iter239 live HTTP).

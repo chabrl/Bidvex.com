@@ -23,6 +23,7 @@ import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Badge } from '../../components/ui/badge';
 import { Skeleton } from '../../components/ui/skeleton';
+import PromotionAnalyticsDashboard from '../../components/admin/PromotionAnalyticsDashboard';
 import {
   Dialog,
   DialogContent,
@@ -311,6 +312,9 @@ const PromotionManager = () => {
 
   return (
     <div className="space-y-4" data-testid="admin-promotions-engine">
+      {/* iter245 Mission 2 — Promotion Performance Dashboard */}
+      <PromotionAnalyticsDashboard />
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
