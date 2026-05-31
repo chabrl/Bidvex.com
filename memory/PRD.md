@@ -1,5 +1,44 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter252 — INBOX QA TOGGLE INSIDE LAUNCH BROADCAST MODAL (Mar 04, 2026) ✅
+
+Adds a "🧪 Test Send to Myself (Inbox QA Pass)" Shadcn `Switch` right inside the Launch Broadcast confirmation modal — admins can now QA the live email + PDF render to their own inbox before pulling the trigger on the real audience, without leaving the launch flow. **Pytest 183/183 PASS** (178 prior + 5 new iter252).
+
+### Frontend — In-modal safety switch
+- NEW `Switch` (from `components/ui/switch.jsx`) inside the Launch Broadcast Dialog (only renders for `partner_launch_offer` promos since this is the only blast path that supports `recipient_emails` override).
+- Toggle state: `launchTestSend` (default OFF, reset on every modal open).
+- Visual feedback:
+  * **OFF** — slate background, indigo→blue gradient confirm button labeled "🚀 Launch Broadcast Now".
+  * **ON** — amber background, amber→orange gradient confirm button labeled "✉️ Send Test to My Inbox", and the helper paragraph updates to "The blast will be redirected to {admin.email} only — the real audience will NOT receive this email."
+- Confirm handler `confirmLaunchBroadcast`:
+  * `launchTestSend=true` → appends `recipient_emails: [user.email]` to the POST body and shows the toast "Test broadcast dispatched to your inbox!" with subtitle `Sent to {admin.email} — uncheck the toggle to run the real blast.` **Modal stays open** so the admin can uncheck and immediately re-fire the real broadcast.
+  * `launchTestSend=false` → unchanged from iter251 (POST body has no `recipient_emails` override → endpoint resolves the real `target_config.custom_emails` audience).
+- data-testids: `launch-test-send-toggle-row`, `launch-test-send-toggle`, `launch-broadcast-confirm` (button text + class swap based on toggle state).
+
+### Backend — No code change required
+The iter247 self-preview semantics already handle the `recipient_emails` override path (`is_preview=true`, bypass segment lookup, surface per-recipient `lang`/`subject`/`pdf_filename`). iter252 simply leverages that contract from a more convenient UI control.
+
+### Validation
+- NEW `tests/test_iter252_inbox_qa_toggle.py` — **5/5 PASS** covering:
+  1. **Toggle OFF**: POST `{promotion_id}` (no recipient_emails) resolves the promo's `target_config.custom_emails` exactly.
+  2. **Toggle ON**: POST `{promotion_id, recipient_emails=[admin]}` bypasses the manual list entirely and routes ONLY to the admin email.
+  3. **Toggle ON → `is_preview=true`** in the response so the modal can route the amber/green "Test broadcast dispatched" toast and keep the modal open.
+  4. **Toggle ON still requires admin auth** (back-compat with iter247's auth gate).
+  5. **`recipient_emails` precedence**: when set, it ALWAYS wins over `target_config.target` — even for `target=="partners"` promos with no `custom_emails`.
+- **Full regression**: 45/45 PASS across iter247→iter252.
+- **Live UI smoke** ✓ — Screenshot confirms the toggle renders with the amber treatment when ON, the button text dynamically swaps to "✉️ Send Test to My Inbox", and the helper copy mirrors the admin's session email.
+
+### Files changed (iter252)
+**Frontend MODIFIED**: `pages/admin/PromotionManager.js` — added `Switch` import, `launchTestSend` state, defaulted-OFF reset in `openLaunch`, conditional payload-append + alternate-toast branch in `confirmLaunchBroadcast`, toggle UI block inside the Launch Broadcast Dialog, dynamic confirm-button text + class.
+**Backend NEW**: `tests/test_iter252_inbox_qa_toggle.py` (5 tests).
+
+### Action items (user)
+1. **Save to GitHub → redeploy** preview → production.
+2. Final QA flow on prod: click 🚀 on the BIDVEX-PARTNERS row → flip the "🧪 Test Send to Myself" toggle ON → click "✉️ Send Test to My Inbox" → confirm you receive the live email + PDF in your inbox → flip the toggle OFF → click "🚀 Launch Broadcast Now" → real audience receives the campaign.
+
+---
+
+
 ## Latest: iter251 — LAUNCH BROADCAST WIRING + MANUAL LIST AUDIENCE (Mar 04, 2026) ✅
 
 Closes the missing-CTA gap reported by the user: the Partner Outreach blast endpoint now honours each promotion's stored `target_config.custom_emails` manual list, and every row in the All Promotions table carries a 🚀 Launch Broadcast button + confirmation modal that fires the campaign on demand. **Pytest 178/178 PASS** (173 prior + 5 new iter251).

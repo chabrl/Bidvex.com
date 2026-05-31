@@ -23,6 +23,7 @@ import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Badge } from '../../components/ui/badge';
 import { Skeleton } from '../../components/ui/skeleton';
+import { Switch } from '../../components/ui/switch';
 import PromotionAnalyticsDashboard from '../../components/admin/PromotionAnalyticsDashboard';
 import {
   Dialog,
@@ -121,7 +122,7 @@ const blankForm = () => ({
 });
 
 const PromotionManager = () => {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const headers = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
 
   const [promotions, setPromotions] = useState([]);
@@ -271,7 +272,13 @@ const PromotionManager = () => {
   // iter251 — Launch broadcast workflow.
   const [launchTarget, setLaunchTarget] = useState(null);
   const [launchSubmitting, setLaunchSubmitting] = useState(false);
-  const openLaunch = (promo) => setLaunchTarget(promo);
+  // iter252 — Inbox QA toggle. When ON, the launch dispatches as a
+  // self-preview to the admin instead of the live audience.
+  const [launchTestSend, setLaunchTestSend] = useState(false);
+  const openLaunch = (promo) => {
+    setLaunchTarget(promo);
+    setLaunchTestSend(false);  // always default OFF when opening
+  };
   const confirmLaunchBroadcast = async () => {
     if (!launchTarget?.id) return;
     setLaunchSubmitting(true);
@@ -284,15 +291,33 @@ const PromotionManager = () => {
         ? `${API}/admin/promotions/partner-outreach/send`
         : `${API}/admin/promotions/${launchTarget.id}/activate`;
       const body = isPartnerCampaign ? { promotion_id: launchTarget.id } : {};
+      // iter252 — Inbox QA: route to admin's own email when toggle is ON.
+      if (launchTestSend && isPartnerCampaign) {
+        const adminEmail = user?.email;
+        if (!adminEmail) {
+          toast.error('Could not resolve your session email');
+          setLaunchSubmitting(false);
+          return;
+        }
+        body.recipient_emails = [adminEmail];
+      }
       const res = await axios.post(endpoint, body, { headers });
       const data = res?.data || {};
       const sent = data.sent ?? data.recipient_count ?? 0;
       const failed = data.failed ?? 0;
-      toast.success(`Broadcast launched — ${sent} sent${failed ? `, ${failed} failed` : ''}`, {
-        description: `Coupon ${launchTarget.coupon_code} dispatched to the audience.`,
-      });
-      setLaunchTarget(null);
-      fetchPromotions();
+      if (launchTestSend && isPartnerCampaign) {
+        toast.success('Test broadcast dispatched to your inbox!', {
+          description: `Sent to ${user?.email} — uncheck the toggle to run the real blast.`,
+        });
+        // iter252 — Keep the modal open so the admin can uncheck and
+        // immediately re-fire the real broadcast.
+      } else {
+        toast.success(`Broadcast launched — ${sent} sent${failed ? `, ${failed} failed` : ''}`, {
+          description: `Coupon ${launchTarget.coupon_code} dispatched to the audience.`,
+        });
+        setLaunchTarget(null);
+        fetchPromotions();
+      }
     } catch (e) {
       toast.error(e?.response?.data?.detail || 'Launch failed');
     } finally {
@@ -782,6 +807,39 @@ const PromotionManager = () => {
               )}
             </div>
           )}
+
+          {/* iter252 — Inbox QA safety toggle */}
+          {launchTarget?.type === 'partner_launch_offer' && (
+            <div
+              className={`flex items-start gap-3 rounded-md border p-3 transition-colors ${
+                launchTestSend
+                  ? 'border-amber-300 bg-amber-50'
+                  : 'border-slate-200 bg-slate-50'
+              }`}
+              data-testid="launch-test-send-toggle-row"
+            >
+              <Switch
+                id="launch-test-send-toggle"
+                checked={launchTestSend}
+                onCheckedChange={setLaunchTestSend}
+                disabled={launchSubmitting}
+                data-testid="launch-test-send-toggle"
+              />
+              <label
+                htmlFor="launch-test-send-toggle"
+                className="text-xs leading-snug cursor-pointer flex-1"
+              >
+                <span className={`font-semibold ${launchTestSend ? 'text-amber-900' : 'text-slate-900'}`}>
+                  🧪 Test Send to Myself (Inbox QA Pass)
+                </span>
+                <p className="mt-0.5 text-slate-600">
+                  {launchTestSend
+                    ? `The blast will be redirected to ${user?.email || 'your inbox'} only — the real audience will NOT receive this email.`
+                    : 'When enabled, the broadcast routes only to your admin email so you can preview the live render before firing to the real audience.'}
+                </p>
+              </label>
+            </div>
+          )}
           <DialogFooter className="gap-2 sm:gap-0">
             <Button
               type="button"
@@ -797,11 +855,17 @@ const PromotionManager = () => {
               type="button"
               onClick={confirmLaunchBroadcast}
               disabled={launchSubmitting}
-              className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white border-0"
+              className={
+                launchTestSend
+                  ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0'
+                  : 'bg-gradient-to-r from-indigo-600 to-blue-600 text-white border-0'
+              }
               data-testid="launch-broadcast-confirm"
             >
               <Rocket className={`h-3.5 w-3.5 mr-1.5 ${launchSubmitting ? 'animate-pulse' : ''}`} />
-              {launchSubmitting ? 'Launching…' : '🚀 Launch Broadcast'}
+              {launchSubmitting
+                ? (launchTestSend ? 'Sending test…' : 'Launching…')
+                : (launchTestSend ? '✉️ Send Test to My Inbox' : '🚀 Launch Broadcast Now')}
             </Button>
           </DialogFooter>
         </DialogContent>
