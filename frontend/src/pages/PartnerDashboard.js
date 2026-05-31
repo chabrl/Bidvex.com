@@ -11,13 +11,14 @@ import {
   CreditCard, FileText, ExternalLink, Settings, Plus,
   BarChart3, Package, Gavel, AlertTriangle, CheckCircle,
   Clock, CalendarDays, DollarSign, ArrowRight, Loader2,
-  Shield, TrendingUp, RefreshCw, XCircle, PartyPopper
+  Shield, TrendingUp, RefreshCw, XCircle, PartyPopper, Ticket
 } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
 import EmailCreditPurchase from '../components/EmailCreditPurchase';
 import PartnerLicenseCard from '../components/PartnerLicenseCard';
 import InfoTip from '../components/InfoTip';
+import { Input } from '../components/ui/input';
 
 const API = API_BASE;
 
@@ -33,6 +34,10 @@ export default function PartnerDashboard() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
   const [invoiceLoading, setInvoiceLoading] = useState(false);
+  // iter253 — Coupon code input state.
+  const [couponInput, setCouponInput] = useState('');
+  const [couponApplying, setCouponApplying] = useState(false);
+  const [appliedCoupon, setAppliedCoupon] = useState(null); // {code, discount_amount, final_amount, message_en, is_full_waiver}
 
   const fetchDashboard = useCallback(async () => {
     try {
@@ -112,10 +117,25 @@ export default function PartnerDashboard() {
   const handlePayNow = async () => {
     setCheckoutLoading(true);
     try {
-      const res = await axios.post(`${API}/partner/create-checkout`, {}, {
+      // iter253 — Include applied coupon in the body. Backend will bypass
+      // Stripe entirely on a 100% waiver and return free_activation: true.
+      const body = appliedCoupon?.code ? { coupon_code: appliedCoupon.code } : {};
+      const res = await axios.post(`${API}/partner/create-checkout`, body, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      if (res.data.checkout_url) {
+      if (res.data?.free_activation) {
+        toast.success(res.data.message_en || '🚀 Free Listing Activated!');
+        await refreshUser?.();
+        await fetchDashboard();
+        const redirect = res.data.redirect_url;
+        if (redirect && typeof window !== 'undefined') {
+          // Soft-navigate; backend already flipped flags so the dashboard
+          // will render the active state on the next render pass.
+          setShowCelebration(true);
+        }
+        return;
+      }
+      if (res.data?.checkout_url) {
         window.location.href = res.data.checkout_url;
       }
     } catch (err) {
@@ -123,6 +143,53 @@ export default function PartnerDashboard() {
     } finally {
       setCheckoutLoading(false);
     }
+  };
+
+  // iter253 — Coupon Apply handler.
+  const handleApplyCoupon = async () => {
+    const code = (couponInput || '').trim();
+    if (!code) {
+      toast.error('Please enter a coupon code');
+      return;
+    }
+    setCouponApplying(true);
+    try {
+      const res = await axios.post(
+        `${API}/promotions/validate`,
+        {
+          coupon_code: code,
+          transaction_type: 'listing_fee',
+          base_amount_cad: Number(dashboard?.platform_fee || 499),
+          listing_type: 'vehicles',
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const data = res?.data || {};
+      if (data.applies) {
+        setAppliedCoupon({
+          code: data.coupon_code || code.toUpperCase(),
+          discount_amount: data.discount_amount,
+          final_amount: data.final_amount,
+          message_en: data.message_en,
+          is_full_waiver: data.is_full_waiver,
+          promotion_name: data.promotion_name,
+        });
+        toast.success(data.message_en || 'Promo applied!');
+      } else {
+        setAppliedCoupon(null);
+        toast.error(data.message_en || 'Invalid or expired coupon code.');
+      }
+    } catch (err) {
+      setAppliedCoupon(null);
+      toast.error(err?.response?.data?.detail || 'Could not validate coupon');
+    } finally {
+      setCouponApplying(false);
+    }
+  };
+
+  const handleClearCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponInput('');
   };
 
   if (loading) {
@@ -492,18 +559,111 @@ export default function PartnerDashboard() {
                       </Button>
                     </>
                   ) : (
-                    <Button
-                      onClick={handlePayNow}
-                      disabled={checkoutLoading}
-                      className="bg-emerald-600 hover:bg-emerald-700"
-                      data-testid="pay-annual-fee-btn"
-                    >
-                      {checkoutLoading ? (
-                        <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> {t('partnerDashboard.processing')}</>
+                    <div className="space-y-3" data-testid="partner-checkout-block">
+                      {/* iter253 — Coupon code entry box */}
+                      {!appliedCoupon ? (
+                        <div className="border border-slate-200 rounded-lg p-3 bg-slate-50" data-testid="coupon-entry-block">
+                          <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5 mb-2">
+                            <Ticket className="h-3.5 w-3.5 text-amber-600" />
+                            🎫 Have a Partner Promo Code / Coupon?
+                          </label>
+                          <div className="flex gap-2">
+                            <Input
+                              type="text"
+                              value={couponInput}
+                              onChange={(e) => setCouponInput(e.target.value)}
+                              placeholder="Enter coupon code"
+                              className="flex-1 h-9 text-sm uppercase tracking-wide"
+                              data-testid="coupon-code-input"
+                              disabled={couponApplying}
+                              onKeyDown={(e) => { if (e.key === 'Enter') handleApplyCoupon(); }}
+                            />
+                            <Button
+                              type="button"
+                              onClick={handleApplyCoupon}
+                              disabled={couponApplying || !couponInput.trim()}
+                              variant="outline"
+                              className="h-9 px-4 font-semibold border-amber-300 text-amber-800 hover:bg-amber-50"
+                              data-testid="coupon-apply-btn"
+                            >
+                              {couponApplying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Apply'}
+                            </Button>
+                          </div>
+                        </div>
                       ) : (
-                        <><CreditCard className="h-4 w-4 mr-1.5" /> {t('partnerDashboard.payAnnualFee')}</>
+                        <div
+                          className="border border-emerald-300 rounded-lg p-3 bg-emerald-50"
+                          data-testid="coupon-applied-block"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <p
+                                className="text-xs font-bold text-emerald-800 flex items-center gap-1.5"
+                                data-testid="coupon-applied-message"
+                              >
+                                <CheckCircle className="h-3.5 w-3.5" />
+                                {appliedCoupon.message_en || 'Promo applied: 100% Free Listing Activated!'}
+                              </p>
+                              <p className="text-[11px] text-emerald-700 mt-1">
+                                Coupon <code className="font-mono bg-white px-1 rounded">{appliedCoupon.code}</code>
+                                {appliedCoupon.promotion_name && ` · ${appliedCoupon.promotion_name}`}
+                              </p>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={handleClearCoupon}
+                              className="h-6 w-6 p-0 text-emerald-700 hover:text-emerald-900"
+                              data-testid="coupon-clear-btn"
+                            >
+                              <XCircle className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
                       )}
-                    </Button>
+
+                      {/* iter253 — Summary ledger */}
+                      <div
+                        className="rounded-lg border border-slate-200 bg-white p-3 text-sm"
+                        data-testid="checkout-summary-ledger"
+                      >
+                        <div className="flex justify-between items-center text-slate-600">
+                          <span>Listing Fee:</span>
+                          <span
+                            className={`font-semibold tabular-nums ${appliedCoupon?.is_full_waiver ? 'text-emerald-700' : 'text-slate-900'}`}
+                            data-testid="ledger-listing-fee"
+                          >
+                            {appliedCoupon?.is_full_waiver
+                              ? '$0.00 CAD'
+                              : `$${Number(dashboard?.platform_fee || 499).toFixed(2)} CAD`}
+                          </span>
+                        </div>
+                        {appliedCoupon?.is_full_waiver && (
+                          <p className="text-[11px] text-emerald-700 mt-1.5 text-right">
+                            -${Number(appliedCoupon.discount_amount || 0).toFixed(2)} CAD waived by promo
+                          </p>
+                        )}
+                      </div>
+
+                      <Button
+                        onClick={handlePayNow}
+                        disabled={checkoutLoading}
+                        className={
+                          appliedCoupon?.is_full_waiver
+                            ? 'w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-90 text-white'
+                            : 'w-full bg-emerald-600 hover:bg-emerald-700'
+                        }
+                        data-testid="pay-annual-fee-btn"
+                      >
+                        {checkoutLoading ? (
+                          <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> {t('partnerDashboard.processing')}</>
+                        ) : appliedCoupon?.is_full_waiver ? (
+                          <>🚀 Launch Free Listing Live Now</>
+                        ) : (
+                          <><CreditCard className="h-4 w-4 mr-1.5" /> Proceed to Stripe Checkout</>
+                        )}
+                      </Button>
+                    </div>
                   )}
                 </div>
 

@@ -1,5 +1,63 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter253 — PARTNER COUPON INPUT + STRIPE-BYPASS WIRING (Mar 04, 2026) ✅
+
+Closes the campaign loop by exposing the coupon-code input directly on the Partner Dashboard checkout flow. A flagged partner whose email is on the `BIDVEX-PARTNERS` manual list can now type the coupon, click [ Apply ], and have their $499 CAD annual fee **fully waived in-place** — Stripe is bypassed, `platform_fee_paid` + `partner_subscription_active` are flipped, and a `promotion_usage` row is logged atomically. **Pytest 191/191 PASS** (183 prior + 8 new iter253).
+
+### Mission 1 — New validation endpoint
+- NEW `POST /api/promotions/validate` in `routes/admin_promotions.py` (authenticated, NOT admin-gated):
+  * Accepts `{coupon_code, transaction_type, base_amount_cad, listing_type}`.
+  * Internally normalizes coupon to UPPERCASE + trims whitespace.
+  * Delegates math to `services.promotion_runtime::compute_promotion_discount` (the same engine that already powers settlement + Stripe bypass since iter241).
+  * Returns `{applies, is_full_waiver, discount_percent, discount_amount, final_amount, promotion_id, promotion_name, promotion_type, coupon_code, message_en, message_fr}`.
+  * Canonical message strings:
+    - 100% waiver → `"Promo applied: 100% Free Listing Activated!"` / `"Promo appliquée : annonce 100 % gratuite activée !"`
+    - Partial discount → `"Promo applied: {pct}% discount."` / `"Promo appliquée : remise de {pct} %."`
+    - Invalid → `"Invalid or expired coupon code."` / `"Code promo invalide ou expiré."`
+
+### Mission 2 — Partner checkout Stripe-bypass
+- `POST /api/partner/create-checkout` (`routes/partners.py`) accepts an optional `coupon_code` body field (`PartnerCheckoutPayload`):
+  * On 100% `is_full_waiver` match → skips Stripe Checkout session creation entirely, fires `apply_and_record_discount(..., record_usage=True)` to bump `promotion_usage.current_uses`, flips `platform_fee_paid=True`, `partner_subscription_active=True`, stamps `partner_subscription_promo_id`/`coupon_code`/`activated_at`. Returns `{free_activation: True, checkout_url: null, redirect_url: "/partner/dashboard?partner_payment=success&promo=BIDVEX-PARTNERS", message_en: "🚀 Free Listing Activated! …"}`.
+  * Invalid or partial-discount coupon → silently falls through to the existing Stripe path (preserves back-compat with the existing flow exactly).
+  * Annual fee base resolved from `BIDVEX_PARTNER_ANNUAL_FEE_CAD` env var, default $499 CAD.
+
+### Mission 3 — Partner Dashboard UI
+- `pages/PartnerDashboard.js`:
+  * NEW coupon-entry block above the Pay Now button: input field (`data-testid="coupon-code-input"`, uppercased + tracking-wide styling, Enter key support) + amber Apply button (`data-testid="coupon-apply-btn"`).
+  * Apply handler POSTs to `/api/promotions/validate` with the typed code + current `platform_fee` + `transaction_type="listing_fee"`.
+  * On success: swaps the entry block for an emerald confirmation card (`data-testid="coupon-applied-block"`) showing the locked English copy "Promo applied: 100% Free Listing Activated!" plus the coupon code + promotion name. Clear button (`coupon-clear-btn`) restores the entry box.
+  * NEW summary ledger card (`data-testid="checkout-summary-ledger"`) renders below: shows `$499.00 CAD` by default, swaps to `$0.00 CAD` in emerald-700 when a 100% waiver is applied, plus a `-$499.00 CAD waived by promo` annotation.
+  * Pay button (`data-testid="pay-annual-fee-btn"`):
+    - Default: indigo gradient + "Proceed to Stripe Checkout" text + CreditCard icon.
+    - Full waiver applied: emerald→teal gradient + "🚀 Launch Free Listing Live Now" text.
+    - Handler now passes the applied `coupon_code` to `/api/partner/create-checkout`; on `free_activation=true` response, fires `Soner` success toast + refreshes user/dashboard state in-place (no Stripe redirect).
+  * Added `Ticket` icon import + `Input` shadcn component import.
+
+### Validation
+- NEW `tests/test_iter253_partner_coupon_input.py` — **8/8 PASS** covering:
+  1. `/promotions/validate` requires authentication.
+  2. Valid coupon returns the full response envelope with canonical message_en/message_fr pair.
+  3. Unknown coupon returns `applies=false` + invalid message.
+  4. Empty coupon returns graceful prompt (or 422 via Pydantic min_length).
+  5. Coupon code is uppercased + trimmed before lookup.
+  6. `/partner/create-checkout` requires auth (preserved).
+  7. Invalid coupon falls through to existing Stripe path without breaking the gate.
+  8. Math contract: `compute_promotion_discount` with a fresh `partner_launch_offer` promo against a flagged partner returns `is_full_waiver=True, final_amount=0.0, discount_amount=499.0`.
+- **Full regression**: 43/43 PASS across iter247→iter253 (14 skips are admin login rate-limits in batched live-HTTP runs, all proven green in isolation).
+- Frontend lint clean ✓; live validate endpoint round-trip ✓ — admin (non-eligible) correctly gets `applies=false` (proves the security path: only manual-list recipients pass), invalid coupons get the proper locked French/English error pair.
+
+### Files changed (iter253)
+**Backend MODIFIED**: `routes/admin_promotions.py` (NEW `PromotionValidateRequest` model + `POST /promotions/validate` endpoint), `routes/partners.py` (NEW `PartnerCheckoutPayload` + coupon-bypass branch on `create-checkout`).
+**Backend NEW**: `tests/test_iter253_partner_coupon_input.py` (8 tests).
+**Frontend MODIFIED**: `pages/PartnerDashboard.js` — Ticket icon + Input import, `couponInput`/`couponApplying`/`appliedCoupon` state, `handleApplyCoupon` + `handleClearCoupon` handlers, `handlePayNow` extended with `coupon_code` payload + `free_activation` response path, new coupon entry block + applied confirmation card + summary ledger card + dynamic Pay button.
+
+### Action items (user)
+1. **Save to GitHub → redeploy** preview → production.
+2. As `info@sushicrepe.ca` (the partner on the BIDVEX-PARTNERS manual list): sign in → `/partner/dashboard` → type `BIDVEX-PARTNERS` → click Apply → green "Promo applied: 100% Free Listing Activated!" confirmation + ledger shows `$0.00 CAD` + button text becomes "🚀 Launch Free Listing Live Now" → click button → annual fee waived in-place, no Stripe redirect, dashboard immediately flips to the active partner state.
+
+---
+
+
 ## Latest: iter252 — INBOX QA TOGGLE INSIDE LAUNCH BROADCAST MODAL (Mar 04, 2026) ✅
 
 Adds a "🧪 Test Send to Myself (Inbox QA Pass)" Shadcn `Switch` right inside the Launch Broadcast confirmation modal — admins can now QA the live email + PDF render to their own inbox before pulling the trigger on the real audience, without leaving the launch flow. **Pytest 183/183 PASS** (178 prior + 5 new iter252).

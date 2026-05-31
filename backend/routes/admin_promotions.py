@@ -78,6 +78,26 @@ class PromotionUpdate(BaseModel):
     show_banner: Optional[bool] = None
 
 
+
+class PromotionValidateRequest(BaseModel):
+    """iter253 — Inbound payload for `POST /api/promotions/validate`.
+
+    Used by the Partner Dashboard coupon input + the listing-checkout
+    coupon entry box. Returns the structured discount math so the
+    frontend can pre-render a $0.00 CAD ledger BEFORE the user clicks
+    "Proceed to Stripe Checkout".
+    """
+    coupon_code: str = Field(..., min_length=1, max_length=64)
+    transaction_type: str = Field(
+        "listing_fee",
+        description="One of: listing_fee, listing_promotion, buyer_premium, "
+                    "seller_commission, subscription_upgrade",
+    )
+    base_amount_cad: float = Field(0.0, ge=0)
+    listing_type: Optional[str] = "vehicles"
+
+
+
 def _generate_coupon_code(prefix: str = "BIDVEX") -> str:
     """Generate a human-readable coupon: BIDVEX-<6 random alphanum>"""
     alphabet = string.ascii_uppercase + string.digits
@@ -1027,6 +1047,85 @@ async def preview_discount(
         coupon_code=coupon_code,
     )
     return discount.to_dict()
+
+
+
+@admin_promotions_router.post("/promotions/validate")
+async def validate_coupon_code(
+    payload: PromotionValidateRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """iter253 — Validate a coupon code typed by a partner/broker on the
+    listing-checkout or partner dashboard page.
+
+    Returns the structured discount math + a human-readable message
+    block so the frontend can pre-render the $0.00 CAD ledger and
+    swap the CTA copy from "Proceed to Stripe Checkout" to
+    "🚀 Launch Free Listing Live Now".
+    """
+    from services.promotion_runtime import compute_promotion_discount
+    db = get_db()
+
+    code = (payload.coupon_code or "").strip().upper()
+    if not code:
+        return {
+            "applies": False,
+            "is_full_waiver": False,
+            "discount_percent": 0.0,
+            "discount_amount": 0.0,
+            "final_amount": payload.base_amount_cad,
+            "promotion_id": None,
+            "promotion_name": None,
+            "coupon_code": payload.coupon_code,
+            "message_en": "Please enter a coupon code.",
+            "message_fr": "Veuillez saisir un code promo.",
+        }
+
+    discount = await compute_promotion_discount(
+        db=db,
+        user_id=current_user.id,
+        transaction_type=payload.transaction_type,
+        listing_type=payload.listing_type,
+        base_amount_cad=payload.base_amount_cad,
+        coupon_code=code,
+    )
+    body = discount.to_dict() if hasattr(discount, "to_dict") else dict(discount)
+
+    # Hydrate the promotion name so the frontend can render "BIDVEX-PARTNERS — Partner Launch Offer"
+    promo_name_en = None
+    promo_name_fr = None
+    if body.get("promotion_id"):
+        p_doc = await db.promotions.find_one(
+            {"id": body["promotion_id"]},
+            {"_id": 0, "name_en": 1, "name_fr": 1, "coupon_code": 1, "type": 1},
+        )
+        if p_doc:
+            promo_name_en = p_doc.get("name_en")
+            promo_name_fr = p_doc.get("name_fr")
+            body["promotion_name"] = promo_name_en
+            body["promotion_type"] = p_doc.get("type")
+
+    applies = bool(body.get("applies"))
+    is_full = bool(body.get("is_full_waiver"))
+
+    if not applies:
+        msg_en = "Invalid or expired coupon code."
+        msg_fr = "Code promo invalide ou expiré."
+    elif is_full:
+        msg_en = "Promo applied: 100% Free Listing Activated!"
+        msg_fr = "Promo appliquée : annonce 100 % gratuite activée !"
+    else:
+        pct = body.get("discount_percent", 0)
+        msg_en = f"Promo applied: {pct:.0f}% discount."
+        msg_fr = f"Promo appliquée : remise de {pct:.0f} %."
+
+    body["message_en"] = msg_en
+    body["message_fr"] = msg_fr
+    body["coupon_code"] = code
+    return body
+
+
+
 
 
 @admin_promotions_router.get("/promotions/active-banners")

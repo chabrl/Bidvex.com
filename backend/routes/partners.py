@@ -627,15 +627,90 @@ async def get_partner_payment_status(current_user: User = Depends(get_current_us
 
 
 
+class PartnerCheckoutPayload(BaseModel):
+    """iter253 — Optional body for `/partner/create-checkout`.
+    When `coupon_code` resolves to a 100% waiver via the promotion
+    engine, Stripe is bypassed entirely — the partner's annual fee is
+    marked paid in-place and a `promotion_usage` row is logged."""
+    coupon_code: Optional[str] = None
+
+
 @partners_router.post("/partner/create-checkout")
-async def create_partner_checkout(current_user: User = Depends(get_current_user)):
-    """Create a new Stripe Checkout Session for partner fee payment."""
+async def create_partner_checkout(
+    payload: Optional[PartnerCheckoutPayload] = None,
+    current_user: User = Depends(get_current_user),
+):
+    """Create a new Stripe Checkout Session for partner fee payment.
+
+    iter253 — When `payload.coupon_code` resolves to a 100% waiver (e.g.
+    BIDVEX-PARTNERS for partner_launch_offer), the Stripe redirect is
+    skipped, the user's `platform_fee_paid` + `partner_subscription_active`
+    flags are flipped in-place, and a `promotion_usage` row is recorded.
+    """
     db = get_db()
     if not current_user.is_partner and current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=400, detail="Not a partner account")
     if current_user.platform_fee_paid:
         raise HTTPException(status_code=400, detail="Annual fee already paid")
-    
+
+    # iter253 — Coupon bypass path. Annual partner fee in this codebase
+    # is anchored at the listing_fee promotion bucket; the
+    # `partner_launch_offer` type waives it 100%.
+    coupon = (payload.coupon_code if payload else None) or ""
+    coupon = coupon.strip().upper()
+    if coupon:
+        try:
+            from services.promotion_runtime import (
+                compute_promotion_discount, apply_and_record_discount,
+            )
+            base_fee = float(_os.environ.get("BIDVEX_PARTNER_ANNUAL_FEE_CAD", "499.0"))
+            discount = await compute_promotion_discount(
+                db=db,
+                user_id=current_user.id,
+                transaction_type="listing_fee",
+                listing_type="vehicles",
+                base_amount_cad=base_fee,
+                coupon_code=coupon,
+            )
+            if getattr(discount, "applies", False) and getattr(discount, "is_full_waiver", False):
+                # 100% waiver — skip Stripe, mark the partner as paid.
+                now = datetime.now(timezone.utc).isoformat()
+                await apply_and_record_discount(
+                    db=db,
+                    user_id=current_user.id,
+                    discount=discount,
+                    transaction_type="listing_fee",
+                    record_usage=True,
+                )
+                await db.users.update_one(
+                    {"id": current_user.id},
+                    {"$set": {
+                        "platform_fee_paid": True,
+                        "partner_subscription_active": True,
+                        "partner_subscription_promo_id": discount.promotion_id,
+                        "partner_subscription_coupon_code": coupon,
+                        "partner_subscription_activated_at": now,
+                    }},
+                )
+                base_url = _os.environ.get("REACT_APP_BACKEND_URL", "https://www.bidvex.com")
+                return {
+                    "free_activation": True,
+                    "checkout_url": None,
+                    "redirect_url": f"{base_url}/partner/dashboard?partner_payment=success&promo={coupon}",
+                    "promotion_id": discount.promotion_id,
+                    "coupon_code": coupon,
+                    "discount_amount_cad": getattr(discount, "discount_amount", base_fee),
+                    "final_amount_cad": 0.0,
+                    "message_en": "🚀 Free Listing Activated! Your annual partner fee has been fully waived.",
+                    "message_fr": "🚀 Annonce gratuite activée ! Vos frais annuels de partenaire ont été entièrement remboursés.",
+                }
+            # If the coupon was invalid OR only partial-discount, fall through to Stripe
+            # (we don't expose mid-tier coupons on this endpoint today).
+        except HTTPException:
+            raise
+        except Exception as exc:  # noqa: BLE001 — fall back to Stripe on any error
+            logger.warning(f"Partner checkout coupon bypass failed: {exc}")
+
     try:
         price_id = await _get_or_create_partner_fee_price()
         base_url = _os.environ.get("REACT_APP_BACKEND_URL", "https://www.bidvex.com")
