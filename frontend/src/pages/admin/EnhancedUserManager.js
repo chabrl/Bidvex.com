@@ -189,6 +189,97 @@ const EnhancedUserManager = () => {
   });
   const [docReqBusy, setDocReqBusy] = useState(false);
 
+  // iter258 Mission 1 — Request Payment modal state.
+  const [reqPayModal, setReqPayModal] = useState({ open: false, user: null });
+  const [reqPayForm, setReqPayForm] = useState({
+    subtotal: '',
+    tax_type: 'gst_qst',
+    custom_tax_rate: '',
+    description: '',
+    internal_notes: '',
+    send_email: true,
+    send_notification: true,
+    expiry_hours: 48,
+  });
+  const [reqPayBusy, setReqPayBusy] = useState(false);
+  const [reqPayHistory, setReqPayHistory] = useState([]);
+  const [reqPayHistoryUser, setReqPayHistoryUser] = useState(null);
+
+  const TAX_RATES = {
+    none: 0, gst: 5, qst: 9.975, gst_qst: 14.975, hst_on: 13, custom: null,
+  };
+  const reqPayResolvedRate = () => {
+    if (reqPayForm.tax_type === 'custom') {
+      const v = parseFloat(reqPayForm.custom_tax_rate);
+      return Number.isFinite(v) && v >= 0 ? v : 0;
+    }
+    return TAX_RATES[reqPayForm.tax_type] ?? 0;
+  };
+  const reqPayCalcTotal = () => {
+    const sub = parseFloat(reqPayForm.subtotal);
+    if (!Number.isFinite(sub) || sub <= 0) return 0;
+    return Math.round((sub + (sub * reqPayResolvedRate()) / 100) * 100) / 100;
+  };
+
+  const submitRequestPayment = async () => {
+    if (!reqPayModal.user) return;
+    const total = reqPayCalcTotal();
+    if (!total || total <= 0) {
+      toast.error('Subtotal must be a positive number');
+      return;
+    }
+    if (!reqPayForm.description.trim()) {
+      toast.error('Description is required');
+      return;
+    }
+    setReqPayBusy(true);
+    try {
+      const body = {
+        subtotal: parseFloat(reqPayForm.subtotal),
+        tax_type: reqPayForm.tax_type,
+        custom_tax_rate: reqPayForm.tax_type === 'custom' ? parseFloat(reqPayForm.custom_tax_rate) : null,
+        total_amount: total,
+        description: reqPayForm.description.trim(),
+        internal_notes: reqPayForm.internal_notes.trim(),
+        send_email: !!reqPayForm.send_email,
+        send_notification: !!reqPayForm.send_notification,
+        expiry_hours: reqPayForm.expiry_hours === 'none' || reqPayForm.expiry_hours === 0
+          ? null
+          : Number(reqPayForm.expiry_hours),
+      };
+      const r = await axios.post(
+        `${API}/admin/users/${reqPayModal.user.id}/request-payment`,
+        body,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      toast.success(`Payment link created — $${r.data.total_amount.toFixed(2)} CAD`);
+      setReqPayModal({ open: false, user: null });
+      setReqPayForm({
+        subtotal: '', tax_type: 'gst_qst', custom_tax_rate: '',
+        description: '', internal_notes: '',
+        send_email: true, send_notification: true, expiry_hours: 48,
+      });
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || 'Failed to create payment request');
+    } finally {
+      setReqPayBusy(false);
+    }
+  };
+
+  const openPaymentHistory = async (user) => {
+    setReqPayHistoryUser(user);
+    setReqPayHistory([]);
+    try {
+      const r = await axios.get(
+        `${API}/admin/users/${user.id}/payment-requests`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      setReqPayHistory(Array.isArray(r.data?.items) ? r.data.items : []);
+    } catch (e) {
+      toast.error('Failed to load payment request history');
+    }
+  };
+
   const submitNotify = async () => {
     if (!notifyModal.user) return;
     if (!notifyForm.subject.trim() || !notifyForm.body_en.trim()) {
@@ -795,6 +886,24 @@ const EnhancedUserManager = () => {
                   </Button>
                   <Button
                     size="sm"
+                    onClick={() => setReqPayModal({ open: true, user })}
+                    title="Request payment from this user"
+                    data-testid={`request-payment-user-${user.id}`}
+                    style={{
+                      backgroundColor: '#0055FF',
+                      color: 'white',
+                      fontWeight: 700,
+                      borderRadius: 6,
+                      padding: '6px 14px',
+                      fontSize: 12,
+                    }}
+                    className="hover:opacity-90 transition-opacity"
+                  >
+                    <CreditCard className="h-3.5 w-3.5 mr-1" />
+                    Request Payment
+                  </Button>
+                  <Button
+                    size="sm"
                     variant="outline"
                     onClick={() => setDocReqModal({ open: true, user })}
                     title="Request documents"
@@ -842,6 +951,9 @@ const EnhancedUserManager = () => {
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => openViewSubscription(user)} data-testid={`view-sub-${user.id}`}>
                         <CreditCard className="h-3.5 w-3.5 mr-2" /> View Subscription Status
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => openPaymentHistory(user)} data-testid={`view-payment-requests-${user.id}`}>
+                        <Receipt className="h-3.5 w-3.5 mr-2" /> Payment Requests
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -1151,6 +1263,204 @@ const EnhancedUserManager = () => {
               {notifyBusy ? 'Sending…' : 'Send'}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* iter258 Mission 1 — Request Payment Dialog */}
+      <Dialog open={reqPayModal.open} onOpenChange={(o) => !o && setReqPayModal({ open: false, user: null })}>
+        <DialogContent data-testid="request-payment-modal" className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5 text-[#0055FF]" />
+              💳 Request Payment from {reqPayModal.user?.name || reqPayModal.user?.email}
+            </DialogTitle>
+            <DialogDescription>
+              Generate a Stripe Payment Link and send it to the user.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
+            <div>
+              <Label className="text-xs">Subtotal Amount (CAD) *</Label>
+              <Input
+                type="number" step="0.01" min="0.01" placeholder="0.00"
+                value={reqPayForm.subtotal}
+                onChange={(e) => setReqPayForm({ ...reqPayForm, subtotal: e.target.value })}
+                data-testid="request-payment-subtotal"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Tax Type *</Label>
+              <div className="grid grid-cols-1 gap-1 mt-1 text-sm">
+                {[
+                  { v: 'none',    l: 'No Tax (0%)' },
+                  { v: 'gst',     l: 'GST only (5%)' },
+                  { v: 'qst',     l: 'QST only (9.975%)' },
+                  { v: 'gst_qst', l: 'GST + QST (14.975%)' },
+                  { v: 'hst_on',  l: 'HST — Ontario (13%)' },
+                  { v: 'custom',  l: 'Custom Tax %' },
+                ].map((opt) => (
+                  <label key={opt.v} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      checked={reqPayForm.tax_type === opt.v}
+                      onChange={() => setReqPayForm({ ...reqPayForm, tax_type: opt.v })}
+                      data-testid={`request-payment-tax-${opt.v}`}
+                    />
+                    <span>{opt.l}</span>
+                  </label>
+                ))}
+              </div>
+              {reqPayForm.tax_type === 'custom' && (
+                <Input
+                  type="number" step="0.001" min="0" placeholder="e.g. 7.5"
+                  className="mt-2"
+                  value={reqPayForm.custom_tax_rate}
+                  onChange={(e) => setReqPayForm({ ...reqPayForm, custom_tax_rate: e.target.value })}
+                  data-testid="request-payment-custom-rate"
+                />
+              )}
+            </div>
+            <div className="rounded-md bg-slate-50 border border-slate-200 p-2 text-sm font-bold flex items-center justify-between">
+              <span className="text-slate-600 font-medium">Calculated Total:</span>
+              <span className="text-lg text-[#0055FF]" data-testid="request-payment-calculated-total">
+                ${reqPayCalcTotal().toFixed(2)} CAD
+              </span>
+            </div>
+            <div>
+              <Label className="text-xs">Payment Reason / Description *</Label>
+              <Input
+                value={reqPayForm.description}
+                onChange={(e) => setReqPayForm({ ...reqPayForm, description: e.target.value })}
+                placeholder='e.g. "Outstanding balance for lot #4821"'
+                data-testid="request-payment-description"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Internal Notes (admin only)</Label>
+              <Input
+                value={reqPayForm.internal_notes}
+                onChange={(e) => setReqPayForm({ ...reqPayForm, internal_notes: e.target.value })}
+                placeholder="Not visible to the user"
+                data-testid="request-payment-notes"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Delivery Method</Label>
+              <div className="flex flex-col gap-1 mt-1 text-sm">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={reqPayForm.send_email}
+                    onChange={(e) => setReqPayForm({ ...reqPayForm, send_email: e.target.checked })}
+                    data-testid="request-payment-send-email"
+                  />
+                  <span>Send by Email</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={reqPayForm.send_notification}
+                    onChange={(e) => setReqPayForm({ ...reqPayForm, send_notification: e.target.checked })}
+                    data-testid="request-payment-send-notif"
+                  />
+                  <span>Send Platform Notification</span>
+                </label>
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs">Payment Link Expiry</Label>
+              <div className="flex flex-wrap gap-3 mt-1 text-sm">
+                {[
+                  { v: 24,     l: '24 hours' },
+                  { v: 48,     l: '48 hours' },
+                  { v: 168,    l: '7 days' },
+                  { v: 'none', l: 'No expiry' },
+                ].map((opt) => (
+                  <label key={String(opt.v)} className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="radio"
+                      checked={String(reqPayForm.expiry_hours) === String(opt.v)}
+                      onChange={() => setReqPayForm({ ...reqPayForm, expiry_hours: opt.v })}
+                      data-testid={`request-payment-expiry-${opt.v}`}
+                    />
+                    <span>{opt.l}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setReqPayModal({ open: false, user: null })}
+              data-testid="request-payment-cancel"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={submitRequestPayment}
+              disabled={reqPayBusy}
+              style={{ backgroundColor: '#0055FF', color: 'white' }}
+              data-testid="request-payment-submit"
+            >
+              {reqPayBusy ? 'Sending…' : 'Send Payment Request →'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* iter258 Mission 1 — Payment Requests history drawer (per-user). */}
+      <Dialog open={!!reqPayHistoryUser} onOpenChange={(o) => !o && setReqPayHistoryUser(null)}>
+        <DialogContent data-testid="payment-requests-history-modal" className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Receipt className="h-5 w-5 text-[#0055FF]" />
+              Payment Requests — {reqPayHistoryUser?.name || reqPayHistoryUser?.email}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto">
+            {reqPayHistory.length === 0 ? (
+              <p className="text-sm text-slate-500 text-center py-6">No payment requests yet.</p>
+            ) : (
+              <table className="w-full text-sm" data-testid="payment-requests-history-table">
+                <thead>
+                  <tr className="border-b border-slate-200 text-xs text-slate-500 uppercase">
+                    <th className="text-left py-2">Date</th>
+                    <th className="text-right">Amount</th>
+                    <th className="text-left px-2">Description</th>
+                    <th className="text-center">Status</th>
+                    <th className="text-center">Expires</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {reqPayHistory.map((pr) => (
+                    <tr key={pr.id} className="border-b border-slate-100" data-testid={`payment-request-row-${pr.id}`}>
+                      <td className="py-2 text-xs">{(pr.created_at || '').slice(0, 10)}</td>
+                      <td className="text-right font-mono">${Number(pr.total_amount).toFixed(2)}</td>
+                      <td className="px-2 truncate max-w-[200px]">{pr.description}</td>
+                      <td className="text-center">
+                        {pr.status === 'paid' && <Badge className="bg-emerald-100 text-emerald-800">paid</Badge>}
+                        {pr.status === 'pending' && <Badge className="bg-amber-100 text-amber-800">pending</Badge>}
+                        {pr.status === 'expired' && <Badge className="bg-rose-100 text-rose-800">expired</Badge>}
+                      </td>
+                      <td className="text-center text-xs">{pr.expiry_label || '—'}</td>
+                      <td>
+                        <Button
+                          size="icon" variant="ghost"
+                          onClick={() => { navigator.clipboard.writeText(pr.stripe_payment_link || ''); toast.success('Link copied'); }}
+                          title="Copy payment link"
+                          data-testid={`copy-payment-link-${pr.id}`}
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 

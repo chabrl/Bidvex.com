@@ -703,6 +703,10 @@ try:
         ("routes.promotions", "promotions_router", "set_promotions_db", False),
         # iter241 Mission 7 — Admin Promotions & Offers Engine.
         ("routes.admin_promotions", "admin_promotions_router", None, False),
+        # iter258 Mission 1 — Admin Request Payment + Stripe Payment Links.
+        ("routes.admin_payment_requests", "admin_payment_requests_router", None, False),
+        # iter258 Mission 4 — Partner trial activation (dealer/broker/storage).
+        ("routes.partner_trial", "partner_trial_router", None, False),
         # iter241 Mission 1 — Stripe checkout for promoted listings + email credits.
         ("routes.payments_promotions", "promotions_sub_router", None, False),
         ("routes.fees", "fees_router", None, False),

@@ -31,6 +31,7 @@ import PriceBreakdown from '../components/PriceBreakdown';
 import PrivateSaleBadge, { BusinessSellerBadge, SellerAccountBadge } from '../components/PrivateSaleBadge';
 import { VerifiedBadge } from '../components/VerifiedBadge';
 import PartnerBadge from '../components/PartnerBadge';
+import SEO from '../components/SEO';
 import SecurityDepositBanner from '../components/SecurityDepositBanner';
 import ListingPromotionModal from '../components/ListingPromotionModal';
 import QuickBidButtons from '../components/QuickBidButtons';
@@ -446,6 +447,35 @@ const ListingDetailPage = () => {
 
           <div className="space-y-6">
             <div>
+              {/* iter258 Mission 5 — SEO meta + Product JSON-LD on the
+                  listing detail page. og:type=product, image=first
+                  photo, schema.org Product → Offer with current_price. */}
+              <SEO
+                title={`${getLocalized(listing, 'title')} — BidVex Auction`}
+                description={`Bid on ${getLocalized(listing, 'title')} currently listed at $${listing.current_price || listing.starting_price || 0} CAD. Auction ends ${listing.auction_end_date || listing.auction_end_time || 'soon'}. Located in ${listing.city || listing.region || 'Canada'}.`}
+                path={`/listing/${listing.id}`}
+                type="product"
+                image={(listing.images && listing.images[0]) || '/bidvex-og.png'}
+                jsonLd={{
+                  '@context': 'https://schema.org',
+                  '@type': 'Product',
+                  name: getLocalized(listing, 'title'),
+                  description: (getLocalized(listing, 'description') || '').slice(0, 5000),
+                  image: (listing.images || []).slice(0, 3),
+                  offers: {
+                    '@type': 'Offer',
+                    url: `https://bidvex.com/listing/${listing.id}`,
+                    priceCurrency: listing.currency || 'CAD',
+                    price: listing.current_price || listing.starting_price || 0,
+                    priceValidUntil: listing.auction_end_date || listing.auction_end_time || undefined,
+                    availability: 'https://schema.org/InStock',
+                    seller: { '@type': 'Organization', name: 'BidVex Inc.' },
+                  },
+                  auctionStatus: 'ActiveAuction',
+                  startTime: listing.created_at,
+                  endTime: listing.auction_end_date || listing.auction_end_time,
+                }}
+              />
               <div className="flex items-start justify-between gap-4 mb-2">
                 <h1 className="text-3xl font-bold flex-1" data-testid="listing-title">{getLocalized(listing, 'title')}</h1>
                 <div className="flex items-center gap-3">

@@ -165,6 +165,11 @@ async def handle_stripe_webhook(request: Request):
                     logger.info(f"[DealerAnnualFee] Activated dealer subscription for user={user_id_dealer}")
             elif session_type == "listing_promotion":
                 await _handle_listing_promotion_paid(db, data)
+            elif session_type == "payment_request":
+                # iter258 Mission 1 — Mark the matching payment_request as
+                # paid, ping the user with a confirmation email + in-app
+                # notification.
+                await _handle_admin_payment_request_paid(db, data)
             elif session_type == "down_payment":
                 from services.down_payment_service import mark_down_payment_paid
                 await mark_down_payment_paid(
@@ -917,6 +922,64 @@ PROMOTION_FEATURE_PACK = {
                      "Email blast", "Social share"],
     },
 }
+
+
+async def _handle_admin_payment_request_paid(db, session):
+    """iter258 Mission 1 — Stripe `checkout.session.completed` for an
+    admin-issued payment_request. Flip the matching payment_requests
+    doc to `paid`, fire the user a confirmation email + notification."""
+    metadata = session.get("metadata", {}) or {}
+    user_id = metadata.get("user_id")
+    request_id = metadata.get("payment_request_id")
+    stripe_payment_link_id = session.get("payment_link") or metadata.get("stripe_payment_link_id")
+
+    query: Dict[str, Any] = {"status": "pending"}
+    if request_id:
+        query["id"] = request_id
+    elif stripe_payment_link_id:
+        query["stripe_payment_link_id"] = stripe_payment_link_id
+    else:
+        logger.warning("[payment-request-paid] no id or payment_link_id in metadata")
+        return
+
+    now = datetime.now(timezone.utc)
+    doc = await db.payment_requests.find_one(query, {"_id": 0})
+    if not doc:
+        logger.warning(f"[payment-request-paid] no pending payment_request matching {query}")
+        return
+    await db.payment_requests.update_one(
+        {"id": doc["id"]},
+        {"$set": {"status": "paid", "paid_at": now.isoformat()}},
+    )
+
+    target = await db.users.find_one({"id": user_id or doc.get("user_id")}, {"_id": 0}) if (user_id or doc.get("user_id")) else None
+    if target:
+        try:
+            from services.email_notifications import send_unified_email
+            await send_unified_email(
+                user=dict(target),
+                email_type="payment_confirmed",
+                data={
+                    "total_amount": f"{float(doc.get('total_amount', 0)):.2f}",
+                    "description": doc.get("description") or "BidVex payment",
+                },
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"payment_confirmed email failed: {exc}")
+        try:
+            import uuid as _uuid
+            await db.notifications.insert_one({
+                "id": str(_uuid.uuid4()),
+                "user_id": target.get("id"),
+                "type": "payment_confirmed",
+                "title": "✅ Payment Received — Thank you!",
+                "body": f"Your payment of ${float(doc.get('total_amount', 0)):.2f} CAD has been received.",
+                "link": "/dashboard",
+                "is_read": False,
+                "created_at": now.isoformat(),
+            })
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"payment_confirmed notification failed: {exc}")
 
 
 async def _handle_listing_promotion_paid(db, session):

@@ -144,6 +144,40 @@ _EMAIL_TYPES: Dict[str, Dict[str, Any]] = {
         "cta_label": "Renew Promotion",
         "cta_url": f"{_PUBLIC_URL}/listing/{{listing_id}}",
     },
+    # iter258 Mission 1 — Admin "Request Payment" pipeline.
+    "payment_request": {
+        "headline": "💳 Payment Request from BidVex",
+        "subheadline": "An outstanding balance requires your attention.",
+        "body_html": (
+            "You have a pending payment of <strong>${total_amount} CAD</strong>.<br>"
+            "Reason: {description}<br>"
+            "This link expires: {expiry_label}."
+        ),
+        "cta_label": "Pay Now Securely →",
+        "cta_url": "{payment_link}",
+    },
+    "payment_confirmed": {
+        "headline": "✅ Payment Confirmed!",
+        "subheadline": "Thank you — your balance is up to date.",
+        "body_html": (
+            "Your payment of <strong>${total_amount} CAD</strong> has been received. "
+            "Reference: {description}."
+        ),
+        "cta_label": "View Receipt",
+        "cta_url": f"{_PUBLIC_URL}/dashboard",
+    },
+    # iter258 Mission 4 — Partner trial welcome.
+    "partner_welcome": {
+        "headline": "🎉 Welcome to the BidVex Partner Program!",
+        "subheadline": "Your {partner_type} trial is now active.",
+        "body_html": (
+            "Your <strong>{trial_duration}-day free trial</strong> is now active. "
+            "You have full access to all <strong>{partner_type}</strong> features "
+            "until <strong>{trial_expires_at}</strong>."
+        ),
+        "cta_label": "Go to My Dashboard →",
+        "cta_url": f"{_PUBLIC_URL}/dashboard",
+    },
 }
 
 

@@ -459,6 +459,59 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
                 onDepositStatusChange={setDepositAuthorized}
               />
               
+              {/* iter258 Mission 3 — Broker Partnership gate for individual users.
+                  Vehicles require a licensed broker or active broker partnership.
+                  Hide the bid input + Quick Bid CTA and render an actionable
+                  callout when the user is an individual with no broker link. */}
+              {user && (
+                ((user.account_type || 'individual').toLowerCase() === 'individual')
+                && !user.is_broker_partner
+                && !user.broker_id
+                && (user.role !== 'admin')
+              ) ? (
+                <div
+                  className="rounded-[10px] p-5 mb-4"
+                  style={{
+                    border: '2px solid #f6c90e',
+                    backgroundColor: '#fffbeb',
+                  }}
+                  data-testid="vehicle-broker-gate"
+                >
+                  <p className="font-extrabold text-[#0a1628] mb-2" style={{ fontSize: 16 }}>
+                    🚗 {t('vehicle.brokerGateTitle', 'Broker Partnership Required')}
+                  </p>
+                  <p className="mb-4" style={{ fontSize: 13, color: '#4a5568', lineHeight: 1.7 }}>
+                    {t(
+                      'vehicle.brokerGateBody',
+                      'Vehicle auctions on BidVex are exclusively available to licensed broker partners or individuals linked to a verified broker, in compliance with Canadian provincial regulations (SAAQ, OMVIC, AMVIC, VSA).',
+                    )}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      onClick={() => navigate('/become-a-broker')}
+                      style={{ backgroundColor: '#0055FF', color: 'white' }}
+                      className="font-bold"
+                      data-testid="vehicle-broker-gate-become-cta"
+                    >
+                      {t('vehicle.becomeBroker', 'Become a Broker Partner')}
+                    </Button>
+                    <Button
+                      onClick={() => navigate('/how-it-works#brokers')}
+                      variant="outline"
+                      style={{
+                        border: '1.5px solid #0055FF',
+                        color: '#0055FF',
+                        backgroundColor: 'transparent',
+                      }}
+                      className="font-bold"
+                      data-testid="vehicle-broker-gate-learn-cta"
+                    >
+                      {t('vehicle.learnMore', 'Learn More')}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+              <>
               <div>
                 <label className="text-sm text-slate-500 mb-1 block">Your Bid</label>
                 <div className="relative">
@@ -590,6 +643,8 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
                 >
                   {t('bid.buyNow', 'Buy Now')}: {formatPrice(vehicle.buy_now_price, vehicle?.currency)}
                 </Button>
+              )}
+              </>
               )}
             </div>
           )}

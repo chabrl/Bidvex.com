@@ -22,9 +22,16 @@ STATIC_PAGES = [
     ("/", "weekly", 1.0),
     ("/marketplace", "hourly", 0.95),
     ("/lots-auction", "hourly", 0.9),
+    ("/lots", "hourly", 0.9),
     ("/vehicle-auctions", "weekly", 0.7),
     ("/storage-auctions", "hourly", 0.9),
+    # iter258 Mission 5 — Partner program + broker pages.
+    ("/promotions/partners", "weekly", 0.9),
+    ("/become-a-broker", "weekly", 0.7),
+    ("/broker-directory", "weekly", 0.7),
+    ("/contact", "monthly", 0.5),
     ("/about", "monthly", 0.5),
+    ("/about-us", "monthly", 0.5),
     ("/how-it-works", "monthly", 0.5),
     ("/storage-auctions/how-it-works", "monthly", 0.5),
     ("/storage-auctions/terms", "monthly", 0.4),
@@ -122,7 +129,9 @@ async def robots(request: Request):
         "Allow: /\n"
         "Disallow: /admin\n"
         "Disallow: /dashboard\n"
+        "Disallow: /auth\n"
         "Disallow: /api/\n\n"
         f"Sitemap: {base}/sitemap.xml\n"
+        f"Sitemap: {base}/api/feeds/google\n"
     )
     return Response(content=body, media_type="text/plain")

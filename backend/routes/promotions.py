@@ -78,11 +78,17 @@ async def get_promoted(
     if section not in _PROMOTION_SECTIONS:
         raise HTTPException(status_code=400, detail=f"section must be one of {sorted(_PROMOTION_SECTIONS)}")
     now = datetime.now(timezone.utc)
+    # iter258 — 4-bug fix:
+    #   (a) `promotion_sections` must use `$in` (it's an array column).
+    #   (b) `is_promoted` may be persisted as bool OR legacy string "true".
+    #   (c) `promotion_expires_at` honors null OR future timestamps.
+    #   (d) `limit` is 8 by default (not 1).
     query = {
-        "is_promoted": True,
-        "promotion_sections": section,
+        "is_promoted": {"$in": [True, "true", "True", 1]},
+        "promotion_sections": {"$in": [section]},
         "$or": [
             {"promotion_expires_at": None},
+            {"promotion_expires_at": {"$exists": False}},
             {"promotion_expires_at": {"$gt": now}},
         ],
         "status": {"$in": ["active", "upcoming"]},
@@ -161,6 +167,55 @@ async def backfill_coordinates(
         raise HTTPException(status_code=503, detail="db not initialised")
     from services.geo_resolver import backfill_all
     return await backfill_all(_db, max_listings=max_listings)
+
+
+@promotions_router.post("/admin/backfill-promotion-sections")
+async def backfill_promotion_sections(
+    creds: HTTPAuthorizationCredentials = Depends(_security),
+) -> Dict[str, Any]:
+    """iter258 — One-shot migration. Every listing carrying
+    `is_promoted: True (or "true")` that has NO `promotion_sections`
+    gets defaulted to `["marketplace", "homepage"]`. Vehicle and
+    storage listings keep their dedicated sections."""
+    if not creds:
+        raise HTTPException(status_code=401, detail="auth required")
+    from routes.admin import require_admin
+    await require_admin(creds)
+    if _db is None:
+        raise HTTPException(status_code=503, detail="db not initialised")
+
+    base_filter = {
+        "is_promoted": {"$in": [True, "true", "True", 1]},
+        "$or": [
+            {"promotion_sections": {"$exists": False}},
+            {"promotion_sections": None},
+            {"promotion_sections": []},
+        ],
+    }
+    # Non-vehicle / non-storage listings → marketplace + homepage.
+    non_vehicle = await _db.listings.update_many(
+        {**base_filter, "listing_type": {"$nin": ["vehicle", "vehicle_auction", "storage_locker", "storage_auction"]}},
+        {"$set": {"promotion_sections": ["marketplace", "homepage"]}},
+    )
+    vehicle = await _db.listings.update_many(
+        {**base_filter, "listing_type": {"$in": ["vehicle", "vehicle_auction"]}},
+        {"$set": {"promotion_sections": ["vehicles", "homepage"]}},
+    )
+    storage = await _db.listings.update_many(
+        {**base_filter, "listing_type": {"$in": ["storage_locker", "storage_auction"]}},
+        {"$set": {"promotion_sections": ["storage", "homepage"]}},
+    )
+    # Also coerce string "true" → bool True for consistency.
+    coerced = await _db.listings.update_many(
+        {"is_promoted": {"$in": ["true", "True", 1]}},
+        {"$set": {"is_promoted": True}},
+    )
+    return {
+        "backfilled_marketplace": non_vehicle.modified_count,
+        "backfilled_vehicles": vehicle.modified_count,
+        "backfilled_storage": storage.modified_count,
+        "is_promoted_coerced_to_bool": coerced.modified_count,
+    }
 
 
 __all__ = ["promotions_router", "set_promotions_db"]

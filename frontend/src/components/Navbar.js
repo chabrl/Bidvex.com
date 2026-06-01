@@ -7,7 +7,7 @@ import {
   Moon, Sun, User, LogOut, LayoutDashboard, 
   MessageCircle, DollarSign, Shield, Lock, Menu, X,
   ShoppingBag, Gavel, ChevronDown, Car, Building2,
-  BarChart3, Plus
+  BarChart3, Plus, Sparkles
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -265,6 +265,14 @@ const Navbar = () => {
                       <DropdownMenuItem onClick={() => navigate('/messages')} className="cursor-pointer">
                         <MessageCircle className="mr-3 h-4 w-4 text-muted-foreground" />
                         Messages
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => navigate('/promotions/partners')}
+                        className="cursor-pointer text-blue-600 font-semibold"
+                        data-testid="dropdown-partner-program-link"
+                      >
+                        <Sparkles className="mr-3 h-4 w-4" />
+                        🚀 {t('nav.partnerProgram', 'Partner Program')}
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={toggleTheme} className="cursor-pointer">
                         {theme === 'light' ? <Moon className="mr-3 h-4 w-4 text-muted-foreground" /> : <Sun className="mr-3 h-4 w-4 text-muted-foreground" />}

@@ -1,5 +1,56 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter258 — 5-MISSION SPRINT (Mar 18, 2026) ✅
+
+Five parallel tracks shipped in a single sprint: an admin Request Payment + Stripe Payment Link pipeline, a Featured Listings query bug fix with backfill migration, a vehicle-listing broker partnership gate UI, a dedicated partner promotion landing page with backend trial activation, and a full SEO upgrade pass.
+
+### Mission 1 — Admin Request Payment + Stripe Payment Link flow
+- NEW endpoint `POST /api/admin/users/{user_id}/request-payment` creates a Stripe Payment Link (with `expires_at` for 24h/48h/7d/null), inserts a `payment_requests` doc, optionally fans out a `payment_request` email + in-app notification.
+- NEW endpoint `GET /api/admin/users/{user_id}/payment-requests` returns the full history with status auto-promoted to `expired` on stale rows.
+- Webhook integration: `checkout.session.completed` with `metadata.type=payment_request` flips the row to `paid` and fires `payment_confirmed` email + notification.
+- Admin UI: new `[💳 Request Payment]` button (#0055FF, white, font-700, radius-6) immediately BEFORE `[Request Docs]` on every user row. Opens a modal with live-calc total (subtotal × tax rate: none/GST 5%/QST 9.975%/GST+QST 14.975%/HST-ON 13%/custom). "Payment Requests" history drawer under More Actions.
+- 3 new email templates registered: `payment_request`, `payment_confirmed`, `partner_welcome`.
+
+### Mission 2 — Featured Listings banner 4-bug fix
+- `GET /api/promoted-listings` query now uses `$in` for `promotion_sections` (was `$eq`), coerces `is_promoted` against `[True, "true", "True", 1]`, accepts null OR missing OR future `promotion_expires_at`, and default `limit=8`.
+- NEW `POST /api/admin/backfill-promotion-sections` migration backfills legacy listings with `is_promoted=True` but no `promotion_sections` array. Coerces stringy `"true"` to bool.
+- Frontend `FeaturedListingsBanner.jsx` was already correctly mapping all items — confirmed by tests; minimum to render is 1 (banner hides only when items[] empty).
+
+### Mission 3 — Vehicle broker partnership gate UI
+- New gold-bordered callout (2px #f6c90e, bg #fffbeb) on `VehicleDetailPage.js` replaces the bid input + Quick Bid section when the viewer is an individual without broker partnership.
+- Two CTAs: `[Become a Broker Partner]` → `/become-a-broker` (#0055FF) and `[Learn More]` → `/how-it-works#brokers` (transparent w/ #0055FF border).
+- Backend gate (`assert_broker_eligible` in `services/category_rules.py`) was already shipped in iter229 — confirmed still wired in the place_bid pipeline.
+
+### Mission 4 — Partner Promotion Program
+- NEW page `/promotions/partners` (also aliased `/partner-program`) with hero, 3 tier cards (Dealer 30-day / Broker 60-day / Storage 45-day), full comparison table, and final urgency CTA. EN/FR via existing i18n helper.
+- NEW endpoint `POST /api/promotions/partner-trial` accepts `partner_type` + company + licence_number (required for broker), province, phone. Inserts `partner_trials` doc with `featured_listings_remaining` quota (3/99/5). Flips `is_broker_partner` + `partner_trial_active` on the user. Fires `partner_welcome` email.
+- Navbar dropdown shortcut → "🚀 Partner Program".
+
+### Mission 5 — SEO upgrades
+- Listing detail page (`/listing/:id`) now ships full `<SEO>` block with `og:type=product` and a `Product` JSON-LD schema (`@context`, `name`, `image`, `offers.priceCurrency=CAD`, `auctionStatus=ActiveAuction`, `startTime`/`endTime`).
+- Partner page ships full Helmet with FR/EN locale, og:image, twitter:card.
+- `routes/sitemap.py` extended: `/promotions/partners`, `/become-a-broker`, `/broker-directory`, `/contact`, `/lots`, `/about-us` added to STATIC_PAGES.
+- `robots.txt` now disallows `/auth` and lists both `/sitemap.xml` AND `/api/feeds/google` as Sitemap entries.
+- Google Merchant + Facebook Catalog feeds (`/api/feeds/google`, `/api/feeds/facebook-local`) were already live from iter235 — confirmed still mounted.
+
+### Validation
+- NEW `tests/test_iter258_missions.py` — **22/22 PASS** covering router wiring, tax math, webhook branch, modal surface (request-payment-modal + all radios), promoted-listings query shape ($in + string-safe + future-or-null expires + limit=8), backfill endpoint, broker gate UI + backend gate, partner trial schema + validation + page surface, sitemap additions, robots, JSON-LD `Product` schema, SEO `og:type` prop wiring, and feeds-mount sanity. End-to-end live smokes confirm `/api/promoted-listings`, `/sitemap.xml`, `/api/promotions/partner-trial` are all reachable.
+- Full regression: 135/137 testable iter24x→iter25x tests pass (2 pre-existing failures unrelated to iter258: `iter244 unified email mock kwarg`, `iter245 analytics DB-state ledger`).
+- Frontend lint clean on all modified files; backend boots clean.
+
+### Files changed (iter258)
+**Backend NEW**: `routes/admin_payment_requests.py`, `routes/partner_trial.py`, `tests/test_iter258_missions.py`.
+**Backend MODIFIED**: `routes/promotions.py`, `routes/sitemap.py`, `routes/webhooks.py`, `services/email_templates.py`, `server.py`.
+**Frontend NEW**: `pages/PartnerPromotionsPage.jsx`.
+**Frontend MODIFIED**: `App.js`, `components/Navbar.js`, `pages/admin/EnhancedUserManager.js`, `pages/ListingDetailPage.js`, `pages/vehicles/VehicleDetailPage.js`.
+
+### Action items (user)
+- 🚀 Click **Deploy** to push iter258 to https://bidvex.com (preview is build-clean; 22/22 iter258 tests green).
+- After deploy, hit `POST /api/admin/backfill-promotion-sections` once with your admin token to backfill the Featured Listings banner across legacy promoted rows.
+
+---
+
+
 ## Latest: iter256 — DYNAMIC NAV OFFSET + ANNUAL PARTNER FEE LEDGER (Mar 04, 2026) ✅
 
 Boost the safe-area padding on every B2B dashboard from `pt-4/pt-6` → `pt-16/pt-20` so the dashboard contents clear BOTH the promo banner AND the fixed navigation header on mobile. Correct the misleading "Listing Fee: $499.00 CAD" placeholder in `PartnerDashboard.js` to "Annual Partner Fee: $100.00 CAD" (matches the warning banner + BidVex's commission-based listings architecture). **Pytest 210/210 PASS** (206 prior + 4 new iter256).
