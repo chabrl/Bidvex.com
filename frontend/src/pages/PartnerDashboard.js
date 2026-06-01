@@ -159,7 +159,7 @@ export default function PartnerDashboard() {
         {
           coupon_code: code,
           transaction_type: 'listing_fee',
-          base_amount_cad: Number(dashboard?.platform_fee || 499),
+          base_amount_cad: Number(dashboard?.platform_fee || 100),
           listing_type: 'vehicles',
         },
         { headers: { Authorization: `Bearer ${token}` } }
@@ -241,7 +241,7 @@ export default function PartnerDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pt-4 sm:pt-6" data-testid="partner-dashboard">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pt-16 sm:pt-20" data-testid="partner-dashboard">
       {/* Soft Lock Banner */}
       {!isFeePaid && !showCelebration && (
         <div className="bg-amber-500 text-white" data-testid="partner-softlock-banner">
@@ -628,14 +628,14 @@ export default function PartnerDashboard() {
                         data-testid="checkout-summary-ledger"
                       >
                         <div className="flex justify-between items-center text-slate-600">
-                          <span>Listing Fee:</span>
+                          <span>Annual Partner Fee:</span>
                           <span
                             className={`font-semibold tabular-nums ${appliedCoupon?.is_full_waiver ? 'text-emerald-700' : 'text-slate-900'}`}
                             data-testid="ledger-listing-fee"
                           >
                             {appliedCoupon?.is_full_waiver
                               ? '$0.00 CAD'
-                              : `$${Number(dashboard?.platform_fee || 499).toFixed(2)} CAD`}
+                              : `$${Number(dashboard?.platform_fee || 100).toFixed(2)} CAD`}
                           </span>
                         </div>
                         {appliedCoupon?.is_full_waiver && (

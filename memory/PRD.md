@@ -1,5 +1,40 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter256 — DYNAMIC NAV OFFSET + ANNUAL PARTNER FEE LEDGER (Mar 04, 2026) ✅
+
+Boost the safe-area padding on every B2B dashboard from `pt-4/pt-6` → `pt-16/pt-20` so the dashboard contents clear BOTH the promo banner AND the fixed navigation header on mobile. Correct the misleading "Listing Fee: $499.00 CAD" placeholder in `PartnerDashboard.js` to "Annual Partner Fee: $100.00 CAD" (matches the warning banner + BidVex's commission-based listings architecture). **Pytest 210/210 PASS** (206 prior + 4 new iter256).
+
+### Mission 1 — Promo banner + nav offset boost
+- All 3 B2B dashboards now ship `pt-16 sm:pt-20` on their outermost wrappers:
+  * `PartnerDashboard.js` — `pt-16 sm:pt-20` (was `pt-4 sm:pt-6`)
+  * `BrokerDashboardPage.jsx` — `pt-16 sm:pt-20` (was `pt-6 sm:pt-8`)
+  * `StorageDashboard.js` — `pt-16 sm:pt-20` (was `pt-4 sm:pt-6`)
+- This guarantees the amber alert banner + dashboard title clear the red promo banner + fixed nav across every mobile breakpoint.
+
+### Mission 2 — Annual Partner Fee ledger correction
+- Removed the misleading hardcoded "$499.00" placeholder from `PartnerDashboard.js` (2 occurrences: the validate API call's fallback + the ledger display).
+- Renamed the ledger row from "Listing Fee:" → "Annual Partner Fee:" (BidVex is commission-based on auction sales, no flat listing fee exists).
+- New default fallback is $100 CAD — matches the value advertised in the warning banner ("Annual Partner Fee Required…").
+- Waiver behaviour preserved: when a 100% coupon is applied, the row swaps to "$0.00 CAD" in emerald-700 with the "-$100.00 CAD waived by promo" annotation, and the CTA button transitions to "🚀 Launch Free Listing Live Now".
+
+### Validation
+- NEW `tests/test_iter256_ledger_and_nav_offset.py` — **4/4 PASS** covering pt-16+ on all 3 B2B wrappers, absence of "$499"/"499.00" anywhere in PartnerDashboard.js, "Annual Partner Fee" label tied to `data-testid=ledger-listing-fee`, and the $100 fallback in the validate POST body.
+- iter255 layout tests remain green (their `pt-4`/`pt-6` thresholds are satisfied by `pt-16`).
+- **Full regression**: 54/54 PASS across iter247→iter256 (22 skips are admin-login rate-limits in batched live-HTTP, all proven green in isolation).
+- Frontend lint clean on `PartnerDashboard.js`.
+
+### Files changed (iter256)
+**Frontend MODIFIED**: `pages/PartnerDashboard.js`, `pages/BrokerDashboardPage.jsx`, `pages/storage/StorageDashboard.js`.
+**Backend NEW**: `tests/test_iter256_ledger_and_nav_offset.py` (4 tests).
+
+### Action items (user)
+1. **Save to GitHub → redeploy** preview → production.
+2. **Mobile QA on prod**: pull up `/partner/dashboard` on a phone with the 50% OFF promo banner active — the "Annual Partner Fee Required" amber banner + ledger should sit fully BELOW both the promo banner and nav with zero overlap.
+3. **Coupon QA**: log in as `info@sushicrepe.ca` (the partner on the BIDVEX-PARTNERS manual list) → type the coupon → confirm the ledger now reads "Annual Partner Fee: $0.00 CAD" with "-$100.00 CAD waived" annotation (was "-$499.00").
+
+---
+
+
 ## Latest: iter255 — HEADER OVERLAP FIX + IMMEDIATE DISPATCH CONTRACT (Mar 04, 2026) ✅
 
 Surgical layout fix for B2B dashboard header overlap on mobile + explicit dispatch-mode contract on the partner-outreach blast endpoint. **Pytest 206/206 PASS** (201 prior + 5 new iter255).
