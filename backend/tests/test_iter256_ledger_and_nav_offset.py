@@ -27,8 +27,10 @@ def _read(rel):
 
 
 def test_iter256_b2b_dashboards_have_promo_banner_safe_padding():
-    """Each B2B dashboard outer wrapper must carry pt-16 or higher to
-    clear the promo banner + fixed nav stack on mobile."""
+    """iter256 — The legacy `pt-16` / `pt-20` hardcoded hotfixes MUST
+    be gone from every B2B dashboard wrapper. The PromoBannerContext
+    drives a dynamic Navbar `top` + spacer marginTop so the layout
+    self-balances at every viewport without per-page padding."""
     for rel, testid in (
         ("PartnerDashboard.js", "partner-dashboard"),
         ("BrokerDashboardPage.jsx", "broker-dashboard-page"),
@@ -38,8 +40,10 @@ def test_iter256_b2b_dashboards_have_promo_banner_safe_padding():
         m = re.search(rf'<div[^>]*data-testid=["\']{re.escape(testid)}["\'][^>]*>', src)
         assert m, f"could not find wrapper {testid} in {rel}"
         chunk = m.group(0)
-        pts = [int(g) for g in re.findall(r"\bpt-(\d+)", chunk)]
-        assert pts and max(pts) >= 16, f"{rel} {testid} needs pt-16+; found {pts}"
+        for legacy in ("pt-16", "pt-20", "sm:pt-16", "sm:pt-20"):
+            assert legacy not in chunk, (
+                f"{rel} {testid} still carries legacy `{legacy}` hotfix"
+            )
 
 
 def test_iter256_partner_dashboard_strips_hardcoded_499_listing_fee():

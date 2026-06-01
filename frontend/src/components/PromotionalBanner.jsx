@@ -1,18 +1,30 @@
 /**
  * iter243 Mission 1 — Platform-wide promotional banner.
+ * iter256 — Dynamic-stack rewrite.
  *
  * Polls `GET /api/promotions/active-banners` every 5 minutes, renders a
  * dismissible top-of-page banner per active promotion that matches the
  * calling user's tier/province/eligibility. Dismissals are persisted to
  * localStorage so users don't see the same banner again for 24h.
  *
+ * iter256 — the banner stack now uses `position: fixed; top: 0;
+ * z-[80]` so the red banner row ALWAYS sits above the fixed Navbar
+ * (z-[70]) and its dismiss `X` button is fully clickable on mobile.
+ * A ResizeObserver pushes the live rendered height into
+ * `PromoBannerContext`, which the Navbar consumes to dynamically bind
+ * its own `top` offset (and which the global spacer consumes to push
+ * page content below the combined banner + nav stack). This kills the
+ * need for hardcoded `pt-16 / pt-20` hotfixes on individual B2B
+ * dashboards — the layout self-balances at every viewport.
+ *
  * Mounted globally inside `App.js`. Silent for anonymous users.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import { useTranslation } from 'react-i18next';
 import { Sparkles, X, Copy, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { usePromoBanner } from '../contexts/PromoBannerContext';
 import API_BASE from '../config';
 
 const POLL_MS = 5 * 60_000;           // 5 minutes
@@ -39,9 +51,11 @@ const dismissBanner = (promoId) => {
 const PromotionalBanner = () => {
   const { token } = useAuth();
   const { i18n } = useTranslation();
+  const { setBannerHeight } = usePromoBanner();
   const isFr = (i18n.language || 'en').startsWith('fr');
   const t = (en, fr) => (isFr ? fr : en);
 
+  const stackRef = useRef(null);
   const [banners, setBanners] = useState([]);
   const [hidden, setHidden] = useState(() => new Set());
   const [copied, setCopied] = useState(null);
@@ -73,6 +87,30 @@ const PromotionalBanner = () => {
     return () => clearInterval(id);
   }, [fetchBanners, token]);
 
+  // iter256 — Live-measure the rendered banner stack height so the
+  // Navbar can dynamically bind its `top` offset. ResizeObserver fires
+  // on mount, on text wrap, on font-load reflow, and on viewport
+  // changes — covering every visual reflow path.
+  useEffect(() => {
+    const node = stackRef.current;
+    if (!node) {
+      setBannerHeight(0);
+      return undefined;
+    }
+    setBannerHeight(node.getBoundingClientRect().height);
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setBannerHeight(entry.contentRect.height);
+      }
+    });
+    ro.observe(node);
+    return () => {
+      ro.disconnect();
+      setBannerHeight(0);
+    };
+  }, [setBannerHeight, visible.length]);
+
   const handleDismiss = (id) => {
     dismissBanner(id);
     setHidden((prev) => {
@@ -92,7 +130,11 @@ const PromotionalBanner = () => {
   if (visible.length === 0) return null;
 
   return (
-    <div className="w-full space-y-1" data-testid="promotional-banner-stack">
+    <div
+      ref={stackRef}
+      className="fixed top-0 left-0 right-0 z-[80] w-full space-y-1"
+      data-testid="promotional-banner-stack"
+    >
       {visible.slice(0, 2).map((b) => (
         <div
           key={b.id}

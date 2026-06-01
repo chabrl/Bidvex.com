@@ -241,7 +241,7 @@ export default function PartnerDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pt-16 sm:pt-20" data-testid="partner-dashboard">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950" data-testid="partner-dashboard">
       {/* Soft Lock Banner */}
       {!isFeePaid && !showCelebration && (
         <div className="bg-amber-500 text-white" data-testid="partner-softlock-banner">

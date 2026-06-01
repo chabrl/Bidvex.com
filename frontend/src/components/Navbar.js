@@ -18,11 +18,17 @@ import {
 import SellOptionsModal from './SellOptionsModal';
 import NotificationCenter from './NotificationCenter';
 import useFeatureFlag from '../hooks/useFeatureFlag';
+import { useBannerHeight } from '../contexts/PromoBannerContext';
 
 const Navbar = () => {
   const { t, i18n } = useTranslation();
   const { user, logout, updateUserPreferences } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  // iter256 — Live banner height from PromoBannerContext. The fixed
+  // nav binds `top` to this so the red promo banner always sits ABOVE
+  // the nav (banner z-[80] > nav z-[70]) and the spacer below the nav
+  // includes the banner height so page content never collides.
+  const bannerHeight = useBannerHeight();
   const navigate = useNavigate();
   const location = useLocation();
   const [sellModalOpen, setSellModalOpen] = useState(false);
@@ -87,11 +93,12 @@ const Navbar = () => {
   return (
     <>
       <nav 
-        className={`fixed top-0 left-0 right-0 z-[70] transition-all duration-300 ${
+        className={`fixed left-0 right-0 z-[70] transition-all duration-300 ${
           scrolled 
             ? 'glassmorphism shadow-md' 
             : 'bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm shadow-sm'
         }`}
+        style={{ top: `${bannerHeight}px` }}
         data-testid="main-navbar"
       >
         <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-3 xl:px-6 2xl:px-8">
@@ -461,8 +468,14 @@ const Navbar = () => {
         )}
       </nav>
 
-      {/* Spacer for fixed navbar */}
-      <div className="h-14 sm:h-16" />
+      {/* Spacer for fixed navbar — iter256: combined banner + nav height
+          so page content auto-clears the dynamic stack without any
+          per-page `pt-16` / `pt-20` hotfixes. */}
+      <div
+        className="h-14 sm:h-16"
+        style={{ marginTop: bannerHeight ? `${bannerHeight}px` : undefined }}
+        data-testid="navbar-spacer"
+      />
 
       {/* Sell Options Modal */}
       <SellOptionsModal 

@@ -7,6 +7,7 @@ import { FeatureFlagsProvider } from './contexts/FeatureFlagsContext';
 import { SiteConfigProvider } from './contexts/SiteConfigContext';
 import { CurrencyProvider } from './contexts/CurrencyContext';
 import { SiteModeProvider, useSiteMode } from './contexts/SiteModeContext';
+import { PromoBannerProvider } from './contexts/PromoBannerContext';
 import { Toaster } from './components/ui/sonner';
 import { HelmetProvider } from 'react-helmet-async';
 
@@ -353,6 +354,7 @@ const App = () => {
           <CurrencyProvider>
           <FeatureFlagsProvider>
           <SiteModeProvider>
+          <PromoBannerProvider>
             <ScrollToTop />
             <MarketingPixelLoader />
             <FbPixelTracker />
@@ -629,6 +631,7 @@ const App = () => {
             <MobileNavWrapper />
           </div>
           </MaintenanceGuard>
+          </PromoBannerProvider>
           </SiteModeProvider>
         </FeatureFlagsProvider>
         </CurrencyProvider>
