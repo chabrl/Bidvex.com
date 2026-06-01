@@ -49,6 +49,26 @@ class PromotionTargetConfig(BaseModel):
     custom_emails: Optional[List[str]] = None
 
 
+class PromotionComponent(BaseModel):
+    """iter257 — A single component inside a multi-type promotion.
+
+    Each component carries its own type + config so admins can stack
+    different incentives inside ONE campaign — e.g. "Free Partner
+    Registration + 25% off the first listing promotion + $10 multi-lot
+    credit" as a single coupon code.
+
+    Combine semantics (deterministic, lowest-cost wins):
+      • For each `transaction_type`, only the component whose type is
+        in `_WAIVERS_BY_TX[transaction_type]` is considered.
+      • If multiple eligible components match, the one giving the
+        biggest CAD discount on that transaction wins.
+      • If no eligible component matches, the legacy single-type promo
+        contract still applies (back-compat).
+    """
+    type: str = Field(..., description="One of PROMOTION_TYPES")
+    config: Dict[str, Any] = Field(default_factory=dict)
+
+
 class PromotionCreate(BaseModel):
     name_en: str
     name_fr: Optional[str] = None
@@ -62,6 +82,11 @@ class PromotionCreate(BaseModel):
     coupon_code: Optional[str] = None
     notify_users: bool = False
     show_banner: bool = False
+    # iter257 — Optional multi-type composite. When present, the legacy
+    # `type` + `config` still act as the *primary* component (kept for
+    # backwards-compat with the analytics dashboard), but the engine
+    # evaluates the full stack at runtime.
+    combined_components: Optional[List[PromotionComponent]] = None
 
 
 class PromotionUpdate(BaseModel):
@@ -76,6 +101,7 @@ class PromotionUpdate(BaseModel):
     status: Optional[str] = None
     notify_users: Optional[bool] = None
     show_banner: Optional[bool] = None
+    combined_components: Optional[List[PromotionComponent]] = None
 
 
 
@@ -170,6 +196,19 @@ async def create_promotion(
     _require_admin(current_user)
     if data.type not in PROMOTION_TYPES:
         raise HTTPException(400, f"type must be one of {sorted(PROMOTION_TYPES)}")
+    # iter257 — Validate each combined component type if provided.
+    components_payload: Optional[List[Dict[str, Any]]] = None
+    if data.combined_components:
+        cleaned: List[Dict[str, Any]] = []
+        for comp in data.combined_components:
+            if comp.type not in PROMOTION_TYPES:
+                raise HTTPException(
+                    400,
+                    f"combined_components[*].type must be one of {sorted(PROMOTION_TYPES)}; "
+                    f"got {comp.type!r}",
+                )
+            cleaned.append({"type": comp.type, "config": comp.config or {}})
+        components_payload = cleaned
 
     db = get_db()
     now = datetime.now(timezone.utc).isoformat()
@@ -205,6 +244,7 @@ async def create_promotion(
         "status": status,
         "notify_users": data.notify_users,
         "show_banner": data.show_banner,
+        "combined_components": components_payload,
         "created_by": current_user.id,
         "created_at": now,
         "updated_at": now,
@@ -598,6 +638,7 @@ async def send_partner_outreach_blast(
             "sent": 0,
             "failed": 0,
             "recipients": [],
+            "recipient_count": 0,
             "promotion_id": payload.promotion_id,
             "coupon_code": coupon_code,
             "subject": PARTNER_OUTREACH_EMAIL_SUBJECT,
@@ -1057,6 +1098,88 @@ async def preview_audience(
     return await _audience_preview(db, target_config)
 
 
+class PromotionPreviewCombinedRequest(BaseModel):
+    """iter257 — Admin-side preview payload. Computes the resolved
+    multi-component discount math for each eligible transaction_type
+    so admins can validate "what does this combined campaign actually
+    cost a partner?" BEFORE saving the campaign."""
+    components: List[PromotionComponent] = Field(..., min_length=1)
+    base_amounts_cad: Dict[str, float] = Field(default_factory=dict)
+    listing_type: Optional[str] = "vehicles"
+
+
+@admin_promotions_router.post("/admin/promotions/preview-combined")
+async def preview_combined_promotion(
+    payload: PromotionPreviewCombinedRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Return per-transaction-type resolved math for a candidate
+    multi-component promotion. Admins call this from the campaign
+    builder UI before clicking Save so they catch bad combos early
+    (e.g. a `reduced_commission`-only stack is a no-op against
+    `listing_promotion`)."""
+    _require_admin(current_user)
+    from services.promotion_runtime import (
+        _WAIVERS_BY_TX, _best_eligible_component,
+    )
+    components_dict = [{"type": c.type, "config": c.config or {}} for c in payload.components]
+    # Validate component types upfront.
+    for c in payload.components:
+        if c.type not in PROMOTION_TYPES:
+            raise HTTPException(
+                400,
+                f"components[*].type must be one of {sorted(PROMOTION_TYPES)}; got {c.type!r}",
+            )
+    # Defaults: $100 partner fee, $25 listing promotion, $50 buyer
+    # premium, $200 seller commission, $20 subscription upgrade. Admin
+    # can override per-call.
+    defaults = {
+        "listing_fee": 100.0,
+        "listing_promotion": 25.0,
+        "buyer_premium": 50.0,
+        "seller_commission": 200.0,
+        "subscription_upgrade": 20.0,
+    }
+    out: Dict[str, Any] = {"components": components_dict, "preview": {}}
+    for tx_type in _WAIVERS_BY_TX.keys():
+        base = float(payload.base_amounts_cad.get(tx_type, defaults.get(tx_type, 100.0)))
+        chosen = _best_eligible_component(components_dict, tx_type, base)
+        if chosen is None:
+            out["preview"][tx_type] = {
+                "applies": False,
+                "base_amount_cad": base,
+                "discount_amount_cad": 0.0,
+                "final_amount_cad": base,
+            }
+            continue
+        ctype, ccfg, pct = chosen
+        disc = round(base * (pct / 100.0), 2)
+        cap = ccfg.get("max_discount_cad")
+        if cap is not None:
+            try:
+                disc = min(disc, float(cap))
+            except (TypeError, ValueError):
+                pass
+        flat = ccfg.get("flat_amount_cad")
+        if flat is not None:
+            try:
+                disc = round(disc + float(flat), 2)
+            except (TypeError, ValueError):
+                pass
+        disc = max(0.0, min(disc, base))
+        final = max(0.0, round(base - disc, 2))
+        out["preview"][tx_type] = {
+            "applies": True,
+            "matched_component_type": ctype,
+            "discount_percent": pct,
+            "base_amount_cad": base,
+            "discount_amount_cad": disc,
+            "final_amount_cad": final,
+            "is_full_waiver": pct >= 100.0 or (final == 0.0 and base > 0),
+        }
+    return out
+
+
 @admin_promotions_router.get("/promotions/preview-discount")
 async def preview_discount(
     transaction_type: str,
@@ -1206,12 +1329,11 @@ async def activate_coupon_to_account(
         raise HTTPException(400, "Coupon code is required.")
 
     # Validate the coupon via the live runtime engine (same path used by
-    # `/promotions/validate`). We compute against a $499 listing_fee
-    # baseline so the math contract matches what the partner will see
-    # at checkout.
+    # `/promotions/validate`). iter257 — Base anchored at $100 (current
+    # Annual Partner Fee) so the math contract matches checkout.
     from services.promotion_runtime import compute_promotion_discount
     import os as _os_local
-    base_fee = float(_os_local.environ.get("BIDVEX_PARTNER_ANNUAL_FEE_CAD", "499.0"))
+    base_fee = float(_os_local.environ.get("BIDVEX_PARTNER_ANNUAL_FEE_CAD", "100.0"))
     discount = await compute_promotion_discount(
         db=db,
         user_id=current_user.id,
@@ -1432,7 +1554,20 @@ async def apply_active_promotions(
         if listing_type and "all" not in scope and listing_type not in scope:
             continue
         # Best-value scoring: higher discount_percent wins; "free" (100%) tops it.
-        if promo["type"] in ("free_platform_fee", "free_first_listing", "partner_launch_offer"):
+        # iter257 — Multi-component promos score off their best eligible
+        # component, so a "75% off listing + free promotion boost"
+        # campaign correctly outranks a flat 50% promo.
+        comps = promo.get("combined_components") or []
+        if comps:
+            best_comp_pct = 0.0
+            from services.promotion_runtime import _WAIVERS_BY_TX, _component_percent
+            elig = _WAIVERS_BY_TX.get(transaction_type, set())
+            for comp in comps:
+                ctype = comp.get("type") if isinstance(comp, dict) else None
+                if ctype in elig:
+                    best_comp_pct = max(best_comp_pct, _component_percent(ctype, comp.get("config") or {}))
+            value = best_comp_pct
+        elif promo["type"] in ("free_platform_fee", "free_first_listing", "partner_launch_offer"):
             value = 100.0
         elif promo["type"] == "reduced_commission":
             value = float(cfg.get("discount_percent", 0))

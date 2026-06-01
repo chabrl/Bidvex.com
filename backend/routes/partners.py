@@ -52,6 +52,54 @@ async def _get_or_create_partner_fee_price():
     await _db.site_config.update_one({"key": "partner_fee_price_id"}, {"$set": {"key": "partner_fee_price_id", "price_id": price.id}}, upsert=True)
     return price.id
 
+
+# iter257 — Stripe Coupon mirror cache. We map each BidVex promotion_id
+# to a Stripe Coupon object so partial discounts surface natively on
+# the Stripe Checkout page (the user sees the reduced total before
+# clicking Subscribe). The cache lives in-process — Stripe's own
+# coupon API is idempotent on `id`, so a re-creation is a no-op.
+_STRIPE_COUPON_CACHE: Dict[str, str] = {}
+
+
+def _ensure_stripe_coupon_for_promotion(
+    promotion_id: str,
+    discount_percent: float,
+    coupon_label: str,
+) -> Optional[str]:
+    """Return a Stripe Coupon id mirroring the given BidVex promotion.
+
+    Idempotent: re-creating a coupon with the same id raises
+    `InvalidRequestError`, in which case we trust the existing object.
+    Returns None if the discount is out of range (Stripe rejects
+    percent_off <= 0 or > 100).
+    """
+    pct = max(0.0, min(100.0, float(discount_percent or 0.0)))
+    if pct <= 0.0:
+        return None
+    cache_key = f"{promotion_id}:{int(round(pct))}"
+    if cache_key in _STRIPE_COUPON_CACHE:
+        return _STRIPE_COUPON_CACHE[cache_key]
+    stripe_coupon_id = f"bidvex_promo_{promotion_id[:24]}_{int(round(pct))}"
+    try:
+        stripe.Coupon.create(
+            id=stripe_coupon_id,
+            percent_off=pct,
+            duration="once",
+            name=f"BidVex {coupon_label or 'Promo'} — {int(round(pct))}% off",
+            metadata={"bidvex_promotion_id": promotion_id, "label": coupon_label or ""},
+        )
+    except stripe.error.InvalidRequestError as exc:
+        # The coupon already exists — that's fine, we re-use it.
+        if "already exists" not in str(exc).lower() and "resource_already_exists" not in str(exc).lower():
+            logger.warning(f"Stripe coupon create failed for {stripe_coupon_id}: {exc}")
+            return None
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(f"Stripe coupon create failed for {stripe_coupon_id}: {exc}")
+        return None
+    _STRIPE_COUPON_CACHE[cache_key] = stripe_coupon_id
+    return stripe_coupon_id
+
+
 partners_router = APIRouter(tags=["Partners"])
 
 
@@ -653,17 +701,20 @@ async def create_partner_checkout(
     if current_user.platform_fee_paid:
         raise HTTPException(status_code=400, detail="Annual fee already paid")
 
-    # iter253 — Coupon bypass path. Annual partner fee in this codebase
-    # is anchored at the listing_fee promotion bucket; the
-    # `partner_launch_offer` type waives it 100%.
+    # iter257 — Coupon bypass + partial-discount pipeline. The annual
+    # partner fee anchors at $100 (iter256 ledger correction). A 100%
+    # waiver skips Stripe entirely; a partial discount creates a Stripe
+    # Coupon on-the-fly and attaches it to the Checkout Session via the
+    # `discounts` parameter so the user sees the reduced total directly
+    # on Stripe (no more "Stripe charged me full price" bug).
     coupon = (payload.coupon_code if payload else None) or ""
     coupon = coupon.strip().upper()
+    applied_stripe_coupon_id: Optional[str] = None
     if coupon:
         try:
-            from services.promotion_runtime import (
-                compute_promotion_discount, apply_and_record_discount,
-            )
-            base_fee = float(_os.environ.get("BIDVEX_PARTNER_ANNUAL_FEE_CAD", "499.0"))
+            from services.promotion_runtime import compute_promotion_discount
+            from routes.admin_promotions import record_promotion_usage
+            base_fee = float(_os.environ.get("BIDVEX_PARTNER_ANNUAL_FEE_CAD", "100.0"))
             discount = await compute_promotion_discount(
                 db=db,
                 user_id=current_user.id,
@@ -674,14 +725,21 @@ async def create_partner_checkout(
             )
             if getattr(discount, "applies", False) and getattr(discount, "is_full_waiver", False):
                 # 100% waiver — skip Stripe, mark the partner as paid.
+                # iter257 — Call record_promotion_usage DIRECTLY (the
+                # previous `apply_and_record_discount(discount=...)`
+                # call passed an invalid kwarg and silently raised
+                # TypeError, falling through to full-price Stripe).
                 now = datetime.now(timezone.utc).isoformat()
-                await apply_and_record_discount(
-                    db=db,
-                    user_id=current_user.id,
-                    discount=discount,
-                    transaction_type="listing_fee",
-                    record_usage=True,
-                )
+                try:
+                    await record_promotion_usage(
+                        db=db,
+                        promotion_id=discount.promotion_id,
+                        user_id=current_user.id,
+                        transaction_type="listing_fee",
+                        saved_amount=float(discount.discount_amount or base_fee),
+                    )
+                except Exception as usage_exc:  # noqa: BLE001
+                    logger.warning(f"record_promotion_usage failed (non-fatal): {usage_exc}")
                 await db.users.update_one(
                     {"id": current_user.id},
                     {"$set": {
@@ -699,13 +757,20 @@ async def create_partner_checkout(
                     "redirect_url": f"{base_url}/partner/dashboard?partner_payment=success&promo={coupon}",
                     "promotion_id": discount.promotion_id,
                     "coupon_code": coupon,
-                    "discount_amount_cad": getattr(discount, "discount_amount", base_fee),
+                    "discount_amount_cad": float(getattr(discount, "discount_amount", base_fee) or base_fee),
                     "final_amount_cad": 0.0,
                     "message_en": "🚀 Free Listing Activated! Your annual partner fee has been fully waived.",
                     "message_fr": "🚀 Annonce gratuite activée ! Vos frais annuels de partenaire ont été entièrement remboursés.",
                 }
-            # If the coupon was invalid OR only partial-discount, fall through to Stripe
-            # (we don't expose mid-tier coupons on this endpoint today).
+            # iter257 — Partial discount path. Create (or reuse) a Stripe
+            # Coupon mirroring the promo's discount_percent and attach it
+            # to the Checkout Session so Stripe renders the reduced total.
+            if getattr(discount, "applies", False) and getattr(discount, "discount_percent", 0) > 0:
+                applied_stripe_coupon_id = _ensure_stripe_coupon_for_promotion(
+                    promotion_id=discount.promotion_id,
+                    discount_percent=float(discount.discount_percent),
+                    coupon_label=coupon,
+                )
         except HTTPException:
             raise
         except Exception as exc:  # noqa: BLE001 — fall back to Stripe on any error
@@ -724,8 +789,8 @@ async def create_partner_checkout(
             )
             customer_id = customer.id
             await db.users.update_one({"id": current_user.id}, {"$set": {"stripe_customer_id": customer_id}})
-        
-        session = stripe.checkout.Session.create(
+
+        session_kwargs: Dict[str, Any] = dict(
             mode="subscription",
             customer=customer_id,
             line_items=[{"price": price_id, "quantity": 1}],
@@ -736,13 +801,24 @@ async def create_partner_checkout(
                 "metadata": {"user_id": current_user.id, "type": "partner_annual_fee"}
             },
         )
+        # iter257 — Attach the Stripe Coupon for partial discounts so
+        # the checkout page renders the discounted total directly.
+        if applied_stripe_coupon_id:
+            session_kwargs["discounts"] = [{"coupon": applied_stripe_coupon_id}]
+            session_kwargs["metadata"]["partner_coupon_code"] = coupon
+            session_kwargs["metadata"]["stripe_coupon_id"] = applied_stripe_coupon_id
+        session = stripe.checkout.Session.create(**session_kwargs)
         
         await db.users.update_one({"id": current_user.id}, {"$set": {
             "partner_checkout_session_id": session.id,
             "partner_checkout_url": session.url,
         }})
         
-        return {"checkout_url": session.url}
+        return {
+            "checkout_url": session.url,
+            "applied_coupon_code": coupon if applied_stripe_coupon_id else None,
+            "stripe_coupon_id": applied_stripe_coupon_id,
+        }
     except Exception as e:
         logger.error(f"Failed to create partner checkout: {e}")
         raise HTTPException(status_code=500, detail="Failed to create payment session")

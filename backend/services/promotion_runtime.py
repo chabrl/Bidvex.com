@@ -88,6 +88,50 @@ async def compute_promotion_discount(
     if not matched:
         return PromotionDiscount(applies=False, final_amount=float(base_amount_cad))
 
+    # iter257 — Multi-component promotions. If the matched campaign
+    # carries `combined_components`, pick the component giving the
+    # biggest CAD discount on THIS transaction. Falls back to the
+    # legacy single-type path when no component matches (back-compat).
+    components = matched.get("combined_components") or []
+    if components:
+        best_comp = _best_eligible_component(
+            components, transaction_type, float(base_amount_cad or 0.0)
+        )
+        if best_comp is not None:
+            comp_type, comp_cfg, comp_pct = best_comp
+            base = float(base_amount_cad or 0.0)
+            discount_amount = round(base * (comp_pct / 100.0), 2)
+            # Apply optional flat cap (e.g. `config.max_discount_cad`).
+            cap = comp_cfg.get("max_discount_cad")
+            if cap is not None:
+                try:
+                    discount_amount = min(discount_amount, float(cap))
+                except (TypeError, ValueError):
+                    pass
+            # Apply optional flat-amount component (additive, e.g.
+            # multi_lot_credit_cad=10).
+            flat = comp_cfg.get("flat_amount_cad")
+            if flat is not None:
+                try:
+                    discount_amount = round(discount_amount + float(flat), 2)
+                except (TypeError, ValueError):
+                    pass
+            discount_amount = max(0.0, min(discount_amount, base))
+            final_amount = max(0.0, round(base - discount_amount, 2))
+            full_waiver = (comp_pct >= 100.0) or (final_amount == 0.0 and base > 0)
+            return PromotionDiscount(
+                applies=True,
+                promotion_id=matched.get("id"),
+                promotion_type=comp_type,
+                coupon_code=matched.get("coupon_code"),
+                discount_percent=comp_pct,
+                discount_amount=discount_amount,
+                final_amount=final_amount,
+                is_full_waiver=full_waiver,
+                raw_promotion=matched,
+                saved_amount_cad=discount_amount,
+            )
+
     ptype = matched.get("type")
     cfg = matched.get("config", {}) or {}
 
@@ -183,3 +227,49 @@ async def apply_and_record_discount(
 
 
 __all__ = ["compute_promotion_discount", "apply_and_record_discount", "PromotionDiscount"]
+
+
+# ─── iter257 — multi-component helper ────────────────────────────────
+
+def _component_percent(comp_type: str, cfg: Dict[str, Any]) -> float:
+    """Resolve the effective discount percent for a single component.
+    Mirrors the single-type path inside `compute_promotion_discount`."""
+    if comp_type in ("free_platform_fee", "free_first_listing", "free_promotion_boost"):
+        return 100.0
+    if comp_type == "partner_launch_offer":
+        return 100.0
+    try:
+        return float(cfg.get("discount_percent", 0))
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _best_eligible_component(
+    components,
+    transaction_type: str,
+    base_amount: float,
+):
+    """Pick the component giving the biggest CAD discount on this
+    transaction. Returns `(type, config, pct)` or None when no
+    component is eligible for `transaction_type`."""
+    eligible_types = _WAIVERS_BY_TX.get(transaction_type, set())
+    best = None
+    best_saving = -1.0
+    for comp in components or []:
+        if not isinstance(comp, dict):
+            continue
+        ctype = comp.get("type")
+        if not ctype or ctype not in eligible_types:
+            continue
+        ccfg = comp.get("config") or {}
+        pct = max(0.0, min(100.0, _component_percent(ctype, ccfg)))
+        saving = round(base_amount * (pct / 100.0), 2)
+        try:
+            flat = float(ccfg.get("flat_amount_cad", 0) or 0)
+        except (TypeError, ValueError):
+            flat = 0.0
+        saving += flat
+        if saving > best_saving:
+            best = (ctype, ccfg, pct)
+            best_saving = saving
+    return best

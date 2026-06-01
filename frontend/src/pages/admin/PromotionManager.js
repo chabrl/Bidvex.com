@@ -119,6 +119,9 @@ const blankForm = () => ({
     credit_tier: 'basic',
     credit_count: 1,
   },
+  // iter257 — Optional multi-component composite. Empty array = single-
+  // type campaign (back-compat). One+ entries = combined campaign.
+  combined_components: [],
 });
 
 const PromotionManager = () => {
@@ -184,6 +187,7 @@ const PromotionManager = () => {
         credit_tier: promo.config?.credit_tier || 'basic',
         credit_count: promo.config?.credit_count || 1,
       },
+      combined_components: Array.isArray(promo.combined_components) ? promo.combined_components : [],
     });
     setEditing(true);
     setPreviewResult(null);
@@ -231,6 +235,9 @@ const PromotionManager = () => {
         uses_per_user: Number(form.uses_per_user) || 1,
         notify_users: !!form.notify_users,
         show_banner: !!form.show_banner,
+        combined_components: (form.combined_components || []).length > 0
+          ? form.combined_components.map((c) => ({ type: c.type, config: c.config || {} }))
+          : undefined,
       };
       if (editing && form.id) {
         await axios.patch(`${API}/admin/promotions/${form.id}`, payload, { headers });
@@ -572,6 +579,165 @@ const PromotionManager = () => {
                 </div>
               </div>
             )}
+
+            {/* iter257 — Multi-component composite editor. Stack any number
+                of promotion types inside ONE campaign. The runtime engine
+                picks the component giving the biggest CAD saving for each
+                transaction_type. Each component carries its own config:
+                  • free_platform_fee / free_first_listing / free_promotion_boost /
+                    partner_launch_offer  → always 100% off the eligible bucket
+                  • reduced_commission / subscription_discount → custom %
+                  • Optional config.flat_amount_cad / config.max_discount_cad
+                    apply on top of the % math.                */}
+            <div
+              className="border border-violet-200 bg-violet-50/50 rounded-lg p-3 space-y-2"
+              data-testid="combined-components-section"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-xs font-bold text-violet-900">
+                    🧬 Combined Components (Multi-Promotion Engine)
+                  </Label>
+                  <p className="text-[11px] text-violet-700 mt-0.5">
+                    Stack 2+ promotion types in a single campaign. Optional —
+                    leave empty for a single-type campaign.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="border-violet-400 text-violet-800 hover:bg-violet-100"
+                  data-testid="add-combined-component-btn"
+                  onClick={() => setForm((f) => ({
+                    ...f,
+                    combined_components: [
+                      ...(f.combined_components || []),
+                      { type: 'reduced_commission', config: { discount_percent: 25 } },
+                    ],
+                  }))}
+                >
+                  + Add Component
+                </Button>
+              </div>
+
+              {(form.combined_components || []).length === 0 ? (
+                <p className="text-[11px] text-violet-700 italic" data-testid="no-combined-components">
+                  No components yet — this campaign will use the single
+                  &quot;Promotion Type&quot; above.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {(form.combined_components || []).map((comp, idx) => (
+                    <div
+                      key={idx}
+                      className="grid grid-cols-12 gap-2 items-end bg-white border border-violet-200 rounded-md p-2"
+                      data-testid={`combined-component-row-${idx}`}
+                    >
+                      <div className="col-span-5">
+                        <Label className="text-[10px] uppercase tracking-wide text-slate-500">Type</Label>
+                        <Select
+                          value={comp.type}
+                          onValueChange={(v) => setForm((f) => ({
+                            ...f,
+                            combined_components: f.combined_components.map((c, i) =>
+                              i === idx ? { ...c, type: v } : c
+                            ),
+                          }))}
+                        >
+                          <SelectTrigger data-testid={`combined-component-type-${idx}`}><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {PROMOTION_TYPES.map((t) => (
+                              <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="col-span-3">
+                        <Label className="text-[10px] uppercase tracking-wide text-slate-500">% off</Label>
+                        <Input
+                          type="number" min="0" max="100"
+                          value={comp.config?.discount_percent ?? ''}
+                          placeholder={['partner_launch_offer','free_platform_fee','free_first_listing','free_promotion_boost'].includes(comp.type) ? '100' : '25'}
+                          onChange={(e) => setForm((f) => ({
+                            ...f,
+                            combined_components: f.combined_components.map((c, i) =>
+                              i === idx ? { ...c, config: { ...(c.config || {}), discount_percent: e.target.value === '' ? undefined : Number(e.target.value) } } : c
+                            ),
+                          }))}
+                          data-testid={`combined-component-percent-${idx}`}
+                        />
+                      </div>
+                      <div className="col-span-3">
+                        <Label className="text-[10px] uppercase tracking-wide text-slate-500">+ Flat $CAD</Label>
+                        <Input
+                          type="number" min="0"
+                          value={comp.config?.flat_amount_cad ?? ''}
+                          placeholder="0"
+                          onChange={(e) => setForm((f) => ({
+                            ...f,
+                            combined_components: f.combined_components.map((c, i) =>
+                              i === idx ? { ...c, config: { ...(c.config || {}), flat_amount_cad: e.target.value === '' ? undefined : Number(e.target.value) } } : c
+                            ),
+                          }))}
+                          data-testid={`combined-component-flat-${idx}`}
+                        />
+                      </div>
+                      <div className="col-span-1 flex justify-end">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="text-rose-600 hover:bg-rose-50 h-8 w-8"
+                          onClick={() => setForm((f) => ({
+                            ...f,
+                            combined_components: f.combined_components.filter((_, i) => i !== idx),
+                          }))}
+                          data-testid={`combined-component-remove-${idx}`}
+                          aria-label="Remove component"
+                        >
+                          ✕
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {(form.combined_components || []).length > 0 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full border-violet-400 text-violet-800 hover:bg-violet-100 mt-1"
+                  data-testid="preview-combined-btn"
+                  onClick={async () => {
+                    try {
+                      const res = await axios.post(
+                        `${API}/admin/promotions/preview-combined`,
+                        {
+                          components: form.combined_components.map((c) => ({
+                            type: c.type, config: c.config || {},
+                          })),
+                          listing_type: 'vehicles',
+                        },
+                        { headers },
+                      );
+                      const lines = Object.entries(res.data?.preview || {}).map(([tx, m]) => {
+                        if (!m.applies) return `${tx}: no match`;
+                        const pct = m.discount_percent ?? 0;
+                        return `${tx}: -$${Number(m.discount_amount_cad).toFixed(2)} (final $${Number(m.final_amount_cad).toFixed(2)} • ${pct}%)`;
+                      });
+                      toast.success(lines.join('\n'), { duration: 8000 });
+                    } catch (e) {
+                      toast.error(e?.response?.data?.detail || 'Preview failed');
+                    }
+                  }}
+                >
+                  🧮 Preview Combined Math
+                </Button>
+              )}
+            </div>
 
             {/* Target */}
             <div>
