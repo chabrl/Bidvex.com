@@ -25,6 +25,7 @@ import { Badge } from '../../components/ui/badge';
 import { Skeleton } from '../../components/ui/skeleton';
 import { Switch } from '../../components/ui/switch';
 import PromotionAnalyticsDashboard from '../../components/admin/PromotionAnalyticsDashboard';
+import PartnerTrialsAdminSection from '../../components/admin/PartnerTrialsAdminSection';
 import {
   Dialog,
   DialogContent,
@@ -413,6 +414,8 @@ const PromotionManager = () => {
       </div>
 
       {/* Table */}
+      <PartnerTrialsAdminSection token={token} />
+
       <Card>
         <CardHeader>
           <CardTitle className="text-sm">All Promotions ({promotions.length})</CardTitle>

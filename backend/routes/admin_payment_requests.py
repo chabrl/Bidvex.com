@@ -124,9 +124,20 @@ async def request_payment(
 
     try:
         link = stripe.PaymentLink.create(**create_kwargs)
-    except stripe.error.StripeError as e:  # type: ignore[attr-defined]
-        logger.error(f"Stripe PaymentLink.create failed: {e}")
-        raise HTTPException(status_code=502, detail=f"Stripe error: {str(e)[:200]}")
+        stripe_payment_link_url = link.url
+        stripe_payment_link_id = link.id
+        stripe_warning = None
+    except Exception as e:  # noqa: BLE001 — stripe SDK errors are not a single class
+        # iter259 — Never crash the request payment flow on Stripe
+        # misconfig. Persist the request with `stripe_payment_link=None`
+        # and surface a warning the admin can act on. Modern Stripe
+        # Python SDK (v8+) exposes errors as `stripe.StripeError` (not
+        # the deprecated `stripe.error.StripeError`); catching the
+        # broad `Exception` covers both shapes + Stripe key absence.
+        logger.warning(f"Stripe PaymentLink.create failed: {e}")
+        stripe_payment_link_url = None
+        stripe_payment_link_id = None
+        stripe_warning = f"Stripe not configured — link not generated ({type(e).__name__})"
 
     now = datetime.now(timezone.utc)
     expiry_label = (
@@ -144,8 +155,8 @@ async def request_payment(
         "total_amount": float(body.total_amount),
         "description": body.description,
         "internal_notes": body.internal_notes,
-        "stripe_payment_link": link.url,
-        "stripe_payment_link_id": link.id,
+        "stripe_payment_link": stripe_payment_link_url,
+        "stripe_payment_link_id": stripe_payment_link_id,
         "status": "pending",
         "expiry_hours": body.expiry_hours,
         "expires_at": expires_at.isoformat() if expires_at else None,
@@ -166,7 +177,7 @@ async def request_payment(
                     "total_amount": f"{float(body.total_amount):.2f}",
                     "description": body.description,
                     "expiry_label": expiry_label,
-                    "payment_link": link.url,
+                    "payment_link": stripe_payment_link_url or "",
                 },
             )
         except Exception as exc:  # noqa: BLE001
@@ -180,7 +191,7 @@ async def request_payment(
                 "type": "payment_request",
                 "title": "💳 Payment Required",
                 "body": f"An outstanding balance of ${float(body.total_amount):.2f} CAD requires your attention.",
-                "link": link.url,
+                "link": stripe_payment_link_url or "/dashboard",
                 "is_read": False,
                 "created_at": now.isoformat(),
             })
@@ -190,10 +201,11 @@ async def request_payment(
     return {
         "success": True,
         "id": request_id,
-        "payment_link": link.url,
-        "stripe_payment_link_id": link.id,
+        "payment_link": stripe_payment_link_url,
+        "stripe_payment_link_id": stripe_payment_link_id,
         "total_amount": float(body.total_amount),
         "expiry_label": expiry_label,
+        "warning": stripe_warning,
     }
 
 

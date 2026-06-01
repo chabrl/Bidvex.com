@@ -25,8 +25,8 @@ STATIC_PAGES = [
     ("/lots", "hourly", 0.9),
     ("/vehicle-auctions", "weekly", 0.7),
     ("/storage-auctions", "hourly", 0.9),
-    # iter258 Mission 5 — Partner program + broker pages.
-    ("/promotions/partners", "weekly", 0.9),
+    # iter259 — Partner program is now admin-managed; no public landing
+    # page. Removed `/promotions/partners` from the sitemap.
     ("/become-a-broker", "weekly", 0.7),
     ("/broker-directory", "weekly", 0.7),
     ("/contact", "monthly", 0.5),

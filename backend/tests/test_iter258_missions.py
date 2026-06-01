@@ -100,18 +100,46 @@ def test_iter258_admin_user_manager_exposes_request_payment_button():
 # ─── Mission 2 — Featured Listings 4-bug fix ─────────────────────────
 
 def test_iter258_promoted_listings_query_uses_in_or_match_and_string_safe():
+    """iter259 evolved the query shape: it now uses `$and` + `$or`
+    clauses to tolerate legacy listings where `promotion_sections`
+    was never populated. The 4-bug fixes from iter258 must still be
+    in effect (string-safe `is_promoted`, expires_at null-tolerance,
+    section `$in` match)."""
     src = _read("routes/promotions.py")
-    # Locate the query dict inside get_promoted.
-    m = re.search(r"query\s*=\s*\{[\s\S]+?\}\s*\n", src)
-    assert m, "could not find query dict in routes/promotions.py"
-    chunk = m.group(0)
-    # Bug (b) — must use $in for promotion_sections.
-    assert '"promotion_sections": {"$in": [section]}' in chunk
-    # Bug (d) — is_promoted accepts bool, "true", "True", 1.
-    assert '"is_promoted": {"$in": [True, "true", "True", 1]}' in chunk
-    # Bug (c) — expires_at: null OR missing OR future.
-    assert '"$exists": False' in chunk
-    assert "\"promotion_expires_at\": {\"$gt\": now}" in chunk
+    # String-safe is_promoted (Bug b).
+    assert '"is_promoted": {"$in": [True, "true", "True", 1]}' in src
+    # Section `$in` match — now lives inside the section_clauses
+    # builder above the query (Bug a).
+    assert '"promotion_sections": {"$in": [section]}' in src
+    # Expires_at null OR missing OR future (Bug c).
+    assert '"$exists": False' in src
+    assert "\"promotion_expires_at\": {\"$gt\": now}" in src
+
+
+def test_iter258_partner_promotions_page_exists_and_routes_mounted():
+    """iter259 — the public landing page was removed. Partner trial
+    activation is now admin-only (Promotion Manager subsection). The
+    React route must NO LONGER mount `/promotions/partners`."""
+    app = _read("App.js", root=FRONTEND_ROOT)
+    assert '/promotions/partners' not in app, (
+        "iter259 removed the public partner page; App.js must not "
+        "mount the /promotions/partners route"
+    )
+    assert 'PartnerPromotionsPage' not in app, (
+        "iter259 unmounted PartnerPromotionsPage from App.js"
+    )
+
+
+def test_iter258_navbar_exposes_partner_program_shortcut():
+    """iter259 — the Partner Program shortcut is gone from the navbar
+    (admin-only feature now)."""
+    nav = _read("components/Navbar.js", root=FRONTEND_ROOT)
+    assert "dropdown-partner-program-link" not in nav, (
+        "iter259 removed the Partner Program shortcut from the navbar"
+    )
+    assert "/promotions/partners" not in nav, (
+        "iter259 removed the /promotions/partners link from the navbar"
+    )
 
 
 def test_iter258_promoted_listings_default_limit_is_8_not_1():
@@ -182,34 +210,14 @@ def test_iter258_partner_trial_router_registered_and_validates_inputs():
     assert "licence_number is required for broker" in src
 
 
-def test_iter258_partner_promotions_page_exists_and_routes_mounted():
-    page = _read("pages/PartnerPromotionsPage.jsx", root=FRONTEND_ROOT)
-    assert 'data-testid="partner-promotions-page"' in page
-    for tid in (
-        "partner-promotions-hero",
-        "partner-card-dealer",
-        "partner-card-broker",
-        "partner-card-storage",
-        "partner-comparison-table",
-        "partner-cta-dealer",
-        "partner-cta-broker",
-        "partner-cta-storage",
-        "partner-final-cta",
-    ):
-        assert tid in page, f"page missing data-testid={tid}"
-    # Helmet meta tags for SEO.
-    assert "<Helmet>" in page
-    assert "Partner Program" in page
-
-    app = _read("App.js", root=FRONTEND_ROOT)
-    assert 'PartnerPromotionsPage' in app
-    assert '/promotions/partners' in app
+def test_iter258_partner_promotions_page_exists_and_routes_mounted_DEPRECATED():
+    """iter259 supersedes — see test above."""
+    pass
 
 
-def test_iter258_navbar_exposes_partner_program_shortcut():
-    nav = _read("components/Navbar.js", root=FRONTEND_ROOT)
-    assert "dropdown-partner-program-link" in nav
-    assert "/promotions/partners" in nav
+def test_iter258_navbar_exposes_partner_program_shortcut_DEPRECATED():
+    """iter259 supersedes — see test above."""
+    pass
 
 
 # ─── Mission 5 — SEO ─────────────────────────────────────────────────

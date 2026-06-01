@@ -30,6 +30,54 @@ _db = None
 def set_promotions_db(database) -> None:
     global _db
     _db = database
+    # iter259 — Best-effort idempotent backfill on first DB attach.
+    # Legacy `is_promoted: True` rows without `promotion_sections` are
+    # auto-tagged so the Featured Listings banner finds them. The
+    # update is bounded (only affects rows missing the field) and is
+    # safe to run on every cold-start.
+    import asyncio as _asyncio
+    try:
+        loop = _asyncio.get_event_loop()
+    except RuntimeError:
+        loop = None
+    if loop and not loop.is_closed():
+        loop.create_task(_iter259_backfill_promotion_sections(database))
+
+
+async def _iter259_backfill_promotion_sections(database) -> None:
+    """One-shot migration scheduled on `set_promotions_db()` — backfills
+    listings that carry `is_promoted: True` but never received a
+    `promotion_sections` array. Splits the target sections by
+    listing_type so vehicle and storage rows hit the right banner."""
+    try:
+        base = {
+            "is_promoted": {"$in": [True, "true", "True", 1]},
+            "$or": [
+                {"promotion_sections": {"$exists": False}},
+                {"promotion_sections": None},
+                {"promotion_sections": []},
+            ],
+        }
+        await database.listings.update_many(
+            {**base, "listing_type": {"$nin": ["vehicle", "vehicle_auction", "storage_locker", "storage_auction"]}},
+            {"$set": {"promotion_sections": ["marketplace", "homepage"]}},
+        )
+        await database.listings.update_many(
+            {**base, "listing_type": {"$in": ["vehicle", "vehicle_auction"]}},
+            {"$set": {"promotion_sections": ["vehicles", "homepage"]}},
+        )
+        await database.listings.update_many(
+            {**base, "listing_type": {"$in": ["storage_locker", "storage_auction"]}},
+            {"$set": {"promotion_sections": ["storage", "homepage"]}},
+        )
+        # Coerce string-y `is_promoted` to bool.
+        await database.listings.update_many(
+            {"is_promoted": {"$in": ["true", "True", 1]}},
+            {"$set": {"is_promoted": True}},
+        )
+        logger.info("[iter259] promotion_sections backfill complete")
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(f"[iter259] backfill skipped: {exc}")
 
 
 _PROMOTION_SECTIONS = {"marketplace", "lots", "storage", "vehicles", "homepage"}
@@ -83,13 +131,29 @@ async def get_promoted(
     #   (b) `is_promoted` may be persisted as bool OR legacy string "true".
     #   (c) `promotion_expires_at` honors null OR future timestamps.
     #   (d) `limit` is 8 by default (not 1).
+    # iter259 — Tolerate legacy listings where `promotion_sections`
+    # was never populated. They surface in the `marketplace` (and
+    # `homepage`) section by default — matching the iter258 backfill
+    # intent so the Featured Listings banner shows on day 1 even when
+    # the one-shot migration hasn't been run yet.
+    default_section = section in ("marketplace", "homepage")
+    section_clauses = [
+        {"promotion_sections": {"$in": [section]}},
+    ]
+    if default_section:
+        section_clauses.append({"promotion_sections": {"$exists": False}})
+        section_clauses.append({"promotion_sections": None})
+        section_clauses.append({"promotion_sections": []})
+
     query = {
         "is_promoted": {"$in": [True, "true", "True", 1]},
-        "promotion_sections": {"$in": [section]},
-        "$or": [
-            {"promotion_expires_at": None},
-            {"promotion_expires_at": {"$exists": False}},
-            {"promotion_expires_at": {"$gt": now}},
+        "$and": [
+            {"$or": section_clauses},
+            {"$or": [
+                {"promotion_expires_at": None},
+                {"promotion_expires_at": {"$exists": False}},
+                {"promotion_expires_at": {"$gt": now}},
+            ]},
         ],
         "status": {"$in": ["active", "upcoming"]},
     }

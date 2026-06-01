@@ -178,6 +178,17 @@ _EMAIL_TYPES: Dict[str, Dict[str, Any]] = {
         "cta_label": "Go to My Dashboard →",
         "cta_url": f"{_PUBLIC_URL}/dashboard",
     },
+    # iter259 — Admin-triggered trial revocation.
+    "trial_revoked": {
+        "headline": "Your BidVex Partner Trial Has Ended",
+        "subheadline": "Reach out to upgrade your account.",
+        "body_html": (
+            "Your <strong>{partner_type}</strong> trial access has been deactivated. "
+            "Contact support to upgrade to a paid plan and keep your benefits."
+        ),
+        "cta_label": "Upgrade to Pro →",
+        "cta_url": f"{_PUBLIC_URL}/contact",
+    },
 }
 
 
