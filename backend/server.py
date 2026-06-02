@@ -47,6 +47,22 @@ stripe_api_key = os.environ.get('STRIPE_API_KEY', '')
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# ─── iter264 Mission 1 — Required ENV validation ─────────────────────
+# Soft validation only: log a WARNING for each missing var so degraded
+# functionality is discoverable in the logs, but never crash the boot.
+_REQUIRED_ENV_VARS = (
+    ("STRIPE_API_KEY", "Stripe payment links + checkout sessions"),
+    ("STRIPE_WEBHOOK_SECRET", "Stripe webhook signature verification"),
+    ("SENDGRID_API_KEY", "Outbound transactional emails"),
+    ("EMERGENT_LLM_KEY", "AI assistant + chat completions"),
+    ("MONGO_URL", "Database connectivity"),
+)
+for _var, _purpose in _REQUIRED_ENV_VARS:
+    if not os.environ.get(_var):
+        logger.warning(
+            f"⚠️  ENV VAR MISSING: {_var} — {_purpose} will be degraded."
+        )
+
 # ─── Sentry (optional) ───
 try:
     import sentry_sdk
@@ -707,6 +723,11 @@ try:
         ("routes.admin_payment_requests", "admin_payment_requests_router", None, False),
         # iter261 Mission 1 — Public pay endpoints + BidVex-hosted pay page.
         ("routes.public_payments", "public_payments_router", None, False),
+        # iter264 Mission 4 — Generic admin oversight (disputes, compliance, auctions).
+        ("routes.admin_oversight", "admin_oversight_router", None, False),
+        ("routes.admin_oversight", "public_disputes_router", None, False),
+        # iter264 Mission 6 — User-controlled notification preferences.
+        ("routes.notification_prefs", "notification_prefs_router", None, False),
         # iter258 Mission 4 — Partner trial activation (dealer/broker/storage).
         ("routes.partner_trial", "partner_trial_router", None, False),
         # iter259 — Admin management of partner trials (list/extend/revoke).
