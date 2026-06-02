@@ -24,6 +24,8 @@ import { SellerAccountBadge } from '../components/PrivateSaleBadge';
 import FilterBar from '../components/FilterBar/FilterBar';
 // iter239 Mission 5 — Featured Listings carousel.
 import FeaturedListingsBanner from '../components/FeaturedListingsBanner';
+// iter268 Mission 4 — SEO meta tags
+import SEO from '../components/SEO';
 // iter236 Mission 2 — Map & radius search panel (lazy so Leaflet's chunk
 // only loads when the user actually clicks "Search by Map").
 const MapSearchPanel = React.lazy(() => import('../components/MapSearchPanel'));
@@ -250,6 +252,11 @@ const LotsMarketplacePage = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900" data-testid="lots-marketplace-page">
+      <SEO
+        title="Lot Auctions — Multi-Item Auctions"
+        description="Browse and bid on multi-item lot auctions. Find estate sale collections, business inventory, and bulk packages across Canada."
+        path="/lots"
+      />
       {/* Hero Header */}
       <div className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-blue-900 via-slate-900 to-cyan-900 opacity-95" />

@@ -10,6 +10,9 @@ import { SiteModeProvider, useSiteMode } from './contexts/SiteModeContext';
 import { PromoBannerProvider } from './contexts/PromoBannerContext';
 import { Toaster } from './components/ui/sonner';
 import { HelmetProvider } from 'react-helmet-async';
+// iter268 Mission 3 — Catch any route-level render crash and show a friendly
+// retry/home UI instead of a blank screen.
+import ErrorBoundary from './components/ErrorBoundary';
 
 // Shell components — kept eager (always visible on every page)
 import Navbar from './components/Navbar';
@@ -371,12 +374,12 @@ const App = () => {
           <Navbar />
           <Suspense fallback={<PageLoader />}>
           <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/marketplace" element={<MarketplacePage />} />
-          <Route path="/items" element={<ItemsMarketplacePage />} />
-          <Route path="/lots" element={<LotsMarketplacePage />} />
-          <Route path="/lots/:id" element={<MultiItemListingDetailPage />} />
-          <Route path="/listing/:id" element={<ListingDetailPage />} />
+          <Route path="/" element={<ErrorBoundary scope="home"><HomePage /></ErrorBoundary>} />
+          <Route path="/marketplace" element={<ErrorBoundary scope="marketplace"><MarketplacePage /></ErrorBoundary>} />
+          <Route path="/items" element={<ErrorBoundary scope="items"><ItemsMarketplacePage /></ErrorBoundary>} />
+          <Route path="/lots" element={<ErrorBoundary scope="lots"><LotsMarketplacePage /></ErrorBoundary>} />
+          <Route path="/lots/:id" element={<ErrorBoundary scope="lot-detail"><MultiItemListingDetailPage /></ErrorBoundary>} />
+          <Route path="/listing/:id" element={<ErrorBoundary scope="listing-detail"><ListingDetailPage /></ErrorBoundary>} />
           <Route path="/compare" element={<CompareListingsPage />} />
           <Route path="/store/:userId" element={<StorefrontPage />} />
           <Route path="/bulk-import" element={<ProtectedRoute><BulkImportPage /></ProtectedRoute>} />
@@ -441,7 +444,9 @@ const App = () => {
           <Route path="/affiliate" element={
             <ProtectedRoute>
               <BlockForStorageFacility>
-                <AffiliateDashboard />
+                <ErrorBoundary scope="affiliate-dashboard">
+                  <AffiliateDashboard />
+                </ErrorBoundary>
               </BlockForStorageFacility>
             </ProtectedRoute>
           } />
@@ -469,7 +474,7 @@ const App = () => {
             <ProtectedRoute><AdminDashboard /></ProtectedRoute>
           } />
           <Route path="/admin" element={
-            <ProtectedRoute><AdminDashboard /></ProtectedRoute>
+            <ProtectedRoute><ErrorBoundary scope="admin"><AdminDashboard /></ErrorBoundary></ProtectedRoute>
           } />
           <Route path="/admin/tax-dashboard" element={
             <ProtectedRoute><AdminTaxDashboard /></ProtectedRoute>
@@ -503,7 +508,7 @@ const App = () => {
             <ProtectedRoute><BrokerBindingRequestPage /></ProtectedRoute>
           } />
           <Route path="/broker/dashboard" element={
-            <ProtectedRoute><BrokerDashboardPage /></ProtectedRoute>
+            <ProtectedRoute><ErrorBoundary scope="broker-dashboard"><BrokerDashboardPage /></ErrorBoundary></ProtectedRoute>
           } />
           <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
           <Route path="/privacy" element={<Navigate to="/privacy-policy" replace />} />
@@ -554,9 +559,9 @@ const App = () => {
           } />
           
           {/* Vehicle Auction Module */}
-          <Route path="/vehicle-auctions" element={<VehicleAuctionsRoute />} />
-          <Route path="/encheres-de-vehicules" element={<VehicleAuctionsRoute />} />
-          <Route path="/vehicle-auctions/:id" element={<VehicleDetailPage />} />
+          <Route path="/vehicle-auctions" element={<ErrorBoundary scope="vehicle-auctions"><VehicleAuctionsRoute /></ErrorBoundary>} />
+          <Route path="/encheres-de-vehicules" element={<ErrorBoundary scope="vehicle-auctions"><VehicleAuctionsRoute /></ErrorBoundary>} />
+          <Route path="/vehicle-auctions/:id" element={<ErrorBoundary scope="vehicle-detail"><VehicleDetailPage /></ErrorBoundary>} />
           <Route path="/vehicle-auctions/create" element={
             <ProtectedRoute>
               <BlockForStorageFacility redirectTo="/storage-auctions/create">
@@ -591,8 +596,8 @@ const App = () => {
           } />
 
           {/* ── Storage Unit Auctions (iteration 169) ── */}
-          <Route path="/storage-auctions" element={<StorageAuctionsBrowse />} />
-          <Route path="/storage-auctions/browse" element={<StorageAuctionsBrowse />} />
+          <Route path="/storage-auctions" element={<ErrorBoundary scope="storage-auctions"><StorageAuctionsBrowse /></ErrorBoundary>} />
+          <Route path="/storage-auctions/browse" element={<ErrorBoundary scope="storage-browse"><StorageAuctionsBrowse /></ErrorBoundary>} />
           <Route path="/storage-auctions/how-it-works" element={<StorageHowItWorks />} />
           <Route path="/storage-auctions/terms" element={<StorageTerms />} />
           <Route path="/storage-auctions/for-facilities" element={<StorageForFacilities />} />

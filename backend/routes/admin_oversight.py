@@ -795,6 +795,90 @@ async def reject_affiliate_payout(
     return {"success": True, "id": payout_id, "status": "rejected", "rejected_at": now_iso, "reason": body.reason}
 
 
+# ─── iter268 Mission 1 — Re-issue a failed/reversed Stripe transfer ──
+
+@admin_oversight_router.post("/affiliate-payouts/{payout_id}/reissue")
+async def reissue_affiliate_payout(
+    payout_id: str,
+    current_user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """iter268 Mission 1 — Create a fresh Stripe Transfer for the same
+    amount when the original one was `failed` or `reversed`."""
+    _require_admin(current_user)
+    db = get_db()
+    payout = await db.affiliate_payouts.find_one({"id": payout_id}, {"_id": 0})
+    if not payout:
+        raise HTTPException(status_code=404, detail="Payout not found")
+    prev_status = (payout.get("stripe_transfer_status") or "").lower()
+    if prev_status not in ("failed", "reversed"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Only failed/reversed transfers can be reissued (was: {prev_status or 'none'})",
+        )
+
+    uid = payout.get("user_id") or payout.get("affiliate_id")
+    affiliate = await db.users.find_one(
+        {"id": uid},
+        {"_id": 0, "stripe_connect_account_id": 1},
+    ) if uid else None
+    connect_id = (affiliate or {}).get("stripe_connect_account_id")
+    if not connect_id:
+        raise HTTPException(status_code=400, detail="Affiliate has no Stripe Connect account")
+
+    try:
+        import stripe as _stripe  # noqa: WPS433
+        amount_cents = int(round(float(payout.get("amount") or 0) * 100))
+        if amount_cents <= 0:
+            raise ValueError("Amount must be > 0")
+        transfer = _stripe.Transfer.create(
+            amount=amount_cents,
+            currency=(payout.get("currency") or "cad").lower(),
+            destination=connect_id,
+            description=f"BidVex affiliate payout RE-ISSUE — {payout_id}",
+            metadata={
+                "payout_id": str(payout_id),
+                "reissue_of": payout.get("stripe_transfer_id") or "",
+                "affiliate_user_id": str(uid),
+                "reissued_by": current_user.email or current_user.id,
+            },
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.error(f"[affiliate-payout-reissue] stripe.Transfer failed: {exc}")
+        raise HTTPException(status_code=502, detail=f"Stripe error: {exc}") from exc
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    history = list(payout.get("stripe_transfer_history") or [])
+    if payout.get("stripe_transfer_id"):
+        history.append({
+            "transfer_id": payout.get("stripe_transfer_id"),
+            "status":      payout.get("stripe_transfer_status"),
+            "reason":      payout.get("stripe_transfer_failure_reason"),
+            "ended_at":    now_iso,
+        })
+
+    await db.affiliate_payouts.update_one(
+        {"id": payout_id},
+        {"$set": {
+            "stripe_transfer_id":             transfer.id,
+            "stripe_transfer_status":         "created",
+            "stripe_transfer_updated_at":     now_iso,
+            "stripe_transfer_failure_reason": None,
+            "stripe_transfer_history":        history,
+            "status":                         "paid",
+            "reissued_by":                    current_user.id,
+            "reissued_at":                    now_iso,
+        }},
+    )
+    return {
+        "success":            True,
+        "id":                 payout_id,
+        "stripe_transfer_id": transfer.id,
+        "status":             "paid",
+        "stripe_transfer_status": "created",
+    }
+
+
+
 # ─── iter267 Mission 1 — Email a Stripe Connect onboarding link to an affiliate ──
 
 @admin_oversight_router.post("/affiliates/{user_id}/send-stripe-onboarding")

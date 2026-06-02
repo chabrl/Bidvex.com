@@ -5,6 +5,8 @@ import FlattenedMarketplace from '../components/FlattenedMarketplace';
 import MarketplaceSidebar from '../components/MarketplaceSidebar';
 import { Badge } from '../components/ui/badge';
 import { ShoppingBag, Sparkles, User, Zap } from 'lucide-react';
+// iter268 Mission 4 — SEO meta tags
+import SEO from '../components/SEO';
 
 const MarketplacePage = () => {
   const { t } = useTranslation();
@@ -32,6 +34,11 @@ const MarketplacePage = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900" data-testid="marketplace-page">
+      <SEO
+        title="Online Auction Marketplace — Canada"
+        description="Buy and bid on thousands of items across Canada. Verified sellers, real-time bidding, and transparent fees. Join BidVex today."
+        path="/marketplace"
+      />
       {/* Hero */}
       <div className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-blue-900 via-slate-900 to-cyan-900 opacity-95" />

@@ -9,6 +9,8 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card, CardContent } from '../components/ui/card';
 import { Mail, Phone, MapPin, Building2, Scale, Handshake, Newspaper, ShieldAlert } from 'lucide-react';
+// iter268 Mission 4 — SEO meta tags
+import SEO from '../components/SEO';
 
 export default function ContactUsPage() {
   const { i18n } = useTranslation();
@@ -17,6 +19,11 @@ export default function ContactUsPage() {
 
   return (
     <div className="container mx-auto max-w-3xl py-10 px-4" data-testid="contact-us-page">
+      <SEO
+        title="Contact BidVex — Support & Legal"
+        description="Get in touch with BidVex. Support, legal, broker, and press contacts for Canada's online auction marketplace."
+        path="/contact-us"
+      />
       <header className="mb-8 border-b border-slate-200 dark:border-slate-700 pb-4">
         <h1 className="text-3xl font-bold flex items-center gap-2" data-testid="contact-us-title">
           <Building2 className="w-7 h-7 text-blue-600" />

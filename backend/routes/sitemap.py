@@ -56,7 +56,7 @@ def _format_lastmod(value: Any) -> str:
 
 
 def _xml_url(loc: str, lastmod: str = "", changefreq: str = "weekly", priority: float = 0.5) -> str:
-    parts = [f"  <url>", f"    <loc>{loc}</loc>"]
+    parts = ["  <url>", f"    <loc>{loc}</loc>"]
     if lastmod:
         parts.append(f"    <lastmod>{lastmod}</lastmod>")
     parts.append(f"    <changefreq>{changefreq}</changefreq>")
@@ -106,6 +106,44 @@ async def sitemap(request: Request):
                 urls.append(_xml_url(
                     f"{base}/storage-auctions/{aid}",
                     lastmod=_format_lastmod(auc.get("updated_at")),
+                    changefreq="hourly",
+                    priority=0.85,
+                ))
+        except Exception:
+            pass
+
+        # iter268 Mission 5 — Vehicle auctions in sitemap.
+        try:
+            vehicles = await db.listings.find(
+                {"status": "active", "listing_type": {"$in": ["vehicle", "vehicle_auction"]}},
+                {"_id": 0, "id": 1, "updated_at": 1},
+            ).limit(500).to_list(500)
+            for v in vehicles:
+                vid = v.get("id")
+                if not vid:
+                    continue
+                urls.append(_xml_url(
+                    f"{base}/vehicle-auctions/{vid}",
+                    lastmod=_format_lastmod(v.get("updated_at")),
+                    changefreq="hourly",
+                    priority=0.85,
+                ))
+        except Exception:
+            pass
+
+        # iter268 Mission 5 — Multi-item lots in sitemap.
+        try:
+            lots = await db.multi_item_listings.find(
+                {"status": "active"},
+                {"_id": 0, "id": 1, "updated_at": 1},
+            ).limit(500).to_list(500)
+            for lot in lots:
+                lid = lot.get("id")
+                if not lid:
+                    continue
+                urls.append(_xml_url(
+                    f"{base}/lots/{lid}",
+                    lastmod=_format_lastmod(lot.get("updated_at")),
                     changefreq="hourly",
                     priority=0.85,
                 ))

@@ -127,6 +127,10 @@ async def handle_stripe_webhook(request: Request):
         elif event_type == "customer.subscription.deleted":
             await _handle_subscription_deleted(db, data)
 
+        # iter268 Mission 1 — Stripe Connect transfer events for affiliate payouts.
+        elif event_type in ("transfer.created", "transfer.paid", "transfer.failed", "transfer.reversed"):
+            await _handle_affiliate_transfer_event(db, event_type, data)
+
         # --- Invoice events ---
         elif event_type == "invoice.payment_succeeded":
             await _handle_payment_succeeded(db, data)
@@ -1804,3 +1808,87 @@ async def _handle_payment_method_attached(db, pm_data):
 
     except Exception as e:
         logger.error(f"Error in payment_method.attached handler: {e}")
+
+
+# ─── iter268 Mission 1 — Affiliate payout transfer webhooks ──────────
+
+
+async def _handle_affiliate_transfer_event(db, event_type: str, data: Dict[str, Any]) -> None:
+    """iter268 Mission 1 — React to Stripe Connect Transfer lifecycle
+    events that affect our `affiliate_payouts` rows. Updates the
+    `stripe_transfer_status` field + status badge mapping, and emails
+    an admin alert on failure / reversal."""
+    transfer_id = (data or {}).get("id")
+    if not transfer_id:
+        logger.warning(f"[transfer-webhook] {event_type} missing transfer id")
+        return
+
+    payout = await db.affiliate_payouts.find_one(
+        {"stripe_transfer_id": transfer_id},
+        {"_id": 0},
+    )
+    if not payout:
+        # No matching payout — log and move on (could be a partner payout etc).
+        logger.info(f"[transfer-webhook] {event_type} {transfer_id} — no affiliate_payouts row")
+        return
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    update: Dict[str, Any] = {"stripe_transfer_updated_at": now_iso}
+
+    if event_type == "transfer.created":
+        update["stripe_transfer_status"] = "created"
+    elif event_type == "transfer.paid":
+        update["stripe_transfer_status"] = "paid"
+        update["stripe_transfer_confirmed_at"] = now_iso
+    elif event_type == "transfer.failed":
+        update["stripe_transfer_status"] = "failed"
+        update["stripe_transfer_failure_reason"] = (data.get("failure_message") or "unknown")
+    elif event_type == "transfer.reversed":
+        update["stripe_transfer_status"] = "reversed"
+        update["status"] = "reversed"
+
+    await db.affiliate_payouts.update_one(
+        {"stripe_transfer_id": transfer_id},
+        {"$set": update},
+    )
+
+    # Admin alert on failure / reversal.
+    if event_type in ("transfer.failed", "transfer.reversed"):
+        try:
+            from services.email_notifications import send_unified_email
+            admin = await db.users.find_one(
+                {"$or": [{"role": "admin"}, {"is_admin": True}]},
+                {"_id": 0, "id": 1, "email": 1, "name": 1, "preferred_language": 1},
+            )
+            if admin and admin.get("email"):
+                fail_reason = update.get("stripe_transfer_failure_reason", "")
+                subject = (
+                    "⚠️ Affiliate payout transfer FAILED — re-issue required"
+                    if event_type == "transfer.failed"
+                    else "⚠️ Affiliate payout REVERSED — re-issue?"
+                )
+                body_html = (
+                    f"<p>Hi {admin.get('name', 'Admin')},</p>"
+                    f"<p>Stripe Transfer <code>{transfer_id}</code> has been "
+                    f"<strong>{'rejected by Stripe' if event_type == 'transfer.failed' else 'reversed'}</strong>.</p>"
+                    f"<p><strong>Affiliate user_id:</strong> {payout.get('user_id') or payout.get('affiliate_id')}</p>"
+                    f"<p><strong>Amount:</strong> ${float(payout.get('amount') or 0):,.2f} CAD</p>"
+                    + (f"<p><strong>Reason:</strong> {fail_reason}</p>" if fail_reason else "")
+                    + "<p>Open the BidVex admin → Marketing → Affiliate Payouts tab to re-issue.</p>"
+                )
+                await send_unified_email(
+                    email_type="new_feature",
+                    user=admin,
+                    data={
+                        "subject_override": subject,
+                        "headline": "Transfer alert",
+                        "subheadline": "An affiliate transfer needs your attention.",
+                        "body_html": body_html,
+                        "cta_label": "Open Affiliate Payouts",
+                        "cta_url":   "https://bidvex.com/admin?primary=marketing&secondary=affiliate-payouts",
+                    },
+                )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"[transfer-webhook] admin alert failed: {exc}")
+
+    logger.info(f"[transfer-webhook] applied {event_type} → payout {payout.get('id')}")

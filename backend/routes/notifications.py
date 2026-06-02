@@ -516,3 +516,104 @@ async def admin_download_notification_attachment(
         media_type=media_type or "application/octet-stream",
         filename=filename,
     )
+
+
+# ─── iter268 Mission 2 — Admin attachment RESET ──────────────────────
+
+
+@admin_notifications_router.post("/{notification_id}/reset-attachment")
+async def admin_reset_notification_attachment(
+    notification_id: str,
+    body: Optional[Dict[str, Any]] = None,
+    current_user: User = Depends(get_current_user),
+):
+    """iter268 Mission 2 — Allow admin to reset a user's submitted
+    attachment so they can re-upload. Clears the submission fields,
+    deletes the old file from disk (path-traversal protected), audits
+    the reset, and notifies the user via the bell."""
+    if not _is_admin(current_user):
+        raise HTTPException(status_code=403, detail="Admin only")
+
+    db = get_db()
+    notif = await db.notifications.find_one({"id": notification_id}, {"_id": 0})
+    if not notif:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    if not notif.get("attachment_submitted"):
+        raise HTTPException(status_code=400, detail="No attachment to reset")
+
+    reason = ((body or {}).get("reason") or "").strip()
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    # Delete the old file from disk (path-traversal guarded).
+    old_url = (notif.get("attachment_url") or "").strip()
+    if old_url:
+        rel = old_url.lstrip("/")
+        if rel.startswith("uploads/"):
+            rel = rel[len("uploads/") :]
+        target = os.path.join(NOTIFICATION_UPLOAD_BASE, rel)
+        resolved = os.path.realpath(target)
+        base_resolved = os.path.realpath(NOTIFICATION_UPLOAD_BASE)
+        if resolved.startswith(base_resolved + os.sep) and os.path.isfile(resolved):
+            try:
+                os.remove(resolved)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(f"[attachment-reset] file delete failed: {exc}")
+
+    await db.notifications.update_one(
+        {"id": notification_id},
+        {"$set": {
+            "attachment_submitted":     False,
+            "attachment_url":           None,
+            "attachment_submitted_at":  None,
+            "attachment_filename":      None,
+            "attachment_size_mb":       None,
+            "attachment_reset_by":      current_user.id,
+            "attachment_reset_at":      now_iso,
+            "attachment_reset_note":    reason,
+        }},
+    )
+
+    # Notify the user.
+    target_user_id = notif.get("user_id")
+    if target_user_id:
+        try:
+            reset_notif_id = str(uuid.uuid4())
+            user_notif = {
+                "id":      reset_notif_id,
+                "user_id": target_user_id,
+                "type":    "attachment_reset",
+                "title":   "Document re-upload requested",
+                "title_fr": "Téléversement à nouveau requis",
+                "message": (
+                    "Your document submission has been reset. Please re-upload the requested file. "
+                    + (f"Reason: {reason}" if reason else "")
+                ).strip(),
+                "body":    (
+                    "Your document submission has been reset. Please re-upload the requested file."
+                    + (f"\n\nReason: {reason}" if reason else "")
+                ),
+                "body_fr": (
+                    "Votre soumission de document a été réinitialisée. Veuillez téléverser à nouveau."
+                    + (f"\n\nRaison : {reason}" if reason else "")
+                ),
+                "sender_name": "BidVex Admin",
+                "color_type":  "action_required",
+                "read":        False,
+                "is_read":     False,
+                "data":        {"source_notification_id": notification_id, "reset_at": now_iso},
+                "created_at":  now_iso,
+            }
+            await db.notifications.insert_one(user_notif)
+            try:
+                await broadcast_notification_to_user(target_user_id, user_notif)
+            except Exception:
+                pass
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"[attachment-reset] user notification failed: {exc}")
+
+    return {
+        "success":   True,
+        "id":        notification_id,
+        "reset_at":  now_iso,
+        "reason":    reason,
+    }

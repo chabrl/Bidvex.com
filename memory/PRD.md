@@ -1,5 +1,104 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter268 — STRIPE WEBHOOKS + ATTACHMENT RESET + LAUNCH-READINESS AUDIT (Jun 02, 2026) ✅
+
+Five-mission sprint closing the iter267 backlog: Stripe Transfer
+lifecycle webhooks, admin attachment reset flow, route-level Error
+Boundary protection, expanded SEO meta coverage, and full sitemap
+inclusion. **Pytest 160/160 PASS** across iter255-iter268 (20 new +
+140 regression).
+
+### Mission 1 — Stripe Transfer Status Webhooks ✅
+- **`routes/webhooks.py`** now handles `transfer.created` /
+  `transfer.paid` / `transfer.failed` / `transfer.reversed` events
+  via `_handle_affiliate_transfer_event(...)`. Writes
+  `stripe_transfer_status`, `stripe_transfer_confirmed_at`,
+  `stripe_transfer_failure_reason`, `stripe_transfer_updated_at` to
+  the matching `affiliate_payouts` row.
+- **Admin alert email** fires on `failed` / `reversed` events with a
+  direct link back to the Affiliate Payouts tab.
+- **NEW** `POST /admin/affiliate-payouts/{id}/reissue` creates a
+  fresh `stripe.Transfer` for failed/reversed rows, stamps
+  `reissued_at` + `reissued_by`, appends previous Transfer to
+  `stripe_transfer_history` for audit.
+- **Frontend `AdminAffiliatePayouts.jsx`** now renders a "Transfer"
+  column with badges: `🟡 Processing` / `✅ Confirmed by Stripe` /
+  `❌ Transfer Failed` / `⚠️ Reversed`. Re-issue button shown when
+  status is `failed` or `reversed`.
+
+### Mission 2 — Admin Attachment Reset ✅
+- **NEW** `POST /api/admin/notifications/{id}/reset-attachment`
+  (admin-only). Clears `attachment_submitted` / `attachment_url`,
+  deletes the old file from disk (`realpath` traversal-guarded),
+  stamps `attachment_reset_by` + `attachment_reset_at` + reason.
+- **Notifies the user** by inserting a new `attachment_reset` bell
+  notification + WebSocket broadcast: *"Your document submission has
+  been reset. Please re-upload the requested file."* (bilingual).
+
+### Mission 3 — Pre-Launch Audit + Error Boundaries ✅
+- Audited `App.js` routes: every route component import resolves
+  (verified by `yarn build` green build).
+- **Top-level `ErrorBoundary`** import + wrapped 9 critical routes:
+  `home`, `marketplace`, `lots`, `lot-detail`, `listing-detail`,
+  `affiliate-dashboard`, `admin`, `broker-dashboard`,
+  `vehicle-auctions`, `vehicle-detail`, `storage-auctions`,
+  `storage-browse`. Failures show friendly retry + home buttons
+  instead of a blank screen.
+- Existing `ErrorBoundary` already i18n-aware (FR/EN), with
+  retry, home, and dev-mode error details.
+
+### Mission 4 — SEO Meta Tags ✅
+- **`MarketplacePage.js`**: SEO with marketplace-specific title +
+  description + canonical.
+- **`LotsMarketplacePage.js`**: SEO for /lots.
+- **`ContactUsPage.jsx`**: SEO for /contact-us.
+- **`HomePage` + `ListingDetailPage`**: already had SEO (verified).
+  ListingDetail has full schema.org Product + Offer JSON-LD with
+  current price + auction window.
+- `HelmetProvider` already wraps App; `react-helmet-async` already
+  in package.json.
+
+### Mission 5 — Sitemap Expansion ✅
+- **`/sitemap.xml`** now includes vehicle auctions
+  (`/vehicle-auctions/{id}`) and multi-item lots (`/lots/{id}`) in
+  addition to the previously covered listings + storage auctions.
+- Up to 500 entries per collection (1000 for general listings).
+- Cache-Control + lastmod from `updated_at` field.
+- `robots.txt` (static frontend + dynamic backend) both list the
+  meta-catalog JSON feed alongside `sitemap.xml`.
+
+### Validation
+- **NEW** `tests/test_iter268_missions.py` — **20/20 PASS** covering
+  every mission with static + live HTTP assertions.
+- **Full regression**: **160/160 PASS** across iter255→iter268
+  (11 skips are env-specific).
+- Backend + frontend lint clean.
+- `yarn build` green — verifies every imported component resolves.
+
+### Files changed (iter268)
+**Backend MODIFIED**: `routes/webhooks.py` (Stripe Transfer
+lifecycle dispatcher + admin alert email), `routes/admin_oversight.py`
+(`/reissue` endpoint with audit history),
+`routes/notifications.py` (`/reset-attachment` endpoint with user
+notification + WS broadcast), `routes/sitemap.py` (vehicle + lot
+sitemap inclusion, f-string lint fix).
+**Backend NEW**: `tests/test_iter268_missions.py` (20 tests).
+**Frontend MODIFIED**: `App.js` (top-level ErrorBoundary import +
+9 route wraps), `pages/admin/AdminAffiliatePayouts.jsx` (Transfer
+column + re-issue button), `pages/MarketplacePage.js` (SEO),
+`pages/LotsMarketplacePage.js` (SEO), `pages/ContactUsPage.jsx` (SEO).
+
+### Action items (user)
+1. **Save to GitHub → redeploy** preview → production.
+2. **Stripe webhook config**: in Stripe Dashboard add 4 new events to
+   the webhook listener — `transfer.created`, `transfer.paid`,
+   `transfer.failed`, `transfer.reversed`.
+3. **Verify sitemap**: hit `https://bidvex.com/sitemap.xml` after
+   redeploy — should list all 4 listing types.
+
+---
+
+
 ## Latest: iter267 — STRIPE CONNECT PAYOUTS + ATTACHMENT DOWNLOAD + WEBSOCKET BELL (Jun 02, 2026) ✅
 
 Five-mission sprint closing the iter266 backlog plus real-time bell

@@ -43,6 +43,16 @@ const STATUS_BADGES = {
   rejected: { label: '🔴 Rejected', cls: 'bg-rose-100 text-rose-800 border-rose-300' },
 };
 
+// iter268 Mission 1 — Stripe Transfer lifecycle badges shown in the
+// "Transfer" column. Maps the `stripe_transfer_status` field set by
+// the Stripe webhook handler onto a visible chip.
+const TRANSFER_BADGES = {
+  created:  { label: '🟡 Processing',           cls: 'bg-amber-100 text-amber-800 border-amber-300' },
+  paid:     { label: '✅ Confirmed by Stripe', cls: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
+  failed:   { label: '❌ Transfer Failed',     cls: 'bg-rose-100 text-rose-800 border-rose-300' },
+  reversed: { label: '⚠️ Reversed',             cls: 'bg-rose-100 text-rose-800 border-rose-300' },
+};
+
 export default function AdminAffiliatePayouts() {
   const { token } = useAuth();
   const [items, setItems] = useState([]);
@@ -153,6 +163,28 @@ export default function AdminAffiliatePayouts() {
       fetchData();
     } catch (e) {
       toast.error(e.response?.data?.detail || 'Reject failed');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleReissue = async (payout) => {
+    if (!window.confirm(`Re-issue Stripe Transfer of $${Number(payout.amount).toFixed(2)} to ${payout.affiliate_email}?`)) return;
+    try {
+      setSubmitting(true);
+      const r = await axios.post(
+        `${API}/admin/affiliate-payouts/${payout.id}/reissue`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      toast.success(
+        r.data?.stripe_transfer_id
+          ? `Re-issued — new Stripe ID ${r.data.stripe_transfer_id.slice(0, 14)}…`
+          : 'Transfer re-issued.',
+      );
+      fetchData();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Re-issue failed');
     } finally {
       setSubmitting(false);
     }
@@ -284,6 +316,7 @@ export default function AdminAffiliatePayouts() {
                     <th className="px-4 py-2 font-semibold text-right">Amount</th>
                     <th className="px-4 py-2 font-semibold">Requested</th>
                     <th className="px-4 py-2 font-semibold">Status</th>
+                    <th className="px-4 py-2 font-semibold">Transfer</th>
                     <th className="px-4 py-2 font-semibold text-right">Actions</th>
                   </tr>
                 </thead>
@@ -311,6 +344,20 @@ export default function AdminAffiliatePayouts() {
                           <Badge className={`border ${badge.cls}`} data-testid={`payout-status-${p.id}`}>
                             {badge.label}
                           </Badge>
+                        </td>
+                        <td className="px-4 py-3" data-testid={`payout-transfer-${p.id}`}>
+                          {(() => {
+                            const t = (p.stripe_transfer_status || '').toLowerCase();
+                            const tb = TRANSFER_BADGES[t];
+                            if (!tb) {
+                              return <span className="text-xs text-slate-400">⏳ Pending</span>;
+                            }
+                            return (
+                              <Badge className={`border ${tb.cls}`} data-testid={`payout-transfer-badge-${p.id}`}>
+                                {tb.label}
+                              </Badge>
+                            );
+                          })()}
                         </td>
                         <td className="px-4 py-3 text-right space-x-2">
                           {status === 'pending' && (
@@ -352,11 +399,24 @@ export default function AdminAffiliatePayouts() {
                             </>
                           )}
                           {status !== 'pending' && (
-                            <span className="text-xs text-slate-400">
-                              {p.paid_at || p.rejected_at
-                                ? new Date(p.paid_at || p.rejected_at).toLocaleDateString()
-                                : ''}
-                            </span>
+                            <>
+                              {['failed', 'reversed'].includes((p.stripe_transfer_status || '').toLowerCase()) && (
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleReissue(p)}
+                                  disabled={submitting}
+                                  className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                                  data-testid={`payout-reissue-${p.id}`}
+                                >
+                                  🔄 Re-issue
+                                </Button>
+                              )}
+                              <span className="text-xs text-slate-400 ml-2">
+                                {p.paid_at || p.rejected_at
+                                  ? new Date(p.paid_at || p.rejected_at).toLocaleDateString()
+                                  : ''}
+                              </span>
+                            </>
                           )}
                         </td>
                       </tr>
