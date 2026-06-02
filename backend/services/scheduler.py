@@ -1102,7 +1102,27 @@ def init_scheduler(database):
         replace_existing=True,
     )
 
-    logger.info("Scheduler initialized with 17 jobs")
+    # Job 18 — iter265 Mission 5 — Daily compliance scan at 06:00 UTC.
+    async def compliance_scan_job():
+        if db_instance is None:
+            return
+        try:
+            from routes.admin_oversight import execute_compliance_scan
+            result = await execute_compliance_scan(db_instance)
+            logger.info(f"[iter265 compliance-scan] {result}")
+            return result
+        except Exception as exc:  # noqa: BLE001
+            logger.error(f"[iter265 compliance-scan] failed: {exc}")
+
+    scheduler.add_job(
+        _tracked("compliance_scan_daily", compliance_scan_job),
+        CronTrigger(hour=6, minute=0),
+        id="compliance_scan_daily",
+        name="iter265 — Daily Compliance Alert Scan (06:00 UTC)",
+        replace_existing=True,
+    )
+
+    logger.info("Scheduler initialized with 18 jobs")
     return scheduler
 
 

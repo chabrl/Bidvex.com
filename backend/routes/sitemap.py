@@ -133,5 +133,6 @@ async def robots(request: Request):
         "Disallow: /api/\n\n"
         f"Sitemap: {base}/sitemap.xml\n"
         f"Sitemap: {base}/api/feeds/google\n"
+        f"Sitemap: {base}/api/feeds/meta-catalog.json\n"
     )
     return Response(content=body, media_type="text/plain")

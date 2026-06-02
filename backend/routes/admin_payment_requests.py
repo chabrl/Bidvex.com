@@ -268,6 +268,7 @@ async def _build_payment_request(
 
 
 @admin_payment_requests_router.get("/users/{user_id}/payment-requests")
+async def get_user_payment_requests(
     user_id: str,
     current_user: User = Depends(get_current_user),
 ):

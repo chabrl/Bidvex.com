@@ -139,6 +139,7 @@ async def get_user_profile_summary(user_id: str):
 
 
 @profiles_router.put("/users/me")
+@profiles_router.patch("/users/me")
 async def update_user_me(
     updates: Dict[str, Any],
     credentials: HTTPAuthorizationCredentials = Depends(security),
@@ -146,8 +147,20 @@ async def update_user_me(
     """
     Update current user's profile.
     Validates preferred_language (en/fr), bio length, privacy settings, currency lock.
+
+    iter265 Mission 5 — Accepts PATCH as well as PUT. `language` is
+    normalised into `preferred_language` so the FR toggle can ship the
+    spec-aligned payload `{language: "fr" | "en"}`.
     """
     current_user = await _require_auth(credentials)
+
+    # iter265 Mission 5 — language alias.
+    if "language" in updates and "preferred_language" not in updates:
+        _lang_raw = (updates.get("language") or "").strip().lower()
+        if _lang_raw.startswith("fr"):
+            updates["preferred_language"] = "fr"
+        elif _lang_raw.startswith("en"):
+            updates["preferred_language"] = "en"
 
     allowed_fields = [
         "name", "phone", "address", "company_name", "tax_number",

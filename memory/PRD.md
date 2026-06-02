@@ -1,5 +1,107 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter265 — 5-MISSION SPRINT (Jun 02, 2026) ✅
+
+Five parallel tracks closed in a single sprint: surgical email-pipeline
+consolidation, live SendGrid verification, spec-aligned affiliate payout
+API, public Meta Catalog JSON feed, and a daily compliance cron + FR
+language toggle hardening. **Pytest 100/100 PASS** across iter255-iter265
+sweep (16 new iter265 + 84 regression).
+
+### Mission 1 — Raw HTML email refactor + Inline Promo + Promote modal
+- **NEW** `EmailService.send_raw_html()` shim in `services/email_service.py`
+  routes through `send_unified_email()` with the `html_full_override`
+  passthrough — 9 callsites (routes/payments, routes/invoices,
+  routes/auctions_bids, routes/partner_pro, services/scheduled_jobs,
+  config/email_templates) were previously calling a non-existent method
+  that silently failed. They now all hit the unified outbound path.
+- **Inline Promoted Card injection** verified on `FlattenedMarketplace.js`
+  (already shipped iter239) and newly added to `pages/LotsMarketplacePage.js`
+  at indices 3, 8, 18, 28, 38 (fetched from `/api/promoted-listings?section=lots&limit=10`).
+- **Seller Promote modal** verified mounted on `pages/SellerDashboard.js`
+  via `PromoteListingModal.jsx` → `POST /api/listings/{id}/promote`.
+- **Geo-notifications** wired from `routes/listings.py::create_listing`
+  → `services.geo_notifications.notify_nearby_users` (async, non-blocking,
+  $geoWithin 50km, 24h dedup via `recent_nearby_notifs`).
+
+### Mission 2 — SendGrid Live Email Delivery
+- Audit confirmed NO mock/dev short-circuit in `email_notifications.py`
+  or `email_service.py` — emails only fall back to logging when
+  `SENDGRID_API_KEY` is absent. Live key is configured in `.env`.
+- **NEW** `GET /api/admin/test-email?to=<email>` in `routes/admin_oversight.py`
+  fires a real SendGrid send through the unified pipeline. Verified
+  live: status_code=202, real email delivered to `charbel911@gmail.com`.
+
+### Mission 3 — Affiliate Dashboard hardening
+- **NEW** `POST /api/affiliate/request-payout` in `routes/misc.py`
+  spec-aligned endpoint persisting to both `affiliate_payouts` (new)
+  and `withdrawal_requests` (legacy). Defaults to full available balance
+  when `amount` omitted. Currency = CAD, method = `stripe_connect`.
+- Existing `GET /api/affiliate/stats` + `pages/AffiliateDashboard.js`
+  render earnings, referral link, and Stripe Connect payout flow.
+
+### Mission 4 — Meta Catalog JSON Feed
+- **NEW** `GET /api/feeds/meta-catalog.json?limit=&offset=` in
+  `routes/feeds.py`. Public, no auth, CORS `*`, 15min Cache-Control.
+  Returns `{version:1, generated_at, count, items:[{id,title,price,
+  currency,image,url,category,type}, ...]}` across all 4 listing
+  collections (`listings`, `multi_item_listings`, `vehicles`,
+  `storage_auctions`).
+- **`robots.txt`** (frontend static) now lists `meta-catalog.json` as
+  a Sitemap entry alongside `sitemap.xml`.
+- Live smoke: returns 5+ active listings with image + price.
+
+### Mission 5 — Compliance Scheduler + FR Toggle
+- Extracted `execute_compliance_scan(db)` callable from the admin HTTP
+  endpoint in `routes/admin_oversight.py`. Scheduler `Job 18` now
+  invokes it daily via `CronTrigger(hour=6, minute=0)` — confirmed in
+  scheduler startup logs ("Scheduler initialized with 18 jobs").
+- **`PATCH /api/users/me`** alias added to canonical `routes/profiles.py`
+  (in addition to existing PUT). New `language` field alias maps
+  `{language:"fr"}` → `preferred_language="fr"` so navbar + bilingual
+  email pipeline pick it up. Live verified: PATCH fr → `/api/auth/me`
+  returns `preferred_language="fr"` immediately.
+
+### Side fix — admin_payment_requests.py syntax error
+While running regression, found a pre-existing `IndentationError` on
+line 270 of `routes/admin_payment_requests.py` (missing `async def
+get_user_payment_requests(` declaration). Fixed in-place — the admin
+payment history endpoint now imports cleanly.
+
+### Validation
+- **NEW** `tests/test_iter265_missions.py` — **16/16 PASS** covering all
+  5 missions including live HTTP smokes for the test-email, meta-catalog,
+  affiliate-payout, and PATCH language endpoints.
+- **Full regression**: 100/100 PASS across iter255→iter265 (15 skips
+  are env-specific live HTTP). Zero new failures introduced.
+- Frontend lint clean on LotsMarketplacePage, SellerDashboard.
+- Backend supervisor reload: clean — 18 scheduler jobs registered.
+
+### Files changed (iter265)
+**Backend MODIFIED**: `services/email_service.py` (NEW `send_raw_html`
+shim), `routes/admin_oversight.py` (NEW `GET /admin/test-email` +
+extracted `execute_compliance_scan`), `routes/misc.py` (NEW
+`POST /affiliate/request-payout`), `routes/feeds.py` (NEW
+`GET /feeds/meta-catalog.json`), `routes/sitemap.py` (robots sitemap entry),
+`routes/profiles.py` (PATCH alias + language field mapper),
+`routes/users.py` (PATCH alias + language alias),
+`routes/admin_payment_requests.py` (syntax error fix),
+`services/scheduler.py` (Job 18 daily compliance scan).
+**Backend NEW**: `tests/test_iter265_missions.py` (16 tests).
+**Frontend MODIFIED**: `pages/LotsMarketplacePage.js` (inline promo
+cards at PROMO_SLOTS), `public/robots.txt` (meta-catalog sitemap entry).
+
+### Action items (user)
+1. **Save to GitHub → redeploy** preview → production.
+2. **Verify SendGrid live email**: hit
+   `GET /api/admin/test-email` with admin token → check inbox for
+   "✅ BidVex SendGrid Live Test".
+3. **Confirm scheduler**: check `GET /admin/jobs` (or backend log)
+   to see `compliance_scan_daily` runs at 06:00 UTC daily.
+
+---
+
+
 ## Latest: iter261 — PAY PAGE + AI SESSION + UNIFIED EMAIL REGISTRY (Mar 24, 2026) ✅
 
 Massive 4-mission sprint to close the "no Pay button in payment email" bug at the root, plus polish across AI chat history, bell notifications, and the email template registry.

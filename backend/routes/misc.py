@@ -153,6 +153,65 @@ async def request_withdrawal(data: Dict[str, Any], current_user: User = Depends(
     return {"message": "Withdrawal request submitted", "request_id": withdrawal_request["id"]}
 
 
+@misc_router.post("/affiliate/request-payout")
+async def request_affiliate_payout(
+    data: Dict[str, Any] = None,
+    current_user: User = Depends(get_current_user),
+):
+    """iter265 Mission 3 — Spec-aligned alias for affiliate payout
+    requests. Persists to `affiliate_payouts` (new) and `withdrawal_requests`
+    (legacy) so both surfaces remain consistent."""
+    db = get_db()
+    data = data or {}
+
+    earnings = await db.affiliate_earnings.find({
+        "affiliate_id": current_user.id,
+        "status": "pending",
+    }).to_list(1000)
+    available = sum(e.get("commission_amount", 0) for e in earnings)
+
+    amount = data.get("amount")
+    if amount is None:
+        amount = available  # default to full available balance
+    try:
+        amount = float(amount)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="Invalid amount")
+
+    if amount <= 0 or amount > available + 1e-6:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Amount {amount} exceeds available balance {available}",
+        )
+
+    method = (data.get("method") or "stripe_connect").strip()
+    payout_id = str(uuid.uuid4())
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    payout_doc = {
+        "id": payout_id,
+        "user_id": current_user.id,
+        "affiliate_id": current_user.id,
+        "amount": amount,
+        "currency": "CAD",
+        "method": method,
+        "status": "pending",
+        "requested_at": now_iso,
+        "created_at": now_iso,
+    }
+    await db.affiliate_payouts.insert_one(payout_doc)
+    # Mirror to legacy collection so existing admin surfaces keep working.
+    await db.withdrawal_requests.insert_one({**payout_doc})
+
+    return {
+        "success": True,
+        "payout_id": payout_id,
+        "amount": amount,
+        "method": method,
+        "status": "pending",
+    }
+
+
 
 
 @misc_router.get("/admin/tax/pending")

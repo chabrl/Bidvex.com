@@ -869,6 +869,59 @@ class EmailService:
     async def send_with_retry(self, *args, **kwargs):
         return await self.send_email(*args, **kwargs)
 
+    async def send_raw_html(
+        self,
+        to: str = "",
+        subject: str = "",
+        html_content: str = "",
+        disable_tracking: bool = False,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """iter265 Mission 1 — Canonical raw-HTML dispatcher.
+
+        Routes through `send_unified_email()` so the unified
+        `build_email_payload()` engine remains the single outbound path.
+        Uses the `html_full_override` passthrough to preserve the rich
+        HTML byte-for-byte (legacy callers stay back-compat).
+
+        Accepts positional-friendly aliases used by legacy callsites:
+        `to_email`, `email`, `body_html`, `html`.
+        """
+        to_email = (
+            to
+            or kwargs.get("to_email")
+            or kwargs.get("email")
+            or ""
+        )
+        body_html = (
+            html_content
+            or kwargs.get("body_html")
+            or kwargs.get("html")
+            or ""
+        )
+        subj = subject or kwargs.get("subject_override") or "BidVex"
+        if not to_email:
+            return {"success": False, "status": "no_recipient"}
+        try:
+            from services.email_notifications import send_unified_email
+            res = await send_unified_email(
+                "new_feature",
+                user={"email": to_email, "first_name": ""},
+                data={
+                    "html_full_override": body_html,
+                    "subject_override": subj,
+                },
+            )
+            status = (res or {}).get("status", "")
+            return {
+                "success": status in ("sent", "logged"),
+                "status": status,
+                "message_id": (res or {}).get("status_code"),
+            }
+        except Exception as e:
+            logger.error(f"[EmailService.send_raw_html] failed for {to_email}: {e}")
+            return {"success": False, "error": str(e)}
+
 
 _email_service_instance = None
 

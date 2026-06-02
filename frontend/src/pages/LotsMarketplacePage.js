@@ -40,9 +40,22 @@ const LotsMarketplacePage = () => {
   const [mapOpen, setMapOpen] = useState(false);
   const [geoFilter, setGeoFilter] = useState(null);
   const [geoListings, setGeoListings] = useState(null);
+  // iter265 Mission 1.2 — Inline promoted-card injection on Lots grid.
+  const [promotedInline, setPromotedInline] = useState([]);
+  const PROMO_SLOTS = [3, 8, 18, 28, 38];
   const backendUrl = process.env.REACT_APP_BACKEND_URL
     ? `${process.env.REACT_APP_BACKEND_URL}/api`
     : '/api';
+
+  // iter265 Mission 1.2 — Fetch promoted lots once on mount.
+  useEffect(() => {
+    const ctrl = new AbortController();
+    fetch(`${backendUrl}/promoted-listings?section=lots&limit=10`, { signal: ctrl.signal })
+      .then(r => (r.ok ? r.json() : { items: [] }))
+      .then(d => setPromotedInline(Array.isArray(d.items) ? d.items : []))
+      .catch(() => setPromotedInline([]));
+    return () => ctrl.abort();
+  }, [backendUrl]);
 
   useEffect(() => {
     if (!geoFilter) {
@@ -377,7 +390,23 @@ const LotsMarketplacePage = () => {
                 ? 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 xl:gap-5'
                 : 'flex flex-col gap-4'
               } data-testid="lots-results-grid">
-                {(geoListings !== null ? geoListings : listings).map(listing => renderListingCard(listing))}
+                {(() => {
+                  // iter265 Mission 1.2 — Splice promoted lots into PROMO_SLOTS.
+                  const base = (geoListings !== null ? geoListings : listings);
+                  const visibleIds = new Set(base.map(l => l.id));
+                  const promoQueue = promotedInline.filter(p => !visibleIds.has(p.id));
+                  const out = [];
+                  let pIdx = 0;
+                  base.forEach((listing, idx) => {
+                    if (PROMO_SLOTS.includes(idx) && pIdx < promoQueue.length) {
+                      const promo = promoQueue[pIdx];
+                      pIdx += 1;
+                      out.push(renderListingCard({ ...promo, _is_promoted_inline: true, _promo_key: `promo-${promo.id}` }));
+                    }
+                    out.push(renderListingCard(listing));
+                  });
+                  return out;
+                })()}
               </div>
             )}
           </div>

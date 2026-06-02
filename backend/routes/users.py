@@ -93,11 +93,17 @@ async def get_user_profile_summary(user_id: str):
 
 
 @users_router.put("/me")
+@users_router.patch("/me")
 async def update_current_user(
     request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
-    """Update current user's profile"""
+    """Update current user's profile.
+
+    iter265 Mission 5 — Accepts both PUT and PATCH. `language` is
+    accepted as a synonym for `preferred_language` so the FR toggle
+    can ship the spec-aligned PATCH body `{language: "fr"|"en"}`.
+    """
     if not credentials:
         raise HTTPException(status_code=401, detail="Authentication required")
     
@@ -105,6 +111,13 @@ async def update_current_user(
     current_user = await _get_current_user(credentials)
     
     data = await request.json()
+    # iter265 Mission 5 — `language` alias.
+    if "language" in data and "preferred_language" not in data:
+        lang = (data.get("language") or "").strip().lower()
+        if lang.startswith("fr"):
+            data["preferred_language"] = "fr"
+        elif lang.startswith("en"):
+            data["preferred_language"] = "en"
     allowed_fields = [
         "name", "phone", "address", "company_name", "preferred_language",
         "preferred_currency", "bio", "bio_fr", "picture", "privacy_settings"

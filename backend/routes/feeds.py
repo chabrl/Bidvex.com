@@ -490,3 +490,84 @@ async def backfill_ended_listings_as_out_of_stock(dry_run: bool = False) -> Dict
             "and Google Merchant Center 'Fetch feed now' to re-ingest."
         ),
     }
+
+
+# ── iter265 Mission 4 — Public Meta Catalog JSON feed ────────────────
+@router.get("/meta-catalog.json")
+async def meta_catalog_json(
+    request: Request,
+    response: Response,
+    limit: int = Query(FEED_DEFAULT_LIMIT, ge=1, le=FEED_MAX_ITEMS_PER_REQUEST),
+    offset: int = Query(0, ge=0),
+) -> Dict[str, Any]:
+    """iter265 Mission 4 — Plain JSON catalog of every ACTIVE listing
+    across the marketplace, lots, vehicle, and storage collections.
+
+    Shape (per spec):
+      {
+        "version": 1,
+        "generated_at": "<ISO>",
+        "count": <n>,
+        "items": [
+          {"id", "title", "price", "currency", "image", "url", "category", "type"}, ...
+        ]
+      }
+
+    Public — no auth required (Meta crawler + dynamic ad retargeting).
+    Listed in `robots.txt` so external scrapers / partner indexers can
+    pick it up alongside `/sitemap.xml`.
+    """
+    _check_rate_limit(request.client.host if request.client else "anon")
+
+    db = get_db()
+    items: List[Dict[str, Any]] = []
+
+    for coll_name, listing_type in COLLECTION_TO_TYPE.items():
+        async for doc in db[coll_name].find(
+            {"status": "active"},
+            {
+                "_id": 0, "id": 1, "title": 1, "category": 1,
+                "current_bid": 1, "current_price": 1, "starting_price": 1,
+                "buy_now_price": 1, "currency": 1,
+                "images": 1, "image_urls": 1, "image_url": 1,
+                "public_url": 1, "listing_type": 1,
+            },
+        ):
+            imgs = doc.get("images") or doc.get("image_urls") or []
+            image = (imgs[0] if isinstance(imgs, list) and imgs
+                     else doc.get("image_url") or "")
+            price = (
+                doc.get("current_bid")
+                or doc.get("current_price")
+                or doc.get("buy_now_price")
+                or doc.get("starting_price")
+                or 0
+            )
+            items.append({
+                "id":       doc.get("id"),
+                "title":    (doc.get("title") or "")[:200],
+                "price":    float(price or 0),
+                "currency": (doc.get("currency") or "CAD"),
+                "image":    image,
+                "url":      (
+                    doc.get("public_url")
+                    or f"{BIDVEX_BASE_URL}/listing/{doc.get('id')}"
+                ),
+                "category": doc.get("category"),
+                "type":     doc.get("listing_type") or listing_type,
+            })
+
+    total = len(items)
+    paged = items[offset:offset + limit]
+
+    response.headers["Cache-Control"] = "public, max-age=900"
+    response.headers["Access-Control-Allow-Origin"] = "*"
+
+    return {
+        "version":      1,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "count":        total,
+        "offset":       offset,
+        "limit":        limit,
+        "items":        paged,
+    }

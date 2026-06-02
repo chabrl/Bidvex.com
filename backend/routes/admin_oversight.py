@@ -222,6 +222,12 @@ async def run_compliance_scan(current_user: User = Depends(get_current_user)):
     alert per (type, listing_id|user_id) pair."""
     _require_admin(current_user)
     db = get_db()
+    return await execute_compliance_scan(db)
+
+
+async def execute_compliance_scan(db) -> Dict[str, Any]:
+    """iter265 Mission 5 — Callable compliance scan, used by both the
+    admin HTTP endpoint and the APScheduler daily cron at 06:00 UTC."""
     created = 0
 
     # Rule 1 — Vehicle listing without a broker assigned.
@@ -409,4 +415,62 @@ async def patch_admin_auction(
     return {"success": True, "id": listing_id, "applied": update}
 
 
-__all__ = ["admin_oversight_router", "public_disputes_router"]
+# ─── iter265 Mission 2 — Live email test endpoint ────────────────────
+
+@admin_oversight_router.get("/test-email")
+async def admin_test_email(
+    to: Optional[str] = Query(None, description="Recipient (defaults to current admin)"),
+    current_user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """iter265 Mission 2 — Send a live test email through the unified
+    SendGrid pipeline. Verifies:
+      • `SENDGRID_API_KEY` is configured
+      • `build_email_payload()` renders correctly
+      • SendGrid returns a 202 (live send) or fallback `logged`
+
+    Returns the raw response so the admin can confirm live delivery.
+    """
+    _require_admin(current_user)
+    recipient = (to or getattr(current_user, "email", "")).strip()
+    if not recipient:
+        raise HTTPException(status_code=400, detail="No recipient email available")
+
+    import os
+    sg_key = os.environ.get("SENDGRID_API_KEY") or ""
+    sg_configured = bool(sg_key) and sg_key != "SG.your-actual-sendgrid-key-here"
+
+    try:
+        from services.email_notifications import send_unified_email
+        result = await send_unified_email(
+            email_type="new_feature",
+            user={"email": recipient, "first_name": "Admin", "name": "Admin"},
+            data={
+                "subject_override": "✅ BidVex SendGrid Live Test",
+                "headline": "SendGrid Live Test",
+                "subheadline": "End-to-end pipeline verified.",
+                "body_html": (
+                    "<p>This is a live test email dispatched via the unified "
+                    "BidVex email pipeline.</p>"
+                    "<p>If you received this, the SendGrid integration is fully "
+                    "operational and the <code>build_email_payload()</code> "
+                    "registry is wired correctly.</p>"
+                ),
+                "cta_label": "Open BidVex",
+                "cta_url": "https://bidvex.com",
+            },
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.error(f"[test-email] dispatch failed: {exc}")
+        raise HTTPException(status_code=500, detail=f"dispatch error: {exc}") from exc
+
+    return {
+        "success": (result or {}).get("status") in ("sent", "logged"),
+        "sendgrid_configured": sg_configured,
+        "from_email": os.environ.get("SENDGRID_FROM_EMAIL"),
+        "to": recipient,
+        "result": result,
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+__all__ = ["admin_oversight_router", "public_disputes_router", "execute_compliance_scan"]

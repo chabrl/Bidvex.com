@@ -12,3 +12,4 @@ Disallow: /verify-phone
 Disallow: /payment/*
 
 Sitemap: https://bidvex.com/sitemap.xml
+Sitemap: https://bidvex.com/api/feeds/meta-catalog.json
