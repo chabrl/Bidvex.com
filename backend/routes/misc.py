@@ -212,6 +212,132 @@ async def request_affiliate_payout(
     }
 
 
+# ─── iter267 Mission 1 — Affiliate Stripe Connect aliases ─────────────
+
+
+@misc_router.post("/affiliate/connect-stripe")
+async def affiliate_connect_stripe(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+):
+    """iter267 Mission 1 — Create (or fetch) the affiliate's Stripe
+    Connect Express account and return an onboarding link the affiliate
+    dashboard can redirect to."""
+    import stripe as _stripe
+    db = get_db()
+    user = await db.users.find_one({"id": current_user.id})
+    connect_id = (user or {}).get("stripe_connect_account_id")
+
+    try:
+        if not connect_id:
+            account = _stripe.Account.create(
+                type="express",
+                country="CA",
+                email=current_user.email,
+                capabilities={
+                    "card_payments": {"requested": True},
+                    "transfers":     {"requested": True},
+                },
+                business_type="individual",
+                metadata={
+                    "user_id": current_user.id,
+                    "platform": "bidvex",
+                    "source": "affiliate_onboarding",
+                },
+            )
+            connect_id = account.id
+            await db.users.update_one(
+                {"id": current_user.id},
+                {"$set": {
+                    "stripe_connect_account_id": connect_id,
+                    "stripe_connect_onboarding_complete": False,
+                    "is_affiliate": True,
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                }},
+            )
+
+        base_url = os.environ.get("REACT_APP_BACKEND_URL", str(request.base_url).rstrip("/"))
+        link = _stripe.AccountLink.create(
+            account=connect_id,
+            refresh_url=f"{base_url}/affiliate?stripe_refresh=true",
+            return_url=f"{base_url}/affiliate?stripe=connected",
+            type="account_onboarding",
+            collection_options={"fields": "eventually_due"},
+        )
+        return {
+            "success":            True,
+            "connect_account_id": connect_id,
+            "onboarding_url":     link.url,
+            "expires_at":         datetime.fromtimestamp(link.expires_at, tz=timezone.utc).isoformat(),
+        }
+    except Exception as exc:  # noqa: BLE001
+        logger.error(f"[affiliate-connect-stripe] failed: {exc}")
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@misc_router.get("/affiliate/stripe-connect-status")
+async def affiliate_stripe_connect_status(current_user: User = Depends(get_current_user)):
+    """iter267 Mission 1 — Returns whether the affiliate has a Connect
+    account ready to receive transfers."""
+    import stripe as _stripe
+    db = get_db()
+    user = await db.users.find_one({"id": current_user.id})
+    connect_id = (user or {}).get("stripe_connect_account_id")
+    if not connect_id:
+        return {
+            "connected":           False,
+            "account_id":          None,
+            "onboarding_complete": False,
+            "payouts_enabled":     False,
+        }
+    try:
+        account = _stripe.Account.retrieve(connect_id)
+        return {
+            "connected":           True,
+            "account_id":          connect_id,
+            "onboarding_complete": bool(account.details_submitted),
+            "payouts_enabled":     bool(account.payouts_enabled),
+            "charges_enabled":     bool(account.charges_enabled),
+        }
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(f"[affiliate-stripe-status] retrieve failed: {exc}")
+        return {
+            "connected":           True,
+            "account_id":          connect_id,
+            "onboarding_complete": bool((user or {}).get("stripe_connect_onboarding_complete")),
+            "payouts_enabled":     False,
+            "error":               str(exc),
+        }
+
+
+@misc_router.get("/affiliate/stripe-dashboard-link")
+async def affiliate_stripe_dashboard_link(current_user: User = Depends(get_current_user)):
+    """iter267 Mission 1 — Stripe Express Dashboard login link (or fall
+    back to an onboarding link if not yet completed)."""
+    import stripe as _stripe
+    db = get_db()
+    user = await db.users.find_one({"id": current_user.id})
+    connect_id = (user or {}).get("stripe_connect_account_id")
+    if not connect_id:
+        raise HTTPException(status_code=400, detail="No Stripe Connect account on file")
+    try:
+        account = _stripe.Account.retrieve(connect_id)
+        if account.details_submitted:
+            link = _stripe.Account.create_login_link(connect_id)
+            return {"url": link.url, "type": "dashboard"}
+        base_url = os.environ.get("REACT_APP_BACKEND_URL", "")
+        link = _stripe.AccountLink.create(
+            account=connect_id,
+            refresh_url=f"{base_url}/affiliate?stripe_refresh=true",
+            return_url=f"{base_url}/affiliate?stripe=connected",
+            type="account_onboarding",
+        )
+        return {"url": link.url, "type": "onboarding"}
+    except Exception as exc:  # noqa: BLE001
+        logger.error(f"[affiliate-stripe-dashboard] failed: {exc}")
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 
 
 @misc_router.get("/admin/tax/pending")

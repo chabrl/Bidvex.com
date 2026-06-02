@@ -80,15 +80,56 @@ export default function AdminAffiliatePayouts() {
     if (!window.confirm(`Approve & pay $${Number(payout.amount).toFixed(2)} to ${payout.affiliate_email}?`)) return;
     try {
       setSubmitting(true);
-      await axios.patch(
+      const r = await axios.patch(
         `${API}/admin/affiliate-payouts/${payout.id}/approve`,
         {},
         { headers: { Authorization: `Bearer ${token}` } },
       );
-      toast.success('Payout approved — affiliate notified by email.');
+      // iter267 Mission 1 — Handle the "affiliate has no Stripe Connect" case.
+      if (r.data?.success === false && r.data?.error === 'affiliate_no_stripe_connect') {
+        const sendNow = window.confirm(
+          `${r.data.message_en}\n\nSend the Stripe onboarding email now?`,
+        );
+        if (sendNow) {
+          await axios.post(
+            `${API}/admin/affiliates/${r.data.affiliate_id}/send-stripe-onboarding`,
+            {},
+            { headers: { Authorization: `Bearer ${token}` } },
+          );
+          toast.success('Stripe onboarding email sent to affiliate.');
+        }
+        return;
+      }
+      toast.success(
+        r.data?.stripe_transfer_id
+          ? `Transfer sent — Stripe ID ${r.data.stripe_transfer_id.slice(0, 14)}…`
+          : 'Payout approved — affiliate notified by email.',
+      );
       fetchData();
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Approve failed');
+      const detail = e.response?.data?.detail;
+      if (detail && typeof detail === 'object' && detail.error === 'stripe_transfer_failed') {
+        toast.error(`Stripe transfer failed: ${detail.stripe_error || 'unknown error'}`);
+      } else {
+        toast.error(typeof detail === 'string' ? detail : 'Approve failed');
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSendOnboarding = async (payout) => {
+    try {
+      setSubmitting(true);
+      const affiliateId = payout.user_id || payout.affiliate_id;
+      await axios.post(
+        `${API}/admin/affiliates/${affiliateId}/send-stripe-onboarding`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      toast.success('Stripe onboarding link emailed to affiliate.');
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Failed to send onboarding link');
     } finally {
       setSubmitting(false);
     }
@@ -274,16 +315,29 @@ export default function AdminAffiliatePayouts() {
                         <td className="px-4 py-3 text-right space-x-2">
                           {status === 'pending' && (
                             <>
-                              <Button
-                                size="sm"
-                                onClick={() => handleApprove(p)}
-                                disabled={submitting}
-                                className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                                data-testid={`payout-approve-${p.id}`}
-                              >
-                                <CheckCircle2 className="h-3 w-3 mr-1" />
-                                Approve & Pay
-                              </Button>
+                              {p.has_stripe_connect ? (
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleApprove(p)}
+                                  disabled={submitting}
+                                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                                  data-testid={`payout-approve-${p.id}`}
+                                >
+                                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                                  Approve & Pay
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleSendOnboarding(p)}
+                                  disabled={submitting}
+                                  className="bg-amber-500 hover:bg-amber-600 text-white"
+                                  data-testid={`payout-onboarding-${p.id}`}
+                                  title="Affiliate has no Stripe account connected"
+                                >
+                                  ⚠️ Send Stripe Onboarding Link
+                                </Button>
+                              )}
                               <Button
                                 size="sm"
                                 variant="outline"

@@ -155,6 +155,31 @@ async def admin_send_notification(
             "created_at": datetime.now(timezone.utc).isoformat(),
             "created_by_admin": current_user.id,
         })
+        # iter267 Mission 4 — Real-time push to the recipient's bell.
+        try:
+            from routes.notifications import broadcast_notification_to_user
+            await broadcast_notification_to_user(user_id, {
+                "id":      in_app_id,
+                "user_id": user_id,
+                "type":    f"admin_{payload.notification_type}",
+                "title":   payload.subject,
+                "title_fr": payload.subject,
+                "message": payload.body_en,
+                "body":    payload.body_en,
+                "body_fr": payload.body_fr or payload.body_en,
+                "sender_name": "BidVex Admin",
+                "color_type": "action_required" if payload.requires_attachment else "info",
+                "requires_attachment": bool(payload.requires_attachment),
+                "attachment_request_label":    payload.attachment_request_label or "",
+                "attachment_request_label_fr": payload.attachment_request_label_fr or "",
+                "attachment_types":  payload.attachment_types or "PDF, JPG, PNG",
+                "attachment_max_mb": float(payload.attachment_max_mb or 1.0),
+                "read":    False,
+                "is_read": False,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            })
+        except Exception:  # noqa: BLE001
+            pass
 
     # ── Email via SendGrid ──
     if payload.send_via in {"email", "both"} and user_doc.get("email"):

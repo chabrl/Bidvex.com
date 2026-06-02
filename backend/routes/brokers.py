@@ -2214,7 +2214,7 @@ async def release_vehicle(invoice_id: str, current_user: User = Depends(get_curr
 @brokers_router.get("/broker-invoices/{invoice_id}/pdf")
 async def get_invoice_pdf(
     invoice_id:   str,
-    lang:         Optional[str] = Query("en", regex="^(en|fr)$"),
+    lang:         Optional[str] = Query("en", pattern="^(en|fr)$"),
     current_user: User = Depends(get_current_user),
 ):
     from fastapi.responses import StreamingResponse

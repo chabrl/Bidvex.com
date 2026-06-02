@@ -128,6 +128,42 @@ const NotificationCenter = () => {
     } catch (e) { /* silent */ }
   }, [user, token]);
 
+  // iter267 Mission 4 — WebSocket for instant notification delivery.
+  // Falls back transparently to 60s polling if the WS connection fails.
+  useEffect(() => {
+    if (!user?.id || !token) return undefined;
+    let ws;
+    let closed = false;
+    try {
+      const apiBase = API.replace(/\/api\/?$/, '');
+      const wsProto = apiBase.startsWith('https:') ? 'wss:' : 'ws:';
+      const wsHost = apiBase.replace(/^https?:/, '');
+      const wsUrl = `${wsProto}${wsHost}/api/ws/notifications/${user.id}?token=${encodeURIComponent(token)}`;
+      ws = new WebSocket(wsUrl);
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'new_notification') {
+            if (typeof data.unread_count === 'number') setUnreadCount(data.unread_count);
+            if (data.notification) {
+              setNotifications(prev => [data.notification, ...prev.filter(n => n.id !== data.notification.id)]);
+              toast.message(
+                isFrench ? '🔔 Nouvelle notification' : '🔔 New notification',
+                { description: (data.notification.title || '').slice(0, 80) },
+              );
+            }
+          } else if (data.type === 'connected' && typeof data.unread_count === 'number') {
+            setUnreadCount(data.unread_count);
+          }
+        } catch (_) { /* ignore */ }
+      };
+      ws.onerror = () => { /* polling fallback already running */ };
+    } catch (_) {
+      // WS not supported / blocked — polling fallback takes over.
+    }
+    return () => { closed = true; try { ws && ws.close(); } catch (_) {} };
+  }, [user?.id, token, isFrench]);
+
   // Fetch notifications
   const fetchNotifications = useCallback(async () => {
     if (!user || !token) return;

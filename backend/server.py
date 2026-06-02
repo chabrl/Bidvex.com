@@ -757,6 +757,8 @@ try:
         ("routes.payments_promotions", "promotions_sub_router", None, False),
         ("routes.fees", "fees_router", None, False),
         ("routes.notifications", "notifications_router", None, False),
+        # iter267 Mission 2 — Admin notification attachment download.
+        ("routes.notifications", "admin_notifications_router", None, False),
         ("routes.watchlist", "watchlist_router", None, False),
         ("routes.tax", "tax_calc_router", None, False),
         ("routes.messages", "messages_router", "set_messages_db", False),
@@ -1004,6 +1006,17 @@ if _frontend_build:
     _static_dir = os.path.join(_frontend_build, "static")
     if os.path.isdir(_static_dir):
         app.mount("/static", StaticFiles(directory=_static_dir), name="static-assets")
+
+    # iter267 Mission 3 — Public `/uploads/...` for notification attachments
+    # + other persistent files. Path-traversal-protected by StaticFiles
+    # which only serves files under the configured directory.
+    _uploads_dir = "/app/uploads"
+    try:
+        os.makedirs(os.path.join(_uploads_dir, "notification_attachments"), exist_ok=True)
+        app.mount("/uploads", StaticFiles(directory=_uploads_dir), name="uploads")
+        logger.info(f"[uploads] Mounted /uploads at {_uploads_dir}")
+    except Exception as _exc:  # noqa: BLE001
+        logger.warning(f"[uploads] Mount failed: {_exc}")
 
     # Serve public assets from build root (manifest.json, ads.txt, etc.)
     _public_exts = {".xml", ".txt", ".ico", ".png", ".json", ".webmanifest"}

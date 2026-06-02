@@ -496,7 +496,13 @@ async def _enrich_payouts(db, payouts: List[Dict[str, Any]]) -> List[Dict[str, A
     if user_ids:
         async for u in db.users.find(
             {"id": {"$in": user_ids}},
-            {"_id": 0, "id": 1, "name": 1, "email": 1, "affiliate_code": 1, "preferred_language": 1},
+            {
+                "_id": 0, "id": 1, "name": 1, "email": 1,
+                "affiliate_code": 1, "preferred_language": 1,
+                # iter267 Mission 1 — Stripe Connect flag for the admin UI.
+                "stripe_connect_account_id": 1,
+                "stripe_connect_onboarding_complete": 1,
+            },
         ):
             users_by_id[u["id"]] = u
     for p in payouts:
@@ -506,6 +512,9 @@ async def _enrich_payouts(db, payouts: List[Dict[str, Any]]) -> List[Dict[str, A
         p["affiliate_email"] = u.get("email") or "—"
         p["affiliate_code"] = u.get("affiliate_code")
         p["status_norm"] = _payout_status_normalize(p.get("status"))
+        # iter267 Mission 1 — Stripe Connect state surfaced to the UI.
+        p["has_stripe_connect"] = bool(u.get("stripe_connect_account_id"))
+        p["stripe_onboarding_complete"] = bool(u.get("stripe_connect_onboarding_complete"))
         # Referrals count for this affiliate.
         try:
             p["referrals_count"] = await db.affiliate_referrals.count_documents({"affiliate_id": uid})
@@ -616,23 +625,82 @@ async def approve_affiliate_payout(
     if _payout_status_normalize(payout.get("status")) == "paid":
         raise HTTPException(status_code=400, detail="Payout already paid")
 
+    # iter267 Mission 1 — Fire a real Stripe Connect transfer if the
+    # affiliate has linked a Connect account. If not, return a
+    # spec-aligned envelope so the admin UI can prompt onboarding.
+    uid = payout.get("user_id") or payout.get("affiliate_id")
+    affiliate = await db.users.find_one(
+        {"id": uid},
+        {"_id": 0, "id": 1, "name": 1, "email": 1, "preferred_language": 1, "stripe_connect_account_id": 1},
+    ) if uid else None
+
+    if not affiliate or not affiliate.get("stripe_connect_account_id"):
+        return {
+            "success": False,
+            "error": "affiliate_no_stripe_connect",
+            "message_en": (
+                "This affiliate has not connected a Stripe account. "
+                "Send them the Stripe Connect onboarding link first."
+            ),
+            "message_fr": (
+                "Cet affilié n'a pas connecté de compte Stripe. "
+                "Envoyez-lui d'abord le lien d'intégration Stripe."
+            ),
+            "affiliate_id": uid,
+            "affiliate_email": (affiliate or {}).get("email"),
+        }
+
+    transfer_id = None
+    transfer_error = None
+    try:
+        import stripe as _stripe  # noqa: WPS433
+        amount_cents = int(round(float(payout.get("amount") or 0) * 100))
+        if amount_cents <= 0:
+            raise ValueError("Amount must be > 0")
+        transfer = _stripe.Transfer.create(
+            amount=amount_cents,
+            currency=(payout.get("currency") or "cad").lower(),
+            destination=affiliate["stripe_connect_account_id"],
+            description=f"BidVex affiliate commission payout — {payout_id}",
+            metadata={
+                "payout_id": str(payout_id),
+                "affiliate_user_id": str(uid),
+                "approved_by": current_user.email or current_user.id,
+            },
+        )
+        transfer_id = getattr(transfer, "id", None)
+    except Exception as exc:  # noqa: BLE001
+        transfer_error = str(exc)
+        logger.warning(f"[affiliate-payout-approve] stripe.Transfer failed: {exc}")
+
     now_iso = datetime.now(timezone.utc).isoformat()
+    set_fields = {
+        "status":       "paid" if transfer_id else "pending",
+        "approved_by":  current_user.id,
+        "approved_at":  now_iso,
+    }
+    if transfer_id:
+        set_fields["paid_at"]            = now_iso
+        set_fields["stripe_transfer_id"] = transfer_id
+    if transfer_error:
+        set_fields["last_transfer_error"] = transfer_error
     await db.affiliate_payouts.update_one(
         {"id": payout_id},
-        {"$set": {
-            "status": "paid",
-            "approved_by": current_user.id,
-            "approved_at": now_iso,
-            "paid_at": now_iso,
-        }},
+        {"$set": set_fields},
     )
 
-    # Email the affiliate.
-    uid = payout.get("user_id") or payout.get("affiliate_id")
-    user = await db.users.find_one(
-        {"id": uid},
-        {"_id": 0, "id": 1, "name": 1, "email": 1, "preferred_language": 1},
-    ) if uid else None
+    if transfer_error:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "error": "stripe_transfer_failed",
+                "message_en": "Stripe failed to process the transfer. Please retry.",
+                "message_fr": "Stripe n'a pas pu traiter le virement. Veuillez réessayer.",
+                "stripe_error": transfer_error,
+            },
+        )
+
+    user = affiliate  # alias used by email block below.
     if user and user.get("email"):
         try:
             from services.email_notifications import send_unified_email
@@ -647,7 +715,8 @@ async def approve_affiliate_payout(
                         f"<p>Hi {user.get('name', 'Partner')},</p>"
                         f"<p>Your affiliate payout request for <strong>${float(payout.get('amount') or 0):,.2f} "
                         f"{payout.get('currency', 'CAD')}</strong> has been <strong>approved</strong> "
-                        f"and is being processed via {payout.get('method', 'Stripe Connect')}.</p>"
+                        f"and is being processed via Stripe Connect.</p>"
+                        f"<p><strong>Transfer ID:</strong> <code>{transfer_id}</code></p>"
                         "<p>You will receive the funds within 1-3 business days.</p>"
                     ),
                     "cta_label": "Open Affiliate Dashboard",
@@ -657,7 +726,13 @@ async def approve_affiliate_payout(
         except Exception as exc:  # noqa: BLE001
             logger.warning(f"[affiliate-payout-approve] email failed: {exc}")
 
-    return {"success": True, "id": payout_id, "status": "paid", "paid_at": now_iso}
+    return {
+        "success": True,
+        "id": payout_id,
+        "status": "paid",
+        "paid_at": now_iso,
+        "stripe_transfer_id": transfer_id,
+    }
 
 
 @admin_oversight_router.patch("/affiliate-payouts/{payout_id}/reject")
@@ -718,6 +793,102 @@ async def reject_affiliate_payout(
             logger.warning(f"[affiliate-payout-reject] email failed: {exc}")
 
     return {"success": True, "id": payout_id, "status": "rejected", "rejected_at": now_iso, "reason": body.reason}
+
+
+# ─── iter267 Mission 1 — Email a Stripe Connect onboarding link to an affiliate ──
+
+@admin_oversight_router.post("/affiliates/{user_id}/send-stripe-onboarding")
+async def send_stripe_onboarding_link(
+    user_id: str,
+    current_user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """iter267 Mission 1 — Used when admin tries to approve a payout
+    but the affiliate has no Stripe Connect account. Creates an Express
+    account + AccountLink and sends the affiliate an email."""
+    _require_admin(current_user)
+    db = get_db()
+    affiliate = await db.users.find_one(
+        {"id": user_id},
+        {"_id": 0, "id": 1, "name": 1, "email": 1, "stripe_connect_account_id": 1, "preferred_language": 1},
+    )
+    if not affiliate:
+        raise HTTPException(status_code=404, detail="Affiliate not found")
+    if not affiliate.get("email"):
+        raise HTTPException(status_code=400, detail="Affiliate has no email on file")
+
+    try:
+        import stripe as _stripe  # noqa: WPS433
+        connect_id = affiliate.get("stripe_connect_account_id")
+        if not connect_id:
+            account = _stripe.Account.create(
+                type="express",
+                country="CA",
+                email=affiliate["email"],
+                capabilities={
+                    "card_payments": {"requested": True},
+                    "transfers":     {"requested": True},
+                },
+                business_type="individual",
+                metadata={"user_id": user_id, "platform": "bidvex", "source": "admin_payout_request"},
+            )
+            connect_id = account.id
+            await db.users.update_one(
+                {"id": user_id},
+                {"$set": {
+                    "stripe_connect_account_id": connect_id,
+                    "stripe_connect_onboarding_complete": False,
+                    "is_affiliate": True,
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                }},
+            )
+
+        base_url = os.environ.get("REACT_APP_BACKEND_URL", "https://bidvex.com")
+        link = _stripe.AccountLink.create(
+            account=connect_id,
+            refresh_url=f"{base_url}/affiliate?stripe_refresh=true",
+            return_url=f"{base_url}/affiliate?stripe=connected",
+            type="account_onboarding",
+            collection_options={"fields": "eventually_due"},
+        )
+        onboarding_url = link.url
+    except Exception as exc:  # noqa: BLE001
+        logger.error(f"[stripe-onboarding] account/link create failed: {exc}")
+        raise HTTPException(status_code=502, detail=f"Stripe error: {exc}") from exc
+
+    try:
+        from services.email_notifications import send_unified_email
+        await send_unified_email(
+            email_type="new_feature",
+            user=affiliate,
+            data={
+                "subject_override": "💰 Connect Your Stripe Account to Receive BidVex Payouts",
+                "headline": "Connect Stripe to Get Paid",
+                "subheadline": "One quick step to receive your affiliate commissions.",
+                "body_html": (
+                    f"<p>Hi {affiliate.get('name', 'Partner')},</p>"
+                    "<p>You've earned affiliate commissions on BidVex! Before we can transfer "
+                    "your funds we need you to set up a Stripe Express account — it takes "
+                    "less than 2 minutes.</p>"
+                    f"<p>Click the secure link below to complete onboarding. The link expires "
+                    f"in a few hours; you can request a fresh one anytime from your "
+                    f"<a href='{base_url}/affiliate'>Affiliate Dashboard</a>.</p>"
+                ),
+                "cta_label": "Connect Stripe Account →",
+                "cta_url":   onboarding_url,
+            },
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(f"[stripe-onboarding] email send failed: {exc}")
+
+    return {
+        "success":        True,
+        "affiliate_id":   user_id,
+        "onboarding_url": onboarding_url,
+        "stripe_connect_account_id": connect_id,
+    }
+
+
+import os  # noqa: E402 — kept low to avoid top-of-file churn.
 
 
 __all__ = ["admin_oversight_router", "public_disputes_router", "execute_compliance_scan"]

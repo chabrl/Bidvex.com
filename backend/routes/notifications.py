@@ -2,22 +2,130 @@
 Notification routes - user notification CRUD
 """
 
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
-from typing import Optional
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form, Query
+from fastapi.responses import FileResponse
+from starlette.websockets import WebSocket, WebSocketDisconnect
+from typing import Optional, Dict, Any
 from datetime import datetime, timezone
 from deps import get_current_user, get_db, User
+import asyncio
 import uuid
 import os
+import mimetypes
 import logging
 
 logger = logging.getLogger(__name__)
 
 notifications_router = APIRouter(tags=["Notifications"])
+admin_notifications_router = APIRouter(prefix="/admin/notifications", tags=["Admin Notifications"])
 
-# iter266 Mission 3C — upload config for notification attachment requests.
+# iter266 Mission 3C / iter267 Mission 3 — upload config + base dir.
 NOTIFICATION_UPLOAD_DIR = "/app/uploads/notification_attachments"
+NOTIFICATION_UPLOAD_BASE = "/app/uploads"
 DEFAULT_ALLOWED_EXT = {"pdf", "jpg", "jpeg", "png", "doc", "docx"}
 DEFAULT_MAX_MB = 5.0
+
+
+def _is_admin(user: User) -> bool:
+    return bool(getattr(user, "is_admin", False)) or getattr(user, "role", None) == "admin"
+
+
+# ─── iter267 Mission 4 — Notification WebSocket bus ──────────────────
+
+
+class NotificationConnectionManager:
+    """Tracks active WebSocket connections per user_id. Multiple
+    connections per user (laptop + phone) are supported via a list."""
+
+    def __init__(self):
+        self.active: Dict[str, list] = {}
+
+    async def connect(self, websocket: WebSocket, user_id: str) -> None:
+        await websocket.accept()
+        self.active.setdefault(user_id, []).append(websocket)
+
+    def disconnect(self, websocket: WebSocket, user_id: str) -> None:
+        conns = self.active.get(user_id) or []
+        if websocket in conns:
+            conns.remove(websocket)
+        if not conns:
+            self.active.pop(user_id, None)
+
+    async def send_to_user(self, user_id: str, message: Dict[str, Any]) -> int:
+        conns = list(self.active.get(user_id) or [])
+        if not conns:
+            return 0
+        delivered = 0
+        for ws in conns:
+            try:
+                await ws.send_json(message)
+                delivered += 1
+            except Exception:  # noqa: BLE001
+                self.disconnect(ws, user_id)
+        return delivered
+
+
+notification_manager = NotificationConnectionManager()
+
+
+async def broadcast_notification_to_user(user_id: str, notification: Dict[str, Any]) -> None:
+    """iter267 Mission 4 — Fire-and-forget broadcaster used by code that
+    inserts a notification. Recomputes the unread_count so the bell
+    badge updates instantly without a full re-fetch."""
+    try:
+        db = get_db()
+        unread = await db.notifications.count_documents({"user_id": user_id, "read": False})
+        payload_notif = {k: v for k, v in (notification or {}).items() if k != "_id"}
+        await notification_manager.send_to_user(user_id, {
+            "type":         "new_notification",
+            "notification": payload_notif,
+            "unread_count": unread,
+        })
+    except Exception as exc:  # noqa: BLE001
+        logger.debug(f"[notif-broadcast] silently skipped: {exc}")
+
+
+@notifications_router.websocket("/ws/notifications/{user_id}")
+async def notifications_websocket(websocket: WebSocket, user_id: str, token: Optional[str] = Query(None)):
+    """iter267 Mission 4 — WebSocket bell stream. Auth via `?token=`
+    query param (since WS handshakes can't read Authorization headers
+    in browsers). Validates that the JWT belongs to `user_id`."""
+    # Verify the token corresponds to user_id BEFORE accepting.
+    authorized = False
+    try:
+        if token:
+            import jwt
+            import os as _os
+            jwt_secret = _os.environ.get("JWT_SECRET", "")
+            payload = jwt.decode(token, jwt_secret, algorithms=["HS256"])
+            authorized = (payload.get("user_id") == user_id or payload.get("sub") == user_id)
+    except Exception:
+        authorized = False
+    if not authorized:
+        await websocket.close(code=4401)
+        return
+
+    await notification_manager.connect(websocket, user_id)
+    try:
+        # Send an initial hello + current unread count.
+        try:
+            db = get_db()
+            unread = await db.notifications.count_documents({"user_id": user_id, "read": False})
+        except Exception:
+            unread = 0
+        await websocket.send_json({"type": "connected", "unread_count": unread})
+
+        # Keep the socket alive with periodic pings.
+        while True:
+            await asyncio.sleep(30)
+            try:
+                await websocket.send_json({"type": "ping"})
+            except Exception:
+                break
+    except WebSocketDisconnect:
+        pass
+    finally:
+        notification_manager.disconnect(websocket, user_id)
 
 
 @notifications_router.get("/notifications")
@@ -215,6 +323,12 @@ async def admin_send_notification(
 
     if docs:
         await db.notifications.insert_many(docs)
+        # iter267 Mission 4 — Push to WebSocket subscribers.
+        for d in docs:
+            try:
+                await broadcast_notification_to_user(d["user_id"], d)
+            except Exception:  # noqa: BLE001
+                pass
     return {"success": True, "sent_count": len(docs)}
 
 
@@ -238,7 +352,11 @@ async def submit_notification_attachment(
     if not notif.get("requires_attachment"):
         raise HTTPException(status_code=400, detail="This notification does not request an attachment")
     if notif.get("attachment_submitted"):
-        raise HTTPException(status_code=400, detail="Attachment already submitted")
+        # iter267 Mission 2 — re-upload blocked after submission (spec requirement).
+        raise HTTPException(
+            status_code=400,
+            detail="Already submitted — contact support if you need to resubmit",
+        )
 
     # Resolve max size + allowed extensions from the notif config.
     max_mb = float(notif.get("attachment_max_mb") or DEFAULT_MAX_MB)
@@ -347,3 +465,54 @@ async def admin_cleanup_empty_notifications(current_user: User = Depends(get_cur
         ]
     })
     return {"deleted_count": result.deleted_count}
+
+
+# ─── iter267 Mission 2 — Admin attachment download ───────────────────
+
+
+@admin_notifications_router.get("/{notification_id}/attachment")
+async def admin_download_notification_attachment(
+    notification_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """iter267 Mission 2 — Stream the file the user uploaded in response
+    to an attachment-request notification. Path-traversal protected:
+    the resolved absolute path must stay under `NOTIFICATION_UPLOAD_BASE`.
+    """
+    if not _is_admin(current_user):
+        raise HTTPException(status_code=403, detail="Admin only")
+
+    db = get_db()
+    notif = await db.notifications.find_one({"id": notification_id}, {"_id": 0})
+    if not notif:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    if not notif.get("attachment_submitted"):
+        raise HTTPException(status_code=404, detail="No attachment submitted for this notification")
+
+    attachment_url = (notif.get("attachment_url") or "").strip()
+    if not attachment_url:
+        raise HTTPException(status_code=404, detail="Attachment URL missing")
+
+    # Strip the public /uploads prefix to map to the on-disk path.
+    rel = attachment_url.lstrip("/")
+    if rel.startswith("uploads/"):
+        rel = rel[len("uploads/") :]
+
+    target = os.path.join(NOTIFICATION_UPLOAD_BASE, rel)
+
+    # ── Path-traversal guard ──
+    resolved = os.path.realpath(target)
+    base_resolved = os.path.realpath(NOTIFICATION_UPLOAD_BASE)
+    if not resolved.startswith(base_resolved + os.sep) and resolved != base_resolved:
+        logger.warning(f"[admin-attachment-download] traversal blocked: {target} → {resolved}")
+        raise HTTPException(status_code=403, detail="Access denied")
+    if not os.path.isfile(resolved):
+        raise HTTPException(status_code=404, detail="File not found on disk")
+
+    filename = (notif.get("attachment_filename") or os.path.basename(resolved))
+    media_type, _ = mimetypes.guess_type(filename)
+    return FileResponse(
+        path=resolved,
+        media_type=media_type or "application/octet-stream",
+        filename=filename,
+    )

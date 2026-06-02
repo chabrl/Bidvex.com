@@ -214,11 +214,38 @@ export default function NotificationDetailModal({
             </div>
 
             {alreadySubmitted ? (
-              <div className="flex items-center gap-2 text-emerald-700 bg-emerald-50 dark:bg-emerald-950/30 rounded p-3" data-testid="notif-attachment-submitted">
-                <CheckCircle2 className="h-5 w-5" />
-                <span className="text-sm font-medium">
-                  {isFrench ? 'Document envoyé à l\'administrateur.' : 'Attachment sent to admin.'}
-                </span>
+              <div className="flex items-center gap-3 text-emerald-700 bg-emerald-50 dark:bg-emerald-950/30 rounded p-3" data-testid="notif-attachment-submitted">
+                <CheckCircle2 className="h-5 w-5 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium">
+                    {isFrench ? 'Document envoyé à l\'administrateur.' : 'Attachment sent to admin.'}
+                  </p>
+                  {notification?.attachment_submitted_at && (
+                    <p className="text-xs text-emerald-600 mt-0.5">
+                      {isFrench ? 'Soumis le' : 'Submitted on'}{' '}
+                      {new Date(notification.attachment_submitted_at).toLocaleString(isFrench ? 'fr-CA' : 'en-CA')}
+                    </p>
+                  )}
+                  {notification?.attachment_url && (
+                    /\.(jpe?g|png|webp|gif)$/i.test(notification.attachment_url) ? (
+                      <img
+                        src={notification.attachment_url}
+                        alt="attachment"
+                        className="mt-2 h-[60px] w-[60px] object-cover rounded border border-emerald-200"
+                        data-testid="notif-attachment-preview-img"
+                      />
+                    ) : (
+                      <p className="text-xs text-emerald-700 mt-1 flex items-center gap-1" data-testid="notif-attachment-preview-pdf">
+                        📄 <span className="font-mono">{notification.attachment_filename || 'attachment'}</span>
+                      </p>
+                    )
+                  )}
+                  <p className="text-xs text-slate-500 mt-1">
+                    {isFrench
+                      ? 'Déjà soumis — contactez le support si vous devez soumettre à nouveau.'
+                      : 'Already submitted — contact support if you need to resubmit.'}
+                  </p>
+                </div>
               </div>
             ) : (
               <div className="space-y-2">
