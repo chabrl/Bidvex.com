@@ -223,6 +223,15 @@ const EnhancedUserManager = () => {
 
   const submitRequestPayment = async () => {
     if (!reqPayModal.user) return;
+    // iter260 — Guard against contact-only stubs that have no account
+    // ID. The admin users list returns these rows alongside real users
+    // (they're created by marketing-list imports + unsubscribe-link
+    // visits) — and clicking Request Payment on one of them would
+    // have produced `/api/admin/users/undefined/request-payment`.
+    if (!reqPayModal.user.id) {
+      toast.error('This contact has no registered account — Request Payment is unavailable.');
+      return;
+    }
     const total = reqPayCalcTotal();
     if (!total || total <= 0) {
       toast.error('Subtotal must be a positive number');
@@ -252,7 +261,10 @@ const EnhancedUserManager = () => {
         body,
         { headers: { Authorization: `Bearer ${token}` } },
       );
-      toast.success(`Payment link created — $${r.data.total_amount.toFixed(2)} CAD`);
+      const warning = r.data?.warning;
+      toast.success(
+        `Payment link created — $${r.data.total_amount.toFixed(2)} CAD${warning ? ` (${warning})` : ''}`,
+      );
       setReqPayModal({ open: false, user: null });
       setReqPayForm({
         subtotal: '', tax_type: 'gst_qst', custom_tax_rate: '',
@@ -260,7 +272,20 @@ const EnhancedUserManager = () => {
         send_email: true, send_notification: true, expiry_hours: 48,
       });
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Failed to create payment request');
+      // iter260 — Surface the real backend error so admins don't see a
+      // generic toast. Bubble validation messages (422 array, 400/404
+      // detail strings, network errors).
+      console.error('[request-payment] error:', e?.response?.status, e?.response?.data);
+      const detail = e?.response?.data?.detail;
+      let msg = 'Failed to create payment request';
+      if (Array.isArray(detail) && detail[0]?.msg) {
+        msg = `Validation: ${detail.map((d) => `${(d.loc || []).join('.')}: ${d.msg}`).join('; ')}`;
+      } else if (typeof detail === 'string' && detail.trim()) {
+        msg = detail;
+      } else if (e?.message) {
+        msg = e.message;
+      }
+      toast.error(msg);
     } finally {
       setReqPayBusy(false);
     }
@@ -887,15 +912,17 @@ const EnhancedUserManager = () => {
                   <Button
                     size="sm"
                     onClick={() => setReqPayModal({ open: true, user })}
-                    title="Request payment from this user"
-                    data-testid={`request-payment-user-${user.id}`}
+                    disabled={!user.id}
+                    title={user.id ? 'Request payment from this user' : 'Contact-only record — no account ID. Request Payment is unavailable.'}
+                    data-testid={`request-payment-user-${user.id || user.email}`}
                     style={{
-                      backgroundColor: '#0055FF',
+                      backgroundColor: user.id ? '#0055FF' : '#9aa6b3',
                       color: 'white',
                       fontWeight: 700,
                       borderRadius: 6,
                       padding: '6px 14px',
                       fontSize: 12,
+                      cursor: user.id ? 'pointer' : 'not-allowed',
                     }}
                     className="hover:opacity-90 transition-opacity"
                   >

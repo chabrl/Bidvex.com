@@ -88,11 +88,12 @@ async def post_chat_stream(
       google_search: optional toggle (default true) — keeps the GoogleSearch tool on
       listing_id:    optional UUID to inject current_viewed_listing + market_comparables
       session_id:    optional chat session UUID; if absent a new session is created
-
-    Response: text/plain stream, one UTF-8 fragment per chunk.
     """
     body = await _enrich_with_listing_context(body)
     user_id = await _resolve_user_id(creds)
+    # iter261 — session_id resolution lives inside _stream() so the
+    # GET variant inherits the same behavior. The first turn anchors
+    # the conversation; the response header echoes the resolved id.
     return _stream(body, user_id=user_id)
 
 
@@ -141,6 +142,11 @@ async def _enrich_with_listing_context(body: StreamChatBody) -> StreamChatBody:
 
 
 def _stream(body: StreamChatBody, *, user_id: Optional[str] = None) -> StreamingResponse:
+    # iter261 — Resolve a session id ONCE at the top of the stream so
+    # the response header `X-Session-Id` matches the id we persist;
+    # the frontend echoes the same id on subsequent turns.
+    import uuid as _uuid
+    resolved_session_id = (body.session_id or "").strip() or str(_uuid.uuid4())
     async def aiter() -> AsyncIterator[bytes]:
         # Bridge the sync google-genai stream → async generator via a queue.
         # This pattern keeps FastAPI's event loop free while the blocking
@@ -178,19 +184,23 @@ def _stream(body: StreamChatBody, *, user_id: Optional[str] = None) -> Streaming
             yield item
 
         # iter239 Mission 4 — Persist the turn for authenticated users.
+        # iter261 — Non-blocking via asyncio.create_task() so persist
+        # adds ZERO latency to the stream tail; the stream completes
+        # the moment the model is done.
         if user_id:
             try:
                 assistant_text = b"".join(accumulator).decode("utf-8", errors="ignore").strip()
                 # Skip the iter236 silent priming probe ("The user is currently viewing listing ID …").
                 is_priming = body.message.startswith("The user is currently viewing listing ID")
                 if assistant_text and not is_priming:
-                    await persist_chat_turn(
+                    import asyncio as _asyncio
+                    _asyncio.create_task(persist_chat_turn(
                         user_id=user_id,
-                        session_id=body.session_id,
+                        session_id=resolved_session_id,
                         listing_id=body.listing_id,
                         user_message=body.message,
                         assistant_message=assistant_text,
-                    )
+                    ))
             except Exception as e:  # noqa: BLE001
                 logger.warning(f"[iter239-mission4] persist_chat_turn failed: {e}")
 
@@ -203,7 +213,11 @@ def _stream(body: StreamChatBody, *, user_id: Optional[str] = None) -> Streaming
             "X-GenAI-Model": GEMINI_MODEL_ID,
             # iter239 — Surface the session_id (if explicitly set) so the FE
             # can persist it client-side without an extra round-trip.
-            **({"X-Chat-Session-Id": body.session_id} if body.session_id else {}),
+            # iter261 — ALSO emit a resolved session id even when the FE
+            # didn't send one, so the first turn anchors the conversation.
+            "X-Chat-Session-Id": resolved_session_id,
+            "X-Session-Id": resolved_session_id,
+            "Access-Control-Expose-Headers": "X-Chat-Session-Id, X-Session-Id, X-GenAI-Model",
         },
     )
 

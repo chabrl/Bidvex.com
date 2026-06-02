@@ -26,6 +26,7 @@ import { formatCurrency, formatPercent } from '../utils/currencyFormatter';
 import { LoadingTimeout } from '../components/LoadingTimeout';
 import InfoTip from '../components/InfoTip';
 import PendingAiReviewBanner from '../components/PendingAiReviewBanner';
+import PendingPaymentsCard from '../components/PendingPaymentsCard';
 // iter239 Mission 5 — Seller "Promote" modal.
 import PromoteListingModal from '../components/PromoteListingModal';
 import { Sparkles } from 'lucide-react';
@@ -123,6 +124,9 @@ const SellerDashboard = () => {
   return (
     <div className="min-h-screen py-4 sm:py-8 px-3 sm:px-4 pb-24 lg:pb-8" data-testid="seller-dashboard">
       <div className="max-w-7xl mx-auto space-y-5 sm:space-y-8">
+        {/* iter261 — Pending payments anchored at the very top so an
+            open admin-issued balance is impossible to miss. */}
+        <PendingPaymentsCard />
         {/* iter211 P4 — Demo mode banner (renders only for is_demo_account users) */}
         <DemoModeBanner user={user} />
 

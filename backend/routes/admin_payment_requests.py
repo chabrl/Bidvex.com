@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import logging
 import os
+import traceback
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
@@ -82,10 +83,52 @@ async def request_payment(
     _require_admin(current_user)
     db = get_db()
 
-    target = await db.users.find_one({"id": user_id}, {"_id": 0})
-    if not target:
-        raise HTTPException(status_code=404, detail="User not found")
+    # iter260 — Hard-fail with a clear message when the caller sends a
+    # garbage path param. The admin UI may pass `undefined` / empty /
+    # `null` when the user row it was rendered for has no `id` field
+    # (e.g. marketing-list "contact-only" stubs). The previous behavior
+    # was a generic 404 "User not found" which the admin saw in the
+    # toast as "Failed to create payment request".
+    clean_uid = (user_id or "").strip()
+    if not clean_uid or clean_uid.lower() in ("undefined", "null", "none"):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "This user has no account ID (likely a contact-only "
+                "stub from a marketing list). Request Payment is only "
+                "available for registered users."
+            ),
+        )
 
+    target = await db.users.find_one({"id": clean_uid}, {"_id": 0})
+    if not target:
+        raise HTTPException(status_code=404, detail=f"User not found: {clean_uid}")
+    # iter260 — Use the cleaned uid everywhere downstream.
+    user_id = clean_uid
+
+    try:
+        return await _build_payment_request(db, user_id, body, current_user, target)
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001
+        # iter260 — Full traceback to backend logs + structured 500
+        # surfacing the real exception type to the admin so the popup
+        # doesn't lie about the cause.
+        traceback.print_exc()
+        logger.exception(f"[request-payment] internal error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal error in request_payment: {type(e).__name__}: {str(e)[:200]}",
+        )
+
+
+async def _build_payment_request(
+    db,
+    user_id: str,
+    body: "RequestPaymentBody",
+    current_user: "User",
+    target: Dict[str, Any],
+):
     tax_rate = _resolve_tax_rate(body.tax_type, body.custom_tax_rate)
 
     # Stripe Payment Link
@@ -166,6 +209,14 @@ async def request_payment(
     }
     await db.payment_requests.insert_one(doc)
 
+    # iter261 — Always compose a payment URL. Even when Stripe is
+    # misconfigured (no STRIPE_SECRET_KEY in preview, or rate-limited)
+    # the user gets a clickable BidVex-hosted fallback Pay page that
+    # creates a Checkout session on demand. The email previously had
+    # `cta_url: None` → button hidden → user had no way to pay.
+    bidvex_pay_url = f"{_PUBLIC_URL}/pay/{request_id}"
+    final_payment_url = stripe_payment_link_url or bidvex_pay_url
+
     # iter258 — Fan-out: email + in-app notification (both opt-in).
     if body.send_email:
         try:
@@ -177,7 +228,9 @@ async def request_payment(
                     "total_amount": f"{float(body.total_amount):.2f}",
                     "description": body.description,
                     "expiry_label": expiry_label,
-                    "payment_link": stripe_payment_link_url or "",
+                    "payment_link": final_payment_url,
+                    "cta_url": final_payment_url,
+                    "cta_label": f"💳 Pay Now — ${float(body.total_amount):.2f} CAD",
                 },
             )
         except Exception as exc:  # noqa: BLE001
@@ -190,8 +243,12 @@ async def request_payment(
                 "user_id": user_id,
                 "type": "payment_request",
                 "title": "💳 Payment Required",
-                "body": f"An outstanding balance of ${float(body.total_amount):.2f} CAD requires your attention.",
-                "link": stripe_payment_link_url or "/dashboard",
+                "body": (
+                    f"Pending payment of ${float(body.total_amount):.2f} CAD. "
+                    f"Reason: {body.description[:80]}"
+                ),
+                "link": final_payment_url,
+                "amount_cad": float(body.total_amount),
                 "is_read": False,
                 "created_at": now.isoformat(),
             })
@@ -202,6 +259,7 @@ async def request_payment(
         "success": True,
         "id": request_id,
         "payment_link": stripe_payment_link_url,
+        "payment_url": final_payment_url,
         "stripe_payment_link_id": stripe_payment_link_id,
         "total_amount": float(body.total_amount),
         "expiry_label": expiry_label,

@@ -94,6 +94,8 @@ const MaintenancePage = lazy(() => import('./pages/MaintenancePage'));
 const CheckoutPage = lazy(() => import('./pages/CheckoutPage'));
 const BecomePartnerPage = lazy(() => import('./pages/BecomePartnerPage'));
 const PartnerDashboard = lazy(() => import('./pages/PartnerDashboard'));
+const PaymentPage = lazy(() => import('./pages/PaymentPage'));
+const PayRequestSuccessPage = lazy(() => import('./pages/PayRequestSuccessPage'));
 const PartnerPaymentSettings = lazy(() => import('./pages/PartnerPaymentSettings'));
 const LegalPage = lazy(() => import('./pages/LegalPage'));
 const PlatformPoliciesPage = lazy(() => import('./pages/PlatformPoliciesPage'));
@@ -386,6 +388,9 @@ const App = () => {
             <PhoneVerificationRoute><PhoneVerificationPage /></PhoneVerificationRoute>
           } />
           <Route path="/how-it-works" element={<HowItWorksPage />} />
+          {/* iter261 — Public payment page (no auth) for admin-issued payment requests. */}
+          <Route path="/pay/:payment_request_id" element={<PaymentPage />} />
+          <Route path="/pay/:payment_request_id/success" element={<PayRequestSuccessPage />} />
           <Route path="/community" element={<CommunityPage />} />
           <Route path="/about" element={<AboutUsPage />} />
           <Route path="/about-us" element={<AboutUsPage />} />

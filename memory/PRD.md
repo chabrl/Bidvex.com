@@ -1,5 +1,57 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter261 — PAY PAGE + AI SESSION + UNIFIED EMAIL REGISTRY (Mar 24, 2026) ✅
+
+Massive 4-mission sprint to close the "no Pay button in payment email" bug at the root, plus polish across AI chat history, bell notifications, and the email template registry.
+
+### Mission 1 — Payment Request: full Stripe integration + BidVex-hosted Pay page
+- **NEW** `routes/public_payments.py` ships 4 endpoints:
+  - `GET  /api/pay/{id}` — public payload (PII-stripped via `_safe_public_payload`).
+  - `POST /api/pay/{id}/checkout-session` — on-demand Stripe Checkout fallback when the original `stripe_payment_link` is null. Persists `stripe_checkout_session_id` for webhook matching.
+  - `POST /api/pay/{id}/confirm-success` — idempotent success handshake; flips status → `paid`, fires `payment_confirmed` email + notification.
+  - `GET  /api/my/payment-requests` — current user's outstanding pending rows.
+- **`routes/admin_payment_requests.py`** now composes `final_payment_url = stripe_payment_link OR f"{PUBLIC_HOST}/pay/{id}"` and passes it to BOTH the email and the notification. Even when Stripe is misconfigured the email button is never dead.
+- **NEW** React pages: `PaymentPage.jsx` (active/paid/expired/error states + manual_instructions modal) and `PayRequestSuccessPage.jsx` (success handshake).
+- **NEW** `components/PendingPaymentsCard.jsx` mounted at the top of `SellerDashboard.js` AND `BuyerDashboard.js` (rose border, red amount, blue Pay Now CTA).
+- **`components/NotificationCenter.js`** now renders a special bell row for `type=payment_request`: 💳 emoji + red title + amount pill + inline blue "Pay Now →" link.
+- Stripe webhook (iter258 `_handle_admin_payment_request_paid`) already matches the new `metadata.type=payment_request` from the on-demand checkout-session.
+
+### Mission 2 — AI chat history non-blocking + session id header
+- `routes/genai_chat.py` `_stream()` now generates `resolved_session_id` (echoes `body.session_id` or mints a UUID) and exposes it on EVERY stream as both `X-Session-Id` AND `X-Chat-Session-Id` headers (with `Access-Control-Expose-Headers`).
+- `persist_chat_turn(...)` switched from `await` to `asyncio.create_task(...)` — zero added latency to the stream tail.
+
+### Mission 3 — Bell notifications registry
+- The 4 notification endpoints (`GET /api/notifications`, `.../unread-count`, `.../{id}/read`, `.../mark-all-read`) were already shipped in iter238 — verified still mounted.
+- iter261 adds the `payment_request` + `payment_confirmed` type definitions in `NOTIFICATION_TYPES` plus inline Pay Now rendering.
+
+### Mission 4 — Unified email template registry
+- Added 6 missing transactional types to `services/email_templates.py`: `listing_approved`, `listing_rejected`, `account_suspended`, `account_unsuspended`, `new_message`, `auction_starting_soon`. Each carries headline/subheadline/body_html/cta_label/cta_url with i18n-safe placeholders.
+- `payment_request` body now uses dynamic `{cta_url}` + `{cta_label}` (previously hardcoded to `{payment_link}`) so the admin caller always passes a non-null URL.
+
+### Validation
+- **`tests/test_iter261_pay_page_and_chat.py` — 14/14 PASS** covering all 4 missions.
+- Live smokes confirmed end-to-end:
+  - `POST /api/admin/users/.../request-payment` → `{payment_url: "https://prod.../pay/{uuid}"}` always set
+  - `GET /api/pay/{id}` → public payload renders amount + description, no PII leak
+  - `POST /api/pay/{id}/checkout-session` → real Stripe URL returned (works even on partial Stripe misconfig)
+  - `POST /api/pay/{id}/confirm-success` → `{success: true}` (idempotent)
+  - `GET /api/my/payment-requests` → array with `payment_url` on every row
+- Frontend Pay page renders cleanly with all 5 testids visible.
+- 104/108 iter25x+iter26x sweep green; 4 pre-existing DB-state failures (iter251 no-partner-users, iter253 admin-already-paid, 2× iter255 cron-state) — all unrelated to iter261 code.
+
+### Files changed (iter261)
+**Backend NEW**: `routes/public_payments.py`, `tests/test_iter261_pay_page_and_chat.py`.
+**Backend MODIFIED**: `server.py`, `routes/admin_payment_requests.py`, `routes/genai_chat.py`, `services/email_templates.py`, `tests/test_iter258_missions.py` (template var rename).
+**Frontend NEW**: `pages/PaymentPage.jsx`, `pages/PayRequestSuccessPage.jsx`, `components/PendingPaymentsCard.jsx`.
+**Frontend MODIFIED**: `App.js`, `pages/SellerDashboard.js`, `pages/BuyerDashboard.js`, `components/NotificationCenter.js`.
+
+### Action items (user)
+- 🚀 Click **Deploy** to push iter261 to https://bidvex.com. Once live, the next payment-request email will carry a working Pay Now button (BidVex-hosted fallback `/pay/{id}` works even when STRIPE_SECRET_KEY is absent).
+- Old open payment_requests in production already have `link: null` on their notification rows — the new dashboard card will pick up new requests automatically. Consider running a one-shot script in prod to backfill `link` on legacy rows if you want them clickable from the bell.
+
+---
+
+
 ## Latest: iter258 — 5-MISSION SPRINT (Mar 18, 2026) ✅
 
 Five parallel tracks shipped in a single sprint: an admin Request Payment + Stripe Payment Link pipeline, a Featured Listings query bug fix with backfill migration, a vehicle-listing broker partnership gate UI, a dedicated partner promotion landing page with backend trial activation, and a full SEO upgrade pass.

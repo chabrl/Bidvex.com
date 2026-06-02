@@ -60,7 +60,11 @@ def test_iter258_payment_request_email_and_confirmed_templates_registered():
     assert '"payment_request"' in src
     assert '"payment_confirmed"' in src
     assert '"partner_welcome"' in src
-    assert "{payment_link}" in src and "{total_amount}" in src
+    # iter261 — `payment_request` now uses dynamic `{cta_url}` +
+    # `{cta_label}` instead of the legacy `{payment_link}` template
+    # variable (the legacy var is gone). `{total_amount}` is still
+    # referenced for the body.
+    assert "{cta_url}" in src and "{total_amount}" in src
     assert "{expiry_label}" in src
 
 
@@ -75,8 +79,9 @@ def test_iter258_webhook_payment_request_branch_present_and_calls_handler():
 
 def test_iter258_admin_user_manager_exposes_request_payment_button():
     src = _read("pages/admin/EnhancedUserManager.js", root=FRONTEND_ROOT)
-    # Button data-testid is the contract; styles inline per spec.
-    assert "request-payment-user-${user.id}" in src
+    # Button data-testid is the contract — iter260 evolved the suffix
+    # to fall back to email for contact-only stubs that have no `id`.
+    assert "request-payment-user-${user.id || user.email}" in src
     assert '"#0055FF"' in src or "'#0055FF'" in src
     # The modal exposes all spec fields + live-calculated total.
     assert 'data-testid="request-payment-modal"' in src

@@ -705,6 +705,8 @@ try:
         ("routes.admin_promotions", "admin_promotions_router", None, False),
         # iter258 Mission 1 — Admin Request Payment + Stripe Payment Links.
         ("routes.admin_payment_requests", "admin_payment_requests_router", None, False),
+        # iter261 Mission 1 — Public pay endpoints + BidVex-hosted pay page.
+        ("routes.public_payments", "public_payments_router", None, False),
         # iter258 Mission 4 — Partner trial activation (dealer/broker/storage).
         ("routes.partner_trial", "partner_trial_router", None, False),
         # iter259 — Admin management of partner trials (list/extend/revoke).

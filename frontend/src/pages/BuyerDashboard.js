@@ -14,6 +14,7 @@ import { formatCurrency } from '../utils/currencyFormatter';
 import { LoadingTimeout } from '../components/LoadingTimeout';
 import { BuyerEscrowPanel } from '../components/EscrowPickupPanel';
 import InfoTip from '../components/InfoTip';
+import PendingPaymentsCard from '../components/PendingPaymentsCard';
 
 const API = API_BASE;
 
@@ -52,6 +53,8 @@ const BuyerDashboard = () => {
   return (
     <div className="min-h-screen py-8 px-4" data-testid="buyer-dashboard">
       <div className="max-w-7xl mx-auto space-y-8">
+        {/* iter261 — Pending payments anchored at the very top. */}
+        <PendingPaymentsCard />
         <div className="flex items-start justify-between gap-3">
           <div>
             <h1 className="text-3xl font-bold mb-2">{t('dashboard.buyer.title')}</h1>

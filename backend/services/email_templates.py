@@ -145,16 +145,21 @@ _EMAIL_TYPES: Dict[str, Dict[str, Any]] = {
         "cta_url": f"{_PUBLIC_URL}/listing/{{listing_id}}",
     },
     # iter258 Mission 1 — Admin "Request Payment" pipeline.
+    # iter261 — `cta_url` + `cta_label` are now sourced from the data
+    # dict so admins can override them per send (specifically, the
+    # caller always passes a BidVex-hosted fallback URL when Stripe
+    # is missing, guaranteeing the email button is never dead).
     "payment_request": {
         "headline": "💳 Payment Request from BidVex",
         "subheadline": "An outstanding balance requires your attention.",
         "body_html": (
             "You have a pending payment of <strong>${total_amount} CAD</strong>.<br>"
-            "Reason: {description}<br>"
-            "This link expires: {expiry_label}."
+            "<strong>Reason:</strong> {description}<br>"
+            "<strong>Expires:</strong> {expiry_label}<br><br>"
+            "Click the button below to complete your payment securely."
         ),
-        "cta_label": "Pay Now Securely →",
-        "cta_url": "{payment_link}",
+        "cta_label": "{cta_label}",
+        "cta_url": "{cta_url}",
     },
     "payment_confirmed": {
         "headline": "✅ Payment Confirmed!",
@@ -188,6 +193,67 @@ _EMAIL_TYPES: Dict[str, Dict[str, Any]] = {
         ),
         "cta_label": "Upgrade to Pro →",
         "cta_url": f"{_PUBLIC_URL}/contact",
+    },
+    # iter261 Mission 4 — Step 4 registry additions. Transactional
+    # notifications that should route through the unified template.
+    "listing_approved": {
+        "headline": "Your Listing is Live! ✅",
+        "subheadline": "Buyers can now find and bid on your listing.",
+        "body_html": (
+            "Great news — your listing <strong>{listing_title}</strong> has been approved "
+            "and is now live on BidVex."
+        ),
+        "cta_label": "View My Listing",
+        "cta_url": f"{_PUBLIC_URL}/listing/{{listing_id}}",
+    },
+    "listing_rejected": {
+        "headline": "Listing Needs Attention ⚠️",
+        "subheadline": "Please update your listing so it can go live.",
+        "body_html": (
+            "Your listing <strong>{listing_title}</strong> needs a few changes before it "
+            "can be published. Reason: {reason}"
+        ),
+        "cta_label": "Edit Listing",
+        "cta_url": f"{_PUBLIC_URL}/listing/{{listing_id}}/edit",
+    },
+    "account_suspended": {
+        "headline": "Account Suspended 🔒",
+        "subheadline": "Your BidVex account has been temporarily suspended.",
+        "body_html": (
+            "Your account was suspended on <strong>{suspended_at}</strong>. "
+            "Reason: {reason}<br><br>Contact our support team to resolve this."
+        ),
+        "cta_label": "Contact Support",
+        "cta_url": f"{_PUBLIC_URL}/contact",
+    },
+    "account_unsuspended": {
+        "headline": "Account Restored ✅",
+        "subheadline": "Welcome back to BidVex!",
+        "body_html": (
+            "Your account has been restored. You can now resume buying and selling "
+            "on BidVex."
+        ),
+        "cta_label": "Go to My Dashboard",
+        "cta_url": f"{_PUBLIC_URL}/dashboard",
+    },
+    "new_message": {
+        "headline": "New Message on BidVex 💬",
+        "subheadline": "{sender_name} sent you a message.",
+        "body_html": (
+            "<strong>{sender_name}</strong> wrote:<br><em>{preview}</em>"
+        ),
+        "cta_label": "Open Conversation",
+        "cta_url": f"{_PUBLIC_URL}/messages",
+    },
+    "auction_starting_soon": {
+        "headline": "Auction Starting Soon ⏰",
+        "subheadline": "Don't miss out — your favorited auction is about to begin.",
+        "body_html": (
+            "<strong>{listing_title}</strong> starts in <strong>{minutes_until_start}</strong> minutes. "
+            "Be the first to bid!"
+        ),
+        "cta_label": "Open Auction",
+        "cta_url": f"{_PUBLIC_URL}/listing/{{listing_id}}",
     },
 }
 

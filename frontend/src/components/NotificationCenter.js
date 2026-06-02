@@ -78,6 +78,24 @@ const NOTIFICATION_TYPES = {
     bgColor: 'bg-slate-50 dark:bg-slate-800/50',
     borderColor: 'border-slate-200 dark:border-slate-700',
     label: 'System'
+  },
+  // iter261 Mission 1.5 — Payment Request special layout.
+  payment_request: {
+    icon: DollarSign,
+    color: 'text-[#e53e3e]',
+    bgColor: 'bg-rose-50 dark:bg-rose-900/20',
+    borderColor: 'border-rose-200 dark:border-rose-800',
+    label: 'Payment Required',
+    emoji: '💳',
+    titleColor: '#e53e3e',
+  },
+  payment_confirmed: {
+    icon: Sparkles,
+    color: 'text-emerald-600',
+    bgColor: 'bg-emerald-50 dark:bg-emerald-900/20',
+    borderColor: 'border-emerald-200 dark:border-emerald-800',
+    label: 'Payment Confirmed',
+    emoji: '✅',
   }
 };
 
@@ -461,13 +479,43 @@ const NotificationCenter = () => {
                         {/* Content */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <p className={`text-sm ${!notification.read ? 'font-semibold' : ''} text-slate-900 dark:text-white`}>
-                                {notification.title}
+                            <div className="flex-1 min-w-0">
+                              <p
+                                className={`text-sm ${!notification.read ? 'font-semibold' : ''} ${notification.type === 'payment_request' ? 'font-bold' : 'text-slate-900 dark:text-white'}`}
+                                style={notification.type === 'payment_request' ? { color: typeConfig.titleColor } : undefined}
+                                data-testid={`notif-title-${notification.id}`}
+                              >
+                                {typeConfig.emoji ? `${typeConfig.emoji} ` : ''}{notification.title}
                               </p>
-                              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-2">
+                              {/* iter261 Mission 1.5 — Payment Request gets
+                                  an amount pill + inline Pay Now CTA. */}
+                              {notification.type === 'payment_request' && notification.amount_cad != null && (
+                                <span
+                                  className="inline-block mt-1"
+                                  style={{
+                                    backgroundColor: '#fff0f0', color: '#e53e3e',
+                                    border: '1px solid #fed7d7', borderRadius: 4,
+                                    padding: '2px 8px', fontWeight: 700, fontSize: 11,
+                                  }}
+                                  data-testid={`notif-amount-${notification.id}`}
+                                >
+                                  ${Number(notification.amount_cad).toFixed(2)} CAD
+                                </span>
+                              )}
+                              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-1">
                                 {notification.message}
                               </p>
+                              {notification.type === 'payment_request' && notification.link && (
+                                <a
+                                  href={notification.link}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="inline-block mt-1 text-xs font-bold"
+                                  style={{ color: '#0055FF' }}
+                                  data-testid={`notif-pay-now-${notification.id}`}
+                                >
+                                  Pay Now →
+                                </a>
+                              )}
                             </div>
                             
                             {/* Delete Button */}
