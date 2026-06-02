@@ -1437,17 +1437,37 @@ const EnhancedUserManager = () => {
       </Dialog>
 
       {/* iter258 Mission 1 — Payment Requests history drawer (per-user). */}
+      {/* iter262 Mission 3 — Colored status badges + Re-issue action +
+          New Request CTA in header (opens the existing modal pre-filled). */}
       <Dialog open={!!reqPayHistoryUser} onOpenChange={(o) => !o && setReqPayHistoryUser(null)}>
-        <DialogContent data-testid="payment-requests-history-modal" className="max-w-2xl">
+        <DialogContent data-testid="payment-requests-history-modal" className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Receipt className="h-5 w-5 text-[#0055FF]" />
-              Payment Requests — {reqPayHistoryUser?.name || reqPayHistoryUser?.email}
-            </DialogTitle>
+            <div className="flex items-center justify-between gap-3">
+              <DialogTitle className="flex items-center gap-2">
+                <Receipt className="h-5 w-5 text-[#0055FF]" />
+                💳 Payment Requests — {reqPayHistoryUser?.name || reqPayHistoryUser?.email}
+              </DialogTitle>
+              <Button
+                size="sm"
+                style={{ backgroundColor: '#0055FF', color: 'white' }}
+                onClick={() => {
+                  const u = reqPayHistoryUser;
+                  setReqPayHistoryUser(null);
+                  setReqPayModal({ open: true, user: u });
+                }}
+                data-testid="payment-history-new-request-btn"
+                disabled={!reqPayHistoryUser?.id}
+                title={reqPayHistoryUser?.id ? 'New payment request' : 'Contact-only record — unavailable'}
+              >
+                + New Request
+              </Button>
+            </div>
           </DialogHeader>
           <div className="max-h-[60vh] overflow-y-auto">
             {reqPayHistory.length === 0 ? (
-              <p className="text-sm text-slate-500 text-center py-6">No payment requests yet.</p>
+              <p className="text-sm text-slate-500 text-center py-6" data-testid="payment-requests-history-empty">
+                No payment requests sent to this user yet.
+              </p>
             ) : (
               <table className="w-full text-sm" data-testid="payment-requests-history-table">
                 <thead>
@@ -1456,34 +1476,77 @@ const EnhancedUserManager = () => {
                     <th className="text-right">Amount</th>
                     <th className="text-left px-2">Description</th>
                     <th className="text-center">Status</th>
-                    <th className="text-center">Expires</th>
-                    <th />
+                    <th className="text-right pr-2">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {reqPayHistory.map((pr) => (
-                    <tr key={pr.id} className="border-b border-slate-100" data-testid={`payment-request-row-${pr.id}`}>
-                      <td className="py-2 text-xs">{(pr.created_at || '').slice(0, 10)}</td>
-                      <td className="text-right font-mono">${Number(pr.total_amount).toFixed(2)}</td>
-                      <td className="px-2 truncate max-w-[200px]">{pr.description}</td>
-                      <td className="text-center">
-                        {pr.status === 'paid' && <Badge className="bg-emerald-100 text-emerald-800">paid</Badge>}
-                        {pr.status === 'pending' && <Badge className="bg-amber-100 text-amber-800">pending</Badge>}
-                        {pr.status === 'expired' && <Badge className="bg-rose-100 text-rose-800">expired</Badge>}
-                      </td>
-                      <td className="text-center text-xs">{pr.expiry_label || '—'}</td>
-                      <td>
-                        <Button
-                          size="icon" variant="ghost"
-                          onClick={() => { navigator.clipboard.writeText(pr.stripe_payment_link || ''); toast.success('Link copied'); }}
-                          title="Copy payment link"
-                          data-testid={`copy-payment-link-${pr.id}`}
-                        >
-                          <Copy className="h-3.5 w-3.5" />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
+                  {reqPayHistory.map((pr) => {
+                    const desc = (pr.description || '');
+                    const shortDesc = desc.length > 40 ? `${desc.slice(0, 40)}…` : desc;
+                    const badgeStyle = pr.status === 'paid' ? {
+                      backgroundColor: '#f0fff4', color: '#276749',
+                      border: '1px solid #c6f6d5', borderRadius: 4,
+                      padding: '2px 8px', fontWeight: 700, fontSize: 11,
+                    } : pr.status === 'expired' ? {
+                      backgroundColor: '#f7fafc', color: '#718096',
+                      border: '1px solid #e2e8f0', borderRadius: 4,
+                      padding: '2px 8px', fontWeight: 700, fontSize: 11,
+                    } : {
+                      backgroundColor: '#fff0f0', color: '#e53e3e',
+                      border: '1px solid #fed7d7', borderRadius: 4,
+                      padding: '2px 8px', fontWeight: 700, fontSize: 11,
+                    };
+                    return (
+                      <tr key={pr.id} className="border-b border-slate-100" data-testid={`payment-request-row-${pr.id}`}>
+                        <td className="py-2 text-xs">{(pr.created_at || '').slice(0, 10)}</td>
+                        <td className="text-right font-mono font-bold" data-testid={`payment-request-amount-${pr.id}`}>
+                          ${Number(pr.total_amount).toFixed(2)}
+                        </td>
+                        <td className="px-2 truncate max-w-[220px]" title={desc}>{shortDesc}</td>
+                        <td className="text-center">
+                          <span style={badgeStyle} data-testid={`payment-request-status-${pr.id}`}>
+                            {pr.status === 'paid' && '✅ '}
+                            {String(pr.status || 'pending').toUpperCase()}
+                          </span>
+                        </td>
+                        <td className="text-right pr-2 space-x-1">
+                          <Button
+                            size="icon" variant="ghost"
+                            onClick={async () => {
+                              try {
+                                await navigator.clipboard.writeText(pr.payment_url || pr.stripe_payment_link || '');
+                                toast.success('Link copied');
+                              } catch { /* noop */ }
+                            }}
+                            title="Copy payment link"
+                            data-testid={`copy-payment-link-${pr.id}`}
+                          >
+                            <Copy className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            size="icon" variant="ghost"
+                            onClick={() => {
+                              // Re-issue: open modal pre-filled with same amount + description.
+                              const u = reqPayHistoryUser;
+                              setReqPayForm({
+                                ...reqPayForm,
+                                subtotal: String(pr.subtotal || pr.total_amount || ''),
+                                tax_type: pr.tax_type || 'none',
+                                custom_tax_rate: pr.tax_type === 'custom' ? String(pr.tax_rate || '') : '',
+                                description: pr.description || '',
+                              });
+                              setReqPayHistoryUser(null);
+                              setReqPayModal({ open: true, user: u });
+                            }}
+                            title="Re-issue with same amount"
+                            data-testid={`reissue-payment-request-${pr.id}`}
+                          >
+                            <Receipt className="h-3.5 w-3.5" />
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             )}

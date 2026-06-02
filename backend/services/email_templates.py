@@ -326,6 +326,14 @@ def build_email_payload(
         cta_url = spec.get("cta_url", "").format(**fmt)
     except (KeyError, IndexError):
         cta_url = spec.get("cta_url", "")
+    # iter262 — Format `cta_label` against the data dict too. Without
+    # this, callers like the admin Request Payment flow that pass a
+    # dynamic `cta_label="💳 Pay Now — $X CAD"` in `data` saw the
+    # literal placeholder text in the rendered button.
+    try:
+        cta_label = spec.get("cta_label", "").format(**fmt)
+    except (KeyError, IndexError):
+        cta_label = spec.get("cta_label", "")
     try:
         headline = spec["headline"].format(**fmt)
         subheadline = spec["subheadline"].format(**fmt)
@@ -337,7 +345,7 @@ def build_email_payload(
         f'<p style="margin:28px 0 0;text-align:center;"><a href="{cta_url}" '
         f'style="display:inline-block;background:#0077FF;color:#fff;text-decoration:none;'
         f'padding:13px 28px;border-radius:7px;font-weight:700;font-size:15px;letter-spacing:0.3px;">'
-        f'{spec["cta_label"]}</a></p>'
+        f'{cta_label}</a></p>'
     ) if cta_url else ""
 
     secondary = data.get("secondary_info") or ""

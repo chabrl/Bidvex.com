@@ -280,6 +280,9 @@ async def list_payment_requests(
     ).sort("created_at", -1).limit(200)
     items: List[Dict[str, Any]] = await cursor.to_list(length=200)
     # iter258 — Mark expired rows on read (stateless).
+    # iter262 — Surface a `payment_url` on every row so the admin
+    # history tab can copy a single canonical link (the BidVex-hosted
+    # `/pay/{id}` fallback when Stripe didn't issue a Payment Link).
     now = datetime.now(timezone.utc)
     for it in items:
         if it.get("status") == "pending" and it.get("expires_at"):
@@ -289,6 +292,8 @@ async def list_payment_requests(
                     it["status"] = "expired"
             except Exception:
                 pass
+        rid = it.get("id")
+        it["payment_url"] = it.get("stripe_payment_link") or f"{_PUBLIC_URL}/pay/{rid}"
     return {"items": items, "total": len(items)}
 
 
