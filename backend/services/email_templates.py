@@ -194,6 +194,19 @@ _EMAIL_TYPES: Dict[str, Dict[str, Any]] = {
         "cta_label": "Upgrade to Pro →",
         "cta_url": f"{_PUBLIC_URL}/contact",
     },
+    # iter265 Mission 1.4 — Per-listing nearby alert (caller supplies
+    # `cta_url` + `cta_label` so the deep-link is correct per send).
+    "nearby_listing": {
+        "headline": "📍 New Listing Near You!",
+        "subheadline": "A new item was just listed in your area.",
+        "body_html": (
+            "A new <strong>{category}</strong> in <strong>{city}</strong>:<br><br>"
+            "<strong>{listing_title}</strong><br>"
+            "Current Bid: <strong>${current_bid} CAD</strong>"
+        ),
+        "cta_label": "{cta_label}",
+        "cta_url": "{cta_url}",
+    },
     # iter261 Mission 4 — Step 4 registry additions. Transactional
     # notifications that should route through the unified template.
     "listing_approved": {

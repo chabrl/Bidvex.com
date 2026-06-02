@@ -542,6 +542,22 @@ async def create_listing(
         import asyncio as _aio
         _aio.ensure_future(_translate_listing_bg(db, result["id"], listing_data.title, listing_data.description, listing_data.content_language or "en"))
 
+    # iter265 Mission 1.4 — Non-blocking geo notification fan-out. Only
+    # fires for listings that resolved real coordinates AND are publicly
+    # visible (status=active). Demo/sandbox listings are skipped because
+    # `is_demo_sandbox` excludes them from the public marketplace.
+    if (
+        result.get("status") == "active"
+        and not result.get("is_demo_sandbox")
+        and (result.get("location") or {}).get("coordinates")
+    ):
+        try:
+            from services.geo_notifications import notify_nearby_users
+            import asyncio as _aio
+            _aio.create_task(notify_nearby_users(result["id"], result, db))
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[geo-notify] skipped for {result.get('id')}: {e}")
+
     return result
 
 

@@ -184,6 +184,27 @@ async def lifespan(app):
         # iter236 Mission 2 — 2dsphere index on listings.location.coordinates
         from routes.geo_search import ensure_2dsphere_index
         await ensure_2dsphere_index()
+        # iter265 Mission 1.4 — 2dsphere on users.location.coordinates so
+        # per-listing nearby fan-out can $geoWithin/$centerSphere. The
+        # `sparse=True` flag lets users without coordinates remain
+        # untouched. Also TTL-style cleanup on recent_nearby_notifs so
+        # dedup rows don't grow unbounded.
+        try:
+            await db.users.create_index(
+                [("location.coordinates", "2dsphere")],
+                sparse=True,
+                name="users_location_2dsphere_iter265",
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"[iter265] users 2dsphere index skipped: {exc}")
+        try:
+            await db.recent_nearby_notifs.create_index(
+                "sent_at",
+                expireAfterSeconds=60 * 60 * 24 * 2,  # 48h TTL
+                name="recent_nearby_notifs_ttl_iter265",
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.info(f"[iter265] recent_nearby_notifs TTL index skipped: {exc}")
     except Exception as e:        logger.warning(f"Strict payment indexes registration failed (non-fatal): {e}")
 
     # ── iter212 — Grandfather existing storage facilities ──
