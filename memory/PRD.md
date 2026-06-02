@@ -1,5 +1,120 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter266 — NOTIFICATION OVERHAUL + AFFILIATE PAYOUTS + UNIVERSAL SUPPRESSION (Jun 02, 2026) ✅
+
+Four parallel missions closed in a single sprint: affiliate payout
+admin oversight, universal suppression gate, click-to-detail
+notification modal with attachment uploads, and bell unread polling.
+**Pytest 123/123 PASS** across iter255-iter266 (17 new iter266 + 106
+regression).
+
+### Mission 1 — Affiliate Payouts oversight panel ✅
+- **NEW** `GET /api/admin/affiliate-payouts?status=pending|paid|rejected`
+  returns paginated payouts hydrated with affiliate name/email/referral
+  count + 4 summary cards: `pending_total_cad`, `paid_this_month_cad`,
+  `active_affiliates`, `referrals_this_month`.
+- **NEW** `PATCH /api/admin/affiliate-payouts/{id}/approve` → marks paid,
+  stamps `paid_at`, sends "✅ Payout Approved" email through
+  `send_unified_email("payment_confirmed", ...)`.
+- **NEW** `PATCH /api/admin/affiliate-payouts/{id}/reject` with reason →
+  marks rejected, sends rejection email with the admin-supplied reason.
+- **NEW** `pages/admin/AdminAffiliatePayouts.jsx` — frontend tab with
+  4 summary cards (Pending / Paid This Month / Active Affiliates /
+  Referrals This Month), filter chips, Approve & Reject buttons, and
+  a reason modal for rejections. Mounted as Marketing → Affiliate
+  Payouts tab in `AdminDashboard.js`.
+- Live verified: `summary.active_affiliates=1, referrals_this_month=1`.
+
+### Mission 2 — Universal Suppression Gate ✅
+- **`services/email_notifications.send_email()`** now performs the
+  suppression check on **every** outbound path (transactional + raw HTML
+  + html_full_override). Before any SendGrid round-trip:
+  - `email_suppressions` collection lookup → `{status: skipped,
+    reason: unsubscribed}`.
+  - Marketing emails additionally check `is_marketing_suppressed()`.
+- **`send_unified_email()`** now accepts `is_marketing=True` and threads
+  it down to the low-level dispatcher.
+- Defensive: never breaks transactional sends if the DB check fails.
+
+### Mission 3 — Notification Detail Modal + Attachment Flow ✅
+- **NEW** `components/NotificationDetailModal.jsx` — centered modal
+  (max-w-560px, max-h-80vh, scrollable) with color-coded top border
+  (info/warning/action_required/success), bilingual rendering
+  (`isFrench` → `title_fr` / `body_fr` / `attachment_request_label_fr`
+  fallback to EN), auto-mark-as-read on open, optional attachment
+  upload widget, optional CTA button.
+- **NEW** `POST /api/notifications/{id}/submit-attachment` (multipart)
+  validates owner + size + extension, stores under
+  `/uploads/notification_attachments/{id}/`, persists `attachment_url`
+  + `attachment_submitted_at`, fans out admin notification of the
+  submission.
+- **NEW** `POST /api/notifications/admin/send` — alternate batch endpoint
+  accepting `user_ids` array + full bilingual + attachment-request fields.
+- **`routes/admin_user_actions.py`** existing `/admin/users/{id}/send-notification`
+  endpoint now also accepts:
+  `requires_attachment`, `attachment_request_label`, `attachment_request_label_fr`,
+  `attachment_types`, `attachment_max_mb`. Writes them into the
+  notification document so the modal can render the upload widget.
+- **`EnhancedUserManager.js`** notify modal now shows an amber "Request
+  an attachment from the user" block when toggled, with EN/FR labels,
+  types selector, and max-MB picker.
+- **`NotificationCenter.js`** refactored: removed all legacy
+  `navigate('/settings?tab=...')` from the click handler.
+  `handleNotificationClick` → `setSelectedNotification` (opens modal).
+  Original navigate-by-type logic preserved in `navigateForNotification`
+  and triggered from the modal's CTA button only.
+- **`NotificationsPage.jsx`** uses the same modal — clicking any row
+  opens the detail card instead of immediate navigation.
+
+### Mission 4 — Bell Badge + Polling ✅
+- **Polling**: `fetchUnreadCount` runs every **60s** hitting the
+  lightweight `GET /api/notifications/unread-count` (no full list).
+- **Badge cap**: shows `9+` when `unreadCount > 9` (spec-aligned, was
+  99+ before).
+- **Optimistic decrement**: modal's `onMarkedRead` callback updates the
+  badge immediately without waiting for the next poll.
+- **`POST /api/notifications/mark-all-read`** now returns both `updated`
+  (spec) and `updated_count` (legacy) keys for back-compat.
+- **`data-testid="notif-bell-badge"`** added for test selectability.
+
+### Validation
+- **NEW** `tests/test_iter266_missions.py` — **17/17 PASS** covering:
+  - 3 admin payout route assertions + live GET + admin dashboard mount
+  - 2 suppression-gate source + thread-through tests
+  - 7 notification modal + endpoints + admin form + live live HTTP smokes
+  - 4 bell unread + 9+ cap + polling interval + mark-all-read live
+- **Full regression**: **123/123 PASS** across iter255→iter266
+  (9 skips are env-specific live HTTP).
+- All frontend + backend lint clean.
+
+### Files changed (iter266)
+**Backend MODIFIED**: `routes/admin_oversight.py` (NEW 3 affiliate
+payout endpoints), `services/email_notifications.py` (suppression gate
+in `send_email`, `is_marketing` thread in `send_unified_email`),
+`routes/notifications.py` (NEW `/submit-attachment` + admin batch send +
+mark-all-read returns `updated`), `routes/admin_user_actions.py`
+(attachment-request fields on `send-notification` endpoint).
+**Backend NEW**: `tests/test_iter266_missions.py` (17 tests).
+**Frontend NEW**: `pages/admin/AdminAffiliatePayouts.jsx`,
+`components/NotificationDetailModal.jsx`.
+**Frontend MODIFIED**: `pages/AdminDashboard.js` (Affiliate Payouts tab),
+`components/NotificationCenter.js` (modal + 60s polling + 9+ cap),
+`pages/NotificationsPage.jsx` (modal on click),
+`pages/admin/EnhancedUserManager.js` (attachment-request form block).
+
+### Action items (user)
+1. **Save to GitHub → redeploy** preview → production.
+2. **Smoke test** Admin → Marketing → Affiliate Payouts tab. Try approving
+   a $0.01 test payout (creates one via `POST /api/affiliate/request-payout`).
+3. **Bell modal QA**: log in as a non-admin, ask admin to send a
+   notification with an attachment request → verify the modal renders
+   the upload widget and accepts a PDF.
+4. **Monitor `email_suppressions`** collection — any user with that
+   email row will now be 100% suppressed across every send path.
+
+---
+
+
 ## Latest: iter265 — 5-MISSION SPRINT (Jun 02, 2026) ✅
 
 Five parallel tracks closed in a single sprint: surgical email-pipeline

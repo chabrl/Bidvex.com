@@ -25,6 +25,8 @@ import {
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
+// iter266 Mission 3 — Centered click-to-detail modal (replaces navigate-to-settings).
+import NotificationDetailModal from './NotificationDetailModal';
 
 const API = API_BASE;
 
@@ -107,11 +109,24 @@ const NotificationCenter = () => {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  // iter266 Mission 3 — Detail modal state.
+  const [selectedNotification, setSelectedNotification] = useState(null);
   const [soundEnabled, setSoundEnabled] = useState(() => 
     localStorage.getItem('notificationSound') !== 'false'
   );
   const panelRef = useRef(null);
   const isFrench = i18n.language === 'fr';
+
+  // iter266 Mission 4 — Lightweight unread-count polling (60s).
+  const fetchUnreadCount = useCallback(async () => {
+    if (!user || !token) return;
+    try {
+      const r = await axios.get(`${API}/notifications/unread-count`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (typeof r.data?.unread_count === 'number') setUnreadCount(r.data.unread_count);
+    } catch (e) { /* silent */ }
+  }, [user, token]);
 
   // Fetch notifications
   const fetchNotifications = useCallback(async () => {
@@ -131,14 +146,13 @@ const NotificationCenter = () => {
     }
   }, [user, token]);
 
-  // Initial fetch
+  // Initial fetch + 60s unread-count polling.
   useEffect(() => {
     fetchNotifications();
-    
-    // Poll for new notifications every 30 seconds
-    const interval = setInterval(fetchNotifications, 30000);
+    // iter266 Mission 4 — Poll unread count every 60s (cheap endpoint).
+    const interval = setInterval(fetchUnreadCount, 60_000);
     return () => clearInterval(interval);
-  }, [fetchNotifications]);
+  }, [fetchNotifications, fetchUnreadCount]);
 
   // Close panel on outside click
   useEffect(() => {
@@ -171,34 +185,28 @@ const NotificationCenter = () => {
     }
   };
 
-  // Mark single notification as read and navigate
-  const handleNotificationClick = async (notification) => {
-    // Mark as read
-    if (!notification.read) {
-      try {
-        await axios.post(`${API}/notifications/${notification.id}/read`, {}, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setNotifications(prev => 
-          prev.map(n => n.id === notification.id ? { ...n, read: true } : n)
-        );
-        setUnreadCount(prev => Math.max(0, prev - 1));
-      } catch (error) {
-        console.error('Failed to mark as read:', error);
-      }
-    }
+  // iter266 Mission 3 — Click on a notification opens the detail
+  // modal (replaces the legacy navigate-to-settings behaviour).
+  const handleNotificationClick = (notification) => {
+    setIsOpen(false);
+    setSelectedNotification(notification);
+  };
 
-    // Navigate based on notification type
+  // Optimistic state update when the modal marks a notification as read.
+  const handleMarkedRead = (notificationId) => {
+    setNotifications(prev => prev.map(n => n.id === notificationId ? { ...n, read: true, is_read: true } : n));
+    setUnreadCount(prev => Math.max(0, prev - 1));
+  };
+
+  // Legacy navigate-by-type logic, now invoked from the modal's CTA
+  // button (when the notification carries a useful action target).
+  const navigateForNotification = async (notification) => {
     const data = notification.data || {};
     setIsOpen(false);
-
-    // iter217 Bug 8 / Phase 6.0 — Universal navigation: prefer the explicit
-    // route URL set by the backend; supports legacy `action_url` plus the new
-    // `route_url` / `path` / `url` fields written by the manual review +
-    // approval / rejection pipelines.
     const explicitUrl =
       notification.action_url ||
       notification.route_url ||
+      notification.cta_url ||
       notification.path ||
       notification.url ||
       data.route_url ||
@@ -240,14 +248,6 @@ const NotificationCenter = () => {
           navigate(`/lots/${data.auction_id}`);
         }
         break;
-      case 'admin_rejection':
-      case 'admin_document_request':
-      case 'admin_general':
-      case 'admin_notification':
-      case 'document_request':
-        // Direct to settings → documents tab where users can re-upload / respond.
-        navigate('/settings?tab=documents');
-        break;
       case 'partner_activated':
       case 'partner_approved':
         navigate('/partners/dashboard');
@@ -263,8 +263,6 @@ const NotificationCenter = () => {
       case 'new_review':
         if (data.target_user_id) {
           navigate(`/profile/${data.target_user_id}`);
-        } else {
-          navigate('/settings?tab=reviews');
         }
         break;
       case 'payment_overdue':
@@ -283,13 +281,11 @@ const NotificationCenter = () => {
           navigate('/orders');
         }
         break;
-      // Phase 6.0 / Repair 2 — admin-facing manual review request notification
       case 'manual_vehicle_review_request': {
         const listingId = data.listing_id || '';
         navigate(`/admin/flagged-listings${listingId ? `?listing_id=${encodeURIComponent(listingId)}` : ''}`);
         break;
       }
-      // Phase 6.0 / Repair 4 — seller-facing approval / rejection notifications
       case 'ai_review_approved':
         if (data.listing_id) {
           navigate(`/listing/${data.listing_id}`);
@@ -301,8 +297,6 @@ const NotificationCenter = () => {
         navigate('/seller/dashboard');
         break;
       default:
-        // iter217 Phase 4 — guaranteed navigation: try listing/auction first,
-        // then dump the user on the dedicated /notifications page (NEVER do nothing).
         if (data.listing_id) {
           navigate(`/listing/${data.listing_id}`);
         } else if (data.auction_id || data.multi_item_listing_id) {
@@ -376,8 +370,11 @@ const NotificationCenter = () => {
         
         {/* Unread Badge */}
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white bg-red-500 rounded-full animate-pulse">
-            {unreadCount > 99 ? '99+' : unreadCount}
+          <span
+            className="absolute -top-1 -right-1 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white bg-red-500 rounded-full animate-pulse"
+            data-testid="notif-bell-badge"
+          >
+            {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
       </Button>
@@ -573,6 +570,15 @@ const NotificationCenter = () => {
           )}
         </div>
       )}
+
+      {/* iter266 Mission 3A — Centered detail modal opened on click. */}
+      <NotificationDetailModal
+        notification={selectedNotification}
+        open={!!selectedNotification}
+        onClose={() => setSelectedNotification(null)}
+        onMarkedRead={handleMarkedRead}
+        onNavigate={navigateForNotification}
+      />
     </div>
   );
 };

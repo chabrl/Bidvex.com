@@ -26,6 +26,7 @@ import AuctionControl from './admin/AuctionControl';
 import CategoryManager from './admin/CategoryManager';
 import PromotionManager from './admin/PromotionManager';
 import AffiliateManager from './admin/AffiliateManager';
+import AdminAffiliatePayouts from './admin/AdminAffiliatePayouts';
 import ReportManager from './admin/ReportManager';
 import AnalyticsDashboard from './admin/AnalyticsDashboard';
 import MessagingOversight from './admin/MessagingOversight';
@@ -167,6 +168,8 @@ const SECONDARY_TABS = {
 const MARKETING_TABS = [
   { id: 'promotions', label: 'Promotions', icon: '🎯', lucideIcon: Megaphone },
   { id: 'affiliates', label: 'Affiliates', icon: '🤝', lucideIcon: Users },
+  // iter266 Mission 1 — Affiliate payouts oversight tab
+  { id: 'affiliate-payouts', label: 'Affiliate Payouts', icon: '💰', lucideIcon: DollarSign },
   // iter217 Phase 5 — Meta Ad Feeds
   { id: 'ad-feeds', label: 'Ad Feeds', icon: '📡', lucideIcon: Megaphone },
 ];
@@ -435,6 +438,8 @@ const AdminDashboard = () => {
     // Check for cross-cutting tabs first
     if (secondaryTab === 'promotions') return <PromotionManager />;
     if (secondaryTab === 'affiliates') return <AffiliateManager />;
+    // iter266 Mission 1 — Affiliate payouts oversight tab
+    if (secondaryTab === 'affiliate-payouts') return <AdminAffiliatePayouts />;
     if (secondaryTab === 'currency-appeals') return <CurrencyAppealsManager />;
     if (secondaryTab === 'messaging') return <MessagingOversight />;
     // iter217 Phase 5 — Meta Ad Feeds health dashboard

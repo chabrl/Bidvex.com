@@ -473,4 +473,251 @@ async def admin_test_email(
     }
 
 
+# ─── iter266 Mission 1 — Affiliate Payouts oversight tab ─────────────
+
+
+class AffiliatePayoutReject(BaseModel):
+    reason: str = Field(..., min_length=2, max_length=500)
+
+
+def _payout_status_normalize(s: Any) -> str:
+    s = (str(s or "pending")).strip().lower()
+    if s in ("approved", "paid"):
+        return "paid"
+    if s in ("rejected", "denied"):
+        return "rejected"
+    return "pending"
+
+
+async def _enrich_payouts(db, payouts: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Hydrate each payout row with affiliate user info + referral count."""
+    user_ids = list({p.get("user_id") or p.get("affiliate_id") for p in payouts if (p.get("user_id") or p.get("affiliate_id"))})
+    users_by_id: Dict[str, Dict[str, Any]] = {}
+    if user_ids:
+        async for u in db.users.find(
+            {"id": {"$in": user_ids}},
+            {"_id": 0, "id": 1, "name": 1, "email": 1, "affiliate_code": 1, "preferred_language": 1},
+        ):
+            users_by_id[u["id"]] = u
+    for p in payouts:
+        uid = p.get("user_id") or p.get("affiliate_id")
+        u = users_by_id.get(uid, {})
+        p["affiliate_name"] = u.get("name") or "Unknown"
+        p["affiliate_email"] = u.get("email") or "—"
+        p["affiliate_code"] = u.get("affiliate_code")
+        p["status_norm"] = _payout_status_normalize(p.get("status"))
+        # Referrals count for this affiliate.
+        try:
+            p["referrals_count"] = await db.affiliate_referrals.count_documents({"affiliate_id": uid})
+        except Exception:
+            p["referrals_count"] = 0
+    return payouts
+
+
+@admin_oversight_router.get("/affiliate-payouts")
+async def list_affiliate_payouts(
+    status: Optional[str] = Query(None),
+    page: int = 1,
+    limit: int = 50,
+    current_user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """iter266 Mission 1 — Affiliate payout queue + summary cards."""
+    _require_admin(current_user)
+    db = get_db()
+    q: Dict[str, Any] = {}
+    if status:
+        norm = _payout_status_normalize(status)
+        if norm == "paid":
+            q["status"] = {"$in": ["paid", "approved"]}
+        elif norm == "rejected":
+            q["status"] = {"$in": ["rejected", "denied"]}
+        else:
+            q["status"] = {"$in": ["pending", None, ""]}
+    page = max(1, int(page))
+    limit = max(1, min(200, int(limit)))
+    skip = (page - 1) * limit
+    cursor = db.affiliate_payouts.find(q, {"_id": 0}).sort("created_at", -1).skip(skip).limit(limit)
+    items: List[Dict[str, Any]] = await cursor.to_list(length=limit)
+    items = await _enrich_payouts(db, items)
+    total = await db.affiliate_payouts.count_documents(q)
+
+    # ── Summary cards ──
+    now = datetime.now(timezone.utc)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    pending_sum_pipeline = [
+        {"$match": {"status": {"$in": ["pending", None, ""]}}},
+        {"$group": {"_id": None, "total": {"$sum": "$amount"}}},
+    ]
+    paid_month_pipeline = [
+        {"$match": {
+            "status": {"$in": ["paid", "approved"]},
+            "$or": [
+                {"paid_at": {"$gte": month_start.isoformat()}},
+                {"approved_at": {"$gte": month_start.isoformat()}},
+            ],
+        }},
+        {"$group": {"_id": None, "total": {"$sum": "$amount"}}},
+    ]
+    pending_total = 0.0
+    paid_this_month = 0.0
+    try:
+        async for r in db.affiliate_payouts.aggregate(pending_sum_pipeline):
+            pending_total = float(r.get("total") or 0)
+        async for r in db.affiliate_payouts.aggregate(paid_month_pipeline):
+            paid_this_month = float(r.get("total") or 0)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(f"[affiliate-payouts] summary aggregation skipped: {exc}")
+
+    active_affiliates = 0
+    try:
+        active_affiliates = await db.users.count_documents({"is_affiliate": True})
+        if active_affiliates == 0:
+            # Fallback: count distinct users with at least one referral.
+            distinct = await db.affiliate_referrals.distinct("affiliate_id")
+            active_affiliates = len([d for d in distinct if d])
+    except Exception:
+        active_affiliates = 0
+
+    referrals_this_month = 0
+    try:
+        referrals_this_month = await db.affiliate_referrals.count_documents({
+            "created_at": {"$gte": month_start.isoformat()},
+        })
+    except Exception:
+        referrals_this_month = 0
+
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "summary": {
+            "pending_total_cad":   round(pending_total, 2),
+            "paid_this_month_cad": round(paid_this_month, 2),
+            "active_affiliates":   active_affiliates,
+            "referrals_this_month": referrals_this_month,
+        },
+    }
+
+
+@admin_oversight_router.patch("/affiliate-payouts/{payout_id}/approve")
+async def approve_affiliate_payout(
+    payout_id: str,
+    current_user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """iter266 Mission 1 — Approve a pending payout. Marks as paid,
+    stamps paid_at, sends confirmation email to the affiliate."""
+    _require_admin(current_user)
+    db = get_db()
+    payout = await db.affiliate_payouts.find_one({"id": payout_id}, {"_id": 0})
+    if not payout:
+        raise HTTPException(status_code=404, detail="Payout not found")
+    if _payout_status_normalize(payout.get("status")) == "paid":
+        raise HTTPException(status_code=400, detail="Payout already paid")
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    await db.affiliate_payouts.update_one(
+        {"id": payout_id},
+        {"$set": {
+            "status": "paid",
+            "approved_by": current_user.id,
+            "approved_at": now_iso,
+            "paid_at": now_iso,
+        }},
+    )
+
+    # Email the affiliate.
+    uid = payout.get("user_id") or payout.get("affiliate_id")
+    user = await db.users.find_one(
+        {"id": uid},
+        {"_id": 0, "id": 1, "name": 1, "email": 1, "preferred_language": 1},
+    ) if uid else None
+    if user and user.get("email"):
+        try:
+            from services.email_notifications import send_unified_email
+            await send_unified_email(
+                email_type="payment_confirmed",
+                user=user,
+                data={
+                    "subject_override": "✅ Your BidVex Affiliate Payout Has Been Approved",
+                    "headline": "Payout Approved",
+                    "subheadline": "Your affiliate earnings are on the way.",
+                    "body_html": (
+                        f"<p>Hi {user.get('name', 'Partner')},</p>"
+                        f"<p>Your affiliate payout request for <strong>${float(payout.get('amount') or 0):,.2f} "
+                        f"{payout.get('currency', 'CAD')}</strong> has been <strong>approved</strong> "
+                        f"and is being processed via {payout.get('method', 'Stripe Connect')}.</p>"
+                        "<p>You will receive the funds within 1-3 business days.</p>"
+                    ),
+                    "cta_label": "Open Affiliate Dashboard",
+                    "cta_url": "https://bidvex.com/affiliate",
+                },
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"[affiliate-payout-approve] email failed: {exc}")
+
+    return {"success": True, "id": payout_id, "status": "paid", "paid_at": now_iso}
+
+
+@admin_oversight_router.patch("/affiliate-payouts/{payout_id}/reject")
+async def reject_affiliate_payout(
+    payout_id: str,
+    body: AffiliatePayoutReject,
+    current_user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """iter266 Mission 1 — Reject a payout with a reason."""
+    _require_admin(current_user)
+    db = get_db()
+    payout = await db.affiliate_payouts.find_one({"id": payout_id}, {"_id": 0})
+    if not payout:
+        raise HTTPException(status_code=404, detail="Payout not found")
+    if _payout_status_normalize(payout.get("status")) != "pending":
+        raise HTTPException(status_code=400, detail="Only pending payouts can be rejected")
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    await db.affiliate_payouts.update_one(
+        {"id": payout_id},
+        {"$set": {
+            "status": "rejected",
+            "rejected_by": current_user.id,
+            "rejected_at": now_iso,
+            "rejection_reason": body.reason,
+        }},
+    )
+
+    uid = payout.get("user_id") or payout.get("affiliate_id")
+    user = await db.users.find_one(
+        {"id": uid},
+        {"_id": 0, "id": 1, "name": 1, "email": 1, "preferred_language": 1},
+    ) if uid else None
+    if user and user.get("email"):
+        try:
+            from services.email_notifications import send_unified_email
+            await send_unified_email(
+                email_type="new_feature",
+                user=user,
+                data={
+                    "subject_override": "BidVex Affiliate Payout Update",
+                    "headline": "Payout Request Update",
+                    "subheadline": "We were unable to process your payout.",
+                    "body_html": (
+                        f"<p>Hi {user.get('name', 'Partner')},</p>"
+                        f"<p>Your recent affiliate payout request for <strong>"
+                        f"${float(payout.get('amount') or 0):,.2f} {payout.get('currency', 'CAD')}</strong> "
+                        "could not be processed.</p>"
+                        f"<p><strong>Reason:</strong> {body.reason}</p>"
+                        "<p>Please reach out to <a href='mailto:support@bidvex.com'>support@bidvex.com</a> "
+                        "if you'd like to discuss this decision.</p>"
+                    ),
+                    "cta_label": "Open Affiliate Dashboard",
+                    "cta_url": "https://bidvex.com/affiliate",
+                },
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"[affiliate-payout-reject] email failed: {exc}")
+
+    return {"success": True, "id": payout_id, "status": "rejected", "rejected_at": now_iso, "reason": body.reason}
+
+
 __all__ = ["admin_oversight_router", "public_disputes_router", "execute_compliance_scan"]

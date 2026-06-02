@@ -97,13 +97,51 @@ async def send_email(
     from_email: Optional[str] = None,
     from_name: Optional[str] = None,
     reply_to: Optional[str] = None,
+    is_marketing: bool = False,
 ) -> Dict[str, Any]:
     """iter244 Mission 2 — Canonical low-level SendGrid dispatcher.
     iter254 Mission 4 — Now accepts optional `from_email`/`from_name`/
     `reply_to` overrides so individual outbound paths can stamp branded
     headers (`partners@bidvex.ca` for B2B blasts, `support@bidvex.com`
     for transactional). Defaults preserve the existing global FROM.
+
+    iter266 Mission 2 — Universal suppression gate. Skips every send
+    (including raw-HTML and html_full_override paths) when the
+    recipient is in `email_suppressions` OR (for marketing emails) has
+    `marketing_unsubscribed=True` on their user record. Returns a
+    `{"status": "skipped", "reason": ...}` envelope without any
+    SendGrid round-trip.
     """
+    # iter266 Mission 2 — suppression gate covering ALL outbound paths.
+    try:
+        from routes.unsubscribe import is_marketing_suppressed as _suppress_check
+        from deps import get_db as _get_db
+        if to_email:
+            _norm = to_email.strip().lower()
+            _db = _get_db()
+            _hit = await _db.email_suppressions.find_one(
+                {"email": _norm}, {"_id": 0, "email": 1}
+            )
+            if _hit:
+                logger.info(f"[email-suppressed] {to_email} — global unsubscribe — skipping send")
+                return {
+                    "status": "skipped",
+                    "reason": "unsubscribed",
+                    "to": to_email,
+                    "subject": subject,
+                }
+            if is_marketing and await _suppress_check(_norm):
+                logger.info(f"[email-suppressed] {to_email} — marketing opt-out — skipping send")
+                return {
+                    "status": "skipped",
+                    "reason": "marketing_suppressed",
+                    "to": to_email,
+                    "subject": subject,
+                }
+    except Exception as _exc:  # noqa: BLE001
+        # Defensive: never let the suppression check break a transactional send.
+        logger.debug(f"[email-suppression-check] skipped: {_exc}")
+
     if not SENDGRID_AVAILABLE:
         logger.info(f"[EMAIL LOG] To: {to_email}, Subject: {subject}")
         logger.debug(f"[EMAIL CONTENT] {html_content[:500]}...")
@@ -170,6 +208,7 @@ async def send_unified_email(
     from_email: Optional[str] = None,
     from_name: Optional[str] = None,
     reply_to: Optional[str] = None,
+    is_marketing: bool = False,
 ) -> Dict[str, Any]:
     """iter239 Mission 6 — Canonical email dispatch using the unified
     `build_email_payload()` mapping engine.
@@ -188,6 +227,10 @@ async def send_unified_email(
     iter254 Mission 4 — Optional from_email/from_name/reply_to overrides
     let callers stamp branded outbound headers (e.g. `partners@bidvex.ca`
     for B2B blasts, `support@bidvex.com` for transactional).
+
+    iter266 Mission 2 — `is_marketing=True` activates the marketing
+    suppression gate so opt-out users never receive promo blasts even
+    when callers route through this unified path.
     """
     from services.email_templates import build_email_payload
     payload = build_email_payload(email_type, user=user, data=data or {}, lang=lang)
@@ -199,6 +242,7 @@ async def send_unified_email(
         from_email=from_email,
         from_name=from_name,
         reply_to=reply_to,
+        is_marketing=is_marketing,
     )
 
 

@@ -19,6 +19,8 @@ import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Card } from '../components/ui/card';
 import { useAuth } from '../contexts/AuthContext';
+// iter266 Mission 3 — Centered detail modal (replaces direct navigation).
+import NotificationDetailModal from '../components/NotificationDetailModal';
 
 const API = API_BASE;
 
@@ -61,6 +63,8 @@ const NotificationsPage = () => {
   const { t, i18n } = useTranslation();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
+  // iter266 Mission 3 — Detail modal.
+  const [selected, setSelected] = useState(null);
 
   const isFr = (i18n.language || '').startsWith('fr');
 
@@ -82,28 +86,21 @@ const NotificationsPage = () => {
     fetchNotifications();
   }, [fetchNotifications]);
 
-  const handleClick = async (n) => {
-    // Mark as read
-    if (!n.read) {
-      try {
-        await axios.post(`${API}/notifications/${n.id}/read`, {}, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setNotifications((prev) =>
-          prev.map((x) => (x.id === n.id ? { ...x, read: true } : x))
-        );
-      } catch (err) {
-        // non-blocking
-      }
-    }
-    // Navigate (guaranteed)
+  // iter266 Mission 3 — Open the centered detail modal on click.
+  const handleClick = (n) => setSelected(n);
+
+  const handleMarkedRead = (id) =>
+    setNotifications(prev => prev.map(x => x.id === id ? { ...x, read: true, is_read: true } : x));
+
+  const navigateForNotification = (n) => {
     const url = n.action_url
+      || n.cta_url
       || (n.data?.listing_id && `/listing/${n.data.listing_id}`)
-      || (n.data?.auction_id && `/lots/${n.data.auction_id}`)
-      || '/notifications';
+      || (n.data?.auction_id && `/lots/${n.data.auction_id}`);
+    if (!url) return;
     if (/^https?:\/\//i.test(url)) {
       window.open(url, '_blank', 'noopener,noreferrer');
-    } else if (url !== '/notifications') {
+    } else {
       navigate(url);
     }
   };
@@ -220,6 +217,15 @@ const NotificationsPage = () => {
           </div>
         )}
       </div>
+
+      {/* iter266 Mission 3 — Centered detail modal. */}
+      <NotificationDetailModal
+        notification={selected}
+        open={!!selected}
+        onClose={() => setSelected(null)}
+        onMarkedRead={handleMarkedRead}
+        onNavigate={navigateForNotification}
+      />
     </div>
   );
 };

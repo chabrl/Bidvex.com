@@ -180,6 +180,12 @@ const EnhancedUserManager = () => {
   const [notifyForm, setNotifyForm] = useState({
     notification_type: 'general', subject: '', body_en: '', body_fr: '',
     send_via: 'both',
+    // iter266 Mission 3D — attachment-request fields.
+    requires_attachment: false,
+    attachment_request_label: '',
+    attachment_request_label_fr: '',
+    attachment_types: 'PDF, JPG, PNG',
+    attachment_max_mb: 1.0,
   });
   const [notifyBusy, setNotifyBusy] = useState(false);
 
@@ -318,7 +324,15 @@ const EnhancedUserManager = () => {
       });
       toast.success('Notification sent · Notification envoyée');
       setNotifyModal({ open: false, user: null });
-      setNotifyForm({ notification_type: 'general', subject: '', body_en: '', body_fr: '', send_via: 'both' });
+      setNotifyForm({
+        notification_type: 'general', subject: '', body_en: '', body_fr: '',
+        send_via: 'both',
+        requires_attachment: false,
+        attachment_request_label: '',
+        attachment_request_label_fr: '',
+        attachment_types: 'PDF, JPG, PNG',
+        attachment_max_mb: 1.0,
+      });
     } catch (e) {
       toast.error(e?.response?.data?.detail?.message_en || e?.response?.data?.detail || 'Send failed');
     } finally {
@@ -1282,6 +1296,64 @@ const EnhancedUserManager = () => {
                   <SelectItem value="both">Both</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* iter266 Mission 3D — Attachment request toggle. */}
+            <div className="rounded-md border border-amber-300 bg-amber-50 p-3 space-y-2" data-testid="notify-attachment-block">
+              <label className="flex items-center gap-2 text-sm font-semibold text-amber-900 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={!!notifyForm.requires_attachment}
+                  onChange={(e) => setNotifyForm((p) => ({ ...p, requires_attachment: e.target.checked }))}
+                  data-testid="notify-requires-attachment"
+                />
+                📎 Request an attachment from the user
+              </label>
+              {notifyForm.requires_attachment && (
+                <div className="space-y-2 mt-2">
+                  <div>
+                    <Label className="text-xs">Attachment label (EN)</Label>
+                    <Input
+                      placeholder='e.g. "Please upload your NEQ certificate"'
+                      value={notifyForm.attachment_request_label || ''}
+                      onChange={(e) => setNotifyForm((p) => ({ ...p, attachment_request_label: e.target.value }))}
+                      data-testid="notify-attachment-label-en"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Attachment label (FR)</Label>
+                    <Input
+                      placeholder='ex. "Veuillez téléverser votre certificat NEQ"'
+                      value={notifyForm.attachment_request_label_fr || ''}
+                      onChange={(e) => setNotifyForm((p) => ({ ...p, attachment_request_label_fr: e.target.value }))}
+                      data-testid="notify-attachment-label-fr"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-xs">Accepted types</Label>
+                      <Input
+                        placeholder="PDF, JPG, PNG"
+                        value={notifyForm.attachment_types || 'PDF, JPG, PNG'}
+                        onChange={(e) => setNotifyForm((p) => ({ ...p, attachment_types: e.target.value }))}
+                        data-testid="notify-attachment-types"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Max size (MB)</Label>
+                      <Input
+                        type="number"
+                        min="0.1"
+                        max="25"
+                        step="0.1"
+                        value={notifyForm.attachment_max_mb || 1.0}
+                        onChange={(e) => setNotifyForm((p) => ({ ...p, attachment_max_mb: parseFloat(e.target.value) || 1.0 }))}
+                        data-testid="notify-attachment-max-mb"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>

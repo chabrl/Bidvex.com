@@ -2,16 +2,22 @@
 Notification routes - user notification CRUD
 """
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
 from typing import Optional
 from datetime import datetime, timezone
 from deps import get_current_user, get_db, User
 import uuid
+import os
 import logging
 
 logger = logging.getLogger(__name__)
 
 notifications_router = APIRouter(tags=["Notifications"])
+
+# iter266 Mission 3C — upload config for notification attachment requests.
+NOTIFICATION_UPLOAD_DIR = "/app/uploads/notification_attachments"
+DEFAULT_ALLOWED_EXT = {"pdf", "jpg", "jpeg", "png", "doc", "docx"}
+DEFAULT_MAX_MB = 5.0
 
 
 @notifications_router.get("/notifications")
@@ -50,13 +56,21 @@ async def get_unread_count(current_user: User = Depends(get_current_user)):
 
 @notifications_router.post("/notifications/mark-all-read")
 async def mark_all_notifications_read(current_user: User = Depends(get_current_user)):
-    """Mark all notifications as read"""
+    """Mark all notifications as read.
+
+    iter266 Mission 4 — Returns both `updated` (spec-aligned) and
+    `updated_count` (legacy) so existing callers keep working.
+    """
     db = get_db()
     result = await db.notifications.update_many(
         {"user_id": current_user.id, "read": False},
-        {"$set": {"read": True}}
+        {"$set": {"read": True, "is_read": True}}
     )
-    return {"success": True, "updated_count": result.modified_count}
+    return {
+        "success": True,
+        "updated": result.modified_count,
+        "updated_count": result.modified_count,
+    }
 
 
 @notifications_router.post("/notifications/{notification_id}/read")
@@ -116,6 +130,205 @@ async def create_notification(
     await db.notifications.insert_one(notification)
     notification.pop("_id", None)
     return notification
+
+
+# ─── iter266 Mission 3 — Admin: send notification with optional attachment request ──
+
+@notifications_router.post("/notifications/admin/send")
+async def admin_send_notification(
+    payload: dict,
+    current_user: User = Depends(get_current_user),
+):
+    """iter266 Mission 3D — Admin endpoint to send a rich notification.
+
+    Body:
+      {
+        "user_id":   "<recipient>",
+        "user_ids":  ["<u1>", "<u2>"],   # batch (optional, alt to user_id)
+        "type":      "admin_general",     # default
+        "title":     "...",
+        "title_fr":  "...",
+        "body":      "...",                # spec-aligned name
+        "body_fr":   "...",
+        "message":   "..." (legacy alias for body),
+        "cta_label": "...",
+        "cta_url":   "/path-or-https-url",
+        "color_type":"info"|"warning"|"action_required"|"success",
+        "notification_icon": "📎",
+        "sender_name": "BidVex Admin",
+        "requires_attachment": True,
+        "attachment_request_label":     "Please upload your NEQ certificate",
+        "attachment_request_label_fr":  "Veuillez téléverser votre certificat NEQ",
+        "attachment_types": "PDF, JPG, PNG",
+        "attachment_max_mb": 1.0
+      }
+    """
+    if not getattr(current_user, "is_admin", False) and getattr(current_user, "role", None) != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    db = get_db()
+    user_id = (payload.get("user_id") or "").strip()
+    user_ids = payload.get("user_ids") or ([user_id] if user_id else [])
+    if not user_ids:
+        raise HTTPException(status_code=400, detail="user_id or user_ids required")
+
+    title = (payload.get("title") or "").strip()
+    body = (payload.get("body") or payload.get("message") or "").strip()
+    if not title:
+        raise HTTPException(status_code=400, detail="title required")
+
+    requires_attachment = bool(payload.get("requires_attachment"))
+    color_type = payload.get("color_type") or ("action_required" if requires_attachment else "info")
+
+    base_doc = {
+        "type":        payload.get("type") or "admin_general",
+        "title":       title,
+        "title_fr":    (payload.get("title_fr") or "").strip() or None,
+        "body":        body,
+        "message":     body,  # legacy alias
+        "body_fr":     (payload.get("body_fr") or "").strip() or None,
+        "cta_label":   payload.get("cta_label"),
+        "cta_url":     payload.get("cta_url") or payload.get("action_url"),
+        "action_url":  payload.get("cta_url") or payload.get("action_url"),
+        "color_type":  color_type,
+        "notification_icon": payload.get("notification_icon"),
+        "sender_name": payload.get("sender_name") or "BidVex Admin",
+        "requires_attachment":         requires_attachment,
+        "attachment_request_label":    payload.get("attachment_request_label") or "",
+        "attachment_request_label_fr": payload.get("attachment_request_label_fr") or "",
+        "attachment_types":            payload.get("attachment_types") or "PDF, JPG, PNG",
+        "attachment_max_mb":           float(payload.get("attachment_max_mb") or DEFAULT_MAX_MB),
+        "attachment_submitted":        False,
+        "attachment_url":              None,
+        "attachment_submitted_at":     None,
+        "read":                        False,
+        "is_read":                     False,
+        "created_by_admin":            current_user.id,
+    }
+
+    docs = []
+    for uid in user_ids:
+        d = dict(base_doc)
+        d["id"] = str(uuid.uuid4())
+        d["user_id"] = uid
+        d["created_at"] = datetime.now(timezone.utc).isoformat()
+        docs.append(d)
+
+    if docs:
+        await db.notifications.insert_many(docs)
+    return {"success": True, "sent_count": len(docs)}
+
+
+@notifications_router.post("/notifications/{notification_id}/submit-attachment")
+async def submit_notification_attachment(
+    notification_id: str,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+):
+    """iter266 Mission 3C — Upload a file in response to a notification
+    that has `requires_attachment=True`. Validates size + extension,
+    stores under `/uploads/notification_attachments/{notification_id}/`,
+    then fans out a follow-up admin notification."""
+    db = get_db()
+    notif = await db.notifications.find_one(
+        {"id": notification_id, "user_id": current_user.id},
+        {"_id": 0},
+    )
+    if not notif:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    if not notif.get("requires_attachment"):
+        raise HTTPException(status_code=400, detail="This notification does not request an attachment")
+    if notif.get("attachment_submitted"):
+        raise HTTPException(status_code=400, detail="Attachment already submitted")
+
+    # Resolve max size + allowed extensions from the notif config.
+    max_mb = float(notif.get("attachment_max_mb") or DEFAULT_MAX_MB)
+    allowed_raw = str(notif.get("attachment_types") or "").lower()
+    allowed = {
+        e.strip().lstrip(".").lower()
+        for e in allowed_raw.replace(",", " ").split()
+        if e.strip()
+    } or DEFAULT_ALLOWED_EXT
+
+    filename = file.filename or "upload"
+    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    if ext not in allowed:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid file type '.{ext}'. Allowed: {sorted(allowed)}",
+        )
+
+    contents = await file.read()
+    size_mb = len(contents) / (1024 * 1024)
+    if size_mb > max_mb:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File too large: {size_mb:.2f} MB (max {max_mb} MB)",
+        )
+
+    target_dir = os.path.join(NOTIFICATION_UPLOAD_DIR, notification_id)
+    os.makedirs(target_dir, exist_ok=True)
+    safe_name = f"{uuid.uuid4().hex[:8]}_{filename.replace('/', '_').replace(' ', '_')}"
+    fpath = os.path.join(target_dir, safe_name)
+    with open(fpath, "wb") as fh:
+        fh.write(contents)
+    attachment_url = f"/uploads/notification_attachments/{notification_id}/{safe_name}"
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    await db.notifications.update_one(
+        {"id": notification_id},
+        {"$set": {
+            "attachment_submitted":    True,
+            "attachment_url":          attachment_url,
+            "attachment_submitted_at": now_iso,
+            "attachment_size_mb":      round(size_mb, 3),
+            "attachment_filename":     filename,
+        }},
+    )
+
+    # Fan-out admin alert. Find the admin who created the notification first.
+    admin_id = notif.get("created_by_admin")
+    if not admin_id:
+        admin_user = await db.users.find_one(
+            {"$or": [{"role": "admin"}, {"is_admin": True}]},
+            {"_id": 0, "id": 1},
+        )
+        admin_id = admin_user["id"] if admin_user else None
+    if admin_id:
+        try:
+            user_name = getattr(current_user, "name", None) or getattr(current_user, "email", "User")
+            await db.notifications.insert_one({
+                "id": str(uuid.uuid4()),
+                "user_id": admin_id,
+                "type": "admin_attachment_received",
+                "title": f"📎 {user_name} submitted an attachment",
+                "message": (
+                    f"User {user_name} responded to notification "
+                    f"'{(notif.get('title') or '')[:80]}' with a file "
+                    f"({filename}, {size_mb:.2f} MB)."
+                ),
+                "data": {
+                    "source_notification_id": notification_id,
+                    "attachment_url": attachment_url,
+                    "responder_user_id": current_user.id,
+                },
+                "cta_label": "View attachment",
+                "cta_url":   attachment_url,
+                "action_url": attachment_url,
+                "sender_name": "BidVex System",
+                "color_type": "success",
+                "read": False,
+                "is_read": False,
+                "created_at": now_iso,
+            })
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"[notification-attachment] admin notify failed: {exc}")
+
+    return {
+        "success": True,
+        "attachment_url": attachment_url,
+        "submitted_at": now_iso,
+        "size_mb": round(size_mb, 3),
+    }
 
 
 @notifications_router.post("/notifications/admin/cleanup-empty")

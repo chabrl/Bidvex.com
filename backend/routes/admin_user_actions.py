@@ -78,6 +78,12 @@ class SendNotificationPayload(BaseModel):
     body_fr: Optional[str] = None
     attached_transaction_id: Optional[str] = None
     send_via: str = Field("both")  # email|in_app|both
+    # iter266 Mission 3D — Optional attachment-request fields.
+    requires_attachment: bool = False
+    attachment_request_label: Optional[str] = None
+    attachment_request_label_fr: Optional[str] = None
+    attachment_types: Optional[str] = "PDF, JPG, PNG"
+    attachment_max_mb: Optional[float] = 1.0
 
 
 _VALID_TYPES = {
@@ -115,24 +121,37 @@ async def admin_send_notification(
         in_app_id = str(uuid.uuid4())
         # iter217 Phase 3 — Write BOTH `message` (the canonical field read by
         # NotificationCenter) and `message_en`/`message_fr` (for templating).
-        # The legacy admin path only wrote *_en/_fr, so the bell rendered
-        # blank message lines.
+        # iter266 Mission 3D — Carry optional attachment-request fields so
+        # the centered detail modal can render an upload widget.
         await db.notifications.insert_one({
             "id": in_app_id,
             "user_id": user_id,
             "type": f"admin_{payload.notification_type}",
             "title": payload.subject,
+            "title_fr": payload.subject,
             "message": payload.body_en,
+            "body": payload.body_en,
+            "body_fr": payload.body_fr or payload.body_en,
             "message_en": payload.body_en,
             "message_fr": payload.body_fr or payload.body_en,
             "data": {
                 "attached_transaction_id": payload.attached_transaction_id,
             },
             "attached_transaction_id": payload.attached_transaction_id,
-            "action_url": "/settings?tab=documents" if payload.notification_type == "document_request" else None,
-            "action_type": "navigate" if payload.notification_type == "document_request" else None,
+            "action_url": None,
+            "action_type": None,
             "is_read": False,
             "read": False,
+            "sender_name": "BidVex Admin",
+            "color_type": "action_required" if payload.requires_attachment else "info",
+            "requires_attachment": bool(payload.requires_attachment),
+            "attachment_request_label": payload.attachment_request_label or "",
+            "attachment_request_label_fr": payload.attachment_request_label_fr or "",
+            "attachment_types": payload.attachment_types or "PDF, JPG, PNG",
+            "attachment_max_mb": float(payload.attachment_max_mb or 1.0),
+            "attachment_submitted": False,
+            "attachment_url": None,
+            "attachment_submitted_at": None,
             "created_at": datetime.now(timezone.utc).isoformat(),
             "created_by_admin": current_user.id,
         })
