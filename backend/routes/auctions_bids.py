@@ -43,7 +43,7 @@ def get_db():
 # ========== BID PLACEMENT (Single-Item) ==========
 
 @bids_router.post("/bids")
-@_limiter.limit("10/minute")
+@_limiter.limit("30/minute")
 async def place_bid(request: Request, bid_data: BidCreate, current_user: User = Depends(get_current_user)):
     db = get_db()
 

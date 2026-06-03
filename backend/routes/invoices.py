@@ -861,7 +861,7 @@ async def complete_auction_and_send_documents(
     
     Triggers when auction status changes to 'ended':
     - Generates all buyer and seller documents
-    - Sends emails with PDF attachments (mock mode)
+    - Sends emails with PDF attachments via SendGrid
     - Updates invoice records with email tracking
     
     Query Parameters:

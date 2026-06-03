@@ -584,7 +584,7 @@ async def _handle_payment_succeeded(db, invoice):
         "id": invoice.get("id"),
         "user_id": user["id"],
         "amount": invoice.get("amount_paid", 0) / 100,
-        "currency": invoice.get("currency", "usd"),
+        "currency": invoice.get("currency", "cad"),
         "status": "succeeded",
         "created_at": datetime.now(timezone.utc).isoformat()
     })
@@ -635,7 +635,7 @@ async def _handle_payment_failed(db, invoice, event_id: str | None = None):
         "id": invoice.get("id"),
         "user_id": user["id"],
         "amount": invoice.get("amount_due", 0) / 100,
-        "currency": invoice.get("currency", "usd"),
+        "currency": invoice.get("currency", "cad"),
         "status": "failed",
         "failure_reason": invoice.get("last_finalization_error", {}).get("message"),
         "created_at": datetime.now(timezone.utc).isoformat()

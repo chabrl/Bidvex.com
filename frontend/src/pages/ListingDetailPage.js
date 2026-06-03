@@ -419,6 +419,8 @@ const ListingDetailPage = () => {
                   alt={getLocalized(listing, 'title')}
                   className="w-full h-full object-cover"
                   data-testid="listing-detail-primary-image"
+                  loading="eager"
+                  fetchpriority="high"
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/10 to-accent/10">
@@ -438,7 +440,7 @@ const ListingDetailPage = () => {
                       setLightboxOpen(true);
                     }}
                   >
-                    <SafeImage src={img} alt={`${getLocalized(listing, 'title')} ${idx + 2}`} className="w-full h-full object-cover" />
+                    <SafeImage src={img} alt={`${getLocalized(listing, 'title')} ${idx + 2}`} className="w-full h-full object-cover" loading="lazy" />
                   </div>
                 ))}
               </div>

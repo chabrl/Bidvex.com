@@ -15,11 +15,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form, Request
 from fastapi.responses import FileResponse
 
 from deps import User, get_current_user
 from models.message_models import MessageCreate, Message
+# iter269 Task 3.2 — Rate limit messages.
+from rate_limit import limiter as _limiter
 
 logger = logging.getLogger(__name__)
 
@@ -151,7 +153,8 @@ def set_message_managers(msg_manager, global_manager):
 # ---------------------------------------------------------------------------
 
 @messages_router.post("/messages")
-async def send_message(msg: MessageCreate, current_user: User = Depends(get_current_user)):
+@_limiter.limit("20/minute")
+async def send_message(request: Request, msg: MessageCreate, current_user: User = Depends(get_current_user)):
     """Send a text message to another user."""
     # iter196 — gate thread creation
     is_admin = (current_user.role or "").lower() in ("admin", "superadmin") if hasattr(current_user, "role") else False

@@ -1,5 +1,79 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter269 — LAUNCH PREP HARDENING (Jun 03, 2026) ✅
+
+Final pre-launch hardening pass. **Pytest 176/176 PASS** across
+iter255-iter269 (14 new iter269 + 162 regression). Zero regressions.
+
+### Task 1 — SendGrid not mocked ✅
+- Grep audit complete: no unconditional email mocks, only proper
+  guards for missing `SENDGRID_API_KEY`.
+- Rewrote stale docstring in `routes/invoices.py` that mentioned
+  "mock mode" — PDFs are sent via real SendGrid in all environments.
+- Live `GET /api/admin/test-email` verified: `status_code=202`,
+  `sendgrid_configured: true`, real email delivered.
+
+### Task 2 — Stripe live-mode safety ✅
+- Zero hardcoded `sk_test`/`sk_live` keys in `routes/` or `services/`
+  (only present in test files and one explicitly-named migration script).
+- All `stripe.api_key` assignments read from env.
+- Webhook signature verification active via `STRIPE_WEBHOOK_SECRET`
+  + multi-secret fallback (`construct_event`).
+- Fixed `"usd"` → `"cad"` defaults in 2 payment-logging branches
+  of `webhooks.py` (BidVex is CAD-first).
+
+### Task 3 — Security hardening ✅
+- **CORS** scoped via `CORS_ORIGINS` env: `bidvex.com`, `www.bidvex.com`,
+  `api.bidvex.com`, preview URL. No wildcard.
+- **Rate limits** confirmed/added:
+  - `/auth/register` → 5/min, `/auth/login` → 10/min
+  - `/bids` raised to **30/min** (was 10/min — matches spec for power bidders)
+  - `/messages` **added** at 20/min
+- **Bleach 6.3.0** present in requirements; `services/html_sanitizer.py`
+  uses `bleach.clean(..., tags=[], strip=True)`.
+- **Admin route audit**: 10 admin route files scanned; 0 unguarded
+  endpoints. All wrapped with `_require_admin`/`is_admin` check.
+
+### Task 4 — Image optimization ✅
+- `ListingDetailPage.js` hero image: `loading="eager"`,
+  `fetchpriority="high"`. Gallery thumbnails: `loading="lazy"`.
+- Grid cards (`FlattenedMarketplace.js`, `LotsMarketplacePage.js`):
+  already `loading="lazy"` + explicit `width={400}` `height` for CLS.
+- `public/index.html` already has preconnect hints for fonts,
+  SendGrid CDN, Unsplash, Stripe.
+
+### Task 5 — LAUNCH_QA.md ✅
+- Created `/app/LAUNCH_QA.md` with the canonical manual checklist
+  spanning Auth, Listings, Bidding, Payments, Admin, Emails, Mobile,
+  Notifications, Affiliate, SEO, Performance, Security, Stripe
+  Live-mode, and Bilingual sections.
+
+### Validation
+- **NEW** `tests/test_iter269_launch_prep.py` — **14/14 PASS** with
+  static + subprocess greps for every constraint.
+- **Full regression**: **176/176 PASS** across iter255→iter269.
+- Backend boots cleanly; 18 scheduler jobs registered; CORS active.
+
+### Files changed (iter269)
+**Backend MODIFIED**: `routes/invoices.py` (docstring), `routes/webhooks.py`
+(currency fallback × 2), `routes/auctions_bids.py` (bid rate-limit 10→30/min),
+`routes/messages.py` (new 20/min rate-limit + Request import + slowapi import).
+**Backend NEW**: `tests/test_iter269_launch_prep.py` (14 tests).
+**Frontend MODIFIED**: `pages/ListingDetailPage.js` (hero eager + fetchpriority,
+gallery lazy).
+**Root NEW**: `LAUNCH_QA.md` (manual pre-launch checklist).
+
+### Action items (user)
+1. **Final smoke-test** using `/app/LAUNCH_QA.md` on preview.
+2. **Save to GitHub → redeploy** to production.
+3. **Stripe Dashboard**: confirm `STRIPE_SECRET_KEY` is `sk_live_…`
+   in prod env vars + 4 transfer webhook events registered.
+4. **Post-deploy**: submit `https://bidvex.com/sitemap.xml` to
+   Google Search Console.
+
+---
+
+
 ## Latest: iter268 — STRIPE WEBHOOKS + ATTACHMENT RESET + LAUNCH-READINESS AUDIT (Jun 02, 2026) ✅
 
 Five-mission sprint closing the iter267 backlog: Stripe Transfer
