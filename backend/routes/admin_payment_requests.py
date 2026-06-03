@@ -159,11 +159,16 @@ async def _build_payment_request(
     }
     expires_at: Optional[datetime] = None
     if body.expiry_hours and body.expiry_hours > 0:
-        # Stripe enforces a 30-min minimum and 24-day maximum on expires_at.
+        # Stripe PaymentLinks do not accept an `expires_at` parameter
+        # (passing it triggers `parameter_unknown` 400 errors). We
+        # store the expiry in the MongoDB `payment_requests` document
+        # and the `/pay/:id` page enforces it server-side — that is
+        # the canonical source of truth.
+        # We still respect the same 30-min minimum / 24-day maximum
+        # window for parity with what Stripe historically allowed.
         seconds = max(30 * 60, body.expiry_hours * 3600)
         seconds = min(seconds, 24 * 24 * 3600)
         expires_at = datetime.now(timezone.utc) + timedelta(seconds=seconds)
-        create_kwargs["expires_at"] = int(expires_at.timestamp())
 
     try:
         link = stripe.PaymentLink.create(**create_kwargs)
