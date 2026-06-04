@@ -1,5 +1,210 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter277 — FLOATING AI CORE SUPPORT WIDGET (Feb 04, 2026) ✅
+
+Surfaces the iter276 Gemini-backed AI Core to logged-in users on every
+authenticated dashboard + admin route via a floating chat bubble.
+**Pytest 261/261 PASS** (iter255→iter277 sprint scope, 27 env-dependent
+skips, 0 failures). Lint clean, webpack compiles.
+
+### Mission 1 — Component (NEW `components/AICoreSupportWidget.jsx`)
+- Floating action button (`ai-core-fab`) bottom-right, expandable into
+  a 400px chat panel (`ai-core-widget`).
+- Distinct from the existing public `AIAssistant.js` — that one stays
+  unchanged for marketing-site visitors. iter277 is the *internal*
+  assistant grounded in the iter275 canonical platform guide.
+- Optimistic UI: user message appears instantly; "AI Core is
+  thinking…" typing indicator (`ai-core-typing`) shows while the
+  network round trip resolves.
+- 4 suggested-question prompt cards in the empty state
+  (`ai-core-suggestion-vehicle-bid`, `-trial-coupon`, `-tax-profile`,
+  `-storage-doc`) — each one a one-click pre-fill of the canonical
+  P0/UX questions.
+- Auth guard: returns `null` for unauthenticated users — prevents
+  anonymous bots from probing the platform-internal P0 language.
+- Composer: textarea with `Enter`-to-send (`Shift+Enter` for newline),
+  4000-char cap matching the backend pydantic max.
+
+### Mission 2 — App wiring + scope (`App.js`)
+- Lazy-imports the widget (own webpack chunk).
+- `AICoreSupportWidgetWrapper` is location-aware — mounts ONLY on:
+  - `/seller/dashboard*`
+  - `/buyer/dashboard*`
+  - `/facility/dashboard*`
+  - `/admin*`
+  Anywhere else → returns `null`. This is deliberate: the public
+  `AIAssistantWrapper` continues to drive the homepage / marketplace
+  surfaces, and the iter277 widget is the *post-login* "Ask AI Core"
+  surface only.
+- Both wrappers live under their own `<Suspense fallback={null}>`.
+
+### Mission 3 — LocalStorage persistence
+- Key format: `bidvex.ai_core_chat.v1.<userId>` — **per-user** so
+  account-switching on the same browser does NOT leak a previous
+  user's transcript.
+- Hard cap of `MAX_LOCAL_HISTORY = 30` messages on both load AND
+  persist paths — keeps the blob bounded.
+- Load + persist + clear paths all wrapped in `try/catch` — disabled
+  storage / quota-exceeded / corrupted blob never crashes the widget.
+- "Clear history" button (`ai-core-clear`) wipes both in-memory
+  state AND the localStorage entry.
+
+### Mission 4 — Bilingual EN/FR (full i18n alignment)
+- New `aiCore` namespace added to BOTH `locales/en.json` AND
+  `locales/fr.json` with identical 15-key sets:
+  - `title`, `subtitle`, `openLabel`, `closeLabel`, `clearLabel`,
+    `sendLabel`, `placeholder`, `thinking`, `errorPrefix`,
+    `emptyStateLead`, 4× `promptXxx` cards, `footerHint`
+- Every literal user-facing string in the component flows through
+  `t('aiCore.*')` — zero hardcoded English. Verified by a static
+  test that scans for the specific `t(...)` calls.
+- Outbound POST also includes `language: i18n.language` so the
+  backend system instruction can hint Gemini to reply in the user's
+  language.
+
+### Mission 5 — Backend handshake (iter276 contract)
+- POSTs to `${API_BASE}/support/chat` with payload
+  `{message, session_id: "user:<userId>", language}`.
+- Reads `r.data.response` from the iter276 `SupportChatResponse`
+  envelope.
+- Auth header `Authorization: Bearer <token>` from `AuthContext`.
+- `session_id` anchored to the user's id so multi-turn context
+  preservation works across page reloads (iter276 in-memory
+  session pool keys exactly on this string).
+
+### Validation (`tests/test_iter277_ai_core_widget.py`)
+**17/17 PASS** covering:
+- File existence + canonical testids (12 unique testids)
+- `useAuth` + `useTranslation` wiring + bearer token + anon-user guard
+- Static scan asserting NO hardcoded user-facing English strings —
+  every label routed through `t('aiCore.*')`
+- `App.js` lazy import + route-gated wrapper + does-not-replace-existing
+  assistant sanity
+- Per-user storage key format + history cap on both paths + try/catch
+  defensive wrapping + clear-history wipes localStorage too
+- Full `aiCore` key set in en.json + fr.json + EN/FR key parity
+  (drift between locales fails the test)
+- Backend handshake: payload shape + envelope read path + session_id
+  anchoring + live HTTP sanity that iter276 endpoint still returns
+  the documented envelope
+
+### Files changed (iter277)
+**Frontend NEW**: `components/AICoreSupportWidget.jsx` (~250 lines).
+**Frontend MODIFIED**: `App.js` (lazy import + route-gated wrapper +
+suspense mount), `locales/en.json` + `locales/fr.json` (`aiCore`
+namespace).
+**Backend NEW**: `tests/test_iter277_ai_core_widget.py` (17 tests).
+
+### Action items (user)
+1. **Save to GitHub → redeploy** preview → production.
+2. **Production toggle reminder**: `AI_ASSISTANT_TEST_MODE=0` (or
+   unset) in prod env BEFORE the redeploy — otherwise users will see
+   the `[TEST_MODE]` stub instead of real Gemini answers.
+3. **Smoke test**: log in → navigate to `/seller/dashboard` (or
+   `/buyer/dashboard` or `/admin`) → the gradient "Ask AI Core" FAB
+   appears bottom-right. Click → chat panel opens with 4 suggestion
+   cards. Type a question → message + reply appear. Reload page →
+   transcript restored. Switch language EN↔FR → all labels swap.
+4. **Verify scope**: navigate to `/marketplace` or homepage → the
+   iter277 widget should NOT appear (only the legacy public AIAssistant).
+
+---
+
+
+
+## Latest: iter276 — GEMINI-BACKED AI CORE PLATFORM ASSISTANT (Feb 04, 2026) ✅
+
+Mounted the BidVex AI Core Platform Assistant — a Gemini-backed
+support chatbot grounded in the iter275 canonical user-platform guide.
+**Pytest 245/245 PASS** (iter255→iter276 sprint scope, 26
+env-dependent skips, 0 failures). Backend healthy, lint clean.
+
+### ⚠️ Critical pre-build correction
+The directive provided a `google-genai` snippet using
+`client.interactions.create(agent="antigravity-preview-05-2026", …)` —
+that SDK surface does **not exist** in the real Google client. Per
+BidVex platform rules ("AUTHENTICATION IS ALWAYS AN INTEGRATION /
+DON'T DO ANY 3rd party integrations BY YOURSELF, always use this
+integration_playbook_expert_v2") the integration was routed through
+the canonical Emergent Universal LLM Key flow via the
+`emergentintegrations` library instead.
+
+### Mission 1 — Service layer (NEW `services/ai_service.py`)
+- Public API: `chat_with_assistant(session_id, message, *, test_mode_override=None)`.
+- Provider: `gemini`, default model `gemini-3-flash-preview` (iter276
+  playbook recommendation). Overridable via `AI_ASSISTANT_MODEL` /
+  `AI_ASSISTANT_PROVIDER` envs.
+- **System instruction loaded at import** from
+  `/app/memory/USER_PLATFORM_GUIDE.md` (iter275 canonical guide) so
+  the assistant automatically picks up future sprint updates to
+  user-facing behaviour without code changes. Includes an inline
+  fallback block when the file isn't present.
+- Persona prepended explicitly enforces the P0 rules: Vehicle-bid lock,
+  SIN compliance, CASL footer, Quebec tax.
+- **In-memory session pool** keyed by `session_id` — each session gets
+  its own `LlmChat` instance which preserves multi-turn history
+  automatically. `reset_chat_pool()` test helper clears the pool.
+- **Token-burn safety**: `AI_ASSISTANT_TEST_MODE=1` (now set in
+  `/app/backend/.env`) short-circuits every call to a deterministic
+  `[TEST_MODE]` stub string. The service NEVER imports
+  emergentintegrations at module top — only inside the lazy helper —
+  so pytest sweeps complete without ever risking a real Gemini call.
+
+### Mission 2 — HTTP endpoints (NEW `routes/support.py`)
+- `GET /api/support/health` — **anonymous** liveness probe. Returns
+  `{ok, provider, model, test_mode}`. Required for K8s/ops checks.
+- `POST /api/support/chat` — **JWT-protected**. Payload:
+  `{message, session_id?}`. Response (`SupportChatResponse`):
+  `{response, session_id, model, test_mode}`. When `session_id` is
+  omitted, the user's id is used (`user:{current_user.id}`) so a
+  single user's follow-up questions always land in the same context.
+- Wired into `server.py` under the standard `/api` prefix.
+- Pydantic validation: message 1-4000 chars; empty/whitespace → 400.
+- Real-LLM failures bubble up as HTTP 502 (not 500) so the caller
+  knows to retry vs. report.
+
+### Mission 3 — Token-burn safety + validation (14 tests PASS)
+- 7 service-level static + behavior tests (module imports,
+  provider/model defaults, P0 language in system instruction, test-mode
+  stub, override param, empty-input ValueError, pool reset).
+- 7 HTTP-level tests:
+  - Anonymous health 200
+  - Anonymous chat 401/403
+  - Auth'd chat returns the locked-down response envelope with
+    `test_mode=True`
+  - Empty message 400/422
+  - Oversized message (>4000 chars) 422
+  - Multi-turn session_id round-trip
+  - **socket-spy hard guard** — monkey-patches
+    `socket.create_connection` and asserts NO outbound dial to
+    `googleapis.com` happens in test mode (catches future env-config
+    drifts that could leak real Gemini calls into CI)
+
+### Files changed (iter276)
+**Backend NEW**: `services/ai_service.py` (~180 lines —
+test-mode-safe service layer), `routes/support.py` (~80 lines — JWT-
+protected chat + anonymous health), `tests/test_iter276_ai_assistant.py`
+(14 tests).
+**Backend MODIFIED**: `server.py` (mounted `routes.support.router`
+under `/api`), `backend/.env` (added `AI_ASSISTANT_TEST_MODE=1`).
+
+### Action items (user)
+1. **Save to GitHub → redeploy** preview → production.
+2. **Production toggle**: set `AI_ASSISTANT_TEST_MODE=0` (or remove the
+   key) in the production environment BEFORE redeploying — otherwise
+   users will see the `[TEST_MODE]` stub. Keep it `=1` in CI/staging.
+3. **Optional model swap**: switch `AI_ASSISTANT_MODEL` env to
+   `gemini-3.1-pro-preview` for higher quality at moderately higher
+   token spend, or leave on `gemini-3-flash-preview` for cost.
+4. **Frontend wiring (deferred)**: nothing built yet on the FE. A
+   thin chat-bubble component on the user dashboard + admin panel
+   would surface this — say the word and I'll ship the floating
+   support chat widget that hits `/api/support/chat`.
+
+---
+
+
+
 ## Latest: iter275 — COUPON CONVERSION ANALYTICS TAB (Feb 04, 2026) ✅
 
 Marketing-masterclass closing piece. Admins can now A/B test subject

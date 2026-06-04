@@ -2377,5 +2377,22 @@
     "pickupAddress": "Adresse de cueillette",
     "additionalNotes": "Notes additionnelles",
     "contactRevealReminder": "Tout paiement pour le véhicule s'effectue entre vous et le concessionnaire. BidVex n'est pas partie à la transaction finale."
+  },
+  "aiCore": {
+    "title": "BidVex IA Core",
+    "subtitle": "Posez une question sur la plateforme",
+    "openLabel": "Demander à l'IA Core",
+    "closeLabel": "Fermer le chat",
+    "clearLabel": "Effacer l'historique",
+    "sendLabel": "Envoyer le message",
+    "placeholder": "Posez votre question sur BidVex…",
+    "thinking": "L'IA Core réfléchit…",
+    "errorPrefix": "Erreur de l'IA Core",
+    "emptyStateLead": "Bienvenue ! Je peux vous aider avec les règles d'enchère, les coupons d'essai, la déclaration fiscale, les demandes de paiement et bien plus.",
+    "promptVehicleBid": "Un utilisateur individuel peut-il enchérir sur des véhicules ?",
+    "promptTrialCoupon": "Comment fonctionne un coupon d'essai gratuit ?",
+    "promptTaxProfile": "Que demande l'entrevue fiscale ?",
+    "promptStorageDoc": "Comment téléverser à nouveau mon document d'enregistrement de facilité ?",
+    "footerHint": "Les conversations sont enregistrées localement et n'incluent jamais votre mot de passe."
   }
 }

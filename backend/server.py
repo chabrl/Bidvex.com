@@ -769,6 +769,10 @@ try:
         ("routes.partner_trial", "partner_trial_router", None, False),
         # iter259 — Admin management of partner trials (list/extend/revoke).
         ("routes.partner_trial", "admin_partner_trials_router", None, False),
+        # iter276 — BidVex AI Core Platform Assistant (Gemini-backed,
+        # via the Emergent Universal LLM Key). Exposes /api/support/chat
+        # + /api/support/health.
+        ("routes.support", "router", None, False),
         # iter241 Mission 1 — Stripe checkout for promoted listings + email credits.
         ("routes.payments_promotions", "promotions_sub_router", None, False),
         ("routes.fees", "fees_router", None, False),

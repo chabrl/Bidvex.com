@@ -129,6 +129,11 @@ const SellerFinancialsPage = lazy(() => import('./pages/vehicles/SellerFinancial
 
 // Lazy-loaded heavy components
 const AIAssistant = lazy(() => import('./components/AIAssistant'));
+// iter277 — Internal "Ask AI Core" support widget mounted on the
+// authenticated dashboards + admin panel. Distinct from the public
+// AIAssistant above; wired to the iter276 POST /api/support/chat
+// endpoint and grounded in the iter275 canonical platform guide.
+const AICoreSupportWidget = lazy(() => import('./components/AICoreSupportWidget'));
 
 // ─── Global Loading Fallback ──────────────────────────────────────
 const PageLoader = () => {
@@ -274,6 +279,23 @@ const AIAssistantWrapper = () => {
   const location = useLocation();
   if (location.pathname === '/messages') return null;
   return <AIAssistant />;
+};
+
+// iter277 — Mount the AI Core support widget ONLY on the
+// authenticated dashboard surfaces + admin pages. Anywhere else, the
+// public AIAssistantWrapper above is the appropriate chat surface.
+const AICoreSupportWidgetWrapper = () => {
+  const location = useLocation();
+  const path = location.pathname || '';
+  const isDashboard =
+    path.startsWith('/seller/dashboard')
+    || path.startsWith('/buyer/dashboard')
+    || path.startsWith('/seller-dashboard')
+    || path.startsWith('/buyer-dashboard')
+    || path.startsWith('/facility/dashboard');
+  const isAdmin = path.startsWith('/admin');
+  if (!isDashboard && !isAdmin) return null;
+  return <AICoreSupportWidget />;
 };
 
 // iter272 — Captures UTM / campaign params on every URL change.
@@ -650,6 +672,10 @@ const App = () => {
           <FooterWrapper />
           <Suspense fallback={null}>
             <AIAssistantWrapper />
+          </Suspense>
+          {/* iter277 — Authenticated-only AI Core support widget */}
+          <Suspense fallback={null}>
+            <AICoreSupportWidgetWrapper />
           </Suspense>
           <MessageNotificationListener />
           <Toaster position="top-right" />

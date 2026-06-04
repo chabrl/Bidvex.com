@@ -2357,5 +2357,22 @@
     "pickupAddress": "Pickup Address",
     "additionalNotes": "Additional Notes",
     "contactRevealReminder": "All payment for the vehicle is between you and the dealer. BidVex is not party to the final transaction."
+  },
+  "aiCore": {
+    "title": "BidVex AI Core",
+    "subtitle": "Ask anything about the platform",
+    "openLabel": "Ask AI Core",
+    "closeLabel": "Close chat",
+    "clearLabel": "Clear history",
+    "sendLabel": "Send message",
+    "placeholder": "Ask a question about BidVex…",
+    "thinking": "AI Core is thinking…",
+    "errorPrefix": "AI Core encountered an error",
+    "emptyStateLead": "Welcome! I can help with bidding rules, trial coupons, tax onboarding, payment requests, and more.",
+    "promptVehicleBid": "Can an individual user bid on vehicles?",
+    "promptTrialCoupon": "How does a free-trial coupon work?",
+    "promptTaxProfile": "What does the tax interview ask for?",
+    "promptStorageDoc": "How do I resubmit my storage registration document?",
+    "footerHint": "Conversations are saved locally and never include your password."
   }
 }
