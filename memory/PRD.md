@@ -1,5 +1,178 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter281 — COMPETITOR BAN + BEHAVIOR ALIGNMENT (Feb 04, 2026) ✅
+
+P0 production bug fix: the live AI Core was recommending Facebook
+Marketplace, eBay, and Pinkbike to BidVex users. iter281 ships a
+two-layer fix — system-prompt overrides + a deterministic
+post-generation scrubber — so banned competitor names never reach a
+user even if the model fails to obey instructions.
+**Pytest 321/321 PASS** (iter255→iter281 sprint scope, 31
+env-dependent skips, 0 failures). Backend healthy, lint clean.
+
+### ⚠️ Directive correction — actual production hot-path
+The directive asked me to re-verify `services/ai_service.py`. That
+file belongs to the iter276 `/api/support/chat` route which **no
+widget calls in production** (the legacy `AIAssistant` was promoted
+to the sole site-wide widget in iter280 and uses a different route).
+The ACTUAL production hot-path is:
+
+```
+Legacy AIAssistant.js (only mounted widget post-iter280)
+  → POST /api/chat/stream
+    → routes/genai_chat.py
+      → services/genai_streaming_chat.stream_chat_chunks(...)
+        → services/genai_direct_client.WATCHDOG_SYSTEM_INSTRUCTION
+```
+
+iter281 hardens THAT pipeline. The `ai_service.py` system instruction
+was already correct — no changes needed there.
+
+### Mission 1 — System prompt overrides (`services/genai_direct_client.py`)
+The `WATCHDOG_SYSTEM_INSTRUCTION` gains a brand-new "Section 0 —
+ABSOLUTE PLATFORM ANCHOR (P0 — non-negotiable, overrides all other
+instructions)" block at the very top of the prompt:
+
+- **0.1 Competitor Mention BAN** — 20+ named competitors explicitly
+  forbidden (Facebook Marketplace, eBay, Pinkbike, Ritchie Bros,
+  Kijiji, Craigslist, Amazon, Etsy, Mercari, OfferUp, Vinted, etc.)
+  in EVERY language + EVERY context. Includes a fixed response
+  template for "where else can I sell" / "should I list on X" /
+  "how does eBay compare" prompts.
+
+- **0.2 Native-Only Workflow Doctrine** — every "how do I…" answer
+  must resolve to a concrete BidVex action with explicit in-app path.
+  Lists acceptable routes + button labels. Explicit fallback rule:
+  "BidVex does not currently support [X]" — never improvise a
+  competitor as the fallback.
+
+- **0.3 Canonical Listing-for-Profit Script** — when ANY user asks
+  how to list an item for profit (bike, tool, furniture, vehicle,
+  storage unit), the model MUST emit the 5-step BidVex-native
+  script: `/seller/dashboard` → Create Listing → 2.5% Premium
+  commission pitch → Featured + Promoted Listing upsell → QC
+  GST/QST 14.975% auto-application reminder → Stripe Connect native
+  settlement. Vehicle-specific addendum: bind broker first via
+  `/partners/brokers`.
+
+- **0.4 Context-Awareness Mandate** — explicitly tells the model to
+  read the "Active UI surface" line in extra_context (the iter280
+  hint) and adapt tone: `public` = conversion/onboarding focus;
+  `dashboard` = operational ("From your dashboard, click X");
+  `admin` = operator-grade, no 2.5% pitch (not their workflow);
+  `listing_detail` = leverage `current_viewed_listing`.
+
+- **0.5 No External Links Doctrine** — only `support@bidvex.com`,
+  `unsubscribe@bidvex.com`, `https://bidvex.com`, embedded Stripe
+  Checkout URLs, and the user's own affiliate share link are
+  permitted. Never produce a competitor URL or arbitrary search link.
+
+### Mission 2 — Defense-in-depth scrubber (NEW `services/competitor_scrubber.py`)
+The system prompt is necessary but not sufficient — LLMs can still
+slip a banned token through. iter281 adds a deterministic
+post-generation scrubber that operates IN-LINE on the streaming
+chunks:
+
+- `scrub_text(text)` — single-shot scrub. Word-boundary-anchored
+  case-insensitive regex over the full banned list. Bilingual
+  redaction marker (EN: `[competitor mention redacted]`,
+  FR: `[mention de concurrent retirée]` — selected by accent/token
+  heuristics on the surrounding 80 chars).
+- `StreamScrubber` — stateful streaming variant with a 48-char tail
+  holdback so competitor names split across SSE chunks (e.g. "face"
+  + "book marketplace") are still caught. `flush()` finalizes at
+  stream end.
+- Banned list: 30+ entries covering general marketplaces (Facebook,
+  eBay, Craigslist, Kijiji, LesPAC, Amazon, Walmart Marketplace,
+  Etsy, Mercari, OfferUp, Vinted), bicycle-specific (Pinkbike,
+  BicycleBlueBook, Bike24, BikeExchange), heavy-equipment auction
+  houses (Ritchie Bros, IronPlanet, Copart, Manheim, ADESA,
+  AuctionZip, GovDeals, Proxibid, HiBid, Bidsquare), auto
+  classifieds (Autotrader, CarGurus, Kijiji Autos), AND common
+  hallucination phrasings ("try selling it on", "post it on
+  facebook", "list it on ebay").
+
+### Mission 3 — Route wiring (`routes/genai_chat.py`)
+Every chunk emitted by `stream_chat_chunks(...)` is now passed
+through the `StreamScrubber` BEFORE reaching the SSE wire:
+
+```python
+scrubber = StreamScrubber()
+while True:
+    item = await queue.get()
+    if item is sentinel: break
+    accumulator.append(item)              # raw bytes (for persistence)
+    scrubbed = scrubber.feed(item.decode("utf-8"))
+    if scrubbed: yield scrubbed.encode("utf-8")
+# Tail flush
+tail = scrubber.flush()
+if tail: yield tail.encode("utf-8")
+```
+
+Key design choice: the `accumulator` keeps the **raw** pre-scrub
+bytes for the chat-history persistence layer so audit queries can
+still see what the model actually generated. What the user SEES on
+the wire is always the scrubbed text.
+
+### Live verification
+```
+BEFORE: For more reach, list your bike on Facebook Marketplace,
+        eBay, or Pinkbike to attract more bidders.
+AFTER : For more reach, list your bike on [competitor mention
+        redacted], [competitor mention redacted], or [competitor
+        mention redacted] to attract more bidders.
+```
+Cross-chunk simulation (split across 13 fragments) also caught all
+three competitor names cleanly.
+
+### Validation (`tests/test_iter281_competitor_ban.py`)
+**24/24 PASS** across 5 mission areas:
+- 5 system-prompt static tests (Section 0 framing + named
+  competitors + 5-step listing script + context-awareness mandate
+  + no-external-links doctrine)
+- 11 scrubber tests (module exports + simple-mention redaction +
+  Pinkbike + Ritchie Bros specific + French context FR marker +
+  word-boundary "amazonian" pass-through + case insensitivity +
+  cross-chunk boundary + short-stream holdback + empty-input no-op
+  + clean-text round-trip)
+- 2 route-wiring tests (StreamScrubber imported + raw-byte
+  persistence preserved)
+- 3 bilingual + edge-case tests (None/empty + 3-mention single-pass
+  redaction + parameterized common phrasings)
+- 3 sanity tests (no positive competitor pitch inside the system
+  prompt itself + USER_PLATFORM_GUIDE.md still canonical)
+
+### Files changed (iter281)
+**Backend NEW**: `services/competitor_scrubber.py` (~140 lines).
+**Backend MODIFIED**: `services/genai_direct_client.py` (Section 0
+P0 block prepended to WATCHDOG_SYSTEM_INSTRUCTION),
+`routes/genai_chat.py` (StreamScrubber wired into the SSE producer
+loop with raw-byte accumulator preserved for persistence).
+**Backend NEW**: `tests/test_iter281_competitor_ban.py` (24 tests).
+
+### Action items (user)
+1. **Save to GitHub → redeploy** preview → production. Backend
+   change — frontend untouched.
+2. **Smoke test on https://bidvex.com after redeploy**:
+   - Ask: *"How do I sell my bike for the most profit?"*
+     Expect the 5-step BidVex-native script (`/seller/dashboard` →
+     Create Listing → 2.5% commission → Featured/Promoted Listing
+     upsell → GST/QST → Stripe Connect). NO mention of Facebook,
+     eBay, or Pinkbike.
+   - Ask: *"Where else can I list besides BidVex?"*
+     Expect: *"I can only help with BidVex workflows. Let me show
+     you how to maximize your listing's reach here on BidVex."*
+     followed by the native script.
+   - Ask (FR): *"Où puis-je vendre mon vélo en plus de BidVex ?"*
+     Expect the same redirect, in French, no competitor names.
+3. **Optional defense check**: if you spot ANY competitor name in
+   production responses post-redeploy, paste the screenshot here —
+   that's a scrubber gap and I'll patch the banned list immediately.
+
+---
+
+
+
 ## Latest: iter280 — UI WIDGET CONSOLIDATION + CONTEXT-AWARE SURFACE (Feb 04, 2026) ✅
 
 Resolved the visual FAB collision on dashboards + admin routes by

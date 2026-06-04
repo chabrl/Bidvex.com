@@ -157,6 +157,14 @@ def _stream(body: StreamChatBody, *, user_id: Optional[str] = None) -> Streaming
         # iter239 Mission 4 — Accumulate streamed bytes so we can persist
         # the full assistant turn after the iterator drains.
         accumulator: list[bytes] = []
+        # iter281 — Defense-in-depth competitor-mention scrubber.
+        # Even with the system-prompt overrides telling the model to
+        # never recommend external marketplaces, an LLM can still slip
+        # a banned token into the stream. The scrubber sits in front
+        # of every emitted chunk and rewrites banned substrings to a
+        # localized redaction marker BEFORE the user sees them.
+        from services.competitor_scrubber import StreamScrubber
+        scrubber = StreamScrubber()
 
         def _producer() -> None:
             try:
@@ -180,8 +188,30 @@ def _stream(body: StreamChatBody, *, user_id: Optional[str] = None) -> Streaming
             item = await queue.get()
             if item is sentinel:
                 break
+            # iter281 — Feed each chunk through the scrubber. The
+            # accumulator keeps the RAW (pre-scrub) bytes for the
+            # persistence pass below so chat-history search still
+            # surfaces what was actually generated; what the user SEES
+            # over the wire is always the scrubbed text.
             accumulator.append(item)
-            yield item
+            try:
+                chunk_text = item.decode("utf-8")
+            except UnicodeDecodeError:
+                # Pass binary chunks through untouched — they can't
+                # contain ASCII competitor names in any meaningful
+                # form, and decoding failures should never crash the
+                # stream.
+                yield item
+                continue
+            scrubbed = scrubber.feed(chunk_text)
+            if scrubbed:
+                yield scrubbed.encode("utf-8")
+
+        # iter281 — Flush whatever the scrubber held back in its tail
+        # buffer (the last ~48 chars of the stream).
+        tail = scrubber.flush()
+        if tail:
+            yield tail.encode("utf-8")
 
         # iter239 Mission 4 — Persist the turn for authenticated users.
         # iter261 — Non-blocking via asyncio.create_task() so persist
