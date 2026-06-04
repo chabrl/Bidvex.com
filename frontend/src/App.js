@@ -13,6 +13,8 @@ import { HelmetProvider } from 'react-helmet-async';
 // iter268 Mission 3 — Catch any route-level render crash and show a friendly
 // retry/home UI instead of a blank screen.
 import ErrorBoundary from './components/ErrorBoundary';
+// iter272 — Campaign attribution lifecycle helper.
+import { captureCampaignTracking } from './lib/campaignTracking';
 
 // Shell components — kept eager (always visible on every page)
 import Navbar from './components/Navbar';
@@ -274,6 +276,17 @@ const AIAssistantWrapper = () => {
   return <AIAssistant />;
 };
 
+// iter272 — Captures UTM / campaign params on every URL change.
+// Mounts once inside <BrowserRouter>; the underlying util is a no-op
+// when no UTM params are present, so this is essentially free.
+const CampaignAttributionTracker = () => {
+  const location = useLocation();
+  React.useEffect(() => {
+    try { captureCampaignTracking(location.search); } catch (_) { /* noop */ }
+  }, [location.search]);
+  return null;
+};
+
 const MaintenanceGuard = ({ children }) => {
   const { mode, message, expectedBack, socialLinks, loading, isMaintenanceOrComingSoon } = useSiteMode();
   const { user, loading: authLoading } = useAuth();
@@ -362,6 +375,8 @@ const App = () => {
           <PromoBannerProvider>
             <ScrollToTop />
             <MarketingPixelLoader />
+            {/* iter272 — Capture incoming UTM/campaign params on every route change. */}
+            <CampaignAttributionTracker />
             <FbPixelTracker />
             <CookieConsentBanner />
             <MaintenanceGuard>

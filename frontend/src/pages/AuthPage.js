@@ -11,6 +11,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { toast } from 'sonner';
 import { Loader2, Lock, Eye, EyeOff, AlertTriangle, CheckCircle, Square, CheckSquare } from 'lucide-react';
 import axios from 'axios';
+// iter272 — Read + consume the captured campaign attribution at signup.
+import { consumeCampaignTracking } from '../lib/campaignTracking';
 
 const API = API_BASE;
 
@@ -60,7 +62,13 @@ const AuthPage = () => {
         const from = location.state?.from?.pathname || '/marketplace';
         navigate(from, { replace: true });
       } else {
-        await register(formData);
+        // iter272 — Attach the persisted UTM blob exactly once. Consuming
+        // it (read + clear) prevents double-attribution on a retry.
+        const tracking = consumeCampaignTracking();
+        const payload = tracking
+          ? { ...formData, campaign_tracking: tracking }
+          : formData;
+        await register(payload);
         toast.success(t('auth.accountCreatedMessage'));
         const from = location.state?.from?.pathname || '/marketplace';
         navigate(from, { replace: true });

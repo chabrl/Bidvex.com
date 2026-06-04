@@ -8,7 +8,7 @@ Extracted from server.py for maintainability
 from fastapi import APIRouter, HTTPException, Depends, Request, BackgroundTasks
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field, EmailStr
-from typing import Optional
+from typing import Optional, Dict, Any
 from datetime import datetime, timezone, timedelta
 from passlib.context import CryptContext
 from jose import jwt, JWTError
@@ -72,6 +72,12 @@ class UserCreate(BaseModel):
     terms_agreed: bool = False
     ai_disclosure_consent: bool = False
     ref_code: Optional[str] = None
+    # iter272 — Optional UTM/campaign attribution blob captured by the
+    # frontend tracker. When present, the register handler binds the
+    # tracking onto the new user document AND increments
+    # `external_email_campaigns.analytics.registrations` for the matching
+    # campaign — closing the marketing ROI loop.
+    campaign_tracking: Optional[Dict[str, Any]] = None
 
 
 class SessionCreate(BaseModel):
@@ -106,6 +112,136 @@ def hash_password(password: str) -> str:
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
+
+
+# ── iter272 — Campaign attribution helpers ────────────────────────────
+
+
+def _normalize_tracking(tracking: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Sanitize the UTM blob shipped from the frontend.
+
+    Each value is trimmed + length-capped to prevent abuse / injection.
+    Returns None when nothing useful is left after sanitisation.
+    """
+    if not tracking or not isinstance(tracking, dict):
+        return None
+    ALLOWED = {
+        "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
+        "bvx_t", "bvx_cid", "landing_url", "captured_at",
+    }
+    out: Dict[str, Any] = {}
+    for key in ALLOWED:
+        val = tracking.get(key)
+        if val is None:
+            continue
+        if isinstance(val, str):
+            val = val.strip()[:300]
+            if val:
+                out[key] = val
+        elif isinstance(val, (int, float)):
+            out[key] = val
+    return out or None
+
+
+async def _record_campaign_attribution(
+    *,
+    user_id: str,
+    normalized_email: str,
+    tracking: Optional[Dict[str, Any]],
+    now_iso: str,
+) -> None:
+    """Persist attribution onto the user document AND increment the
+    `external_email_campaigns.analytics.registrations` counter on the
+    matching campaign (matched by `utm_campaign` slug, then `bvx_cid`,
+    then plain campaign_id)."""
+    blob = _normalize_tracking(tracking)
+    if not blob:
+        return
+
+    # Stamp the attribution on the user doc.
+    await db.users.update_one(
+        {"id": user_id},
+        {"$set": {
+            "campaign_attribution":           blob,
+            "campaign_attribution_at":        now_iso,
+            "campaign_attribution_email":     normalized_email,
+        }},
+    )
+
+    # Resolve a campaign_id from the blob — try the most specific keys
+    # first so the analytics counter increments deterministically.
+    candidate = (
+        blob.get("bvx_cid")
+        or blob.get("utm_campaign")
+        or blob.get("utm_content")
+    )
+    if not candidate:
+        logger.info(
+            f"[iter272 attribution] persisted on user but no campaign key (email={normalized_email})"
+        )
+        return
+
+    # Match either the exact id or the slugified utm_campaign field.
+    campaign = await db.external_email_campaigns.find_one(
+        {"$or": [{"id": candidate}, {"utm_campaign": candidate}]},
+        {"_id": 0, "id": 1},
+    )
+    if not campaign:
+        logger.info(
+            f"[iter272 attribution] no external_email_campaigns row for "
+            f"candidate={candidate!r} — leaving counter unchanged"
+        )
+        return
+
+    await db.external_email_campaigns.update_one(
+        {"id": campaign["id"]},
+        {
+            "$inc": {"analytics.registrations": 1},
+            "$set": {"analytics.last_updated_at": now_iso},
+        },
+    )
+    logger.info(
+        f"[iter272 attribution] +1 registration → campaign={campaign['id']} "
+        f"(user={user_id}, email={normalized_email})"
+    )
+
+
+async def record_premium_upgrade(user_id: str) -> Dict[str, Any]:
+    """iter272 — Called when a tracked user upgrades to a paid plan.
+
+    Increments `analytics.premium_upgrades` on the originating campaign
+    (whichever campaign attributed the user). Returns a dict the caller
+    can inspect for ROI reporting; never raises.
+    """
+    try:
+        user = await db.users.find_one(
+            {"id": user_id},
+            {"_id": 0, "campaign_attribution": 1, "campaign_attribution_email": 1},
+        )
+        if not user:
+            return {"updated": False, "reason": "user_not_found"}
+        attr = user.get("campaign_attribution") or {}
+        candidate = (
+            attr.get("bvx_cid") or attr.get("utm_campaign") or attr.get("utm_content")
+        )
+        if not candidate:
+            return {"updated": False, "reason": "no_attribution"}
+        campaign = await db.external_email_campaigns.find_one(
+            {"$or": [{"id": candidate}, {"utm_campaign": candidate}]},
+            {"_id": 0, "id": 1},
+        )
+        if not campaign:
+            return {"updated": False, "reason": "campaign_not_found"}
+        now_iso = datetime.now(timezone.utc).isoformat()
+        await db.external_email_campaigns.update_one(
+            {"id": campaign["id"]},
+            {"$inc": {"analytics.premium_upgrades": 1},
+             "$set": {"analytics.last_updated_at": now_iso}},
+        )
+        return {"updated": True, "campaign_id": campaign["id"]}
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(f"[iter272 premium-upgrade] non-fatal: {exc}")
+        return {"updated": False, "reason": str(exc)}
 
 
 def create_access_token(data: dict) -> str:
@@ -333,6 +469,20 @@ async def register(user_data: UserCreate, request: Request, background_tasks: Ba
     }
     
     await db.users.insert_one(user_doc)
+
+    # iter272 — Campaign attribution binding. The frontend sends the
+    # captured UTM blob in `campaign_tracking`. We persist it onto the
+    # user document AND increment the matching external-campaign
+    # `analytics.registrations` counter so admins see real ROI per send.
+    try:
+        await _record_campaign_attribution(
+            user_id=user_id,
+            normalized_email=normalized_email,
+            tracking=user_data.campaign_tracking,
+            now_iso=now.isoformat(),
+        )
+    except Exception as _attr_exc:  # noqa: BLE001 — never block signup
+        logger.warning(f"[iter272 campaign-attribution] non-fatal: {_attr_exc}")
 
     # ── Affiliate Referral Tracking ──
     ref_code = user_data.ref_code
