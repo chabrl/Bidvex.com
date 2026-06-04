@@ -1,5 +1,5 @@
 import API_BASE from '../config';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -21,7 +21,17 @@ const AuthPage = () => {
   const { login, register } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [isLogin, setIsLogin] = useState(true);
+  const [isLogin, setIsLogin] = useState(() => {
+    // iter274 — Land on the SIGNUP tab whenever the URL carries a
+    // `?promo=` query string so trial-link clickers see the registration
+    // form immediately instead of the login form.
+    try {
+      const params = new URLSearchParams(window.location.search);
+      return !params.get('promo');
+    } catch {
+      return true;
+    }
+  });
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
@@ -35,6 +45,54 @@ const AuthPage = () => {
     terms_agreed: false,
     ai_disclosure_consent: false,
   });
+
+  // iter274 — Trial coupon parsed from `?promo=BVX-TRIAL-XXXXXXXX`.
+  // We hit the public preview endpoint once on mount so we can render
+  // a clear "🎉 Free 30-day dealer trial unlocked" banner. The code is
+  // also pre-stashed in formData so the register POST carries it.
+  const [trialCoupon, setTrialCoupon] = useState(null);
+  const [trialCouponError, setTrialCouponError] = useState('');
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const promo = (params.get('promo') || '').toUpperCase().trim();
+    if (!promo) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await axios.get(`${API}/promotions/coupons/${promo}`);
+        if (cancelled) return;
+        const c = r.data || {};
+        if (c.valid) {
+          setTrialCoupon(c);
+          setTrialCouponError('');
+          setFormData((prev) => ({
+            ...prev,
+            promo_code: promo,
+            email: prev.email || c?.pre_filled?.recipient_email || '',
+            name:  prev.name  || c?.pre_filled?.recipient_name  || '',
+            company_name: prev.company_name || c?.pre_filled?.company_name || '',
+            account_type: 'business',
+          }));
+        } else {
+          setTrialCoupon(null);
+          setTrialCouponError(
+            c.expired ? 'This trial code has expired.' :
+            c.status === 'redeemed' ? 'This trial code has already been used.' :
+            'This trial code is not active.',
+          );
+        }
+      } catch (err) {
+        if (cancelled) return;
+        setTrialCoupon(null);
+        setTrialCouponError(
+          err?.response?.data?.detail?.message_en
+          || 'Trial code is invalid or expired.',
+        );
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // Forced Password Reset State
   const [showForceReset, setShowForceReset] = useState(false);
@@ -65,9 +123,12 @@ const AuthPage = () => {
         // iter272 — Attach the persisted UTM blob exactly once. Consuming
         // it (read + clear) prevents double-attribution on a retry.
         const tracking = consumeCampaignTracking();
-        const payload = tracking
-          ? { ...formData, campaign_tracking: tracking }
-          : formData;
+        // iter274 — `promo_code` was pre-stashed onto formData by the
+        // useEffect after we validated it against /promotions/coupons.
+        // Including it in the register payload triggers the backend
+        // short-circuit that waives the annual partner fee.
+        const base = tracking ? { ...formData, campaign_tracking: tracking } : formData;
+        const payload = trialCoupon?.code ? { ...base, promo_code: trialCoupon.code } : base;
         await register(payload);
         toast.success(t('auth.accountCreatedMessage'));
         const from = location.state?.from?.pathname || '/marketplace';
@@ -268,6 +329,31 @@ const AuthPage = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* iter274 — Trial coupon unlock banner / error */}
+          {trialCoupon && (
+            <div
+              className="rounded-lg border-2 border-emerald-300 bg-emerald-50 px-4 py-3"
+              data-testid="trial-coupon-banner"
+            >
+              <p className="text-sm font-bold text-emerald-900 flex items-center gap-2">
+                <CheckCircle className="h-4 w-4" />
+                Free {trialCoupon.duration_days}-day {trialCoupon.partner_type} trial unlocked
+              </p>
+              <p className="text-xs text-emerald-700 mt-1">
+                Code <code className="bg-white px-1 rounded border border-emerald-300">{trialCoupon.code}</code>{' '}
+                — sign up below and your annual partner fee is waived for {trialCoupon.duration_days} days.
+              </p>
+            </div>
+          )}
+          {trialCouponError && (
+            <div
+              className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+              data-testid="trial-coupon-error"
+            >
+              <p className="font-semibold mb-0.5">⚠️ Trial code not applied</p>
+              <p>{trialCouponError} You can still register without the trial.</p>
+            </div>
+          )}
           {formError && (
             <div
               role="alert"

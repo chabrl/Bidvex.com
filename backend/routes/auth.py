@@ -78,6 +78,11 @@ class UserCreate(BaseModel):
     # `external_email_campaigns.analytics.registrations` for the matching
     # campaign — closing the marketing ROI loop.
     campaign_tracking: Optional[Dict[str, Any]] = None
+    # iter274 — Optional `BVX-TRIAL-XXXXXXXX` coupon parsed from the
+    # `?promo=` query string on the landing page. When valid this
+    # short-circuits the annual partner-fee gate and activates a
+    # 30/45/60-day partner trial in one round trip.
+    promo_code: Optional[str] = None
 
 
 class SessionCreate(BaseModel):
@@ -483,6 +488,34 @@ async def register(user_data: UserCreate, request: Request, background_tasks: Ba
         )
     except Exception as _attr_exc:  # noqa: BLE001 — never block signup
         logger.warning(f"[iter272 campaign-attribution] non-fatal: {_attr_exc}")
+
+    # iter274 — Coupon redemption short-circuit. When the signup carried
+    # a `BVX-TRIAL-XXXXXXXX` promo, atomically claim it and provision
+    # the partner_trials row + waive the annual fee. Failures here NEVER
+    # block the signup — the user just lands without trial flags set.
+    trial_coupon_redeemed = None
+    if user_data.promo_code:
+        try:
+            from routes.trial_coupons import redeem_coupon_for_user
+            trial_coupon_redeemed = await redeem_coupon_for_user(
+                user_data.promo_code,
+                user_id=user_id,
+                user_email=normalized_email,
+                company_name_hint=user_data.company_name,
+                phone_hint=user_data.mobile_number or user_data.phone,
+            )
+            if trial_coupon_redeemed:
+                # Mirror the trial flags into the in-memory user_doc so the
+                # response payload below already reflects the upgrade
+                # without a second `find_one`.
+                pt = trial_coupon_redeemed["partner_type"]
+                user_doc["partner_type"] = pt
+                user_doc["partner_trial_active"] = True
+                user_doc["platform_fee_paid"] = True
+                user_doc["partner_subscription_active"] = True
+                user_doc["partner_fee_paid_via_coupon"] = trial_coupon_redeemed["code"]
+        except Exception as _coupon_exc:  # noqa: BLE001
+            logger.warning(f"[iter274 coupon-redemption] non-fatal: {_coupon_exc}")
 
     # ── Affiliate Referral Tracking ──
     ref_code = user_data.ref_code

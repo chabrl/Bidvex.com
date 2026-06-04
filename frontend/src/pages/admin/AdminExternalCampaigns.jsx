@@ -277,6 +277,12 @@ function CampaignWizard({ campaignId, headers, onClose }) {
     cta_label_fr: "S'inscrire maintenant",
     cta_url: 'https://bidvex.com/register',
     reply_to_email: 'support@bidvex.com',
+    // iter274 — Auctioneer free-trial coupon attachment. When toggled
+    // on, every recipient gets a unique BVX-TRIAL-* code minted at
+    // send-time and {trial_signup_url} in the body is substituted to
+    // a pre-authorized signup link.
+    attach_trial_coupon: false,
+    trial_partner_type: 'dealer',
   });
   const [savedId, setSavedId] = useState(campaignId || null);
   const [manualEmails, setManualEmails] = useState('');
@@ -298,6 +304,8 @@ function CampaignWizard({ campaignId, headers, onClose }) {
           cta_label_fr: r.data.cta_label_fr || "S'inscrire maintenant",
           cta_url: r.data.cta_url || 'https://bidvex.com/register',
           reply_to_email: r.data.reply_to_email || 'support@bidvex.com',
+          attach_trial_coupon: !!r.data.attach_trial_coupon,
+          trial_partner_type: r.data.trial_partner_type || 'dealer',
         });
         setStats({
           recipient_count: r.data.recipient_count || 0,
@@ -550,6 +558,46 @@ function CampaignWizard({ campaignId, headers, onClose }) {
                   data-testid="cta-url-input"
                 />
               </div>
+            </div>
+
+            {/* iter274 — Attach Free Trial Coupon section */}
+            <div
+              className="border-2 border-dashed border-emerald-200 bg-emerald-50/40 rounded-lg p-3 space-y-2"
+              data-testid="coupon-attach-section"
+            >
+              <label className="flex items-center gap-2 text-sm font-semibold">
+                <input
+                  type="checkbox"
+                  checked={doc.attach_trial_coupon}
+                  onChange={(e) => setDoc({ ...doc, attach_trial_coupon: e.target.checked })}
+                  data-testid="coupon-attach-toggle"
+                />
+                🎟️ Attach Free Trial Coupon (auctioneer acquisition)
+              </label>
+              {doc.attach_trial_coupon && (
+                <div className="space-y-2 pl-6" data-testid="coupon-attach-config">
+                  <p className="text-xs text-slate-600">
+                    A unique <code>BVX-TRIAL-XXXXXXXX</code> code is minted
+                    per recipient at send-time. The body template can use
+                    <code> {'{trial_signup_url}'}</code> (full registration link)
+                    and <code>{'{promo_code}'}</code> (raw code) as
+                    placeholders — both are replaced per recipient.
+                  </p>
+                  <div>
+                    <Label className="text-xs">Partner Trial Type</Label>
+                    <select
+                      className="block w-full border border-slate-300 rounded-md text-sm py-1.5 px-2"
+                      value={doc.trial_partner_type}
+                      onChange={(e) => setDoc({ ...doc, trial_partner_type: e.target.value })}
+                      data-testid="coupon-partner-type-select"
+                    >
+                      <option value="dealer">Vehicle Dealer (30-day trial)</option>
+                      <option value="broker">Licensed Broker (60-day trial)</option>
+                      <option value="storage">Storage Facility (45-day trial)</option>
+                    </select>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}

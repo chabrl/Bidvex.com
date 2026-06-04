@@ -1,5 +1,146 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter274 — MANUAL TRIAL COUPONS + AUCTIONEER ACQUISITION (Feb 04, 2026) ✅
+
+Bridged the Admin Promotions Engine and the External Email Marketing
+system. Admins can now mint `BVX-TRIAL-XXXXXXXX` coupons one at a time
+OR attach them to a bulk acquisition campaign — unregistered partners
+get a 30/45/60-day platform trial with the annual fee waived after a
+single click.
+
+**Pytest 218/218 PASS** (iter255→iter274 sprint scope, 21 env-dependent
+skips, 0 failures). Backend healthy, lint clean.
+
+### Mission 1 — Trial coupon issuance (NEW `routes/trial_coupons.py`)
+- **Schema** `partner_trial_coupons` (id, code, partner_type,
+  duration_days, status, created_by, expires_at, redeemed_by_user_id,
+  source, campaign_id, recipient_email, …).
+- **Code format** `BVX-TRIAL-XXXXXXXX` (regex `^BVX-TRIAL-[A-Z0-9]{8}$`)
+  minted via `secrets.token_hex(4).upper()` — 4.3B address space, with
+  retry-on-collision guard.
+- **Endpoints**:
+  - `POST /api/admin/promotions/activate-trial` — mint one. Optional
+    `recipient_email` / `recipient_name` / `company_name` / `note` /
+    `send_invite_email`. **Idempotent** on `(recipient_email,
+    partner_type)` — returns `deduped=True` on a repeat.
+  - `POST /api/admin/promotions/coupons/bulk` — mint N (1-2000) for a
+    campaign. Returns the raw code list.
+  - `GET /api/admin/promotions/coupons` — admin listing with
+    `status` / `partner_type` / `campaign_id` filters.
+  - `DELETE /api/admin/promotions/coupons/{code}` — revoke.
+  - `GET /api/promotions/coupons/{code}` — **public** preview for the
+    AuthPage banner. Returns `valid`, `expired`, `duration_days`,
+    `partner_type`, and `pre_filled` recipient hints.
+- **`redeem_coupon_for_user()`** helper — atomic
+  `find_one_and_update({status:"issued", expires_at:{$gte: now}})` flips
+  it to redeemed, inserts the matching `partner_trials` row, and sets
+  `users.platform_fee_paid=True` + `partner_subscription_active=True` +
+  `partner_fee_paid_via_coupon=<code>`.
+- **Router ordering**: mounted BEFORE `admin_promotions_router` because
+  the latter declares `/admin/promotions/{promo_id}` which would
+  greedy-match `/admin/promotions/coupons`.
+
+### Mission 2 — External campaign coupon attachment
+- **`CampaignCreate`** schema gains `attach_trial_coupon: bool` +
+  `trial_partner_type` (regex `^(dealer|broker|storage)$`). Defaults
+  preserve iter271 behavior for all existing campaigns.
+- **`_do_dispatch()`** — when both flags are set, every recipient gets
+  a unique coupon minted BEFORE the SendGrid call. Body placeholders
+  `{trial_signup_url}` and `{promo_code}` are substituted per recipient.
+  On mint failure the placeholders gracefully fall back to the generic
+  /register URL so the campaign still ships.
+- **`send-now` response + `last_dispatch`** envelope both carry the
+  new `coupons_minted` integer so the iter273 ROI dashboard can chart
+  auctioneer acquisition per campaign without an extra query.
+
+### Mission 3 — Public landing + register flow
+- **`UserCreate`** gains an optional `promo_code` field.
+- **`/api/auth/register`** invokes `redeem_coupon_for_user` AFTER the
+  user insert (try/except — failure never blocks signup). On success
+  the in-memory `user_doc` is updated so the response payload reflects
+  the upgrade immediately.
+- **`AuthPage.js`** parses `?promo=BVX-TRIAL-*` on mount, hits the
+  public preview endpoint, and shows a green "Free 30-day dealer trial
+  unlocked" banner (or amber "this code is not active" error). Lands
+  on the **signup** tab by default when `?promo=` is present so trial
+  clickers don't get confused by the login form.
+
+### Mission 4 — Admin UI surfaces
+- **`PartnerTrialsAdminSection.jsx`** — the "Activate for a User"
+  modal now has a mode toggle:
+  - **"Existing User"** (legacy iter259) — search a registered user,
+    activate trial in place.
+  - **"🎟️ Generate Coupon"** (iter274) — mint a `BVX-TRIAL-*` for an
+    unregistered partner. The result panel shows the code + per-
+    recipient signup URL with two copy buttons. Optional checkbox
+    fires the bilingual invite email via the SendGrid path.
+- **`AdminExternalCampaigns.jsx`** — wizard step 1 grows a green
+  dashed-border section: ☑ Attach Free Trial Coupon, partner-type
+  select (Dealer 30d / Broker 60d / Storage 45d), and an inline help
+  string explaining the two new body placeholders. Both fields are
+  read back on edit and persisted to the campaign document.
+
+### Validation (`tests/test_iter274_manual_trial_and_acquisition.py`)
+**18/18 PASS** + 1 rate-limit skip covering:
+- Helper exports (`TRIAL_DURATIONS`, `COUPON_CODE_RE`,
+  `generate_coupon_code`, `build_signup_url`)
+- 3 live mint tests (single, idempotency on duplicate recipient, bulk N)
+- Schema accepts `attach_trial_coupon` + dispatcher substitutes both
+  placeholders + `send-now` returns `coupons_minted`
+- **End-to-end campaign mint** — creates a coupon-attached campaign,
+  posts 3 recipients, sends now, asserts exactly 3 coupons appear in
+  the admin listing with the right `campaign_id` + `source` linkage
+- Public preview rejects malformed codes (400) and unknown codes (404)
+- **End-to-end redemption** — admin mints a broker coupon → guest
+  registers with `promo_code=THAT` → coupon status → `redeemed`,
+  user has `platform_fee_paid=True`, `partner_trials` row exists with
+  `partner_type=broker`, duration 60
+- Vanilla register (no promo) does NOT flip any trial flags
+- Register with malformed promo still returns 200 (graceful no-op)
+- 4 frontend static tests (mode toggle + coupon submit testids, result
+  panel with code + URL + copy buttons, AdminExternalCampaigns wizard
+  attach section, AuthPage banner + promo parsing + payload inclusion)
+
+### Files changed (iter274)
+**Backend NEW**: `routes/trial_coupons.py` (444 lines — the entire
+coupon engine).
+**Backend MODIFIED**: `server.py` (router mounts, ordered before
+admin_promotions to avoid path collision), `routes/auth.py`
+(`UserCreate.promo_code` + register-time redemption call),
+`routes/external_campaigns.py` (schema fields + dispatcher placeholder
+substitution + last_dispatch coupons_minted).
+**Frontend MODIFIED**:
+`components/admin/PartnerTrialsAdminSection.jsx` (mode toggle + coupon
+form + result panel + copy helpers),
+`pages/admin/AdminExternalCampaigns.jsx` (wizard attach section + state
+preservation through edit reload),
+`pages/AuthPage.js` (promo parsing useEffect + banner UI + payload
+extension).
+**Backend NEW**:
+`tests/test_iter274_manual_trial_and_acquisition.py` (18+1 tests).
+
+### Action items (user)
+1. **Save to GitHub → redeploy** preview → production.
+2. **Smoke test manual coupon**: Admin → Promotions → click any
+   "Activate for a User" → toggle to "🎟️ Generate Coupon" → fill
+   recipient → click "Generate". Copy the URL → open in incognito →
+   sign up → confirm the new account shows `partner_trial_active=True`
+   in the admin user view.
+3. **Smoke test campaign coupon attachment**: External Campaigns →
+   New → in step 1 check ☑ "Attach Free Trial Coupon" + pick partner
+   type → put `{trial_signup_url}` in the body HTML → add a test
+   recipient → Send Now → confirm `coupons_minted` count on the
+   analytics modal.
+4. **Verify the funnel**: tracked clicker registers via campaign URL →
+   `analytics.registrations` AND `analytics.premium_upgrades` both
+   bump (iter272 ROI loop closes around the new flow automatically
+   because `platform_fee_paid=True` is set by `redeem_coupon_for_user`,
+   which triggers `record_premium_upgrade` already wired in iter272).
+
+---
+
+
+
 ## Latest: iter273 — STORAGE DOC 404 + SIN COMPLIANCE + ROI DASHBOARD (Feb 04, 2026) ✅
 
 Two P0 blockers cleared and the marketing ROI loop visualized in the

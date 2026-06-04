@@ -748,6 +748,12 @@ try:
         ("routes.chat_history", "chat_history_router", "set_chat_history_db", False),
         # iter238 Mission 5 — Promoted/featured listings + admin backfill.
         ("routes.promotions", "promotions_router", "set_promotions_db", False),
+        # iter274 — Trial-coupon routers MUST be mounted before
+        # admin_promotions_router because that router declares
+        # `/admin/promotions/{promo_id}` which would otherwise greedy-
+        # match our `/admin/promotions/coupons` listing endpoint.
+        ("routes.trial_coupons", "admin_coupons_router", None, False),
+        ("routes.trial_coupons", "public_coupons_router", None, False),
         # iter241 Mission 7 — Admin Promotions & Offers Engine.
         ("routes.admin_promotions", "admin_promotions_router", None, False),
         # iter258 Mission 1 — Admin Request Payment + Stripe Payment Links.

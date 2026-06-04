@@ -110,6 +110,15 @@ class CampaignCreate(BaseModel):
     cta_url: Optional[str] = "https://bidvex.com/register"
     reply_to_email: Optional[str] = EXTERNAL_REPLY_TO
     scheduled_at: Optional[datetime] = None
+    # iter274 — Auctioneer acquisition coupon attachment. When
+    # `attach_trial_coupon=True`, every recipient gets a unique
+    # `BVX-TRIAL-*` code minted on send-now and the `{trial_signup_url}`
+    # template token in the body resolves to a deep registration link
+    # that skips the annual fee gate.
+    attach_trial_coupon: bool = False
+    trial_partner_type: Optional[str] = Field(
+        default=None, pattern="^(dealer|broker|storage)$",
+    )
 
 
 class CampaignUpdate(BaseModel):
@@ -123,6 +132,10 @@ class CampaignUpdate(BaseModel):
     cta_url: Optional[str] = None
     reply_to_email: Optional[str] = None
     scheduled_at: Optional[datetime] = None
+    attach_trial_coupon: Optional[bool] = None
+    trial_partner_type: Optional[str] = Field(
+        default=None, pattern="^(dealer|broker|storage)$",
+    )
 
 
 class ManualRecipients(BaseModel):
@@ -181,6 +194,11 @@ async def create_campaign(body: CampaignCreate, current_user: User = Depends(get
         "updated_at":    _now_iso(),
         "analytics":     _empty_analytics(),
         "custom_args":   {"campaign_id": campaign_id, "campaign_type": "external"},
+        # iter274 — Auctioneer coupon attachment metadata. Defaults
+        # `attach_trial_coupon=False` keep existing iter271 campaigns
+        # behaving unchanged.
+        "attach_trial_coupon": bool(body.attach_trial_coupon),
+        "trial_partner_type":  body.trial_partner_type if body.attach_trial_coupon else None,
     }
     await db.external_email_campaigns.insert_one(doc)
     return {"campaign_id": campaign_id, "status": "draft"}
@@ -643,7 +661,14 @@ async def _do_dispatch(
 
     iter272 — Returns extra envelope keys (`fallback_used`,
     `from_emails_used`) so `send-now` can persist them onto the campaign
-    document for ROI + debugging visibility."""
+    document for ROI + debugging visibility.
+
+    iter274 — When the campaign opts into `attach_trial_coupon`, mint a
+    unique `BVX-TRIAL-*` code per recipient and substitute
+    `{trial_signup_url}` in the body HTML before each send. The minted
+    codes are recorded on the partner_trial_coupons collection with
+    `source="external_campaign"` and `recipient_email` locked, so a
+    forwarded link can't be redeemed by anyone else."""
     err = validate_casl(doc.get("subject_en", ""), doc.get("body_html_en", ""))
     if err:
         raise HTTPException(status_code=400, detail=err)
@@ -654,21 +679,80 @@ async def _do_dispatch(
     failures: List[Dict[str, Any]] = []
     fallback_used = 0
     from_emails_used: Dict[str, int] = {}
+    coupons_minted = 0
     subject = doc["subject_en"]
     if is_test:
         subject = f"[TEST] {subject}"
     attachments = _collect_attachments_for_send(doc.get("attachments") or [])
+    base_body = doc["body_html_en"]
+
+    # iter274 — Coupon attachment mode pre-resolves the partner_type +
+    # minting helper so the per-recipient loop stays a single import.
+    coupon_mode = bool(doc.get("attach_trial_coupon")) and bool(doc.get("trial_partner_type"))
+    if coupon_mode:
+        from routes.trial_coupons import (
+            TRIAL_DURATIONS, build_signup_url, _ensure_unique_code, _now_iso,
+        )
+        from datetime import timedelta, datetime as _dt, timezone as _tz
 
     for email in to_emails:
         if email in suppressed:
             skipped += 1
             continue
+
+        # iter274 — Resolve the per-recipient body (with coupon URL) BEFORE
+        # the actual send. If minting fails (DB hiccup), we still ship the
+        # campaign — the {trial_signup_url} token just resolves to the
+        # generic /register URL so the recipient lands cleanly.
+        body_for_recipient = base_body
+        if coupon_mode:
+            try:
+                code = await _ensure_unique_code(db)
+                expires = (_dt.now(_tz.utc)
+                           + timedelta(days=90)).isoformat()
+                coupon_doc = {
+                    "id":              str(uuid.uuid4()),
+                    "code":            code,
+                    "partner_type":    doc["trial_partner_type"],
+                    "duration_days":   TRIAL_DURATIONS[doc["trial_partner_type"]],
+                    "status":          "issued",
+                    "created_by":      doc.get("created_by") or "system",
+                    "created_at":      _now_iso(),
+                    "expires_at":      expires,
+                    "redeemed_by_user_id": None,
+                    "redeemed_at":     None,
+                    "source":          "external_campaign",
+                    "campaign_id":     doc["id"],
+                    "campaign_slug":   doc.get("utm_campaign"),
+                    "recipient_email": email.lower(),
+                    "recipient_name":  None,
+                    "company_name":    None,
+                    "note":            None,
+                }
+                await db.partner_trial_coupons.insert_one(coupon_doc)
+                signup_url = build_signup_url(
+                    code,
+                    campaign_slug=doc.get("utm_campaign"),
+                )
+                body_for_recipient = base_body.replace(
+                    "{trial_signup_url}", signup_url,
+                ).replace("{promo_code}", code)
+                coupons_minted += 1
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(f"[iter274 coupon-mint] failed for {email}: {exc}")
+                # Fallback — drop the placeholders so they don't ship raw.
+                body_for_recipient = (
+                    base_body
+                    .replace("{trial_signup_url}", "https://bidvex.com/register")
+                    .replace("{promo_code}", "")
+                )
+
         try:
             result = await send_external_campaign_email(
                 to_email=email,
                 to_name="",
                 subject=subject,
-                body_html=doc["body_html_en"],
+                body_html=body_for_recipient,
                 campaign_id=doc["id"],
                 utm_campaign=doc.get("utm_campaign") or doc["id"],
                 attachments=attachments,
@@ -702,6 +786,7 @@ async def _do_dispatch(
         "failures":         failures,
         "fallback_used":    fallback_used,
         "from_emails_used": from_emails_used,
+        "coupons_minted":   coupons_minted,
     }
 
 
@@ -794,11 +879,15 @@ async def send_now(
         # iter272 — Surface the operational metadata so the admin UI
         # can show "X emails shipped via fallback sender" + the
         # last failure message for fast diagnosis.
+        # iter274 — Track coupons minted into the same envelope so the
+        # ROI dashboard can chart auctioneer acquisition flow per
+        # campaign without a second query.
         "last_dispatch": {
             "sent":             result["sent"],
             "skipped":          result["skipped"],
             "failed":           len(result["failures"]),
             "fallback_used":    result.get("fallback_used", 0),
+            "coupons_minted":   result.get("coupons_minted", 0),
             "from_emails_used": result.get("from_emails_used", {}),
             "first_failure":   (result["failures"][0]["error"] if result["failures"] else None),
             "dispatched_at":    sent_at,
@@ -817,6 +906,7 @@ async def send_now(
         "sent_at":         sent_at,
         "status":          new_status,
         "fallback_used":   result.get("fallback_used", 0),
+        "coupons_minted":  result.get("coupons_minted", 0),
     }
 
 

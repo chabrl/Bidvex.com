@@ -85,6 +85,11 @@ const PartnerTrialsAdminSection = ({ token }) => {
   );
 
   const [activateModal, setActivateModal] = useState({ open: false, partnerType: null });
+  // iter274 — Modal supports two activation modes:
+  //   • "existing"  → search for a registered user, activate trial in-place (legacy)
+  //   • "coupon"    → mint a BVX-TRIAL-* coupon for an unregistered partner,
+  //                    optionally fire the bilingual invite email
+  const [activateMode, setActivateMode] = useState('existing');
   const [searchQuery, setSearchQuery] = useState('');
   const [userResults, setUserResults] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
@@ -94,6 +99,15 @@ const PartnerTrialsAdminSection = ({ token }) => {
     province: 'QC',
     phone: '',
   });
+  // iter274 — coupon-mode fields + last minted coupon shown back to admin
+  const [couponForm, setCouponForm] = useState({
+    recipient_email: '',
+    recipient_name: '',
+    company_name: '',
+    send_invite_email: true,
+    note: '',
+  });
+  const [lastMintedCoupon, setLastMintedCoupon] = useState(null);
   const [busy, setBusy] = useState(false);
 
   const [trials, setTrials] = useState([]);
@@ -138,10 +152,68 @@ const PartnerTrialsAdminSection = ({ token }) => {
 
   const openActivate = (partnerType) => {
     setActivateModal({ open: true, partnerType });
+    setActivateMode('existing');
     setSearchQuery('');
     setUserResults([]);
     setSelectedUser(null);
     setForm({ company_name: '', licence_number: '', province: 'QC', phone: '' });
+    setCouponForm({
+      recipient_email: '',
+      recipient_name: '',
+      company_name: '',
+      send_invite_email: true,
+      note: '',
+    });
+    setLastMintedCoupon(null);
+  };
+
+  // iter274 — Mint a tracking-friendly trial coupon for an unregistered
+  // partner via POST /api/admin/promotions/activate-trial. On success we
+  // pin the coupon to local state so the admin can copy the signup URL
+  // / code straight from the modal.
+  const mintCoupon = async () => {
+    if (!activateModal.partnerType) return;
+    if (couponForm.recipient_email && !/^[^@]+@[^@]+\.[^@]+$/.test(couponForm.recipient_email)) {
+      toast.error('Recipient email looks invalid');
+      return;
+    }
+    setBusy(true);
+    try {
+      const r = await axios.post(
+        `${API_BASE}/admin/promotions/activate-trial`,
+        {
+          partner_type:      activateModal.partnerType,
+          recipient_email:   couponForm.recipient_email.trim() || null,
+          recipient_name:    couponForm.recipient_name.trim() || null,
+          company_name:      couponForm.company_name.trim() || null,
+          send_invite_email: !!couponForm.send_invite_email,
+          note:              couponForm.note.trim() || null,
+        },
+        { headers },
+      );
+      const data = r?.data || {};
+      const coupon = data.coupon || {};
+      setLastMintedCoupon(coupon);
+      toast.success(
+        data.deduped
+          ? `Existing coupon reused: ${coupon.code}`
+          : `Coupon minted: ${coupon.code}${data.email_sent ? ' (invite emailed)' : ''}`,
+      );
+    } catch (e) {
+      toast.error(e?.response?.data?.detail?.message_en || e?.response?.data?.detail || 'Failed to mint coupon');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // iter274 — Copy helper for the coupon-display panel.
+  const copyToClipboard = (text) => {
+    try {
+      navigator.clipboard.writeText(text || '');
+      toast.success('Copied to clipboard');
+    } catch {
+      toast.error('Copy failed — select the text manually');
+    }
   };
 
   const submitActivate = async () => {
@@ -350,7 +422,36 @@ const PartnerTrialsAdminSection = ({ token }) => {
               Activate {activateModal.partnerType} Trial
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-3">
+
+          {/* iter274 — Mode toggle */}
+          <div
+            className="flex gap-2 mb-2"
+            role="tablist"
+            data-testid="activate-mode-toggle"
+          >
+            <Button
+              size="sm"
+              variant={activateMode === 'existing' ? 'default' : 'outline'}
+              onClick={() => setActivateMode('existing')}
+              data-testid="activate-mode-existing"
+              style={activateMode === 'existing' ? { backgroundColor: '#0055FF', color: 'white' } : {}}
+            >
+              Existing User
+            </Button>
+            <Button
+              size="sm"
+              variant={activateMode === 'coupon' ? 'default' : 'outline'}
+              onClick={() => setActivateMode('coupon')}
+              data-testid="activate-mode-coupon"
+              style={activateMode === 'coupon' ? { backgroundColor: '#0055FF', color: 'white' } : {}}
+            >
+              🎟️ Generate Coupon
+            </Button>
+          </div>
+
+          {/* ── EXISTING USER MODE (legacy iter259 flow) ── */}
+          {activateMode === 'existing' && (
+          <div className="space-y-3" data-testid="activate-existing-mode">
             <div>
               <Label className="text-xs">Search User *</Label>
               <Input
@@ -431,22 +532,141 @@ const PartnerTrialsAdminSection = ({ token }) => {
               </p>
             )}
           </div>
+          )}
+
+          {/* ── COUPON MODE (iter274) ── */}
+          {activateMode === 'coupon' && (
+          <div className="space-y-3" data-testid="activate-coupon-mode">
+            <p className="text-xs text-slate-500">
+              Mint a one-shot <code>BVX-TRIAL-XXXXXXXX</code> code. Share
+              the generated link with an unregistered partner — they sign
+              up via the link and the {offer?.duration || 30}-day annual
+              fee waiver activates automatically.
+            </p>
+            <div>
+              <Label className="text-xs">Recipient Email <span className="text-slate-400">(optional)</span></Label>
+              <Input
+                type="email"
+                value={couponForm.recipient_email}
+                onChange={(e) => setCouponForm({ ...couponForm, recipient_email: e.target.value })}
+                placeholder="auctioneer@example.com"
+                data-testid="coupon-recipient-email"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs">Recipient Name</Label>
+                <Input
+                  value={couponForm.recipient_name}
+                  onChange={(e) => setCouponForm({ ...couponForm, recipient_name: e.target.value })}
+                  data-testid="coupon-recipient-name"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Company Name</Label>
+                <Input
+                  value={couponForm.company_name}
+                  onChange={(e) => setCouponForm({ ...couponForm, company_name: e.target.value })}
+                  data-testid="coupon-company-name"
+                />
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs">Internal Note</Label>
+              <Input
+                value={couponForm.note}
+                onChange={(e) => setCouponForm({ ...couponForm, note: e.target.value })}
+                placeholder="Why this coupon?"
+                data-testid="coupon-note"
+              />
+            </div>
+            <label className="flex items-center gap-2 text-xs">
+              <input
+                type="checkbox"
+                checked={couponForm.send_invite_email}
+                onChange={(e) => setCouponForm({ ...couponForm, send_invite_email: e.target.checked })}
+                data-testid="coupon-send-invite-toggle"
+              />
+              Email the invite link to the recipient now
+            </label>
+
+            {/* Minted coupon panel */}
+            {lastMintedCoupon && (
+              <div
+                className="rounded-md border border-emerald-200 bg-emerald-50 p-3 space-y-2"
+                data-testid="coupon-result-panel"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-emerald-800">Coupon ready</span>
+                  <Badge className="bg-emerald-200 text-emerald-900">
+                    {lastMintedCoupon.duration_days}d {lastMintedCoupon.partner_type}
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-1">
+                  <code
+                    className="text-sm font-mono bg-white border border-emerald-300 px-2 py-1 rounded flex-1"
+                    data-testid="coupon-result-code"
+                  >
+                    {lastMintedCoupon.code}
+                  </code>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => copyToClipboard(lastMintedCoupon.code)}
+                    data-testid="coupon-copy-code"
+                  >
+                    Copy
+                  </Button>
+                </div>
+                <div className="flex items-center gap-1">
+                  <code
+                    className="text-[10px] font-mono bg-white border border-emerald-300 px-2 py-1 rounded flex-1 truncate"
+                    title={lastMintedCoupon.signup_url}
+                    data-testid="coupon-result-signup-url"
+                  >
+                    {lastMintedCoupon.signup_url}
+                  </code>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => copyToClipboard(lastMintedCoupon.signup_url)}
+                    data-testid="coupon-copy-url"
+                  >
+                    Copy
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+          )}
+
           <DialogFooter>
             <Button
               variant="outline"
               onClick={() => setActivateModal({ open: false, partnerType: null })}
               data-testid="activate-trial-cancel"
             >
-              Cancel
+              Close
             </Button>
-            <Button
-              onClick={submitActivate}
-              disabled={busy || !selectedUser}
-              style={{ backgroundColor: '#0055FF', color: 'white' }}
-              data-testid="activate-trial-submit"
-            >
-              {busy ? 'Activating…' : '✅ Activate Trial & Notify User'}
-            </Button>
+            {activateMode === 'existing' ? (
+              <Button
+                onClick={submitActivate}
+                disabled={busy || !selectedUser}
+                style={{ backgroundColor: '#0055FF', color: 'white' }}
+                data-testid="activate-trial-submit"
+              >
+                {busy ? 'Activating…' : '✅ Activate Trial & Notify User'}
+              </Button>
+            ) : (
+              <Button
+                onClick={mintCoupon}
+                disabled={busy}
+                style={{ backgroundColor: '#0055FF', color: 'white' }}
+                data-testid="coupon-mint-submit"
+              >
+                {busy ? 'Minting…' : '🎟️ Generate Coupon'}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
