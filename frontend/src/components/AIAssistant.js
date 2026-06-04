@@ -389,6 +389,26 @@ const AIAssistant = () => {
     // iter211 — optimistically clear the degraded banner when the user retries
     if (serviceDegraded) setServiceDegraded(false);
 
+    // iter280 — Detect the current "surface" (public marketplace,
+    // authenticated dashboard, admin control panel, or listing detail)
+    // so the same unified assistant can adjust its tone + escalation
+    // affordances per route. This replaces the previous iter277
+    // approach of forking off into a separate dashboard-only widget.
+    const _detectSurface = () => {
+      if (typeof window === 'undefined') return 'public';
+      const p = (window.location.pathname || '').toLowerCase();
+      if (p.startsWith('/admin')) return 'admin';
+      if (p.startsWith('/seller/dashboard') || p.startsWith('/seller-dashboard')
+          || p.startsWith('/buyer/dashboard')  || p.startsWith('/buyer-dashboard')
+          || p.startsWith('/facility/dashboard')) {
+        return 'dashboard';
+      }
+      if (p.startsWith('/admin')) return 'admin';
+      if (listingIdForChat) return 'listing_detail';
+      return 'public';
+    };
+    const _activeSurface = _detectSurface();
+
     const buildBody = () => JSON.stringify({
       // iter235 — Direct google-genai streaming endpoint (/api/chat/stream)
       // expects { message, extra_context, google_search, listing_id }.
@@ -403,6 +423,10 @@ const AIAssistant = () => {
       session_id: sid || null,
       extra_context: [
         `Active UI language: ${lang === 'fr' ? 'French (fr)' : 'English (en)'}.`,
+        // iter280 — Surface hint lets the model adapt its tone for
+        // dashboards (operational answers, link to admin/seller flows)
+        // vs. public marketplace (lead-friendly + onboarding-focused).
+        `Active UI surface: ${_activeSurface}.`,
         'Recent conversation (most recent last):',
         ...messages.slice(-10).map((m) => `- ${m.role}: ${(m.content || '').slice(0, 280)}`),
       ].join('\n'),

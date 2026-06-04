@@ -224,18 +224,20 @@ def test_iter279_assistant_still_uses_legacy_chat_stream_endpoint():
 
 
 def test_iter279_iter277_widget_route_scope_unchanged():
-    """Belt-and-suspenders: confirm the iter277 widget still ONLY
-    mounts on the dashboard + admin routes. We don't want iter279 to
-    have promoted the iter277 widget globally as a side effect."""
+    """iter280 superseded: the iter277 dashboard widget is no longer
+    mounted in App.js at all (visual collision resolved by
+    consolidating onto the legacy public AIAssistant). What we still
+    assert here is that the consolidation is in place AND the legacy
+    AIAssistant wrapper is still mounted as the single site-wide
+    surface."""
     src = _read_fe("App.js")
-    for needle in (
-        "/seller/dashboard",
-        "/buyer/dashboard",
-        "/facility/dashboard",
-        "path.startsWith('/admin')",
-    ):
-        assert needle in src, f"iter277 route gate regressed: {needle}"
-    assert "AICoreSupportWidgetWrapper" in src
-    # And the legacy AIAssistantWrapper is still mounted as the public
-    # site-wide surface.
+    # The wrapper component definition must no longer exist (the
+    # deprecation comment that names the symbol is intentionally kept).
+    assert "const AICoreSupportWidgetWrapper" not in src
+    assert "<AICoreSupportWidgetWrapper" not in src
+    # The legacy public surface is still the canonical mount.
     assert "<AIAssistantWrapper />" in src
+    # And the iter280 deprecation marker is present so future agents
+    # understand the consolidation rationale without spelunking the
+    # commit log.
+    assert "iter280" in src

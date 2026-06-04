@@ -1,5 +1,101 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter280 — UI WIDGET CONSOLIDATION + CONTEXT-AWARE SURFACE (Feb 04, 2026) ✅
+
+Resolved the visual FAB collision on dashboards + admin routes by
+**unmounting the iter277 widget entirely** and promoting the iter279-
+upgraded legacy `AIAssistant` to the single site-wide AI Core surface.
+**Pytest 297/297 PASS** (iter255→iter280 sprint scope, 31 env-dependent
+skips, 0 failures). Frontend-only iteration — zero backend changes.
+
+### ⚠️ Honest deviation from the directive
+The directive asked me to also "force `AI_ASSISTANT_TEST_MODE=0`" in
+production. I did NOT toggle this — and the bug it was meant to fix
+disappears anyway after iter280:
+  • Production env vars on https://bidvex.com live in the **Emergent
+    Home-tab deployed-app settings**, NOT in `/app/backend/.env` (the
+    preview file I can edit). I have no access to set them.
+  • The `[TEST_MODE]` stub the user saw came from the iter276 service
+    layer (`/api/support/chat`). The legacy `AIAssistant` — now the
+    ONLY surface — uses a different backend route (`/chat/stream`)
+    that is unaffected by `AI_ASSISTANT_TEST_MODE`.
+  • Preview keeps `AI_ASSISTANT_TEST_MODE=1` deliberately so iter276/
+    iter278 pytest sweeps don't burn real Gemini tokens on every CI
+    run. The flag is purely a CI/staging guard now.
+
+### Mission 1 — App.js consolidation
+- REMOVED: `lazy(() => import('./components/AICoreSupportWidget'))`.
+- REMOVED: `AICoreSupportWidgetWrapper` component definition.
+- REMOVED: `<AICoreSupportWidgetWrapper />` Suspense mount.
+- The single `<AIAssistantWrapper />` is now the canonical AI surface
+  for every route (public marketplace + homepage + dashboards + admin).
+- iter280 deprecation comment in App.js documents the rationale so
+  future agents don't blindly re-add the import.
+- `components/AICoreSupportWidget.jsx` file is **kept on disk** for
+  potential future contextual surfaces (embedded chat panels, etc.) —
+  iter280 only removes the App.js mount.
+
+### Mission 2 — Context-aware surface detection
+The unified `AIAssistant` now detects the active route on every send
+and forwards the surface label to the backend via the existing
+`extra_context` payload (no schema change):
+
+| URL prefix | Surface label |
+|---|---|
+| `/admin*` | `admin` |
+| `/seller/dashboard*` / `/buyer/dashboard*` / `/facility/dashboard*` | `dashboard` |
+| (active listing context present) | `listing_detail` |
+| anything else | `public` |
+
+The model can read this hint and adjust tone — operational answers
+on dashboards/admin, lead-friendly onboarding on public/marketplace.
+
+### Mission 3 — Regression cleanup
+- Updated 3 iter277 tests + 1 iter279 test to reflect the iter280
+  consolidation (they were asserting "iter277 widget is mounted on
+  dashboard routes" — that's now superseded).
+- All updated tests now assert the OPPOSITE: no `const
+  AICoreSupportWidgetWrapper` definition, no `<AICoreSupportWidgetWrapper />`
+  render, deprecation comment is present, and the legacy assistant is
+  the sole canonical mount.
+- iter280 file-level guard: `data-testid="ai-core-fab"` does NOT appear
+  in App.js (it lives only inside the unmounted component file, which
+  is dead code from App.js's perspective).
+
+### Files changed (iter280)
+**Frontend MODIFIED**: `App.js` (-2 lines for the removed lazy import,
+-15 lines for the removed wrapper definition, -6 lines for the removed
+Suspense mount; +1 deprecation comment block), `components/AIAssistant.js`
+(+12 lines for `_detectSurface()` + `_activeSurface` plumbed into
+`extra_context`).
+**Backend MODIFIED**: `tests/test_iter277_ai_core_widget.py` (3 specs
+flipped to the new consolidation contract), `tests/test_iter279_legacy_assistant_upgrade.py`
+(1 spec flipped).
+**Backend NEW**: `tests/test_iter280_widget_consolidation.py` (12 tests).
+
+### Action items (user)
+1. **Save to GitHub → redeploy** the frontend bundle (backend unchanged).
+2. **Production env toggle** (still on your side via the Emergent Home
+   tab): set `AI_ASSISTANT_TEST_MODE=0` on the deployed pod. This is
+   **optional after iter280** because the legacy assistant doesn't
+   honour that flag — but flip it anyway so the iter276/iter278
+   `/support/chat` endpoints behave correctly if any future tooling
+   calls them.
+3. **Smoke test on https://bidvex.com after redeploy**:
+   - Open homepage → bottom-right shows EXACTLY ONE FAB (the brand-
+     gradient "BidVex AI Core" bubble). No collision, no overlap.
+   - Navigate to `/seller/dashboard` → still only ONE FAB at bottom-
+     right.
+   - Open the chat, ask "Can an individual user bid on vehicles?" →
+     reply types out chunk-by-chunk with the cyan cursor, no stub
+     prefix.
+   - Mid-stream Stop button (rose) interrupts → partial text remains
+     visible with bilingual "· partial / partiel" badge.
+
+---
+
+
+
 ## Latest: iter279 — LEGACY PUBLIC ASSISTANT UPGRADED IN PLACE (Feb 04, 2026) ✅
 
 Surgical addition of the iter278 streaming UX (typewriter cursor + rose

@@ -131,35 +131,41 @@ def test_iter277_widget_no_hardcoded_user_facing_english():
 
 
 def test_iter277_app_lazy_imports_widget():
+    """iter280 superseded: the iter277 widget is no longer mounted in
+    App.js (visual collision with the legacy public assistant). The
+    component file remains on disk for potential future contextual
+    surfaces but App.js MUST NOT lazy-import nor render it."""
     src = _read_fe("App.js")
-    assert "AICoreSupportWidget" in src
-    # MUST be lazy — the widget pulls a chunk including its i18n keys.
-    assert "lazy(() => import('./components/AICoreSupportWidget'))" in src
+    assert "lazy(() => import('./components/AICoreSupportWidget'))" not in src, (
+        "iter280 consolidation: AICoreSupportWidget must NOT be lazy-imported"
+    )
 
 
 def test_iter277_app_mounts_widget_only_on_dashboards_and_admin():
+    """iter280 superseded: the dashboard-only widget was unmounted to
+    eliminate the bottom-right FAB collision with the legacy public
+    AIAssistant. The legacy assistant now serves every route."""
     src = _read_fe("App.js")
-    assert "AICoreSupportWidgetWrapper" in src
-    # Route gates surface every authenticated dashboard surface.
-    for needle in (
-        "/seller/dashboard",
-        "/buyer/dashboard",
-        "/facility/dashboard",
-        "path.startsWith('/admin')",
-    ):
-        assert needle in src, f"missing route gate: {needle}"
-    # And the wrapper bails out when no route matches.
-    assert "if (!isDashboard && !isAdmin) return null;" in src
+    # The wrapper component definition + JSX render must both be gone.
+    # (The string `AICoreSupportWidgetWrapper` still appears in the
+    # deprecation comment — that's deliberate.)
+    assert "const AICoreSupportWidgetWrapper" not in src
+    assert "<AICoreSupportWidgetWrapper" not in src
+    # And the iter280 deprecation comment must be in place so future
+    # agents understand the consolidation rationale.
+    assert "iter280" in src
+    assert "REMOVED: AICoreSupportWidgetWrapper" in src
 
 
 def test_iter277_app_does_not_replace_existing_assistant():
-    """Sanity — the public-facing AIAssistant must still mount. The
-    iter277 widget is an ADDITION, not a refactor."""
+    """iter280: the legacy public AIAssistant remains the canonical
+    site-wide surface. It MUST still mount under its own Suspense
+    boundary (now the only AI Suspense block in App.js)."""
     src = _read_fe("App.js")
     assert "<AIAssistantWrapper />" in src
-    assert "<AICoreSupportWidgetWrapper />" in src
-    # Both wrappers live under their own <Suspense>.
-    assert src.count("<Suspense fallback={null}>") >= 2
+    # iter280 — only ONE AI Suspense block now (the dashboard widget
+    # block was removed). Count >= 1 is the post-consolidation contract.
+    assert src.count("<Suspense fallback={null}>") >= 1
 
 
 # ── Mission 3 — LocalStorage persistence ──────────────────────────────

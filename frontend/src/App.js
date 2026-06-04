@@ -129,11 +129,14 @@ const SellerFinancialsPage = lazy(() => import('./pages/vehicles/SellerFinancial
 
 // Lazy-loaded heavy components
 const AIAssistant = lazy(() => import('./components/AIAssistant'));
-// iter277 — Internal "Ask AI Core" support widget mounted on the
-// authenticated dashboards + admin panel. Distinct from the public
-// AIAssistant above; wired to the iter276 POST /api/support/chat
-// endpoint and grounded in the iter275 canonical platform guide.
-const AICoreSupportWidget = lazy(() => import('./components/AICoreSupportWidget'));
+// iter280 — Single, unified site-wide AI Core widget. The iter277
+// dashboard-only `AICoreSupportWidget` was unmounted in this sprint
+// to resolve the visual collision (two FABs overlapping on dashboard
+// + admin routes). The legacy `AIAssistant` already supports the full
+// iter278/279 streaming UX (typewriter cursor + rose Stop button +
+// graceful abort) so it serves as the canonical surface across every
+// route. The `AICoreSupportWidget.jsx` file is kept on disk for
+// potential future contextual surfaces but NEVER mounted in App.js.
 
 // ─── Global Loading Fallback ──────────────────────────────────────
 const PageLoader = () => {
@@ -281,22 +284,13 @@ const AIAssistantWrapper = () => {
   return <AIAssistant />;
 };
 
-// iter277 — Mount the AI Core support widget ONLY on the
-// authenticated dashboard surfaces + admin pages. Anywhere else, the
-// public AIAssistantWrapper above is the appropriate chat surface.
-const AICoreSupportWidgetWrapper = () => {
-  const location = useLocation();
-  const path = location.pathname || '';
-  const isDashboard =
-    path.startsWith('/seller/dashboard')
-    || path.startsWith('/buyer/dashboard')
-    || path.startsWith('/seller-dashboard')
-    || path.startsWith('/buyer-dashboard')
-    || path.startsWith('/facility/dashboard');
-  const isAdmin = path.startsWith('/admin');
-  if (!isDashboard && !isAdmin) return null;
-  return <AICoreSupportWidget />;
-};
+// iter280 — REMOVED: AICoreSupportWidgetWrapper.
+// The dashboard-only widget caused a bottom-right FAB collision with
+// the legacy public AIAssistant. The legacy assistant is now the
+// single, unified, site-wide AI Core surface across every route
+// (public marketplace + homepage + dashboards + admin). It already
+// carries the full iter278/279 streaming UX + bilingual i18n + auth-
+// aware history.
 
 // iter272 — Captures UTM / campaign params on every URL change.
 // Mounts once inside <BrowserRouter>; the underlying util is a no-op
@@ -672,10 +666,6 @@ const App = () => {
           <FooterWrapper />
           <Suspense fallback={null}>
             <AIAssistantWrapper />
-          </Suspense>
-          {/* iter277 — Authenticated-only AI Core support widget */}
-          <Suspense fallback={null}>
-            <AICoreSupportWidgetWrapper />
           </Suspense>
           <MessageNotificationListener />
           <Toaster position="top-right" />
