@@ -578,6 +578,14 @@ async def _handle_payment_succeeded(db, invoice):
                 "created_at": datetime.now(timezone.utc).isoformat(),
             })
             logger.info(f"Partner re-activated via subscription renewal: user={user['id']}")
+            # iter272 — Subscription renewal is also a tier-upgrade event
+            # (re-activation from a soft-locked state). Increment the
+            # premium_upgrades counter on the attributing campaign.
+            try:
+                from routes.auth import record_premium_upgrade
+                await record_premium_upgrade(user["id"])
+            except Exception as upg_exc:  # noqa: BLE001
+                logger.warning(f"[iter272 premium-upgrade] subscription renewal non-fatal: {upg_exc}")
     
     # Log payment
     await db.payments.insert_one({
@@ -1139,6 +1147,17 @@ async def _handle_checkout_completed(db, session):
         )
         
         logger.info(f"Partner activated via checkout: user={user_id}, subscription={subscription_id}")
+
+        # iter272 — Partner Stripe checkout success is the canonical tier
+        # upgrade event. Bump the originating external campaign's
+        # `analytics.premium_upgrades` counter so admins can attribute
+        # paid conversions back to the marketing campaign that brought
+        # the user in. Never blocks the webhook on failure.
+        try:
+            from routes.auth import record_premium_upgrade
+            await record_premium_upgrade(user_id)
+        except Exception as upg_exc:  # noqa: BLE001
+            logger.warning(f"[iter272 premium-upgrade] partner_activation webhook non-fatal: {upg_exc}")
         
         # Create a notification for the user
         await db.notifications.insert_one({

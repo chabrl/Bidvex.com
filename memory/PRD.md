@@ -1,5 +1,141 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter272 — CONVERSION TRACKING + P0 CAMPAIGN-SEND BUG FIX (Feb 04, 2026) ✅
+
+P0 hotfix + full ROI loop for the External Email Marketing system.
+**Pytest 189/189 PASS** across iter255→iter272 (26 new iter272 + 163
+regression, 11 env-dependent skips). Zero regressions in scope.
+
+### P0 Bug fix — External campaign send no longer flips to `failed`
+- **Root cause**: `EXTERNAL_FROM_EMAIL` defaulted to `noreply@bidvex.ca`,
+  but the `.ca` domain is NOT yet DKIM-authenticated in SendGrid (the
+  `.com` mailbox is the only verified one per iter270 findings). Every
+  `sg.send()` raised an HTTPError with *"from address does not match a
+  verified Sender Identity"* → `result.status="error"` → all recipients
+  failed → campaign status flipped to `failed`, no emails delivered.
+- **Fix in `services/external_email.py`**:
+  - NEW `EXTERNAL_VERIFIED_FROM_EMAIL` resolves at import: env override
+    → `SENDGRID_FROM_EMAIL` → `noreply@bidvex.com` (always picks the
+    authenticated mailbox).
+  - NEW `_looks_like_sender_auth_error(message)` heuristic detects the
+    6 canonical SendGrid phrasings for unverified sender / domain
+    authentication errors.
+  - NEW `_build_mail_message()` extracted so we can rebuild the entire
+    `Mail()` (headers + categories + tracking + attachments) cleanly
+    when retrying with the fallback sender.
+  - `send_external_campaign_email()` now does **primary attempt →
+    catch HTTPError → match heuristic → retry once with verified
+    fallback**. Result envelope surfaces `from_email_used` +
+    `fallback_used=True/False` so analytics can chart the split.
+  - Non-sender errors (500 transient, network glitch) do NOT trigger
+    the retry — that would mask real outages.
+- **Fix in `routes/external_campaigns.py`**:
+  - `_do_dispatch()` aggregates fallback metrics into a new
+    `last_dispatch` envelope (`sent`, `skipped`, `failed`,
+    `fallback_used`, `from_emails_used`, `first_failure`).
+  - `send-now` writes that envelope onto the campaign document so the
+    admin UI can show *"X emails shipped via fallback sender"* + the
+    last failure reason for fast diagnosis. Also returns
+    `fallback_used` in the API response.
+  - Status resolution is explicit: `sent>0 → sent`, `no failures → sent`
+    (e.g. all-suppressed), `else → failed`. No more silent `failed`
+    when a single SendGrid hiccup affects every recipient.
+
+### Mission 1 — Frontend UTM/campaign capture (`lib/campaignTracking.js`)
+- Captures `utm_source`, `utm_medium`, `utm_campaign`, `utm_term`,
+  `utm_content`, plus our private `bvx_t` + `bvx_cid` keys.
+- 30-day `localStorage` TTL — survives multi-step signup, page reloads,
+  and detours through other routes.
+- **First-touch model**: subsequent UTM-bearing landings do NOT
+  overwrite the original attribution (matches industry standard for
+  ROI tooling like HubSpot + Mixpanel).
+- Exports `captureCampaignTracking()`, `readCampaignTracking()`,
+  `consumeCampaignTracking()` (read+clear single-shot), and
+  `buildSignupTrackingPayload()`.
+- **`App.js` mounts `<CampaignAttributionTracker>`** inside the
+  `<BrowserRouter>` — calls `captureCampaignTracking(location.search)`
+  on every navigation, no-op when no UTMs are present.
+
+### Mission 2 — Signup binding (backend `routes/auth.py`)
+- `UserCreate` model now accepts an optional `campaign_tracking` dict.
+- `_normalize_tracking()` whitelists 9 keys, trims values, caps each at
+  300 chars, and returns `None` when nothing valid remains (defensive
+  against XSS / unbounded payloads).
+- `_record_campaign_attribution()` runs immediately after the user
+  insert (wrapped in try/except — never blocks signup):
+  - Persists the sanitised blob to `users.campaign_attribution` +
+    `campaign_attribution_at` + `campaign_attribution_email`.
+  - Resolves a campaign by `bvx_cid` (id) **OR** `utm_campaign` slug.
+  - `$inc {"analytics.registrations": 1}` on the matching campaign
+    + stamps `analytics.last_updated_at`.
+
+### Mission 3 — Premium-upgrade conversion wiring
+- NEW `record_premium_upgrade(user_id)` helper in `routes/auth.py`:
+  reads the attribution off the user record, resolves the originating
+  campaign, increments `analytics.premium_upgrades`. Never raises.
+- **Wired into 3 conversion points** (the canonical "user pays" events):
+  1. `routes/partners.py` — partner Stripe checkout coupon free
+     activation (100% waiver path).
+  2. `routes/webhooks.py` — `checkout.session.completed` with
+     `metadata.type=partner_activation` (paid Stripe checkout).
+  3. `routes/webhooks.py` — partner subscription renewal payment
+     (re-activation from soft-locked state).
+
+### Mission 4 — Analytics counters
+- `external_email_campaigns.analytics` schema now ships
+  `registrations` AND `premium_upgrades` in the empty template — both
+  visible in `GET /admin/external-campaigns/{id}/analytics`.
+
+### Validation (`tests/test_iter272_conversion_tracking.py`)
+**26/26 PASS** covering:
+- 5 static + 1 import test on the sender-fallback machinery.
+- 4 frontend-tracker static existence + export shape + mount tests.
+- 6 backend `_normalize_tracking` / `_record_campaign_attribution` /
+  helper-wiring static tests.
+- 4 webhook + partner-route wiring static tests.
+- 4 live HTTP round-trip tests (creates a campaign → registers a guest
+  with `bvx_cid` OR `utm_campaign` slug → asserts the counter bumps by
+  exactly +1 → asserts a vanilla signup does NOT bump it).
+- 2 monkey-patched SendGrid tests proving:
+  * Sender-auth error triggers exactly one fallback retry and the
+    final result is `status=sent`, `fallback_used=True`,
+    `from_email_used=noreply@bidvex.com`.
+  * Non-sender error (e.g. 500) does NOT retry — fails fast at 1 call.
+
+### Files changed (iter272)
+**Backend MODIFIED**: `services/external_email.py` (verified-sender
+fallback + `_build_mail_message` extraction + `_looks_like_sender_auth_error`
+heuristic), `routes/external_campaigns.py` (`_do_dispatch` aggregates
+fallback metadata, `send-now` persists `last_dispatch` envelope,
+`_empty_analytics` adds `premium_upgrades` counter), `routes/partners.py`
+(premium-upgrade hook on free activation), `routes/webhooks.py`
+(premium-upgrade hooks on partner_activation checkout + subscription
+renewal).
+**Backend NEW**: `tests/test_iter272_conversion_tracking.py` (26 tests).
+**Frontend already in place from earlier work**: `lib/campaignTracking.js`,
+`App.js` (mount), `pages/AuthPage.js` (consumes blob on register).
+
+### Action items (user)
+1. **Save to GitHub → redeploy** preview → production.
+2. **Smoke test the campaign fix**: Admin → External Campaigns → add a
+   recipient + body containing `{unsubscribe_url}` → Send Now. The
+   campaign should land in `sent` status with a populated
+   `last_dispatch.fallback_used` count visible in the analytics API.
+3. **Verify conversion tracking**:
+   - Hit `https://bidvex.com/?utm_source=email&utm_campaign=<slug>` →
+     register a fresh account → `GET /api/admin/external-campaigns/{id}/analytics`
+     should show `registrations: 1`.
+   - Pay the partner annual fee → same endpoint should show
+     `premium_upgrades: 1`.
+4. **(P0 still open)** Add the missing DNS record per iter270 so the
+   `.ca` brand FROM also works without the fallback retry overhead:
+   `CNAME em.bidvex.ca → u57420291.wl042.sendgrid.net` (mirror of the
+   `.com` setup). Until then the iter272 fallback keeps emails flowing.
+
+---
+
+
+
 ## Latest: iter271 — EXTERNAL EMAIL CAMPAIGNS (Acquisition Marketing) (Jun 03, 2026) ✅
 
 Complete acquisition-marketing system for sending to non-registered

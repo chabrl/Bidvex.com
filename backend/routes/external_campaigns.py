@@ -85,7 +85,13 @@ def _empty_analytics() -> Dict[str, Any]:
         "bounced": 0,   "bounce_rate_pct": 0.0,
         "unsubscribed": 0,
         "spam_reports": 0,
+        # iter272 — Conversion ROI counters wired in by the auth +
+        # partner/webhook flows. `registrations` increments on
+        # signup-binding; `premium_upgrades` increments when a tracked
+        # user pays their partner annual fee (Stripe checkout, free
+        # activation coupon, or subscription renewal).
         "registrations": 0,
+        "premium_upgrades": 0,
         "last_updated_at": None,
     }
 
@@ -633,7 +639,11 @@ async def _do_dispatch(
     db, doc: Dict[str, Any], to_emails: List[str], *, is_test: bool = False,
 ) -> Dict[str, Any]:
     """Iterate the recipient list, suppression-check, then send one by
-    one. Each failure is collected but never aborts the batch."""
+    one. Each failure is collected but never aborts the batch.
+
+    iter272 — Returns extra envelope keys (`fallback_used`,
+    `from_emails_used`) so `send-now` can persist them onto the campaign
+    document for ROI + debugging visibility."""
     err = validate_casl(doc.get("subject_en", ""), doc.get("body_html_en", ""))
     if err:
         raise HTTPException(status_code=400, detail=err)
@@ -642,6 +652,8 @@ async def _do_dispatch(
     sent = 0
     skipped = 0
     failures: List[Dict[str, Any]] = []
+    fallback_used = 0
+    from_emails_used: Dict[str, int] = {}
     subject = doc["subject_en"]
     if is_test:
         subject = f"[TEST] {subject}"
@@ -651,24 +663,46 @@ async def _do_dispatch(
         if email in suppressed:
             skipped += 1
             continue
-        result = await send_external_campaign_email(
-            to_email=email,
-            to_name="",
-            subject=subject,
-            body_html=doc["body_html_en"],
-            campaign_id=doc["id"],
-            utm_campaign=doc.get("utm_campaign") or doc["id"],
-            attachments=attachments,
-            language="en",
-        )
-        if result.get("status") == "sent":
+        try:
+            result = await send_external_campaign_email(
+                to_email=email,
+                to_name="",
+                subject=subject,
+                body_html=doc["body_html_en"],
+                campaign_id=doc["id"],
+                utm_campaign=doc.get("utm_campaign") or doc["id"],
+                attachments=attachments,
+                language="en",
+            )
+        except Exception as exc:  # noqa: BLE001
+            # iter272 — Defensive: send_external_campaign_email is meant to
+            # never raise, but if it does (e.g. SendGrid SDK bug), we
+            # still keep the batch alive instead of crashing the request.
+            logger.error(f"[external-dispatch] unexpected exception for {email}: {exc}")
+            failures.append({"to": email, "error": str(exc)})
+            continue
+
+        used = result.get("from_email_used") or ""
+        if used:
+            from_emails_used[used] = from_emails_used.get(used, 0) + 1
+        if result.get("fallback_used"):
+            fallback_used += 1
+
+        status = result.get("status")
+        if status == "sent":
             sent += 1
-        elif result.get("status") == "logged":
+        elif status == "logged":
             sent += 1  # treat dev-mode logged as sent for stats
         else:
             failures.append({"to": email, "error": result.get("message", "unknown")})
 
-    return {"sent": sent, "skipped": skipped, "failures": failures}
+    return {
+        "sent":             sent,
+        "skipped":          skipped,
+        "failures":         failures,
+        "fallback_used":    fallback_used,
+        "from_emails_used": from_emails_used,
+    }
 
 
 @router.post("/{campaign_id}/send-test")
@@ -740,17 +774,39 @@ async def send_now(
     result = await _do_dispatch(db, doc, recipients, is_test=False)
 
     sent_at = _now_iso()
-    new_status = "sent" if not result["failures"] else (
-        "sent" if result["sent"] > 0 else "failed"
-    )
+    # iter272 — Status reflects actual SendGrid outcome:
+    #   • All recipients suppressed (sent=0, failures=0) → 'sent' (no work).
+    #   • At least one delivered → 'sent' (partial success counts).
+    #   • Every attempt failed → 'failed'.
+    if result["sent"] > 0:
+        new_status = "sent"
+    elif not result["failures"]:
+        new_status = "sent"  # everyone was on the suppression list
+    else:
+        new_status = "failed"
+
+    update_doc = {
+        "status":                     new_status,
+        "sent_at":                    sent_at,
+        "updated_at":                 sent_at,
+        "analytics.delivered":        result["sent"],
+        "analytics.last_updated_at":  sent_at,
+        # iter272 — Surface the operational metadata so the admin UI
+        # can show "X emails shipped via fallback sender" + the
+        # last failure message for fast diagnosis.
+        "last_dispatch": {
+            "sent":             result["sent"],
+            "skipped":          result["skipped"],
+            "failed":           len(result["failures"]),
+            "fallback_used":    result.get("fallback_used", 0),
+            "from_emails_used": result.get("from_emails_used", {}),
+            "first_failure":   (result["failures"][0]["error"] if result["failures"] else None),
+            "dispatched_at":    sent_at,
+        },
+    }
     await db.external_email_campaigns.update_one(
         {"id": campaign_id},
-        {"$set": {
-            "status":     new_status,
-            "sent_at":    sent_at,
-            "updated_at": sent_at,
-            "analytics.delivered": result["sent"],
-        }},
+        {"$set": update_doc},
     )
 
     return {
@@ -760,6 +816,7 @@ async def send_now(
         "recipient_count": len(recipients),
         "sent_at":         sent_at,
         "status":          new_status,
+        "fallback_used":   result.get("fallback_used", 0),
     }
 
 

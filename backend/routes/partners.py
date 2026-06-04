@@ -750,6 +750,14 @@ async def create_partner_checkout(
                         "partner_subscription_activated_at": now,
                     }},
                 )
+                # iter272 — Free-activation is still a tier upgrade; bump
+                # the originating external campaign's premium_upgrades
+                # counter so admins see ROI on the coupon-driven cohort.
+                try:
+                    from routes.auth import record_premium_upgrade
+                    await record_premium_upgrade(current_user.id)
+                except Exception as upg_exc:  # noqa: BLE001
+                    logger.warning(f"[iter272 premium-upgrade] partner free-activation non-fatal: {upg_exc}")
                 base_url = _os.environ.get("REACT_APP_BACKEND_URL", "https://www.bidvex.com")
                 return {
                     "free_activation": True,

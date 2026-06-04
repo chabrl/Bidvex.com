@@ -33,6 +33,16 @@ from urllib.parse import urlencode, urlsplit, urlunsplit, parse_qsl
 logger = logging.getLogger(__name__)
 
 # ── Canonical envelope ───────────────────────────────────────────────
+#
+# iter271 spec target: `noreply@bidvex.ca`.
+# iter272 reality:     the `.ca` domain is NOT yet DKIM-authenticated
+#                      in SendGrid, so every live send returns 403 →
+#                      campaign status flips to `failed` → no emails
+#                      reach inboxes. We keep the `.ca` brand as the
+#                      documented default but ALSO resolve a verified
+#                      operational sender (defaults to the `.com`
+#                      authenticated mailbox) and auto-fall back to
+#                      it when SendGrid rejects the primary FROM.
 
 EXTERNAL_FROM_EMAIL = os.environ.get(
     "EXTERNAL_FROM_EMAIL", "noreply@bidvex.ca",
@@ -41,6 +51,31 @@ EXTERNAL_FROM_NAME = os.environ.get("EXTERNAL_FROM_NAME", "BidVex Canada")
 EXTERNAL_REPLY_TO = os.environ.get("EXTERNAL_REPLY_TO", "support@bidvex.com")
 EXTERNAL_REPLY_TO_NAME = os.environ.get(
     "EXTERNAL_REPLY_TO_NAME", "BidVex Support",
+)
+# Operational fallback — the verified SendGrid mailbox that will always
+# pass DKIM + SPF alignment. Resolved at import-time so all sends share
+# the same authoritative value.
+EXTERNAL_VERIFIED_FROM_EMAIL = (
+    os.environ.get("EXTERNAL_VERIFIED_FROM_EMAIL")
+    or os.environ.get("SENDGRID_FROM_EMAIL")
+    or "noreply@bidvex.com"
+)
+EXTERNAL_VERIFIED_FROM_NAME = (
+    os.environ.get("EXTERNAL_VERIFIED_FROM_NAME")
+    or os.environ.get("SENDGRID_FROM_NAME")
+    or "BidVex Canada"
+)
+
+# A 4xx response carrying any of these substrings indicates the SendGrid
+# account does not yet trust the primary FROM address — we then retry
+# once with the verified fallback sender so the campaign still ships.
+_SENDER_AUTH_HINTS = (
+    "verified sender",
+    "sender identity",
+    "domain authentication",
+    "from address",
+    "must be verified",
+    "does not match a verified",
 )
 
 
@@ -146,58 +181,41 @@ def decode_unsubscribe_token(token: str) -> Dict[str, Any]:
 # ── Send helper ──────────────────────────────────────────────────────
 
 
-async def send_external_campaign_email(
+def _looks_like_sender_auth_error(message: str) -> bool:
+    """Heuristic match for SendGrid responses indicating the FROM mailbox
+    is not yet authenticated in this account. We use this to decide
+    whether retrying with the verified fallback sender is worthwhile."""
+    if not message:
+        return False
+    haystack = message.lower()
+    return any(hint in haystack for hint in _SENDER_AUTH_HINTS)
+
+
+def _build_mail_message(
     *,
+    from_email: str,
+    from_name: str,
     to_email: str,
     to_name: str,
     subject: str,
-    body_html: str,
+    rendered: str,
+    unsub_url: str,
     campaign_id: str,
-    utm_campaign: str,
-    attachments: Optional[List[Dict[str, Any]]] = None,
-    language: str = "en",
-    public_base_url: str = "https://bidvex.com",
-) -> Dict[str, Any]:
-    """Send a single external campaign email through SendGrid.
-    Returns a result dict — never raises. Suppression checks are the
-    caller's responsibility (done once before the batch starts)."""
-    try:
-        from sendgrid import SendGridAPIClient
-        from sendgrid.helpers.mail import (
-            Mail, Email, To, Content,
-            Attachment, FileContent, FileName, FileType, Disposition,
-            Header, Category, CustomArg, ReplyTo,
-            TrackingSettings, ClickTracking, OpenTracking, SubscriptionTracking,
-        )
-    except ImportError:
-        logger.error("[external-email] SendGrid SDK not installed")
-        return {"status": "error", "message": "sendgrid not installed"}
-
-    api_key = os.environ.get("SENDGRID_API_KEY")
-    if not api_key or api_key == "SG.your-actual-sendgrid-key-here":
-        logger.warning(f"[external-email] No SendGrid key — logging only {to_email}")
-        return {"status": "logged", "to": to_email}
-
-    # Unsubscribe link with per-recipient token.
-    unsub_token = make_unsubscribe_token(to_email, campaign_id, language)
-    unsub_url = f"{public_base_url}/api/external/unsubscribe?token={unsub_token}"
-
-    # Inject the per-recipient unsubscribe URL into the {unsubscribe_url}
-    # placeholder. If the admin forgot the placeholder, auto-append the
-    # CASL footer so we never break compliance.
-    if "{unsubscribe_url}" in body_html:
-        rendered = body_html.replace("{unsubscribe_url}", unsub_url)
-    else:
-        rendered = body_html + "\n" + casl_footer_html(unsub_url)
-
-    rendered = inject_utm_params(rendered, {
-        "utm_source":   "email",
-        "utm_medium":   "marketing",
-        "utm_campaign": utm_campaign or campaign_id,
-    })
+    attachments: Optional[List[Dict[str, Any]]],
+):
+    """Construct the full SendGrid Mail() with every header/category/
+    tracking setting we ship across all external-campaign sends. Isolated
+    so we can rebuild it cleanly when the first send is rejected and we
+    need to retry with the verified fallback FROM address."""
+    from sendgrid.helpers.mail import (
+        Mail, Email, To, Content,
+        Attachment, FileContent, FileName, FileType, Disposition,
+        Header, Category, CustomArg, ReplyTo,
+        TrackingSettings, ClickTracking, OpenTracking, SubscriptionTracking,
+    )
 
     message = Mail(
-        from_email=Email(EXTERNAL_FROM_EMAIL, EXTERNAL_FROM_NAME),
+        from_email=Email(from_email, from_name),
         to_emails=To(to_email, to_name or to_email),
         subject=subject,
         html_content=Content("text/html", rendered),
@@ -207,7 +225,7 @@ async def send_external_campaign_email(
     except Exception:
         message.reply_to = Email(EXTERNAL_REPLY_TO, EXTERNAL_REPLY_TO_NAME)
 
-    # ── Required headers ──
+    # ── Required spam-classification headers ──
     try:
         message.add_header(Header(
             "List-Unsubscribe",
@@ -242,7 +260,7 @@ async def send_external_campaign_email(
     except Exception as exc:  # noqa: BLE001
         logger.debug(f"[external-email] tracking attach skipped: {exc}")
 
-    # ── Attachments ──
+    # ── Attachments (base64-encoded, MIME validated upstream) ──
     for att in (attachments or []):
         fpath = att.get("file_path")
         if not fpath or not os.path.isfile(fpath):
@@ -259,24 +277,156 @@ async def send_external_campaign_email(
         except Exception as exc:  # noqa: BLE001
             logger.warning(f"[external-email] attachment skipped {fpath}: {exc}")
 
+    return message
+
+
+async def send_external_campaign_email(
+    *,
+    to_email: str,
+    to_name: str,
+    subject: str,
+    body_html: str,
+    campaign_id: str,
+    utm_campaign: str,
+    attachments: Optional[List[Dict[str, Any]]] = None,
+    language: str = "en",
+    public_base_url: str = "https://bidvex.com",
+) -> Dict[str, Any]:
+    """Send a single external campaign email through SendGrid.
+
+    Returns a result dict — never raises. Suppression checks are the
+    caller's responsibility (done once before the batch starts).
+
+    iter272 — On a primary-sender auth failure (e.g. `noreply@bidvex.ca`
+    not yet DKIM-authenticated), we transparently retry once with the
+    verified fallback FROM address so the campaign still ships and the
+    overall status no longer flips to `failed`. The result envelope
+    surfaces `from_email_used` + `fallback_used=True` for analytics.
+    """
     try:
-        sg = SendGridAPIClient(api_key)
-        response = sg.send(message)
+        from sendgrid import SendGridAPIClient
+    except ImportError:
+        logger.error("[external-email] SendGrid SDK not installed")
+        return {"status": "error", "message": "sendgrid not installed"}
+
+    api_key = os.environ.get("SENDGRID_API_KEY")
+    if not api_key or api_key == "SG.your-actual-sendgrid-key-here":
+        logger.warning(f"[external-email] No SendGrid key — logging only {to_email}")
         return {
-            "status":      "sent",
-            "status_code": response.status_code,
-            "to":          to_email,
-            "campaign_id": campaign_id,
+            "status":          "logged",
+            "to":              to_email,
+            "from_email_used": EXTERNAL_FROM_EMAIL,
+            "fallback_used":   False,
+        }
+
+    # Unsubscribe link with per-recipient token.
+    unsub_token = make_unsubscribe_token(to_email, campaign_id, language)
+    unsub_url = f"{public_base_url}/api/external/unsubscribe?token={unsub_token}"
+
+    # Inject the per-recipient unsubscribe URL into the {unsubscribe_url}
+    # placeholder. If the admin forgot the placeholder, auto-append the
+    # CASL footer so we never break compliance.
+    if "{unsubscribe_url}" in body_html:
+        rendered = body_html.replace("{unsubscribe_url}", unsub_url)
+    else:
+        rendered = body_html + "\n" + casl_footer_html(unsub_url)
+
+    rendered = inject_utm_params(rendered, {
+        "utm_source":   "email",
+        "utm_medium":   "marketing",
+        "utm_campaign": utm_campaign or campaign_id,
+    })
+
+    # Primary attempt with the documented acquisition sender.
+    sg = SendGridAPIClient(api_key)
+    primary_message = _build_mail_message(
+        from_email=EXTERNAL_FROM_EMAIL,
+        from_name=EXTERNAL_FROM_NAME,
+        to_email=to_email, to_name=to_name,
+        subject=subject, rendered=rendered, unsub_url=unsub_url,
+        campaign_id=campaign_id, attachments=attachments,
+    )
+    try:
+        response = sg.send(primary_message)
+        return {
+            "status":          "sent",
+            "status_code":     response.status_code,
+            "to":              to_email,
+            "campaign_id":     campaign_id,
+            "from_email_used": EXTERNAL_FROM_EMAIL,
+            "fallback_used":   False,
         }
     except Exception as exc:  # noqa: BLE001
-        logger.error(f"[external-email] send failed for {to_email}: {exc}")
-        return {"status": "error", "to": to_email, "message": str(exc)}
+        primary_err = str(exc)
+        # Try to pull the SendGrid HTTPError body for a clearer signal.
+        body_text = primary_err
+        try:
+            raw = getattr(exc, "body", None)
+            if raw:
+                body_text = raw.decode("utf-8") if isinstance(raw, (bytes, bytearray)) else str(raw)
+        except Exception:
+            pass
+
+        retry_with_fallback = (
+            _looks_like_sender_auth_error(body_text)
+            and EXTERNAL_VERIFIED_FROM_EMAIL
+            and EXTERNAL_VERIFIED_FROM_EMAIL.lower() != EXTERNAL_FROM_EMAIL.lower()
+        )
+        if not retry_with_fallback:
+            logger.error(
+                f"[external-email] send failed for {to_email} from "
+                f"{EXTERNAL_FROM_EMAIL}: {primary_err} | body={body_text[:240]}"
+            )
+            return {
+                "status":          "error",
+                "to":              to_email,
+                "message":         primary_err,
+                "from_email_used": EXTERNAL_FROM_EMAIL,
+                "fallback_used":   False,
+            }
+
+        logger.warning(
+            f"[external-email] primary FROM {EXTERNAL_FROM_EMAIL} rejected "
+            f"({body_text[:160]}). Retrying with verified sender "
+            f"{EXTERNAL_VERIFIED_FROM_EMAIL}."
+        )
+        fallback_message = _build_mail_message(
+            from_email=EXTERNAL_VERIFIED_FROM_EMAIL,
+            from_name=EXTERNAL_VERIFIED_FROM_NAME,
+            to_email=to_email, to_name=to_name,
+            subject=subject, rendered=rendered, unsub_url=unsub_url,
+            campaign_id=campaign_id, attachments=attachments,
+        )
+        try:
+            response = sg.send(fallback_message)
+            return {
+                "status":          "sent",
+                "status_code":     response.status_code,
+                "to":              to_email,
+                "campaign_id":     campaign_id,
+                "from_email_used": EXTERNAL_VERIFIED_FROM_EMAIL,
+                "fallback_used":   True,
+            }
+        except Exception as exc2:  # noqa: BLE001
+            logger.error(
+                f"[external-email] fallback send ALSO failed for {to_email} "
+                f"from {EXTERNAL_VERIFIED_FROM_EMAIL}: {exc2}"
+            )
+            return {
+                "status":          "error",
+                "to":              to_email,
+                "message":         f"primary: {primary_err} | fallback: {exc2}",
+                "from_email_used": EXTERNAL_VERIFIED_FROM_EMAIL,
+                "fallback_used":   True,
+            }
 
 
 __all__ = [
     "EXTERNAL_FROM_EMAIL", "EXTERNAL_FROM_NAME",
     "EXTERNAL_REPLY_TO", "EXTERNAL_REPLY_TO_NAME",
+    "EXTERNAL_VERIFIED_FROM_EMAIL", "EXTERNAL_VERIFIED_FROM_NAME",
     "inject_utm_params", "casl_footer_html", "validate_casl",
     "make_unsubscribe_token", "decode_unsubscribe_token",
     "send_external_campaign_email",
+    "_looks_like_sender_auth_error",
 ]
