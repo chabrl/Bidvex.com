@@ -2,7 +2,7 @@ import API_BASE from '../config';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { X, MessageCircle, Send, ShieldCheck, CreditCard, Package, HelpCircle, Mail, GripVertical, History, Trash2, ChevronLeft } from 'lucide-react';
+import { X, MessageCircle, Send, ShieldCheck, CreditCard, Package, HelpCircle, Mail, GripVertical, History, Trash2, ChevronLeft, Square } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -59,6 +59,11 @@ const AIAssistant = () => {
     setSessionId(sid);
   }, []);
   const messagesEndRef = useRef(null);
+  // iter279 — Stop-button support. Holds the AbortController of the
+  // currently in-flight stream so the user can interrupt mid-stream
+  // without dangling fetches. Cleared on stream completion AND on
+  // component unmount (cleanup useEffect at bottom of file).
+  const activeStreamCtrlRef = useRef(null);
   const { token } = useAuth();
   const navigate = useNavigate();
   const backendUrl = API_BASE;
@@ -411,6 +416,8 @@ const AIAssistant = () => {
       const headers = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
       const ctrl = new AbortController();
+      // iter279 — Expose controller so the Stop button can call abort().
+      activeStreamCtrlRef.current = ctrl;
       const tid = setTimeout(() => ctrl.abort(), timeoutMs);
       let assembled = '';
       let convertedAck = false;
@@ -458,6 +465,11 @@ const AIAssistant = () => {
         return assembled;
       } finally {
         clearTimeout(tid);
+        // iter279 — Always release the controller ref so a follow-up
+        // turn doesn't try to abort the wrong fetch.
+        if (activeStreamCtrlRef.current === ctrl) {
+          activeStreamCtrlRef.current = null;
+        }
       }
     };
 
@@ -481,30 +493,56 @@ const AIAssistant = () => {
       ));
       fireResponseNotification(assembled, isFr);
     } catch (e) {
+      // iter279 — When the user clicks Stop mid-stream the fetch
+      // throws AbortError. That's a deliberate cancellation, not a
+      // failure — finalize the partial bubble in place and DO NOT
+      // surface the giant "service unavailable" red CTA.
+      const wasUserAbort = e?.name === 'AbortError' && !activeStreamCtrlRef.current;
       // eslint-disable-next-line no-console
       console.error('[AIAssistant] both attempts failed:', e?.message);
       clearTimeout(stillProcessingTimer);
-      setServiceDegraded(true);
-      setMessages((prev) => {
-        // iter235 — also drop any partial streaming bubble produced by a failed retry.
-        const out = prev.filter((m) => !(m.ack && m.ackId === ackId) && m.streamId !== ackId);
-        return [
-          ...out,
-          {
-            role: 'assistant',
-            content: 'Service temporarily unavailable. Please retry in a moment, or email support@bidvex.com for immediate help.\n\nService temporairement indisponible. Veuillez réessayer dans un instant ou écrire à support@bidvex.com pour de l\'aide immédiate.',
-            rich_content: {
-              has_rich_content: true,
-              action_buttons: [
-                { text: 'Email Support / Contacter le support', action: 'email', url: 'support@bidvex.com', icon: 'mail', style: 'primary' },
-              ],
+      if (wasUserAbort) {
+        setMessages((prev) => prev.map((m) => (
+          m.streamId === ackId
+            ? { ...m, streaming: false, streamId: undefined, partial: true }
+            : m
+        )));
+      } else {
+        setServiceDegraded(true);
+        setMessages((prev) => {
+          // iter235 — also drop any partial streaming bubble produced by a failed retry.
+          const out = prev.filter((m) => !(m.ack && m.ackId === ackId) && m.streamId !== ackId);
+          return [
+            ...out,
+            {
+              role: 'assistant',
+              content: 'Service temporarily unavailable. Please retry in a moment, or email support@bidvex.com for immediate help.\n\nService temporairement indisponible. Veuillez réessayer dans un instant ou écrire à support@bidvex.com pour de l\'aide immédiate.',
+              rich_content: {
+                has_rich_content: true,
+                action_buttons: [
+                  { text: 'Email Support / Contacter le support', action: 'email', url: 'support@bidvex.com', icon: 'mail', style: 'primary' },
+                ],
+              },
             },
-          },
-        ];
-      });
+          ];
+        });
+      }
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // iter279 — User-initiated stop. Aborts the active stream's
+  // AbortController; the partial text already on screen remains
+  // visible and is finalized in the catch above.
+  const handleStop = () => {
+    const ctrl = activeStreamCtrlRef.current;
+    if (!ctrl) return;
+    // Clear ref BEFORE calling abort so the catch handler's
+    // `!activeStreamCtrlRef.current` check identifies this as a
+    // user-initiated abort vs. an internal timeout abort.
+    activeStreamCtrlRef.current = null;
+    try { ctrl.abort(); } catch { /* noop */ }
   };
 
   const handleActionButton = (action, url) => {
@@ -594,6 +632,17 @@ const AIAssistant = () => {
       toast.error('Could not delete that conversation.');
     }
   }, [backendUrl, token, sessionId]);
+
+  // iter279 — Cleanup: if the component unmounts (route change /
+  // hot reload) while a stream is in flight, abort the fetch so the
+  // socket isn't leaked.
+  useEffect(() => () => {
+    const ctrl = activeStreamCtrlRef.current;
+    if (ctrl) {
+      activeStreamCtrlRef.current = null;
+      try { ctrl.abort(); } catch { /* noop */ }
+    }
+  }, []);
 
   const startNewChat = useCallback(() => {
     try { localStorage.removeItem('bidvex.chat.session_id'); } catch { /* ignore */ }
@@ -816,7 +865,28 @@ const AIAssistant = () => {
                           : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-gray-200 dark:border-gray-700'
                       }`}
                     >
-                      <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{msg.content}</p>
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                        {msg.content}
+                        {/* iter279 — Pulsing typewriter cursor on the
+                            active streaming bubble. Mirrors the
+                            iter278 dashboard widget UX. */}
+                        {msg.streaming && (
+                          <span
+                            className="inline-block w-1.5 h-3.5 ml-0.5 align-middle bg-[#06B6D4] animate-pulse"
+                            data-testid="ai-core-stream-cursor"
+                          />
+                        )}
+                      </p>
+                      {/* iter279 — "(partial)" badge when the user
+                          stops a stream mid-flight. */}
+                      {msg.partial && (
+                        <p
+                          className="text-[10px] mt-1 text-rose-500"
+                          data-testid={`ai-core-msg-partial-${idx}`}
+                        >
+                          · partial / partiel
+                        </p>
+                      )}
                     </div>
                   </div>
                   {msg.rich_content?.has_rich_content && msg.rich_content.action_buttons?.length > 0 && (
@@ -869,12 +939,15 @@ const AIAssistant = () => {
                   data-testid="ai-assistant-input"
                 />
                 <Button
-                  onClick={handleSend}
-                  disabled={isLoading || !input.trim()}
-                  className="bg-gradient-to-r from-[#1E3A8A] to-[#06B6D4] hover:from-[#1E3A8A]/90 hover:to-[#06B6D4]/90 text-white border-0 px-4 flex-shrink-0"
-                  data-testid="ai-assistant-send-btn"
+                  onClick={isLoading ? handleStop : handleSend}
+                  disabled={!isLoading && !input.trim()}
+                  className={isLoading
+                    ? "bg-rose-600 hover:bg-rose-700 text-white border-0 px-4 flex-shrink-0"
+                    : "bg-gradient-to-r from-[#1E3A8A] to-[#06B6D4] hover:from-[#1E3A8A]/90 hover:to-[#06B6D4]/90 text-white border-0 px-4 flex-shrink-0"}
+                  data-testid={isLoading ? "ai-core-stop" : "ai-assistant-send-btn"}
+                  aria-label={isLoading ? "Stop generating" : "Send message"}
                 >
-                  <Send className="h-4 w-4" />
+                  {isLoading ? <Square className="h-4 w-4" /> : <Send className="h-4 w-4" />}
                 </Button>
               </div>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">

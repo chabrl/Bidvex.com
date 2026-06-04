@@ -1,5 +1,121 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter279 — LEGACY PUBLIC ASSISTANT UPGRADED IN PLACE (Feb 04, 2026) ✅
+
+Surgical addition of the iter278 streaming UX (typewriter cursor + rose
+Stop button) to the site-wide public `components/AIAssistant.js`
+without touching its endpoint, history, or anonymous-access behavior.
+**Pytest 286/286 PASS** (iter255→iter279 sprint scope, 31 env-dependent
+skips, 0 failures). Lint clean, webpack compiles.
+
+### Context (clarified after the user screenshot)
+The screenshot showed the **legacy** site-wide "Luxury Auction
+Specialist" widget — NOT the iter277 dashboard widget. The user
+asked specifically for **option (c)**: upgrade the legacy assistant
+in place so the Stop UX matches the dashboard widget across the
+whole platform.
+
+**Critical scope guard**: the legacy assistant mounts on PUBLIC
+routes (marketplace, homepage, public listings). It MUST keep using
+its existing public `/chat/stream` route — it cannot be repointed to
+the iter278 `/support/chat/stream` which is JWT-only. Anonymous
+visitors keep their assistant access. An iter279 regression test
+hard-asserts that `/support/chat/stream` does NOT appear in the
+legacy file.
+
+### Mission 1 — Stop button + abort wiring
+- NEW `activeStreamCtrlRef` (`useRef(null)`) holds the in-flight
+  `AbortController` so the user-clickable Stop button can interrupt
+  the stream.
+- `streamOnce()` now publishes `activeStreamCtrlRef.current = ctrl`
+  immediately after creating the controller, and releases it on
+  every finally branch via the `=== ctrl` identity guard.
+- NEW `handleStop()` reads the ref → clears it → calls `.abort()`
+  **in that order**. The clear-before-abort sequencing is critical:
+  the catch handler uses `e.name === 'AbortError' &&
+  !activeStreamCtrlRef.current` to distinguish a *user-initiated*
+  abort (intentional, finalize partial bubble silently) from an
+  *internal-timeout* abort (real failure, surface the legacy red CTA).
+- NEW unmount cleanup useEffect aborts any in-flight stream so route
+  changes or hot-reloads don't leak the socket.
+
+### Mission 2 — Typewriter cursor + partial badge
+- Streaming bubble now renders an `ai-core-stream-cursor` span when
+  `msg.streaming === true`.
+- **Branding parity preserved**: cursor color is `#06B6D4` (cyan, the
+  legacy brand color) — NOT the indigo of the dashboard widget. The
+  "Luxury Auction Specialist" palette stays intact.
+- Bilingual "· partial / partiel" badge (`ai-core-msg-partial-{idx}`)
+  appears on the bubble when the user stops a stream mid-flight.
+
+### Mission 3 — Send/Stop button swap
+- Action button now branches on `isLoading`:
+  - **Idle**: brand-gradient styling + Send icon + `ai-assistant-send-btn`
+    testid (legacy testid preserved for any existing automation).
+  - **Streaming**: rose-600 styling + Square icon + `ai-core-stop` testid
+    (matches the iter278 dashboard widget).
+- The button is **enabled during streaming** so the user can actually
+  click Stop — the legacy code disabled it whenever `isLoading`, which
+  prevented interruption entirely.
+
+### Mission 4 — User abort UX (no false-positive error CTA)
+- Catch block now branches:
+  - `wasUserAbort = e.name === 'AbortError' && !activeStreamCtrlRef.current`
+    → finalize the streaming bubble with `partial: true`, no CTA.
+  - Otherwise → existing red "Service temporarily unavailable"
+    bilingual CTA + email-support button (unchanged from iter235).
+
+### Mission 5 — Branding + scope preservation
+- Header "BidVex AI Core" + "Your Luxury Auction Specialist" intact.
+- Footer "Powered by Gemini 2.5 Flash · Available 24/7" intact.
+- Endpoint `/chat/stream` (public, anonymous-friendly) intact — guard
+  test asserts iter278's JWT-only `/support/chat/stream` was NOT
+  swapped in by mistake.
+- iter277 widget route scope (`/seller/dashboard*`, `/buyer/dashboard*`,
+  `/facility/dashboard*`, `/admin*`) verified unchanged.
+
+### Validation (`tests/test_iter279_legacy_assistant_upgrade.py`)
+**11/11 PASS** covering:
+- Active stream controller ref published + released correctly
+- `handleStop` exists + clears ref BEFORE calling abort (ordering!)
+- Unmount cleanup useEffect aborts in-flight streams
+- Typewriter cursor rendered on `msg.streaming` bubbles with cyan
+  brand color
+- "· partial / partiel" bilingual badge on interrupted bubbles
+- Action button conditional testid + aria-label + rose styling when
+  streaming
+- Catch block distinguishes user abort from real failure
+- All legacy branding strings retained
+- Legacy `/chat/stream` endpoint preserved + iter278 JWT-only endpoint
+  NOT introduced
+- iter277 widget route scope unchanged (no accidental global promotion)
+
+### Files changed (iter279)
+**Frontend MODIFIED**: `components/AIAssistant.js` (5 surgical edits —
++Square import, +ref, +ctrl publish in streamOnce, +handleStop +
+unmount cleanup, +cursor + partial badge rendering, +button swap +
+catch-branch user-abort handling).
+**Backend NEW**: `tests/test_iter279_legacy_assistant_upgrade.py`
+(11 tests).
+
+### Action items (user)
+1. **Deploy preview → production**: this is a frontend-only iteration,
+   so a redeploy of the SPA bundle is all that's needed. Backend
+   changes are zero.
+2. **Smoke test on https://bidvex.com**: open the floating "BidVex
+   AI Core" widget from the homepage / marketplace → ask anything →
+   reply types out with a cyan blinking cursor → during streaming the
+   blue Send button morphs into a **rose Stop button**. Click it
+   mid-stream → partial text remains visible with a "· partial /
+   partiel" badge. No red error CTA on user-aborts.
+3. **Verify scope**: confirm the iter277 dashboard widget still only
+   appears on `/seller/dashboard*`, `/buyer/dashboard*`,
+   `/facility/dashboard*`, and `/admin*` routes.
+
+---
+
+
+
 ## Latest: iter278 — STREAMING TYPEWRITER (SSE) FOR AI CORE WIDGET (Feb 04, 2026) ✅
 
 Real-time chunk-by-chunk responses for the iter277 widget. **Pytest
