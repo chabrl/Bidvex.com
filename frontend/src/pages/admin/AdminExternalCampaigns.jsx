@@ -74,7 +74,7 @@ export default function AdminExternalCampaigns() {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, search, token]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [statusFilter, search, token]);
 
   useEffect(() => { fetchCampaigns(); }, [fetchCampaigns]);
 
@@ -316,7 +316,7 @@ function CampaignWizard({ campaignId, headers, onClose }) {
         toast.error('Failed to load campaign');
       }
     })();
-  }, [campaignId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [campaignId]);
 
   const saveDraft = async () => {
     try {
