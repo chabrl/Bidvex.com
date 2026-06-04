@@ -502,7 +502,7 @@ async def send_test_draft_invoice_email(
     if not sg_key:
         raise HTTPException(status_code=503, detail="SENDGRID_API_KEY not configured")
 
-    from_email = os.environ.get("SENDGRID_FROM_EMAIL", "info@bidvex.com")
+    from_email = os.environ.get("SENDGRID_FROM_EMAIL", "noreply@bidvex.com")
     from_name = os.environ.get("SENDGRID_FROM_NAME", "BidVex")
 
     message = Mail(

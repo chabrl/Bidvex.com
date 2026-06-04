@@ -282,6 +282,16 @@ async def lifespan(app):
     except Exception as e:
         logger.warning(f"Failed to start vehicle scheduler (non-fatal): {e}")
 
+    # iter270 — Email config validation + SendGrid DNS authentication probe.
+    try:
+        from services.email_deliverability import (
+            validate_email_config, verify_sendgrid_domain,
+        )
+        validate_email_config()
+        await verify_sendgrid_domain()
+    except Exception as e:
+        logger.warning(f"[iter270] Email deliverability check failed (non-fatal): {e}")
+
     # Hand control to the app
     yield
 

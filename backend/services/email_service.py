@@ -136,6 +136,39 @@ async def send_template_email(
     message.template_id = template_id
     message.dynamic_template_data = dynamic_data
 
+    # iter270 — Spam-busting headers + categories + tracking settings.
+    try:
+        from sendgrid.helpers.mail import (
+            Header as _SgHeader, Category as _SgCategory,
+            TrackingSettings as _SgTS, ClickTracking as _SgCT,
+            OpenTracking as _SgOT, SubscriptionTracking as _SgST,
+        )
+        import hashlib as _hashlib
+        entity_id = _hashlib.sha256(
+            f"{to_email}|{template_id}|{datetime.now().date().isoformat()}".encode()
+        ).hexdigest()[:32]
+        message.add_header(_SgHeader("X-Entity-Ref-ID", entity_id))
+        message.add_header(_SgHeader("X-Mailer", "BidVex Email System v2.0"))
+        if is_marketing:
+            unsub_url = f"https://bidvex.com/unsubscribe?email={to_email}"
+            message.add_header(_SgHeader(
+                "List-Unsubscribe",
+                f"<{unsub_url}>, <mailto:unsubscribe@bidvex.com?subject=unsubscribe>",
+            ))
+            message.add_header(_SgHeader("List-Unsubscribe-Post", "List-Unsubscribe=One-Click"))
+            message.add_header(_SgHeader("Precedence", "bulk"))
+            message.add_category(_SgCategory("marketing"))
+            message.add_category(_SgCategory("promotional"))
+        else:
+            message.add_category(_SgCategory("transactional"))
+        _ts = _SgTS()
+        _ts.click_tracking = _SgCT(False, False)
+        _ts.open_tracking = _SgOT(True)
+        _ts.subscription_tracking = _SgST(False)
+        message.tracking_settings = _ts
+    except Exception as _hexc:  # noqa: BLE001
+        logger.debug(f"[email-template] header/tracking setup skipped: {_hexc}")
+
     for attempt in range(max_retries):
         try:
             response = sg.send(message)
@@ -200,6 +233,39 @@ async def send_html_email(
         html_content=html_content,
     )
     message.reply_to = Email("support@bidvex.com", "BidVex Support")
+
+    # iter270 — Spam-busting headers + tracking parity with template path.
+    try:
+        from sendgrid.helpers.mail import (
+            Header as _SgHeader, Category as _SgCategory,
+            TrackingSettings as _SgTS, ClickTracking as _SgCT,
+            OpenTracking as _SgOT, SubscriptionTracking as _SgST,
+        )
+        import hashlib as _hashlib
+        entity_id = _hashlib.sha256(
+            f"{to_email}|{subject or ''}|{datetime.now().date().isoformat()}".encode()
+        ).hexdigest()[:32]
+        message.add_header(_SgHeader("X-Entity-Ref-ID", entity_id))
+        message.add_header(_SgHeader("X-Mailer", "BidVex Email System v2.0"))
+        if is_marketing:
+            unsub_url = f"https://bidvex.com/unsubscribe?email={to_email}"
+            message.add_header(_SgHeader(
+                "List-Unsubscribe",
+                f"<{unsub_url}>, <mailto:unsubscribe@bidvex.com?subject=unsubscribe>",
+            ))
+            message.add_header(_SgHeader("List-Unsubscribe-Post", "List-Unsubscribe=One-Click"))
+            message.add_header(_SgHeader("Precedence", "bulk"))
+            message.add_category(_SgCategory("marketing"))
+            message.add_category(_SgCategory("promotional"))
+        else:
+            message.add_category(_SgCategory("transactional"))
+        _ts = _SgTS()
+        _ts.click_tracking = _SgCT(False, False)
+        _ts.open_tracking = _SgOT(True)
+        _ts.subscription_tracking = _SgST(False)
+        message.tracking_settings = _ts
+    except Exception as _hexc:  # noqa: BLE001
+        logger.debug(f"[email-html] header/tracking setup skipped: {_hexc}")
 
     for attempt in range(max_retries):
         try:
@@ -613,7 +679,8 @@ async def _send_p0_email(to_email: str, to_name: str, template_name: str,
     try:
         from sendgrid.helpers.mail import Mail as SgMail, Email as SgEmail, To as SgTo, Content as SgContent
         msg = SgMail(
-            from_email=SgEmail(os.environ.get("SENDGRID_FROM_EMAIL", "info@bidvex.com"), "BidVex"),
+            # iter270 — Unified sender; .com only (matches DKIM domain).
+            from_email=SgEmail(os.environ.get("SENDGRID_FROM_EMAIL", "noreply@bidvex.com"), "BidVex Canada"),
             to_emails=SgTo(to_email, to_name),
             subject=subject,
             html_content=SgContent("text/html", html_fallback),
@@ -840,7 +907,7 @@ class EmailService:
 
     def __init__(self):
         self.client = _get_sg()
-        self.from_email = os.environ.get("SENDGRID_FROM_EMAIL", "info@bidvex.com")
+        self.from_email = os.environ.get("SENDGRID_FROM_EMAIL", "noreply@bidvex.com")
         self.from_name = os.environ.get("SENDGRID_FROM_NAME", "BidVex")
 
     def is_configured(self) -> bool:

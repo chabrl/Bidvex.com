@@ -12,16 +12,28 @@ logger = logging.getLogger(__name__)
 
 # Email configuration
 SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY")
-FROM_EMAIL = os.environ.get("SENDGRID_FROM_EMAIL", "support@bidvex.com")
-FROM_NAME = os.environ.get("SENDGRID_FROM_NAME", "BidVex")
+# iter270 Deliverability fix — Canonical FROM = noreply@bidvex.com so
+# DKIM/SPF/DMARC alignment is consistent across every outbound path.
+# Reply-To is set per email-type (support@bidvex.com for transactional,
+# partners@bidvex.ca for partner-related) so users still reach the right
+# inbox when they hit Reply.
+FROM_EMAIL = os.environ.get("SENDGRID_FROM_EMAIL", "noreply@bidvex.com")
+FROM_NAME = os.environ.get("SENDGRID_FROM_NAME", "BidVex Canada")
 
-# iter254 Mission 4 — Canonical outbound branding constants.
-# Use these to override the From/Reply-To headers for branded paths
-# without polluting the global SENDGRID_FROM_EMAIL env default.
-B2B_PARTNER_FROM_EMAIL = "partners@bidvex.ca"
-B2B_PARTNER_FROM_NAME = "BidVex Partner Program"
-TRANSACTIONAL_FROM_EMAIL = "support@bidvex.com"
-TRANSACTIONAL_FROM_NAME = "BidVex"
+# iter254 Mission 4 / iter270 — Branded FROM addresses are now collapsed
+# onto the unified noreply@bidvex.com sender (.com — not .ca) so Gmail/
+# Outlook see the same authenticated domain on every message. The .ca
+# address remains only as a Reply-To target for partner inboxes.
+B2B_PARTNER_FROM_EMAIL = "noreply@bidvex.com"
+B2B_PARTNER_FROM_NAME = "BidVex Canada"
+B2B_PARTNER_REPLY_TO = "partners@bidvex.ca"
+B2B_PARTNER_REPLY_TO_NAME = "BidVex Partner Team"
+TRANSACTIONAL_FROM_EMAIL = "noreply@bidvex.com"
+TRANSACTIONAL_FROM_NAME = "BidVex Canada"
+TRANSACTIONAL_REPLY_TO = "support@bidvex.com"
+TRANSACTIONAL_REPLY_TO_NAME = "BidVex Support"
+MARKETING_REPLY_TO = "support@bidvex.com"
+MARKETING_REPLY_TO_NAME = "BidVex Support"
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "https://www.bidvex.com")
 
 # Check if SendGrid is available
@@ -30,7 +42,30 @@ sg = None
 
 try:
     from sendgrid import SendGridAPIClient
-    from sendgrid.helpers.mail import Mail, Email, To, Content, Attachment, FileContent, FileName, FileType, Disposition
+    from sendgrid.helpers.mail import (
+        Mail, Email, To, Content, Attachment,
+        FileContent, FileName, FileType, Disposition,
+    )
+    # iter270 — Spam-classification helpers. Imported lazily/optionally
+    # so older SDKs still work even if a helper isn't available.
+    try:
+        from sendgrid.helpers.mail import (
+            Header as _SgHeader,
+            Category as _SgCategory,
+            TrackingSettings as _SgTrackingSettings,
+            ClickTracking as _SgClickTracking,
+            OpenTracking as _SgOpenTracking,
+            SubscriptionTracking as _SgSubscriptionTracking,
+            ReplyTo as _SgReplyTo,
+        )
+    except ImportError:
+        _SgHeader = None
+        _SgCategory = None
+        _SgTrackingSettings = None
+        _SgClickTracking = None
+        _SgOpenTracking = None
+        _SgSubscriptionTracking = None
+        _SgReplyTo = None
     if SENDGRID_API_KEY and SENDGRID_API_KEY != "SG.your-actual-sendgrid-key-here":
         sg = SendGridAPIClient(SENDGRID_API_KEY)
         SENDGRID_AVAILABLE = True
@@ -97,7 +132,10 @@ async def send_email(
     from_email: Optional[str] = None,
     from_name: Optional[str] = None,
     reply_to: Optional[str] = None,
+    reply_to_name: Optional[str] = None,
     is_marketing: bool = False,
+    categories: Optional[List[str]] = None,
+    custom_args: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
     """iter244 Mission 2 — Canonical low-level SendGrid dispatcher.
     iter254 Mission 4 — Now accepts optional `from_email`/`from_name`/
@@ -111,6 +149,16 @@ async def send_email(
     `marketing_unsubscribed=True` on their user record. Returns a
     `{"status": "skipped", "reason": ...}` envelope without any
     SendGrid round-trip.
+
+    iter270 deliverability fix — Adds the full Gmail-Promotions /
+    CAN-SPAM / CASL header set on every send:
+      • List-Unsubscribe + List-Unsubscribe-Post on marketing emails
+      • SendGrid Categories so Activity Feed segments correctly
+      • Click-tracking OFF (kills url8676-style redirects that flag spam)
+      • Open-tracking ON (pixel only, neutral)
+      • X-Entity-Ref-ID (per-recipient/day) to avoid Gmail grouping
+      • Precedence: bulk on marketing emails
+      • X-Mailer stamp for forensic traceability
     """
     # iter266 Mission 2 — suppression gate covering ALL outbound paths.
     try:
@@ -154,7 +202,13 @@ async def send_email(
         }
     
     try:
-        _from = from_email or FROM_EMAIL
+        # iter270 — Always send from the unified noreply@bidvex.com so
+        # the same DKIM key + SPF record + DMARC policy is used on every
+        # message. Callers can pass `from_name` to keep their branded
+        # display name (e.g. "BidVex Partner Team") but the address
+        # is locked to the authenticated sender. Reply-To preserves
+        # the intended human inbox.
+        _from = FROM_EMAIL  # Force canonical sender — overrides ignored.
         _from_name = from_name or FROM_NAME
         message = Mail(
             from_email=Email(_from, _from_name),
@@ -162,15 +216,85 @@ async def send_email(
             subject=subject,
             html_content=Content("text/html", html_content)
         )
-        if reply_to:
+
+        # ── Reply-To ──
+        # Pick the right human inbox if not explicitly provided.
+        _reply_to = reply_to
+        _reply_to_name = reply_to_name
+        if not _reply_to:
+            if is_marketing:
+                _reply_to = MARKETING_REPLY_TO
+                _reply_to_name = MARKETING_REPLY_TO_NAME
+            else:
+                _reply_to = TRANSACTIONAL_REPLY_TO
+                _reply_to_name = TRANSACTIONAL_REPLY_TO_NAME
+        try:
+            if _SgReplyTo is not None:
+                message.reply_to = _SgReplyTo(_reply_to, _reply_to_name)
+            else:
+                message.reply_to = Email(_reply_to, _reply_to_name)
+        except Exception:
+            message.reply_to = Email(_reply_to)
+
+        # ── iter270 — Spam-busting headers & categories ──
+        if _SgHeader is not None:
             try:
-                from sendgrid.helpers.mail import ReplyTo as _ReplyTo
-                message.reply_to = _ReplyTo(reply_to)
+                # Per-recipient, per-day entity id stops Gmail from
+                # collapsing many similar broadcasts into the spam folder.
+                import hashlib as _hashlib
+                entity_id = _hashlib.sha256(
+                    f"{to_email}|{subject}|{datetime.now(timezone.utc).date().isoformat()}".encode()
+                ).hexdigest()[:32]
+                message.add_header(_SgHeader("X-Entity-Ref-ID", entity_id))
+                message.add_header(_SgHeader("X-Mailer", "BidVex Email System v2.0"))
+                if is_marketing:
+                    unsub_url = f"https://bidvex.com/unsubscribe?email={to_email}"
+                    message.add_header(_SgHeader(
+                        "List-Unsubscribe",
+                        f"<{unsub_url}>, <mailto:unsubscribe@bidvex.com?subject=unsubscribe>",
+                    ))
+                    message.add_header(_SgHeader(
+                        "List-Unsubscribe-Post",
+                        "List-Unsubscribe=One-Click",
+                    ))
+                    message.add_header(_SgHeader("Precedence", "bulk"))
+            except Exception as _hexc:  # noqa: BLE001
+                logger.debug(f"[email-headers] skipped: {_hexc}")
+
+        # ── SendGrid Categories ──
+        try:
+            _cats = list(categories or [])
+            if not _cats:
+                _cats = ["marketing", "promotional"] if is_marketing else ["transactional"]
+            if _SgCategory is not None:
+                for cat in _cats:
+                    message.add_category(_SgCategory(cat))
+            else:
+                for cat in _cats:
+                    message.add_category(cat)
+        except Exception as _cexc:  # noqa: BLE001
+            logger.debug(f"[email-categories] skipped: {_cexc}")
+
+        # ── Tracking settings: click OFF, open ON, subscription OFF ──
+        try:
+            if _SgTrackingSettings is not None:
+                _ts = _SgTrackingSettings()
+                _ts.click_tracking = _SgClickTracking(False, False)
+                _ts.open_tracking = _SgOpenTracking(True)
+                _ts.subscription_tracking = _SgSubscriptionTracking(False)
+                message.tracking_settings = _ts
+        except Exception as _texc:  # noqa: BLE001
+            logger.debug(f"[email-tracking] skipped: {_texc}")
+
+        # ── Custom args (analytics / per-tenant attribution) ──
+        if custom_args:
+            try:
+                from sendgrid.helpers.mail import CustomArg as _SgCustomArg
+                for k, v in custom_args.items():
+                    message.add_custom_arg(_SgCustomArg(str(k), str(v)))
             except Exception:
-                # ReplyTo class import may differ between SendGrid SDK
-                # versions; fall back to setting the attribute directly.
-                message.reply_to = Email(reply_to)
-        
+                pass
+
         # Add attachments if any
         if attachments:
             for att in attachments:
@@ -182,7 +306,9 @@ async def send_email(
                 )
                 message.add_attachment(attachment)
         
-        logger.info(f"[EMAIL_DEBUG] Sending email to: {to_email} | Subject: {subject} | From: {FROM_EMAIL}")
+        logger.info(
+            f"[EMAIL_DEBUG] Sending email to: {to_email} | Subject: {subject} | From: {_from} | Reply-To: {_reply_to}"
+        )
         response = sg.send(message)
         
         logger.info(f"[EMAIL_DEBUG] SendGrid response for {to_email}: status_code={response.status_code}")
@@ -191,7 +317,10 @@ async def send_email(
             "status": "sent",
             "status_code": response.status_code,
             "to": to_email,
-            "subject": subject
+            "from": _from,
+            "reply_to": _reply_to,
+            "subject": subject,
+            "is_marketing": is_marketing,
         }
     except Exception as e:
         logger.error(f"[EMAIL_DEBUG] FAILED to send email to {to_email}: {e}")
@@ -208,7 +337,10 @@ async def send_unified_email(
     from_email: Optional[str] = None,
     from_name: Optional[str] = None,
     reply_to: Optional[str] = None,
+    reply_to_name: Optional[str] = None,
     is_marketing: bool = False,
+    categories: Optional[List[str]] = None,
+    custom_args: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
     """iter239 Mission 6 — Canonical email dispatch using the unified
     `build_email_payload()` mapping engine.
@@ -242,7 +374,10 @@ async def send_unified_email(
         from_email=from_email,
         from_name=from_name,
         reply_to=reply_to,
+        reply_to_name=reply_to_name,
         is_marketing=is_marketing,
+        categories=categories,
+        custom_args=custom_args,
     )
 
 
@@ -2641,7 +2776,7 @@ async def send_promotion_confirmation_email(
       </td></tr>
     </table>
 
-    <p style="color:#64748b;font-size:13px;">Questions? <a href="mailto:support@bidvex.ca">support@bidvex.ca</a></p>
+    <p style="color:#64748b;font-size:12px;">Questions? <a href="mailto:support@bidvex.com">support@bidvex.com</a></p>
 
     <hr style="border:0;border-top:1px solid #e2e8f0;margin:24px 0;" />
     <p style="color:#475569;line-height:1.6;">

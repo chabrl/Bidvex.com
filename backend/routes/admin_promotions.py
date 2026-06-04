@@ -688,10 +688,13 @@ async def send_partner_outreach_blast(
             })
             continue
         try:
-            # iter254 Mission 4 — Partner-program campaigns ship under
-            # the partners@bidvex.ca branded sender.
+            # iter254 Mission 4 / iter270 — Partner-program campaigns
+            # now ship FROM the unified noreply@bidvex.com sender for
+            # DKIM alignment. Reply-To routes partner replies to the
+            # partners@bidvex.ca inbox.
             from services.email_notifications import (
-                B2B_PARTNER_FROM_EMAIL as _B2B_FROM,
+                B2B_PARTNER_REPLY_TO as _B2B_REPLY,
+                B2B_PARTNER_REPLY_TO_NAME as _B2B_REPLY_NAME,
                 B2B_PARTNER_FROM_NAME as _B2B_FROM_NAME,
             )
             res = await send_unified_email(
@@ -706,9 +709,11 @@ async def send_partner_outreach_blast(
                     "filename": pdf_filename,
                     "type": "application/pdf",
                 }],
-                from_email=_B2B_FROM,
                 from_name=_B2B_FROM_NAME,
-                reply_to=_B2B_FROM,
+                reply_to=_B2B_REPLY,
+                reply_to_name=_B2B_REPLY_NAME,
+                is_marketing=True,
+                categories=["partner", "marketing"],
             )
             if res and res.get("status") in ("sent", "logged"):
                 sent += 1

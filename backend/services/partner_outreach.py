@@ -47,7 +47,7 @@ Please check the attachment for full details on how to register and launch your 
 Best regards,
 
 The BidVex Team
-support@bidvex.ca
+support@bidvex.com
 """
 
 
@@ -124,7 +124,7 @@ def partner_outreach_email_html(coupon_code: Optional[str] = None) -> str:
     <p style="margin:36px 0 0;color:#475569;font-size:14px;line-height:1.6;">
       Best regards,<br>
       <strong style="color:#0f172a;">The BidVex Team</strong><br>
-      <a href="mailto:support@bidvex.ca" style="color:#2563eb;text-decoration:none;">support@bidvex.ca</a>
+      <a href="mailto:support@bidvex.com" style="color:#2563eb;text-decoration:none;">support@bidvex.com</a>
     </p>
   </td></tr>
   <tr><td style="background:#f8fafc;padding:18px 32px;border-top:1px solid #e2e8f0;border-radius:0 0 16px 16px;text-align:center;">
@@ -307,7 +307,7 @@ def build_partner_outreach_pdf(coupon_code: Optional[str] = None) -> bytes:
     story.append(HRFlowable(width="100%", thickness=0.5, color=SLATE_500, spaceBefore=14, spaceAfter=8))
     story.append(Paragraph(
         "Questions? Reach our partner desk anytime at "
-        "<b>support@bidvex.ca</b> or visit "
+        "<b>support@bidvex.com</b> or visit "
         "<a href='https://bidvex.com/become-a-partner' color='#2563eb'>bidvex.com/become-a-partner</a>.",
         ParagraphStyle("Foot", parent=body, fontSize=9.5, textColor=SLATE_500),
     ))
@@ -415,7 +415,7 @@ def partner_outreach_email_html_fr(coupon_code: Optional[str] = None) -> str:
     <p style="margin:36px 0 0;color:#475569;font-size:14px;line-height:1.6;">
       Cordialement,<br>
       <strong style="color:#0f172a;">L'équipe BidVex</strong><br>
-      <a href="mailto:support@bidvex.ca" style="color:#2563eb;text-decoration:none;">support@bidvex.ca</a>
+      <a href="mailto:support@bidvex.com" style="color:#2563eb;text-decoration:none;">support@bidvex.com</a>
     </p>
   </td></tr>
   <tr><td style="background:#f8fafc;padding:18px 32px;border-top:1px solid #e2e8f0;border-radius:0 0 16px 16px;text-align:center;">
@@ -575,7 +575,7 @@ def build_partner_outreach_pdf_fr(coupon_code: Optional[str] = None) -> bytes:
     story.append(HRFlowable(width="100%", thickness=0.5, color=SLATE_500, spaceBefore=14, spaceAfter=8))
     story.append(Paragraph(
         "Des questions ? Communiquez avec notre équipe partenaires à "
-        "<b>support@bidvex.ca</b> ou visitez "
+        "<b>support@bidvex.com</b> ou visitez "
         "<a href='https://bidvex.com/become-a-partner' color='#2563eb'>bidvex.com/become-a-partner</a>.",
         ParagraphStyle("Foot", parent=body, fontSize=9.5, textColor=SLATE_500),
     ))
@@ -630,14 +630,14 @@ def partner_followup_email_html(coupon_code: Optional[str] = None) -> str:
   <p style="text-align:center;margin:24px 0;">{coupon_html}</p>
   <p style="color:#475569;font-size:15px;line-height:1.7;margin:18px 0 0;">
     Need help getting set up? Reach us anytime at
-    <a href="mailto:support@bidvex.ca" style="color:#2563eb;">support@bidvex.ca</a>.
+    <a href="mailto:support@bidvex.com" style="color:#2563eb;">support@bidvex.com</a>.
   </p>
   <p style="margin:32px 0 0;color:#475569;font-size:14px;">
     Best regards,<br><strong style="color:#0f172a;">The BidVex Team</strong>
   </p>
 </td></tr>
 <tr><td style="background:#f8fafc;padding:16px 32px;border-top:1px solid #e2e8f0;text-align:center;">
-  <p style="margin:0;color:#94a3b8;font-size:11px;">&copy; 2026 BidVex Inc. &middot; support@bidvex.ca</p>
+  <p style="margin:0;color:#94a3b8;font-size:11px;">&copy; 2026 BidVex Inc. &middot; support@bidvex.com</p>
 </td></tr>
 </table></body></html>"""
 
@@ -674,14 +674,14 @@ def partner_followup_email_html_fr(coupon_code: Optional[str] = None) -> str:
   <p style="text-align:center;margin:24px 0;">{coupon_html}</p>
   <p style="color:#475569;font-size:15px;line-height:1.7;margin:18px 0 0;">
     Besoin d'aide ? Communiquez avec nous à
-    <a href="mailto:support@bidvex.ca" style="color:#2563eb;">support@bidvex.ca</a>.
+    <a href="mailto:support@bidvex.com" style="color:#2563eb;">support@bidvex.com</a>.
   </p>
   <p style="margin:32px 0 0;color:#475569;font-size:14px;">
     Cordialement,<br><strong style="color:#0f172a;">L'équipe BidVex</strong>
   </p>
 </td></tr>
 <tr><td style="background:#f8fafc;padding:16px 32px;border-top:1px solid #e2e8f0;text-align:center;">
-  <p style="margin:0;color:#94a3b8;font-size:11px;">&copy; 2026 BidVex Inc. &middot; support@bidvex.ca</p>
+  <p style="margin:0;color:#94a3b8;font-size:11px;">&copy; 2026 BidVex Inc. &middot; support@bidvex.com</p>
 </td></tr>
 </table></body></html>"""
 

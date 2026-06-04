@@ -420,6 +420,7 @@ async def patch_admin_auction(
 @admin_oversight_router.get("/test-email")
 async def admin_test_email(
     to: Optional[str] = Query(None, description="Recipient (defaults to current admin)"),
+    type: str = Query("transactional", description="transactional | marketing | partner"),
     current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """iter265 Mission 2 — Send a live test email through the unified
@@ -428,7 +429,10 @@ async def admin_test_email(
       • `build_email_payload()` renders correctly
       • SendGrid returns a 202 (live send) or fallback `logged`
 
-    Returns the raw response so the admin can confirm live delivery.
+    iter270 — Now accepts a `type` parameter so admins can confirm
+    each of the three classification paths (transactional / marketing /
+    partner) lands correctly. The unified pipeline applies the
+    appropriate Reply-To, categories, and List-Unsubscribe header.
     """
     _require_admin(current_user)
     recipient = (to or getattr(current_user, "email", "")).strip()
@@ -439,25 +443,70 @@ async def admin_test_email(
     sg_key = os.environ.get("SENDGRID_API_KEY") or ""
     sg_configured = bool(sg_key) and sg_key != "SG.your-actual-sendgrid-key-here"
 
+    flavor = (type or "transactional").lower().strip()
+    if flavor not in ("transactional", "marketing", "partner"):
+        flavor = "transactional"
+
+    if flavor == "marketing":
+        subject = "🎉 BidVex SendGrid Live Test — Marketing"
+        body_html = (
+            "<p>This is a <strong>marketing</strong> test email.</p>"
+            "<p>It should arrive in your Gmail Promotions tab with a "
+            "List-Unsubscribe header and a <code>marketing</code> + "
+            "<code>promotional</code> SendGrid category.</p>"
+            "<p style='font-size:11px;color:#666;text-align:center;margin-top:24px;'>"
+            "BidVex Inc. | Sherbrooke, QC, Canada<br>"
+            "You received this email because you registered on BidVex.<br>"
+            f"<a href='https://bidvex.com/unsubscribe?email={recipient}' style='color:#666;'>"
+            "Unsubscribe / Se désabonner</a></p>"
+        )
+        send_kwargs = {
+            "is_marketing": True,
+            "reply_to": "support@bidvex.com",
+            "reply_to_name": "BidVex Support",
+            "categories": ["marketing", "promotional", "iter270-test"],
+        }
+    elif flavor == "partner":
+        subject = "🤝 BidVex SendGrid Live Test — Partner"
+        body_html = (
+            "<p>This is a <strong>partner</strong> test email.</p>"
+            "<p>From: <code>noreply@bidvex.com</code> · Reply-To: "
+            "<code>partners@bidvex.ca</code>.</p>"
+        )
+        send_kwargs = {
+            "is_marketing": True,
+            "reply_to": "partners@bidvex.ca",
+            "reply_to_name": "BidVex Partner Team",
+            "from_name": "BidVex Canada",
+            "categories": ["partner", "marketing", "iter270-test"],
+        }
+    else:
+        subject = "✅ BidVex SendGrid Live Test — Transactional"
+        body_html = (
+            "<p>This is a <strong>transactional</strong> test email.</p>"
+            "<p>From: <code>noreply@bidvex.com</code> · Reply-To: "
+            "<code>support@bidvex.com</code> · Category: <code>transactional</code>.</p>"
+        )
+        send_kwargs = {
+            "reply_to": "support@bidvex.com",
+            "reply_to_name": "BidVex Support",
+            "categories": ["transactional", "iter270-test"],
+        }
+
     try:
         from services.email_notifications import send_unified_email
         result = await send_unified_email(
             email_type="new_feature",
             user={"email": recipient, "first_name": "Admin", "name": "Admin"},
             data={
-                "subject_override": "✅ BidVex SendGrid Live Test",
+                "subject_override": subject,
                 "headline": "SendGrid Live Test",
                 "subheadline": "End-to-end pipeline verified.",
-                "body_html": (
-                    "<p>This is a live test email dispatched via the unified "
-                    "BidVex email pipeline.</p>"
-                    "<p>If you received this, the SendGrid integration is fully "
-                    "operational and the <code>build_email_payload()</code> "
-                    "registry is wired correctly.</p>"
-                ),
+                "body_html": body_html,
                 "cta_label": "Open BidVex",
                 "cta_url": "https://bidvex.com",
             },
+            **send_kwargs,
         )
     except Exception as exc:  # noqa: BLE001
         logger.error(f"[test-email] dispatch failed: {exc}")
@@ -465,6 +514,7 @@ async def admin_test_email(
 
     return {
         "success": (result or {}).get("status") in ("sent", "logged"),
+        "type": flavor,
         "sendgrid_configured": sg_configured,
         "from_email": os.environ.get("SENDGRID_FROM_EMAIL"),
         "to": recipient,

@@ -1,5 +1,105 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter270 — EMAIL DELIVERABILITY (Anti-Spam) (Jun 03, 2026) ✅
+
+P0 deliverability sprint. **Pytest 191/191 PASS** (18 new + 173 regression).
+
+### 🎯 ROOT CAUSE IDENTIFIED
+Startup DNS probe (new in iter270) revealed the real reason emails
+land in spam: **`em.bidvex.com` CNAME is MISSING (NXDOMAIN)**.
+DKIM (`s1._domainkey`, `s2._domainkey`) records are configured, but
+without the envelope-sender CNAME, SPF alignment breaks and Gmail
+rejects/spam-folds the mail.
+
+**ACTION REQUIRED FROM USER**: Add this DNS record at the bidvex.com
+DNS provider:
+```
+CNAME  em.bidvex.com → u57420291.wl042.sendgrid.net
+```
+
+### Mission 1 — Unified sender ✅
+- `services/email_notifications.py`: `FROM_EMAIL` defaults to
+  `noreply@bidvex.com`, `FROM_NAME` to `"BidVex Canada"`.
+- `B2B_PARTNER_FROM_EMAIL` collapsed onto `noreply@bidvex.com`;
+  `B2B_PARTNER_REPLY_TO` = `partners@bidvex.ca` (replies still land
+  in the partner inbox).
+- `send_email()` now **forces** the canonical FROM, ignoring any
+  caller-supplied override (comment: `# Force canonical sender`).
+  Same DKIM key + SPF record on every outbound message.
+- `services/email_service.py` two `Mail()` builders fixed:
+  fallback `info@bidvex.com` → `noreply@bidvex.com`, `"BidVex"` →
+  `"BidVex Canada"`.
+
+### Mission 2 — PDF + email-body contacts ✅
+- All `support@bidvex.ca` references in templates, emails, and PDF
+  generators replaced with `support@bidvex.com`. The `.ca` domain
+  only remains as the partner-team Reply-To (legitimate).
+- `pdf_invoice.py` and `invoice_generator.py` confirmed correct.
+
+### Mission 3 — Spam classification ✅
+Every outbound message now gets:
+- **List-Unsubscribe** header (marketing only) with both HTTPS and
+  mailto URIs.
+- **List-Unsubscribe-Post: List-Unsubscribe=One-Click** (RFC 8058
+  required by Gmail bulk-sender rules).
+- **Precedence: bulk** on marketing.
+- **X-Entity-Ref-ID** (SHA-256 of `to|subject|date`) prevents Gmail
+  from clustering similar broadcasts as spam.
+- **X-Mailer: BidVex Email System v2.0** for forensic traceability.
+- **SendGrid Categories**: `transactional` / `marketing` +
+  `promotional` / `partner` so the Activity Feed segments cleanly.
+- **TrackingSettings**: `click_tracking=False` (kills url8676
+  redirects), `open_tracking=True` (pixel only), `subscription_tracking=False`.
+- Reply-To set contextually: support@ for transactional/marketing,
+  partners@bidvex.ca for partner paths.
+- All headers + categories + tracking applied in **both**
+  `send_email()` (raw HTML path) and `send_template_email()` +
+  `send_html_email()` (template/HTML paths).
+
+### Mission 4 — Validation & probes ✅
+- **NEW** `services/email_deliverability.py`:
+  - `validate_email_config()` — logs ✅/❌ for SENDGRID_API_KEY +
+    SENDGRID_FROM_EMAIL + canonical FROM domain alignment.
+  - `verify_sendgrid_domain()` — async DNS probe for the 3
+    SendGrid CNAME records.
+- **`server.py` lifespan** now calls both on startup (non-fatal).
+- **`GET /api/admin/test-email?type=…`** extended to accept
+  `transactional` | `marketing` | `partner`. Live verified all 3
+  flavors: FROM=noreply@bidvex.com, Reply-To contextual, all
+  delivered with status 202.
+
+### Files changed (iter270)
+**Backend MODIFIED**: `services/email_notifications.py` (FROM
+constants + forced canonical sender + spam-busting headers + tracking
+config), `services/email_service.py` (matching headers/tracking in
+template + html paths; info@ fallback → noreply@),
+`services/email_journey.py` (.ca → .com), `services/partner_outreach.py`
+(.ca → .com), `services/pickup_coordination_service.py` (.ca → .com),
+`services/user_email_marketing.py` (info@ → support@ marketing reply-to),
+`routes/admin_promotions.py` (partner blast uses Reply-To pattern),
+`routes/admin_config.py` (info@ → noreply@),
+`routes/admin_oversight.py` (test-email accepts type=transactional/marketing/partner),
+`server.py` (startup deliverability probes).
+**Backend NEW**: `services/email_deliverability.py`,
+`tests/test_iter270_deliverability.py` (18 tests).
+
+### Action items (user) — CRITICAL
+1. **🚨 ADD MISSING DNS RECORD** at your DNS provider for bidvex.com:
+   ```
+   CNAME  em.bidvex.com → u57420291.wl042.sendgrid.net
+   ```
+   This is the #1 fix — without it, SPF fails alignment and emails
+   spam-fold even with DKIM signed correctly.
+2. **Save to GitHub → redeploy** to production.
+3. Wait 5-30 minutes for DNS propagation, then check backend logs
+   on prod — the startup probe should now log:
+   `✅ DNS CNAME em.bidvex.com → u57420291.wl042.sendgrid.net`
+4. **Reputation warm-up** (optional but recommended): test on
+   `mail-tester.com` after the DNS record is live. Aim for 9-10/10.
+
+---
+
+
 ## Latest: iter269 — LAUNCH PREP HARDENING (Jun 03, 2026) ✅
 
 Final pre-launch hardening pass. **Pytest 176/176 PASS** across

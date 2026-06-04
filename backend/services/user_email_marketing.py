@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 MARKETING_API_KEY = os.environ.get("SENDGRID_MARKETING_API_KEY") or os.environ.get("SENDGRID_API_KEY")
 MARKETING_FROM_EMAIL = os.environ.get("SENDGRID_MARKETING_FROM_EMAIL", "noreply@bidvex.com")
 MARKETING_FROM_NAME = os.environ.get("SENDGRID_MARKETING_FROM_NAME", "BidVex")
-MARKETING_REPLY_TO = os.environ.get("SENDGRID_MARKETING_REPLY_TO", "info@bidvex.com")
+MARKETING_REPLY_TO = os.environ.get("SENDGRID_MARKETING_REPLY_TO", "support@bidvex.com")
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "https://www.bidvex.com")
 
 # Initialize client
