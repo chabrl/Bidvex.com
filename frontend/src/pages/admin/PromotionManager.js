@@ -26,6 +26,9 @@ import { Skeleton } from '../../components/ui/skeleton';
 import { Switch } from '../../components/ui/switch';
 import PromotionAnalyticsDashboard from '../../components/admin/PromotionAnalyticsDashboard';
 import PartnerTrialsAdminSection from '../../components/admin/PartnerTrialsAdminSection';
+// iter275 — Coupon conversion analytics tab (mint → click → redeem
+// funnel per external campaign, side-by-side subject A/B comparison).
+import CouponAnalyticsTab from '../../components/admin/CouponAnalyticsTab';
 import {
   Dialog,
   DialogContent,
@@ -415,6 +418,9 @@ const PromotionManager = () => {
 
       {/* Table */}
       <PartnerTrialsAdminSection token={token} />
+
+      {/* iter275 — Coupon conversion analytics (mint → redeem funnel) */}
+      <CouponAnalyticsTab token={token} />
 
       <Card>
         <CardHeader>

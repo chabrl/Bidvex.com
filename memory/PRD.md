@@ -1,5 +1,112 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter275 — COUPON CONVERSION ANALYTICS TAB (Feb 04, 2026) ✅
+
+Marketing-masterclass closing piece. Admins can now A/B test subject
+lines against real paid-trial conversions, not just SendGrid opens.
+**Pytest 235/235 PASS** (iter255→iter275 sprint scope, 22
+env-dependent skips, 0 failures). Lint clean, webpack compiles.
+
+### Mission 1 — Mount inside Admin Promotions Engine
+- **NEW `components/admin/CouponAnalyticsTab.jsx`** (~430 lines)
+  mounted in `PromotionManager.js` immediately below the Partner Trial
+  Offers section so the mint→analytics flow is visually contiguous.
+- Pure frontend work — no new backend models or endpoints. All metrics
+  are derived from the existing iter274 + iter271 endpoints.
+
+### Mission 2 — Conversion charting (mint → click → redeem)
+- Component parallel-fetches both data sources via `Promise.all`:
+  - `GET /api/admin/promotions/coupons?limit=500`
+  - `GET /api/admin/external-campaigns?limit=100`
+- Per-campaign aggregation buckets compute:
+  - `minted` (count), `redeemed` (count), `revoked`, `expired`
+  - `delivered` / `opened` / `clicked` joined from
+    `campaign.analytics.*`
+  - `redemption_rate_pct` = redeemed / minted
+  - `click_to_redeem_pct` = redeemed / clicked
+  - `delivered_to_redeem_pct` = redeemed / delivered
+  - `avg_mint_to_redeem_hours` from the `created_at` → `redeemed_at`
+    timeline anchor pair on each coupon
+- Coupons without a `campaign_id` (manual `BVX-TRIAL-*` mints from the
+  PartnerTrialsAdminSection) are bucketed under a synthetic
+  "Manual / Direct" row so admins still see their volume.
+
+### Mission 3 — Side-by-side subject A/B comparison
+- **Subject A/B sub-tab** (default view) — `coupon-analytics-comparison-table`
+  with 10 funnel columns: Campaign / Subject · Partner · Minted ·
+  Delivered · Opened · Clicked · Redeemed (highlighted) · Mint→Redeem %
+  (highlighted) · Click→Redeem % · Avg Latency (h).
+- Rows sorted by `redemption_rate_pct DESC` so the **winning subjects
+  float to the top**. Cell tint hints the performance band:
+  - ≥10% → emerald (winner)
+  - ≥3% → amber (acceptable)
+  - <3% → slate (rework subject)
+- Per-row `data-testid="coupon-row-{campaign_id}"` + `data-testid=
+  "coupon-redemption-rate-{campaign_id}"` for precise spec assertions.
+
+### Mission 4 — Bar chart + Timeline views
+- **Bar Chart sub-tab** — recharts horizontal `BarChart` comparing
+  `minted` vs `redeemed` for the top 10 campaigns (manual bucket
+  excluded). Height scales with row count so 1 campaign isn't stretched
+  to 220px.
+- **Timeline sub-tab** — first-mint, last-mint, window (hours), and
+  redemption-rate per campaign so the team can see velocity AND
+  conversion side by side.
+
+### Mission 5 — KPIs + filter
+- 4 KPI cards at the top of the tab — `kpi-total-minted`,
+  `kpi-total-redeemed`, `kpi-active-campaigns`, `kpi-revoked` — each
+  with a `-value` testid suffix for numeric-payload assertions.
+- Partner-type dropdown (`coupon-analytics-partner-filter`) sub-selects
+  Dealer / Broker / Storage so cross-cohort A/B comparisons can be
+  isolated to one tier.
+- Refresh button (`coupon-analytics-refresh`) re-runs both fetches.
+- Empty-state messaging guides admins to the "Partner Trial Offers"
+  card upstream when no coupons have been minted yet.
+- `safePct(num, denom)` guards divide-by-zero across all 3 ratio
+  computations (sanity-pinned by an explicit spec test).
+
+### Validation (`tests/test_iter275_coupon_analytics_tab.py`)
+**18/18 PASS** covering:
+- File existence + PromotionManager import + render ordering (mounted
+  AFTER PartnerTrialsAdminSection)
+- Root testid + 4 KPI cards + 3 sub-tab triggers
+- Parallel `Promise.all` fetch with the right query params
+- Full funnel column headers + per-row testids + manual bucket
+  fallback + `hoursBetween` helper using `created_at` + `redeemed_at`
+- Recharts symbols imported + chart container testid + dual `dataKey`
+  bars (minted vs redeemed)
+- Top-N slicing for the chart + manual exclusion from the chart
+- Sort DESC by `redemption_rate_pct`
+- Partner-type filter dropdown with all 4 options
+- `safePct` divide-by-zero guard
+- Refresh button wires to the same `loadAll` loader
+- Empty-state messaging present
+- Live HTTP sanity that both data-source endpoints still return 200
+  with the expected JSON shape
+
+### Files changed (iter275)
+**Frontend NEW**: `components/admin/CouponAnalyticsTab.jsx` (430+ lines).
+**Frontend MODIFIED**: `pages/admin/PromotionManager.js` (import + mount).
+**Backend NEW**: `tests/test_iter275_coupon_analytics_tab.py` (18 tests).
+
+### Action items (user)
+1. **Save to GitHub → redeploy** preview → production.
+2. **Smoke test the tab**: Admin → Promotions → scroll under the
+   Partner Trial Offers card → the "📊 Coupon Conversion Analytics"
+   card appears. Cycle through Subject A/B → Bar Chart → Timeline
+   sub-tabs and verify each renders the same dataset.
+3. **A/B test a real subject**: clone an existing external campaign,
+   change only `subject_en`, attach a coupon, send both → compare
+   redemption-rate columns side-by-side a few hours later.
+4. **DNS (still open from iter270)**: add `CNAME em.bidvex.com →
+   u57420291.wl042.sendgrid.net` — iter272 fallback retry keeps sends
+   flowing in the meantime.
+
+---
+
+
+
 ## Latest: iter274 — MANUAL TRIAL COUPONS + AUCTIONEER ACQUISITION (Feb 04, 2026) ✅
 
 Bridged the Admin Promotions Engine and the External Email Marketing
