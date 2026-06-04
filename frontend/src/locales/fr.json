@@ -2393,6 +2393,8 @@
     "promptTrialCoupon": "Comment fonctionne un coupon d'essai gratuit ?",
     "promptTaxProfile": "Que demande l'entrevue fiscale ?",
     "promptStorageDoc": "Comment téléverser à nouveau mon document d'enregistrement de facilité ?",
-    "footerHint": "Les conversations sont enregistrées localement et n'incluent jamais votre mot de passe."
+    "footerHint": "Les conversations sont enregistrées localement et n'incluent jamais votre mot de passe.",
+    "stopLabel": "Arrêter la génération",
+    "partialLabel": "partiel"
   }
 }

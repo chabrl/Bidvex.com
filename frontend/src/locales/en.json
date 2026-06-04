@@ -2373,6 +2373,8 @@
     "promptTrialCoupon": "How does a free-trial coupon work?",
     "promptTaxProfile": "What does the tax interview ask for?",
     "promptStorageDoc": "How do I resubmit my storage registration document?",
-    "footerHint": "Conversations are saved locally and never include your password."
+    "footerHint": "Conversations are saved locally and never include your password.",
+    "stopLabel": "Stop generating",
+    "partialLabel": "partial"
   }
 }

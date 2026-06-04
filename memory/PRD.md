@@ -1,5 +1,152 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter278 — STREAMING TYPEWRITER (SSE) FOR AI CORE WIDGET (Feb 04, 2026) ✅
+
+Real-time chunk-by-chunk responses for the iter277 widget. **Pytest
+275/275 PASS** (iter255→iter278 sprint scope, 31 env-dependent skips,
+0 failures). Lint clean, webpack compiles.
+
+### ⚠️ SDK reality check
+The directive assumed `emergentintegrations` exposes a built-in
+streaming buffer. Live inspection via `inspect.signature` confirmed
+otherwise — `LlmChat.send_message()` returns a single `str`, no token
+generator. Rather than ship a lie about SDK capabilities, iter278
+implements a **faithful equivalent**: the server calls `send_message()`
+once, then chunks the completed reply over SSE so the client renders
+the typewriter UX. The deviation is documented in
+`services/ai_service.py` and the iter278 PRD entry so future agents
+don't get misled.
+
+### Mission 1 — Server-side chunker + generator
+- NEW `_slice_for_streaming(text, soft_limit=24)` in `ai_service.py`
+  yields word-boundary-respecting chunks. Re-joining always reproduces
+  the original text exactly.
+- NEW async-generator `chat_stream_with_assistant()`:
+  - Calls the underlying `LlmChat.send_message()` once.
+  - Chunks the reply via `_slice_for_streaming`.
+  - Paces output with `asyncio.sleep(chunk_delay_ms/1000)` (25ms
+    default → ~40 chunks/sec typewriter feel).
+  - **Never raises** — failures yield a terminal
+    `[STREAM_ERROR] <ExceptionType>` chunk so clients always have a
+    final byte to react to.
+  - Test mode short-circuits to the deterministic stub, chunked at
+    soft_limit=12 so test infra still exercises the boundary logic
+    without burning Gemini tokens.
+
+### Mission 2 — SSE endpoint (`POST /api/support/chat/stream`)
+- JWT-protected, same auth contract as `/chat`.
+- Yields three event types, each as a single SSE frame:
+  - `event: start` — `{session_id, model}` envelope before first chunk
+  - `event: chunk` — `{text: "..."}` repeated per slice
+  - `event: error` — `{reason: "..."}` on mid-stream failure (terminal
+    bubble is still finalized on the client)
+  - `event: done` — `{session_id, model, test_mode, had_error, chunks}`
+    always emitted, even after errors, so the client knows the stream
+    is closed.
+- Response headers locked down to prevent buffering: `Content-Type:
+  text/event-stream`, `Cache-Control: no-cache, no-transform`,
+  `X-Accel-Buffering: no` (the nginx/k8s buffer-off flag),
+  `Connection: keep-alive`.
+- The non-streaming `POST /api/support/chat` endpoint stays unchanged
+  for legacy callers; iter278 just adds the streaming sibling.
+
+### Mission 3 — Frontend consumer + robustness (`AICoreSupportWidget.jsx`)
+- Switched from `axios.post` to native `fetch` + `res.body.getReader()`
+  because SSE consumption requires the streams API (axios doesn't
+  expose readable streams in browsers, and `EventSource` can't carry
+  the JWT Authorization header).
+- `_parseSseBlock(raw)` helper parses `event:`/`data:` lines and
+  silently skips `:` keepalive comments.
+- Streaming bubble lifecycle:
+  - Pre-created with `streaming: true` on user submit so the
+    typewriter cursor renders before the first chunk lands.
+  - `_appendChunkToActiveStream(text)` mutates the most recent
+    `streaming: true` bubble — tracked by flag, not index, so a
+    concurrent `clearHistory()` doesn't blow up the appender.
+  - `_finalizeActiveStream({error, partial})` flips the flag off when
+    `done` arrives (or when the fetch fails / aborts).
+- **AbortController** wired:
+  - Stored on `abortRef.current` while in flight
+  - Cleared on `finally` of every send cycle
+  - **Aborted in a cleanup useEffect on unmount** so navigating away
+    mid-stream never leaks a fetch
+  - Aborted by the user via the **Stop button** (`ai-core-stop`),
+    which replaces the **Send button** (`ai-core-send`) while
+    `sending=true`
+- Robustness contract verified by tests:
+  - Mid-stream `event: error` → renders inline system note + closes
+    the partial bubble with `partial: true` (timestamp row shows
+    "· partial")
+  - HTTP-layer failure (non-200, unreadable body) → graceful inline
+    error + partial bubble preserved (no runtime exception thrown)
+  - User-initiated `abort()` → `AbortError` recognized → finalize as
+    partial without surfacing an error message
+- New visual cells:
+  - `ai-core-stream-cursor` — pulsing 1.5px indigo block on the
+    streaming bubble
+  - `ai-core-msg-partial-{idx}` — rose "(partial)" label on
+    interrupted bubbles
+
+### Mission 4 — Bilingual UX preserved
+- Two new `aiCore` keys (`stopLabel`, `partialLabel`) added to BOTH
+  `locales/en.json` and `locales/fr.json`. FR strings are real French:
+  *"Arrêter la génération"* and *"partiel"*.
+- iter278 locale-parity test asserts `en_keys == fr_keys` for the
+  `aiCore` namespace — drift between locales is a hard fail.
+
+### Validation (`tests/test_iter278_streaming.py`)
+**18/18 PASS** covering:
+- 2 chunker static tests (word boundaries + edge cases like empty/long-word)
+- 2 generator tests (test-mode multi-chunk yield + empty-input
+  STREAM_ERROR contract)
+- 4 SSE endpoint tests (anonymous 401/403 + content-type/headers +
+  full event sequence reassembly + empty-message 400)
+- 7 frontend static tests (fetch+ReadableStream not axios, AbortController
+  + Stop button, SSE block parser + 3 event handlers, typewriter cursor
+  rendering, send/stop button swap, partial-finalize contract,
+  unmount-cleanup abort)
+- 2 locale parity tests
+- 1 sanity that the legacy `/chat` endpoint still returns the iter276
+  envelope unchanged
+
+### iter277 test updates (3 tests refreshed to match new contract)
+- Action button testid is now conditional → assert
+  `data-testid={sending ? "ai-core-stop" : "ai-core-send"}`
+- aria-label is conditional → assert
+  `sending ? t('aiCore.stopLabel') : t('aiCore.sendLabel')`
+- Endpoint POST target updated from `/chat` to `/chat/stream`,
+  consumer reads `res.body.getReader()` instead of `r.data.response`
+
+### Files changed (iter278)
+**Backend MODIFIED**: `services/ai_service.py` (+chunker + streaming
+generator), `routes/support.py` (+SSE POST `/chat/stream`).
+**Frontend MODIFIED**: `components/AICoreSupportWidget.jsx` (fetch
+streaming + AbortController + SSE parser + send/stop swap +
+typewriter cursor + partial-bubble UX),
+`locales/en.json` + `locales/fr.json` (+stopLabel +partialLabel).
+**Backend NEW**: `tests/test_iter278_streaming.py` (18 tests).
+**Backend MODIFIED**: `tests/test_iter277_ai_core_widget.py` (3 tests
+updated to match the new conditional testid + endpoint contract).
+
+### Action items (user)
+1. **Save to GitHub → redeploy** preview → production.
+2. **Production env reminder**: set `AI_ASSISTANT_TEST_MODE=0` (or
+   unset) in prod BEFORE redeploy so users get real Gemini streaming
+   responses instead of the chunked `[TEST_MODE]` stub.
+3. **Smoke test**: log in → `/seller/dashboard` → open the floating
+   "Ask AI Core" widget → type a question → reply types out
+   chunk-by-chunk with a blinking cursor. Click the rose Stop button
+   mid-stream → partial text remains on screen with a rose "· partial"
+   tag in the timestamp.
+4. **Optional tuning**: tweak `_CHUNK_DELAY_MS_DEFAULT` in
+   `ai_service.py` (currently 25ms ≈ 40 chunks/sec) — drop to 10ms
+   for snappier typewriter, raise to 50ms for a more deliberate
+   reading-pace feel.
+
+---
+
+
+
 ## Latest: iter277 — FLOATING AI CORE SUPPORT WIDGET (Feb 04, 2026) ✅
 
 Surfaces the iter276 Gemini-backed AI Core to logged-in users on every

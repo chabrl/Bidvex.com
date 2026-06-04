@@ -75,7 +75,6 @@ def test_iter277_widget_exposes_canonical_testids():
         "ai-core-fab",
         "ai-core-widget",
         "ai-core-input",
-        "ai-core-send",
         "ai-core-close",
         "ai-core-clear",
         "ai-core-empty-state",
@@ -83,6 +82,9 @@ def test_iter277_widget_exposes_canonical_testids():
         "ai-core-message-list",
     ):
         assert f'data-testid="{tid}"' in src, f"missing testid: {tid}"
+    # iter278 — the action button testid is a conditional template:
+    # `ai-core-stop` while streaming, `ai-core-send` otherwise.
+    assert 'data-testid={sending ? "ai-core-stop" : "ai-core-send"}' in src
     # Suggestion-card testids are template-literals.
     assert "data-testid={`ai-core-suggestion-${p.key}`}" in src
     # Message-bubble testids carry role + index.
@@ -110,7 +112,9 @@ def test_iter277_widget_no_hardcoded_user_facing_english():
     assert "aria-label={t('aiCore.openLabel')}" in src
     assert "aria-label={t('aiCore.closeLabel')}" in src
     assert "aria-label={t('aiCore.clearLabel')}" in src
-    assert "aria-label={t('aiCore.sendLabel')}" in src
+    # iter278 — Send/Stop aria-label is conditional but both branches
+    # route through t().
+    assert "aria-label={sending ? t('aiCore.stopLabel') : t('aiCore.sendLabel')}" in src
     assert "{t('aiCore.title')}" in src
     assert "{t('aiCore.subtitle')}" in src
     assert "{t('aiCore.thinking')}" in src
@@ -248,15 +252,18 @@ def test_iter277_en_and_fr_aicore_key_sets_match():
 
 def test_iter277_widget_posts_to_iter276_endpoint_with_correct_envelope():
     src = _read_fe("components/AICoreSupportWidget.jsx")
-    # Hits the iter276 support route under the standard /api prefix.
-    assert "${API_BASE}/support/chat" in src
+    # iter278 — Widget now hits the streaming variant (`/chat/stream`)
+    # via fetch. The legacy `/chat` JSON endpoint is still up (verified
+    # in iter278 regression tests) but the widget itself prefers the
+    # streaming surface for the typewriter UX.
+    assert "${API_BASE}/support/chat/stream" in src
     # Payload includes message + session_id + language so the iter276
     # backend can route multi-turn AND honour the active locale.
-    assert "message: text" in src
+    assert "message:    text," in src or "message: text" in src
     assert "session_id: sessionId" in src
-    assert "language: i18n.language || 'en'" in src
-    # Response envelope is read by `r?.data?.response`.
-    assert "r?.data?.response" in src
+    assert "language:   i18n.language || 'en'" in src or "language: i18n.language || 'en'" in src
+    # Stream consumer reads the body via ReadableStream.
+    assert "res.body.getReader()" in src
 
 
 def test_iter277_session_id_anchored_to_user_id():

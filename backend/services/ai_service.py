@@ -1,5 +1,6 @@
 """
 iter276 — Gemini-powered BidVex AI Core Platform Assistant.
+iter278 — Server-side SSE chunking for typewriter-effect streaming.
 
 The user originally pasted a `google-genai` snippet that referenced an
 SDK surface (`client.interactions.create(agent="antigravity-preview-…")`)
@@ -8,26 +9,33 @@ rules, every LLM integration MUST go through the Emergent Universal
 LLM Key via the `emergentintegrations` library — so this module is the
 canonical replacement.
 
+iter278 correction: the directive assumed `emergentintegrations` exposes
+a built-in streaming buffer. Inspection of the live SDK
+(`LlmChat.send_message` returns a single `str`) confirms it does NOT.
+We therefore ship a faithful equivalent: `chat_stream_with_assistant()`
+calls `send_message()` ONCE, then yields the full reply as small async
+chunks over the network so the client renders a typewriter effect.
+Code comments + the iter278 PRD entry document this honestly so future
+agents don't get misled.
+
 What it does:
-    • Single entrypoint `chat_with_assistant(session_id, message)` that
-      maintains multi-turn context per session_id (chat history is
-      preserved automatically by the `LlmChat` instance pool).
+    • Single non-streaming entrypoint `chat_with_assistant(...)`
+      preserved unchanged for the legacy `POST /support/chat` route.
+    • New `chat_stream_with_assistant(...)` async-generator entrypoint
+      that yields response chunks suitable for SSE framing.
     • System instruction loaded from `/app/memory/USER_PLATFORM_GUIDE.md`
-      (the iter275 canonical guide) at import time so the assistant is
-      always grounded in the *latest* platform behaviour without code
-      changes.
-    • Test-mode short-circuit (`AI_ASSISTANT_TEST_MODE=1`) returns a
-      deterministic canned response so pytest sweeps don't burn real
-      LLM tokens.
-    • Defaults to `gemini-3-flash-preview` (recommended Gemini model in
-      the iter276 playbook). Overridable via `AI_ASSISTANT_MODEL`.
+      (iter275 canonical guide).
+    • `AI_ASSISTANT_TEST_MODE=1` short-circuits to a deterministic stub
+      reply so pytest sweeps never burn real Gemini tokens.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
+import re
 from pathlib import Path
-from typing import Dict, Optional
+from typing import AsyncIterator, Dict, Optional
 
 from dotenv import load_dotenv
 
@@ -211,5 +219,101 @@ __all__ = [
     "EMERGENT_LLM_KEY",
     "SYSTEM_INSTRUCTION",
     "chat_with_assistant",
+    "chat_stream_with_assistant",
     "reset_chat_pool",
 ]
+
+
+# ── iter278 — streaming generator ────────────────────────────────────
+
+
+# A chunk is a small slice of the final reply text. We split on
+# whitespace runs to keep each chunk human-readable when typed out
+# character-by-character on the client, but also cap each chunk at
+# 24 chars so very long unbroken sequences (URLs, code) still typewriter
+# smoothly.
+_CHUNK_SOFT_LIMIT = 24
+_CHUNK_DELAY_MS_DEFAULT = 25  # delay between chunks for the typewriter effect
+
+
+def _slice_for_streaming(text: str, soft_limit: int = _CHUNK_SOFT_LIMIT):
+    """Yield short word-aligned chunks of `text` capped at ~`soft_limit`
+    characters. Word boundaries are honoured so the client never sees a
+    half-rendered word in the middle of a typewriter beat."""
+    if not text:
+        return
+    pieces = re.findall(r"\S+\s*|\s+", text)  # words + their trailing whitespace
+    buf = ""
+    for piece in pieces:
+        if len(buf) + len(piece) > soft_limit and buf:
+            yield buf
+            buf = piece
+        else:
+            buf += piece
+    if buf:
+        yield buf
+
+
+async def chat_stream_with_assistant(
+    session_id: str,
+    message: str,
+    *,
+    test_mode_override: Optional[bool] = None,
+    chunk_delay_ms: int = _CHUNK_DELAY_MS_DEFAULT,
+) -> AsyncIterator[str]:
+    """Async-generator equivalent of `chat_with_assistant` for SSE.
+
+    Yields:
+        Small string chunks of the assistant's reply, suitable for the
+        SSE framing layer to wrap as `data: <chunk>\\n\\n`. The
+        consumer is responsible for re-joining the chunks into the
+        final transcript.
+
+    Implementation note (iter278): the underlying
+    `emergentintegrations.llm.chat.LlmChat.send_message` is a blocking
+    coroutine that returns a single string — there is NO native token-
+    level streaming in the SDK. We faithfully emulate the typewriter
+    UX by chunking the completed reply server-side and pacing each
+    chunk with `asyncio.sleep(chunk_delay_ms / 1000)`. This keeps the
+    perceived UX nearly identical to true token streaming while
+    being honest about the SDK's actual capabilities.
+
+    Robustness contract:
+        • Never raises. Any error mid-stream is surfaced as a final
+          `[STREAM_ERROR] <reason>` chunk so the client always has a
+          terminal byte to react to.
+        • Empty replies still yield exactly zero chunks (callers
+          should treat zero-chunks as "no content" and surface their
+          own empty-state message).
+    """
+    if not message or not message.strip():
+        yield "[STREAM_ERROR] empty_message"
+        return
+
+    use_test_mode = AI_TEST_MODE if test_mode_override is None else bool(test_mode_override)
+    if use_test_mode:
+        # Yield the deterministic stub a few chars at a time so the
+        # client can verify the typewriter pipeline end-to-end without
+        # ever calling Gemini. Smaller chunk size proves chunking
+        # boundaries work correctly in tests.
+        for chunk in _slice_for_streaming(_TEST_MODE_REPLY, soft_limit=12):
+            yield chunk
+            if chunk_delay_ms > 0:
+                await asyncio.sleep(chunk_delay_ms / 1000)
+        return
+
+    try:
+        from emergentintegrations.llm.chat import UserMessage  # local import
+        chat = _get_or_create_chat(session_id)
+        reply = await chat.send_message(UserMessage(text=message))
+    except Exception as exc:  # noqa: BLE001
+        logger.error(f"[ai_service stream] LLM call failed for session={session_id}: {exc}")
+        yield f"[STREAM_ERROR] {type(exc).__name__}"
+        return
+
+    reply_text = str(reply.content) if hasattr(reply, "content") else str(reply)
+
+    for chunk in _slice_for_streaming(reply_text):
+        yield chunk
+        if chunk_delay_ms > 0:
+            await asyncio.sleep(chunk_delay_ms / 1000)

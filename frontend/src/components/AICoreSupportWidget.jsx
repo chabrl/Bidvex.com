@@ -28,9 +28,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from './ui/button';
-import { Sparkles, X, Send, Loader2, Trash2 } from 'lucide-react';
+import { Sparkles, X, Send, Loader2, Trash2, Square } from 'lucide-react';
 import API_BASE from '../config';
-import axios from 'axios';
 
 const STORAGE_PREFIX = 'bidvex.ai_core_chat.v1';
 const MAX_LOCAL_HISTORY = 30;   // hard cap so localStorage stays small
@@ -57,9 +56,13 @@ const AICoreSupportWidget = () => {
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   // Each message: { role: 'user' | 'assistant' | 'system',
-  //                 content: string, ts: iso, error?: boolean }
+  //                 content: string, ts: iso, error?: boolean,
+  //                 streaming?: bool, partial?: bool }
   const [messages, setMessages] = useState([]);
   const scrollRef = useRef(null);
+  // iter278 — Hold the in-flight stream's AbortController so the user
+  // (or an unmount) can cancel mid-stream without dangling fetches.
+  const abortRef = useRef(null);
 
   // ── Load persisted history on mount / user change ───────────────────
   useEffect(() => {
@@ -102,41 +105,195 @@ const AICoreSupportWidget = () => {
 
   const sessionId = user?.id ? `user:${user.id}` : null;
 
+  // iter278 — Parse a single SSE event block ("event: foo\ndata: {...}").
+  // Returns `{ event, data }` or null when the block is malformed
+  // (which we silently ignore — keepalive comments and blank
+  // separators are normal in the protocol).
+  const _parseSseBlock = (raw) => {
+    let event = 'message';
+    let data = '';
+    for (const line of raw.split('\n')) {
+      if (line.startsWith(':')) continue;     // SSE keepalive comment
+      if (line.startsWith('event:')) event = line.slice(6).trim();
+      else if (line.startsWith('data:')) data += (data ? '\n' : '') + line.slice(5).trim();
+    }
+    if (!data) return null;
+    try {
+      return { event, data: JSON.parse(data) };
+    } catch {
+      return { event, data: { raw: data } };
+    }
+  };
+
+  // iter278 — Append a streaming chunk to the LAST assistant message.
+  // We track the streaming bubble by `streaming: true` flag rather than
+  // index so a concurrent `clearHistory` doesn't blow up.
+  const _appendChunkToActiveStream = (chunkText) => {
+    setMessages((prev) => {
+      const next = [...prev];
+      for (let i = next.length - 1; i >= 0; i -= 1) {
+        if (next[i].streaming) {
+          next[i] = { ...next[i], content: next[i].content + chunkText };
+          return next;
+        }
+      }
+      return prev;
+    });
+  };
+
+  // iter278 — Mark the active streaming bubble as completed. When
+  // `error=true` we set `partial=true` so the UI shows "(partial)" in
+  // the timestamp row — matches the "displays the partially
+  // accumulated text without throwing" robustness contract.
+  const _finalizeActiveStream = ({ error = false, partial = false } = {}) => {
+    setMessages((prev) => {
+      const next = [...prev];
+      for (let i = next.length - 1; i >= 0; i -= 1) {
+        if (next[i].streaming) {
+          next[i] = {
+            ...next[i],
+            streaming: false,
+            partial,
+            error: error || next[i].error,
+          };
+          return next;
+        }
+      }
+      return prev;
+    });
+  };
+
+  // iter278 — User can interrupt mid-stream via the Stop button. The
+  // partially streamed text remains on screen as a finalized bubble.
+  const stopStream = useCallback(() => {
+    if (abortRef.current) {
+      try { abortRef.current.abort(); } catch { /* noop */ }
+    }
+  }, []);
+
+  // Clean up any in-flight stream when the widget unmounts.
+  useEffect(() => () => {
+    if (abortRef.current) {
+      try { abortRef.current.abort(); } catch { /* noop */ }
+    }
+  }, []);
+
   const sendMessage = useCallback(async () => {
     const text = draft.trim();
     if (!text || sending || !token) return;
 
     const userMsg = { role: 'user', content: text, ts: new Date().toISOString() };
-    setMessages((prev) => [...prev, userMsg]);
+    // Pre-create the assistant streaming bubble so the typewriter
+    // begins rendering chunks IMMEDIATELY when the first event lands.
+    const assistantPlaceholder = {
+      role: 'assistant', content: '', ts: new Date().toISOString(), streaming: true,
+    };
+    setMessages((prev) => [...prev, userMsg, assistantPlaceholder]);
     setDraft('');
     setSending(true);
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+    let receivedAnyChunk = false;
+
     try {
-      const r = await axios.post(
-        `${API_BASE}/support/chat`,
-        { message: text, session_id: sessionId, language: i18n.language || 'en' },
-        { headers: { Authorization: `Bearer ${token}` }, timeout: 25_000 },
-      );
-      const reply = r?.data?.response || '';
-      setMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: reply, ts: new Date().toISOString() },
-      ]);
-    } catch (err) {
-      const detail =
-        err?.response?.data?.detail
-        || err?.response?.data?.message
-        || err?.message
-        || 'unknown_error';
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: 'system',
-          content: `${t('aiCore.errorPrefix')}: ${String(detail).slice(0, 200)}`,
-          ts: new Date().toISOString(),
-          error: true,
+      const res = await fetch(`${API_BASE}/support/chat/stream`, {
+        method:  'POST',
+        headers: {
+          'Content-Type':  'application/json',
+          Authorization: `Bearer ${token}`,
         },
-      ]);
+        body: JSON.stringify({
+          message:    text,
+          session_id: sessionId,
+          language:   i18n.language || 'en',
+        }),
+        signal: controller.signal,
+      });
+
+      if (!res.ok || !res.body) {
+        // Fall back to a single error frame — surface what the
+        // backend said where possible so the user has actionable info.
+        let detail = `HTTP ${res.status}`;
+        try {
+          const j = await res.json();
+          detail = j?.detail || j?.message || detail;
+        } catch { /* ignore */ }
+        throw new Error(detail);
+      }
+
+      // ── Stream consumer ──
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let buffer = '';
+
+      // SSE blocks are separated by a blank line — we accumulate raw
+      // bytes until we find that boundary, then parse each block.
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        let boundary = buffer.indexOf('\n\n');
+        while (boundary !== -1) {
+          const rawBlock = buffer.slice(0, boundary);
+          buffer = buffer.slice(boundary + 2);
+          const parsed = _parseSseBlock(rawBlock);
+          if (parsed) {
+            if (parsed.event === 'chunk' && parsed.data?.text) {
+              receivedAnyChunk = true;
+              _appendChunkToActiveStream(parsed.data.text);
+            } else if (parsed.event === 'error') {
+              // Server-side mid-stream failure — render an inline
+              // system note AND mark the partial bubble as partial.
+              const reason = parsed.data?.reason || 'stream_error';
+              setMessages((prev) => [
+                ...prev,
+                {
+                  role:    'system',
+                  content: `${t('aiCore.errorPrefix')}: ${reason}`,
+                  ts:      new Date().toISOString(),
+                  error:   true,
+                },
+              ]);
+              _finalizeActiveStream({ error: true, partial: receivedAnyChunk });
+              // We continue the loop so the eventual `done` frame
+              // still arrives cleanly — but the bubble is already
+              // closed.
+            } else if (parsed.event === 'done') {
+              _finalizeActiveStream({ partial: false });
+            }
+          }
+          boundary = buffer.indexOf('\n\n');
+        }
+      }
+
+      // Stream ended cleanly without a `done` frame — finalize anyway.
+      _finalizeActiveStream({ partial: !receivedAnyChunk });
+    } catch (err) {
+      // AbortController.abort() raises an AbortError — that's the user
+      // explicitly stopping, not a failure. Everything else surfaces
+      // as an inline error system message.
+      const isAbort = err?.name === 'AbortError';
+      if (!isAbort) {
+        const detail = err?.message || 'unknown_error';
+        setMessages((prev) => [
+          ...prev,
+          {
+            role:    'system',
+            content: `${t('aiCore.errorPrefix')}: ${String(detail).slice(0, 200)}`,
+            ts:      new Date().toISOString(),
+            error:   true,
+          },
+        ]);
+      }
+      _finalizeActiveStream({
+        error:   !isAbort,
+        partial: receivedAnyChunk,
+      });
     } finally {
+      abortRef.current = null;
       setSending(false);
     }
   }, [draft, sending, token, sessionId, i18n.language, t]);
@@ -269,13 +426,35 @@ const AICoreSupportWidget = () => {
                               : 'mr-auto bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700'}`}
                 data-testid={`ai-core-msg-${m.role}-${idx}`}
               >
-                <div className="whitespace-pre-wrap break-words">{m.content}</div>
+                <div className="whitespace-pre-wrap break-words">
+                  {m.content}
+                  {/* iter278 — typewriter cursor on the active streaming bubble */}
+                  {m.streaming && (
+                    <span
+                      className="inline-block w-1.5 h-3.5 ml-0.5 align-middle bg-indigo-500 animate-pulse"
+                      data-testid="ai-core-stream-cursor"
+                    />
+                  )}
+                </div>
                 <div className={`text-[9px] mt-1 ${m.role === 'user' ? 'text-indigo-200' : 'text-slate-400'}`}>
                   {fmtTime(m.ts)}
+                  {m.partial && (
+                    <span
+                      className="ml-1 text-rose-500"
+                      data-testid={`ai-core-msg-partial-${idx}`}
+                    >
+                      · {t('aiCore.partialLabel')}
+                    </span>
+                  )}
                 </div>
               </div>
             ))}
-            {sending && (
+            {/* iter278 — typing indicator only while we're streaming AND
+                the active bubble hasn't received a chunk yet. Once
+                chunks arrive, the typewriter cursor replaces it. */}
+            {sending && !messages.some(
+              (m) => m.streaming && m.content && m.content.length > 0,
+            ) && (
               <div
                 className="mr-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700
                            rounded-xl px-3 py-2 text-xs text-slate-500 flex items-center gap-2"
@@ -305,13 +484,15 @@ const AICoreSupportWidget = () => {
               />
               <Button
                 type="button"
-                onClick={sendMessage}
-                disabled={sending || !draft.trim()}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white"
-                data-testid="ai-core-send"
-                aria-label={t('aiCore.sendLabel')}
+                onClick={sending ? stopStream : sendMessage}
+                disabled={!sending && !draft.trim()}
+                className={sending
+                  ? "bg-rose-600 hover:bg-rose-700 text-white"
+                  : "bg-indigo-600 hover:bg-indigo-700 text-white"}
+                data-testid={sending ? "ai-core-stop" : "ai-core-send"}
+                aria-label={sending ? t('aiCore.stopLabel') : t('aiCore.sendLabel')}
               >
-                {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                {sending ? <Square className="w-4 h-4" /> : <Send className="w-4 h-4" />}
               </Button>
             </div>
             <p className="text-[9px] text-slate-400 mt-1">
