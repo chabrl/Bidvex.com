@@ -44,7 +44,10 @@ const REG_TYPE_LABEL = {
 };
 
 // iter212 — token-bearing document opener (same pattern as PartnerManager)
-const useDocOpener = (token, onMissing) => async (rawPath) => {
+// iter273 — Defensive 404 handling + facility context passthrough so the
+// missing-doc modal can fire a "Request resubmission" call against the
+// correct facility id without a second round trip.
+const useDocOpener = (token, onMissing) => async (rawPath, facility) => {
   if (!rawPath) return;
   try {
     const abs = rawPath.startsWith('http') ? rawPath : `${process.env.REACT_APP_BACKEND_URL}${rawPath}`;
@@ -58,9 +61,30 @@ const useDocOpener = (token, onMissing) => async (rawPath) => {
     }
     if (res.status === 404) {
       const data = await res.json().catch(() => ({}));
-      const detail = data?.detail || {};
-      if (detail.error_code === 'file_missing_on_disk') {
-        onMissing(detail);
+      const detail = (data && typeof data.detail === 'object') ? data.detail : {};
+      // Trust the structured signal when present, but also treat ANY 404
+      // on a storage_facilities path as a missing-file event so the admin
+      // never sees a bare toast for this category.
+      const isStorageFacilityDoc = (rawPath || '').includes('/storage_facilities/');
+      if (detail.error_code === 'file_missing_on_disk' || isStorageFacilityDoc) {
+        const fileName = (rawPath || '').split('/').pop() || '';
+        onMissing({
+          error_code:   detail.error_code || 'file_missing_on_disk',
+          filename:     detail.filename || fileName,
+          owner_email:  detail.owner_email || facility?.email,
+          owner_user_id: detail.owner_user_id || facility?.owner_user_id,
+          facility_id:  facility?.id,
+          facility_name: facility?.company_name,
+          message_en:   detail.message_en || (
+            'This document is no longer available on the server. ' +
+            'Files uploaded before the most recent redeployment may have been lost. ' +
+            'Please ask the facility to re-upload their registration proof.'
+          ),
+          message_fr:   detail.message_fr || (
+            'Ce document n\'est plus disponible sur le serveur. ' +
+            'Veuillez demander à la facilité de téléverser à nouveau sa preuve d\'enregistrement.'
+          ),
+        });
         return;
       }
     }
@@ -84,10 +108,42 @@ const AdminFacilities = () => {
   const [rejectReason, setRejectReason] = useState('');
   const [rejecting, setRejecting] = useState(false);
   const [missingDocModal, setMissingDocModal] = useState(null);
+  // iter273 — resubmission CTA in-flight flag
+  const [requestingResubmit, setRequestingResubmit] = useState(false);
 
   const openDoc = useDocOpener(token, setMissingDocModal);
 
   const auth = { headers: { Authorization: `Bearer ${token}` } };
+
+  // iter273 — Fires `POST /admin/storage-facilities/{id}/request-resubmission`
+  // which emails the facility owner asking them to re-upload their
+  // registration document. Idempotent on the backend.
+  const requestResubmission = async () => {
+    if (!missingDocModal?.facility_id) {
+      toast.error('Missing facility id — refresh the page and try again.');
+      return;
+    }
+    setRequestingResubmit(true);
+    try {
+      const r = await axios.post(
+        `${API}/admin/storage-facilities/${missingDocModal.facility_id}/request-resubmission`,
+        {},
+        auth,
+      );
+      const sent = r?.data?.email_sent;
+      toast.success(
+        sent
+          ? 'Resubmission request sent · Demande envoyée à la facilité'
+          : 'Marked for resubmission (email pending) · Marqué pour re-soumission',
+      );
+      setMissingDocModal(null);
+      loadFacilities();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail?.message_en || 'Resubmission request failed');
+    } finally {
+      setRequestingResubmit(false);
+    }
+  };
 
   const loadFacilities = useCallback(async () => {
     setLoading(true);
@@ -270,7 +326,7 @@ const AdminFacilities = () => {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => openDoc(f.company_registration_document_url)}
+                              onClick={() => openDoc(f.company_registration_document_url, f)}
                               data-testid={`view-reg-doc-${f.id}`}
                               className="text-blue-700 border-blue-300"
                             >
@@ -413,12 +469,26 @@ const AdminFacilities = () => {
               <p className="text-muted-foreground">{missingDocModal.message_fr}</p>
               <div className="text-xs bg-slate-50 dark:bg-slate-800/40 p-2 rounded mt-3">
                 <div><strong>Filename:</strong> {missingDocModal.filename}</div>
+                <div><strong>Facility:</strong> {missingDocModal.facility_name || '—'}</div>
                 <div><strong>Owner:</strong> {missingDocModal.owner_email || '—'}</div>
               </div>
             </div>
           )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setMissingDocModal(null)}>Close · Fermer</Button>
+          <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2">
+            <Button variant="outline" onClick={() => setMissingDocModal(null)}>
+              Close · Fermer
+            </Button>
+            {missingDocModal?.facility_id && (
+              <Button
+                onClick={requestResubmission}
+                disabled={requestingResubmit}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                data-testid="request-resubmission-btn"
+              >
+                {requestingResubmit ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Mail className="h-4 w-4 mr-1" />}
+                Request resubmission · Demander re-soumission
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

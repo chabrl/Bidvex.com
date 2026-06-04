@@ -355,7 +355,9 @@ async def get_pending_tax_verifications(current_user: User = Depends(get_current
     # Mask sensitive data for display
     for user in users:
         if user.get("tax_id"):
-            # Mask SIN/BN - show only last 4 digits
+            # iter273 — `tax_id` is now exclusively a business BN (never
+            # a SIN — BidVex never requests one). Mask all but last 4
+            # digits for display.
             user["tax_id_masked"] = "****" + user["tax_id"][-4:] if len(user["tax_id"]) >= 4 else "****"
             del user["tax_id"]  # Remove actual value from response
     

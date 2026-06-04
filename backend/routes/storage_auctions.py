@@ -79,8 +79,14 @@ MAX_PHOTO_BYTES = 8 * 1024 * 1024  # 8 MB per photo
 MAX_PHOTOS_PER_AUCTION = 10
 
 # iter212 — Storage Facility Business-Registration documents
-FACILITY_DOC_ROOT_REL = Path("uploads/storage_facilities")           # relative to backend CWD
-FACILITY_DOC_ROOT_ABS = Path("/app/backend/uploads/storage_facilities")  # absolute fallback
+# iter273 — PRIMARY upload root moved to `/app/uploads/storage_facilities/`
+#           (persistent mount per iter267) so files survive container
+#           redeployments. The legacy `/app/backend/uploads/...` path is
+#           kept as a search-only candidate to serve docs uploaded
+#           before iter273.
+FACILITY_DOC_ROOT_PERSISTENT = Path("/app/uploads/storage_facilities")
+FACILITY_DOC_ROOT_REL = Path("uploads/storage_facilities")           # legacy, relative
+FACILITY_DOC_ROOT_ABS = Path("/app/backend/uploads/storage_facilities")  # legacy, absolute
 ALLOWED_FACILITY_DOC_MIME = {
     "application/pdf",
     "image/png", "image/jpeg", "image/jpg", "image/webp",
@@ -1175,12 +1181,20 @@ async def upload_facility_registration_doc(
         }.get(file.content_type, ".bin")
 
     fname = f"reg_{current_user.id}_{uuid.uuid4().hex[:8]}{ext}"
-    # Persist to both candidate roots so cwd drift doesn't matter — but we
-    # actually only need ONE write; the serve endpoint will search both.
-    FACILITY_DOC_ROOT_ABS.mkdir(parents=True, exist_ok=True)
-    target = FACILITY_DOC_ROOT_ABS / fname
+    # iter273 — Persist to the persistent uploads root so the file
+    # survives container redeployments. Also write a legacy-path mirror
+    # so old `FileResponse` lookups still find it during the rollover.
+    FACILITY_DOC_ROOT_PERSISTENT.mkdir(parents=True, exist_ok=True)
+    target = FACILITY_DOC_ROOT_PERSISTENT / fname
     with open(target, "wb") as f:
         f.write(payload)
+    # Best-effort legacy mirror — never block the upload if it fails.
+    try:
+        FACILITY_DOC_ROOT_ABS.mkdir(parents=True, exist_ok=True)
+        with open(FACILITY_DOC_ROOT_ABS / fname, "wb") as f:
+            f.write(payload)
+    except Exception as exc:  # noqa: BLE001
+        logger.debug(f"[facility-doc-upload] legacy mirror skipped: {exc}")
 
     rel_url = f"/api/uploads/storage_facilities/{fname}"
     return {
@@ -1253,8 +1267,11 @@ async def serve_facility_registration_doc(
     if not is_owner and not is_admin:
         raise HTTPException(status_code=403, detail="Access denied")
 
-    # ── Search both upload roots ──────────────────────────────────
+    # ── Search every known upload root ────────────────────────────
+    # iter273 — Persistent mount first (current canonical), then the
+    # two legacy locations for files uploaded before the cutover.
     candidates = [
+        FACILITY_DOC_ROOT_PERSISTENT / bare,
         FACILITY_DOC_ROOT_REL / bare,
         FACILITY_DOC_ROOT_ABS / bare,
     ]
@@ -1462,6 +1479,72 @@ async def admin_reject_facility_registration(
     except Exception as e:
         logger.warning(f"[STORAGE] reject-registration email failed: {e}")
     return {"success": True, "facility_id": facility_id, "company_registration_verified": False, "reason": reason}
+
+
+@storage_router.post("/admin/storage-facilities/{facility_id}/request-resubmission")
+async def admin_request_facility_resubmission(
+    facility_id: str,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(_require_admin),
+):
+    """iter273 — Admin clicks "Request resubmission" on a facility whose
+    registration document is missing on disk (lost in redeploy). Resets
+    the `company_registration_verified` flag back to False, stamps
+    `resubmission_requested_at` + `_by`, and fires a bilingual email to
+    the facility owner with a deep link to the registration form so
+    they can re-upload.
+
+    Idempotent — safe to call multiple times. Never raises on email
+    failure (admin still gets HTTP 200 with `email_sent: false`)."""
+    db = get_db()
+    fac = await db.storage_facilities.find_one({"id": facility_id}, {"_id": 0})
+    if not fac:
+        raise HTTPException(status_code=404, detail="Facility not found")
+
+    now_iso = _now().isoformat()
+    await db.storage_facilities.update_one(
+        {"id": facility_id},
+        {"$set": {
+            "company_registration_verified": False,
+            "company_registration_rejection_reason": (
+                "Document missing on server — please re-upload your "
+                "business registration proof so we can verify your facility."
+            ),
+            "company_registration_resubmission_requested_at": now_iso,
+            "company_registration_resubmission_requested_by": current_user.id,
+        }},
+    )
+
+    email_sent = False
+    try:
+        from services.email_notifications import send_storage_facility_registration_rejected_email
+        reason = (
+            "Your previously uploaded business registration document is no "
+            "longer available on our servers (it may have been lost during a "
+            "recent platform redeployment). Please log in to your facility "
+            "dashboard and re-upload your registration proof so we can "
+            "complete your verification.\n\n"
+            "Votre document d'enregistrement d'entreprise précédemment "
+            "téléversé n'est plus disponible sur nos serveurs (il a peut-être "
+            "été perdu lors d'un redéploiement récent de la plateforme). "
+            "Veuillez vous connecter au tableau de bord de votre facilité et "
+            "téléverser à nouveau votre preuve d'enregistrement afin que nous "
+            "puissions compléter votre vérification."
+        )
+        background_tasks.add_task(send_storage_facility_registration_rejected_email, fac, reason)
+        email_sent = True
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(f"[STORAGE iter273] resubmission email failed: {exc}")
+
+    return {
+        "success":                  True,
+        "facility_id":              facility_id,
+        "email_sent":               email_sent,
+        "requested_at":             now_iso,
+        "owner_email":              fac.get("email"),
+        "message_en":               "Resubmission request sent — the facility has been notified to re-upload their registration document.",
+        "message_fr":               "Demande de soumission envoyée — la facilité a été notifiée pour téléverser à nouveau son document d'enregistrement.",
+    }
 
 
 @storage_router.get("/admin/storage-auctions")

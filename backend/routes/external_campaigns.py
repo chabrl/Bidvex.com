@@ -879,7 +879,7 @@ async def get_analytics(
     db = get_db()
     doc = await db.external_email_campaigns.find_one(
         {"id": campaign_id},
-        {"_id": 0, "analytics": 1, "recipient_count": 1, "sent_at": 1},
+        {"_id": 0, "analytics": 1, "recipient_count": 1, "sent_at": 1, "last_dispatch": 1},
     )
     if not doc:
         raise HTTPException(status_code=404, detail="Campaign not found")
@@ -887,6 +887,12 @@ async def get_analytics(
     a = _compute_rates(a, doc.get("recipient_count") or 0)
     a["daily_chart"] = a.get("daily_chart") or []
     a["sent_at"] = doc.get("sent_at")
+    # iter273 — Surface the fallback-sender retry count to the analytics
+    # endpoint so the admin ROI dashboard can chart it without a second
+    # round trip into the campaign document.
+    last_dispatch = doc.get("last_dispatch") or {}
+    a["fallback_dispatches"] = int(last_dispatch.get("fallback_used") or 0)
+    a["last_dispatch"] = last_dispatch
     return a
 
 

@@ -26,10 +26,12 @@ const TaxInterviewModal = ({ user, onComplete, onCancel }) => {
   const [loading, setLoading] = useState(false);
   
   const [formData, setFormData] = useState({
-    // Individual fields
+    // Individual fields — iter273: SIN removed for legal compliance.
+    // BidVex no longer requests, stores, or processes a Social Insurance
+    // Number from any user. CRA reporting is handled at year-end via
+    // T4A-derived reporting on the seller's existing legal name + DOB.
     legal_name: user?.name || '',
     date_of_birth: '',
-    sin: '',
     principal_address: user?.address || '',
     
     // Business fields
@@ -79,12 +81,12 @@ const TaxInterviewModal = ({ user, onComplete, onCancel }) => {
     const declarations = TAX_DECLARATIONS[lang];
     
     if (sellerType === 'individual') {
-      if (!formData.legal_name || !formData.date_of_birth || !formData.sin) {
-        toast.error('Please fill all required fields');
-        return false;
-      }
-      if (formData.sin.replace(/\D/g, '').length !== 9) {
-        toast.error('SIN must be 9 digits');
+      // iter273 — SIN intentionally NOT requested. Individual sellers
+      // only need to certify their legal name + DOB + principal address.
+      if (!formData.legal_name || !formData.date_of_birth || !formData.principal_address) {
+        toast.error(lang === 'en'
+          ? 'Please fill all required fields (legal name, date of birth, address).'
+          : 'Veuillez remplir tous les champs requis (nom légal, date de naissance, adresse).');
         return false;
       }
     } else if (sellerType === 'business') {
@@ -135,7 +137,9 @@ const TaxInterviewModal = ({ user, onComplete, onCancel }) => {
         seller_type: sellerType,
         tax_onboarding_completed: true,
         ...(sellerType === 'individual' ? {
-          tax_id: formData.sin,
+          // iter273 — No `tax_id` field on individual payload. BidVex
+          // never requests a SIN.
+          legal_name: formData.legal_name,
           date_of_birth: formData.date_of_birth,
           address: formData.principal_address,
           is_tax_registered: false
@@ -221,7 +225,7 @@ const TaxInterviewModal = ({ user, onComplete, onCancel }) => {
                   </h4>
                   <ul className="text-sm text-slate-600 dark:text-slate-400 space-y-1 text-left">
                     <li>• {lang === 'en' ? 'Personal sales' : 'Ventes personnelles'}</li>
-                    <li>• {lang === 'en' ? 'SIN required' : 'NAS requis'}</li>
+                    <li>• {lang === 'en' ? 'Legal name + DOB on file' : 'Nom légal + date de naissance enregistrés'}</li>
                     <li>• {lang === 'en' ? 'Platform handles tax' : 'Plateforme gère taxes'}</li>
                   </ul>
                   {sellerType === 'individual' && (
@@ -316,21 +320,7 @@ const TaxInterviewModal = ({ user, onComplete, onCancel }) => {
                     </p>
                   </div>
                   
-                  <div>
-                    <Label className="text-slate-900 dark:text-slate-100">
-                      {lang === 'en' ? 'Social Insurance Number (SIN)' : 'Numéro d\'Assurance Sociale (NAS)'} *
-                    </Label>
-                    <Input
-                      value={formData.sin}
-                      onChange={(e) => handleInputChange('sin', e.target.value.replace(/\D/g, '').slice(0, 9))}
-                      placeholder="123-456-789"
-                      maxLength={11}
-                      className="text-slate-900 dark:text-slate-100 font-mono"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {lang === 'en' ? '9 digits - Encrypted and secure' : '9 chiffres - Crypté et sécurisé'}
-                    </p>
-                  </div>
+                  {/* iter273 — SIN field removed. BidVex never requests a Social Insurance Number. */}
                   
                   <div>
                     <Label className="text-slate-900 dark:text-slate-100">

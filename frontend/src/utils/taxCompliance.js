@@ -13,7 +13,7 @@ export const TAX_DECLARATIONS = {
         "BidVex may be required to report my sales information to the Canada Revenue Agency (CRA) and Revenu Québec as per Part XX of the Income Tax Act.",
         "If my annual sales exceed $30,000 CAD, I am required to register for GST/HST and QST.",
         "BidVex may collect and remit GST/QST (14.975%) on my behalf for sales to Quebec buyers.",
-        "I must provide accurate tax information including my Social Insurance Number (SIN) and date of birth for CRA reporting.",
+        "I must provide accurate tax information including my legal name and date of birth for CRA reporting. BidVex never requests or stores a Social Insurance Number.",
         "I am responsible for declaring this income on my personal tax return."
       ],
       agreement: "I hereby certify that the information provided is true and accurate. I understand my tax obligations as an individual seller in Canada."
@@ -48,7 +48,7 @@ export const TAX_DECLARATIONS = {
         "BidVex peut être tenu de déclarer mes informations de vente à l'Agence du revenu du Canada (ARC) et à Revenu Québec conformément à la partie XX de la Loi de l'impôt sur le revenu.",
         "Si mes ventes annuelles dépassent 30 000 $ CAD, je dois m'inscrire à la TPS/TVH et à la TVQ.",
         "BidVex peut percevoir et remettre la TPS/TVQ (14,975 %) en mon nom pour les ventes aux acheteurs québécois.",
-        "Je dois fournir des informations fiscales exactes, y compris mon numéro d'assurance sociale (NAS) et ma date de naissance pour les rapports de l'ARC.",
+        "Je dois fournir des informations fiscales exactes, y compris mon nom légal et ma date de naissance pour les rapports de l'ARC. BidVex ne demande ni ne stocke jamais de numéro d'assurance sociale.",
         "Je suis responsable de déclarer ce revenu dans ma déclaration de revenus personnelle."
       ],
       agreement: "Je certifie par la présente que les informations fournies sont vraies et exactes. Je comprends mes obligations fiscales en tant que vendeur individuel au Canada."
@@ -74,18 +74,20 @@ export const TAX_DECLARATIONS = {
 };
 
 // Field requirements by seller type
+// iter273 — Individual sellers NO LONGER provide a tax_id (SIN). BidVex
+// never requests, stores, or processes a Social Insurance Number.
 export const TAX_FIELD_REQUIREMENTS = {
   individual: {
-    required: ['tax_id', 'date_of_birth', 'address'],
-    optional: ['gst_number', 'qst_number'],
+    required: ['legal_name', 'date_of_birth', 'address'],
+    optional: [],
     labels: {
       en: {
-        tax_id: 'Social Insurance Number (SIN)',
+        legal_name: 'Full Legal Name',
         date_of_birth: 'Date of Birth',
         address: 'Principal Residential Address'
       },
       fr: {
-        tax_id: 'Numéro d\'assurance sociale (NAS)',
+        legal_name: 'Nom légal complet',
         date_of_birth: 'Date de naissance',
         address: 'Adresse résidentielle principale'
       }

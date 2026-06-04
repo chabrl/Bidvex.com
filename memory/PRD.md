@@ -1,5 +1,141 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter273 — STORAGE DOC 404 + SIN COMPLIANCE + ROI DASHBOARD (Feb 04, 2026) ✅
+
+Two P0 blockers cleared and the marketing ROI loop visualized in the
+admin UI. **Pytest 205/205 PASS** (iter255→iter273 sprint scope, 15
+env-dependent skips, 0 failures). Backend healthy, lint clean.
+
+### P0 Mission 1 — Storage facility document 404 recovery
+- **Root cause**: Registration documents were written to
+  `/app/backend/uploads/storage_facilities/` (non-persistent), so they
+  were wiped on every container redeployment. The 404 page existed but
+  the user-facing UX was a bare toast that didn't explain the path
+  forward.
+- **Backend fix in `routes/storage_auctions.py`**:
+  - NEW `FACILITY_DOC_ROOT_PERSISTENT = Path("/app/uploads/storage_facilities")`
+    — primary write location, lives on the persistent mount (per
+    iter267) and survives redeploys.
+  - Upload writes to persistent root FIRST, then best-effort mirrors
+    into the legacy abs path for backwards reads.
+  - `serve_facility_doc()` candidate list now searches all 3 roots in
+    priority order: persistent → relative legacy → absolute legacy.
+  - NEW endpoint `POST /admin/storage-facilities/{id}/request-resubmission`
+    — flips `company_registration_verified=False`, stamps
+    `resubmission_requested_at` + `_by`, and fires the bilingual
+    rejection-style email to the facility owner so they get a clear
+    deep link to re-upload. Idempotent, returns
+    `{success, email_sent, requested_at, owner_email}`.
+- **Frontend fix in `pages/admin/AdminFacilities.js`**:
+  - `useDocOpener` now accepts an optional `facility` arg and passes
+    `facility.id` / `facility.email` / `facility.company_name` into
+    the missing-doc modal payload.
+  - Defensive 404 handling: ANY 404 on a `/storage_facilities/` URL
+    triggers the structured modal (handles cases where ingress 404
+    layers strip the `error_code` body).
+  - NEW "Request resubmission" CTA in the modal —
+    `data-testid="request-resubmission-btn"` — wired to the new
+    backend endpoint with bilingual success/failure toasts.
+  - View · Voir button now passes the full facility row alongside the
+    URL: `openDoc(f.company_registration_document_url, f)`.
+
+### P0 Mission 2 — Total SIN removal (CASL + privacy compliance)
+- **Directive**: BidVex must never request, store, or process a Social
+  Insurance Number from any user.
+- **Frontend (`components/TaxInterviewModal.js`)** — REMOVED:
+  - SIN input field for individual sellers
+  - SIN validator ("must be 9 digits")
+  - SIN bullet from the "What you'll provide" preview
+  - SIN key from the form state's `formData` initializer
+  - SIN from the submit payload — individuals now send `legal_name +
+    date_of_birth + address` only
+- **Frontend (`utils/taxCompliance.js`)** — REMOVED:
+  - `'tax_id'` from individual sellers' `required` field list
+  - SIN label strings (`"Social Insurance Number (SIN)"`,
+    `"Numéro d'assurance sociale (NAS)"`)
+  - SIN reference from the individual seller declaration text
+  - ADDED affirmative no-SIN policy statement (EN + FR) so the user
+    sees that BidVex never collects this data
+- **Backend (`routes/profiles.py`)** — `PUT /users/me/tax-profile`:
+  - REJECTS any payload that includes `sin` / `social_insurance_number`
+    / `sin_number` with HTTP 400 and structured `error_code=sin_not_accepted`
+    + bilingual messages
+  - Silently strips `tax_id` from individual-seller updates (so legacy
+    clients never write a SIN to `users.tax_id`)
+  - `date_of_birth` is the only remaining required field for individuals
+- **Backend (`routes/misc.py`)** — updated mask comment to clarify
+  `tax_id` is now exclusively a Business Number (never a SIN).
+- **Kept intentionally**: anti-fraud rules in
+  `listing_moderation_scanner.py` + `ProhibitedItemsPage.js` that
+  PROHIBIT selling SIN cards on the marketplace. These don't request
+  SIN from users — they enforce against fraudsters listing stolen IDs.
+
+### Mission 3 — Admin ROI dashboard (5 cards + 2 funnel pills)
+- **`pages/admin/AdminExternalCampaigns.jsx`**: top of the analytics
+  modal now renders a `roi-cards-row` with 5 testid-tagged cards:
+  - `roi-card-total-sent` — SendGrid 202 acks count
+  - `roi-card-opens-clicks` — combined opens / clicks
+  - `roi-card-registrations` — tracked signups with `Click → Reg %` sub
+  - `roi-card-premium-upgrades` — paid conversions with `Reg → Paid %` sub
+  - `roi-card-fallback-dispatches` — fallback-sender retries (amber when >0)
+- **`roi-funnel-rates`** pill strip below the cards surfaces the two
+  canonical marketing-performance percentages explicitly:
+  - `rate-click-to-reg` — `(registrations / clicks) × 100`, 1-decimal
+  - `rate-reg-to-premium` — `(premium_upgrades / registrations) × 100`
+- **Defensive `_safePct(num, denom)`** helper guards against
+  divide-by-zero (denom ≤ 0 → returns 0).
+- **Backend `GET /admin/external-campaigns/{id}/analytics`** now
+  surfaces `fallback_dispatches` (pulled from
+  `last_dispatch.fallback_used`) AND echoes the full `last_dispatch`
+  envelope for diagnostics.
+
+### Validation (`tests/test_iter273_p0_fixes_and_roi.py`)
+**20/20 PASS** covering:
+- 9 storage-doc tests (persistent root constants, write-mirror flow,
+  candidate-list ordering, resubmission endpoint registration + live
+  404 sanity + live success path against a real facility, frontend
+  modal CTA + facility-id passthrough, View-button arg shape)
+- 6 SIN compliance tests (static modal sweeps with comment-stripping,
+  field-requirements helper, backend SIN-key rejection, live HTTP 400
+  rejection, user-facing strings sweep, individual payload shape
+  contains no `sin` or `tax_id`)
+- 5 ROI dashboard tests (5 testid keys present, 2 funnel rate pills,
+  fallback-count payload reading, backend analytics endpoint surfaces
+  `fallback_dispatches`, live HTTP analytics envelope returns zero
+  defaults for a fresh campaign)
+
+### Files changed (iter273)
+**Backend MODIFIED**: `routes/storage_auctions.py` (persistent root +
+candidate search + resubmission endpoint), `routes/profiles.py` (SIN
+rejection + individual-branch tax_id stripping),
+`routes/external_campaigns.py` (analytics endpoint surfaces
+`fallback_dispatches`), `routes/misc.py` (mask comment update).
+**Frontend MODIFIED**: `pages/admin/AdminFacilities.js` (defensive 404
++ resubmission CTA + facility passthrough),
+`pages/admin/AdminExternalCampaigns.jsx` (5 ROI cards + funnel pills),
+`components/TaxInterviewModal.js` (SIN stripped),
+`utils/taxCompliance.js` (SIN labels stripped + no-SIN affirmation).
+**Backend NEW**: `tests/test_iter273_p0_fixes_and_roi.py` (20 tests).
+
+### Action items (user)
+1. **Save to GitHub → redeploy** preview → production.
+2. **Smoke test storage facility docs**: Admin → Storage Facilities →
+   click "View · Voir" on a facility whose file is missing. You should
+   now see the upgraded modal with EN+FR explanation AND a "Request
+   resubmission" CTA. Clicking it emails the facility owner.
+3. **Smoke test SIN removal**: Try the Tax Interview as an individual
+   seller. The SIN field should be gone, and `date_of_birth + address`
+   should be the only required fields. Posting a payload containing
+   `sin` directly via curl must come back as `400 sin_not_accepted`.
+4. **Smoke test ROI dashboard**: Admin → External Campaigns → open
+   any campaign's analytics modal. The 5-card row + 2 funnel-rate
+   pills should mount at the top. All zeros on a fresh campaign,
+   real values on a sent one.
+
+---
+
+
+
 ## Latest: iter272 — CONVERSION TRACKING + P0 CAMPAIGN-SEND BUG FIX (Feb 04, 2026) ✅
 
 P0 hotfix + full ROI loop for the External Email Marketing system.

@@ -721,6 +721,68 @@ function AnalyticsView({ campaignId, headers, onClose }) {
     );
   }
 
+  // iter273 — Top-of-modal ROI row: surfaces the full marketing funnel
+  // from email send → user signup → paid upgrade. Numbers come straight
+  // from the backend analytics envelope; conversion-rate % cells are
+  // computed defensively so a denominator of 0 never explodes.
+  const _safePct = (num, denom) => {
+    const n = Number(num) || 0;
+    const d = Number(denom) || 0;
+    if (d <= 0) return 0;
+    return Math.round((n / d) * 1000) / 10;  // 1-decimal precision
+  };
+  const totalSent = Number(data.delivered) || 0;
+  const totalOpens = Number(data.opened) || 0;
+  const totalClicks = Number(data.clicked) || 0;
+  const totalRegs = Number(data.registrations) || 0;
+  const totalUpgrades = Number(data.premium_upgrades) || 0;
+  const fallbackDispatches = Number(data.fallback_dispatches ?? data.fallback_used) || 0;
+  const clickToRegPct = _safePct(totalRegs, totalClicks);
+  const regToPremiumPct = _safePct(totalUpgrades, totalRegs);
+
+  const roiCards = [
+    {
+      key:   'total-sent',
+      label: 'Total Sent',
+      sub:   'SendGrid 202 acks',
+      val:   totalSent,
+      color: 'emerald',
+      icon:  '📤',
+    },
+    {
+      key:   'opens-clicks',
+      label: 'Opens / Clicks',
+      sub:   `${totalOpens} opened · ${totalClicks} clicked`,
+      val:   `${totalOpens} / ${totalClicks}`,
+      color: 'blue',
+      icon:  '👁️',
+    },
+    {
+      key:   'registrations',
+      label: 'Registrations',
+      sub:   `${clickToRegPct}% click → reg`,
+      val:   totalRegs,
+      color: 'indigo',
+      icon:  '✍️',
+    },
+    {
+      key:   'premium-upgrades',
+      label: 'Premium Upgrades',
+      sub:   `${regToPremiumPct}% reg → paid`,
+      val:   totalUpgrades,
+      color: 'violet',
+      icon:  '🚀',
+    },
+    {
+      key:   'fallback-dispatches',
+      label: 'Fallback Dispatches',
+      sub:   fallbackDispatches > 0 ? 'verified sender retries' : 'all sent natively',
+      val:   fallbackDispatches,
+      color: fallbackDispatches > 0 ? 'amber' : 'slate',
+      icon:  '🔁',
+    },
+  ];
+
   const cards = [
     { label: 'Delivered',    val: data.delivered, pct: data.delivery_rate_pct, color: 'emerald' },
     { label: 'Opened',       val: data.opened,    pct: data.open_rate_pct,     color: 'blue' },
@@ -732,7 +794,7 @@ function AnalyticsView({ campaignId, headers, onClose }) {
 
   return (
     <Dialog open={true} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-[720px] max-h-[90vh] overflow-y-auto" data-testid="analytics-view">
+      <DialogContent className="sm:max-w-[860px] max-h-[90vh] overflow-y-auto" data-testid="analytics-view">
         <DialogHeader>
           <DialogTitle>Campaign Analytics</DialogTitle>
           <div className="text-xs text-slate-500">
@@ -740,6 +802,49 @@ function AnalyticsView({ campaignId, headers, onClose }) {
             · Last updated: {data.last_updated_at ? new Date(data.last_updated_at).toLocaleString() : 'never'}
           </div>
         </DialogHeader>
+
+        {/* iter273 — ROI dashboard (5 cards) */}
+        <div
+          className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-2 pb-3 border-b border-slate-200 dark:border-slate-700"
+          data-testid="roi-cards-row"
+        >
+          {roiCards.map((c) => (
+            <Card key={c.key} data-testid={`roi-card-${c.key}`} className="rounded-xl">
+              <CardContent className="p-3 text-center">
+                <div className="text-lg mb-0.5" aria-hidden="true">{c.icon}</div>
+                <p className="text-[10px] uppercase tracking-wide text-slate-500">{c.label}</p>
+                <p
+                  className={`text-xl font-bold text-${c.color}-600`}
+                  data-testid={`roi-value-${c.key}`}
+                >
+                  {c.val}
+                </p>
+                <p className="text-[10px] text-slate-500 mt-0.5">{c.sub}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* iter273 — Funnel-rate strip — surfaces the two canonical
+            marketing-performance percentages directly next to the cards. */}
+        <div
+          className="flex flex-wrap gap-3 text-xs mb-3 px-1"
+          data-testid="roi-funnel-rates"
+        >
+          <div className="rounded-md bg-indigo-50 dark:bg-indigo-900/20 px-3 py-1.5">
+            <span className="text-slate-500">Click → Registration:</span>{' '}
+            <span className="font-semibold text-indigo-700" data-testid="rate-click-to-reg">
+              {clickToRegPct}%
+            </span>
+          </div>
+          <div className="rounded-md bg-violet-50 dark:bg-violet-900/20 px-3 py-1.5">
+            <span className="text-slate-500">Registration → Premium Paid:</span>{' '}
+            <span className="font-semibold text-violet-700" data-testid="rate-reg-to-premium">
+              {regToPremiumPct}%
+            </span>
+          </div>
+        </div>
+
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3" data-testid="analytics-cards">
           {cards.map(c => (
             <Card key={c.label}>

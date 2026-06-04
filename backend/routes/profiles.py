@@ -529,8 +529,26 @@ async def update_tax_profile(
     current_user = await _require_auth(credentials)
 
     seller_type = tax_data.get("seller_type")
+    # iter273 — BidVex never requests, stores, or processes a Social
+    # Insurance Number. Strip any incoming `tax_id` / `sin` keys from
+    # the individual-seller branch and reject the request if the
+    # frontend forgot to remove the field.
     if seller_type == "individual":
-        for field in ["tax_id", "date_of_birth"]:
+        for forbidden in ("sin", "social_insurance_number", "sin_number"):
+            if tax_data.get(forbidden):
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "error_code": "sin_not_accepted",
+                        "message_en": "BidVex does not request a Social Insurance Number. Please remove this field and resubmit.",
+                        "message_fr": "BidVex ne demande pas de numéro d'assurance sociale. Veuillez retirer ce champ et réessayer.",
+                    },
+                )
+        # `tax_id` is intentionally no longer required for individuals.
+        # If the frontend still sends one (legacy clients), silently drop
+        # it so it never reaches the database.
+        tax_data.pop("tax_id", None)
+        for field in ["date_of_birth"]:
             if not tax_data.get(field):
                 raise HTTPException(status_code=422, detail=f"Missing required field: {field}")
     elif seller_type == "business":
@@ -546,18 +564,22 @@ async def update_tax_profile(
 
     update_data = {
         "seller_type": seller_type,
-        "tax_id": tax_data.get("tax_id"),
         "tax_onboarding_completed": True,
         "tax_verification_status": "pending",
     }
+    # iter273 — `tax_id` is ONLY persisted for the business path (and
+    # always represents a Business Number, never a SIN). Individual
+    # sellers' update_data does NOT include `tax_id` at all.
     if seller_type == "individual":
         update_data.update({
+            "legal_name": tax_data.get("legal_name"),
             "date_of_birth": tax_data.get("date_of_birth"),
             "address": tax_data.get("address"),
             "is_tax_registered": False,
         })
     else:
         update_data.update({
+            "tax_id": tax_data.get("tax_id"),
             "neq_number": tax_data.get("neq_number"),
             "gst_number": tax_data.get("gst_number"),
             "qst_number": tax_data.get("qst_number"),
