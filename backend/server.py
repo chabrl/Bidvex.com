@@ -769,6 +769,10 @@ try:
         ("routes.notifications", "notifications_router", None, False),
         # iter267 Mission 2 — Admin notification attachment download.
         ("routes.notifications", "admin_notifications_router", None, False),
+        # iter271 — External campaign manager (acquisition emails).
+        ("routes.external_campaigns", "router", None, False),
+        ("routes.external_campaigns", "public_router", None, False),
+        ("routes.external_campaigns", "suppression_router", None, False),
         ("routes.watchlist", "watchlist_router", None, False),
         ("routes.tax", "tax_calc_router", None, False),
         ("routes.messages", "messages_router", "set_messages_db", False),

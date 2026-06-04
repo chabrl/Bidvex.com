@@ -1,5 +1,103 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter271 — EXTERNAL EMAIL CAMPAIGNS (Acquisition Marketing) (Jun 03, 2026) ✅
+
+Complete acquisition-marketing system for sending to non-registered
+contacts. **Pytest 211/211 PASS** across iter255→iter271 (23 new + 188
+regression). Strictly isolated from existing platform marketing.
+
+### Mission 1 — Schema ✅ (3 new collections)
+- `external_email_campaigns` — full lifecycle doc with analytics
+- `external_email_suppressions` — opt-out + bounce + spam list
+- `external_campaign_attachments` — uploaded files metadata
+
+### Mission 2 — Backend API ✅ (23 endpoints across 3 routers)
+- **CRUD**: POST/GET/PATCH/DELETE `/api/admin/external-campaigns`
+- **Recipients**: manual paste (`/recipients/manual`), CSV upload
+  (`/recipients/csv`, max 10K rows / 5 MB), preview, clear
+- **Attachments**: upload (PDF/JPG/PNG/DOCX/XLSX, 3 MB cap, 3 max),
+  delete, admin download (path-traversal guarded)
+- **Send**: `send-test`, `schedule`, `send-now` (CASL + empty-list
+  pre-flight), `pause`, `cancel`
+- **Analytics**: `GET /analytics`, `POST /analytics/refresh`
+- **Public unsubscribe**: `GET /api/external/unsubscribe?token=…`
+  (JWT-signed, bilingual confirmation page)
+- **Suppression list**: add / remove / paginated list
+
+### Mission 3 — Email sending (`services/external_email.py`) ✅
+- FROM: `noreply@bidvex.ca` (acquisition domain) — env-overridable
+- Reply-To: `support@bidvex.com`
+- List-Unsubscribe + List-Unsubscribe-Post (One-Click)
+- Precedence: bulk
+- Categories: `external_marketing` + `acquisition`
+- Custom args: `campaign_id` + `campaign_type=external` (webhook keys)
+- ClickTracking OFF, OpenTracking ON, SubscriptionTracking OFF
+- X-Entity-Ref-ID per-recipient-per-day SHA-256 hash
+- Attachments: base64-encoded, MIME validated
+- UTM injection: `utm_source=email`, `utm_medium=marketing`,
+  `utm_campaign={campaign_id}` on every absolute href (skips
+  `mailto:`, `#anchors`, and unsubscribe URLs)
+
+### Mission 4 — Frontend ✅
+- **NEW** `pages/admin/AdminExternalCampaigns.jsx` — 700+ LOC,
+  fully isolated tab in Admin → Settings → "📬 External Campaigns"
+- 4-step wizard: Content → Recipients → Attachments → Review & Send
+- Campaign list with status badges (Draft/Scheduled/Sending/Sent/Failed/Paused)
+- Manual paste + CSV upload with live stats (added/duplicates/invalid/suppressed)
+- Attachment list with remove button + size display
+- Send test, schedule, send now (with confirmation)
+- Analytics modal with 6 metric cards
+- Suppression list sub-tab with search + manual add + remove
+
+### Mission 5 — CASL compliance ✅
+- `validate_casl()` blocks sends when:
+  - Subject empty
+  - Body empty
+  - Body missing `{unsubscribe_url}` AND no "unsubscribe" anywhere
+- `casl_footer_html()` auto-appends mandatory bilingual footer if
+  the admin forgot the placeholder
+- Bilingual unsubscribe confirmation page (EN/FR via token's `lang`)
+- Physical address line: "BidVex Inc. | Sherbrooke, QC, Canada"
+
+### SendGrid Webhook integration ✅
+- `_handle_external_campaign_event()` in `routes/sendgrid_webhook.py`
+  routes events with `custom_args.campaign_type == "external"` to:
+  - Increment `analytics.delivered/opened/clicked/bounced/unsubscribed/spam_reports`
+  - Auto-upsert into `external_email_suppressions` on bounce / unsubscribe /
+    spamreport (with reason tag)
+  - Stamp `analytics.last_updated_at`
+
+### Validation
+- **23/23 NEW iter271 tests pass** with full live HTTP smoke coverage:
+  CRUD round-trip, recipient dedup/invalid/suppression, CSV parsing,
+  send-now block paths, attachment MIME/size validation, public
+  unsubscribe token round-trip, admin-only enforcement.
+- **211/211 PASS regression** across iter255→iter271
+- Backend + frontend lint clean
+
+### Files changed (iter271)
+**Backend NEW**: `services/external_email.py` (sender + UTM + token +
+CASL helpers), `routes/external_campaigns.py` (3 routers, 23 endpoints),
+`tests/test_iter271_external_campaigns.py` (23 tests).
+**Backend MODIFIED**: `routes/sendgrid_webhook.py` (external event
+handler + auto-suppression), `server.py` (router registration).
+**Frontend NEW**: `pages/admin/AdminExternalCampaigns.jsx` (4-step
+wizard + analytics + suppression).
+**Frontend MODIFIED**: `pages/AdminDashboard.js` (new tab mount).
+
+### Action items (user)
+1. **Save to GitHub → redeploy** to production.
+2. **DNS**: ensure `noreply@bidvex.ca` is also DKIM-authenticated in
+   SendGrid (the `.com` SPF/DKIM was the iter270 fix; acquisition
+   emails ride on `.ca` per spec).
+3. **Test**: Admin → Settings → "📬 External Campaigns" → New
+   Campaign → 4-step wizard → Send Test to your own inbox.
+4. **CSV import test**: prepare a CSV with `email` column and try
+   ingesting 1000 sample contacts.
+
+---
+
+
 ## Latest: iter270 — EMAIL DELIVERABILITY (Anti-Spam) (Jun 03, 2026) ✅
 
 P0 deliverability sprint. **Pytest 191/191 PASS** (18 new + 173 regression).

@@ -285,6 +285,17 @@ async def _process_events(events: List[Dict[str, Any]]) -> Dict[str, int]:
         etype = (ev.get("event") or "").lower()
         counters[etype] = counters.get(etype, 0) + 1
         try:
+            # iter271 — External campaign analytics counters.
+            # The `custom_args` keys ride alongside top-level fields
+            # in SendGrid's webhook payload, so check both.
+            campaign_type = (
+                ev.get("campaign_type")
+                or (ev.get("custom_args") or {}).get("campaign_type")
+                or ""
+            )
+            if campaign_type == "external":
+                await _handle_external_campaign_event(db, ev)
+
             if etype in DELIVERABILITY_KILL_EVENTS:
                 await _handle_deliverability_kill(db, ev)
             elif etype in UNSUBSCRIBE_EVENTS:
@@ -303,6 +314,65 @@ async def _process_events(events: List[Dict[str, Any]]) -> Dict[str, int]:
             )
     logger.info(f"[SG_WEBHOOK] Processed {sum(counters.values())} events: {counters}")
     return counters
+
+
+# ─── iter271 — External campaign event handler ──────────────────────────────
+
+
+_EXTERNAL_FIELD_MAP: Dict[str, str] = {
+    "delivered":   "analytics.delivered",
+    "open":        "analytics.opened",
+    "click":       "analytics.clicked",
+    "bounce":      "analytics.bounced",
+    "dropped":     "analytics.bounced",
+    "deferred":    "analytics.bounced",
+    "blocked":     "analytics.bounced",
+    "unsubscribe": "analytics.unsubscribed",
+    "group_unsubscribe": "analytics.unsubscribed",
+    "spamreport":  "analytics.spam_reports",
+}
+
+_EXTERNAL_AUTO_SUPPRESS: Dict[str, str] = {
+    "bounce":            "bounce",
+    "dropped":           "bounce",
+    "blocked":           "bounce",
+    "unsubscribe":       "unsubscribe",
+    "group_unsubscribe": "unsubscribe",
+    "spamreport":        "spam_report",
+}
+
+
+async def _handle_external_campaign_event(db, event: Dict[str, Any]) -> None:
+    """Update `external_email_campaigns.analytics` + auto-suppress on
+    bounce/unsubscribe/spamreport for external campaigns only."""
+    etype = (event.get("event") or "").lower()
+    custom = event.get("custom_args") or {}
+    campaign_id = event.get("campaign_id") or custom.get("campaign_id")
+    email = (event.get("email") or "").strip().lower()
+    if not campaign_id:
+        logger.info(f"[external-campaign-event] {etype} missing campaign_id — skipped")
+        return
+
+    field = _EXTERNAL_FIELD_MAP.get(etype)
+    if field:
+        await db.external_email_campaigns.update_one(
+            {"id": campaign_id},
+            {"$inc": {field: 1},
+             "$set": {"analytics.last_updated_at": datetime.now(timezone.utc).isoformat()}},
+        )
+
+    suppress_reason = _EXTERNAL_AUTO_SUPPRESS.get(etype)
+    if suppress_reason and email:
+        await db.external_email_suppressions.update_one(
+            {"email": email},
+            {"$setOnInsert": {
+                "email":         email,
+                "reason":        suppress_reason,
+                "campaign_id":   campaign_id,
+                "suppressed_at": datetime.now(timezone.utc).isoformat(),
+            }},
+            upsert=True,
+        )
 
 
 # ─── Routes ─────────────────────────────────────────────────────────────────

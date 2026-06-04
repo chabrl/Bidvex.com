@@ -27,6 +27,8 @@ import CategoryManager from './admin/CategoryManager';
 import PromotionManager from './admin/PromotionManager';
 import AffiliateManager from './admin/AffiliateManager';
 import AdminAffiliatePayouts from './admin/AdminAffiliatePayouts';
+// iter271 — External email campaigns (acquisition marketing)
+import AdminExternalCampaigns from './admin/AdminExternalCampaigns';
 import ReportManager from './admin/ReportManager';
 import AnalyticsDashboard from './admin/AnalyticsDashboard';
 import MessagingOversight from './admin/MessagingOversight';
@@ -133,6 +135,8 @@ const SECONDARY_TABS = {
     { id: 'demo-accounts', label: 'Demo Accounts', icon: '🎭', lucideIcon: DollarSign },
     { id: 'coupon-codes', label: 'Coupon Codes', icon: '🎟️', lucideIcon: Ticket },
     { id: 'email-marketing', label: 'Email Marketing', icon: '📤', lucideIcon: Send },
+    // iter271 — External acquisition campaigns
+    { id: 'external-campaigns', label: 'External Campaigns', icon: '📬', lucideIcon: Send },
     { id: 'marketing-integrations', label: 'Marketing Integrations', icon: '📣', lucideIcon: Send },
     { id: 'trust-safety', label: 'Trust & Safety', icon: '🛡️', lucideIcon: Shield },
     { id: 'escrow-manager', label: 'Escrow & Penalties', icon: '🔒', lucideIcon: Lock },
@@ -491,6 +495,8 @@ const AdminDashboard = () => {
           case 'demo-accounts': return <DemoAccountsPage />;
           case 'coupon-codes': return <CouponManager />;
           case 'email-marketing': return <EmailMarketingManager />;
+          // iter271 — External acquisition campaigns
+          case 'external-campaigns': return <AdminExternalCampaigns />;
           case 'marketing-integrations': return <AdminMarketingIntegrations />;
           case 'trust-safety': return <TrustSafetyDashboard />;
           case 'escrow-manager': return <AdminEscrowManager />;
