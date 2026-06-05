@@ -1,6 +1,57 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: iter283-hotfix-2 — VEHICLE VISIBILITY DEEP FIX (Feb 05, 2026) ✅
+## Latest: iter283 — FINAL PRODUCTION-READY BUILD (Feb 05, 2026) 🚀
+
+iter283 + hotfix-1 + hotfix-2 are LOCKED for production deploy.
+All fixes consolidated. Final sanity check: 100% GREEN compliance.
+
+### Compliance matrix (final pre-deploy run)
+- **iter283 full suite** (`tests/test_iter283*.py`): **40/40 PASS**
+- **Full sprint scope** (iter217 + iter219 + iter220 + iter222 +
+  iter237 + iter238 + iter27x + iter28x): **394 passed, 24
+  env-skipped, 0 failures** (90.76s)
+- **Backend health**: `/api/listings`, `/api/vehicles`,
+  `/api/storage-auctions`, `/api/marketplace/items` all return
+  **HTTP 200**
+- **Startup backfills idempotent on latest boot**:
+  - `[iter283] section backfill counts: {'storage': 0, 'vehicles':
+    0, 'lots': 0, 'marketplace': 0}` (no further updates needed)
+  - `[iter283-hotfix-2] vehicle fast-track: {'promoted': 0,
+    'approved_sellers': 2} toggle_default_written=False`
+    (idempotent — state is healthy)
+- **Frontend compile**: clean (no errors in supervisor logs)
+
+### Deferred to post-launch backlog (P2)
+- **"My Drafts" seller dashboard view** — Pre-launch decision: NOT
+  shipping. Unverified third-party sellers who fall into the strict
+  vehicle-approval workflow still have no way to discover their
+  draft listings or see what's blocking submission. Post-launch
+  optimization: add `/vehicle-auctions/my-listings?status=draft`
+  view with a "Submit for Approval" CTA + a 10-photo + required-
+  category checklist that closes the silent-fail UX gap.
+- **Pydantic V1 → V2 migration** (P1 backlog — touches 50+ models)
+- **Split `services/email_notifications.py`** (P2 backlog —
+  3000+ lines)
+
+### Production deployment readiness
+Codebase is locked. The user must use the **"Save to GitHub"**
+button in the chat input to push this build to production via the
+Emergent platform pipeline. Direct git commands (`git push`,
+`git commit`) are not available to the coding agent — the platform
+deployment flow handles versioning, image build, and rollout.
+
+After redeploy completes:
+1. The startup backfill runs on the production boot — every active
+   listing gets the canonical `section` + `listing_type` tags.
+2. The vehicle fast-track promotes any DRAFT vehicles from
+   verified sellers to ACTIVE in the same boot pass.
+3. `vehicle_auctions_enabled` defaults to True if missing.
+
+---
+
+
+
+## Previous: iter283-hotfix-2 — VEHICLE VISIBILITY DEEP FIX (Feb 05, 2026) ✅
 
 After iter283-hotfix shipped, the user reported vehicles section
 STILL empty in BOTH preview and production. Investigation surfaced
