@@ -49,12 +49,52 @@ async def _auth(credentials):
     return await fn(credentials)
 
 
+def _section_deposit_default(listing: dict) -> tuple[float, str, str]:
+    """iter283 Mission 5 — Return section-default deposit (amount, type, label).
+    Used when the listing has `requires_deposit=True` but no explicit
+    `deposit_amount` set. Returns (0, "fixed", "") for sections without
+    a default rule (marketplace / generic).
+
+    Section rules per spec:
+      • Storage          → $50 flat (refundable)
+      • Vehicles         → $200 floor OR 10% of starting_price (whichever higher)
+      • Lots (>$500)     → $50 floor OR 10% of starting_price
+      • Marketplace      → no default (returns 0)
+    """
+    from services.listing_sections import infer_section
+    section = infer_section(listing)
+    starting = float(listing.get("starting_price") or 0)
+    if section == "storage":
+        return (50.0, "fixed", "$50 Refundable Storage Deposit")
+    if section == "vehicles":
+        amt = max(200.0, round(starting * 0.10, 2))
+        return (amt, "fixed", "Vehicle Bidding Deposit (Refundable)")
+    if section == "lots" and starting > 500.0:
+        amt = max(50.0, round(starting * 0.10, 2))
+        return (amt, "fixed", "10% Refundable Deposit")
+    return (0.0, "fixed", "")
+
+
 def _calc_deposit_amount(listing: dict) -> float:
     if not listing.get("requires_deposit"):
+        # iter283 Mission 5 — Storage and vehicle listings have an
+        # implicit deposit requirement even when the legacy field
+        # `requires_deposit` is unset. Section-default kicks in.
+        try:
+            from services.listing_sections import infer_section
+            _sec = infer_section(listing)
+            if _sec in ("storage", "vehicles"):
+                amt, _t, _l = _section_deposit_default(listing)
+                if amt > 0:
+                    return amt
+        except Exception:  # noqa: BLE001
+            pass
         return 0.0
     amount = float(listing.get("deposit_amount") or 0)
     if amount <= 0:
-        return 0.0
+        # Explicit opt-in but no amount specified → use section default.
+        amt, _t, _l = _section_deposit_default(listing)
+        return amt
     if (listing.get("deposit_type") or "fixed").lower() == "percentage":
         starting = float(listing.get("starting_price") or 0)
         return round(starting * (amount / 100.0), 2)
@@ -90,6 +130,13 @@ async def check_deposit(
     required = bool(listing.get("requires_deposit"))
     amount = _calc_deposit_amount(listing)
     currency = (listing.get("currency") or "CAD").upper()
+    # iter283 Mission 5 — Section-default may auto-require deposit on
+    # storage / vehicle listings even when the legacy `requires_deposit`
+    # flag is unset. Reflect that in the response.
+    if not required and amount > 0:
+        required = True
+    _amt_default, _type_default, _label_default = _section_deposit_default(listing)
+    deposit_label = listing.get("deposit_label") or _label_default or None
 
     existing = await db.bidding_deposits.find_one(
         {"auction_id": auction_id, "user_id": user.id,
@@ -101,7 +148,8 @@ async def check_deposit(
         "paid": bool(existing),
         "amount": amount,
         "currency": currency,
-        "deposit_type": listing.get("deposit_type"),
+        "deposit_type": listing.get("deposit_type") or _type_default,
+        "deposit_label": deposit_label,
         "deposit": existing,
     }
 

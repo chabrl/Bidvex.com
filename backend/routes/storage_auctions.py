@@ -328,17 +328,19 @@ async def list_storage_auctions(
     auctions = await cursor.to_list(limit)
     total = await db.storage_auctions.count_documents(query)
 
-    # iter222 Repair 1 — Storage lockers created via the general
-    # `/create-listing?type=storage_locker` form write to the `listings`
-    # collection rather than `storage_auctions`. Pull them in here so
-    # buyers see EVERY storage locker on `/storage-auctions`, regardless
-    # of which authoring flow created the doc.
-    # `listings`-collection storage lockers don't have facility metadata
-    # (those fields live in `storage_metadata`); we map them into the same
-    # shape the storage card component expects.
+    # iter222 Repair 1 / iter283 expansion — Storage units created via the
+    # general `/create-listing` form (or admin tooling) write to the
+    # `listings` collection. iter283 now accepts EVERY storage alias
+    # (`storage_locker`, `storage_auction`, `storage`, `unit`,
+    # `unit_auction`) so the UNIT 205 case appears on `/storage-auctions`
+    # regardless of which authoring flow created it.
+    from services.listing_sections import STORAGE_TYPES
     listings_query = {
         "status": "active",
-        "listing_type": "storage_locker",
+        "$or": [
+            {"listing_type": {"$in": list(STORAGE_TYPES)}},
+            {"section": "storage"},
+        ],
         "is_demo": {"$ne": True},
         "is_demo_sandbox": {"$ne": True},
     }

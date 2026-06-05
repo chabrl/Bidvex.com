@@ -35,7 +35,9 @@ import {
   Receipt,
   Scale,
   X,
-  Flame
+  Flame,
+  Warehouse,
+  Car
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCurrency } from '../utils/currencyFormatter';
@@ -850,6 +852,43 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
                 {isFrench ? 'Partie d\'une enchère' : 'Part of Auction'}
               </Badge>
             )}
+            {/* iter283 — Section routing badge so buyers know which
+                surface a marketplace card actually belongs to. */}
+            {(() => {
+              const _lt = (item.listing_type || '').toLowerCase();
+              const _sec = (item.section || '').toLowerCase();
+              const isStorage = _sec === 'storage' || ['storage_locker','storage_auction','storage','unit','unit_auction'].includes(_lt);
+              const isVehicle = _sec === 'vehicles' || ['vehicle_auction','vehicles','vehicle'].includes(_lt);
+              const isLots = _sec === 'lots' || ['lot_auction','lots','multi_lot','multi_item'].includes(_lt);
+              if (isStorage) {
+                return (
+                  <Badge data-testid="section-badge-storage"
+                    className="bg-amber-100 text-amber-800 border-amber-200 text-[10px] font-bold tracking-wide">
+                    <Warehouse className="h-3 w-3 mr-1" />
+                    {isFrench ? 'Entreposage' : 'Storage'}
+                  </Badge>
+                );
+              }
+              if (isVehicle) {
+                return (
+                  <Badge data-testid="section-badge-vehicles"
+                    className="bg-slate-200 text-slate-800 border-slate-300 text-[10px] font-bold tracking-wide">
+                    <Car className="h-3 w-3 mr-1" />
+                    {isFrench ? 'Véhicules' : 'Vehicles'}
+                  </Badge>
+                );
+              }
+              if (isLots && item.listing_type !== 'multi_lot') {
+                return (
+                  <Badge data-testid="section-badge-lots"
+                    className="bg-indigo-100 text-indigo-800 border-indigo-200 text-[10px] font-bold tracking-wide">
+                    <Package className="h-3 w-3 mr-1" />
+                    {isFrench ? 'Lots' : 'Lots'}
+                  </Badge>
+                );
+              }
+              return null;
+            })()}
             {/* New Listing Badge */}
             {item.created_at && (Date.now() - new Date(item.created_at).getTime()) < 86400000 * 3 && (
               <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 text-xs" data-testid="new-badge">

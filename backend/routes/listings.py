@@ -427,6 +427,37 @@ async def create_listing(
         getattr(listing_data, "visible_content_tags", None)
     )
 
+    # iter283 — Universal section auto-tagging.
+    # Stamp BOTH `listing_type` (if missing or non-canonical) AND `section`
+    # so every listing routes to the right marketplace surface. This closes
+    # the UNIT 205 bug: a storage unit created via the general create-form
+    # used to land in `db.listings` with `listing_type=null`, which made it
+    # invisible to /storage-auctions.
+    from services.listing_sections import (
+        infer_section,
+        CANONICAL_TYPE,
+        STORAGE_TYPES,
+        VEHICLE_TYPES,
+        LOT_TYPES,
+    )
+    _inferred_section = infer_section(listing_dict)
+    listing_dict["section"] = _inferred_section
+    # Only overwrite listing_type when it's missing OR when the current
+    # value is incompatible with the inferred section (e.g. category=Storage
+    # but listing_type=marketplace).
+    _current_lt = (listing_dict.get("listing_type") or "").strip().lower()
+    _aliases_by_section = {
+        "storage":     STORAGE_TYPES,
+        "vehicles":    VEHICLE_TYPES,
+        "lots":        LOT_TYPES,
+        "marketplace": ("marketplace",),
+    }
+    _allowed_aliases = _aliases_by_section.get(_inferred_section, ())
+    if not _current_lt or _current_lt not in _allowed_aliases:
+        canonical_key = {"storage": "storage", "vehicles": "vehicle",
+                         "lots": "lots", "marketplace": "marketplace"}[_inferred_section]
+        listing_dict["listing_type"] = CANONICAL_TYPE[canonical_key]
+
     # iter237/iter282 — auto-populate GeoJSON Point with seller-pin accuracy.
     # Priority chain (per iter282 Change 4):
     #   1. postal_code → Nominatim (most accurate; FSA-precise)
@@ -571,10 +602,20 @@ async def create_listing(
     # fires for listings that resolved real coordinates AND are publicly
     # visible (status=active). Demo/sandbox listings are skipped because
     # `is_demo_sandbox` excludes them from the public marketplace.
+    # iter283 hotfix — `location` is a STRING per the Listing model
+    # ("Montreal, QC"); coordinates live under `geo.coordinates` (iter237
+    # GeoJSON Point). The old `(result.get("location") or {}).get(...)`
+    # crashed with AttributeError on every new listing.
+    _geo = result.get("geo")
+    _has_coords = bool(
+        isinstance(_geo, dict)
+        and isinstance(_geo.get("coordinates"), (list, tuple))
+        and len(_geo.get("coordinates") or []) == 2
+    )
     if (
         result.get("status") == "active"
         and not result.get("is_demo_sandbox")
-        and (result.get("location") or {}).get("coordinates")
+        and _has_coords
     ):
         try:
             from services.geo_notifications import notify_nearby_users
@@ -596,10 +637,11 @@ async def get_listings(
     buyer_province: Optional[str] = None,    # for "nearby_first" geo-sort
 ):
     db = get_db()
-    # Phase 6.2 Task 1 — Storage locker auctions are walled off from the
-    # global marketplace. They are visible ONLY on /storage-auctions (which
-    # hits the dedicated routes in `storage_auctions.py`).
-    query = {"status": "active", "listing_type": {"$ne": "storage_locker"}}
+    # iter283 — Marketplace shows ALL listing types. Storage / vehicle
+    # / lots listings are no longer walled off; section badges on the
+    # cards help buyers distinguish. Section-specific surfaces filter
+    # by their own listing_type list.
+    query = {"status": "active"}
     if category:
         query["category"] = category
     if city:
@@ -646,9 +688,9 @@ async def get_listings(
 
     listings = await db.listings.find(query, {"_id": 0}).sort(sort_spec).skip(skip).limit(limit).to_list(limit)
 
-    # Also include individual lots from multi-item listings as independent items
-    # Phase 6.2 Task 1 — Wall-off storage_locker auctions from the marketplace.
-    multi_query = {"status": "active", "listing_type": {"$ne": "storage_locker"}}
+    # iter283 — Multi-item listings also surface in marketplace. Storage
+    # walls were removed for universal dual-visibility per the spec.
+    multi_query = {"status": "active"}
     if category:
         multi_query["category"] = category
     if city:
@@ -802,6 +844,12 @@ async def get_listing(listing_id: str, background_tasks: BackgroundTasks):
                 "subscription_tier": 1,
                 "platform_fee_paid": 1,
                 "partner_subscription_active": 1,
+                # iter283 — Public seller-info fields surfaced on the
+                # listing detail "Seller Information" card.
+                "website": 1,
+                "company_name": 1,
+                "province": 1,
+                "city": 1,
             }}],
         }},
         {"$project": {"_id": 0}},
@@ -820,8 +868,15 @@ async def get_listing(listing_id: str, background_tasks: BackgroundTasks):
         listing_doc["auction_end_date"] = datetime.fromisoformat(listing_doc["auction_end_date"])
 
     # In-process enrichment using the seller doc already loaded by $lookup.
+    # iter283 — infer the listing context (storage / vehicle / general)
+    # from listing shape so a multi-flagged seller (e.g. admin who is
+    # is_vehicle_dealer AND is_storage_facility) gets the badge that
+    # matches the LISTING, not their most-aggressive seller flag.
     from services.listing_seller_enrichment import enrich_listing_with_seller
-    listing_doc = enrich_listing_with_seller(listing_doc, seller, "general")
+    from services.listing_sections import infer_seller_context
+    listing_doc = enrich_listing_with_seller(
+        listing_doc, seller, infer_seller_context(listing_doc),
+    )
 
     # Fire-and-forget view increment — never blocks the response.
     background_tasks.add_task(_increment_listing_views, listing_id)

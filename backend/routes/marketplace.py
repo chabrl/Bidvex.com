@@ -116,6 +116,9 @@ _LISTING_PROJECTION = {
     # iter217 Phase 4 — BP fields needed for partner card display
     "buyer_premium_rate": 1, "premium_percentage": 1,
     "custom_buyer_premium_rate": 1, "buyers_premium_percent": 1,
+    # iter283 — Section routing so marketplace cards can show
+    # "Storage / Vehicles / Lots" badges.
+    "listing_type": 1, "section": 1,
 }
 _MULTI_PROJECTION = {
     "_id": 0, "id": 1, "title": 1, "description": 1, "category": 1,
@@ -130,6 +133,8 @@ _MULTI_PROJECTION = {
     # iter217 Phase 4 — BP fields needed for partner card display
     "buyer_premium_rate": 1, "premium_percentage": 1,
     "custom_buyer_premium_rate": 1, "buyers_premium_percent": 1,
+    # iter283 — Section routing.
+    "listing_type": 1, "section": 1,
 }
 
 
@@ -155,8 +160,12 @@ async def _build_marketplace_items():
     single_listings = await db.listings.find(
         {
             "status": "active",
-            "category": {"$nin": VEHICLE_CATEGORIES + ["storage_locker"]},
-            "listing_type": {"$ne": "storage_locker"},
+            "category": {"$nin": VEHICLE_CATEGORIES},
+            # iter283 — Marketplace now shows ALL listing types
+            # (storage / vehicles / lots / marketplace). Section pages
+            # add their own filter. Section badges on the cards help
+            # buyers distinguish. Per the spec: "every listing must
+            # appear in the Marketplace AND in its specific section".
             "is_demo": {"$ne": True},
             "is_demo_sandbox": {"$ne": True},
         },
@@ -341,9 +350,15 @@ async def _build_marketplace_items():
             "description_fr": listing.get("description_fr"),
             "parent_auction_title_en": None,
             "parent_auction_title_fr": None,
+            # iter283 — Section routing badge on marketplace cards.
+            "listing_type": listing.get("listing_type"),
+            "section": listing.get("section"),
         }
         # iter217 Phase 4 — surface seller_account_type + canonical BP.
-        _enrich_seller_fields(single_doc, listing, "general")
+        # iter283 — Use per-listing inferred context so a multi-flagged
+        # seller's storage row shows a storage badge.
+        from services.listing_sections import infer_seller_context
+        _enrich_seller_fields(single_doc, listing, infer_seller_context(listing))
         items.append(single_doc)
 
     # ── High-Velocity Sort ──
@@ -503,8 +518,8 @@ async def get_marketplace_items(
                         "status": "active",
                         "seller_id": current_user.id,
                         "is_demo_sandbox": True,
-                        "category": {"$nin": ["storage_locker"]},
-                        "listing_type": {"$ne": "storage_locker"},
+                        # iter283 — sandbox owner sees ALL their own listings
+                        # (including storage) in marketplace per dual-visibility.
                     },
                     _LISTING_PROJECTION,
                 ).sort("auction_end_date", 1).limit(100).to_list(100)
@@ -671,12 +686,12 @@ async def track_item_click(item_id: str):
 @marketplace_router.post("/listings/search/location")
 async def search_by_location(params: LocationSearchParams):
     db = get_db()
-    # iter211 P4 — exclude demo listings from public location search
-    # iter222 Repair 1 — exclude storage_locker listings (own surface)
+    # iter211 P4 — exclude demo listings from public location search.
+    # iter283 — Marketplace location search includes storage + vehicle
+    # listings (universal dual-visibility).
     query = {
         "status": "active",
         "is_demo": {"$ne": True},
-        "listing_type": {"$ne": "storage_locker"},
     }
     
     if params.category:

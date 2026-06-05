@@ -596,7 +596,9 @@ const App = () => {
           <Route path="/vehicle-auctions/create" element={
             <ProtectedRoute>
               <BlockForStorageFacility redirectTo="/storage-auctions/create">
-                <CreateVehicleListingPage />
+                <ErrorBoundary scope="vehicle-listing-create">
+                  <CreateVehicleListingPage />
+                </ErrorBoundary>
               </BlockForStorageFacility>
             </ProtectedRoute>
           } />

@@ -112,6 +112,22 @@ def enrich_listing_with_seller(
     listing["seller_partner_company_name"] = (
         seller.get("partner_company_name") if account_type == "partner" else None
     )
+    # iter283 — Public seller-info fields surfaced on the listing detail
+    # "Seller Information" card. None when missing so the FE can hide the
+    # row cleanly. Only forwarded for non-individual sellers to avoid
+    # leaking a private seller's home address-derived city/province.
+    if account_type in ("partner", "vehicle_dealer", "storage_facility"):
+        listing["seller_website"] = (seller.get("website") or None)
+        listing["seller_company_name"] = (
+            seller.get("partner_company_name")
+            or seller.get("company_name")
+            or None
+        )
+        listing["seller_province"] = seller.get("province") or listing.get("seller_province")
+        listing["seller_city"] = seller.get("city") or listing.get("seller_city")
+    else:
+        listing.setdefault("seller_website", None)
+        listing.setdefault("seller_company_name", None)
 
     # Canonical buyer's premium rate (fraction). Prefer explicit per-listing
     # fields; fall back to the partner's account-level BP.
@@ -160,13 +176,31 @@ async def enrich_listings_bulk_async(
                 "subscription_tier": 1,
                 "platform_fee_paid": 1,
                 "partner_subscription_active": 1,
+                # iter283 — Public seller-info fields (website + company)
+                # used by the listing detail "Seller Information" card.
+                "website": 1,
+                "company_name": 1,
+                "province": 1,
+                "city": 1,
             },
         )
         async for s in cursor:
             sellers_by_id[s["id"]] = s
     for listing in listings:
         seller = sellers_by_id.get(listing.get("seller_id"), {})
-        enrich_listing_with_seller(listing, seller, listing_context)
+        # iter283 — When `listing_context` is "auto" (or None), infer the
+        # context per-listing so a multi-flagged seller's storage row
+        # shows a storage badge while their vehicle row shows a vehicle
+        # badge. Callers can still pin a single context (e.g. "vehicle"
+        # for the vehicle auctions page) by passing it explicitly.
+        ctx = listing_context
+        if not ctx or ctx == "auto":
+            try:
+                from services.listing_sections import infer_seller_context
+                ctx = infer_seller_context(listing)
+            except Exception:  # noqa: BLE001
+                ctx = "general"
+        enrich_listing_with_seller(listing, seller, ctx)
     return listings
 
 
@@ -197,6 +231,11 @@ async def enrich_listing_async(
             "subscription_tier": 1,
             "platform_fee_paid": 1,
             "partner_subscription_active": 1,
+            # iter283 — Public seller-info fields.
+            "website": 1,
+            "company_name": 1,
+            "province": 1,
+            "city": 1,
         },
     )
     return enrich_listing_with_seller(listing, seller, listing_context)

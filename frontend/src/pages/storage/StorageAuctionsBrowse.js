@@ -174,6 +174,16 @@ const StorageAuctionsBrowse = () => {
         <Link to="/storage-auctions/how-it-works" className="underline hover:no-underline">{t('storage.browse.howItWorksLink')}</Link>
       </div>
 
+      {/* iter283 — Cross-link to Marketplace per dual-visibility spec. */}
+      <div className="bg-slate-50 dark:bg-slate-900/30 border-b border-slate-200 dark:border-slate-800 py-2 text-center text-[12px] text-slate-500 dark:text-slate-400"
+           data-testid="storage-marketplace-crosslink">
+        🛒 {t('storage.browse.alsoInMarketplace',
+            'All these listings are also available in the')}{' '}
+        <Link to="/marketplace" className="underline hover:no-underline font-medium text-slate-700 dark:text-slate-200">
+          {t('storage.browse.marketplaceLink', 'Marketplace →')}
+        </Link>
+      </div>
+
       {/* iter219 — Buyer keyword search + visible-content tag pills.
           Tags filter by `visible_content_tags` server-side; the search box
           additionally scans description / facility / unit# / tag labels. */}

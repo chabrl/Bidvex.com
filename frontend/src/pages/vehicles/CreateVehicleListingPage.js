@@ -404,31 +404,81 @@ const CreateVehicleListingPage = () => {
       }
 
       // Create listing
-      const createResponse = await axios.post(`${API}/vehicles`, listingData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      const vehicleId = createResponse.data.id;
+      let vehicleId;
+      try {
+        const createResponse = await axios.post(`${API}/vehicles`, listingData, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        vehicleId = createResponse.data?.id;
+        if (!vehicleId) {
+          // Backend OK but no id back — surface gracefully, do NOT navigate.
+          toast.error(i18n.language?.startsWith('fr')
+            ? "Annonce créée mais identifiant manquant. Réessayez."
+            : "Listing created but no id returned. Please retry.");
+          setLoading(false);
+          return;
+        }
+      } catch (createErr) {
+        // iter283 — Structured backend errors (400/403/422) ship a dict
+        // body like { detail: { error, message_en, message_fr } }. Coerce
+        // to a string toast so React/sonner doesn't try to render an
+        // object and blow up the page.
+        const _resp = createErr?.response;
+        const _detail = _resp?.data?.detail;
+        let _msg;
+        if (typeof _detail === 'string') {
+          _msg = _detail;
+        } else if (_detail && typeof _detail === 'object') {
+          const _isFr = (i18n.language || '').toLowerCase().startsWith('fr');
+          _msg = (_isFr ? _detail.message_fr : _detail.message_en)
+            || _detail.message_en
+            || _detail.message_fr
+            || _detail.error
+            || JSON.stringify(_detail);
+        } else {
+          _msg = createErr?.message || 'Failed to create listing';
+        }
+        // 403 = broker partnership required.
+        if (_resp?.status === 403) {
+          toast.error(_msg || (i18n.language?.startsWith('fr')
+            ? "Les annonces de véhicules nécessitent un partenariat courtier vérifié."
+            : "Vehicle listings require verified broker partnership."));
+        } else {
+          toast.error(_msg);
+        }
+        setLoading(false);
+        return; // ← Never navigate on error.
+      }
       toast.success('Listing created! Uploading photos...');
-      
+
       // Upload photos (in production, would use cloud storage)
-      // For now, we'll simulate the upload
+      // For now, we'll simulate the upload.
+      // iter283 — Wrap each upload in try/catch so ONE bad image doesn't
+      // bring down the whole submit and leave the user on a blank page.
+      let _photo_fail = 0;
       for (const [category, categoryPhotos] of Object.entries(photos)) {
         for (const photo of categoryPhotos) {
-          const uploadFormData = new FormData();
-          uploadFormData.append('file', photo.file);
-          
-          await axios.post(
-            `${API}/vehicles/${vehicleId}/media?category=${category}`,
-            uploadFormData,
-            { 
-              headers: { 
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'multipart/form-data'
-              } 
-            }
-          );
+          try {
+            const uploadFormData = new FormData();
+            uploadFormData.append('file', photo.file);
+            await axios.post(
+              `${API}/vehicles/${vehicleId}/media?category=${category}`,
+              uploadFormData,
+              {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  'Content-Type': 'multipart/form-data'
+                }
+              }
+            );
+          } catch (uploadErr) {
+            _photo_fail += 1;
+            console.error('[CreateVehicle] photo upload failed:', uploadErr);
+          }
         }
+      }
+      if (_photo_fail > 0) {
+        toast.warning(`${_photo_fail} photo(s) failed to upload. You can add more from the listing detail page.`);
       }
 
       // iter198 — Pilot success celebration: confetti + warm toast on a pilot dealer's FIRST listing
@@ -462,7 +512,21 @@ const CreateVehicleListingPage = () => {
       navigate(`/vehicle-auctions/my-listings`);
       
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to create listing');
+      // iter283 — Same defense as the inner catch: coerce dict details
+      // to a string toast so we never crash the page on submit.
+      const _detail = error?.response?.data?.detail;
+      let _msg;
+      if (typeof _detail === 'string') {
+        _msg = _detail;
+      } else if (_detail && typeof _detail === 'object') {
+        const _isFr = (i18n.language || '').toLowerCase().startsWith('fr');
+        _msg = (_isFr ? _detail.message_fr : _detail.message_en)
+          || _detail.message_en || _detail.message_fr || _detail.error
+          || JSON.stringify(_detail);
+      } else {
+        _msg = error?.message || 'Failed to create listing';
+      }
+      toast.error(_msg);
     } finally {
       setLoading(false);
     }

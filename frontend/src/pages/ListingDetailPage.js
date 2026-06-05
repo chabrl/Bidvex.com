@@ -1063,6 +1063,33 @@ const ListingDetailPage = () => {
                 <CardContent className="space-y-4">
                   <AuctioneerInfo sellerId={listing.seller_id} variant="full" />
 
+                  {/* iter283 — Public seller info: company name + website,
+                      surfaced only for verified business sellers (partner /
+                      vehicle dealer / storage facility). Hidden for
+                      private/individual sellers (privacy). */}
+                  {(listing?.seller_company_name || listing?.seller_website) && (
+                    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40 px-3 py-2.5 space-y-1"
+                         data-testid="seller-public-info">
+                      {listing?.seller_company_name && (
+                        <div className="text-sm font-medium text-slate-700 dark:text-slate-200"
+                             data-testid="seller-public-company">
+                          {listing.seller_company_name}
+                        </div>
+                      )}
+                      {listing?.seller_website && (
+                        <a
+                          href={listing.seller_website}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-cyan-600 dark:text-cyan-400 hover:underline break-all inline-block"
+                          data-testid="seller-public-website"
+                        >
+                          {listing.seller_website}
+                        </a>
+                      )}
+                    </div>
+                  )}
+
                   {/* Seller Reputation Breakdown */}
                   <SellerReputationCard sellerId={listing.seller_id} />
 

@@ -257,6 +257,15 @@ const LotsMarketplacePage = () => {
         description="Browse and bid on multi-item lot auctions. Find estate sale collections, business inventory, and bulk packages across Canada."
         path="/lots"
       />
+      {/* iter283 — Cross-link to Marketplace per dual-visibility spec. */}
+      <div className="bg-slate-100 dark:bg-slate-800/40 border-b border-slate-200 dark:border-slate-800 py-2 text-center text-[12px] text-slate-500 dark:text-slate-400"
+           data-testid="lots-marketplace-crosslink">
+        🛒 {t('lotsMarketplace.alsoInMarketplace',
+            'All these listings are also available in the')}{' '}
+        <Link to="/marketplace" className="underline hover:no-underline font-medium text-slate-700 dark:text-slate-200">
+          {t('lotsMarketplace.marketplaceLink', 'Marketplace →')}
+        </Link>
+      </div>
       {/* Hero Header */}
       <div className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-blue-900 via-slate-900 to-cyan-900 opacity-95" />

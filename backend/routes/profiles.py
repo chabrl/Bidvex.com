@@ -169,8 +169,26 @@ async def update_user_me(
         "privacy_settings", "personalized_recommendations",
         "province", "city", "postal_code",
         "notification_settings",  # iter211 Step 3 — in-app notification toggles
+        "website",  # iter283 — Public seller website (shown on listing detail)
     ]
     update_data = {k: v for k, v in updates.items() if k in allowed_fields}
+
+    # iter283 — Sanitize the website URL (prefix http:// when missing, cap
+    # at 256 chars). Reject obviously malformed schemes to keep XSS out
+    # of the public listing detail card.
+    if "website" in update_data:
+        w = (update_data.get("website") or "").strip()
+        if not w:
+            update_data["website"] = None
+        else:
+            if len(w) > 256:
+                raise HTTPException(status_code=400, detail="Website URL exceeds 256 characters")
+            low = w.lower()
+            if low.startswith(("javascript:", "data:", "vbscript:", "file:")):
+                raise HTTPException(status_code=400, detail="Invalid website scheme")
+            if not (low.startswith("http://") or low.startswith("https://")):
+                w = "https://" + w
+            update_data["website"] = w
 
     if "bio" in update_data and update_data["bio"] and len(update_data["bio"]) > 500:
         raise HTTPException(status_code=400, detail="Bio must be 500 characters or less")

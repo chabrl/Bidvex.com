@@ -205,7 +205,20 @@ async def lifespan(app):
             )
         except Exception as exc:  # noqa: BLE001
             logger.info(f"[iter265] recent_nearby_notifs TTL index skipped: {exc}")
-    except Exception as e:        logger.warning(f"Strict payment indexes registration failed (non-fatal): {e}")
+    except Exception as e:
+        logger.warning(f"Strict payment indexes registration failed (non-fatal): {e}")
+
+    # iter283 — Idempotent listing-section backfill. Tags every active
+    # listing with `section` + canonical `listing_type` so the storage,
+    # vehicle, and lots section pages see EVERY listing they should.
+    # Safe to run every boot — only updates docs that don't already
+    # match the canonical set.
+    try:
+        from services.listing_sections import backfill_listing_sections
+        sec_counts = await backfill_listing_sections(db)
+        logger.info(f"[iter283] section backfill counts: {sec_counts}")
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(f"[iter283] section backfill skipped: {exc}")
 
     # ── iter212 — Grandfather existing storage facilities ──
     try:

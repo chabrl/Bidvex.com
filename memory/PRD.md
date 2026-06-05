@@ -1,5 +1,205 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter283 — FINAL PRE-LAUNCH FIX (Feb 05, 2026) ✅
+
+Closed every blocker reported in the final pre-launch ask: storage units
+that were missing from the storage section, the wrong "Vehicle Dealer"
+badge on storage listings, the vehicle-listing-form blank-page crash,
+universal dual-visibility across marketplace + section pages, the
+section-default deposit rules, and the test-listing audit matrix.
+**Pytest 370/370 PASS** (24 env-skipped, 0 failures). Lint clean.
+Live verification matrix 20/20 GREEN.
+
+### Mission 1 — Storage listings appear in /storage-auctions
+- NEW shared module `services/listing_sections.py` defines:
+  - `STORAGE_TYPES = (storage_auction, storage, storage_locker, unit, unit_auction)`
+  - `VEHICLE_TYPES`, `LOT_TYPES` for the other sections
+  - `infer_section(listing)` — priority chain: listing_type → category → quantity → marketplace
+  - `infer_seller_context(listing)` — returns "storage" | "vehicle" | "general"
+  - `section_query_filter(section)` — returns `{$in: ...}` filter for the section
+  - `backfill_listing_sections(db)` — idempotent at-startup batch update
+- `routes/listings.py::create_listing` now auto-stamps `listing_type`
+  (canonical, from CANONICAL_TYPE) + `section` (slug) on every new
+  doc whose current state doesn't match the inferred section. Closes
+  the UNIT 205 bug at the source: a storage unit created via the
+  general "Create Listing" form now lands tagged correctly.
+- `routes/storage_auctions.py` storage-section query now accepts ALL
+  five storage aliases via `STORAGE_TYPES` (was hard-coded to
+  `storage_locker` only).
+- `server.py` startup hook runs `backfill_listing_sections` after the
+  index registration. Idempotent — safe on every boot.
+
+### Mission 2 — Wrong "Vehicle Dealer" badge on storage listings
+- `routes/listings.py::get_listing` now passes
+  `infer_seller_context(listing_doc)` to `enrich_listing_with_seller`
+  instead of the static `"general"`. A multi-flagged seller (admin
+  who is `is_vehicle_dealer=True` AND `is_storage_facility=True`)
+  whose listing is a storage unit now gets `seller_account_type =
+  "storage_facility"` — which renders the StorageFacilityBadge (amber
+  warehouse) instead of the slate VehicleDealerBadge.
+- Same fix in `services/listing_seller_enrichment.py::enrich_listings_bulk`
+  — when called with `listing_context="auto"` or unset, infers
+  per-listing so marketplace cards from a multi-flagged seller render
+  the badge that matches each LISTING, not the seller's most
+  aggressive flag.
+
+### Mission 2.5 — Seller info card surfaces website + company
+- `services/listing_seller_enrichment.py` now forwards `seller_website`,
+  `seller_company_name`, `seller_province`, `seller_city` from the
+  user doc (only for non-individual sellers — privacy guard for
+  individual sellers).
+- `routes/profiles.py::update_profile` whitelist now includes
+  `website` with XSS-safe scheme rejection (rejects `javascript:`,
+  `data:`, `vbscript:`, `file:`; auto-prefixes `https://` when missing).
+- `models/auction_models.py::Listing` adds `seller_website`,
+  `seller_company_name`, and `section`.
+- `pages/ListingDetailPage.js` Seller Information card now renders
+  the company name + clickable website (target=_blank, rel="noopener
+  noreferrer") below the AuctioneerInfo line. Hidden cleanly when
+  the seller has no public website.
+
+### Mission 3 — Vehicle listing crash-proof submit
+- `App.js` wraps `/vehicle-auctions/create` in an `ErrorBoundary`
+  with `scope="vehicle-listing-create"` so a render-time crash
+  shows the bilingual fallback instead of a blank white page.
+- `pages/vehicles/CreateVehicleListingPage.js::handleSubmit` now:
+  - Wraps `POST /api/vehicles` in its own try/catch so a 400/403/422
+    NEVER navigates away and NEVER lets toast.error receive an
+    object payload (the backend ships
+    `{detail: {error, message_en, message_fr}}` — we coerce to a
+    string before passing to sonner).
+  - 403 → friendly "Vehicle listings require verified broker
+    partnership" (bilingual).
+  - Each photo upload is wrapped in its own try/catch so ONE bad
+    image doesn't kill the whole submit. Failed uploads surface as
+    a warning toast; the user can re-upload from the listing
+    detail page.
+  - Outer catch ALSO coerces dict details — defence-in-depth.
+
+### Mission 4 — Universal dual-visibility
+- `routes/listings.py::list_listings` removed the
+  `{"listing_type": {"$ne": "storage_locker"}}` exclusion.
+- `routes/marketplace.py::_build_marketplace_items` removed the
+  `category: {$nin: [..., "storage_locker"]}` + `listing_type: {$ne:
+  "storage_locker"}` filter trio. Marketplace now shows EVERY active
+  listing.
+- `_LISTING_PROJECTION` + `_MULTI_PROJECTION` now include
+  `listing_type` + `section` so the cards can render the new badges.
+- `_build_marketplace_items` doc-builder now writes both fields into
+  the response payload and uses `infer_seller_context` for the
+  seller enrichment.
+- `components/FlattenedMarketplace.js` card stack adds three new
+  pill badges (under the existing Multi-Lot badge):
+  - `section-badge-storage` — amber, Warehouse icon, "Storage"
+  - `section-badge-vehicles` — slate, Car icon, "Vehicles"
+  - `section-badge-lots` — indigo, Package icon, "Lots"
+- Storage page (`StorageAuctionsBrowse.js`) + Lots page
+  (`LotsMarketplacePage.js`) ship a centered "🛒 All these listings
+  are also available in the Marketplace →" cross-link banner just
+  below the hero / transparency banner.
+
+### Mission 5 — Section-default deposit rules
+- `routes/bidder_deposits.py` adds `_section_deposit_default(listing)`
+  returning `(amount, type, label)` per section:
+  - Storage: `$50` flat, "$50 Refundable Storage Deposit"
+  - Vehicles: `max($200, 10% of starting_price)`, "Vehicle Bidding
+    Deposit (Refundable)"
+  - Lots (>$500): `max($50, 10%)`, "10% Refundable Deposit"
+  - Marketplace: `0` (no default)
+- `_calc_deposit_amount` falls back to the section default in TWO
+  cases:
+  1. `requires_deposit=True` but no explicit `deposit_amount` set
+  2. `requires_deposit` unset BUT section is `storage` / `vehicles`
+     (these sections always require a deposit)
+- `/check/{auction_id}` response now includes `deposit_label`
+  derived from the section default for frontend toast/modal copy.
+
+### Mission 6 — Test listings seed + verification matrix
+- NEW `scripts/iter283_seed_test_listings.py` upserts (idempotent
+  by id) one listing per section:
+  - `iter283-test-marketplace` (Electronics, marketplace)
+  - `iter283-test-lot` (Business & Industrial, lot_auction, qty=10)
+  - `iter283-test-storage` (Storage, storage_locker)
+  - `iter283-test-vehicle` (Vehicles, vehicle_auction, requires_broker)
+- All seeds carry valid Sherbrooke geo + the J1H 1B1 postal code so
+  they show up on the iter282 full-screen map too.
+- `--retire` flag flips status to `test_only` so they disappear from
+  public surfaces while remaining in the audit trail.
+
+### Other fixes wrapped into this iteration
+- `routes/listings.py::create_listing` was crashing with
+  `AttributeError: 'str' object has no attribute 'get'` whenever a
+  new listing had a `location` field (the iter265 geo-notification
+  hook treated `location` like a dict; the model defines it as a
+  STRING). Fix: read coordinates from `geo.coordinates` (the
+  canonical iter237 GeoJSON Point), not from `location`.
+- iter222 storage-routing tests INVERTED: the "storage_locker
+  excluded from marketplace" assertion is now "storage_locker
+  appears in marketplace" per Mission 4.
+
+### Validation
+- `tests/test_iter283_final_prelaunch.py` — **21/21 PASS**.
+- `tests/test_iter222_storage_routing.py` — **6/6 PASS** (after
+  iter283-aware inversion). Storage cross-collection routing still
+  works as designed.
+- Full iter217 + iter219 + iter220 + iter222 + iter236 + iter237 +
+  iter27x + iter28x sprint scope — **370 passed, 24 skipped, 0
+  failures** in ~99s.
+- Live verification matrix — all 20 checks GREEN.
+
+### Files changed (iter283)
+**Backend NEW**:
+- `services/listing_sections.py` (single source of truth)
+- `scripts/iter283_seed_test_listings.py` (verification seed)
+- `tests/test_iter283_final_prelaunch.py` (21 tests)
+
+**Backend MODIFIED**:
+- `routes/listings.py` (auto-tag at create, per-listing context, geo
+  guard hot-fix)
+- `routes/marketplace.py` (universal feed, projection + builder
+  surfaces listing_type + section)
+- `routes/storage_auctions.py` (accept all storage aliases)
+- `routes/bidder_deposits.py` (section-default deposit rules)
+- `routes/profiles.py` (website field + XSS guard)
+- `services/listing_seller_enrichment.py` (auto-context per listing,
+  public seller fields)
+- `models/auction_models.py` (seller_website, seller_company_name,
+  section)
+- `server.py` (startup backfill wired)
+- `tests/test_iter222_storage_routing.py` (inverted for Mission 4)
+
+**Frontend MODIFIED**:
+- `App.js` (ErrorBoundary on vehicle create)
+- `pages/vehicles/CreateVehicleListingPage.js` (crash-proof submit)
+- `pages/ListingDetailPage.js` (seller public info card)
+- `pages/LotsMarketplacePage.js` (cross-link banner)
+- `pages/storage/StorageAuctionsBrowse.js` (cross-link banner)
+- `components/FlattenedMarketplace.js` (3 section badges)
+
+### Action items (user)
+1. **Save to GitHub → redeploy** preview → production. Backend + frontend
+   + test seed both changed. Run the seed script ON production once
+   after deploy: `python -m scripts.iter283_seed_test_listings`,
+   verify the 4 endpoints, then run `--retire` to flip them to
+   `test_only`.
+2. **Smoke test on https://bidvex.com after redeploy**:
+   - Open Marketplace → confirm storage units show with amber
+     "Storage" badge, vehicles with slate "Vehicles" badge.
+   - Open /storage-auctions → confirm the "🛒 All these listings are
+     also available in the Marketplace →" cross-link banner just
+     below the transparency banner.
+   - Open a Storage listing detail → badge should be amber
+     "Storage Facility Auction" (NOT slate "Vehicle Dealer").
+   - Submit a vehicle listing — the form must NEVER blank-page,
+     even on 403/422 (it'll show a friendly toast instead).
+3. **Bid-flow audit**: log in as a bidder → try to bid on a Storage
+   listing → confirm the deposit modal shows `$50 Refundable Storage
+   Deposit` BEFORE the bid is accepted.
+
+---
+
+
+
 ## Latest: iter282 — FULL-SCREEN IMMERSIVE MAP SEARCH + SELLER PIN ACCURACY (Feb 05, 2026) ✅
 
 Upgraded the inline 320px `MapSearchPanel` into a full-viewport immersive

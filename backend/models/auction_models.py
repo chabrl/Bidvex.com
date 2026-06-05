@@ -149,6 +149,11 @@ class Listing(BaseModel):
     seller_is_storage_facility: bool = False
     seller_is_business: bool = False
     seller_partner_company_name: Optional[str] = None
+    # iter283 — Public seller-info card on listing detail.
+    seller_website: Optional[str] = None
+    seller_company_name: Optional[str] = None
+    # iter283 — Section routing (marketplace | lots | storage | vehicles).
+    section: Optional[str] = None
     buyer_premium_rate: Optional[float] = None  # canonical, fraction (0.15 = 15%)
 
 
