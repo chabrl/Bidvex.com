@@ -220,6 +220,22 @@ async def lifespan(app):
     except Exception as exc:  # noqa: BLE001
         logger.warning(f"[iter283] section backfill skipped: {exc}")
 
+    # iter283-hotfix-2 — Vehicle fast-track for trusted sellers
+    # (admins / verified partners / vehicle dealers / storage facilities)
+    # and a sane default for the `vehicle_auctions_enabled` toggle.
+    # Without this, vehicle listings stay invisible behind the
+    # admin-approval workflow even when the seller is a trusted account.
+    try:
+        from services.vehicle_fast_track import (
+            fast_track_trusted_drafts,
+            ensure_vehicle_auctions_toggle_default,
+        )
+        vfast = await fast_track_trusted_drafts(db)
+        vtog = await ensure_vehicle_auctions_toggle_default(db)
+        logger.info(f"[iter283-hotfix-2] vehicle fast-track: {vfast} toggle_default_written={vtog}")
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(f"[iter283-hotfix-2] vehicle fast-track skipped: {exc}")
+
     # ── iter212 — Grandfather existing storage facilities ──
     try:
         res = await db.storage_facilities.update_many(

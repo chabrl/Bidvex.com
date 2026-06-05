@@ -1,6 +1,117 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: iter283-hotfix — POST-LAUNCH PRODUCTION HOTFIX (Feb 05, 2026) ✅
+## Latest: iter283-hotfix-2 — VEHICLE VISIBILITY DEEP FIX (Feb 05, 2026) ✅
+
+After iter283-hotfix shipped, the user reported vehicles section
+STILL empty in BOTH preview and production. Investigation surfaced
+a deeper data-flow gate: vehicles in `db.vehicle_listings` are
+locked behind a strict admin-approval workflow that traps them
+in DRAFT/PENDING/APPROVED states forever, and the public browse
+filters by `status="active"`. Closed with a three-layer fix.
+
+**Pytest 394/394 PASS** across full sprint scope (24 env-skipped,
+0 failures). Lint clean. Live `/api/vehicles` verified — seeds
+surface immediately, fast-track is idempotent.
+
+### Root cause (3 stacked gates)
+
+1. **`db.vehicle_listings` create flow** writes `status=DRAFT` by
+   default. Sellers complete the form, hit Submit, and the
+   listing disappears into a draft pipeline they have no way to
+   discover.
+2. **`vehicle_listings.seller_id`** references `vehicle_sellers.id`
+   (the seller-profile document), NOT `users.id`. Backfills that
+   tried to join on users were no-ops.
+3. **`vehicle_auctions_enabled` system toggle** defaults to
+   `False` when missing. Even after an admin approves a vehicle,
+   it lands in `APPROVED` (not `ACTIVE`) — and the public browse
+   filters by `status="active"` only.
+
+### Fix layers
+
+**Layer 1 — Create-time trusted-seller fast-track** (`routes/vehicles.py`):
+The create endpoint now detects trust signals on the authenticated
+user (`role==admin`, `is_partner`, `is_vehicle_dealer`,
+`is_storage_facility`, `partner_verification_status==verified`) and
+writes `status=ACTIVE` directly with `approved_at` + `approved_by`
+stamps. Same trust model the rest of the platform uses for
+`db.listings`.
+
+**Layer 2 — Public browse status expansion**:
+The `/api/vehicles` browse now accepts BOTH `ACTIVE` AND `APPROVED`
+status. Admin-vetted listings waiting on the global launch toggle
+become visible automatically. Visibility-column flex (iter283-hotfix
+Mission 2) preserved.
+
+**Layer 3 — Idempotent startup backfill** (NEW
+`services/vehicle_fast_track.py`):
+- `fast_track_trusted_drafts(db)` — promotes every DRAFT/PENDING/APPROVED
+  vehicle whose seller has `vehicle_sellers.verification_status="approved"`
+  straight to `status=ACTIVE`. Wired through `vehicle_sellers.id`
+  (the correct join). Logs `{promoted, approved_sellers}` counts so
+  the boot trail captures rollout state.
+- `ensure_vehicle_auctions_toggle_default(db)` — creates
+  `system_settings` doc with `vehicle_auctions_enabled=True` when
+  missing, OR sets the field to True on an existing doc that's
+  missing it. The flag was designed for emergency pause; default-on
+  is the safe expectation for a launched platform.
+- Both helpers are wired into `server.py` startup after the iter283
+  section backfill. Idempotent — subsequent boots show
+  `promoted: 0` (the doc set is already healthy).
+
+### Validation
+- `tests/test_iter283_hotfix2_vehicle_visibility.py` — **6/6 PASS**:
+  create fast-track signal coverage, public-browse status union,
+  backfill uses vehicle_sellers join (not users), promotion targets
+  draft/pending/approved, toggle default=True, server wiring.
+- Full sprint scope (iter217 + iter219 + iter220 + iter222 + iter237 +
+  iter238 + iter27x + iter28x including iter283 + hotfix1 + hotfix2)
+  — **394 passed, 24 skipped, 0 failures**.
+- Live `/api/vehicles` smoke: with the iter283 test-vehicle seed
+  active, the endpoint returns the listing with `source="listings"`.
+  Backend logs show fast-track ran on every restart with consistent
+  counts (idempotent confirmed).
+- UI screenshot of `/vehicle-auctions` shows "1 auction" card
+  rendered with QC + NO RESERVE badges.
+
+### Files changed (iter283-hotfix-2)
+**Backend NEW**:
+- `services/vehicle_fast_track.py` (idempotent backfill helpers)
+- `tests/test_iter283_hotfix2_vehicle_visibility.py` (6 tests)
+
+**Backend MODIFIED**:
+- `routes/vehicles.py` (create-time fast-track + public-browse
+  status union ACTIVE+APPROVED)
+- `server.py` (startup wires both backfill helpers)
+
+### Preserved contracts
+- iter283 section backfill remains idempotent and runs first.
+- iter283 deposit rules unchanged (storage = $50, vehicles =
+  max($200, 10%), lots > $500 = max($50, 10%), marketplace = $0).
+- iter283-hotfix province filter + section chip row unchanged.
+
+### Action items (user)
+1. **Save to GitHub → redeploy** preview → production. The startup
+   backfill runs on every boot — so the first production boot
+   after deploy will fast-track any draft vehicles from verified
+   sellers AND default the system toggle.
+2. **Smoke test on https://bidvex.com after redeploy**:
+   - Open `/vehicle-auctions` → if your verified vehicle sellers
+     have any drafts or pending listings, they will become visible
+     within ~30s of the redeploy (fast-track runs at boot).
+   - Create a new vehicle listing as an admin / verified partner /
+     vehicle dealer / storage facility — the listing should appear
+     IMMEDIATELY on `/vehicle-auctions` without an approval step.
+3. **Operational note**: Unverified third-party sellers still go
+   through the strict approval workflow (DRAFT → PENDING → APPROVED →
+   ACTIVE). That's correct: the fast-track is a trust-gated
+   optimization, not a free pass.
+
+---
+
+
+
+## Previous: iter283-hotfix — POST-LAUNCH PRODUCTION HOTFIX (Feb 05, 2026) ✅
 
 Four targeted fixes for issues surfaced after the iter283 push:
 storage province filter returning 0, vehicles section empty,

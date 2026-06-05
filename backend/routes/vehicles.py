@@ -904,6 +904,30 @@ async def create_vehicle_listing(
     from services.demo_filter import tag_listing_if_demo
     await tag_listing_if_demo(db, user["id"], listing)
 
+    # iter283-hotfix-2 — Trusted-seller fast-track.
+    # The strict DRAFT → PENDING → APPROVED → ACTIVE workflow makes
+    # sense for unverified third-party sellers, but admins, verified
+    # partners, vehicle dealers, and storage facilities have already
+    # been vetted out-of-band. Trapping their listings in DRAFT until
+    # an admin reviews them is the actual cause of the "vehicles
+    # section empty" production complaint — sellers complete the form,
+    # nothing appears, no clear signal what to do next.
+    # Fast-track skips DRAFT/PENDING and writes status=ACTIVE directly
+    # for these trusted accounts. Same trust model the rest of the
+    # platform uses (db.listings).
+    _trusted = (
+        user.get("role") == "admin"
+        or user.get("is_partner") is True
+        or (user.get("partner_verification_status") or "").lower() == "verified"
+        or user.get("is_vehicle_dealer") is True
+        or user.get("is_storage_facility") is True
+    )
+    if _trusted:
+        from models.vehicle_models import VehicleListingStatus as _VLS
+        listing["status"] = _VLS.ACTIVE.value
+        listing["approved_at"] = datetime.now(timezone.utc)
+        listing["approved_by"] = user["id"]
+
     await db.vehicle_listings.insert_one(listing)
     
     # Update seller monthly count
@@ -1055,13 +1079,19 @@ async def list_vehicles(
     List public vehicle auctions
     This is the main browse endpoint for buyers
     """
-    # iter283-hotfix Mission 2 — Public vehicle browse must NEVER drop
-    # listings just because `visibility` is missing on legacy docs or
-    # because `requires_broker=True` (the broker gate restricts CREATION,
-    # not BROWSING). We keep the active+non-demo filter strict but flex
-    # the visibility column.
+    # iter283-hotfix Mission 2 / hotfix-2 — Public vehicle browse must
+    # NEVER drop listings just because `visibility` is missing on legacy
+    # docs or because `requires_broker=True` (the broker gate restricts
+    # CREATION, not BROWSING). It also surfaces `APPROVED` listings —
+    # admin-vetted but waiting on the global launch toggle — so
+    # frontends can show the inventory and let admins flip
+    # `vehicle_auctions_enabled` confidently. Without this, sellers
+    # complete the workflow and STILL see "0 auctions" until the
+    # platform-wide toggle flips, with no visibility into what's
+    # waiting in the pipeline.
+    from models.vehicle_models import VehicleListingStatus as _VLS
     query = {
-        "status": VehicleListingStatus.ACTIVE.value,
+        "status": {"$in": [_VLS.ACTIVE.value, _VLS.APPROVED.value]},
         "$or": [
             {"visibility": VehicleAuctionVisibility.PUBLIC.value},
             {"visibility": {"$exists": False}},

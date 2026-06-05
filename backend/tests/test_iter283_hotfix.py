@@ -77,7 +77,7 @@ def test_hotfix_vehicles_endpoint_flex_visibility():
     # accepts missing/null visibility too.
     idx = src.find("# iter283-hotfix Mission 2")
     assert idx > 0, "hotfix note missing — fix may have been reverted"
-    block = src[idx:idx + 800]
+    block = src[idx:idx + 1800]
     assert '"$exists": False' in block or '"$exists": false' in block.lower()
 
 
