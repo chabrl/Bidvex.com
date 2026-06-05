@@ -224,7 +224,7 @@ const VehicleAuctionsPage = () => {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950" data-testid="vehicle-auctions-page">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 overflow-x-hidden" data-testid="vehicle-auctions-page">
       {/* HERO */}
       <VehicleHero
         searchQuery={searchQuery}
@@ -337,7 +337,7 @@ const VehicleAuctionsPage = () => {
 
             {/* Loading skeletons */}
             {loading && (
-              <div className={`grid gap-5 ${viewMode === 'grid' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`} data-testid="vehicle-grid-loading">
+              <div className={`grid gap-4 sm:gap-5 ${viewMode === 'grid' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' : 'grid-cols-1'}`} data-testid="vehicle-grid-loading">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <div key={i} className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 overflow-hidden">
                     <div className="aspect-[16/10] bg-slate-100 dark:bg-slate-800 animate-pulse" />
@@ -371,7 +371,7 @@ const VehicleAuctionsPage = () => {
             {!loading && !error && vehicles.length > 0 && (
               <>
                 <div
-                  className={`grid gap-5 ${viewMode === 'grid' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}
+                  className={`grid gap-4 sm:gap-5 ${viewMode === 'grid' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' : 'grid-cols-1'}`}
                   data-testid="vehicle-grid"
                 >
                   {vehicles.map((v) => {

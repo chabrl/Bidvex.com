@@ -385,24 +385,24 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
             {isEnded ? (
               <p className="text-xl font-bold text-red-300">Auction Ended</p>
             ) : timeRemaining ? (
-              <div className="flex gap-4">
-                {timeRemaining.days > 0 && (
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-white">{timeRemaining.days}</p>
-                    <p className="text-xs text-blue-200">Days</p>
-                  </div>
-                )}
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-white">{timeRemaining.hours}</p>
-                  <p className="text-xs text-blue-200">Hours</p>
+              /* iter283-responsive — equal-width countdown grid so the
+                  timer fits in one row at 375px. */
+              <div className="grid grid-cols-4 gap-1 sm:gap-2 w-full">
+                <div className="text-center min-w-0">
+                  <p className="text-xl sm:text-2xl font-bold text-white truncate">{timeRemaining.days || 0}</p>
+                  <p className="text-[10px] sm:text-xs text-blue-200">Days</p>
                 </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-white">{timeRemaining.minutes}</p>
-                  <p className="text-xs text-blue-200">Min</p>
+                <div className="text-center min-w-0">
+                  <p className="text-xl sm:text-2xl font-bold text-white truncate">{timeRemaining.hours}</p>
+                  <p className="text-[10px] sm:text-xs text-blue-200">Hours</p>
                 </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-white">{timeRemaining.seconds}</p>
-                  <p className="text-xs text-blue-200">Sec</p>
+                <div className="text-center min-w-0">
+                  <p className="text-xl sm:text-2xl font-bold text-white truncate">{timeRemaining.minutes}</p>
+                  <p className="text-[10px] sm:text-xs text-blue-200">Min</p>
+                </div>
+                <div className="text-center min-w-0">
+                  <p className="text-xl sm:text-2xl font-bold text-white truncate">{timeRemaining.seconds}</p>
+                  <p className="text-[10px] sm:text-xs text-blue-200">Sec</p>
                 </div>
               </div>
             ) : (
@@ -486,11 +486,12 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
                       'Vehicle auctions on BidVex are exclusively available to licensed broker partners or individuals linked to a verified broker, in compliance with Canadian provincial regulations (SAAQ, OMVIC, AMVIC, VSA).',
                     )}
                   </p>
-                  <div className="flex flex-wrap gap-2">
+                  {/* iter283-responsive — Stack CTAs on mobile, side-by-side at sm+. */}
+                  <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2">
                     <Button
                       onClick={() => navigate('/become-a-broker')}
                       style={{ backgroundColor: '#0055FF', color: 'white' }}
-                      className="font-bold"
+                      className="font-bold w-full sm:w-auto"
                       data-testid="vehicle-broker-gate-become-cta"
                     >
                       {t('vehicle.becomeBroker', 'Become a Broker Partner')}
@@ -503,7 +504,7 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
                         color: '#0055FF',
                         backgroundColor: 'transparent',
                       }}
-                      className="font-bold"
+                      className="font-bold w-full sm:w-auto"
                       data-testid="vehicle-broker-gate-learn-cta"
                     >
                       {t('vehicle.learnMore', 'Learn More')}
@@ -532,8 +533,10 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
                 </p>
               </div>
 
-              {/* iter202 Phase B — Quick-bid increments (+$100 / +$500 / +$1,000) */}
-              <div className="flex gap-2" data-testid="bid-quick-chips">
+              {/* iter202 Phase B — Quick-bid increments (+$100 / +$500 / +$1,000)
+                  iter283-responsive — flex-wrap + justify-center so the
+                  three pills never overflow on narrow viewports. */}
+              <div className="flex flex-wrap gap-2 justify-center" data-testid="bid-quick-chips">
                 {[100, 500, 1000].map((inc) => (
                   <button
                     key={inc}
@@ -543,7 +546,7 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
                       const next = (Number.isFinite(base) ? base : minBid) + inc;
                       setBidAmount(String(Math.round(next)));
                     }}
-                    className="flex-1 text-sm font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-cyan-500 hover:text-cyan-700 hover:bg-cyan-50 dark:hover:bg-cyan-950/40 py-2 transition-colors"
+                    className="flex-1 min-w-[90px] text-sm font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-cyan-500 hover:text-cyan-700 hover:bg-cyan-50 dark:hover:bg-cyan-950/40 py-2 transition-colors"
                     data-testid={`bid-quick-plus-${inc}`}
                   >
                     +${inc.toLocaleString()}
@@ -998,14 +1001,16 @@ const VehicleDetailPage = () => {
   const isEnded = vehicle.end_time && new Date(vehicle.end_time) < new Date();
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950" data-testid="vehicle-detail-page">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 overflow-x-hidden" data-testid="vehicle-detail-page">
       {/* iter231 — Schema.org Vehicle JSON-LD for Google Merchant + crawl alignment */}
       <ListingJsonLd listing={vehicle} canonicalUrl={`https://bidvex.com/vehicles/${vehicle.id}`} />
       {/* Header */}
-      <div className="bg-white dark:bg-slate-900 border-b">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          {/* iter202 Phase B — Breadcrumb (Home › Vehicle Auctions › Category › YMM) */}
-          <div className="mb-3">
+      <div className="bg-white dark:bg-slate-900 border-b overflow-x-hidden">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4">
+          {/* iter202 Phase B — Breadcrumb (Home › Vehicle Auctions › Category › YMM)
+              iter283-responsive — Scrolls horizontally on mobile rather
+              than wrapping awkwardly. */}
+          <div className="mb-3 overflow-x-auto whitespace-nowrap scrollbar-thin min-w-0">
             <VehicleBreadcrumb
               category={vehicle.category_id ? { id: vehicle.category_id, label_en: vehicle.category_label_en, label_fr: vehicle.category_label_fr } : null}
               vehicle={vehicle}
@@ -1020,15 +1025,15 @@ const VehicleDetailPage = () => {
           </Button>
           
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-3 mb-1">
-                <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-1">
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-900 dark:text-white break-words min-w-0">
                   {vehicle.year} {vehicle.make} {vehicle.model}
                 </h1>
                 {vehicle.auction_type === 'live' && <LiveAuctionBadge />}
               </div>
               {vehicle.trim && (
-                <p className="text-lg text-slate-500">{vehicle.trim}</p>
+                <p className="text-base sm:text-lg text-slate-500 break-words">{vehicle.trim}</p>
               )}
             </div>
             
@@ -1078,11 +1083,13 @@ const VehicleDetailPage = () => {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 py-8 pb-24 lg:pb-8">
-        {/* iter202 Phase B — 60/40 split (5-col grid: 3 left + 2 right) */}
-        <div className="grid lg:grid-cols-5 gap-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-6 sm:py-8 pb-24 lg:pb-8 overflow-x-hidden">
+        {/* iter202 Phase B — 60/40 split (5-col grid: 3 left + 2 right)
+            iter283-responsive — Mobile: stacks (bid panel below content
+            per spec); lg+: 60/40 sidebar layout. */}
+        <div className="grid lg:grid-cols-5 gap-4 sm:gap-6 lg:gap-8">
           {/* Left Column - Images & Details (60%) */}
-          <div className="lg:col-span-3 space-y-6">
+          <div className="lg:col-span-3 space-y-4 sm:space-y-6 min-w-0">
             {/* iter202 Phase B — VehiclePhotoGallery with lightbox (← → ESC swipe) */}
             <VehiclePhotoGallery
               media={(vehicle.media || []).filter(m => !m.type || m.type === 'photo')}
@@ -1091,13 +1098,15 @@ const VehicleDetailPage = () => {
             
             {/* Tabs */}
             <Tabs defaultValue="details">
-              <TabsList className="w-full justify-start bg-transparent flex-wrap">
-                <TabsTrigger value="details" className="bg-transparent">Details</TabsTrigger>
-                <TabsTrigger value="condition" className="bg-transparent">Condition</TabsTrigger>
-                <TabsTrigger value="history" className="bg-transparent">Bid History</TabsTrigger>
-                <TabsTrigger value="seller" className="bg-transparent">Seller</TabsTrigger>
-                <TabsTrigger value="rules" className="bg-transparent">Auction Rules</TabsTrigger>
-                <TabsTrigger value="pricing" className="bg-transparent">Pricing</TabsTrigger>
+              {/* iter283-responsive — Tab bar scrolls horizontally on
+                  mobile instead of wrapping to two rows. */}
+              <TabsList className="w-full justify-start bg-transparent flex flex-nowrap overflow-x-auto whitespace-nowrap scrollbar-thin">
+                <TabsTrigger value="details" className="bg-transparent flex-shrink-0">Details</TabsTrigger>
+                <TabsTrigger value="condition" className="bg-transparent flex-shrink-0">Condition</TabsTrigger>
+                <TabsTrigger value="history" className="bg-transparent flex-shrink-0">Bid History</TabsTrigger>
+                <TabsTrigger value="seller" className="bg-transparent flex-shrink-0">Seller</TabsTrigger>
+                <TabsTrigger value="rules" className="bg-transparent flex-shrink-0">Auction Rules</TabsTrigger>
+                <TabsTrigger value="pricing" className="bg-transparent flex-shrink-0">Pricing</TabsTrigger>
               </TabsList>
               
               {/* Details Tab */}
@@ -1107,7 +1116,9 @@ const VehicleDetailPage = () => {
                     <CardTitle>{t("vehicles.vehicleSpecifications")}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {/* iter283-responsive — 2/3/4 col grid per spec
+                        (was 2/3 — needed an xl breakpoint). */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                       <div className="space-y-1">
                         <p className="text-sm text-slate-500">Year</p>
                         <p className="font-semibold">{vehicle.year}</p>
@@ -1192,21 +1203,24 @@ const VehicleDetailPage = () => {
                     <CardTitle>{t("vehicles.documentation")}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="text-center p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
-                        <p className="text-sm text-slate-500 mb-1">Title Status</p>
-                        <Badge className={vehicle.title_status === 'clean' ? 'bg-green-500' : 'bg-yellow-500'}>
+                    {/* iter283-responsive — tighter gap + min-w-0 on the
+                        text-center boxes so badges never overflow the
+                        375px viewport. */}
+                    <div className="grid grid-cols-3 gap-2 sm:gap-4 text-sm">
+                      <div className="text-center p-3 sm:p-4 bg-slate-50 dark:bg-slate-800 rounded-lg min-w-0">
+                        <p className="text-xs sm:text-sm text-slate-500 mb-1 truncate">Title Status</p>
+                        <Badge className={`${vehicle.title_status === 'clean' ? 'bg-green-500' : 'bg-yellow-500'} max-w-full break-words`}>
                           {vehicle.title_status}
                         </Badge>
                       </div>
-                      <div className="text-center p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
-                        <p className="text-sm text-slate-500 mb-1">Ownership</p>
-                        <Badge variant="outline" className="capitalize">
+                      <div className="text-center p-3 sm:p-4 bg-slate-50 dark:bg-slate-800 rounded-lg min-w-0">
+                        <p className="text-xs sm:text-sm text-slate-500 mb-1 truncate">Ownership</p>
+                        <Badge variant="outline" className="capitalize max-w-full break-words">
                           {vehicle.ownership_status}
                         </Badge>
                       </div>
-                      <div className="text-center p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
-                        <p className="text-sm text-slate-500 mb-1">Lien Status</p>
+                      <div className="text-center p-3 sm:p-4 bg-slate-50 dark:bg-slate-800 rounded-lg min-w-0">
+                        <p className="text-xs sm:text-sm text-slate-500 mb-1 truncate">Lien Status</p>
                         <Badge className={vehicle.lien_status === 'clear' ? 'bg-green-500' : 'bg-yellow-500'}>
                           {vehicle.lien_status}
                         </Badge>
@@ -1591,8 +1605,18 @@ const VehicleDetailPage = () => {
             </Tabs>
           </div>
 
-          {/* Right Column - Bidding Panel (40% — sticky on scroll) */}
-          <div className="lg:col-span-2 space-y-4" data-testid="vehicle-detail-bid-column">
+          {/* Right Column - Bidding Panel (40% — sticky on scroll)
+              iter283-responsive — Mobile: full-width block below the
+              content. lg+: sticky right-column sidebar. `min-w-0` so
+              the bid input never forces a horizontal scroll.
+
+              Spec: "On mobile, the bid panel must stack BELOW the
+              main content as a full-width block. On lg: and above,
+              it should sit as a sticky right-column sidebar." */}
+          <div
+            className="lg:col-span-2 space-y-4 min-w-0 lg:sticky lg:top-20 lg:self-start lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto"
+            data-testid="vehicle-detail-bid-column"
+          >
             <BiddingPanel 
               vehicle={vehicle} 
               onBidPlaced={fetchVehicle}
