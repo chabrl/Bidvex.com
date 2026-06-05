@@ -551,35 +551,28 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
                 ))}
               </div>
 
-              {/* iter202 Phase B — Total Acquisition Cost (gross-up estimate) */}
+              {/* iter202 Phase B — Total Acquisition Cost (gross-up estimate)
+                  iter283-bid-panel-dedup — This is the ONE breakdown that
+                  renders during the bidding flow on a broker-required
+                  vehicle. It shows the buyer EXACTLY what BidVex will
+                  charge them (platform fee + QC tax on fee + Stripe
+                  processing), and an "Est. total to acquire" line that
+                  adds the hammer price for context. The seller is paid
+                  the hammer price directly out-of-band.
+
+                  The full invoice-style `<CostBreakdown />` (Hammer Price
+                  → Total Charged) is intentionally REMOVED from the bid
+                  panel — it conflicts mathematically (compounds tax on
+                  the full hammer price instead of just on the unlock
+                  fee) and rendering both side-by-side breaks payment
+                  transparency. The full invoice still ships on the
+                  post-win Checkout/Invoice surfaces where it's
+                  legally accurate. */}
               {bidAmount && parseFloat(bidAmount) > 0 && (
                 <VehicleAcquisitionCost
                   bid={parseFloat(bidAmount)}
                   currency={vehicle?.currency || 'CAD'}
                   province={vehicle?.location_province || 'ON'}
-                />
-              )}
-              
-              {/* Pricing Breakdown */}
-              {user && bidAmount && parseFloat(bidAmount) > 0 && (
-                <PricingEstimate 
-                  vehicleId={vehicle?.id} 
-                  bidAmount={parseFloat(bidAmount)}
-                  province={vehicle?.location_province}
-                />
-              )}
-              
-              {/* iter210 Step 6 — Live CostBreakdown (vehicle_dealer 2.5% buyer fee) */}
-              {bidAmount && parseFloat(bidAmount) > 0 && (
-                <CostBreakdown
-                  hammerPrice={parseFloat(bidAmount)}
-                  auctionType="vehicle"
-                  sellerAccountType="vehicle_dealer"
-                  sellerUserId={vehicle?.seller_user_id || vehicle?.created_by}
-                  buyerTier={user?.subscription_tier || 'standard'}
-                  paymentMethod="stripe"
-                  currency={vehicle?.currency || 'CAD'}
-                  className="mt-2"
                 />
               )}
               
