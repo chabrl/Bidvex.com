@@ -74,7 +74,12 @@ def test_iter282_back_button_zindex_1002_blue_pill():
 def test_iter282_close_handler_wired_to_back_button():
     src = _read_fe("components/MapSearchPanel.jsx")
     btn_idx = src.find('data-testid="map-search-back-btn"')
-    block = src[btn_idx:btn_idx + 600]
+    # Look at the whole button JSX (search backward to the opening
+    # `<button` so attribute ordering doesn't matter).
+    open_idx = src.rfind("<button", 0, btn_idx)
+    close_idx = src.find("</button>", btn_idx)
+    assert open_idx > 0 and close_idx > btn_idx, "back button JSX not found"
+    block = src[open_idx:close_idx]
     # Back button MUST call the parent-supplied onClose (CSS/state
     # toggle, not a route change).
     assert "onClick={onClose}" in block
@@ -234,20 +239,27 @@ def test_iter282_no_new_npm_dependencies_added():
     refactored file MUST import ONLY from packages already in
     package.json."""
     src = _read_fe("components/MapSearchPanel.jsx")
-    allowed_imports = (
-        "from 'react'",
-        "from 'react-leaflet'",
-        "from 'react-leaflet-cluster'",
-        "from 'leaflet'",
-        "from 'leaflet/dist/leaflet.css'",
-        "from 'lucide-react'",
+    allowed_modules = {
+        "react",
+        "react-leaflet",
+        "react-leaflet-cluster",
+        "leaflet",
+        "leaflet/dist/leaflet.css",
+        "lucide-react",
+    }
+    # Match every full `import ... from '...';` statement (named, default,
+    # multi-line, and bare side-effect imports like `import 'foo.css';`).
+    import re
+    statements = re.findall(
+        r"import\s+(?:[^'\";]*?\s+from\s+)?'([^']+)'\s*;",
+        src,
+        re.DOTALL,
     )
-    import_lines = [ln for ln in src.splitlines() if ln.startswith("import ")]
-    assert import_lines, "no import lines found"
-    for ln in import_lines:
-        # Each import must reference one of the allowed sources.
-        assert any(allowed in ln for allowed in allowed_imports), (
-            f"unexpected import (new dependency?): {ln!r}"
+    assert statements, "no import statements found"
+    for module in statements:
+        # Each import MUST reference one of the allowed modules.
+        assert module in allowed_modules, (
+            f"unexpected import (new dependency?): {module!r}"
         )
 
 

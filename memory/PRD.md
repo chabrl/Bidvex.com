@@ -1,5 +1,122 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter282 — FULL-SCREEN IMMERSIVE MAP SEARCH + SELLER PIN ACCURACY (Feb 05, 2026) ✅
+
+Upgraded the inline 320px `MapSearchPanel` into a full-viewport immersive
+map experience with custom image-circle markers, clustering, branded
+popups, and seller-postal-code-precise geocoding. Closes the
+geographical-browsing UX loop from iter237/iter241/iter238.
+**Pytest 235/235 PASS** (iter237 + iter27*+iter28* sprint scope, 18
+env-dependent skips, 0 failures). Lint clean, webpack compiles.
+
+### Mission 1 — Full-screen overlay (`components/MapSearchPanel.jsx`)
+- The panel now flips to **`position: fixed; 100vw × 100vh`**, `zIndex:
+  1000`, behind a floating control surface:
+  - **Back button** (top-left, `zIndex: 1002`) — BidVex-blue pill,
+    `ArrowLeft` icon, wired to `onClose`.
+  - **Radius slider card** (bottom-left, `zIndex: 1001`) — translucent
+    slate-900 glassmorphic, holds the 10-500km range slider with live
+    "Showing listings within X km" banner (EN + FR).
+- **Scroll restoration** via `useScrollLockAndRestore(open)` hook —
+  saves `window.scrollY` to `sessionStorage` under
+  `bvx.mapSearch.scrollRestore.v1`, locks `document.body.style.overflow
+  = 'hidden'` while open, restores both on close. Parents (`/lots`,
+  `/marketplace`) need NO changes — the UX is fully encapsulated.
+
+### Mission 2 — Custom image-circle markers
+- NEW `buildImageMarkerIcon(imageUrl)` returns an `L.divIcon` rendering
+  the listing's primary thumbnail as a **40×40 circle** with a 2px
+  white border + soft drop-shadow.
+- NEW `primaryImage(m)` walks every shape the backend can ship
+  (`images: [string]`, `images: [{url}]`, flat `m.image` / `m.thumbnail`).
+- NEW `BVX_FALLBACK_LOGO` — inline data-URI SVG of the BidVex "BV"
+  mark on the `#1A1A2E` brand background — used when a listing has
+  no image (never a blank circle).
+- Markers hover-scale via `:hover .bvx-map-marker { transform: scale(1.08) }`
+  for visual feedback.
+
+### Mission 3 — Clustering preserved
+- `react-leaflet-cluster` (already in `package.json` — NO new
+  dependencies) wraps the marker layer when there are **> 10** listings
+  in view. Below that threshold individual markers render directly.
+  `chunkedLoading` + `maxClusterRadius={60}` for smooth pans.
+
+### Mission 4 — Branded popups
+- Popup `className="bv-map-popup"` + inline `<style>` block hides the
+  default Leaflet tip arrow + rounds the container to 8px.
+- Each popup contains:
+  - 120×90 rounded listing thumbnail
+  - Title clamped to 2 lines via `-webkit-line-clamp`
+  - Current bid in green (`#0D9F4F`), CAD-formatted via
+    `Intl.NumberFormat('en-CA', { style: 'currency' })`
+  - Full-width BidVex-blue "View Listing →" anchor wired to
+    `/listing/${m.id}`
+- Per-listing testids: `bvx-map-popup-{id}` + `bvx-map-view-listing-{id}`.
+
+### Mission 5 — Seller pin accuracy (NEW Change 4, backend)
+The Map endpoint already silently skipped listings without coordinates
+(`$geoWithin` semantics), but **listing creation** was only populating
+`geo` via city centroid (iter237). iter282 adds the postal-code
+priority chain at create time so seller pins land on the actual FSA:
+
+1. `postal_code` present + Nominatim resolves → `geo.source =
+   "nominatim_postal"` (precise per-FSA placement).
+2. Else → `build_geo_point(city, region)` → `geo.source =
+   "city_centroid"` (rough fallback).
+3. Neither resolves → `geo` is **NOT set** — listing is silently
+   skipped on the map. **Never plotted at 0,0 or map center.**
+
+Wired in `routes/listings.py::create_listing` (~lines 430-464) using
+the existing iter238 `services/geo_resolver.py::resolve_postal_code()`
+helper. No live Nominatim call in tests — monkey-patched.
+
+### Validation
+- `tests/test_iter282_fullscreen_map.py` — **19/19 PASS**: overlay
+  fixed-positioning + viewport sizing, z-index hierarchy (1000 < 1001 <
+  1002), Back-button wiring + branding, scroll-restore key + lifecycle
+  hook, divIcon image markers + circle CSS + BV fallback, primaryImage
+  shape-walker, branded popup CSS + image + 2-line clamp + CAD format
+  + per-listing testid + `/listing/${m.id}` route, marker clustering
+  preserved at >10 threshold, **no new npm dependencies** added,
+  parent pages unchanged, design-decision pin (no client-side
+  geocoding), live HTTP sanity on `/api/marketplace/items/geo`.
+- `tests/test_iter282_seller_pin_accuracy.py` — **6/6 PASS**: static
+  routes/listings.py guard on the priority chain text, postal-wins-over-city
+  precedence, postal-fail falls back to city centroid, neither
+  resolves leaves `geo` unset (no DB write), frontend defends with
+  `coordinates?.length === 2` filter, never plots `[0, 0]`.
+
+### Files changed (iter282)
+**Frontend MODIFIED**: `components/MapSearchPanel.jsx` (refactored to
+full-screen with divIcon markers + branded popups + sessionStorage
+scroll restore — same `open / onClose / onGeoChange / backendUrl /
+isFrench` parent API).
+**Backend MODIFIED**: `routes/listings.py` (~lines 430-464 — postal
+priority chain at create time).
+**Backend NEW**: `tests/test_iter282_fullscreen_map.py` (19 tests),
+`tests/test_iter282_seller_pin_accuracy.py` (6 tests).
+
+### Action items (user)
+1. **Save to GitHub → redeploy** preview → production.
+2. **Smoke test on https://bidvex.com**: navigate to `/lots` or
+   `/marketplace` → click "Search by Map" → the entire viewport
+   becomes the map. Drag the radius slider → listings re-fetch and
+   re-cluster live. Click a marker → branded popup with thumbnail +
+   bid + "View Listing →". Click Back → scroll restores to where you
+   were before.
+3. **Verify pin accuracy after redeploy**: create a new listing with
+   a valid Canadian postal code (e.g. `J1H 1B1` Sherbrooke) → the
+   marker should appear within the FSA, NOT at the city centroid.
+   Create one with an unknown city + no postal → it should NOT
+   appear on the map at all (correct silent-skip behavior).
+4. **Optional backfill**: run `python scripts/backfill_listing_geo.py`
+   in production to upgrade legacy city-only listings to FSA precision
+   where they have a `postal_code`. The script is idempotent.
+
+---
+
+
+
 ## Latest: iter281 — COMPETITOR BAN + BEHAVIOR ALIGNMENT (Feb 04, 2026) ✅
 
 P0 production bug fix: the live AI Core was recommending Facebook

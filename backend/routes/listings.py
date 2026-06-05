@@ -427,16 +427,41 @@ async def create_listing(
         getattr(listing_data, "visible_content_tags", None)
     )
 
-    # iter237 — auto-populate GeoJSON Point from the city when known.
-    # The `geo` field is indexed by 2dsphere and consumed by /api/marketplace/items/geo.
-    # Falls back gracefully when the city isn't in the lookup table.
+    # iter237/iter282 — auto-populate GeoJSON Point with seller-pin accuracy.
+    # Priority chain (per iter282 Change 4):
+    #   1. postal_code → Nominatim (most accurate; FSA-precise)
+    #   2. city → CITY_COORDS centroid (rough fallback)
+    #   3. neither resolves → leave `geo` UNSET so the listing is
+    #      silently skipped on the map (never plotted at 0,0 or
+    #      the map default — that would mislead buyers about
+    #      seller location).
+    # The `geo` field is indexed by 2dsphere and consumed by
+    # /api/marketplace/items/geo via `$geoWithin`, which inherently
+    # excludes documents missing the field.
     try:
-        from utils import build_geo_point
-        _geo = build_geo_point(listing_data.city, province=listing_data.region)
+        _geo = None
+        _postal = (getattr(listing_data, "postal_code", "") or "").strip()
+        if _postal:
+            from services.geo_resolver import resolve_postal_code
+            _coords = await resolve_postal_code(_postal)
+            if _coords:
+                _geo = {
+                    "type": "Point",
+                    "coordinates": [_coords["lng"], _coords["lat"]],
+                    "city": listing_data.city or "",
+                    "province": listing_data.region or "",
+                    "source": "nominatim_postal",
+                }
+        if not _geo:
+            from utils import build_geo_point
+            _city_geo = build_geo_point(listing_data.city, province=listing_data.region)
+            if _city_geo:
+                _geo = {**_city_geo, "source": "city_centroid"}
         if _geo:
             listing_dict["geo"] = _geo
+        # else: deliberately leave `geo` unset — map silently skips it.
     except Exception as _e:  # noqa: BLE001
-        logger.warning(f"[iter237] geo enrichment skipped for new listing: {_e}")
+        logger.warning(f"[iter282-geo] enrichment skipped for new listing: {_e}")
 
     # LEGACY: opc_permit → migrated to dealer_license_* (iter201). Field kept for back-compat.
     # Dealer-certified seller check + buyer-premium rate
