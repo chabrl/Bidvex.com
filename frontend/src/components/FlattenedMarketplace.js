@@ -860,13 +860,27 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
   const getDetailLink = (item) => {
     const cat = (item.category || '').toLowerCase();
     const lt = (item.listing_type || '').toLowerCase();
+    const sec = (item.section || '').toLowerCase();
     // iter222 — storage lockers from `listings` collection route to the
     // dedicated storage detail page so the storage-specific bidding UI
     // (deposit hold, cleanout deadline, etc.) renders correctly.
-    if (lt === 'storage_locker' || cat === 'storage_locker') {
+    if (
+      lt === 'storage_locker' || lt === 'storage_auction' || lt === 'storage' ||
+      lt === 'unit' || lt === 'unit_auction' ||
+      sec === 'storage' ||
+      cat === 'storage_locker' || cat === 'storage'
+    ) {
       return `/storage-auctions/${item.id}`;
     }
-    if (cat === 'vehicle' || cat === 'vehicles' || cat === 'car' || cat === 'auto') {
+    // iter283-emergency-detail — Route ALL vehicle aliases to
+    // /vehicle-auctions/{id}. The backend detail endpoint now falls
+    // back to db.listings, so this href resolves cleanly.
+    if (
+      lt === 'vehicle_auction' || lt === 'vehicles' || lt === 'vehicle' ||
+      sec === 'vehicles' ||
+      cat === 'vehicle' || cat === 'vehicles' || cat === 'car' ||
+      cat === 'auto' || cat === 'vehicle parts'
+    ) {
       return `/vehicle-auctions/${item.id}`;
     }
     return item.auction_id ? `/lots/${item.auction_id}` : `/listing/${item.id}`;

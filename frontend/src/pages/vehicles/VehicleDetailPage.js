@@ -943,19 +943,35 @@ const VehicleDetailPage = () => {
   const [showBuyerGateModal, setShowBuyerGateModal] = useState(false);
   const [buyerGateCleared, setBuyerGateCleared] = useState(false);
 
+  // iter283-emergency-detail — `trackViewContent` was previously
+  // referenced in `fetchVehicle` without being in lexical scope. It
+  // belongs to a sibling component's hook call. The undefined
+  // identifier threw ReferenceError synchronously inside the try
+  // block, hit the catch, and surfaced as "Vehicle not found" even
+  // on a 200 OK API response. Pulling the hook into the page-level
+  // component fixes the crash AND keeps the Meta Pixel tracking we
+  // already pay for (and the catalog feed parity per iter230 wiring).
+  const { trackViewContent: trackVehicleView } =
+    useMetaPixelTracking({ routeHint: 'vehicle' });
+
   const fetchVehicle = useCallback(async () => {
     try {
       const response = await axios.get(`${API}/vehicles/${id}`);
       setVehicle(response.data);
       setSeller(response.data.seller);
       // Meta Pixel ViewContent — dedupe-safe per (listing, session).
-      trackViewContent({ listing: response.data });
+      // Wrapped so a tracking failure NEVER kills the page render.
+      try {
+        trackVehicleView({ listing: response.data });
+      } catch (_trackErr) {
+        // Tracking is best-effort. Swallow.
+      }
     } catch (err) {
       setError(err.response?.data?.detail || 'Vehicle not found');
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, trackVehicleView]);
 
   useEffect(() => {
     fetchVehicle();

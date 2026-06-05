@@ -878,6 +878,20 @@ async def get_listing(listing_id: str, background_tasks: BackgroundTasks):
         listing_doc, seller, infer_seller_context(listing_doc),
     )
 
+    # iter283-emergency-detail — Defensive coercion before Pydantic
+    # validation. The Listing model expects `location` as a STRING
+    # ("City, Province") but some seed paths (and historical imports)
+    # have written it as a GeoJSON-shaped dict. The structured shape
+    # belongs under `geo` per iter237. Reshape inline so we never 500
+    # on a single-listing fetch.
+    _loc = listing_doc.get("location")
+    if isinstance(_loc, dict):
+        _city = _loc.get("city") or listing_doc.get("city") or ""
+        _prov = _loc.get("province") or listing_doc.get("region") or ""
+        listing_doc["location"] = (
+            f"{_city}, {_prov}".strip(", ") if (_city or _prov) else ""
+        )
+
     # Fire-and-forget view increment — never blocks the response.
     background_tasks.add_task(_increment_listing_views, listing_id)
 

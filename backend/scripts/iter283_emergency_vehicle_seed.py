@@ -77,7 +77,9 @@ def _vehicle(_id: str, title: str, make: str, model: str, year: int,
         "province": "QC",
         "country": "CA",
         "postal_code": postal,
-        "location": loc,
+        # Listing model expects `location` as STRING. The structured
+        # GeoJSON Point lives under `geo` (iter237 canonical shape).
+        "location": f"{city}, QC",
         "geo": {
             "type": "Point",
             "coordinates": loc["coordinates"],

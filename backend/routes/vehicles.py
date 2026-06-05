@@ -1245,14 +1245,35 @@ async def list_vehicles(
 
 @vehicle_router.get("/vehicles/{vehicle_id}")
 async def get_vehicle_detail(vehicle_id: str, request: Request):
-    """Get detailed vehicle listing"""
+    """Get detailed vehicle listing.
+
+    iter283-emergency-detail — Fallback chain so vehicles in either
+    storage land on the same UI:
+      1. db.vehicle_listings by id (legacy strict-flow listings)
+      2. db.listings by id with a flexible vehicle-shape match
+         (listing_type alias OR section=vehicles OR case-insensitive
+         category match). The earlier strict `category: {$in: ['vehicles',
+         'vehicle','car','auto']}` filter dropped `category: 'Vehicles'`
+         (capital V) and was the root cause of the 404.
+    """
     listing = await db.vehicle_listings.find_one({"id": vehicle_id}, {"_id": 0})
-    
-    # Fallback: check general listings collection for vehicle-category items
+
+    # Fallback: check general listings collection.
     if not listing:
+        from services.listing_sections import VEHICLE_TYPES
         listing = await db.listings.find_one(
-            {"id": vehicle_id, "category": {"$in": ["vehicles", "vehicle", "car", "auto"]}},
-            {"_id": 0}
+            {
+                "id": vehicle_id,
+                "$or": [
+                    {"listing_type": {"$in": list(VEHICLE_TYPES)}},
+                    {"section": "vehicles"},
+                    {"category": {
+                        "$regex": r"^(vehicles?|vehicle\s*parts|cars?|autos?|trucks?|motorcycles?|boats?|rvs?|trailers?)$",
+                        "$options": "i",
+                    }},
+                ],
+            },
+            {"_id": 0},
         )
         if listing:
             # Parse title to extract year/make/model (e.g. "2024 BMW M3 Competition xDrive")
