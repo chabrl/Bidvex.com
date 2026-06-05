@@ -6,6 +6,7 @@ Handles external webhooks from third-party services:
 """
 
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import JSONResponse
 from typing import Dict, Any, List
 from datetime import datetime, timezone, timedelta
 import logging
@@ -103,19 +104,37 @@ async def handle_stripe_webhook(request: Request):
         data = (event.get("data", {}) if isinstance(event, dict) else event["data"]).get("object", {})
 
         db = get_db()
+        event_id = event.get("id")
 
-        # Log the event
-        logger.info(f"[Webhook] DB name: {db.name}, client address: {db.client.address}, inserting event {event.get('id')}")
-        try:
-            insert_result = await db.stripe_events.insert_one({
-                "id": event.get("id"),
-                "type": event_type,
-                "data": data,
-                "created_at": datetime.now(timezone.utc).isoformat()
-            })
-            logger.info(f"[Webhook] Event inserted: {insert_result.inserted_id}")
-        except Exception as insert_err:
-            logger.error(f"[Webhook] stripe_events insert FAILED: {insert_err}")
+        # iter283-payments-audit Mission 4B — Idempotency guard.
+        # Stripe retries delivery up to 3 days. Without this guard,
+        # every retry would re-fire all handler side effects
+        # (subscription updates, invoice payments, fee capture).
+        # Strategy: atomic insert; duplicate-key = already processed,
+        # early-return 200 so Stripe stops retrying. Requires the
+        # unique index `id_unique` on `stripe_events.id` (created in
+        # `services/stripe_events_index.py` at startup).
+        if event_id:
+            try:
+                from pymongo.errors import DuplicateKeyError
+                await db.stripe_events.insert_one({
+                    "id": event_id,
+                    "type": event_type,
+                    "data": data,
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "processed_at": None,
+                })
+                logger.info(f"[Webhook] Event {event_id} accepted for processing")
+            except DuplicateKeyError:
+                logger.info(
+                    f"[Webhook] Event {event_id} already processed — "
+                    "returning 200 to halt Stripe retries"
+                )
+                return JSONResponse(status_code=200, content={"status": "duplicate_ignored"})
+            except Exception as insert_err:
+                logger.error(f"[Webhook] stripe_events insert FAILED: {insert_err}")
+        else:
+            logger.warning("[Webhook] event missing id — proceeding without idempotency guard")
 
         logger.info(f"Processing Stripe webhook: {event_type}")
 

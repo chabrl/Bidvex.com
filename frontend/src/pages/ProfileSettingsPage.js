@@ -1032,26 +1032,64 @@ const AddCardForm = ({ onSuccess, onCancel }) => {
   const [loading, setLoading] = useState(false);
   const { t } = useTranslation();
 
+  // iter283-payments-audit Mission 1A — Switched from
+  // `stripe.createPaymentMethod()` to `stripe.confirmCardSetup()`
+  // with a SetupIntent + `usage="off_session"`. This:
+  //   • Verifies the card is usable for off-session charges (the
+  //     way our deposit/auto-capture flows actually use it).
+  //   • Completes 3DS / SCA in-flow so we don't fail later when
+  //     a Quebec/EU bank requires 3DS at deposit-hold time.
+  //   • Attaches the PaymentMethod to the Customer automatically
+  //     — no separate PaymentMethod.attach call needed.
+  // Raw PAN never leaves the browser (still goes through Stripe
+  // Elements `CardElement` as before).
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!stripe || !elements) return;
 
     setLoading(true);
     try {
-      const { error, paymentMethod } = await stripe.createPaymentMethod({
-        type: 'card',
-        card: elements.getElement(CardElement),
-      });
+      // 1) Backend creates a SetupIntent + ensures the Customer exists.
+      const setupRes = await axios.post(`${API}/payments/setup-intent`);
+      const clientSecret = setupRes.data?.client_secret;
+      if (!clientSecret) {
+        toast.error(t('paymentTrust.cardAddFailed',
+          'Failed to add payment method'));
+        return;
+      }
+
+      // 2) Stripe confirms the card off-session (handles 3DS).
+      const { error, setupIntent } = await stripe.confirmCardSetup(
+        clientSecret,
+        {
+          payment_method: { card: elements.getElement(CardElement) },
+        },
+      );
 
       if (error) {
         toast.error(error.message);
-      } else {
-        await axios.post(`${API}/payments/payment-methods`, {
-          payment_method_id: paymentMethod.id,
-        });
-        toast.success(t('paymentTrust.cardAddedSuccess', 'Payment method added successfully!'));
-        onSuccess();
+        return;
       }
+
+      const paymentMethodId =
+        setupIntent?.payment_method ||
+        (typeof setupIntent?.payment_method === 'object'
+          ? setupIntent.payment_method.id
+          : null);
+
+      if (!paymentMethodId) {
+        toast.error(t('paymentTrust.cardAddFailed',
+          'Failed to add payment method'));
+        return;
+      }
+
+      // 3) Backend persists PM metadata + flips trust_status.
+      await axios.post(`${API}/payments/payment-methods`, {
+        payment_method_id: paymentMethodId,
+      });
+      toast.success(t('paymentTrust.cardAddedSuccess',
+        'Payment method added successfully!'));
+      onSuccess();
     } catch (error) {
       const detail = error?.response?.data?.detail || error?.message || 'Unknown error';
       console.error('Add payment method failed:', detail, error);

@@ -236,6 +236,65 @@ async def lifespan(app):
     except Exception as exc:  # noqa: BLE001
         logger.warning(f"[iter283-hotfix-2] vehicle fast-track skipped: {exc}")
 
+    # iter283-payments-audit Mission 4B — Webhook idempotency.
+    # Adds a unique index on `stripe_events.id`. Combined with the
+    # webhook handler's check-and-insert flow, this guarantees every
+    # Stripe event is processed AT MOST ONCE even under retry storms.
+    # We first purge legacy docs with a NULL/missing `id` field, then
+    # dedupe by `id` (keeping the oldest doc per event) — these were
+    # written by a pre-iter283-payments-audit handler that didn't
+    # enforce uniqueness.
+    try:
+        await db.stripe_events.delete_many(
+            {"$or": [{"id": {"$exists": False}}, {"id": None}, {"id": ""}]}
+        )
+        # Dedupe: aggregate-then-delete keeping `_id` of the oldest
+        # doc per event id. Idempotent — repeat runs find 0 dupes.
+        pipeline = [
+            {"$match": {"id": {"$type": "string"}}},
+            {"$sort": {"created_at": 1, "_id": 1}},
+            {"$group": {
+                "_id": "$id",
+                "keep": {"$first": "$_id"},
+                "all": {"$push": "$_id"},
+            }},
+            {"$project": {
+                "to_delete": {
+                    "$filter": {
+                        "input": "$all",
+                        "as": "oid",
+                        "cond": {"$ne": ["$$oid", "$keep"]},
+                    }
+                }
+            }},
+        ]
+        oids_to_delete = []
+        async for row in db.stripe_events.aggregate(pipeline):
+            oids_to_delete.extend(row.get("to_delete") or [])
+        if oids_to_delete:
+            await db.stripe_events.delete_many({"_id": {"$in": oids_to_delete}})
+            logger.info(
+                f"[iter283-payments-audit] purged {len(oids_to_delete)} "
+                "duplicate stripe_events before index build"
+            )
+        await db.stripe_events.create_index(
+            "id", unique=True, name="id_unique",
+            partialFilterExpression={"id": {"$type": "string"}},
+        )
+        logger.info("[iter283-payments-audit] stripe_events.id unique index ensured")
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(f"[iter283-payments-audit] stripe_events index skipped: {exc}")
+
+    # iter283-payments-audit Mission 1B — Backfill Stripe Customers
+    # for users missing `stripe_customer_id`. Idempotent — only acts
+    # on users without an existing customer record.
+    try:
+        from services.stripe_customer_backfill import backfill_stripe_customers
+        bf = await backfill_stripe_customers(db)
+        logger.info(f"[iter283-payments-audit] stripe customer backfill: {bf}")
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(f"[iter283-payments-audit] customer backfill skipped: {exc}")
+
     # ── iter212 — Grandfather existing storage facilities ──
     try:
         res = await db.storage_facilities.update_many(

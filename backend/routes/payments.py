@@ -454,9 +454,15 @@ async def create_setup_intent(
         )
     
     # Create SetupIntent
+    # iter283-payments-audit Mission 1A — `usage="off_session"` is
+    # REQUIRED so the card can be charged later for deposit holds
+    # and post-auction settlement without re-prompting the buyer.
+    # Without this, 3DS-enforcing banks (most Quebec issuers) fail
+    # the deposit hold at bid time.
     setup_intent = stripe.SetupIntent.create(
         customer=customer_id,
         payment_method_types=["card"],
+        usage="off_session",
         metadata={
             "user_id": current_user.id,
             "purpose": "trust_verification"
