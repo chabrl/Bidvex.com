@@ -1788,7 +1788,8 @@
     "processingFee": "Traitement et technologie",
     "unlockTotal": "Total des frais de déverrouillage",
     "estTotalCost": "Coût total estimé d'acquisition",
-    "acquisitionNote": "Le prix du véhicule est versé directement au vendeur. BidVex perçoit uniquement les frais de déverrouillage (plateforme + taxes + traitement). Les droits de mutation et l'immatriculation provinciaux sont à la charge de l'acheteur."
+    "acquisitionNote": "Le prix du véhicule est versé directement au vendeur. BidVex perçoit uniquement les frais de déverrouillage (plateforme + taxes + traitement). Les droits de mutation et l'immatriculation provinciaux sont à la charge de l'acheteur.",
+    "legalDisclaimer": "Le prix d'adjudication du véhicule est payé directement au vendeur. BidVex ne perçoit que les frais de plateforme + les taxes applicables. Taxe de transfert provinciale & immatriculation sont à la charge de l'acheteur."
   },
   "vehicleRelated": {
     "title": "Véhicules similaires",

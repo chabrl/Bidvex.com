@@ -1549,37 +1549,42 @@ const VehicleDetailPage = () => {
                   expanded={true}
                   listing={vehicle}
                 />
-                
-                {/* Fee Transparency */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Info className="h-5 w-5 text-slate-600" />
-                      Fee Transparency
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-blue-50 dark:bg-blue-950/30 rounded-lg p-4">
-                        <h4 className="font-semibold text-blue-800 dark:text-blue-200 mb-2">Buyer Premium</h4>
-                        <ul className="space-y-1 text-sm text-blue-700 dark:text-blue-300">
-                          <li>Standard: 5%</li>
-                          <li>Premium: 3.5%</li>
-                          <li>VIP Elite: 3%</li>
-                        </ul>
-                      </div>
-                      <div className="bg-green-50 dark:bg-green-950/30 rounded-lg p-4">
-                        <h4 className="font-semibold text-green-800 dark:text-green-200 mb-2">Seller Commission</h4>
-                        <ul className="space-y-1 text-sm text-green-700 dark:text-green-300">
-                          <li>Standard: 4%</li>
-                          <li>Premium: 2.5%</li>
-                          <li>VIP Elite: 2%</li>
-                        </ul>
-                      </div>
+
+                {/* iter283-vehicle-fee-cleanup —
+                    The legacy "Fee Transparency" card (Buyer Premium
+                    5%/3.5%/3% + Seller Commission 4%/2.5%/2% grid) was
+                    REMOVED from this surface. Vehicles do not carry a
+                    tier-based buyer premium (see test_iter283_vehicle_bp_zero)
+                    so showing the matrix here misled buyers about the
+                    pricing model. The same `<FeeTransparency>` content
+                    remains valid on the Storage / Lots surfaces where
+                    the tier matrix legitimately applies.
+
+                    Replaced by the bilingual legal disclaimer card
+                    required for Quebec / Canadian auto-dealer compliance. */}
+                <Card data-testid="vehicle-legal-disclaimer-footer">
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <Info className="h-4 w-4 text-slate-500 dark:text-slate-400 mt-0.5 flex-shrink-0" />
+                      <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+                        {i18n.language?.startsWith('fr') ? (
+                          <>
+                            Le prix d'adjudication du véhicule est payé
+                            directement au vendeur. BidVex ne perçoit que les
+                            frais de plateforme + les taxes applicables.
+                            Taxe de transfert provinciale & immatriculation
+                            sont à la charge de l'acheteur.
+                          </>
+                        ) : (
+                          <>
+                            Vehicle hammer price is paid directly to the
+                            seller. BidVex collects only the Platform Fee +
+                            applicable tax. Provincial transfer tax &
+                            registration are buyer-paid.
+                          </>
+                        )}
+                      </p>
                     </div>
-                    <p className="text-xs text-slate-500 text-center">
-                      Platform fee of 2.5% applies to all transactions. Taxes calculated based on buyer's province.
-                    </p>
                   </CardContent>
                 </Card>
               </TabsContent>

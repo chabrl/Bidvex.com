@@ -1768,7 +1768,8 @@
     "processingFee": "Processing & technology",
     "unlockTotal": "Unlock fee total",
     "estTotalCost": "Est. total to acquire",
-    "acquisitionNote": "Vehicle price is paid directly to the seller. BidVex collects only the unlock fee (platform + taxes + processing). Provincial transfer tax & registration are buyer-paid."
+    "acquisitionNote": "Vehicle price is paid directly to the seller. BidVex collects only the unlock fee (platform + taxes + processing). Provincial transfer tax & registration are buyer-paid.",
+    "legalDisclaimer": "Vehicle hammer price is paid directly to the seller. BidVex collects only the Platform Fee + applicable tax. Provincial transfer tax & registration are buyer-paid."
   },
   "vehicleRelated": {
     "title": "Similar Vehicles",

@@ -347,9 +347,20 @@ export const VehicleAcquisitionCost = ({ bid, currency = 'CAD', province = 'ON' 
         emphasis
         testId="vehicle-acq-total"
       />
-      <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed mt-1">
+      {/* iter283-vehicle-fee-cleanup — Stable, bilingual legal
+          disclaimer footer required for Quebec / Canadian auto-dealer
+          regulatory compliance. Always visible in the pricing card,
+          regardless of locale/expansion/tier. Wording is FROZEN —
+          coordinate with legal before changing. */}
+      <p
+        className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed mt-2 pt-2 border-t border-slate-200 dark:border-slate-700"
+        data-testid="vehicle-pricing-legal-disclaimer"
+      >
         <Info className="inline h-3 w-3 mr-0.5" />
-        {t('vehicleBidPanel.acquisitionNote', 'Vehicle price is paid directly to the seller. BidVex collects only the unlock fee (platform + taxes + processing). Provincial transfer tax & registration are buyer-paid.')}
+        {t(
+          'vehicleBidPanel.legalDisclaimer',
+          'Vehicle hammer price is paid directly to the seller. BidVex collects only the Platform Fee + applicable tax. Provincial transfer tax & registration are buyer-paid.'
+        )}
       </p>
     </div>
   );
