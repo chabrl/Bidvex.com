@@ -342,6 +342,46 @@ const MapSearchPanel = ({
         }
         .leaflet-popup.bv-map-popup .leaflet-popup-content { margin: 0; }
         .leaflet-popup.bv-map-popup .leaflet-popup-tip { display: none; }
+
+        /* iter283-hotfix Mission 3 — High-visibility cluster counter
+           pill. Overrides the default leaflet-cluster green blob with
+           a prominent white circle + BidVex Blue ring + bold navy
+           digits. The default theme is too subtle on satellite-style
+           tiles and gets lost over busy backgrounds. */
+        .leaflet-cluster-anim .leaflet-marker-icon,
+        .leaflet-cluster-anim .leaflet-marker-shadow { transition: transform 0.3s ease-out; }
+        .marker-cluster,
+        .marker-cluster-small,
+        .marker-cluster-medium,
+        .marker-cluster-large {
+          background-color: transparent !important;
+        }
+        .marker-cluster div,
+        .marker-cluster-small div,
+        .marker-cluster-medium div,
+        .marker-cluster-large div {
+          background-color: #ffffff !important;
+          border: 3px solid #0055FF !important;
+          color: #0a1628 !important;
+          font-weight: 800 !important;
+          border-radius: 50% !important;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          width: 100% !important;
+          height: 100% !important;
+          margin: 0 !important;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+        }
+        .marker-cluster span {
+          line-height: 1 !important;
+          font-size: 14px !important;
+          color: #0a1628 !important;
+          font-weight: 800 !important;
+        }
+        /* Slightly bigger digits for high-count clusters (visual hierarchy). */
+        .marker-cluster-large span { font-size: 16px !important; }
       `}</style>
 
       {/* Fullscreen overlay */}

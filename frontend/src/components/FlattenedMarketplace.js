@@ -125,7 +125,8 @@ const FlattenedMarketplace = ({
     condition: '',
     sort: 'ending_soon',
     private_sales_only: false,
-    zero_fee_only: false
+    zero_fee_only: false,
+    section_filter: 'all',  // iter283-hotfix Mission 4 — chip row state
   });
   
   // Quick Bid Modal State
@@ -235,7 +236,31 @@ const FlattenedMarketplace = ({
     ? allItems.filter((item) => !item.seller_is_business)
     : allItems;
   // iter236 Mission 2 — Geo override takes priority when map filter active.
-  const items = geoItems !== null ? geoItems : baseItems;
+  // iter283-hotfix Mission 4 — Section filter chip row pre-filters the
+  // grid client-side (instant UX) without re-fetching from the backend.
+  const sectionItems = (() => {
+    const list = geoItems !== null ? geoItems : baseItems;
+    const sf = (filters.section_filter || 'all').toLowerCase();
+    if (sf === 'all') return list;
+    return list.filter((i) => {
+      const lt = (i.listing_type || '').toLowerCase();
+      const sec = (i.section || '').toLowerCase();
+      if (sf === 'marketplace') {
+        return sec === 'marketplace' || (!sec && !['storage_locker','storage_auction','storage','unit','unit_auction','vehicle_auction','vehicles','vehicle','lot_auction','lots','multi_lot','multi_item'].includes(lt));
+      }
+      if (sf === 'lots') {
+        return sec === 'lots' || ['lot_auction','lots','multi_lot','multi_item'].includes(lt);
+      }
+      if (sf === 'vehicles') {
+        return sec === 'vehicles' || ['vehicle_auction','vehicles','vehicle'].includes(lt);
+      }
+      if (sf === 'storage') {
+        return sec === 'storage' || ['storage_locker','storage_auction','storage','unit','unit_auction'].includes(lt);
+      }
+      return true;
+    });
+  })();
+  const items = sectionItems;
   const total = marketplaceData?.pages?.[0]?.total ?? 0;
   const hasMore = hasNextPage;
 
@@ -348,6 +373,54 @@ const FlattenedMarketplace = ({
 
       {/* iter239 Mission 5 — Featured Listings horizontal snap-scroll carousel. */}
       <FeaturedListingsBanner section="marketplace" limit={8} />
+
+      {/* iter283-hotfix Mission 4 — Section-filter chip row.
+          Lets buyers narrow the universal-feed instantly without a
+          server round-trip. Mobile: horizontally scrollable. */}
+      <div
+        data-testid="section-filter-chip-row"
+        className="mb-4 -mx-4 md:mx-0 px-4 md:px-0"
+        style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}
+      >
+        <div
+          className="flex items-center gap-2"
+          style={{ whiteSpace: 'nowrap', minWidth: 'min-content' }}
+        >
+          {[
+            { id: 'all',         label: isFrench ? 'Toutes les enchères' : 'All Auctions',   icon: '✨' },
+            { id: 'marketplace', label: isFrench ? 'Marketplace'         : 'Marketplace',     icon: '🛒' },
+            { id: 'lots',        label: isFrench ? 'Lots'                : 'Lots',            icon: '📦' },
+            { id: 'vehicles',    label: isFrench ? 'Véhicules'           : 'Vehicles',        icon: '🚗' },
+            { id: 'storage',     label: isFrench ? 'Entreposage'         : 'Storage',         icon: '🏪' },
+          ].map((chip) => {
+            const active = (filters.section_filter || 'all') === chip.id;
+            return (
+              <button
+                key={chip.id}
+                type="button"
+                data-testid={`section-chip-${chip.id}`}
+                onClick={() => setFilters((f) => ({ ...f, section_filter: chip.id }))}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: 999,
+                  fontSize: 14,
+                  fontWeight: active ? 700 : 500,
+                  transition: 'all 150ms ease',
+                  cursor: 'pointer',
+                  border: active ? '1px solid transparent' : '1px solid #e2e8f0',
+                  background: active ? '#0055FF' : '#f0f4f8',
+                  color: active ? '#ffffff' : '#4a5568',
+                  boxShadow: active ? '0 2px 8px rgba(0, 85, 255, 0.25)' : 'none',
+                  flex: '0 0 auto',
+                }}
+              >
+                <span style={{ marginRight: 6 }}>{chip.icon}</span>
+                {chip.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
       {/* Header */}
       {showHeader && (

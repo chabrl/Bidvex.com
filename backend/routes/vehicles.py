@@ -1055,9 +1055,18 @@ async def list_vehicles(
     List public vehicle auctions
     This is the main browse endpoint for buyers
     """
+    # iter283-hotfix Mission 2 — Public vehicle browse must NEVER drop
+    # listings just because `visibility` is missing on legacy docs or
+    # because `requires_broker=True` (the broker gate restricts CREATION,
+    # not BROWSING). We keep the active+non-demo filter strict but flex
+    # the visibility column.
     query = {
         "status": VehicleListingStatus.ACTIVE.value,
-        "visibility": VehicleAuctionVisibility.PUBLIC.value,
+        "$or": [
+            {"visibility": VehicleAuctionVisibility.PUBLIC.value},
+            {"visibility": {"$exists": False}},
+            {"visibility": None},
+        ],
         "is_demo": {"$ne": True},  # iter211 P4 — exclude demo dealers' vehicles
     }
     
@@ -1116,11 +1125,26 @@ async def list_vehicles(
     
     total = await db.vehicle_listings.count_documents(query)
     
-    # Also include vehicle-category items from the general listings collection
+    # Also include vehicle-shape items from the general listings
+    # collection (iter222 + iter283).
+    # iter283-hotfix Mission 2 — Match BOTH listing_type aliases AND
+    # categories (case-insensitive) so vehicles authored via the legacy
+    # general create-form OR a partner sync surface here too.
+    from services.listing_sections import VEHICLE_TYPES
     general_vehicle_query = {
         "status": "active",
-        "category": {"$in": ["vehicles", "vehicle", "car", "auto"]}
+        "$or": [
+            {"listing_type": {"$in": list(VEHICLE_TYPES)}},
+            {"section": "vehicles"},
+            {"category": {"$regex": r"^vehicle(s|\s*parts)?$", "$options": "i"}},
+            {"category": {"$regex": r"^(cars?|autos?|trucks?|motorcycles?|boats?|rvs?|trailers?)$", "$options": "i"}},
+        ],
     }
+    # Apply the SAME public filters as the vehicle_listings query.
+    if province:
+        general_vehicle_query["region"] = {
+            "$regex": f"^{province.strip()}$", "$options": "i",
+        }
     general_vehicles = await db.listings.find(
         general_vehicle_query, {"_id": 0}
     ).sort("auction_end_date", 1).to_list(500)

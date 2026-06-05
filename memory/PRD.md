@@ -1,5 +1,127 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter283-hotfix — POST-LAUNCH PRODUCTION HOTFIX (Feb 05, 2026) ✅
+
+Four targeted fixes for issues surfaced after the iter283 push:
+storage province filter returning 0, vehicles section empty,
+map cluster pill needs higher visibility, and a section-filter
+chip row above the marketplace grid to tame the universal feed.
+**Pytest 41/41 PASS** (iter283-hotfix + iter283-final-prelaunch +
+iter222 storage routing). Lint clean. Verification matrix 16/16 GREEN.
+
+### Mission 1 — Storage section province filter
+- `GET /api/storage-auctions/provinces` now aggregates BOTH source
+  collections (`storage_auctions` AND `listings` via STORAGE_TYPES).
+  Counts are merged by province key, normalized to uppercase.
+- `GET /api/storage-auctions?province=XX` now uses a case-insensitive
+  regex on BOTH `facility_province` (storage_auctions collection)
+  AND `region` (listings collection). Selecting "QC" matches stored
+  "qc" / "Qc" / "  QC  " (whitespace stripped). Selecting "ON"
+  correctly returns 0 when no Ontario stock exists.
+- Listings query now sorts `created_at DESC` so newly authored
+  storage units surface in the first page (closes the iter222
+  tag-filter regression test flakiness).
+
+### Mission 2 — Vehicles section restored
+- `GET /api/vehicles` visibility filter relaxed: a doc passes when
+  `visibility="public"` OR the field is missing/null (legacy docs
+  before iter256 didn't write the visibility column).
+- General-listings fallback query now uses `$or` of:
+  - `listing_type IN VEHICLE_TYPES` (iter283 aliases)
+  - `section == "vehicles"`
+  - `category` regex (case-insensitive) on the canonical
+    Vehicle / Cars / Trucks / Motorcycles / Boats / RVs / Trailers
+    word set
+- Explicit pin: NO `requires_broker` filter on the public browse —
+  the broker gate restricts CREATION, not VIEWING. Buyers and guests
+  must see every active vehicle regardless of broker status.
+
+### Mission 3 — High-visibility map cluster pill
+- `components/MapSearchPanel.jsx` style block now overrides the
+  `react-leaflet-cluster` default green-blob CSS with the BidVex
+  brand identity per spec:
+  - White circle (`#ffffff`)
+  - 3px BidVex Blue ring (`#0055FF`)
+  - Deep-navy digits (`#0a1628`, `font-weight: 800`)
+  - Soft drop shadow (`0 4px 12px rgba(0,0,0,0.15)`)
+  - Perfect circle (`border-radius: 50%`)
+  - Centered via `flex` + `align-items / justify-content: center`
+  - Larger 16px digits on `.marker-cluster-large` for visual hierarchy
+- Cleared the `background-color` on the outer `.marker-cluster` so
+  only the inner `div` carries the new styling (no double background
+  artifacts).
+
+### Mission 4 — Section-filter chip row above marketplace grid
+- `components/FlattenedMarketplace.js` ships a new horizontally
+  scrollable chip row immediately below the Featured Listings
+  carousel, above the main grid:
+  - `✨ All Auctions` (default active)
+  - `🛒 Marketplace`
+  - `📦 Lots`
+  - `🚗 Vehicles`
+  - `🏪 Storage`
+- Active style: `bg #0055FF`, `text #ffffff`, `font-weight: 700`,
+  pill shape with a soft `0 2px 8px rgba(0, 85, 255, 0.25)` shadow.
+- Inactive style: `bg #f0f4f8`, `text #4a5568`, `border 1px solid
+  #e2e8f0`, font-weight 500.
+- Mobile: `overflowX: auto` + `whiteSpace: nowrap` so the chips
+  scroll horizontally without breaking the grid layout. Touch
+  momentum scrolling enabled (`-webkit-overflow-scrolling: touch`).
+- Filtering happens client-side against `listing_type` + `section`
+  on the already-fetched dataset — instant UX, no server round-trip.
+
+### Validation
+- `tests/test_iter283_hotfix.py` — **13/13 PASS** (4 missions × ~3
+  tests each + 2 contract preservation pins).
+- Storage iter222 + iter283 final-prelaunch sweeps still **28/28 PASS**.
+- Full iter217 + iter219 + iter220 + iter222 + iter236 + iter237 +
+  iter238 + iter27x + iter28x — **404 passed, 24 skipped, 0 failures**
+  in ~108s.
+- Live verification: province filter returns 68 QC storage auctions,
+  ON returns 0; vehicles endpoint surfaces test-seed vehicle while
+  active (returns 0 after retirement, by design); cluster CSS verified
+  via `getComputedStyle` and grep; chip row visible with all 5 chips
+  and click-filter behavior confirmed via Playwright screenshot
+  (Storage chip → grid filtered to storage-only cards with amber
+  badges).
+
+### Files changed (iter283-hotfix)
+**Backend MODIFIED**:
+- `routes/storage_auctions.py` (M1: dual-source provinces, case-insensitive
+  province filter, created_at DESC sort)
+- `routes/vehicles.py` (M2: visibility flex, listing_type/category union)
+
+**Frontend MODIFIED**:
+- `components/MapSearchPanel.jsx` (M3: high-vis cluster pill CSS)
+- `components/FlattenedMarketplace.js` (M4: section-filter chip row)
+
+**Backend NEW**:
+- `tests/test_iter283_hotfix.py` (13 tests pinning all four missions)
+
+### Preserved contracts
+- iter283 `STORAGE_TYPES` / `VEHICLE_TYPES` / `LOT_TYPES` aliases
+  unchanged.
+- iter283 deposit rules unchanged: storage = $50 flat, vehicles =
+  max($200, 10%), lots > $500 = max($50, 10%), marketplace = $0.
+- iter283 startup backfill remains idempotent (cumulative log
+  shows 31 backfill runs with consistent counts).
+
+### Action items (user)
+1. **Save to GitHub → redeploy** preview → production.
+2. **Smoke test on https://bidvex.com after redeploy**:
+   - Storage Auctions page → province dropdown should show real
+     counts and selecting "QC" must filter to QC-only listings.
+   - Vehicle Auctions page → all active vehicles should be visible
+     to guests too (regardless of broker status).
+   - Open the full-screen map → zoom out → the cluster pill should
+     be a white circle with BidVex Blue ring + bold navy digits.
+   - On `/marketplace` → the chip row sits above the grid. Tap
+     "🏪 Storage" → only storage cards remain.
+
+---
+
+
+
 ## Latest: iter283 — FINAL PRE-LAUNCH FIX (Feb 05, 2026) ✅
 
 Closed every blocker reported in the final pre-launch ask: storage units

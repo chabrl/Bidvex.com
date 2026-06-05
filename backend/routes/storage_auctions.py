@@ -219,18 +219,56 @@ async def storage_public_stats():
 
 @storage_router.get("/storage-auctions/provinces")
 async def list_provinces():
-    """Province → active-auction count."""
+    """Province → active-auction count.
+
+    iter283-hotfix Mission 1 — Aggregate provinces from BOTH the legacy
+    `storage_auctions` collection AND the iter222 `listings` collection
+    (where storage units land via the general create-form). Empty
+    province codes are skipped and case is normalized to upper.
+    """
     db = get_db()
     now = _now().isoformat()
-    pipe = [
-        {"$match": {"status": "active", "end_time": {"$gt": now}}},
-        {"$group": {"_id": "$facility_province", "count": {"$sum": 1}}},
-        {"$sort": {"count": -1}},
-    ]
-    results = await db.storage_auctions.aggregate(pipe).to_list(20)
-    return {
-        "provinces": [{"province": r["_id"], "count": r["count"]} for r in results if r["_id"]]
-    }
+    counts: dict = {}
+
+    # Source 1 — legacy storage_auctions collection.
+    try:
+        pipe = [
+            {"$match": {"status": "active", "end_time": {"$gt": now}}},
+            {"$group": {"_id": "$facility_province", "count": {"$sum": 1}}},
+        ]
+        async for r in db.storage_auctions.aggregate(pipe):
+            prov = (r.get("_id") or "").strip().upper()
+            if prov:
+                counts[prov] = counts.get(prov, 0) + int(r.get("count") or 0)
+    except Exception:  # noqa: BLE001
+        pass
+
+    # Source 2 — listings collection (iter283 STORAGE_TYPES aliases).
+    try:
+        from services.listing_sections import STORAGE_TYPES
+        pipe = [
+            {"$match": {
+                "status": "active",
+                "$or": [
+                    {"listing_type": {"$in": list(STORAGE_TYPES)}},
+                    {"section": "storage"},
+                ],
+            }},
+            {"$group": {"_id": "$region", "count": {"$sum": 1}}},
+        ]
+        async for r in db.listings.aggregate(pipe):
+            prov = (r.get("_id") or "").strip().upper()
+            if prov:
+                counts[prov] = counts.get(prov, 0) + int(r.get("count") or 0)
+    except Exception:  # noqa: BLE001
+        pass
+
+    rows = sorted(
+        ({"province": p, "count": c} for p, c in counts.items()),
+        key=lambda x: x["count"],
+        reverse=True,
+    )
+    return {"provinces": rows}
 
 
 @storage_router.get("/storage-auctions")
@@ -263,7 +301,13 @@ async def list_storage_auctions(
         "is_demo_sandbox": {"$ne": True},
     }
     if province:
-        query["facility_province"] = province.upper()
+        # iter283-hotfix Mission 1 — case-insensitive match so users
+        # selecting "QC" find facilities stored as "qc" too.
+        _prov = province.strip()
+        query["facility_province"] = {
+            "$regex": f"^{re.escape(_prov)}$",
+            "$options": "i",
+        }
     if city:
         query["facility_city"] = {"$regex": city, "$options": "i"}
     if unit_size:
@@ -346,7 +390,14 @@ async def list_storage_auctions(
     }
     if province:
         # The listings collection stores province under `region`.
-        listings_query["region"] = province.upper()
+        # iter283-hotfix Mission 1 — case-insensitive match so a user
+        # selecting "QC" still finds listings stored as "qc" or with
+        # surrounding whitespace.
+        _prov = province.strip()
+        listings_query["region"] = {
+            "$regex": f"^{re.escape(_prov)}$",
+            "$options": "i",
+        }
     if city:
         listings_query["city"] = {"$regex": city, "$options": "i"}
     if tags:
@@ -365,7 +416,12 @@ async def list_storage_auctions(
                 {"visible_content_tags": {"$regex": safe, "$options": "i"}},
             ]
 
-    listing_locker_docs = await db.listings.find(listings_query, {"_id": 0}).limit(limit).to_list(limit)
+    # iter283-hotfix — sort by newest first so a freshly-created listing
+    # surfaces predictably within the first page (closes a flakiness in
+    # the iter222 tag-filter regression test).
+    listing_locker_docs = await db.listings.find(
+        listings_query, {"_id": 0}
+    ).sort("created_at", -1).limit(limit).to_list(limit)
     listings_total = await db.listings.count_documents(listings_query)
 
     for ld in listing_locker_docs:
