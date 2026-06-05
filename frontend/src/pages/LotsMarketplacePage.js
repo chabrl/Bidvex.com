@@ -371,7 +371,16 @@ const LotsMarketplacePage = () => {
               {mapOpen && (
                 <MapSearchPanel
                   open={mapOpen}
-                  onClose={() => setMapOpen(false)}
+                  onClose={() => {
+                    // iter282 hotfix — MUST clear geoFilter here because
+                    // the conditional `{mapOpen && <MapSearchPanel/>}`
+                    // unmounts the panel before its internal "clear on
+                    // close" useEffect can fire onGeoChange(null).
+                    // Without this, the lots grid stays empty until a
+                    // page refresh.
+                    setMapOpen(false);
+                    setGeoFilter(null);
+                  }}
                   onGeoChange={setGeoFilter}
                   backendUrl={backendUrl}
                   isFrench={i18n.language?.startsWith('fr')}

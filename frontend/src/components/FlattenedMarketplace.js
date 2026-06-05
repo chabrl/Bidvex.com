@@ -426,7 +426,17 @@ const FlattenedMarketplace = ({
         <React.Suspense fallback={<div className="w-full mb-4 p-4 text-center text-xs text-slate-500">Loading map…</div>}>
           <MapSearchPanel
             open={mapOpen}
-            onClose={() => setMapOpen(false)}
+            onClose={() => {
+              // iter282 hotfix — MUST clear geoFilter here because the
+              // parent's conditional `{mapOpen && <MapSearchPanel/>}`
+              // unmounts the panel before its internal "clear on close"
+              // useEffect can fire onGeoChange(null). Without this, the
+              // items grid stays stuck on whatever the last geo fetch
+              // returned (often [] when the user closes near an
+              // unpopulated radius) until a full page refresh.
+              setMapOpen(false);
+              setGeoFilter(null);
+            }}
             onGeoChange={setGeoFilter}
             backendUrl={BACKEND_URL}
             isFrench={i18n.language?.startsWith('fr')}
