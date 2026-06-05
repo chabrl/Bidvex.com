@@ -1215,12 +1215,31 @@ async def list_vehicles(
     # Merge and re-sort
     all_vehicles = vehicles + general_vehicles
     general_total = await db.listings.count_documents(general_vehicle_query)
-    
+
+    # iter283-emergency — Hard dump of the response count. Per the
+    # emergency directive, log every fetch so a 0-count fault is loud.
+    # `vehicle_listings_count` + `general_listings_count` makes the
+    # split visible at a glance in the boot log.
+    _final = total + general_total
+    logger.warning(
+        "[iter283-emergency] /api/vehicles fetched "
+        f"vehicle_listings={total} general_listings={general_total} "
+        f"merged={_final}"
+    )
+    if _final == 0 and os.environ.get("BIDVEX_VEHICLES_STRICT") == "1":
+        # Opt-in strict mode raises so the traceback surfaces in tests.
+        # NOT default-on — would break legitimate empty-section states.
+        raise RuntimeError(
+            "[iter283-emergency] /api/vehicles returned 0 listings — "
+            "the strict gate (BIDVEX_VEHICLES_STRICT=1) tripped. "
+            f"query={query!r} general_query={general_vehicle_query!r}"
+        )
+
     return {
         "vehicles": all_vehicles,
-        "total": total + general_total,
+        "total": _final,
         "page": page,
-        "pages": ((total + general_total) + limit - 1) // limit
+        "pages": (_final + limit - 1) // limit
     }
 
 
