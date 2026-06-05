@@ -887,12 +887,25 @@ const ListingDetailPage = () => {
                     >
                       {canBid ? (
                         ((listing.starting_price || 0) >= 10000 && !depositAuthorized) ? (
-                          <span className="flex flex-col items-center justify-center gap-0.5 leading-tight py-1" data-testid="bid-btn-deposit-required">
-                            <span className="flex items-center gap-2">
-                              <Shield className="h-4 w-4" />
-                              <span>Security Hold Required — $500 on your card</span>
+                          // iter283-deposit-btn-fit — Compact locale-aware label
+                          // (was stacking EN + FR, clipped on mobile).
+                          <span
+                            className="flex flex-col items-center justify-center gap-0.5 leading-tight py-1 px-2 min-w-0 max-w-full text-center"
+                            data-testid="bid-btn-deposit-required"
+                          >
+                            <span className="flex items-center gap-2 text-sm font-bold break-words">
+                              <Shield className="h-4 w-4 flex-shrink-0" />
+                              <span>
+                                {i18n.language?.startsWith('fr')
+                                  ? 'Retenue de sécurité requise'
+                                  : 'Security Hold Required'}
+                              </span>
                             </span>
-                            <span className="text-[11px] font-normal opacity-80">Retenue de sécurité requise — 500 $ sur votre carte</span>
+                            <span className="text-[11px] font-normal opacity-80">
+                              {i18n.language?.startsWith('fr')
+                                ? "500 $ retenus sur votre carte"
+                                : "$500 hold on your card"}
+                            </span>
                           </span>
                         ) : (
                           <>
