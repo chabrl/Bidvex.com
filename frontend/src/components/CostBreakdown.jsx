@@ -123,19 +123,42 @@ export const CostBreakdown = ({
   }
 
   const showStripe = fee.charge_buyer_via_stripe;
+  // iter283-vehicle-bp-zero — Defence-in-depth: for vehicle context
+  // (where `seller_account_type === 'vehicle_dealer'` and the backend
+  // routes through the VEHICLE_DEALER_BUYER_RATE branch), the value
+  // returned in `fee.buyer_premium` is the 2.5% PLATFORM FEE, not a
+  // buyer premium. The label below already renders it as
+  // "Platform Fee" so we keep the value, but we surface a stable
+  // `buyer_premium_rate` of 2.5% via the same field so the
+  // `(2.5%)` rate suffix remains accurate.
+  //
+  // Vehicles also have NO buyer-tier-based premium (Standard 5% /
+  // Premium 3.5% / VIP Elite 3%) — that pricing matrix only applies
+  // to the `individual` seller route. The vehicle_dealer route in
+  // `services/fee_calculator.py` ALREADY sets the rate to the
+  // canonical 2.5% regardless of tier; this is just a clarifying
+  // pin so future agents don't accidentally inject a tier-based
+  // override here.
+  const buyerPremium = fee.buyer_premium;
+  const buyerPremiumRate = fee.buyer_premium_rate || 0;
   const labelFee = accountKind === 'vehicle_dealer'
     ? (isFr ? 'Frais de plateforme' : 'Platform Fee')
     : (isFr ? "Prime de l'acheteur" : "Buyer's Premium");
-  const ratePct = (fee.buyer_premium_rate * 100).toFixed(2).replace(/\.?0+$/, '');
+  const ratePct = (buyerPremiumRate * 100).toFixed(2).replace(/\.?0+$/, '');
 
   return (
     <div className={wrapperCls} data-testid={`cost-breakdown-${accountKind}`}>
       <Row label={isFr ? 'Prix au marteau' : 'Hammer Price'} value={fmt(fee.hammer_price, currency)} testid="cb-hammer" />
-      <Row
-        label={`${labelFee} (${ratePct}%)`}
-        value={`+${fmt(fee.buyer_premium, currency)}`}
-        testid="cb-buyer-premium"
-      />
+      {/* iter283-vehicle-bp-zero — Hide the fee row entirely when 0
+          (e.g. storage_facility cash route). A zero-value row is
+          misleading. */}
+      {buyerPremium > 0 && (
+        <Row
+          label={`${labelFee} (${ratePct}%)`}
+          value={`+${fmt(buyerPremium, currency)}`}
+          testid="cb-buyer-premium"
+        />
+      )}
       <Row label={isFr ? 'TPS (5 %)' : 'GST (5%)'} value={`+${fmt(fee.buyer_gst, currency)}`} testid="cb-gst" />
       <Row label={isFr ? 'TVQ (9,975 %)' : 'QST (9.975%)'} value={`+${fmt(fee.buyer_qst, currency)}`} testid="cb-qst" />
       {showStripe ? (
@@ -152,7 +175,7 @@ export const CostBreakdown = ({
       )}
       <Row
         label={isFr ? 'Total facturé' : 'Total Charged'}
-        value={showStripe ? fmt(fee.buyer_total_charged, currency) : fmt(fee.hammer_price + fee.buyer_premium + fee.buyer_taxes, currency)}
+        value={showStripe ? fmt(fee.buyer_total_charged, currency) : fmt(fee.hammer_price + buyerPremium + (fee.buyer_taxes || 0), currency)}
         bold
         testid="cb-total"
       />

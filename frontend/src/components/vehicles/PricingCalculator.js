@@ -68,6 +68,17 @@ const TAX_RATES = {
 
 // Savings Calculator Component
 export const SavingsDisplay = ({ bidAmount, currentTier }) => {
+  // iter283-vehicle-bp-zero — The vehicle PricingCalculator NEVER
+  // shows the "Subscription Savings" tier upsell. Vehicles carry a
+  // hard-zero buyer premium per platform policy, so there are no
+  // savings to advertise. Returning null here is the safest guard
+  // even if SavingsDisplay gets composed into the tree from a
+  // future caller. The shared (non-vehicle) marketplace surface
+  // owns its own SavingsDisplay copy where the upsell IS relevant.
+  return null;
+};
+
+const _UNUSED_SavingsDisplay_legacy = ({ bidAmount, currentTier }) => {
   if (currentTier === 'vip') return null;
 
   const currentRate = FEE_TIERS.buyer[currentTier]?.rate || 5.0;
@@ -168,10 +179,22 @@ export const PricingCalculator = ({
     const tier = FEE_TIERS.buyer[subscriptionTier] || FEE_TIERS.buyer.free;
     const taxConfig = TAX_RATES[province] || TAX_RATES.ON;
 
-    // Use listing-defined BP if available, otherwise tier default
-    const bpRate = (listingBpPercent !== null && listingBpPercent !== undefined) ? listingBpPercent : tier.rate;
-    const buyerPremium = (amount * bpRate) / 100;
+    // iter283-vehicle-bp-zero — Vehicles NEVER charge buyer premium.
+    // The /vehicles flow uses the "Unlock Fee" model (platform 2.5% +
+    // tax on the FEE only). Force-clamp BP regardless of tier or any
+    // listing-level BP override so a misconfigured listing doc cannot
+    // accidentally surface a premium to the buyer.
+    const bpRate = 0;
+    const buyerPremium = 0;
+
     const platformFee = (amount * PLATFORM_FEE_RATE) / 100;
+
+    // iter283-vehicle-bp-zero — Tax base for vehicles is ONLY the
+    // platform fee, NOT the (hammer + premium + fee) subtotal. The
+    // hammer price is paid directly to the seller out-of-band; the
+    // platform never holds or transmits it, so no provincial sales
+    // tax applies to that portion.
+    const taxBase = platformFee;
     const subtotal = amount + buyerPremium + platformFee;
     
     let taxes = {
@@ -184,18 +207,18 @@ export const PricingCalculator = ({
     };
 
     if (taxConfig.type === 'HST') {
-      taxes.hst = (subtotal * taxConfig.rate) / 100;
+      taxes.hst = (taxBase * taxConfig.rate) / 100;
       taxes.total = taxes.hst;
     } else if (taxConfig.type === 'GST') {
-      taxes.gst = (subtotal * taxConfig.rate) / 100;
+      taxes.gst = (taxBase * taxConfig.rate) / 100;
       taxes.total = taxes.gst;
     } else if (taxConfig.type === 'GST+PST') {
-      taxes.gst = (subtotal * taxConfig.gst) / 100;
-      taxes.pst = (subtotal * taxConfig.pst) / 100;
+      taxes.gst = (taxBase * taxConfig.gst) / 100;
+      taxes.pst = (taxBase * taxConfig.pst) / 100;
       taxes.total = taxes.gst + taxes.pst;
     } else if (taxConfig.type === 'GST+QST') {
-      taxes.gst = (subtotal * taxConfig.gst) / 100;
-      taxes.qst = (subtotal * taxConfig.qst) / 100;
+      taxes.gst = (taxBase * taxConfig.gst) / 100;
+      taxes.qst = (taxBase * taxConfig.qst) / 100;
       taxes.total = taxes.gst + taxes.qst;
     }
 
@@ -315,22 +338,26 @@ export const PricingCalculator = ({
                 <span className="font-semibold">{formatCurrency(breakdown.hammer_price)}</span>
               </div>
 
-              {/* Buyer Premium */}
-              <div className="flex justify-between items-center">
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger className="flex items-center gap-1 text-slate-600 dark:text-slate-400">
-                      Buyer Premium ({breakdown.buyer_premium?.rate})
-                      <HelpCircle className="h-3 w-3" />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Fee charged to buyers for platform services.</p>
-                      <p className="text-xs mt-1">Premium: 3.5% | VIP: 3%</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-                <span className="font-semibold">+ {formatCurrency(breakdown.buyer_premium?.amount)}</span>
-              </div>
+              {/* Buyer Premium — iter283-vehicle-bp-zero — Hidden for vehicles.
+                  Vehicles carry a hard-zero buyer premium per platform policy.
+                  Rendering the row with "$0.00" would be misleading; the buyer
+                  shouldn't even see a label that implies it could be non-zero. */}
+              {breakdown.buyer_premium?.amount > 0 && (
+                <div className="flex justify-between items-center">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger className="flex items-center gap-1 text-slate-600 dark:text-slate-400">
+                        Buyer Premium ({breakdown.buyer_premium?.rate})
+                        <HelpCircle className="h-3 w-3" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Fee charged to buyers for platform services.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <span className="font-semibold">+ {formatCurrency(breakdown.buyer_premium?.amount)}</span>
+                </div>
+              )}
 
               {/* Platform Fee */}
               <div className="flex justify-between items-center">
@@ -388,31 +415,22 @@ export const PricingCalculator = ({
                 </span>
               </div>
 
-              {/* Subscription Badge */}
-              <div className="flex items-center justify-between text-sm bg-slate-50 dark:bg-slate-800/50 rounded-lg p-2">
-                <span className="text-slate-500">Your Rate</span>
-                <Badge className={`${subscriptionTier === 'vip' ? 'bg-amber-100 text-amber-700' : subscriptionTier === 'premium' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}`}>
-                  {subscriptionTier === 'vip' ? 'VIP Elite (3%)' : subscriptionTier === 'premium' ? 'Premium (3.5%)' : 'Standard (5%)'}
-                </Badge>
-              </div>
+              {/* iter283-vehicle-bp-zero — "Your Rate" badge hidden.
+                  The badge displayed a buyer-premium tier (Standard 5% /
+                  Premium 3.5% / VIP Elite 3%) that does NOT apply to
+                  vehicles — vehicles always carry 0% buyer premium. */}
             </div>
 
             {/* Expanded View with Savings */}
             {expanded && (
               <div className="space-y-4 pt-4 border-t">
-                {/* Fee Tier Comparison */}
-                <div>
-                  <p className="text-sm font-medium mb-2">Buyer Premium by Tier</p>
-                  <FeeTierComparison bidAmount={breakdown.hammer_price} type="buyer" />
-                </div>
-
-                {/* Savings Display */}
-                {subscriptionTier !== 'vip' && (
-                  <SavingsDisplay 
-                    bidAmount={breakdown.hammer_price} 
-                    currentTier={subscriptionTier} 
-                  />
-                )}
+                {/* iter283-vehicle-bp-zero — Hidden:
+                    `<FeeTierComparison type="buyer" />` (the "Buyer
+                    Premium by Tier" matrix) and `<SavingsDisplay />`
+                    (the "With Premium..." / "With VIP Elite..." upsell).
+                    Both surface a buyer-premium tier system that does
+                    NOT apply to vehicles. Surfacing them implied the
+                    buyer's tier affects vehicle pricing — it doesn't. */}
 
                 {/* Payment Terms Notice */}
                 <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
