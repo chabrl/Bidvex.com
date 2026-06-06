@@ -616,7 +616,11 @@ const App = () => {
             <ProtectedRoute><SellerRegistrationPage /></ProtectedRoute>
           } />
           <Route path="/vehicle-auctions/my-listings" element={
-            <ProtectedRoute><MyVehicleListingsPage /></ProtectedRoute>
+            <ProtectedRoute>
+              <ErrorBoundary scope="vehicle-my-listings">
+                <MyVehicleListingsPage />
+              </ErrorBoundary>
+            </ProtectedRoute>
           } />
           <Route path="/vehicle-auctions/invoices" element={
             <ProtectedRoute><VehicleInvoicesPage /></ProtectedRoute>

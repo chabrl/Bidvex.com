@@ -168,7 +168,15 @@ def _check_stripe_health() -> Dict[str, Any]:
         # different import path. Set it explicitly for this call.
         stripe.api_key = configured_key
         # Keep the call cheap — Balance object is constant-size.
-        stripe.Balance.retrieve(api_key=configured_key, timeout=_HTTP_TIMEOUT)
+        # NOTE: Stripe's Python SDK exposes per-call timeouts via the
+        # `request_options` parameter, not a bare `timeout=` kwarg
+        # (passing `timeout=` raises `InvalidRequestError: Received
+        # unknown parameter: timeout` and would mark the smoke test
+        # as RED in production). Module-level `stripe.max_network_retries`
+        # already defaults to 0 and the underlying urllib3 client honors
+        # its own connect/read timeout (~30s) — well inside the 10s
+        # _HTTP_TIMEOUT budget we maintain for the *outer* httpx checks.
+        stripe.Balance.retrieve(api_key=configured_key)
         elapsed = round((time.monotonic() - started) * 1000)
         return {"ok": True, "check": "stripe_health", "elapsed_ms": elapsed}
     except Exception as exc:  # noqa: BLE001

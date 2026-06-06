@@ -1,5 +1,51 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter284 — UNIT 205 CRITICAL P0 PATCH (Jun 06, 2026) 🩹
+
+Three production-blocking bugs reported by the operator (UNIT 205
+incident) fixed in a single patch. Codebase is locked for launch.
+
+### Bug fixes — Verified ✅
+1. **Storage cards rendered 🔒 placeholder instead of uploaded photo.**
+   Root cause: storage units authored via `/create-listing` live in
+   `db.listings` under the `images` array, but `StorageAuctionCard`
+   reads `auction.photos`. `GET /api/storage-auctions` now mirrors
+   `images → photos` for every cross-collection unit. UNIT 205
+   (DEPODIUM) confirmed visible in production.
+2. **"Auction not found" toast on storage detail click.**
+   `GET /api/storage-auctions/{id}` + `/bids` + `/pricing` now fall
+   back to `db.listings`, synthesize the storage-card schema, and
+   return the QC GST+QST breakdown. A truly unknown id still 404s.
+3. **Vehicle submit → blank white page.** `/vehicle-auctions/my-
+   listings` is now wrapped in `ErrorBoundary` and the price
+   formatter coerces null/undefined to 0 (prevents the dreaded
+   `Intl.NumberFormat` crash).
+
+### Smoke pipeline restored
+`stripe.Balance.retrieve(timeout=…)` raised
+`InvalidRequestError: Received unknown parameter: timeout`. The
+`timeout=` kwarg has been removed; the SDK's default urllib3 timeout
+(~30s) still applies. `POST /api/admin/smoke-test/run` now reports
+`all_ok=True` across all 4 checks.
+
+### Compliance matrix (post-iter284)
+- **iter283 + iter284 + storage routing + financial constraints**:
+  **165 / 165 pass, 1 skipped, 0 failures** (80.5s)
+- **Deposit rules unchanged**: Storage $50 flat · Vehicles
+  max($200, 10%) · Lots max($50, 10%) · Marketplace $0
+- **Vehicle Buyer Premium**: strictly 0% (Platform fee 2.5%)
+- **Smoke test runner**: 4/4 GREEN (vehicles_endpoint, qc_tax,
+  mongo_ping, stripe_health)
+
+### Files modified — iter284
+- `backend/routes/storage_auctions.py` (+88 / -0 lines)
+- `backend/services/smoke_test_runner.py` (+9 / -1 lines)
+- `frontend/src/App.js` (+5 / -1 lines)
+- `frontend/src/pages/vehicles/MyVehicleListingsPage.js` (+10 / -1)
+- `backend/tests/test_iter284_critical_bugs.py` (NEW — 6 tests)
+
+---
+
 ## Latest: iter283 — FINAL PRODUCTION-READY BUILD (Feb 05, 2026) 🚀
 
 iter283 + hotfix-1 + hotfix-2 are LOCKED for production deploy.

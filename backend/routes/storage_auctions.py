@@ -439,6 +439,17 @@ async def list_storage_auctions(
         ld.setdefault("description_en",     ld.get("description") or "")
         ld.setdefault("description_fr",     ld.get("description") or "")
         ld.setdefault("source",             "listings")
+        # iter284 — Field-name normalization. Marketplace listings store
+        # photos in the `images` array; storage cards read from `photos`.
+        # Without this mapping, the storage browse grid + homepage banner
+        # render the lock-emoji placeholder for every cross-collection
+        # storage unit (UNIT 205 production bug). Default to whatever
+        # the listing exposed and fall back to `images` so we never lose
+        # the original media.
+        if not ld.get("photos"):
+            _imgs = ld.get("images") or []
+            if _imgs:
+                ld["photos"] = _imgs
         ld["live_status"] = _resolve_status(ld)
 
     auctions = auctions + listing_locker_docs
@@ -533,7 +544,57 @@ async def get_storage_auction(auction_id: str):
     db = get_db()
     a = await db.storage_auctions.find_one({"id": auction_id}, {"_id": 0})
     if not a:
-        raise HTTPException(status_code=404, detail="Auction not found")
+        # iter284 — Dual-visibility fallback. Storage units authored via
+        # the general `/create-listing` flow live in `db.listings`. The
+        # browse grid already merges both collections (see list endpoint
+        # above) — without this fallback the card links open and 404 with
+        # the "Auction not found" toast (production UNIT 205 bug).
+        from services.listing_sections import STORAGE_TYPES
+        ld = await db.listings.find_one(
+            {
+                "id": auction_id,
+                "$or": [
+                    {"listing_type": {"$in": list(STORAGE_TYPES)}},
+                    {"section": "storage"},
+                ],
+            },
+            {"_id": 0},
+        )
+        if not ld:
+            raise HTTPException(status_code=404, detail="Auction not found")
+        meta = ld.get("storage_metadata") or {}
+        ld.setdefault("facility_id",       ld.get("seller_id") or "")
+        ld.setdefault("facility_name",     meta.get("facility_name") or ld.get("seller_name") or "")
+        ld.setdefault("facility_city",     ld.get("city") or "")
+        ld.setdefault("facility_province", ld.get("region") or "")
+        ld.setdefault("facility_address",  meta.get("facility_address") or "")
+        ld.setdefault("unit_number",       meta.get("locker_number") or "")
+        ld.setdefault("unit_size",         meta.get("locker_size") or "")
+        ld.setdefault("unit_type",         meta.get("unit_type") or "standard")
+        ld.setdefault("current_bid",       ld.get("current_price") or ld.get("starting_price") or 0)
+        ld.setdefault("starting_price",    ld.get("starting_price") or 0)
+        ld.setdefault("bid_increment",     ld.get("bid_increment") or 5)
+        ld.setdefault("start_time",        ld.get("auction_start_date") or ld.get("created_at"))
+        ld.setdefault("end_time",          ld.get("auction_end_date"))
+        ld.setdefault("description_en",    ld.get("description") or ld.get("title") or "")
+        ld.setdefault("description_fr",    ld.get("description_fr") or ld.get("description") or "")
+        ld.setdefault("bid_count",         ld.get("bid_count") or 0)
+        ld.setdefault("bids",              ld.get("bids") or [])
+        ld.setdefault("source",            "listings")
+        # Normalize images → photos so the gallery renders the uploaded media.
+        if not ld.get("photos"):
+            _imgs = ld.get("images") or []
+            if _imgs:
+                ld["photos"] = _imgs
+        ld["live_status"] = _resolve_status(ld)
+        ld["facility"] = {
+            "id":           ld.get("facility_id"),
+            "company_name": ld.get("facility_name"),
+            "city":         ld.get("facility_city"),
+            "province":     ld.get("facility_province"),
+            "verified":     True,
+        }
+        return ld
     a["live_status"] = _resolve_status(a)
     fac = await db.storage_facilities.find_one({"id": a["facility_id"]}, {"_id": 0, "id": 1, "company_name": 1, "company_name_fr": 1, "city": 1, "province": 1, "verified": 1})
     a["facility"] = fac or {}
@@ -546,8 +607,24 @@ async def get_anonymized_bid_history(auction_id: str):
     db = get_db()
     a = await db.storage_auctions.find_one({"id": auction_id}, {"_id": 0, "bids": 1})
     if not a:
-        raise HTTPException(status_code=404, detail="Auction not found")
-    bids = a.get("bids", [])
+        # iter284 — Dual-visibility fallback. A storage unit created via
+        # `/create-listing` lives in `db.listings`; surface an empty bid
+        # history rather than a 404 so the detail page renders cleanly.
+        from services.listing_sections import STORAGE_TYPES
+        ld = await db.listings.find_one(
+            {
+                "id": auction_id,
+                "$or": [
+                    {"listing_type": {"$in": list(STORAGE_TYPES)}},
+                    {"section": "storage"},
+                ],
+            },
+            {"_id": 0, "bids": 1},
+        )
+        if ld is None:
+            raise HTTPException(status_code=404, detail="Auction not found")
+        a = ld
+    bids = a.get("bids", []) or []
     aliases: dict = {}
     out = []
     for b in bids:
@@ -2472,7 +2549,29 @@ async def auction_pricing_preview(
         {"_id": 0, "current_bid": 1, "facility_province": 1, "payment_method": 1, "deposit_required": 1, "deposit_amount": 1},
     )
     if not a:
-        raise HTTPException(status_code=404, detail="Auction not found")
+        # iter284 — Dual-visibility fallback. Storage listings created via
+        # /create-listing live in `db.listings`. Synthesize the same shape
+        # so the detail page's `/pricing` call resolves successfully.
+        from services.listing_sections import STORAGE_TYPES
+        ld = await db.listings.find_one(
+            {
+                "id": auction_id,
+                "$or": [
+                    {"listing_type": {"$in": list(STORAGE_TYPES)}},
+                    {"section": "storage"},
+                ],
+            },
+            {"_id": 0, "current_price": 1, "starting_price": 1, "region": 1, "requires_deposit": 1, "deposit_amount": 1},
+        )
+        if not ld:
+            raise HTTPException(status_code=404, detail="Auction not found")
+        a = {
+            "current_bid":       ld.get("current_price") or ld.get("starting_price") or 0,
+            "facility_province": ld.get("region") or "",
+            "payment_method":    "stripe",
+            "deposit_required":  bool(ld.get("requires_deposit") or False),
+            "deposit_amount":    float(ld.get("deposit_amount") or 0),
+        }
     pm = (payment_method or a.get("payment_method") or "stripe").lower()
     dep = deposit_amount if deposit_amount is not None else (
         float(a.get("deposit_amount") or 0) if a.get("deposit_required") else 0

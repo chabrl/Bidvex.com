@@ -29,11 +29,16 @@ import {
 const API = API_BASE;
 
 const formatPrice = (price) => {
+  // iter284 — Defensive: a freshly-created listing may briefly lack a
+  // starting_price (returned as `null`/`undefined`). Coerce to 0 so
+  // Intl.NumberFormat never throws — a thrown formatter would unmount
+  // the page and present the user with the dreaded blank-white screen.
+  const _n = Number.isFinite(Number(price)) ? Number(price) : 0;
   return new Intl.NumberFormat('en-CA', {
     style: 'currency',
     currency: 'CAD',
     minimumFractionDigits: 0,
-  }).format(price);
+  }).format(_n);
 };
 
 const getStatusBadge = (status) => {
