@@ -1440,3 +1440,55 @@ async def get_tax_report(
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "generated_by": admin_user.email,
     }
+
+
+# ========== iter283-smoke — Post-deploy smoke test surface ==========
+
+
+@admin_router.post("/smoke-test/run")
+async def admin_run_smoke_test(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    """Manually trigger the smoke test. Returns the full result
+    envelope. Same checks the every-6-hour scheduler job runs."""
+    await require_admin(credentials)
+    from services.smoke_test_runner import run_smoke_test
+    db = get_db()
+    return await run_smoke_test(db)
+
+
+@admin_router.get("/smoke-test/alerts")
+async def admin_list_smoke_alerts(
+    limit: int = 50,
+    only_unacknowledged: bool = True,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    """List recent smoke-test alerts. Used by the admin dashboard
+    banner to surface failed checks."""
+    await require_admin(credentials)
+    db = get_db()
+    query: Dict[str, Any] = {}
+    if only_unacknowledged:
+        query["acknowledged"] = False
+    cursor = db.smoke_test_alerts.find(query, {"_id": 0}).sort("created_at", -1).limit(min(limit, 200))
+    alerts = await cursor.to_list(min(limit, 200))
+    return {"count": len(alerts), "alerts": alerts}
+
+
+@admin_router.post("/smoke-test/alerts/acknowledge")
+async def admin_ack_smoke_alerts(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    """Acknowledge every pending smoke alert (clears the dashboard banner)."""
+    admin_user = await require_admin(credentials)
+    db = get_db()
+    r = await db.smoke_test_alerts.update_many(
+        {"acknowledged": False},
+        {"$set": {
+            "acknowledged": True,
+            "acknowledged_by": admin_user.email,
+            "acknowledged_at": datetime.now(timezone.utc).isoformat(),
+        }},
+    )
+    return {"acknowledged": int(r.modified_count or 0)}
+

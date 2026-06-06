@@ -750,6 +750,20 @@ def init_scheduler(database):
         name="Demo Account Expiry (iter210)",
         replace_existing=True,
     )
+
+    # iter283-smoke — Continuous post-deployment health monitor.
+    # Runs every 6 hours: HTTP /api/vehicles probe + QC tax math
+    # check + MongoDB ping + Stripe Balance.retrieve. Each pass
+    # logs `[SMOKE_TEST_PASS]` on green; on failure writes to
+    # `db.smoke_test_alerts` for the admin dashboard banner.
+    from services.smoke_test_runner import smoke_test_job
+    scheduler.add_job(
+        _tracked("smoke_test", smoke_test_job),
+        IntervalTrigger(hours=6),
+        id="smoke_test",
+        name="Post-Deploy Smoke Test (iter283)",
+        replace_existing=True,
+    )
     
     # Job 7: Check subscription expirations - daily at 00:30 UTC
     scheduler.add_job(
