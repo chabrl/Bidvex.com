@@ -667,10 +667,10 @@ async def place_storage_bid(
     db = get_db()
 
     # ── Deposit guard ──
-    auction = await db.storage_auctions.find_one(
-        {"id": auction_id},
-        {"_id": 0, "deposit_required": 1, "deposit_amount": 1, "status": 1},
-    )
+    # iter285 — Use the dual-visibility bridge so cross-collection storage
+    # units (authored via /create-listing) load correctly here too.
+    from services.storage_auction_service import _ensure_storage_auction_row
+    auction = await _ensure_storage_auction_row(db, auction_id)
     if not auction:
         raise HTTPException(status_code=404, detail="Auction not found")
     if auction.get("deposit_required") and float(auction.get("deposit_amount", 0)) > 0:

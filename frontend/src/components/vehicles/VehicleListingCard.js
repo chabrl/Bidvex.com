@@ -321,6 +321,37 @@ const VehicleListingCard = ({ vehicle, countdown, onClick, onQuickView, compact 
           {vehicle.seller_id && <PartnerBadge sellerId={vehicle.seller_id} size="sm" />}
         </div>
 
+        {/* iter285 — Bug 4 — Province eligibility pill (compact). Shows top
+            3 eligible provinces or "All Provinces". Renders TBD when the
+            listing predates the feature (legacy listings stay healthy). */}
+        {(() => {
+          const eligible = vehicle.eligible_provinces;
+          if (!Array.isArray(eligible) || eligible.length === 0) {
+            return (
+              <span
+                className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-semibold"
+                style={{ background: '#fffbeb', color: '#b7791f', fontSize: '10px', border: '1px solid #f6c90e' }}
+                data-testid={`vehicle-card-province-pill-${vehicle.id}`}
+              >
+                ⚠️ {t('vehicleCard.eligibilityTBD', 'Eligibility TBD')}
+              </span>
+            );
+          }
+          const isAllSentinel = eligible.length === 1 && eligible[0] === 'ALL';
+          const summary = isAllSentinel
+            ? t('vehicleCard.allProvinces', 'All Provinces')
+            : eligible.slice(0, 3).join(' · ');
+          return (
+            <span
+              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-semibold"
+              style={{ background: '#f0fff4', color: '#276749', fontSize: '10px', border: '1px solid #c6f6d5' }}
+              data-testid={`vehicle-card-province-pill-${vehicle.id}`}
+            >
+              ✅ {summary}
+            </span>
+          );
+        })()}
+
         {/* Specs grid */}
         <div className="grid grid-cols-2 gap-1.5 text-xs text-slate-600 dark:text-slate-400">
           {mileageText && (

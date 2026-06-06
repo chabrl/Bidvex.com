@@ -15,6 +15,7 @@ import confetti from 'canvas-confetti';
 import VehicleCategoryGrid from '../../components/vehicles/VehicleCategoryGrid';
 import ProvinceSellerNotice from '../../components/vehicles/ProvinceSellerNotice';
 import VehicleLegalFooter from '../../components/vehicles/VehicleLegalFooter';
+import VehicleProvinceEligibility from '../../components/vehicles/VehicleProvinceEligibility';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -195,8 +196,18 @@ const CreateVehicleListingPage = () => {
     
     // Description
     title: '',
+    title_fr: '',          // iter285 — QC Bill 96 French title (auto-mirrors `title` when blank)
     description: '',
+    description_fr: '',    // iter285 — QC Bill 96 French description
     features: [],
+
+    // iter285 — Provincial registration eligibility (Bug 4).
+    // `eligible_provinces` is either `["ALL"]` or an explicit list of 2-letter
+    // codes (QC, ON, BC, …). `inspection_status` indicates safety/e-test/MVI
+    // status. Both default to empty so existing listings without these fields
+    // continue to render the "TBD / contact seller" notice.
+    eligible_provinces: ['ALL'],
+    inspection_status: 'as_is',
   });
 
   // Check seller profile
@@ -369,8 +380,22 @@ const CreateVehicleListingPage = () => {
         auction_access: formData.auction_access,
         run_status: formData.run_status,
         title: formData.title,
+        // iter285 — Quebec Bill 96 compliance. Auto-mirror the English title
+        // when the seller left the FR field blank (the form pre-fills it
+        // anyway, but this is a belt-and-suspenders guard).
+        title_fr: (formData.title_fr && formData.title_fr.trim())
+          ? formData.title_fr.trim()
+          : formData.title,
         description: formData.description,
+        description_fr: (formData.description_fr && formData.description_fr.trim())
+          ? formData.description_fr.trim()
+          : formData.description,
         features: formData.features,
+        // iter285 — Bug 4 — Provincial registration eligibility.
+        eligible_provinces: Array.isArray(formData.eligible_provinces) && formData.eligible_provinces.length > 0
+          ? formData.eligible_provinces
+          : ['ALL'],
+        inspection_status: formData.inspection_status || 'as_is',
         // iter201 — Phase 2 — Vehicle category (CEO 15-category taxonomy)
         category_id: formData.category_id || null,
         subcategory_id: formData.subcategory_id || null,
@@ -389,15 +414,23 @@ const CreateVehicleListingPage = () => {
         return;
       }
       // iter201 — Phase 2 — Quebec French-language enforcement (CEO constraint #2)
+      // iter285 — Actionable error messages now point the seller to the EXACT
+      // step + field that needs filling (no more dead-end popup).
       if ((listingData.location_province || '').toUpperCase() === 'QC') {
         const fr = (s) => typeof s === 'string' && s.trim().length > 0;
         if (!fr(listingData.title_fr) && !fr(listingData.title)) {
-          toast.error("Quebec listings must include a French title (Charter of the French Language). / Les annonces québécoises doivent inclure un titre en français.");
+          toast.error(i18n.language?.startsWith('fr')
+            ? "Étape 5 (Paramètres d'enchère) — veuillez remplir le champ « Titre du véhicule (Français) »."
+            : "Step 5 (Auction Settings) — please fill in the 'Titre du véhicule (Français)' field.");
+          setCurrentStep(STEPS.findIndex(s => s.id === 'auction'));
           setLoading(false);
           return;
         }
         if (!fr(listingData.description_fr) && !fr(listingData.description)) {
-          toast.error("Quebec listings must include a French description. / Les annonces québécoises doivent inclure une description en français.");
+          toast.error(i18n.language?.startsWith('fr')
+            ? "Étape 5 — veuillez remplir le champ « Description (Français) »."
+            : "Step 5 — please fill in the 'Description (Français)' field.");
+          setCurrentStep(STEPS.findIndex(s => s.id === 'auction'));
           setLoading(false);
           return;
         }
@@ -807,6 +840,22 @@ const CreateVehicleListingPage = () => {
                 </Select>
               </div>
             </div>
+
+            {/* iter285 — Bug 4 — Provincial registration eligibility picker.
+                Compliance requirement, not optional. Card pills + detail
+                page surface these flags so buyers know whether they can
+                register the vehicle in their home province. */}
+            <VehicleProvinceEligibility
+              value={formData.eligible_provinces}
+              inspectionStatus={formData.inspection_status}
+              onChange={({ eligible_provinces, inspection_status }) =>
+                setFormData(prev => ({
+                  ...prev,
+                  eligible_provinces,
+                  inspection_status,
+                }))
+              }
+            />
           </div>
         );
         
@@ -987,20 +1036,77 @@ const CreateVehicleListingPage = () => {
             {/* Title & Description */}
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label>Listing Title *</Label>
+                <Label>Listing Title (English) *</Label>
                 <Input
+                  data-testid="vehicle-title-en-input"
                   value={formData.title}
-                  onChange={(e) => updateField('title', e.target.value)}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setFormData(prev => ({
+                      ...prev,
+                      title: v,
+                      // iter285 — Auto-mirror to title_fr when it's empty OR
+                      // when the seller hasn't customized it yet (still equals
+                      // the previous English title). Sellers can edit FR
+                      // independently after touching that field.
+                      title_fr: (!prev.title_fr || prev.title_fr === prev.title) ? v : prev.title_fr,
+                    }));
+                  }}
                   placeholder="e.g., 2020 Toyota Camry XSE - Low Mileage, One Owner"
                 />
               </div>
-              
+
+              {/* iter285 — French title field (Quebec Bill 96 compliance).
+                  Required only when location_province === 'QC'. Auto-populated
+                  with the English title so sellers can edit rather than retype. */}
               <div className="space-y-2">
-                <Label>Description *</Label>
+                <Label>
+                  Titre du véhicule (Français)
+                  {(formData.location_province || '').toUpperCase() === 'QC' ? ' *' : ' (optional)'}
+                </Label>
+                <Input
+                  data-testid="vehicle-title-fr-input"
+                  value={formData.title_fr}
+                  onChange={(e) => updateField('title_fr', e.target.value)}
+                  placeholder="ex. 2020 Toyota Camry XSE - Faible kilométrage, un propriétaire"
+                />
+                {(formData.location_province || '').toUpperCase() === 'QC' && (
+                  <p className="text-[11px] text-muted-foreground">
+                    Requis pour les annonces québécoises (Charte de la langue française).
+                    Peut être identique au titre anglais.
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label>Description (English) *</Label>
                 <Textarea
+                  data-testid="vehicle-description-en-input"
                   value={formData.description}
-                  onChange={(e) => updateField('description', e.target.value)}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setFormData(prev => ({
+                      ...prev,
+                      description: v,
+                      description_fr: (!prev.description_fr || prev.description_fr === prev.description) ? v : prev.description_fr,
+                    }));
+                  }}
                   placeholder="Describe your vehicle in detail..."
+                  rows={5}
+                />
+              </div>
+
+              {/* iter285 — French description (Quebec Bill 96 compliance). */}
+              <div className="space-y-2">
+                <Label>
+                  Description (Français)
+                  {(formData.location_province || '').toUpperCase() === 'QC' ? ' *' : ' (optional)'}
+                </Label>
+                <Textarea
+                  data-testid="vehicle-description-fr-input"
+                  value={formData.description_fr}
+                  onChange={(e) => updateField('description_fr', e.target.value)}
+                  placeholder="Décrivez votre véhicule en détail…"
                   rows={5}
                 />
               </div>

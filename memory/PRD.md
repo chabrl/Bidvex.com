@@ -1,5 +1,70 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter285 — 4 P0 LAUNCH-BLOCKING BUGS (Jun 06, 2026) 🩹
+
+Four production-blocking bugs reported after the iter284 deploy. All
+fixed in a single patch with full regression coverage.
+
+### Bug fixes — Verified ✅
+
+**Bug 1 — Storage bid endpoint returned "Auction not found".**
+The bid path queried `db.storage_auctions` only, so units authored via
+`/create-listing` (which live in `db.listings`) 404'd on click. Fix:
+`_ensure_storage_auction_row` in `services/storage_auction_service.py`
+lazily promotes the listings doc into `storage_auctions` on first bid,
+preserving all field-name conventions the proxy/soft-close/settlement
+pipeline expects. Verified end-to-end via curl: UNIT 205 bid placed
+successfully (200 OK, leader=current_user, bid_count=1).
+
+**Bug 2 — Duplicate `<StorageBiddingPanel>` slider widget.**
+The detail page rendered both the canonical Quick-Bid panel and a legacy
+slider-confirm panel beneath it, blocking submission. Removed the
+duplicate import + render block. Visual regression confirmed: single
+`place-bid-btn`, zero sliders, zero bidding-panel duplicates.
+
+**Bug 3 — Vehicle form QC popup with no FR title input field.**
+Added `data-testid="vehicle-title-fr-input"` + `vehicle-description-fr-input`
+to Step 5 (Auction Settings). Auto-mirrors the English value as the FR
+default so sellers can edit rather than retype. Backend validator
+unchanged (`title_fr` was already a Pydantic field). Frontend error
+toast now navigates the seller back to Step 5 + names the exact field
+to fill.
+
+**Bug 4 — Provincial registration eligibility never persisted.**
+New `<VehicleProvinceEligibility>` checkbox grid in Step 2 with 13-
+province selector + Select-All sentinel + Inspection radio. New buyer-
+facing `<VehicleProvinceEligibilityDisplay>` on the vehicle detail page
+(✅/❌ pills + "Based on your location" callout when buyer province is
+known). Listing-card pill summarizes top-3 eligible provinces or "All
+Provinces" or "Eligibility TBD" fallback. Model fields
+`eligible_provinces` (`["ALL"]` sentinel or explicit list) and
+`inspection_status` added to `VehicleListingCreate`; both optional so
+legacy listings continue to render.
+
+### Compliance matrix (post-iter285)
+- **iter283 + iter284 + iter285 + storage routing + financial
+  constraints**: **168 / 168 pass, 1 skipped, 0 failures** (84.7s)
+- **Deposit rules unchanged**: Storage $50 flat · Vehicles
+  max($200, 10%) · Lots max($50, 10%) · Marketplace $0
+- **Vehicle Buyer Premium**: strictly 0% (Platform fee 2.5%)
+- **Smoke test runner**: 4/4 GREEN (vehicles_endpoint, qc_tax,
+  mongo_ping, stripe_health)
+
+### Files modified — iter285
+- `backend/services/storage_auction_service.py` (+86 / -1 lines)
+- `backend/routes/storage_auctions.py` (+5 / -7 lines)
+- `backend/routes/vehicles.py` (+6 / -0 lines)
+- `backend/models/vehicle_models.py` (+7 / -0 lines)
+- `frontend/src/pages/storage/StorageAuctionDetail.js` (+5 / -22 lines)
+- `frontend/src/pages/vehicles/CreateVehicleListingPage.js` (+105 / -10 lines)
+- `frontend/src/pages/vehicles/VehicleDetailPage.js` (+10 / -1 lines)
+- `frontend/src/components/vehicles/VehicleListingCard.js` (+30 / -0 lines)
+- `frontend/src/components/vehicles/VehicleProvinceEligibility.jsx` (NEW)
+- `frontend/src/components/vehicles/VehicleProvinceEligibilityDisplay.jsx` (NEW)
+- `backend/tests/test_iter285_critical_bugs.py` (NEW — 3 tests)
+
+---
+
 ## Latest: iter284 — UNIT 205 CRITICAL P0 PATCH (Jun 06, 2026) 🩹
 
 Three production-blocking bugs reported by the operator (UNIT 205

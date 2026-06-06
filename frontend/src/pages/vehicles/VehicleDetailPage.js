@@ -47,6 +47,7 @@ import MessageSellerModal from '../../components/MessageSellerModal';
 import { MessageSquare, ShieldCheck } from 'lucide-react';
 import VehicleLegalFooter from '../../components/vehicles/VehicleLegalFooter';
 import VehicleBuyerGateModal from '../../components/vehicles/VehicleBuyerGateModal';
+import VehicleProvinceEligibilityDisplay from '../../components/vehicles/VehicleProvinceEligibilityDisplay';
 // iter202 Phase B — new detail-page primitives (breadcrumb, gallery+lightbox, acq-cost, related)
 import {
   VehicleBreadcrumb,
@@ -439,6 +440,15 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
             </div>
           )}
           
+          {/* iter285 — Bug 4 — Provincial registration eligibility for buyers.
+              Renders below the bid panel so a buyer sees whether they can
+              register the vehicle in their home province BEFORE bidding. */}
+          <VehicleProvinceEligibilityDisplay
+            listing={vehicle}
+            buyerProvince={user?.profile?.province || user?.province}
+            isFr={(i18n.language || '').toLowerCase().startsWith('fr')}
+          />
+
           {/* Bid Input */}
           {!isEnded && (
             <div className="space-y-3">

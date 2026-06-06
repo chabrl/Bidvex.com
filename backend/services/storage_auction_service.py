@@ -67,13 +67,94 @@ def _highest_max_bidder(bids: list, exclude_bidder: Optional[str] = None):
     return top_bidder, eligible[top_bidder]
 
 
+async def _ensure_storage_auction_row(db, auction_id: str) -> Optional[Dict]:
+    """
+    iter285 — Dual-visibility bridge for storage auctions authored via the
+    general `/create-listing` flow. Those storage units live in `db.listings`
+    with marketplace-shaped field names (`current_price`, `auction_end_date`,
+    `images`, …). The bid/settle pipeline expects `db.storage_auctions`
+    shape (`current_bid`, `end_time`, `bids`, …). When the bid endpoint
+    encounters a UUID that exists only in `db.listings`, we lazily promote
+    it into `db.storage_auctions` so all downstream proxy-bidding, soft-
+    close, settlement, and email-notification logic works untouched.
+
+    Idempotent: subsequent calls find the doc already in `storage_auctions`
+    and become a no-op. Returns the storage_auctions row (or None if the
+    id is truly unknown).
+    """
+    existing = await db.storage_auctions.find_one({"id": auction_id}, {"_id": 0})
+    if existing:
+        return existing
+
+    from services.listing_sections import STORAGE_TYPES
+    ld = await db.listings.find_one(
+        {
+            "id": auction_id,
+            "$or": [
+                {"listing_type": {"$in": list(STORAGE_TYPES)}},
+                {"section": "storage"},
+            ],
+        },
+        {"_id": 0},
+    )
+    if not ld:
+        return None
+
+    meta = ld.get("storage_metadata") or {}
+    now_iso = _now().isoformat()
+    promoted = {
+        "id":                      auction_id,
+        "facility_id":             ld.get("seller_id") or "",
+        "facility_name":           meta.get("facility_name") or ld.get("seller_name") or "",
+        "facility_city":           ld.get("city") or "",
+        "facility_province":       ld.get("region") or "",
+        "facility_address":        meta.get("facility_address") or "",
+        "facility_postal_code":    meta.get("facility_postal_code") or "",
+        "unit_number":             meta.get("locker_number") or "",
+        "unit_size":               meta.get("locker_size") or "",
+        "unit_type":               meta.get("unit_type") or "standard",
+        "description_en":          ld.get("description") or ld.get("title") or "",
+        "description_fr":          ld.get("description_fr") or ld.get("description") or "",
+        "starting_price":          float(ld.get("starting_price") or 0),
+        "current_bid":             float(ld.get("current_price") or ld.get("starting_price") or 0),
+        "bid_increment":           float(ld.get("bid_increment") or 5),
+        "start_time":              ld.get("auction_start_date") or ld.get("created_at") or now_iso,
+        "end_time":                ld.get("auction_end_date"),
+        "status":                  ld.get("status") or "active",
+        "soft_close_enabled":      True,
+        "soft_close_extension_minutes": 2,
+        "deposit_required":        bool(ld.get("requires_deposit") or False),
+        "deposit_amount":          float(ld.get("deposit_amount") or 0),
+        "security_deposit_amount": float(meta.get("security_deposit_amount") or ld.get("deposit_amount") or 100),
+        "payment_methods_accepted": ld.get("payment_methods_accepted") or ["stripe"],
+        "payment_method":          (ld.get("payment_methods_accepted") or ["stripe"])[0],
+        "photos":                  ld.get("photos") or ld.get("images") or [],
+        "bids":                    ld.get("bids") or [],
+        "bid_count":                int(ld.get("bid_count") or 0),
+        "created_at":              ld.get("created_at") or now_iso,
+        "updated_at":              now_iso,
+        "promoted_from_listings":  True,  # audit flag
+    }
+    # `upsert=True` makes this safe under concurrent bid attempts on the
+    # very first bid for a cross-collection unit.
+    await db.storage_auctions.update_one(
+        {"id": auction_id},
+        {"$setOnInsert": promoted},
+        upsert=True,
+    )
+    return await db.storage_auctions.find_one({"id": auction_id}, {"_id": 0})
+
+
 async def place_bid(db, auction_id: str, bidder_id: str, max_bid: float) -> Dict:
     """
     Run a proxy bid and persist atomically. Returns the new state:
       { current_bid, bid_count, end_time, leader_id, soft_close_extended,
         your_max_bid, you_are_winning, outbid_user_id, is_duplicate }
     """
-    auction = await db.storage_auctions.find_one({"id": auction_id}, {"_id": 0})
+    # iter285 — Dual-visibility bridge. If the unit was authored via
+    # /create-listing it lives in `db.listings`; promote it into
+    # storage_auctions before bidding so the existing logic just works.
+    auction = await _ensure_storage_auction_row(db, auction_id)
     if not auction:
         raise HTTPException(status_code=404, detail="Auction not found")
 

@@ -381,6 +381,13 @@ class VehicleListingCreate(BaseModel):
     title_fr: Optional[str] = None
     description_fr: Optional[str] = None
 
+    # iter285 — Bug 4 — Provincial registration eligibility. Either ['ALL'] or
+    # an explicit list of 2-letter Canadian province codes (QC, ON, BC, …).
+    # Optional on existing listings — absence renders the "Eligibility TBD"
+    # warning on the buyer side, never blocks rendering.
+    eligible_provinces: Optional[List[str]] = None
+    inspection_status: Optional[str] = None  # safety_certified | e_tested | mvi_passed | as_is
+
     @field_validator('vin')
     @classmethod
     def validate_vin_format(cls, v):

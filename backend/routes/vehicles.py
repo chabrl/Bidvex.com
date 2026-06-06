@@ -869,6 +869,12 @@ async def create_vehicle_listing(
         "subcategory_id": listing_data.subcategory_id or None,
         "title_fr": (listing_data.title_fr or "").strip() or None,
         "description_fr": (listing_data.description_fr or "").strip() or None,
+
+        # iter285 — Bug 4 — Provincial registration eligibility (compliance).
+        # Stored as either `["ALL"]` or an explicit province-code list.
+        # Empty/None on legacy listings renders the buyer-side warning.
+        "eligible_provinces": (listing_data.eligible_provinces or ["ALL"]),
+        "inspection_status":  (listing_data.inspection_status or "as_is"),
         
         # Media (to be added separately)
         "media": [],

@@ -24,7 +24,8 @@ import StorageDepositBanner from './StorageDepositBanner';
 import AuctionStatusBadge, { CountdownTimer } from '../../components/AuctionStatusBadge';
 import ListingPromotionModal from '../../components/ListingPromotionModal';
 // Phase 6.3 — new bidding suite components
-import StorageBiddingPanel from '../../components/storage/StorageBiddingPanel';
+// iter285 — `StorageBiddingPanel` was a duplicate bid widget below the
+// Quick-Bid panel and confused buyers. Import removed alongside its render.
 import StorageAuctionClock from '../../components/storage/StorageAuctionClock';
 import ListingJsonLd from '../../components/seo/ListingJsonLd';
 import { useMetaPixelTracking } from '../../hooks/useMetaPixelTracking';
@@ -471,24 +472,10 @@ const StorageAuctionDetail = () => {
               <Link to="/storage-auctions/how-it-works" className="underline">{t('storage.detail.howItWorks')}</Link>
             </div>
 
-            {/* Phase 6.3 Task 1 — Premium bidding panel with slide-to-confirm.
-                Sticky position is handled by the parent <aside> wrapper. */}
-            {auction.status === 'active' && (
-              <StorageBiddingPanel
-                auction={{
-                  ...auction,
-                  // Map snake_case fields to the panel's expectations
-                  current_bid: auction.current_bid,
-                  leader_id: auction.leader_id || auction.high_bidder_id,
-                  has_user_bid: !!auction.has_user_bid,
-                  status: auction.status,
-                  starting_bid: auction.starting_price,
-                }}
-                currentUserId={user?.id}
-                onPlaceBid={handlePlaceBid}
-                loading={submittingBid}
-              />
-            )}
+            {/* iter285 — Duplicate `<StorageBiddingPanel>` removed. The
+                Quick-Bid panel above (lines 360-432) is the canonical
+                bid UI; rendering both confused buyers (the slider duplicate
+                appeared empty by default, blocking submission). */}
           </aside>
         </div>
       </div>
