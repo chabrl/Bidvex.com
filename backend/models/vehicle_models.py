@@ -388,6 +388,15 @@ class VehicleListingCreate(BaseModel):
     eligible_provinces: Optional[List[str]] = None
     inspection_status: Optional[str] = None  # safety_certified | e_tested | mvi_passed | as_is
 
+    # iter286 — Bug 5 — Carfax / vehicle-history references.
+    # `carfax_url` is the official Carfax CA shareable link. `carfax_file`
+    # is an uploaded PDF (S3 URL). `inspection_file` is an optional
+    # safety/MVI PDF. Documents are gated to broker-partner accounts on
+    # the buyer side; sellers can attach them during listing creation.
+    carfax_url: Optional[str] = None
+    carfax_file: Optional[str] = None
+    inspection_file: Optional[str] = None
+
     @field_validator('vin')
     @classmethod
     def validate_vin_format(cls, v):

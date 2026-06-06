@@ -293,12 +293,54 @@ const FlattenedMarketplace = ({
   const openQuickBid = (item, e) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     if (!token) {
       navigate('/auth', { state: { from: { pathname: '/marketplace' } } });
       return;
     }
-    
+
+    // iter286 — Bug 4 — Section-aware Quick Bid routing.
+    // Storage / Vehicle / Lots listings must bid under their own section's
+    // rules and fee structure, NOT the generic marketplace buyer premium.
+    // For these types we navigate to the dedicated detail page (which
+    // renders the section-specific BidPanel with the correct
+    // fees/terms/deposit messaging). Generic marketplace listings keep
+    // the inline Quick Bid modal flow unchanged.
+    const _section = (() => {
+      const lt = (item.listing_type || '').toLowerCase();
+      const sec = (item.section || '').toLowerCase();
+      const cat = (item.category || '').toLowerCase();
+      if (
+        lt === 'storage_locker' || lt === 'storage_auction' || lt === 'storage' ||
+        lt === 'unit' || lt === 'unit_auction' ||
+        sec === 'storage' || cat === 'storage_locker' || cat === 'storage'
+      ) return 'storage';
+      if (
+        lt === 'vehicle_auction' || lt === 'vehicles' || lt === 'vehicle' ||
+        sec === 'vehicles' ||
+        cat === 'vehicle' || cat === 'vehicles' || cat === 'car' ||
+        cat === 'auto' || cat === 'vehicle parts'
+      ) return 'vehicle';
+      if (
+        lt === 'multi_lot' || lt === 'lots' ||
+        sec === 'lots' || cat === 'multi_lot' || cat === 'lots'
+      ) return 'lots';
+      return 'marketplace';
+    })();
+    if (_section === 'storage') {
+      navigate(`/storage-auctions/${item.id}#bid`);
+      return;
+    }
+    if (_section === 'vehicle') {
+      navigate(`/vehicle-auctions/${item.id}#bid`);
+      return;
+    }
+    if (_section === 'lots') {
+      navigate(item.auction_id ? `/lots/${item.auction_id}#bid` : `/listing/${item.id}#bid`);
+      return;
+    }
+
+    // Generic marketplace item — inline modal flow.
     setSelectedItem(item);
     const minBid = (item.current_price || item.starting_price || 0) + 10;
     setBidAmount(minBid.toFixed(2));

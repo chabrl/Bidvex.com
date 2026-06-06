@@ -875,6 +875,13 @@ async def create_vehicle_listing(
         # Empty/None on legacy listings renders the buyer-side warning.
         "eligible_provinces": (listing_data.eligible_provinces or ["ALL"]),
         "inspection_status":  (listing_data.inspection_status or "as_is"),
+
+        # iter286 — Bug 5 — Carfax / Inspection report references. Optional
+        # on every listing; gated to broker partners on the buyer side
+        # via GET /vehicle-auctions/{id}/carfax.
+        "carfax_url":      (listing_data.carfax_url or "").strip() or None,
+        "carfax_file":     (listing_data.carfax_file or "").strip() or None,
+        "inspection_file": (listing_data.inspection_file or "").strip() or None,
         
         # Media (to be added separately)
         "media": [],
@@ -958,38 +965,58 @@ async def upload_vehicle_media(
     seller: dict = Depends(get_vehicle_seller),
     user: dict = Depends(get_current_user)
 ):
-    """Upload media (photo/video) for vehicle listing"""
+    """Upload media (photo/video) for vehicle listing.
+
+    iter286 — Bug 1 — Previously this endpoint **mocked** the upload
+    (it generated a `/uploads/vehicles/…` placeholder URL and discarded
+    the file bytes). That left every vehicle detail page rendering grey
+    placeholder images. Now we upload the bytes to S3 via the existing
+    `services/s3_service.py` (resize + compress to JPEG ≤ 1600px,
+    quality 75) and persist the absolute CloudFront URL.
+    """
     listing = await db.vehicle_listings.find_one({
         "id": vehicle_id,
         "seller_id": seller["id"]
     })
     if not listing:
         raise HTTPException(status_code=404, detail="Vehicle listing not found")
-    
-    valid_categories = ["front", "rear", "driver_side", "passenger_side", 
-                       "interior_front", "interior_rear", "dashboard", 
+
+    valid_categories = ["front", "rear", "driver_side", "passenger_side",
+                       "interior_front", "interior_rear", "dashboard",
                        "engine", "trunk", "vin_plate", "damage", "document", "other"]
     if category not in valid_categories:
         raise HTTPException(status_code=400, detail=f"Invalid category. Must be one of: {valid_categories}")
-    
+
     # Determine media type
     content_type = file.content_type or ""
     media_type = "video" if "video" in content_type else "photo"
-    
-    # Generate placeholder URL (in production, upload to cloud storage)
-    file_url = f"/uploads/vehicles/{vehicle_id}/{category}_{uuid.uuid4()}"
-    
+
+    # iter286 — Real S3 upload. Index is computed from the current media
+    # count so each photo gets a unique deterministic key.
+    from services.s3_service import upload_image_to_s3
+    next_index = len(listing.get("media", []))
+    try:
+        file_url = await upload_image_to_s3(file, vehicle_id, next_index)
+    except Exception as e:
+        # Surface a useful error rather than silently saving a broken URL.
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Photo upload failed: {type(e).__name__}: {str(e)}",
+        )
+
     media_item = {
         "id": str(uuid.uuid4()),
         "type": media_type,
         "url": file_url,
-        "thumbnail_url": file_url,  # In production, generate thumbnail
+        "thumbnail_url": file_url,
         "category": category,
         "caption": caption,
-        "order": len(listing.get("media", [])),
+        "order": next_index,
         "uploaded_at": datetime.now(timezone.utc)
     }
-    
+
     await db.vehicle_listings.update_one(
         {"id": vehicle_id},
         {
@@ -997,7 +1024,7 @@ async def upload_vehicle_media(
             "$set": {"updated_at": datetime.now(timezone.utc)}
         }
     )
-    
+
     return {"message": "Media uploaded successfully", "media": media_item}
 
 
@@ -1341,6 +1368,17 @@ async def get_vehicle_detail(vehicle_id: str, request: Request):
         {"$inc": {"views_count": 1}}
     )
     
+    # iter286 — Bug 1 — Normalize media URLs. Legacy listings stored
+    # placeholder relative paths (`/uploads/vehicles/…`) when the upload
+    # endpoint was mocked. Those URLs never resolve in the browser. Drop
+    # them so the gallery shows a clean "no photos yet" state instead of
+    # a row of broken `<img>` tags.
+    _media = listing.get("media") or []
+    listing["media"] = [
+        m for m in _media
+        if isinstance(m.get("url"), str) and m["url"].startswith("http")
+    ]
+    
     # Get seller info
     seller = await db.vehicle_sellers.find_one(
         {"id": listing["seller_id"]},
@@ -1360,6 +1398,58 @@ async def get_vehicle_detail(vehicle_id: str, request: Request):
     listing["recent_bids"] = bids
     
     return listing
+
+
+# iter286 — Bug 5 — Broker-gated Carfax / inspection report endpoint.
+@vehicle_router.get("/vehicle-auctions/{vehicle_id}/carfax")
+async def get_vehicle_carfax(
+    vehicle_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """Return Carfax / inspection report references for a vehicle listing.
+
+    Gated to broker-partner accounts (and admins). Individual buyers see a
+    `broker_required` 403 so the buyer-side UI can render a locked-state
+    teaser with a "Become a Broker Partner" CTA. Sellers can always read
+    their own listing's documents.
+
+    Returns:
+      { carfax_url, carfax_file, inspection_file, viewer_role }
+    """
+    listing = await db.vehicle_listings.find_one(
+        {"id": vehicle_id},
+        {"_id": 0, "seller_id": 1, "carfax_url": 1, "carfax_file": 1, "inspection_file": 1},
+    )
+    if not listing:
+        # Cross-collection fallback for older listings.
+        listing = await db.listings.find_one(
+            {"id": vehicle_id, "$or": [{"section": "vehicles"}, {"category": {"$regex": "vehicle", "$options": "i"}}]},
+            {"_id": 0, "seller_id": 1, "carfax_url": 1, "carfax_file": 1, "inspection_file": 1},
+        )
+    if not listing:
+        raise HTTPException(status_code=404, detail="Vehicle not found")
+
+    is_admin   = (user.get("role") == "admin") or bool(user.get("is_admin"))
+    is_seller  = (user.get("id") == listing.get("seller_id"))
+    is_broker  = bool(
+        user.get("is_broker_partner")
+        or user.get("is_broker")
+        or user.get("broker_partner_status") in ("active", "approved")
+    )
+    if not (is_admin or is_seller or is_broker):
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code":    "broker_required",
+                "message": "Carfax reports are only available to verified broker partners.",
+            },
+        )
+    return {
+        "carfax_url":       listing.get("carfax_url") or None,
+        "carfax_file":      listing.get("carfax_file") or None,
+        "inspection_file":  listing.get("inspection_file") or None,
+        "viewer_role":      "admin" if is_admin else ("seller" if is_seller else "broker"),
+    }
 
 
 @vehicle_router.get("/vehicles/my/listings")

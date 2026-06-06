@@ -322,14 +322,28 @@ export default function VehicleBidPanel({ listingId, vehicleProvince, currentHig
       );
 
     case 'error':
-      return (
-        <Card className="border-2 border-rose-300 bg-rose-50" data-testid="vehicle-bid-panel-error">
-          <CardContent className="p-4 text-rose-800 text-sm flex items-start gap-2">
-            <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-            <p>{gatewayStatus.message || 'Compliance gateway failed to load.'}</p>
-          </CardContent>
-        </Card>
-      );
+      // iter286 — Bug 2 — Translate raw codes into a friendly message.
+      // Previously the bid panel rendered "listing_not_found" raw,
+      // confusing real buyers. Map the most common code first and fall
+      // back to a generic load-failure copy.
+      {
+        const _raw = String(gatewayStatus.message || '');
+        const _friendly = _raw === 'listing_not_found'
+          ? (lang === 'fr'
+              ? "Cette enchère n\u2019a pas pu \u00eatre charg\u00e9e. Veuillez rafra\u00eechir la page ou contacter le support."
+              : "This vehicle auction could not be loaded. Please refresh the page or contact support.")
+          : (_raw || (lang === 'fr'
+              ? "\u00c9chec du chargement du panneau d\u2019enchères."
+              : 'Compliance gateway failed to load.'));
+        return (
+          <Card className="border-2 border-rose-300 bg-rose-50" data-testid="vehicle-bid-panel-error">
+            <CardContent className="p-4 text-rose-800 text-sm flex items-start gap-2">
+              <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+              <p>{_friendly}</p>
+            </CardContent>
+          </Card>
+        );
+      }
 
     default:
       return null;

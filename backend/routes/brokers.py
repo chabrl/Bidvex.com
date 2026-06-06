@@ -844,8 +844,34 @@ async def broker_compliance_check(
     """
     db = get_db()
 
+    # iter286 — Bug 2 — Dual-collection lookup. Vehicle listings created
+    # via the broker dealer wizard live in `db.vehicle_listings` (not in
+    # `db.listings`). The single-collection query below previously 404'd
+    # with `listing_not_found`, which rendered raw inside the bid panel.
+    # Try the canonical marketplace collection first; if missing, fall
+    # back to vehicle_listings and synthesize the minimum fields this
+    # endpoint reads (`category`, `seller_province`, `requires_broker`).
+    #
+    # NOTE: explicit `is not None` check (NOT truthiness). When the doc
+    # exists but none of the projected fields are set, the projection
+    # returns an empty dict `{}` which is falsy — the previous truthiness
+    # check silently fell through to the 404 branch.
     listing = await db.listings.find_one({"id": listing_id}, {"_id": 0})
-    if not listing:
+    if listing is None:
+        vlisting = await db.vehicle_listings.find_one(
+            {"id": listing_id},
+            {"_id": 0, "category_id": 1, "location_province": 1, "seller_province": 1},
+        )
+        if vlisting is not None:
+            listing = {
+                "category":         "vehicle",
+                "requires_broker":  True,
+                "seller_province":  (vlisting.get("location_province")
+                                     or vlisting.get("seller_province")
+                                     or ""),
+                "province":         (vlisting.get("location_province") or ""),
+            }
+    if listing is None:
         raise HTTPException(status_code=404, detail={"error": "listing_not_found"})
 
     cat = (listing.get("category") or "").lower()

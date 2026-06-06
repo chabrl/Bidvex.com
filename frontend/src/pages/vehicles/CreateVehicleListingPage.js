@@ -208,6 +208,11 @@ const CreateVehicleListingPage = () => {
     // continue to render the "TBD / contact seller" notice.
     eligible_provinces: ['ALL'],
     inspection_status: 'as_is',
+
+    // iter286 — Bug 5 — Carfax / inspection report fields.
+    carfax_url: '',
+    carfax_file: '',
+    inspection_file: '',
   });
 
   // Check seller profile
@@ -396,6 +401,11 @@ const CreateVehicleListingPage = () => {
           ? formData.eligible_provinces
           : ['ALL'],
         inspection_status: formData.inspection_status || 'as_is',
+
+        // iter286 — Bug 5 — Carfax / inspection references.
+        carfax_url:       (formData.carfax_url || '').trim() || null,
+        carfax_file:      (formData.carfax_file || '').trim() || null,
+        inspection_file:  (formData.inspection_file || '').trim() || null,
         // iter201 — Phase 2 — Vehicle category (CEO 15-category taxonomy)
         category_id: formData.category_id || null,
         subcategory_id: formData.subcategory_id || null,
@@ -1026,6 +1036,60 @@ const CreateVehicleListingPage = () => {
                   </CardContent>
                 </Card>
               ))}
+            </div>
+
+            {/* iter286 — Bug 5 — Carfax / Inspection report inputs.
+                Optional fields. Sellers paste a Carfax CA share URL OR
+                an S3 URL to a previously-uploaded PDF. The documents are
+                broker-gated on the buyer side via the dedicated endpoint
+                /api/vehicle-auctions/{id}/carfax. */}
+            <div
+              data-testid="vehicle-carfax-step"
+              className="space-y-3 p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/30"
+            >
+              <div>
+                <Label className="text-sm font-semibold">Vehicle Documents (optional)</Label>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Documents are only visible to verified broker partners.
+                  Individual buyers see a locked preview.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="carfax-url-input">Carfax / Vehicle History Report URL</Label>
+                <Input
+                  id="carfax-url-input"
+                  data-testid="vehicle-carfax-url-input"
+                  type="url"
+                  value={formData.carfax_url}
+                  onChange={(e) => updateField('carfax_url', e.target.value)}
+                  placeholder="https://www.carfax.ca/VehicleHistory/..."
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="carfax-file-input">Carfax PDF (S3 / public URL)</Label>
+                <Input
+                  id="carfax-file-input"
+                  data-testid="vehicle-carfax-file-input"
+                  type="url"
+                  value={formData.carfax_file}
+                  onChange={(e) => updateField('carfax_file', e.target.value)}
+                  placeholder="https://your-bucket.s3.amazonaws.com/.../carfax.pdf"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="inspection-file-input">Inspection / Safety Report PDF</Label>
+                <Input
+                  id="inspection-file-input"
+                  data-testid="vehicle-inspection-file-input"
+                  type="url"
+                  value={formData.inspection_file}
+                  onChange={(e) => updateField('inspection_file', e.target.value)}
+                  placeholder="https://your-bucket.s3.amazonaws.com/.../inspection.pdf"
+                />
+              </div>
             </div>
           </div>
         );

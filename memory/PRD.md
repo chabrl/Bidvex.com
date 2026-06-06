@@ -1,5 +1,85 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter286 — 5 P0 LAUNCH-BLOCKING BUGS (Jun 06, 2026) 🩹
+
+Five production bugs reported after the iter285 deploy (Ford F-350
+listing on `https://bidvex.com/vehicle-auctions/277dc733-...`). All
+fixed in a single patch with full regression coverage.
+
+### Bug fixes — Verified ✅
+
+**Bug 1 — Vehicle photos invisible on detail page.**
+The upload endpoint was MOCKED — it generated placeholder
+`/uploads/vehicles/…` paths and discarded the file bytes. Production
+listings stored 10+ broken URLs. Fix: real S3 upload via
+`services/s3_service.upload_image_to_s3`. GET endpoint now strips
+legacy relative URLs so the gallery renders a clean empty state
+instead of a row of broken `<img>` tags.
+
+**Bug 2 — "listing_not_found" in vehicle bid panel.**
+`/broker-relationships/compliance-check` queried only `db.listings`,
+404-ing every vehicle authored via the broker dealer wizard (lives in
+`db.vehicle_listings`). Fix: dual-collection lookup with `is not None`
+check (the empty-projected-dict case previously fell through silently).
+The bid-panel UI now renders a friendly "auction could not be loaded"
+fallback for any future code-raw error.
+
+**Bug 3 — Inner scrollbar on the right-side bid panel.**
+The bid column wrapper carried `lg:max-h-[calc(100vh-6rem)]
+lg:overflow-y-auto`, forcing buyers to scroll twice. Removed.
+The panel now sticks to the viewport top and scrolls naturally
+with the page when its content exceeds the screen height.
+
+**Bug 4 — Wrong section rules in Quick Bid modal from Marketplace.**
+Quick Bid from a marketplace card opened the GENERIC marketplace bid
+modal regardless of section, rendering wrong fee/terms (e.g. buyer
+premium on a vehicle). Fix: section-aware routing — storage / vehicle
+/ lots Quick Bid now navigates to the dedicated detail page (which
+renders the correct section-specific BidPanel + terms + deposit
+notice). Generic marketplace flow unchanged.
+
+**Bug 5 — Carfax / inspection report feature.**
+Three optional model fields (`carfax_url`, `carfax_file`,
+`inspection_file`) added to `VehicleListingCreate`. New broker-gated
+endpoint `GET /api/vehicle-auctions/{id}/carfax` returns 403 with
+`broker_required` for individuals, 200 for brokers / sellers /
+admins. New `<VehicleCarfaxWidget>` renders three states (broker /
+individual / unauthenticated). New seller-side inputs in the listing
+wizard's photos step. New badge on vehicle cards (green for brokers,
+gray-locked for individuals).
+
+### Compliance matrix (post-iter286)
+- **iter283 + iter284 + iter285 + iter286 + storage routing +
+  financial constraints**: **175 / 175 pass, 1 skipped, 0 failures**
+  (89.3s)
+- **Deposit rules unchanged**: Storage $50 flat · Vehicles
+  max($200, 10%) · Lots max($50, 10%) · Marketplace $0
+- **Vehicle Buyer Premium**: strictly 0% (Platform fee 2.5%)
+- **Smoke test runner**: 4/4 GREEN
+
+### Files modified — iter286
+- `backend/routes/vehicles.py` (+99 / -5 lines) — real S3 upload +
+  Carfax endpoint + media URL normalization
+- `backend/routes/brokers.py` (+24 / -2 lines) — dual-collection
+  compliance-check
+- `backend/models/vehicle_models.py` (+9 / -0 lines) — Carfax fields
+- `frontend/src/pages/vehicles/VehicleDetailPage.js` (+22 / -7 lines)
+  — removed inner-scroll, wired Carfax widget
+- `frontend/src/pages/vehicles/CreateVehicleListingPage.js` (+65 / -1)
+  — Carfax inputs in photos step
+- `frontend/src/components/FlattenedMarketplace.js` (+42 / -0 lines)
+  — section-aware Quick Bid routing
+- `frontend/src/components/broker/VehicleBidPanel.jsx` (+18 / -4)
+  — friendly listing_not_found fallback
+- `frontend/src/components/vehicles/VehicleListingCard.js` (+45 / -0)
+  — Carfax pill + auth context
+- `frontend/src/components/vehicles/VehicleCarfaxWidget.jsx` (NEW)
+- `backend/tests/test_iter286_critical_bugs.py` (NEW — 7 tests)
+- `backend/tests/test_iter283_vehicle_responsive.py` (updated to
+  guard against the inner-scroll regression)
+
+---
+
 ## Latest: iter285 — 4 P0 LAUNCH-BLOCKING BUGS (Jun 06, 2026) 🩹
 
 Four production-blocking bugs reported after the iter284 deploy. All

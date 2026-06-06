@@ -24,6 +24,8 @@ import {
 import PartnerBadge from '../PartnerBadge';
 import SafeImage from '../SafeImage';
 import { formatListingPrice } from '../../utils/currencyFormatter';
+// iter286 — Bug 5 — Carfax badge needs viewer's broker status.
+import { useAuth } from '../../contexts/AuthContext';
 
 const PROVINCE_LABEL = {
   BC: 'BC', AB: 'AB', SK: 'SK', MB: 'MB', ON: 'ON', QC: 'QC',
@@ -42,6 +44,9 @@ const VehicleListingCard = ({ vehicle, countdown, onClick, onQuickView, compact 
   const { t, i18n } = useTranslation();
   const isFr = (i18n.language || 'en').toLowerCase().startsWith('fr');
   const [imgError, setImgError] = useState(false);
+  // iter286 — Bug 5 — Pull viewer auth context so the Carfax badge can
+  // toggle between "Carfax Available" (broker) and "Carfax (Broker Only)".
+  const { user } = useAuth() || {};
 
   const mainImage = (vehicle.media && (
     vehicle.media.find((m) => m.category === 'front')?.url || vehicle.media[0]?.url
@@ -348,6 +353,40 @@ const VehicleListingCard = ({ vehicle, countdown, onClick, onQuickView, compact 
               data-testid={`vehicle-card-province-pill-${vehicle.id}`}
             >
               ✅ {summary}
+            </span>
+          );
+        })()}
+
+        {/* iter286 — Bug 5 — Carfax availability pill. Only renders when the
+            listing has a Carfax URL or PDF attached. Broker partners see a
+            green "Carfax Available" badge; individual buyers see a gray
+            "Carfax (Broker Only)" badge — a soft conversion nudge. */}
+        {(vehicle.carfax_url || vehicle.carfax_file) && (() => {
+          const isBroker = !!(
+            user?.is_broker_partner ||
+            user?.is_broker ||
+            user?.broker_partner_status === 'active' ||
+            user?.broker_partner_status === 'approved' ||
+            user?.role === 'admin'
+          );
+          if (isBroker) {
+            return (
+              <span
+                className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-semibold"
+                style={{ background: '#f0fff4', color: '#276749', fontSize: '10px', border: '1px solid #c6f6d5' }}
+                data-testid={`vehicle-card-carfax-badge-${vehicle.id}`}
+              >
+                📄 Carfax Available
+              </span>
+            );
+          }
+          return (
+            <span
+              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5"
+              style={{ background: '#f7fafc', color: '#718096', fontSize: '10px', border: '1px solid #cbd5e0' }}
+              data-testid={`vehicle-card-carfax-badge-${vehicle.id}`}
+            >
+              🔒 Carfax (Broker Only)
             </span>
           );
         })()}

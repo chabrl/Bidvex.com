@@ -98,19 +98,33 @@ def test_detail_page_bid_column_sticky_only_at_lg():
     main content) and becomes a sticky right-rail at lg+. Spec:
     "On mobile, the bid panel must stack BELOW the main content
     as a full-width block. On lg: and above, it should sit as a
-    sticky right-column sidebar." """
+    sticky right-column sidebar."
+
+    iter286 — Bug 3 — Updated: the previous test pinned an inner-
+    scroll constraint (`lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto`)
+    that was the *cause* of the production "bid panel has its own
+    scrollbar" bug. The fix removes those classes so the panel sticks
+    to the viewport top but scrolls naturally with the page when its
+    content exceeds the screen height. This test guards the corrected
+    className and explicitly fails if the inner-scroll regression
+    sneaks back in.
+    """
     src = _read_fe("pages/vehicles/VehicleDetailPage.js")
     # The bid-column wrapper sits IMMEDIATELY above the testid in
     # the JSX tree — match the className -> data-testid pair.
     needle = (
         'lg:col-span-2 space-y-4 min-w-0 lg:sticky lg:top-20 '
-        'lg:self-start lg:max-h-[calc(100vh-6rem)] '
-        'lg:overflow-y-auto"\n            data-testid="vehicle-detail-bid-column"'
+        'lg:self-start"\n            data-testid="vehicle-detail-bid-column"'
     )
     assert needle in src, (
         "bid-panel wrapper className regressed — expected:\n"
         f"  {needle!r}\n"
         "but it was not found in VehicleDetailPage.js"
+    )
+    # Guard against the inner-scroll regression.
+    assert "lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto" not in src, (
+        "Inner-scroll classes reintroduced — re-creates the production "
+        "bug where the right-side bid panel scrolled independently."
     )
 
 

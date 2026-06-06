@@ -48,6 +48,7 @@ import { MessageSquare, ShieldCheck } from 'lucide-react';
 import VehicleLegalFooter from '../../components/vehicles/VehicleLegalFooter';
 import VehicleBuyerGateModal from '../../components/vehicles/VehicleBuyerGateModal';
 import VehicleProvinceEligibilityDisplay from '../../components/vehicles/VehicleProvinceEligibilityDisplay';
+import VehicleCarfaxWidget from '../../components/vehicles/VehicleCarfaxWidget';
 // iter202 Phase B — new detail-page primitives (breadcrumb, gallery+lightbox, acq-cost, related)
 import {
   VehicleBreadcrumb,
@@ -448,6 +449,17 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
             buyerProvince={user?.profile?.province || user?.province}
             isFr={(i18n.language || '').toLowerCase().startsWith('fr')}
           />
+
+          {/* iter286 — Bug 5 — Broker-gated Carfax / inspection report widget.
+              Only renders when the listing has at least one document attached
+              — keeps the panel tidy for legacy listings without Carfax data. */}
+          {(vehicle.carfax_url || vehicle.carfax_file || vehicle.inspection_file) && (
+            <VehicleCarfaxWidget
+              vehicleId={vehicle.id}
+              user={user}
+              isFr={(i18n.language || '').toLowerCase().startsWith('fr')}
+            />
+          )}
 
           {/* Bid Input */}
           {!isEnded && (
@@ -1642,8 +1654,16 @@ const VehicleDetailPage = () => {
               Spec: "On mobile, the bid panel must stack BELOW the
               main content as a full-width block. On lg: and above,
               it should sit as a sticky right-column sidebar." */}
+          {/* iter286 — Bug 3 — Removed inner-scroll constraints on the
+              bid-column wrapper. The old combo created a separate
+              scrollbar on the right-hand bid panel, forcing buyers to
+              scroll twice (once for the gallery, once for the bid
+              widget). The panel now stays sticky to the viewport top
+              but scrolls with the page when its content exceeds the
+              screen height. On mobile (no `lg:sticky`), it stacks
+              below the gallery as before. */}
           <div
-            className="lg:col-span-2 space-y-4 min-w-0 lg:sticky lg:top-20 lg:self-start lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto"
+            className="lg:col-span-2 space-y-4 min-w-0 lg:sticky lg:top-20 lg:self-start"
             data-testid="vehicle-detail-bid-column"
           >
             <BiddingPanel 
