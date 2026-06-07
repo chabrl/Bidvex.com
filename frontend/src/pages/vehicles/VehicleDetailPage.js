@@ -203,6 +203,11 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
   const { trackViewContent, trackAddToCart, trackBidSubmitted } =
     useMetaPixelTracking({ routeHint: 'vehicle' });
   const [bidAmount, setBidAmount] = useState('');
+  // iter287 — Vehicle Auto-Bid state. When `autoBidEnabled` is true,
+  // the input is treated as the MAX threshold for the proxy bidder
+  // and the [Place Bid] CTA flips to [Setup Auto-Bid]. Persisted on
+  // the backend in `db.vehicle_auto_bids` via the new endpoint.
+  const [autoBidEnabled, setAutoBidEnabled] = useState(false);
   const [bidding, setBidding] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
@@ -288,6 +293,29 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
     const amount = parseFloat(bidAmount);
     if (isNaN(amount) || amount < minBid) {
       toast.error(`Minimum bid is ${formatPrice(minBid, vehicle?.currency)}`);
+      return;
+    }
+
+    // iter287 — Auto-Bid path. The same input doubles as the
+    // `max_bid` threshold; we persist the proxy and stop. The next
+    // manual bid from anyone else triggers the bot.
+    if (autoBidEnabled) {
+      setBidding(true);
+      try {
+        await axios.post(
+          `${API}/vehicles/${vehicle.id}/auto-bid?max_bid=${amount}`,
+          {},
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+        toast.success(i18n.language?.startsWith('fr')
+          ? `Enchère automatique configurée jusqu'à ${formatPrice(amount, vehicle?.currency)}`
+          : `Auto-Bid configured up to ${formatPrice(amount, vehicle?.currency)}`);
+      } catch (err) {
+        const detail = err?.response?.data?.detail;
+        toast.error(typeof detail === 'string' ? detail : (detail?.msg || 'Auto-Bid setup failed'));
+      } finally {
+        setBidding(false);
+      }
       return;
     }
 
@@ -536,7 +564,11 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
               ) : (
               <>
               <div>
-                <label className="text-sm text-slate-500 mb-1 block">Your Bid</label>
+                <label className="text-sm text-slate-500 mb-1 block">
+                  {autoBidEnabled
+                    ? (i18n.language?.startsWith('fr') ? "Montant maximum" : "Max Bid Amount")
+                    : (i18n.language?.startsWith('fr') ? "Votre offre" : "Your Bid")}
+                </label>
                 <div className="relative">
                   <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
                   <Input
@@ -553,6 +585,37 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
                 <p className="text-xs text-slate-500 mt-1">
                   Minimum bid: {formatPrice(minBid, vehicle?.currency)} (increment: {formatPrice(100, vehicle?.currency)})
                 </p>
+
+                {/* iter287 — Vehicle Auto-Bid toggle. Parity with the
+                    marketplace + storage proxy-bidding engines. When
+                    enabled the input is treated as the max threshold;
+                    the bot incrementally counter-bids on the buyer's
+                    behalf up to that amount. */}
+                <label
+                  className="mt-3 flex items-start gap-2 cursor-pointer rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/30 p-2"
+                  data-testid="vehicle-autobid-toggle-row"
+                >
+                  <input
+                    type="checkbox"
+                    checked={autoBidEnabled}
+                    onChange={(e) => setAutoBidEnabled(e.target.checked)}
+                    className="mt-0.5"
+                    data-testid="vehicle-autobid-checkbox"
+                  />
+                  <span className="text-xs leading-snug">
+                    <span className="font-semibold">
+                      {i18n.language?.startsWith('fr')
+                        ? "Configurer l\u2019enchère automatique"
+                        : "Setup Auto-Bid"}
+                    </span>
+                    <br />
+                    <span className="text-slate-500">
+                      {i18n.language?.startsWith('fr')
+                        ? "Nous enchérirons pour vous jusqu\u2019à ce montant maximum."
+                        : "We'll bid for you up to this maximum amount."}
+                    </span>
+                  </span>
+                </label>
               </div>
 
               {/* iter202 Phase B — Quick-bid increments (+$100 / +$500 / +$1,000)
@@ -647,7 +710,11 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
                 ) : (
                   <>
                     <Gavel className="h-5 w-5 mr-2" />
-                    {t('bid.placeBid', 'Place Bid')}
+                    {autoBidEnabled
+                      ? (i18n.language?.startsWith('fr')
+                          ? "Configurer l\u2019enchère automatique"
+                          : "Setup Auto-Bid")
+                      : t('bid.placeBid', 'Place Bid')}
                   </>
                 )}
               </Button>

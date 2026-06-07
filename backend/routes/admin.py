@@ -1492,3 +1492,109 @@ async def admin_ack_smoke_alerts(
     )
     return {"acknowledged": int(r.modified_count or 0)}
 
+
+# ──────────────────────────────────────────────────────────────────────
+# iter287 — Admin: Full Vehicle Listing Management
+# ──────────────────────────────────────────────────────────────────────
+# Admins must have hard-delete privileges over `db.vehicle_listings`
+# (parity with the existing storage/marketplace controls). The delete
+# tears down every relation that could keep the unit visible:
+#   • db.vehicle_listings        — the canonical listing doc
+#   • db.vehicle_bids            — historical bid log for that vehicle
+#   • db.vehicle_auto_bids       — any active proxy bids
+#   • db.watchlists              — buyer watchlist entries
+#   • db.listings                — cross-collection mirror if present
+# After deletion the unit instantly drops out of the public listings
+# index, homepage banners, and global search.
+
+@admin_router.delete("/vehicles/{vehicle_id}")
+async def admin_delete_vehicle_listing(
+    vehicle_id: str,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    soft: bool = False,
+):
+    """Hard-delete (default) or soft-delete a vehicle listing.
+
+    Soft delete: flips `status` to `cancelled` and `is_visible=False` so
+    historical bid/payout records remain auditable but the listing
+    disappears from buyer-facing surfaces.
+
+    Hard delete: physically removes the listing + related bid logs.
+    """
+    admin_user = await require_admin(credentials)
+    db = get_db()
+
+    listing = await db.vehicle_listings.find_one({"id": vehicle_id}, {"_id": 0})
+    cross   = await db.listings.find_one({"id": vehicle_id}, {"_id": 0})
+    if not listing and not cross:
+        raise HTTPException(status_code=404, detail="Vehicle listing not found")
+
+    if soft:
+        now = datetime.now(timezone.utc).isoformat()
+        await db.vehicle_listings.update_one(
+            {"id": vehicle_id},
+            {"$set": {
+                "status":      "cancelled",
+                "is_visible":  False,
+                "deleted_at":  now,
+                "deleted_by":  admin_user.email,
+            }},
+        )
+        await db.listings.update_one(
+            {"id": vehicle_id},
+            {"$set": {
+                "status":      "cancelled",
+                "is_visible":  False,
+                "deleted_at":  now,
+                "deleted_by":  admin_user.email,
+            }},
+        )
+        await db.vehicle_auto_bids.update_many(
+            {"vehicle_id": vehicle_id, "is_active": True},
+            {"$set": {"is_active": False, "deactivated_at": now}},
+        )
+        return {
+            "message":   "Vehicle listing soft-deleted",
+            "id":        vehicle_id,
+            "soft":      True,
+            "actioned_by": admin_user.email,
+        }
+
+    # Hard delete — cascade across every related collection.
+    deleted_counts = {}
+    r_vl   = await db.vehicle_listings.delete_one({"id": vehicle_id})
+    r_lst  = await db.listings.delete_one({"id": vehicle_id})
+    r_bids = await db.vehicle_bids.delete_many({"vehicle_id": vehicle_id})
+    r_ab   = await db.vehicle_auto_bids.delete_many({"vehicle_id": vehicle_id})
+    r_wl   = await db.watchlists.delete_many({"listing_id": vehicle_id})
+
+    deleted_counts = {
+        "vehicle_listings": int(r_vl.deleted_count or 0),
+        "listings_mirror":  int(r_lst.deleted_count or 0),
+        "vehicle_bids":     int(r_bids.deleted_count or 0),
+        "vehicle_auto_bids": int(r_ab.deleted_count or 0),
+        "watchlists":       int(r_wl.deleted_count or 0),
+    }
+
+    # Audit trail.
+    try:
+        await db.admin_audit_log.insert_one({
+            "id":          str(uuid.uuid4()),
+            "actor_email": admin_user.email,
+            "actor_id":    admin_user.id,
+            "action":      "vehicle_listing_hard_delete",
+            "target_id":   vehicle_id,
+            "details":     deleted_counts,
+            "created_at":  datetime.now(timezone.utc).isoformat(),
+        })
+    except Exception:
+        pass  # audit failure must not block the delete
+
+    return {
+        "message":     "Vehicle listing deleted",
+        "id":          vehicle_id,
+        "soft":        False,
+        "deleted":     deleted_counts,
+        "actioned_by": admin_user.email,
+    }
+

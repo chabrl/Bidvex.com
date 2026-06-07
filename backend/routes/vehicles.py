@@ -1701,12 +1701,254 @@ async def place_vehicle_bid(
     )
     
     bid.pop("_id", None)
+
+    # iter287 — Vehicle Auto-Bid (Proxy Bidding) Engine.
+    # After the manual bid commits, run the proxy bidder for any active
+    # `vehicle_auto_bids` whose `max_bid` exceeds the new floor. This
+    # mirrors the marketplace `_process_auto_bids` logic but works
+    # against `db.vehicle_listings` (vehicles never land in db.listings
+    # so the existing processor can't see them).
+    try:
+        await _process_vehicle_auto_bids(
+            db=db,
+            vehicle_id=bid_data.vehicle_id,
+            current_price=bid_data.amount,
+            manual_bidder_id=user["id"],
+        )
+    except Exception as _proxy_err:
+        # Proxy-bid execution must NEVER fail the buyer's manual bid.
+        logger.warning(f"Vehicle auto-bid processing error: {_proxy_err}")
+
     return {
         "message": "Bid placed successfully",
         "bid": bid,
         "new_current_bid": bid_data.amount,
         "reserve_met": update_data.get("reserve_met", listing.get("reserve_met", False))
     }
+
+
+# ──────────────────────────────────────────────────────────────────────
+# iter287 — Vehicle Auto-Bid (Proxy Bidding) Engine
+# ──────────────────────────────────────────────────────────────────────
+
+
+async def _process_vehicle_auto_bids(
+    db,
+    vehicle_id: str,
+    current_price: float,
+    manual_bidder_id: str,
+) -> None:
+    """
+    After a manual bid on a vehicle, run all active auto-bids for that
+    listing. The highest active auto-bid wins each round; we place an
+    incremental counter-bid (`current_price + 100`) up to the bidder's
+    declared maximum.
+
+    Mirror of `routes.auctions_bids._process_auto_bids` but targets
+    `db.vehicle_listings` + `db.vehicle_bids` + the vehicle-specific
+    `db.vehicle_auto_bids` collection. Buyers who set their own
+    auto-bid do NOT trigger their own bot (`bidder_id !=
+    manual_bidder_id`).
+    """
+    # Pull every active vehicle auto-bid except the one belonging to
+    # the buyer who just placed the manual bid (avoid self-outbidding).
+    auto_bids = await db.vehicle_auto_bids.find({
+        "vehicle_id": vehicle_id,
+        "is_active": True,
+        "user_id": {"$ne": manual_bidder_id},
+    }).to_list(100)
+    if not auto_bids:
+        return
+
+    listing = await db.vehicle_listings.find_one({"id": vehicle_id})
+    if not listing:
+        return
+    if listing.get("status") != VehicleListingStatus.ACTIVE.value:
+        return
+
+    # Sort highest max_bid first — that bidder wins the round.
+    auto_bids.sort(key=lambda x: float(x.get("max_bid", 0)), reverse=True)
+    for ab in auto_bids:
+        # Vehicle bid increment is hard-coded at $100 in the manual
+        # path (see `setBidAmount((amount + 100).toString())` in the
+        # frontend). Match it here so proxy bids don't violate the
+        # buyer-facing increment rule.
+        counter = float(current_price) + 100.0
+        if counter > float(ab["max_bid"]):
+            await db.vehicle_auto_bids.update_one(
+                {"id": ab["id"]},
+                {"$set": {"is_active": False, "exhausted_at": datetime.now(timezone.utc).isoformat()}},
+            )
+            try:
+                await db.notifications.insert_one({
+                    "id":         str(uuid.uuid4()),
+                    "user_id":    ab["user_id"],
+                    "type":       "vehicle_auto_bid_exceeded",
+                    "title":      "Auto-bid maxed out",
+                    "message":    f"Your maximum auto-bid of ${float(ab['max_bid']):.2f} on a vehicle was exceeded.",
+                    "data":       {"vehicle_id": vehicle_id, "max_bid": ab["max_bid"], "current_price": current_price},
+                    "read":       False,
+                    "created_at": datetime.now(timezone.utc),
+                })
+            except Exception:
+                pass
+            continue
+
+        # Place the proxy counter-bid as the auto-bid owner.
+        # Skip the heavy province/dealer gates — they were enforced
+        # when the auto-bid was first registered; re-running them here
+        # would lock out auto-bids set before a buyer's province got
+        # rate-limited mid-auction. Anti-sniping still applies via the
+        # update_data branch below.
+        bidder = await db.users.find_one({"id": ab["user_id"]}, {"_id": 0, "name": 1, "email": 1})
+        bidder_name = (bidder or {}).get("name") or ((bidder or {}).get("email") or "").split("@")[0] or "Anonymous"
+        proxy_bid = {
+            "id":             str(uuid.uuid4()),
+            "vehicle_id":     vehicle_id,
+            "bidder_id":      ab["user_id"],
+            "bidder_name":    bidder_name,
+            "amount":         counter,
+            "max_bid":        float(ab["max_bid"]),
+            "status":         BidStatus.WINNING.value,
+            "deposit_paid":   listing.get("requires_deposit", False),
+            "is_auto_bid":    True,
+            "created_at":     datetime.now(timezone.utc),
+        }
+        await db.vehicle_bids.insert_one(proxy_bid)
+        # Outbid the previous winner (the manual bidder we just placed).
+        await db.vehicle_bids.update_many(
+            {
+                "vehicle_id": vehicle_id,
+                "bidder_id":  manual_bidder_id,
+                "status":     BidStatus.WINNING.value,
+            },
+            {"$set": {"status": BidStatus.OUTBID.value}},
+        )
+        update_data: dict = {
+            "current_bid":       counter,
+            "highest_bidder_id": ab["user_id"],
+            "updated_at":        datetime.now(timezone.utc),
+        }
+        if listing.get("reserve_price") and counter >= float(listing["reserve_price"]):
+            update_data["reserve_met"] = True
+        # Anti-sniping — same 2-minute soft-close rule as manual bids.
+        end_time = listing.get("end_time")
+        if isinstance(end_time, str):
+            try:
+                end_time = datetime.fromisoformat(end_time.replace("Z", "+00:00"))
+            except Exception:
+                end_time = None
+        if end_time:
+            time_remaining = (end_time - datetime.now(timezone.utc)).total_seconds()
+            if 0 < time_remaining < 120:
+                update_data["end_time"] = datetime.now(timezone.utc) + timedelta(minutes=2)
+        await db.vehicle_listings.update_one(
+            {"id": vehicle_id},
+            {"$set": update_data, "$inc": {"bid_count": 1}},
+        )
+        # Only the highest auto-bid wins this round. Lower-tier auto-
+        # bids re-fire on the *next* manual bid because their floor
+        # has moved up.
+        return
+
+
+@vehicle_router.post("/vehicles/{vehicle_id}/auto-bid")
+async def setup_vehicle_auto_bid(
+    vehicle_id: str,
+    max_bid: float,
+    user: dict = Depends(get_current_user),
+):
+    """
+    Register or update a vehicle auto-bid. The proxy bidder will
+    counter-bid up to `max_bid` automatically whenever someone else
+    bids on the listing. Idempotent — calling again updates the
+    existing row.
+
+    iter287 — Vehicle parity with the marketplace auto-bid engine.
+    Returns:
+      { id, vehicle_id, max_bid, is_active, updated }
+    """
+    if max_bid is None or float(max_bid) <= 0:
+        raise HTTPException(status_code=400, detail="max_bid must be greater than 0")
+
+    listing = await db.vehicle_listings.find_one(
+        {"id": vehicle_id},
+        {"_id": 0, "current_bid": 1, "starting_price": 1, "status": 1, "end_time": 1},
+    )
+    if not listing:
+        raise HTTPException(status_code=404, detail="Vehicle listing not found")
+    if listing.get("status") != VehicleListingStatus.ACTIVE.value:
+        raise HTTPException(status_code=400, detail="Auction is not active")
+
+    current = float(listing.get("current_bid") or listing.get("starting_price") or 0)
+    if float(max_bid) <= current:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Max bid must be greater than the current bid (${current:.2f})",
+        )
+
+    existing = await db.vehicle_auto_bids.find_one(
+        {"user_id": user["id"], "vehicle_id": vehicle_id, "is_active": True},
+        {"_id": 0},
+    )
+    if existing:
+        await db.vehicle_auto_bids.update_one(
+            {"id": existing["id"]},
+            {"$set": {
+                "max_bid":    float(max_bid),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }},
+        )
+        return {
+            "id":         existing["id"],
+            "vehicle_id": vehicle_id,
+            "max_bid":    float(max_bid),
+            "is_active":  True,
+            "updated":    True,
+        }
+
+    row = {
+        "id":         str(uuid.uuid4()),
+        "user_id":    user["id"],
+        "vehicle_id": vehicle_id,
+        "max_bid":    float(max_bid),
+        "is_active":  True,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.vehicle_auto_bids.insert_one(row.copy())
+    return {
+        "id":         row["id"],
+        "vehicle_id": vehicle_id,
+        "max_bid":    float(max_bid),
+        "is_active":  True,
+        "updated":    False,
+    }
+
+
+@vehicle_router.delete("/vehicles/{vehicle_id}/auto-bid")
+async def deactivate_vehicle_auto_bid(
+    vehicle_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """Deactivate the caller's active auto-bid on a vehicle listing."""
+    r = await db.vehicle_auto_bids.update_many(
+        {"user_id": user["id"], "vehicle_id": vehicle_id, "is_active": True},
+        {"$set": {"is_active": False, "deactivated_at": datetime.now(timezone.utc).isoformat()}},
+    )
+    if r.modified_count == 0:
+        raise HTTPException(status_code=404, detail="No active auto-bid found")
+    return {"message": "Auto-bid deactivated"}
+
+
+@vehicle_router.get("/vehicles/auto-bid/mine")
+async def list_my_vehicle_auto_bids(user: dict = Depends(get_current_user)):
+    """List the caller's active vehicle auto-bids."""
+    rows = await db.vehicle_auto_bids.find(
+        {"user_id": user["id"], "is_active": True},
+        {"_id": 0},
+    ).to_list(100)
+    return {"auto_bids": rows, "total": len(rows)}
 
 
 @vehicle_router.post("/vehicle-bids/deposit")

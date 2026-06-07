@@ -1,5 +1,78 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter287 — VEHICLE AUTO-BID + ADMIN DELETE PARITY (Jun 06, 2026) 🚀
+
+Two launch-critical features delivering vehicle parity with the
+storage / marketplace sections.
+
+### Task 1 — Vehicle Auto-Bid (Proxy Bidding) Engine ✅
+
+Buyers can now set a `max_bid` on any active vehicle listing and have
+the proxy bot incrementally outbid competitors up to that threshold —
+identical UX to storage auctions.
+
+**New endpoints**
+- `POST   /api/vehicles/{id}/auto-bid?max_bid=<float>` — set/update (idempotent)
+- `DELETE /api/vehicles/{id}/auto-bid` — deactivate the caller's auto-bid
+- `GET    /api/vehicles/auto-bid/mine` — list caller's active rows
+
+**Engine** (`_process_vehicle_auto_bids` in `routes/vehicles.py`)
+- Fires inside `place_vehicle_bid` after every manual bid commits
+- Operates on `db.vehicle_auto_bids` (new collection) + `db.vehicle_bids`
+- Honours the same $100 increment + 2-minute soft-close as manual bids
+- Sends `vehicle_auto_bid_exceeded` notification when a buyer's max
+  is exhausted
+- Self-outbid guard (skips the auto-bid of the buyer who just bid)
+
+**Frontend**
+- Auto-Bid checkbox + bilingual copy in `VehicleDetailPage.js` bid
+  panel (data-testid `vehicle-autobid-checkbox`)
+- Input label flips between "Your Bid" and "Max Bid Amount" based on
+  the toggle
+- CTA flips to "Setup Auto-Bid / Configurer l'enchère automatique"
+- Persists via the new POST endpoint
+
+### Task 2 — Admin: Full Vehicle Listing Management ✅
+
+Admins now have hard-delete privileges over `db.vehicle_listings`
+(parity with storage / marketplace controls).
+
+**New endpoint**
+- `DELETE /api/admin/vehicles/{id}` — hard delete (default)
+- `DELETE /api/admin/vehicles/{id}?soft=true` — soft delete (flags
+  `status=cancelled` + `is_visible=False`)
+
+**Hard delete cascade** tears down every relation:
+- `db.vehicle_listings` — canonical doc
+- `db.listings` — cross-collection mirror
+- `db.vehicle_bids` — bid log
+- `db.vehicle_auto_bids` — active proxies
+- `db.watchlists` — buyer entries
+- Writes an `admin_audit_log` row with actor + deletion counts
+
+Returns 403 `admin_required` for non-admins. Returns 404 for unknown ids.
+
+### Compliance matrix (post-iter287)
+- **187 / 187 tests pass, 1 skipped, 0 failures** (112s)
+- **12 new iter287 regression tests pass** (`test_iter287_critical_bugs.py`)
+- **Smoke test runner**: 4/4 GREEN
+- **Deposit rules unchanged**: Storage $50 flat · Vehicles
+  max($200, 10%) · Lots max($50, 10%) · Marketplace $0
+- **Vehicle Buyer Premium row**: hidden by UI (iter283), backend
+  still computes the 2.5% platform fee internally
+- **Vehicle Platform Fee**: 2.5% on the hammer price
+
+### Files modified — iter287
+- `backend/routes/vehicles.py` (+177 / -0 lines) — auto-bid engine
+  + endpoints
+- `backend/routes/admin.py` (+106 / -0 lines) — admin delete endpoint
+- `frontend/src/pages/vehicles/VehicleDetailPage.js` (+76 / -3 lines)
+  — auto-bid checkbox UI, max-bid input flip, CTA label flip,
+  endpoint-call branch in `handleBid`
+- `backend/tests/test_iter287_critical_bugs.py` (NEW — 12 tests)
+
+---
+
 ## Latest: iter286 — 5 P0 LAUNCH-BLOCKING BUGS (Jun 06, 2026) 🩹
 
 Five production bugs reported after the iter285 deploy (Ford F-350
