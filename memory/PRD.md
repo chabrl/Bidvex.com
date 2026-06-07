@@ -1,6 +1,64 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: iter289 — UNIFIED MULTI-SECTION CATALOG FEED (Jun 07, 2026) 📡
+## Latest: iter290 — MANAGE ALL AUCTIONS CROSS-COLLECTION FIX (Jun 07, 2026) 🛠️
+
+Surgical fix to the Admin "Manage All Auctions" dashboard so vehicle,
+storage, marketplace, and lots listings all surface in the central
+oversight panel AND respond to admin actions (Pause/Archive/Feature/
+End-Time/Delete) regardless of which collection owns them.
+
+### Production gaps closed
+
+**Gap 1 — Multi-item rows missing `_section` tag.**
+`/admin/multi-item-listings/all` now tags every row with
+`_section='lots'` + `_collection='multi_item_listings'` so the orange
+Lots badge renders + the View / Edit / Delete CTAs route correctly.
+
+**Gap 2 — End-time editor blind to vehicle + storage collections.**
+`_resolve_collection()` in `admin_end_time.py` previously only walked
+`listings` + `multi_item_listings`, returning 404 for every vehicle and
+storage auction. Now walks all 4 directory collections. The updater
+also writes BOTH `auction_end_date` and `end_time` so the
+field-name mismatch (vehicles + storage read `end_time` everywhere
+else) no longer hides the update.
+
+**Gap 3 — Edit modal broke for vehicle + storage rows.**
+The marketplace inline Edit modal can't safely round-trip
+collection-specific schemas (year/make/model for vehicles, facility/
+unit for storage). Frontend now routes vehicle/storage/lots Edit
+clicks to the dedicated admin panels:
+  - Vehicle → `/admin?tab=vehicle-admin`
+  - Storage → `/admin?tab=storage-auctions-admin`
+  - Lots    → `/admin?tab=lots`
+Marketplace listings keep the inline modal.
+
+### Constraints honoured
+- Vehicle Buyer Premium = 0% (unchanged)
+- Vehicle Platform Fee = 2.5% (unchanged)
+- Deposits: Storage $50, Vehicles max($200, 10%), Lots max($50, 10%) (unchanged)
+- No bid logic, fee math, JWT, Stripe, or SendGrid wiring touched
+- All previous regression tests still pass
+
+### Files modified — iter290
+- `backend/routes/admin_ops.py` (+8/-1) — tag multi-item rows
+- `backend/routes/admin_end_time.py` (+18/-12) — 4-collection resolver +
+  write both end-time fields
+- `frontend/src/pages/admin/ManageAllAuctions.js` (+24/-6) — cross-route
+  Edit clicks
+- `backend/tests/test_iter290_manage_all_auctions.py` (NEW — 6 tests, all pass)
+
+### Test results — iter290
+- 6/6 iter290 regression tests pass (vehicle aggregation, lots tagging,
+  status dispatch, feature dispatch, end-time vehicle+storage,
+  vehicle BP guardrail)
+- iter284 → iter290 sweep: 47 passed, 12 skipped, 0 failures (81s)
+- UI smoke screenshot: 13 auctions render, 13 section badges
+  ({🏪 Storage, 🚗 Vehicle, 🛒 Marketplace}), View + Edit buttons
+  wire up correctly
+
+---
+
+## Previous: iter289 — UNIFIED MULTI-SECTION CATALOG FEED (Jun 07, 2026) 📡
 
 Surgical refactor of the Meta + Google Merchant catalog feed system
 to surface every section's active listings. The previous

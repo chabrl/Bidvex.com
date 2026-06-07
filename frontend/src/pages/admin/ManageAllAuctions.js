@@ -128,7 +128,28 @@ const ManageAllAuctions = () => {
   };
 
   // ── Edit listing ──
+  // iter290 — Vehicle + storage rows live in different collections and
+  // have collection-specific schemas (year/make/model for vehicles,
+  // facility/unit for storage). The inline marketplace Edit modal can't
+  // safely round-trip those — instead route the admin to the dedicated
+  // panel that already owns the full edit experience.
   const openEditModal = (listing) => {
+    const sec = listing._section || (listing.type === 'multi' ? 'lots' : 'marketplace');
+    if (sec === 'vehicle') {
+      navigate('/admin?tab=vehicle-admin');
+      toast.info('Opened Vehicle Admin — find this listing to edit it.');
+      return;
+    }
+    if (sec === 'storage') {
+      navigate('/admin?tab=storage-auctions-admin');
+      toast.info('Opened Storage Auctions Admin — find this listing to edit it.');
+      return;
+    }
+    if (sec === 'lots') {
+      navigate('/admin?tab=lots');
+      toast.info('Opened Lots Moderation — find this listing to edit it.');
+      return;
+    }
     setEditModal({
       open: true,
       listing,
@@ -594,9 +615,13 @@ const ManageAllAuctions = () => {
                       size="sm"
                       variant="outline"
                       onClick={() => openEditModal(listing)}
-                      disabled={listing.type === 'multi'}
                       data-testid={`edit-btn-${listing.id}`}
-                      title={listing.type === 'multi' ? 'Edit not available for multi-item listings' : ''}
+                      title={
+                        (listing._section === 'vehicle') ? 'Edit in Vehicle Admin panel' :
+                        (listing._section === 'storage') ? 'Edit in Storage Auctions Admin panel' :
+                        (listing._section === 'lots' || listing.type === 'multi') ? 'Edit in Lots Moderation panel' :
+                        'Edit listing details'
+                      }
                     >
                       <Edit2 className="h-4 w-4 mr-1" />
                       Edit

@@ -302,9 +302,17 @@ async def get_all_listings_admin(current_user: User = Depends(require_admin)):
 
 @admin_ops_router.get("/admin/multi-item-listings/all")
 async def get_all_multi_listings_admin(current_user: User = Depends(require_admin)):
-    """Admin: Get all multi-item listings"""
+    """Admin: Get all multi-item listings.
+
+    iter290 — Tag every row with `_section='lots'` + `_collection` so the
+    Manage All Auctions UI can render the orange 'Lots' badge and route
+    the View / Edit / Delete CTAs at the multi_item_listings table.
+    """
     db = get_db()
     listings = await db.multi_item_listings.find({}, {"_id": 0}).sort("created_at", -1).to_list(None)
+    for d in listings:
+        d["_section"]    = "lots"
+        d["_collection"] = "multi_item_listings"
     return listings
 
 

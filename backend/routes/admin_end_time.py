@@ -33,13 +33,17 @@ class EndTimeUpdate(BaseModel):
 
 
 async def _resolve_collection(db, listing_id: str) -> tuple[str, dict]:
-    """Locate the listing in either single-item or multi-item collection."""
-    doc = await db.listings.find_one({"id": listing_id}, {"_id": 0})
-    if doc:
-        return ("listings", doc)
-    doc = await db.multi_item_listings.find_one({"id": listing_id}, {"_id": 0})
-    if doc:
-        return ("multi_item_listings", doc)
+    """Locate the listing in any directory collection (marketplace,
+    multi-item, vehicle, storage). iter290 — vehicles + storage rows
+    surface in the Manage All Auctions table and must respond to
+    end-time edits the same way marketplace + lots do."""
+    for coll in ("listings", "multi_item_listings", "vehicle_listings", "storage_auctions"):
+        try:
+            doc = await db[coll].find_one({"id": listing_id}, {"_id": 0})
+        except Exception:
+            doc = None
+        if doc:
+            return (coll, doc)
     raise HTTPException(status_code=404, detail="Auction not found")
 
 
@@ -169,21 +173,26 @@ async def admin_update_auction_end_time(
             "message_fr": "La nouvelle heure de fin doit être dans le futur.",
         })
 
-    old_end = doc.get("auction_end_date")
+    old_end = doc.get("auction_end_date") or doc.get("end_time")
     if isinstance(old_end, str):
         try:
             old_end = datetime.fromisoformat(old_end)
         except Exception:
             old_end = None
 
+    # iter290 — Different collections store the end timestamp under
+    # different field names. Update both so reads from any code path
+    # see the new value.
+    end_field_writes = {
+        "auction_end_date":        new_end,
+        "end_time":                new_end,
+        "end_time_last_edited_by": current_user.email,
+        "end_time_last_edited_at": now,
+    }
     # Update the auction
     await db[collection].update_one(
         {"id": listing_id},
-        {"$set": {
-            "auction_end_date": new_end,
-            "end_time_last_edited_by": current_user.email,
-            "end_time_last_edited_at": now,
-        }},
+        {"$set": end_field_writes},
     )
 
     # Audit log
