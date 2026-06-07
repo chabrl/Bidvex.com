@@ -1722,6 +1722,40 @@ async def admin_release_deposits(auction_id: str, current_user: User = Depends(_
     return await release_deposits_on_close(db, auction_id, a.get("winning_bidder_id"))
 
 
+# iter290 — Admin hard-delete for storage auctions (parity with the
+# vehicle delete added in iter287). The Manage All Auctions panel
+# DELETE button now lands here when the row's `_section === 'storage'`.
+@storage_router.delete("/admin/storage-auctions/{auction_id}")
+async def admin_delete_storage_auction(
+    auction_id: str,
+    current_user: User = Depends(_require_admin),
+):
+    """Hard-delete a storage auction + cascade related rows.
+
+    Drops the auction from `storage_auctions`, removes any cross-
+    collection mirror in `listings`, and clears watchlist entries.
+    Returns the deletion counts so the FE can confirm.
+    """
+    db = get_db()
+    a = await db.storage_auctions.find_one({"id": auction_id}, {"_id": 0, "id": 1})
+    cross = await db.listings.find_one({"id": auction_id}, {"_id": 0, "id": 1})
+    if not a and not cross:
+        raise HTTPException(status_code=404, detail="Storage auction not found")
+
+    r_sa = await db.storage_auctions.delete_one({"id": auction_id})
+    r_lst = await db.listings.delete_one({"id": auction_id})
+    r_wl = await db.watchlists.delete_many({"listing_id": auction_id})
+    return {
+        "message": "Storage auction deleted",
+        "id":       auction_id,
+        "deleted":  {
+            "storage_auctions": int(r_sa.deleted_count or 0),
+            "listings_mirror":  int(r_lst.deleted_count or 0),
+            "watchlists":       int(r_wl.deleted_count or 0),
+        },
+    }
+
+
 @storage_router.post("/admin/storage-auctions/{auction_id}/forfeit-deposit")
 async def admin_forfeit_deposit(
     auction_id: str,

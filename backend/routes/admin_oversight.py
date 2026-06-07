@@ -332,34 +332,113 @@ async def list_admin_auctions(
     status: Optional[str] = Query(None),
     category: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
+    section: Optional[str] = Query(
+        None,
+        description="Optional filter — marketplace | vehicle | storage | lots",
+    ),
     page: int = 1,
     limit: int = 20,
     current_user: User = Depends(get_current_user),
 ):
+    """
+    iter290 — Multi-collection admin auctions panel. The old endpoint
+    only walked `db.listings`, hiding every vehicle / storage / lot
+    auction from the Manage All Auctions screen. Now we aggregate
+    every collection an admin needs to oversee:
+
+      • db.listings              → "marketplace"
+      • db.vehicle_listings      → "vehicle"
+      • db.storage_auctions      → "storage"
+      • db.multi_item_listings   → "lots"
+
+    Each row is tagged with `_section` and `_collection` so the
+    frontend can render the right badge + route the View / Edit /
+    delete CTAs at the proper detail page + collection.
+    """
     _require_admin(current_user)
     db = get_db()
-    q: Dict[str, Any] = {}
-    if status:
-        q["status"] = status
-    if category:
-        q["category"] = category
-    if search:
-        q["title"] = {"$regex": search.strip()[:80], "$options": "i"}
-    page = max(1, int(page))
-    limit = max(1, min(100, int(limit)))
-    skip = (page - 1) * limit
-    cursor = db.listings.find(
-        q,
-        {
-            "_id": 0, "id": 1, "title": 1, "seller_id": 1, "created_by": 1,
-            "category": 1, "current_price": 1, "starting_price": 1,
-            "auction_end_time": 1, "auction_end_date": 1, "status": 1,
-            "is_promoted": 1, "bid_count": 1,
-        },
-    ).sort("created_at", -1).skip(skip).limit(limit)
-    items: List[Dict[str, Any]] = await cursor.to_list(length=limit)
-    total = await db.listings.count_documents(q)
 
+    # ── Build a per-collection query. Search has to map onto the
+    # field names each collection actually uses (vehicles store the
+    # display string under `make` + `model`, storage under
+    # `unit_number` + `facility_name`, etc.). ────────────────────
+    q_base: Dict[str, Any] = {}
+    if status:
+        q_base["status"] = status
+    if category:
+        q_base["category"] = category
+    safe_search = (search or "").strip()[:80]
+
+    def _q_with_search(searchable_fields: List[str]) -> Dict[str, Any]:
+        q = dict(q_base)
+        if safe_search:
+            q["$or"] = [
+                {f: {"$regex": safe_search, "$options": "i"}}
+                for f in searchable_fields
+            ]
+        return q
+
+    SECTION_SPECS = [
+        ("marketplace",     "listings",            ["title", "category"]),
+        ("vehicle",         "vehicle_listings",    ["title", "make", "model", "vin"]),
+        ("storage",         "storage_auctions",    ["unit_number", "facility_name", "facility_city"]),
+        ("lots",            "multi_item_listings", ["title", "category"]),
+    ]
+    # Optional section filter — keep the list ordered + idempotent.
+    if section:
+        section_norm = {"vehicles": "vehicle"}.get(section.lower().strip(), section.lower().strip())
+        SECTION_SPECS = [s for s in SECTION_SPECS if s[0] == section_norm]
+
+    # ── Walk every collection, tag each doc, and merge. ─────────
+    merged: List[Dict[str, Any]] = []
+    for sec, coll_name, searchable in SECTION_SPECS:
+        try:
+            cursor = db[coll_name].find(
+                _q_with_search(searchable),
+                {
+                    "_id": 0, "id": 1, "title": 1, "seller_id": 1, "created_by": 1,
+                    "category": 1, "current_price": 1, "starting_price": 1,
+                    "current_bid": 1,
+                    "auction_end_time": 1, "auction_end_date": 1, "end_time": 1,
+                    "status": 1, "is_promoted": 1, "bid_count": 1,
+                    "created_at": 1, "auction_start": 1, "quantity": 1,
+                    # Section-specific display fields for the table row.
+                    "make": 1, "model": 1, "year": 1, "vin": 1,                # vehicle
+                    "unit_number": 1, "facility_name": 1, "facility_city": 1,   # storage
+                },
+            )
+            docs = await cursor.to_list(length=1000)
+        except Exception:
+            docs = []  # Collection may not exist yet — never block the panel.
+
+        for doc in docs:
+            doc["_section"]    = sec
+            doc["_collection"] = coll_name
+            # Vehicles/storage rarely have a `title` — synthesize one
+            # so the UI row never renders an empty cell.
+            if not doc.get("title"):
+                if sec == "vehicle":
+                    parts = [str(doc.get("year") or ""), doc.get("make") or "", doc.get("model") or ""]
+                    doc["title"] = " ".join(p for p in parts if p).strip() or "Vehicle Listing"
+                elif sec == "storage":
+                    doc["title"] = (
+                        f"Storage Unit #{doc.get('unit_number') or '—'} · "
+                        f"{doc.get('facility_name') or doc.get('facility_city') or 'Facility'}"
+                    )
+            merged.append(doc)
+
+    # Sort newest-first across collections.
+    def _sort_key(it: Dict[str, Any]):
+        return str(it.get("created_at") or it.get("auction_start") or "")
+    merged.sort(key=_sort_key, reverse=True)
+
+    total = len(merged)
+    page  = max(1, int(page))
+    limit = max(1, min(100, int(limit)))
+    skip  = (page - 1) * limit
+    items = merged[skip:skip + limit]
+
+    # ── Single sellers lookup across the merged page. ───────────
     seller_ids = list({it.get("seller_id") or it.get("created_by") for it in items if (it.get("seller_id") or it.get("created_by"))})
     seller_map: Dict[str, Dict[str, Any]] = {}
     if seller_ids:
@@ -368,6 +447,7 @@ async def list_admin_auctions(
     for it in items:
         sid = it.get("seller_id") or it.get("created_by")
         it["seller"] = seller_map.get(sid) or {}
+
     return {"items": items, "total": total, "page": page, "limit": limit}
 
 
@@ -377,11 +457,35 @@ async def patch_admin_auction(
     body: AdminAuctionAction,
     current_user: User = Depends(get_current_user),
 ):
+    """
+    iter290 — Cross-collection action dispatcher. End / extend /
+    feature / remove now resolve the source collection and update
+    the right table so vehicle + storage + lot rows respond to the
+    admin Manage All Auctions panel actions.
+    """
     _require_admin(current_user)
     db = get_db()
-    doc = await db.listings.find_one({"id": listing_id}, {"_id": 0})
+
+    # ── Resolve which collection owns this listing id. ──────────
+    COLLECTIONS = [
+        ("listings",            "marketplace"),
+        ("vehicle_listings",    "vehicle"),
+        ("storage_auctions",    "storage"),
+        ("multi_item_listings", "lots"),
+    ]
+    doc = None
+    coll_name = None
+    for name, _sec in COLLECTIONS:
+        try:
+            d = await db[name].find_one({"id": listing_id}, {"_id": 0})
+        except Exception:
+            d = None
+        if d:
+            doc = d
+            coll_name = name
+            break
     if not doc:
-        raise HTTPException(status_code=404, detail="Listing not found")
+        raise HTTPException(status_code=404, detail="Listing not found in any collection")
 
     now = datetime.now(timezone.utc)
     update: Dict[str, Any] = {}
@@ -392,7 +496,7 @@ async def patch_admin_auction(
     elif body.action == "extend":
         if not body.extend_hours:
             raise HTTPException(status_code=400, detail="extend_hours required")
-        raw_end = doc.get("auction_end_time") or doc.get("auction_end_date")
+        raw_end = doc.get("auction_end_time") or doc.get("auction_end_date") or doc.get("end_time")
         try:
             current_end = datetime.fromisoformat(str(raw_end).replace("Z", "+00:00")) if raw_end else now
         except Exception:
@@ -400,6 +504,8 @@ async def patch_admin_auction(
         new_end = max(current_end, now) + timedelta(hours=int(body.extend_hours))
         update["auction_end_time"] = new_end.isoformat()
         update["auction_end_date"] = new_end.isoformat()
+        # Vehicle / storage collections track the end in `end_time`.
+        update["end_time"] = new_end.isoformat()
     elif body.action == "feature":
         update["is_promoted"] = True
         sections = doc.get("promotion_sections") or []
@@ -411,8 +517,14 @@ async def patch_admin_auction(
         update["status"] = "removed"
         update["removed_by_admin"] = current_user.id
         update["removed_at"] = now.isoformat()
-    await db.listings.update_one({"id": listing_id}, {"$set": update})
-    return {"success": True, "id": listing_id, "applied": update}
+
+    await db[coll_name].update_one({"id": listing_id}, {"$set": update})
+    return {
+        "success":    True,
+        "id":         listing_id,
+        "collection": coll_name,
+        "applied":    update,
+    }
 
 
 # ─── iter265 Mission 2 — Live email test endpoint ────────────────────

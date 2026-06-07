@@ -65,8 +65,15 @@ const ManageAllAuctions = () => {
     if (!listing) return;
     
     try {
-      const isMultiItem = listing.type === 'multi';
-      const endpoint = isMultiItem ? `multi-item-listings/${listing.id}` : `listings/${listing.id}`;
+      // iter290 — Cross-collection delete routing. Storage + vehicle +
+      // lots rows live in different directories — DELETE to the right
+      // admin endpoint so the cascade fires on the correct collection.
+      const sec = listing._section || (listing.type === 'multi' ? 'lots' : 'marketplace');
+      const endpoint =
+        sec === 'vehicle' ? `vehicles/${listing.id}` :
+        sec === 'storage' ? `storage-auctions/${listing.id}` :
+        sec === 'lots'    ? `multi-item-listings/${listing.id}` :
+                            `listings/${listing.id}`;
       await axios.delete(`${API}/admin/${endpoint}`, { headers });
       toast.success('Auction deleted successfully');
       setDeleteModal({ open: false, listing: null });
@@ -521,6 +528,26 @@ const ManageAllAuctions = () => {
                         {listing.status}
                       </Badge>
                       {listing.is_featured && <Badge className="bg-amber-100 text-amber-900 border border-amber-300" data-testid={`featured-badge-${listing.id}`}>★ Featured</Badge>}
+                      {/* iter290 — Section badge tagged by the backend
+                          aggregator. Lets admins see at-a-glance which
+                          directory the listing lives in. */}
+                      {listing._section && (
+                        <Badge
+                          variant="outline"
+                          className={
+                            listing._section === 'vehicle' ? 'border-blue-300 bg-blue-50 text-blue-900' :
+                            listing._section === 'storage' ? 'border-teal-300 bg-teal-50 text-teal-900' :
+                            listing._section === 'lots'    ? 'border-orange-300 bg-orange-50 text-orange-900' :
+                            'border-slate-300 bg-slate-50 text-slate-700'
+                          }
+                          data-testid={`section-badge-${listing.id}`}
+                        >
+                          {listing._section === 'vehicle' ? '🚗 Vehicle'
+                            : listing._section === 'storage' ? '🏪 Storage'
+                            : listing._section === 'lots'    ? '📦 Lots'
+                            : '🛒 Marketplace'}
+                        </Badge>
+                      )}
                     </div>
                     <p className="text-sm text-muted-foreground mb-2">{listing.category} • {listing.city}, {listing.region}</p>
                     <div className="flex gap-4 text-sm">
@@ -546,7 +573,19 @@ const ManageAllAuctions = () => {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => navigate(listing.type === 'multi' ? `/lots/${listing.id}` : `/listing/${listing.id}`)}
+                      onClick={() => {
+                        // iter290 — Cross-collection View routing.
+                        // Storage / vehicle / lots rows live in different
+                        // directories — link to the right detail page.
+                        const sec = listing._section || (listing.type === 'multi' ? 'lots' : 'marketplace');
+                        const path =
+                          sec === 'vehicle' ? `/vehicle-auctions/${listing.id}` :
+                          sec === 'storage' ? `/storage-auctions/${listing.id}` :
+                          sec === 'lots'    ? `/lots/${listing.id}` :
+                                              `/listing/${listing.id}`;
+                        navigate(path);
+                      }}
+                      data-testid={`view-btn-${listing.id}`}
                     >
                       <Eye className="h-4 w-4 mr-1" />
                       View

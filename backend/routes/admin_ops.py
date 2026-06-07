@@ -226,10 +226,77 @@ async def admin_promotion_revenue(current_user: User = Depends(require_admin)):
 
 @admin_ops_router.get("/admin/listings/all")
 async def get_all_listings_admin(current_user: User = Depends(require_admin)):
-    """Admin: Get all single listings"""
+    """
+    Admin: Get all single listings across every directory collection.
+
+    iter290 — Previously this only queried `db.listings`, hiding every
+    vehicle + storage auction from the "Manage All Auctions" panel.
+    Now we aggregate:
+
+      • db.listings           → `_section='marketplace'`
+      • db.vehicle_listings   → `_section='vehicle'`
+      • db.storage_auctions   → `_section='storage'`
+
+    Each row is tagged with `_section` + `_collection` so the frontend
+    can render the right badge and route the View / Edit / End /
+    Feature / Pause / Archive / Delete CTAs at the proper detail
+    page + collection.
+    """
     db = get_db()
-    listings = await db.listings.find({}, {"_id": 0}).sort("created_at", -1).to_list(None)
-    return listings
+    merged: list = []
+
+    # ── 1) Marketplace listings ─────────────────────────────────
+    marketplace = await db.listings.find({}, {"_id": 0}).sort("created_at", -1).to_list(None)
+    for d in marketplace:
+        d["_section"]    = "marketplace"
+        d["_collection"] = "listings"
+        merged.append(d)
+
+    # ── 2) Vehicle auctions ────────────────────────────────────
+    try:
+        vehicles = await db.vehicle_listings.find({}, {"_id": 0}).sort("created_at", -1).to_list(None)
+    except Exception:
+        vehicles = []
+    for d in vehicles:
+        d["_section"]    = "vehicle"
+        d["_collection"] = "vehicle_listings"
+        # Synthesize a display `title` when the wizard didn't set one.
+        if not d.get("title"):
+            parts = [str(d.get("year") or ""), d.get("make") or "", d.get("model") or ""]
+            d["title"] = " ".join(p for p in parts if p).strip() or "Vehicle Listing"
+        # The card reads `auction_end_date` / `current_price`. Surface
+        # the vehicle-collection field names under those keys so the
+        # UI row renders cleanly without touching the frontend code.
+        d.setdefault("auction_end_date", d.get("end_time"))
+        d.setdefault("current_price",    d.get("current_bid"))
+        d.setdefault("category",         "Vehicle")
+        d.setdefault("city",             d.get("location_city") or "")
+        d.setdefault("region",           d.get("location_province") or "")
+        merged.append(d)
+
+    # ── 3) Storage auctions ────────────────────────────────────
+    try:
+        storage = await db.storage_auctions.find({}, {"_id": 0}).sort("created_at", -1).to_list(None)
+    except Exception:
+        storage = []
+    for d in storage:
+        d["_section"]    = "storage"
+        d["_collection"] = "storage_auctions"
+        if not d.get("title"):
+            d["title"] = (
+                f"Storage Unit #{d.get('unit_number') or '—'} · "
+                f"{d.get('facility_name') or d.get('facility_city') or 'Facility'}"
+            )
+        d.setdefault("auction_end_date", d.get("end_time"))
+        d.setdefault("current_price",    d.get("current_bid"))
+        d.setdefault("category",         "Storage")
+        d.setdefault("city",             d.get("facility_city") or "")
+        d.setdefault("region",           d.get("facility_province") or "")
+        merged.append(d)
+
+    # Sort newest-first across collections.
+    merged.sort(key=lambda x: str(x.get("created_at") or ""), reverse=True)
+    return merged
 
 
 
@@ -424,10 +491,19 @@ async def admin_delete_promotion(promotion_id: str, current_user: User = Depends
 
 @admin_ops_router.put("/admin/listings/{listing_id}/feature")
 async def admin_feature_listing(listing_id: str, data: Dict[str, bool], current_user: User = Depends(require_admin)):
+    """iter290 — Cross-collection feature toggle. The Manage All
+    Auctions table can promote vehicles + storage rows; route the
+    update to whichever collection owns the listing id."""
     db = get_db()
     is_featured = data.get("is_featured", False)
-    await db.listings.update_one({"id": listing_id}, {"$set": {"is_featured": is_featured}})
-    return {"message": f"Listing {'featured' if is_featured else 'unfeatured'}"}
+    for coll_name in ("listings", "vehicle_listings", "storage_auctions", "multi_item_listings"):
+        try:
+            r = await db[coll_name].update_one({"id": listing_id}, {"$set": {"is_featured": is_featured}})
+        except Exception:
+            r = None
+        if r and r.matched_count:
+            return {"message": f"Listing {'featured' if is_featured else 'unfeatured'}", "collection": coll_name}
+    raise HTTPException(status_code=404, detail="Listing not found")
 
 # CATEGORY MANAGEMENT
 
@@ -1626,23 +1702,42 @@ async def admin_delete_multi_item_listing(listing_id: str, current_user: User = 
 
 @admin_ops_router.put("/admin/listings/{listing_id}/status")
 async def admin_update_listing_status(listing_id: str, data: Dict[str, Any], current_user: User = Depends(require_admin)):
-    """Admin: Update single listing status (active, paused, archived, cancelled)."""
+    """Admin: Update single listing status (active, paused, archived, cancelled).
+
+    iter290 — Multi-collection dispatch. Vehicle + storage rows surface
+    in the same Manage All Auctions table; their Pause / Archive /
+    Cancel CTAs hit this endpoint with their UUID. Walk every directory
+    collection so the action lands on the right table.
+    """
     db = get_db()
     new_status = data.get("status")
     if new_status not in ("active", "paused", "archived", "cancelled", "ended"):
         raise HTTPException(status_code=400, detail=f"Invalid status: {new_status}")
-    result = await db.listings.update_one(
-        {"id": listing_id},
-        {"$set": {"status": new_status, "updated_at": datetime.now(timezone.utc).isoformat()}}
-    )
-    if result.matched_count == 0:
+
+    updated_collection = None
+    for coll_name in ("listings", "vehicle_listings", "storage_auctions", "multi_item_listings"):
+        try:
+            r = await db[coll_name].update_one(
+                {"id": listing_id},
+                {"$set": {"status": new_status, "updated_at": datetime.now(timezone.utc).isoformat()}},
+            )
+        except Exception:
+            r = None
+        if r and r.matched_count:
+            updated_collection = coll_name
+            break
+
+    if not updated_collection:
         raise HTTPException(status_code=404, detail="Listing not found")
+
     await db.admin_logs.insert_one({
         "id": str(uuid.uuid4()), "action": f"listing_status_{new_status}",
         "admin_id": current_user.id, "target_id": listing_id,
+        "collection": updated_collection,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     })
-    return {"success": True, "message": f"Listing status updated to {new_status}"}
+    return {"success": True, "collection": updated_collection,
+            "message": f"Listing status updated to {new_status}"}
 
 
 @admin_ops_router.put("/admin/multi-item-listings/{listing_id}/status")
