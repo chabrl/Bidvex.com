@@ -1006,6 +1006,10 @@ try:
     from routes.transaction_pickup_code import router as pickup_code_router
     api_router.include_router(pickup_code_router)
 
+    # iter288 — Listing change-request pipeline (user self-service + admin triage)
+    from routes.listing_requests import router as listing_requests_router
+    api_router.include_router(listing_requests_router)
+
     # SEO: Dynamic sitemap.xml + robots.txt (app-level, not /api)
     from routes.sitemap import sitemap_router
     app.include_router(sitemap_router, tags=["SEO"])

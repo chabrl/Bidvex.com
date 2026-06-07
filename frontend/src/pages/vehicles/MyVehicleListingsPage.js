@@ -25,6 +25,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '../../components/ui/dropdown-menu';
+// iter288 — Shared user-side change-request modal.
+import ListingChangeRequestModal from '../../components/listings/ListingChangeRequestModal';
 
 const API = API_BASE;
 
@@ -64,7 +66,9 @@ const getStatusBadge = (status) => {
   );
 };
 
-const VehicleListingCard = ({ listing, onView, onEdit }) => {
+const VehicleListingCard = ({ listing, onView, onEdit, isFr = false }) => {
+  // iter288 — Per-card request-change modal state.
+  const [modal, setModal] = useState({ open: false, type: 'delete' });
   const mainImage = listing.media?.find(m => m.category === 'front')?.url || 
                     listing.media?.[0]?.url;
   
@@ -107,6 +111,26 @@ const VehicleListingCard = ({ listing, onView, onEdit }) => {
                     <Edit className="h-4 w-4 mr-2" /> Edit
                   </DropdownMenuItem>
                 )}
+                {/* iter288 — Active-auction self-service: request edit
+                    or deletion via the admin moderation queue. The
+                    actual modification never bypasses admin review. */}
+                {listing.status !== 'draft' && (
+                  <DropdownMenuItem
+                    onClick={() => setModal({ open: true, type: 'edit' })}
+                    data-testid={`vehicle-request-edit-${listing.id}`}
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    {isFr ? 'Demander une modification' : 'Edit Listing'}
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem
+                  onClick={() => setModal({ open: true, type: 'delete' })}
+                  data-testid={`vehicle-request-delete-${listing.id}`}
+                  className="text-rose-600 focus:text-rose-700"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  {isFr ? 'Demande de suppression' : 'Request Deletion'}
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -145,13 +169,24 @@ const VehicleListingCard = ({ listing, onView, onEdit }) => {
           )}
         </CardContent>
       </div>
+
+      {/* iter288 — Modal launches from the dropdown actions above. */}
+      <ListingChangeRequestModal
+        listingId={listing.id}
+        listingLabel={`${listing.year || ''} ${listing.make || ''} ${listing.model || ''}`.trim()}
+        requestType={modal.type}
+        isFr={isFr}
+        open={modal.open}
+        onClose={() => setModal({ open: false, type: modal.type })}
+      />
     </Card>
   );
 };
 
 const MyVehicleListingsPage = () => {
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isFr = (i18n.language || '').toLowerCase().startsWith('fr');
   const { token, user } = useAuth();
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -317,6 +352,7 @@ const MyVehicleListingsPage = () => {
                   <VehicleListingCard
                     key={listing.id}
                     listing={listing}
+                    isFr={isFr}
                     onView={(id) => navigate(`/vehicle-auctions/${id}`)}
                     onEdit={(id) => navigate(`/vehicle-auctions/edit/${id}`)}
                   />

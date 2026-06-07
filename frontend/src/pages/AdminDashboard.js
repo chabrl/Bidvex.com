@@ -21,6 +21,8 @@ import ConversionFunnelDashboard from './admin/ConversionFunnelDashboard';
 import DisputedSettlements from './admin/DisputedSettlements';
 import ManageAllAuctions from './admin/ManageAllAuctions';
 import DeletionRequestsManager from './admin/DeletionRequestsManager';
+// iter288 — Listing change-request inbox (admin moderation triage).
+import ListingRequestsManager from './admin/ListingRequestsManager';
 import TaxVerificationQueue from './admin/TaxVerificationQueue';
 import AuctionControl from './admin/AuctionControl';
 import CategoryManager from './admin/CategoryManager';
@@ -75,7 +77,7 @@ import {
   Users, Package, Gavel, Shield, TrendingUp, Bell, Settings, FileText, 
   MessageSquare, DollarSign, Search, Image, CreditCard, Megaphone, 
   Activity, AlertTriangle, ChevronRight, Power, Zap, Eye, History,
-  ToggleLeft, ToggleRight, Clock, Mail, Sliders, Car, Send, Bot, Ticket, BarChart3, Globe, Building2, BarChart2, ShieldAlert, ShieldCheck, Lock
+  ToggleLeft, ToggleRight, Clock, Mail, Sliders, Car, Send, Bot, Ticket, BarChart3, Globe, Building2, BarChart2, ShieldAlert, ShieldCheck, Lock, Inbox
 } from 'lucide-react';
 
 const API = API_BASE;
@@ -102,6 +104,8 @@ const SECONDARY_TABS = {
     { id: 'lots', label: 'Lots Moderation', icon: '📦', lucideIcon: Package },
     { id: 'all-auctions', label: 'Manage All Auctions', icon: '🏛️', lucideIcon: Package },
     { id: 'deletion-requests', label: 'Deletion Requests', icon: '🗑️', lucideIcon: AlertTriangle },
+    // iter288 — Per-listing change-request inbox (edit / delete triage)
+    { id: 'listing-requests', label: 'Listing Change Requests', icon: '📝', lucideIcon: Inbox },
     { id: 'tax-verification', label: 'Tax Verification', icon: '🛡️', lucideIcon: Shield },
     { id: 'tax-dashboard', label: 'Tax Dashboard', icon: '📊', lucideIcon: BarChart2 },
     { id: 'auctions', label: 'Auction Control', icon: '🔨', lucideIcon: Gavel },
@@ -460,6 +464,8 @@ const AdminDashboard = () => {
           case 'lots': return <LotsModeration />;
           case 'all-auctions': return <ManageAllAuctions />;
           case 'deletion-requests': return <DeletionRequestsManager />;
+          // iter288 — New listing-change request triage queue
+          case 'listing-requests': return <ListingRequestsManager />;
           case 'tax-verification': return <TaxVerificationQueue />;
           case 'tax-dashboard': return <AdminTaxDashboard />;
           case 'auctions': return <AuctionControl />;

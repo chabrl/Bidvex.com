@@ -1,5 +1,89 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter288 — LISTING CHANGE-REQUEST PIPELINE (Jun 07, 2026) 🛠️
+
+Three-part sprint delivering the centralized "edit / delete request"
+workflow demanded by Ops. Eliminates ad-hoc DB tampering on active
+auctions and gives admins a single inbox to triage user requests
+across every directory.
+
+### Part 1 — Backend pipeline ✅
+New `routes/listing_requests.py` with five endpoints:
+- `POST   /api/listings/{id}/request-change`    — user submits
+- `GET    /api/listing-requests/mine`           — caller's history
+- `GET    /api/admin/listing-requests`          — admin triage queue
+- `POST   /api/admin/listing-requests/{rid}/approve`
+- `POST   /api/admin/listing-requests/{rid}/reject`
+
+New collection `db.listing_requests` with schema:
+```
+{ id, listing_id, listing_type, listing_collection, user_id,
+  user_email, request_type, reason, current_payload_delta,
+  status, created_at, resolved_at, resolved_by, admin_notes }
+```
+
+Listing resolver walks all four directory collections
+(`vehicle_listings`, `storage_auctions`, `listings`,
+`multi_item_listings`) so a single endpoint serves every section.
+Sellers can only request changes on their own listings (403 otherwise).
+Duplicate pending requests for the same listing return 409 with
+`code='duplicate_pending_request'`.
+
+### Part 2 — User self-service UI ✅
+- New shared modal: `components/listings/ListingChangeRequestModal.jsx`
+  (bilingual EN/FR, required reason validation, busy + error states,
+  data-testid suite for testing)
+- `pages/vehicles/MyVehicleListingsPage.js`: added "Edit Listing"
+  + "Request Deletion" dropdown items per listing card
+  (`data-testid="vehicle-request-edit-{id}"` /
+  `vehicle-request-delete-{id}`)
+- Modal forces a 3+ character reason; ships the structured payload
+  to `POST /api/listings/{id}/request-change`
+
+### Part 3 — Admin triage inbox ✅
+- New admin tab: `pages/admin/ListingRequestsManager.jsx`
+- Wired into `pages/AdminDashboard.js` `LISTING_TABS.marketplace`
+  array with the `📝` icon + `Inbox` lucide
+- Filter chips: pending / approved / rejected / all
+- Per-row Approve + Reject buttons; pending count badge on the tab
+- Approve `delete` → soft-cancels the listing (status='cancelled',
+  is_visible=false, deleted_at stamp, deleted_by audit)
+- Approve `edit` → safely merges `current_payload_delta` (strips
+  Mongo-dangerous keys with `$` or `.`)
+- Reject → flips status to rejected without touching the listing
+
+### Vehicle Auto-Bid alignment (iter287 sanity check) ✅
+- Confirmed `data-testid="vehicle-autobid-checkbox"` toggle wiring
+  in `VehicleDetailPage.js` — when active, the input flips to
+  "Max Bid Amount" and dispatches to `POST /vehicles/{id}/auto-bid`
+- Confirmed `_process_vehicle_auto_bids` runs after every manual bid
+  with $100 increment, 2-min soft-close, and the
+  `vehicle_auto_bid_exceeded` notification when a max is exhausted
+- Added a regression guard
+  (`test_vehicle_autobid_endpoint_wiring_intact`) that fails if
+  any future refactor renames or removes the endpoint
+
+### Compliance matrix (post-iter288)
+- **201 / 201 tests pass, 1 skipped, 0 failures** (130s sweep)
+- **14 new iter288 regression tests pass** (`test_iter288_critical_bugs.py`)
+- **Smoke test runner**: 4/4 GREEN (vehicles_endpoint, qc_tax,
+  mongo_ping, stripe_health)
+- **Deposit rules unchanged**: Storage $50 · Vehicles max($200, 10%)
+  · Lots max($50, 10%) · Marketplace $0
+- **Vehicle Buyer Premium**: row hidden by UI (iter283 contract intact)
+- **Vehicle Platform Fee**: 2.5% (untouched)
+
+### Files modified — iter288
+- `backend/routes/listing_requests.py` (NEW — 250 lines)
+- `backend/server.py` (+5 lines — register new router)
+- `frontend/src/components/listings/ListingChangeRequestModal.jsx` (NEW)
+- `frontend/src/pages/admin/ListingRequestsManager.jsx` (NEW)
+- `frontend/src/pages/vehicles/MyVehicleListingsPage.js` (+45 / -2)
+- `frontend/src/pages/AdminDashboard.js` (+5 / -2 — new tab wiring)
+- `backend/tests/test_iter288_critical_bugs.py` (NEW — 14 tests)
+
+---
+
 ## Latest: iter287 — VEHICLE AUTO-BID + ADMIN DELETE PARITY (Jun 06, 2026) 🚀
 
 Two launch-critical features delivering vehicle parity with the

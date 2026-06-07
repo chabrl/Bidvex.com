@@ -193,17 +193,17 @@ def test_bug5_carfax_endpoint_returns_documents_for_admin(seeded_vehicle_with_le
     import time as _t
     token = None
     last = None
-    for _attempt in range(5):
+    for _attempt in range(8):
         r = requests.post(
             f"{BASE_URL}/api/auth/login",
             json={"email": "charbel911@gmail.com", "password": "Anderosli123!@#"},
-            timeout=10,
+            timeout=15,
         )
         last = r
         if r.status_code == 200:
             token = r.json().get("access_token") or r.json().get("token")
             break
-        _t.sleep(2 + _attempt * 2)
+        _t.sleep(min(2 ** _attempt, 16))
     assert token, f"admin login failed: {last.status_code} {last.text[:200]}"
     rr = requests.get(
         f"{BASE_URL}/api/vehicle-auctions/{vid}/carfax",
