@@ -319,6 +319,11 @@ async def get_facebook_local_feed(
     province: Optional[str] = None,
     category: Optional[str] = None,
     type: Optional[str] = Query(None, description="marketplace|lots|vehicle|storage"),
+    section: Optional[str] = Query(
+        None,
+        description="Alias for `type` — accepts marketplace|vehicles|storage|lots "
+                    "(iter289 — match the documented Meta + Google feed contract)",
+    ),
     format: str = Query("csv", description="csv (default, Meta-compliant) | json"),
 ):
     """Public catalog feed for Meta Dynamic & Local Inventory Ads.
@@ -337,6 +342,19 @@ async def get_facebook_local_feed(
     fmt = (format or "csv").lower().strip()
     if fmt not in ("csv", "json"):
         raise HTTPException(status_code=400, detail="format must be 'csv' or 'json'")
+
+    # iter289 — Accept the documented `section` alias used by the new
+    # Meta + Google catalog contract. Map plural section names to the
+    # internal type filter expected by `_walk_active_listings`.
+    if section and not type:
+        _alias = {
+            "marketplace": "marketplace",
+            "vehicles":    "vehicle",
+            "vehicle":     "vehicle",
+            "storage":     "storage",
+            "lots":        "lots",
+        }
+        type = _alias.get(section.lower().strip(), section)
 
     key = make_cache_key(province, category, type, limit, offset)
 

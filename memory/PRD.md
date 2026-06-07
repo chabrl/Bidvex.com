@@ -1,5 +1,84 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter289 — UNIFIED MULTI-SECTION CATALOG FEED (Jun 07, 2026) 📡
+
+Surgical refactor of the Meta + Google Merchant catalog feed system
+to surface every section's active listings. The previous
+implementation already had multi-collection aggregation + a 900s
+in-memory cache + an admin force-refresh endpoint + a Google
+Merchant XML feed — but three production bugs were silently
+excluding the bulk of vehicle + storage listings.
+
+### Production gaps closed
+
+**Gap 1 — Vehicles never appeared in the feed.**
+`services.meta_feed_mapper.COLLECTION_TO_TYPE` mapped the listing
+walker to `db.vehicles` (empty legacy table). Real broker-dealer
+vehicles live in `db.vehicle_listings`. Renamed the entry — 4 real
+vehicles now surface in `?section=vehicles`.
+
+**Gap 2 — Listings without photos got silently dropped.**
+The mapper raised `exclusion_counter["no_images"] += 1; return None`
+for any listing whose `images`/`lots` field was empty. The Ford F-350
+and every other dealer listing without S3 photos was excluded from
+Meta + Google catalogs. Now the mapper:
+  - Also reads vehicle media (`media[*].url`) and storage photos
+    (`photos[]`) before falling back
+  - Injects a per-section S3 placeholder when no usable image is found
+    (`default-vehicle.jpg`, `default-storage.jpg`, `default-lots.jpg`,
+    `default-item.jpg`)
+  - Never returns `None` for missing image data — every active listing
+    appears in the feed
+
+**Gap 3 — Vehicle / storage location fields ignored.**
+The mapper only read `city` + `region`/`province`. Vehicles use
+`location_city`/`location_province`; storage uses `facility_city`/
+`facility_province`. Added both fallback chains so the `no_location`
+exclusion no longer silently drops the entire vehicle + storage
+catalog.
+
+**Gap 4 — `?section=` query alias missing.**
+The documented Meta + Google catalog contract uses
+`?section=vehicles|storage|lots|marketplace`, but the existing
+endpoint only accepted `?type=vehicle|storage|lots|marketplace`.
+Added an alias that maps the plural section names to the internal
+type filter.
+
+**Gap 5 — robots.txt didn't authorize crawler feed access.**
+Updated to add an explicit `Allow: /api/feeds/` that overrides the
+broader `Disallow: /api/` for Googlebot, facebookexternalhit, and
+other Allow-aware bots.
+
+### Compliance matrix (post-iter289)
+- **189 / 189 backend tests pass** (iter283 → iter289 + storage
+  routing + financial constraints, 0 failures, 13 skipped pre-
+  existing env gates, 154s sweep)
+- **11 new iter289 regression tests pass** (`test_iter289_catalog_feed.py`)
+- **Smoke test runner**: 4/4 GREEN
+- **Cache TTL**: unchanged at 900s (FEED_CACHE_TTL_SECONDS env)
+- **Response schema**: unchanged (existing Meta integrations keep
+  working — only data coverage expanded)
+- **Item `id` field**: still the raw UUID (iter224 contract — adding
+  prefixes would break Google Merchant Center's `id ↔ link page id`
+  validation). Section discriminator is exposed via `custom_label_0`
+  for campaign targeting.
+- **Vehicle Buyer Premium / Platform Fee / Deposit rules**: untouched
+
+### Files modified — iter289
+- `backend/services/meta_feed_mapper.py` (+38 / -10)
+  - Fix vehicles collection name (`vehicles` → `vehicle_listings`)
+  - Add `SECTION_PLACEHOLDERS` dict
+  - Read photos from `media[*].url` and `photos[]`
+  - Inject per-section placeholder instead of dropping listing
+  - Accept `location_city` / `facility_city` / etc. as fallbacks
+- `backend/routes/feeds.py` (+13 / -0)
+  - Accept `?section=` as alias for `?type=`
+- `backend/routes/sitemap.py` (+8 / -2)
+  - `robots.txt` explicit `Allow: /api/feeds/` override
+- `backend/tests/test_iter289_catalog_feed.py` (NEW — 11 tests)
+
+---
+
 ## Latest: iter288 — LISTING CHANGE-REQUEST PIPELINE (Jun 07, 2026) 🛠️
 
 Three-part sprint delivering the centralized "edit / delete request"

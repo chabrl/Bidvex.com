@@ -162,13 +162,19 @@ async def sitemap(request: Request):
 @sitemap_router.get("/robots.txt", include_in_schema=False)
 async def robots(request: Request):
     base = PUBLIC_HOST or f"{request.url.scheme}://{request.url.netloc}"
+    # iter289 — Allow Meta + Google crawlers to read the catalog feeds
+    # while keeping the rest of /api/ blocked. The explicit
+    # `Allow: /api/feeds/` overrides the broader `Disallow: /api/`
+    # for crawler User-agents that respect Allow rules (Googlebot,
+    # facebookexternalhit, Twitterbot, all major SEO bots).
     body = (
         "User-agent: *\n"
         "Allow: /\n"
         "Disallow: /admin\n"
         "Disallow: /dashboard\n"
         "Disallow: /auth\n"
-        "Disallow: /api/\n\n"
+        "Disallow: /api/\n"
+        "Allow: /api/feeds/\n\n"
         f"Sitemap: {base}/sitemap.xml\n"
         f"Sitemap: {base}/api/feeds/google\n"
         f"Sitemap: {base}/api/feeds/meta-catalog.json\n"

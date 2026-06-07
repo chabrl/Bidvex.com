@@ -44,11 +44,25 @@ LISTING_TYPE_TO_PATH = {
 }
 
 # Source-collection → derived listing_type
+# iter289 — Fix vehicle collection. Vehicles authored via the broker
+# dealer wizard live in `db.vehicle_listings` (canonical), not the
+# legacy `db.vehicles` table. This bug excluded EVERY new vehicle
+# listing from the Meta + Google Merchant catalog feeds.
 COLLECTION_TO_TYPE = {
     "listings":            "marketplace",
     "multi_item_listings": "lots",
-    "vehicles":            "vehicle",
+    "vehicle_listings":    "vehicle",
     "storage_auctions":    "storage",
+}
+
+# iter289 — Per-section S3 placeholder URLs so listings missing images
+# still surface in the catalog feed (Meta/Google reject items with no
+# image_link, so we MUST inject a fallback rather than drop the row).
+SECTION_PLACEHOLDERS = {
+    "vehicle":     "https://bidvex-marketplace-images.s3.amazonaws.com/placeholders/default-vehicle.jpg",
+    "storage":     "https://bidvex-marketplace-images.s3.amazonaws.com/placeholders/default-storage.jpg",
+    "lots":        "https://bidvex-marketplace-images.s3.amazonaws.com/placeholders/default-lots.jpg",
+    "marketplace": "https://bidvex-marketplace-images.s3.amazonaws.com/placeholders/default-item.jpg",
 }
 
 # Type prefix for the catalog `id` (must match the frontend pixel's content_ids)
@@ -441,21 +455,50 @@ def map_listing_to_meta_item(
         listing.get("images"),
         listing.get("lots"),
     )
+    # iter289 — Vehicle listings store photos under `media` (array of
+    # `{type, url, category}` dicts), not `images`. Pull those too so
+    # the catalog feed renders the real S3 photos when present.
     if not primary_image:
-        # Listing has SOME image data (base64 etc) but no valid https URL:
-        # serve the branded BidVex placeholder so the listing still surfaces
-        # in Meta's catalog. Listings with literally zero images of any kind
-        # remain excluded — those are spammy/incomplete records.
-        if _has_any_image(listing.get("images"), listing.get("lots")):
-            primary_image = BIDVEX_PLACEHOLDER_IMAGE
-            exclusion_counter["placeholder_used"] = exclusion_counter.get("placeholder_used", 0) + 1
-        else:
-            exclusion_counter["no_images"] += 1
-            return None
+        _media = listing.get("media") or []
+        _media_urls = [
+            m.get("url") for m in _media
+            if isinstance(m, dict) and isinstance(m.get("url"), str)
+        ]
+        if _media_urls:
+            primary_image, extra_images = _first_valid_image(_media_urls, None)
+    # iter289 — Storage units store photos under `photos`. Same pattern.
+    if not primary_image:
+        _photos = listing.get("photos") or []
+        if _photos:
+            primary_image, extra_images = _first_valid_image(_photos, None)
 
-    # Location — flat fields on the BidVex schema (no nested location object)
-    city = (listing.get("city") or "").strip()
-    region_iso = _iso_region_code(listing.get("region") or listing.get("province"))
+    if not primary_image:
+        # iter289 — NEVER drop a listing from the feed for missing
+        # image data. Inject the per-section S3 placeholder so the
+        # buyer-acquisition campaigns keep targeting the listing
+        # (Meta/Google match-rate would otherwise nosedive on every
+        # fresh listing the seller forgot to attach photos to).
+        primary_image = SECTION_PLACEHOLDERS.get(listing_type, BIDVEX_PLACEHOLDER_IMAGE)
+        exclusion_counter["placeholder_used"] = exclusion_counter.get("placeholder_used", 0) + 1
+
+    # Location — flat fields on the BidVex schema (no nested location object).
+    # iter289 — Vehicle listings use `location_city` / `location_province`
+    # field names (broker dealer wizard). Storage listings use
+    # `facility_city` / `facility_province`. Fall back to those so the
+    # location gate doesn't silently drop every vehicle + every storage
+    # listing from the catalog.
+    city = (
+        listing.get("city")
+        or listing.get("location_city")
+        or listing.get("facility_city")
+        or ""
+    ).strip()
+    region_iso = _iso_region_code(
+        listing.get("region")
+        or listing.get("province")
+        or listing.get("location_province")
+        or listing.get("facility_province")
+    )
     if not city or not region_iso:
         exclusion_counter["no_location"] += 1
         return None
