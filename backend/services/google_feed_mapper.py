@@ -30,6 +30,22 @@ logger = logging.getLogger(__name__)
 
 BIDVEX_BASE_URL = os.environ.get("BIDVEX_BASE_URL", "https://bidvex.com").rstrip("/")
 
+# iter291 — Per-section JPEG placeholders. Google Merchant rejects any
+# product whose image_link isn't a publicly-accessible JPEG/PNG/GIF.
+# When a real listing photo can't be sanitized (webp / query-string /
+# proxied URL), we substitute the relevant section placeholder so the
+# product still ingests + appears in Shopping search.
+#
+# iter291 — Use the production CDN placeholder JPEG (returns 200 +
+# image/jpeg) instead of the S3 bucket placeholders (returned 403).
+_PLACEHOLDER_FALLBACK = f"{BIDVEX_BASE_URL}/assets/placeholder-ad.jpg"
+_SECTION_PLACEHOLDERS: Dict[str, str] = {
+    "vehicle":     _PLACEHOLDER_FALLBACK,
+    "storage":     _PLACEHOLDER_FALLBACK,
+    "lots":        _PLACEHOLDER_FALLBACK,
+    "marketplace": _PLACEHOLDER_FALLBACK,
+}
+
 
 def _g(text: Any) -> str:
     """XML-escape any value and coerce to string. None → empty string."""
@@ -70,6 +86,39 @@ def _split_meta_price(meta_price: str) -> str:
     return f"{meta_price} CAD"
 
 
+# iter291 — Google Merchant accepts ONLY image_link URLs that resolve to
+# Content-Type: image/jpeg, image/png, or image/gif. webp + signed URLs
+# + backend-proxied URLs all fail with `Unsupported image type
+# [image_link]`. Strip query strings (e.g. `?w=800&format=webp`) and
+# drop any URL whose extension isn't in the whitelist.
+_GOOGLE_OK_IMG_EXT = (".jpg", ".jpeg", ".png", ".gif")
+
+
+def _sanitize_google_image_url(url: str) -> str:
+    """Return a Google-Merchant-safe URL, or empty string if it can't be
+    rescued.
+
+    Stripping rules:
+      • Strip URL query parameters (Google's crawler resolves the bare
+        path; ?w=… or ?format=webp causes Content-Type drift).
+      • Drop the URL outright if its extension isn't in the JPEG / PNG
+        / GIF whitelist (including .webp).
+      • Pass through the per-section S3 placeholders untouched —
+        they're already JPEG.
+    """
+    if not isinstance(url, str) or not url:
+        return ""
+    u = url.strip()
+    if not u:
+        return ""
+    # Strip query string AND hash fragment.
+    base = u.split("#", 1)[0].split("?", 1)[0]
+    lower = base.lower()
+    if not lower.endswith(_GOOGLE_OK_IMG_EXT):
+        return ""
+    return base
+
+
 def meta_item_to_google_xml(item: Dict[str, Any]) -> str:
     """Render a single Meta-shaped item dict as a Google Merchant <item> block.
 
@@ -86,8 +135,17 @@ def meta_item_to_google_xml(item: Dict[str, Any]) -> str:
     condition      = _to_google_condition(item.get("condition"))
     brand          = item.get("brand") or "BidVex"
     city           = item.get("city") or ""
-    region         = item.get("region") or ""
+    # iter291 — Google Merchant Center requires ISO 3166-2 subdivision
+    # codes ("CA-QC", "CA-ON" …). Meta accepts bare "QC" / "ON" but
+    # Google rejects them as `Invalid region [region]`. Convert here
+    # without mutating the Meta feed (single source of truth above).
+    region_raw     = item.get("region") or ""
     country        = item.get("country") or "CA"
+    region_iso     = (
+        f"{country}-{region_raw}"
+        if region_raw and len(region_raw) == 2 and "-" not in region_raw
+        else region_raw
+    )
     postal         = item.get("postal_code") or ""
     google_cat     = item.get("google_product_category") or ""
     custom_0       = item.get("custom_label_0") or ""
@@ -95,6 +153,21 @@ def meta_item_to_google_xml(item: Dict[str, Any]) -> str:
     custom_2       = item.get("custom_label_2") or ""
     custom_3       = item.get("custom_label_3") or ""
     extra_images   = item.get("additional_image_link") or ""
+
+    # iter291 — Sanitize image_link for Google Merchant Center.
+    # Google rejects webp images AND URLs whose Content-Type isn't
+    # JPEG / PNG / GIF. Strip query parameters that proxy formats and
+    # drop any URL that still ends in `.webp` after sanitization.
+    sanitized_primary = _sanitize_google_image_url(image_link)
+    if not sanitized_primary:
+        # Fall back to the per-section S3 placeholder (always JPEG) so
+        # the product still ingests instead of failing with "missing
+        # image_link". `custom_label_0` carries the section key.
+        sanitized_primary = _SECTION_PLACEHOLDERS.get(
+            (custom_0 or "").lower(),
+            _SECTION_PLACEHOLDERS["marketplace"],
+        )
+    image_link = sanitized_primary
 
     # Build the XML — RSS 2.0 dialect with g: namespace
     parts: List[str] = []
@@ -108,7 +181,7 @@ def meta_item_to_google_xml(item: Dict[str, Any]) -> str:
         # Google accepts up to 10 additional_image_link entries; Meta packs them
         # comma-separated in a single string — split + emit one tag each.
         for extra in str(extra_images).split(",")[:10]:
-            extra = extra.strip()
+            extra = _sanitize_google_image_url(extra.strip())
             if extra:
                 parts.append(f"<g:additional_image_link>{_g(extra)}</g:additional_image_link>")
     parts.append(f"<g:availability>{_g(availability)}</g:availability>")
@@ -123,10 +196,22 @@ def meta_item_to_google_xml(item: Dict[str, Any]) -> str:
     parts.append("<g:identifier_exists>no</g:identifier_exists>")
     if google_cat:
         parts.append(f"<g:google_product_category>{_g(google_cat)}</g:google_product_category>")
-    if city or region:
-        parts.append(f"<g:shipping><g:country>{_g(country)}</g:country><g:region>{_g(region)}</g:region><g:price>0.00 CAD</g:price></g:shipping>")
+    # iter291 — Always emit the country-level shipping block so Google
+    # Merchant Center doesn't flag "Missing shipping info in some
+    # countries" on every product. Region-level <g:region> uses the
+    # ISO 3166-2 code ("CA-QC"). Price defaults to 0 CAD because BidVex
+    # auctions are buyer-arranges-pickup; the contract is set at the
+    # listing page.
+    parts.append(
+        "<g:shipping>"
+        f"<g:country>{_g(country)}</g:country>"
+        f"{f'<g:region>{_g(region_iso)}</g:region>' if region_iso else ''}"
+        "<g:service>Buyer Arranges Pickup</g:service>"
+        "<g:price>0.00 CAD</g:price>"
+        "</g:shipping>"
+    )
     if postal:
-        parts.append(f"<g:product_highlight>{_g(f'Located in {city}, {region} {postal}')}</g:product_highlight>")
+        parts.append(f"<g:product_highlight>{_g(f'Located in {city}, {region_iso} {postal}')}</g:product_highlight>")
     # Custom labels — same scheme as Meta so reporting comparisons line up
     if custom_0: parts.append(f"<g:custom_label_0>{_g(custom_0)}</g:custom_label_0>")
     if custom_1: parts.append(f"<g:custom_label_1>{_g(custom_1)}</g:custom_label_1>")

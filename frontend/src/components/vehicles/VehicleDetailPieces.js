@@ -272,10 +272,12 @@ export const VehiclePhotoGallery = ({ media = [], title = 'Vehicle' }) => {
         </div>
       )}
 
-      {/* Lightbox */}
+      {/* Lightbox — iter291: z-[9998] keeps the overlay above the
+          navbar (z-[70]) and banner (z-[80]); close button sits at
+          z-[9999] so the × is always tappable on mobile. */}
       {lightboxOpen && (
         <div
-          className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center"
+          className="fixed inset-0 z-[9998] bg-black flex items-center justify-center"
           role="dialog"
           aria-modal="true"
           aria-label={t('vehicleGallery.lightboxLabel', 'Vehicle photo gallery')}
@@ -286,11 +288,12 @@ export const VehiclePhotoGallery = ({ media = [], title = 'Vehicle' }) => {
           <button
             type="button"
             onClick={() => setLightboxOpen(false)}
-            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/15 hover:bg-white/25 text-white flex items-center justify-center"
+            className="fixed top-4 right-4 z-[9999] w-11 h-11 rounded-full bg-black/70 hover:bg-black/90 text-white flex items-center justify-center shadow-lg ring-1 ring-white/20"
+            style={{ top: 'max(1rem, env(safe-area-inset-top, 1rem))' }}
             aria-label={t('common.close', 'Close')}
             data-testid="vehicle-gallery-lightbox-close"
           >
-            <X className="h-5 w-5" />
+            <X className="h-6 w-6" />
           </button>
           <span className="absolute top-5 left-4 text-white text-sm font-semibold bg-white/15 backdrop-blur rounded-full px-3 py-1">
             {index + 1} / {photos.length}

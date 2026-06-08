@@ -58,11 +58,16 @@ COLLECTION_TO_TYPE = {
 # iter289 — Per-section S3 placeholder URLs so listings missing images
 # still surface in the catalog feed (Meta/Google reject items with no
 # image_link, so we MUST inject a fallback rather than drop the row).
+# iter291 — The S3 placeholder bucket returned 403 in production
+# (private/missing objects). Fall back to the public CDN-served JPEG
+# that ships with the BidVex frontend; it returns 200 / image/jpeg
+# from every Google + Meta crawler IP and never expires.
+_PLACEHOLDER_FALLBACK = f"{BIDVEX_BASE_URL}/assets/placeholder-ad.jpg"
 SECTION_PLACEHOLDERS = {
-    "vehicle":     "https://bidvex-marketplace-images.s3.amazonaws.com/placeholders/default-vehicle.jpg",
-    "storage":     "https://bidvex-marketplace-images.s3.amazonaws.com/placeholders/default-storage.jpg",
-    "lots":        "https://bidvex-marketplace-images.s3.amazonaws.com/placeholders/default-lots.jpg",
-    "marketplace": "https://bidvex-marketplace-images.s3.amazonaws.com/placeholders/default-item.jpg",
+    "vehicle":     _PLACEHOLDER_FALLBACK,
+    "storage":     _PLACEHOLDER_FALLBACK,
+    "lots":        _PLACEHOLDER_FALLBACK,
+    "marketplace": _PLACEHOLDER_FALLBACK,
 }
 
 # Type prefix for the catalog `id` (must match the frontend pixel's content_ids)
@@ -165,8 +170,26 @@ def _is_valid_image_url(url: Any) -> bool:
     # the token is invalidated).
     if "scontent" in lower and ".facebook" in lower:
         return False
-    # Meta auto-detects content-type, so we don't enforce extension.
+    # iter291 — Reject .webp and any extension Meta/Google don't honour.
+    # Catalog ingestion fails with "Unsupported image type [image_link]"
+    # when the URL points to webp / svg / heic. Validate against the
+    # path (strip ?query and #fragment) so `image.jpg?w=800` still passes.
+    path = lower.split("#", 1)[0].split("?", 1)[0]
+    if not path.endswith((".jpg", ".jpeg", ".png", ".gif")):
+        return False
     return True
+
+
+def _normalize_image_url(url: str) -> str:
+    """iter291 — Strip query strings and hash fragments so Meta + Google
+    crawlers resolve a single canonical Content-Type. Without this,
+    `image.jpg?w=800&format=webp` would 200-OK in the browser but
+    serve `image/webp` to Google's crawler, triggering the
+    `Unsupported image type` rejection.
+    """
+    if not isinstance(url, str):
+        return ""
+    return url.strip().split("#", 1)[0].split("?", 1)[0]
 
 
 def _first_valid_image(images: Optional[List[Any]], lots: Optional[List[Dict]]) -> Tuple[Optional[str], List[str]]:
@@ -184,6 +207,9 @@ def _first_valid_image(images: Optional[List[Any]], lots: Optional[List[Dict]]) 
         for u in url_list:
             if not _is_valid_image_url(u):
                 continue
+            # iter291 — Strip ?query and #fragment so the crawler sees a
+            # deterministic Content-Type (was rejecting webp variants).
+            u = _normalize_image_url(u)
             if primary is None:
                 primary = u
             elif u != primary and len(extras) < 9:

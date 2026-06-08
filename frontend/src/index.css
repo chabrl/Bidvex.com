@@ -7,6 +7,33 @@
 .safe-area-top { padding-top: env(safe-area-inset-top, 0px); }
 :root { --bidvex-mobile-nav-height: 64px; }
 
+/* ---------------------------------------------------------------------
+ * iter291 — Image Lightbox z-index guarantee
+ * Navbar is z-[70] and the live banner is z-[80]. Both 3rd-party
+ * lightboxes (`yet-another-react-lightbox` for marketplace, and
+ * `react-image-lightbox` for lots) ship with z-indexes that historically
+ * sat below the BidVex navbar on mobile — the result was the close
+ * (×) button being obscured behind the sticky BidVex logo bar.
+ *
+ * Force every lightbox surface to render above the navbar AND the
+ * promo banner, and offset the close button by the iOS safe-area top
+ * so it never slips behind the notch.
+ * ------------------------------------------------------------------ */
+:root { --yarl__portal_zindex: 9999; }
+.yarl__portal { z-index: 9999 !important; }
+.yarl__toolbar {
+  /* push the toolbar (which hosts the × close button) below the notch */
+  padding-top: max(8px, env(safe-area-inset-top, 8px)) !important;
+}
+.ReactModal__Overlay--after-open,
+.ril__outer,
+.ril-outer { z-index: 9998 !important; }
+.ril__toolbar,
+.ril-toolbar { z-index: 9999 !important; padding-top: max(0px, env(safe-area-inset-top, 0px)) !important; }
+.ril__closeButton,
+.ril-close { z-index: 9999 !important; }
+
+
 /* BidVex CSS v2.0.1 - Build Date: 2026-01-08 - Cache Bust */
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap');
 

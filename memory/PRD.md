@@ -1,6 +1,68 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: iter290 — MANAGE ALL AUCTIONS CROSS-COLLECTION FIX (Jun 07, 2026) 🛠️
+## Latest: iter291 — LIGHTBOX Z-INDEX + CATALOG FEED COMPLIANCE (Jun 08, 2026) 🛠️
+
+Two production hot-patches:
+
+**Bug 1 — Vehicle Image Lightbox close (×) hidden behind header.**
+The custom lightbox in `VehicleDetailPieces.js` used `z-50` while the
+navbar sits at `z-[70]` and the live banner at `z-[80]` — on mobile the
+× was completely obscured by the BidVex logo bar. Fixed by:
+  - Lightbox overlay → `z-[9998]` (solid black, fully covers navbar)
+  - Close (×) button → `z-[9999]` + `position: fixed` + iOS safe-area
+    `top: max(1rem, env(safe-area-inset-top, 1rem))`
+  - Defensive `index.css` rules guarantee the 3rd-party lightbox
+    libraries (`yet-another-react-lightbox` for marketplace,
+    `react-image-lightbox` for lots) also sit above the navbar.
+
+**Bug 2 — Google Merchant Center catalog feed compliance.**
+Three Merchant Center errors fixed at the XML mapper layer:
+  - `Invalid region [region]` → emit ISO 3166-2 (`CA-QC` not `QC`).
+    `meta_item_to_google_xml()` now prefixes the country code.
+  - `Missing shipping info in some countries` → ALWAYS emit a
+    `<g:shipping>` block with `country=CA`, ISO region,
+    `service=Buyer Arranges Pickup`, `price=0.00 CAD`.
+  - `Unsupported image type [image_link]` → strip query strings and
+    fragments at the Meta source (`_normalize_image_url`) AND drop
+    any URL whose path doesn't end in `.jpg|.jpeg|.png|.gif`. When
+    sanitization drops the URL, fall back to a public CDN-served
+    JPEG placeholder (`/assets/placeholder-ad.jpg`) — the previous
+    S3 placeholder bucket returned 403 in prod and was itself
+    triggering the same Merchant Center error.
+  - In-memory feed cache busted via backend restart so the next
+    Merchant Center fetch sees the new XML immediately.
+
+### Files modified — iter291
+- `frontend/src/components/vehicles/VehicleDetailPieces.js` (+9/-9)
+- `frontend/src/index.css` (+22 lines — defensive z-index guarantees
+  for 3rd-party lightbox libraries)
+- `backend/services/meta_feed_mapper.py` (+22/-3 — webp rejection,
+  query-string stripping, working placeholder fallback)
+- `backend/services/google_feed_mapper.py` (+50/-4 — ISO region,
+  always-emit shipping block, image sanitizer + placeholder fallback)
+- `backend/tests/test_iter291_lightbox_and_feed.py` (NEW — 9 tests)
+- `backend/tests/test_iter289_catalog_feed.py` (2 tests updated to
+  reflect the new working placeholder URL)
+
+### Test results — iter291
+- 9/9 new iter291 backend tests pass
+- iter289 + iter290 + iter291 sweep: 26/26 pass, 0 failures
+- Live feed validation (curl):
+  - `/api/feeds/google` returns ISO `CA-QC`, full shipping block,
+    direct S3 JPEG `image_link`
+  - `/api/feeds/facebook-local` returns direct S3 JPEG image_link,
+    no webp leakage
+- Mobile screenshot validation: vehicle lightbox at z-9998,
+  close × at z-9999, navbar fully obscured, × tappable + closes
+  the lightbox on click.
+
+### Constraints honoured
+- No bid logic, fee math, JWT, Stripe, or SendGrid touched.
+- Vehicle Buyer Premium still 0%; vehicle platform fee still 2.5%.
+
+---
+
+## Previous: iter290 — MANAGE ALL AUCTIONS CROSS-COLLECTION FIX (Jun 07, 2026) 🛠️
 
 Surgical fix to the Admin "Manage All Auctions" dashboard so vehicle,
 storage, marketplace, and lots listings all surface in the central

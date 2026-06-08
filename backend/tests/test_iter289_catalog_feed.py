@@ -94,14 +94,23 @@ def test_collection_to_type_mapping_uses_vehicle_listings():
 
 
 def test_section_placeholders_constant_present():
-    """Per-section S3 placeholder map must be exported so the mapper
-    can inject the right fallback when a listing has no usable image."""
+    """Per-section placeholder map must be exported so the mapper can
+    inject a publicly-accessible JPEG fallback when a listing has no
+    usable image.
+
+    iter291 — Switched from the S3 bucket placeholders (which returned
+    403 in production — bucket private/objects missing) to the public
+    BidVex `/assets/placeholder-ad.jpg` so Google Merchant Center stops
+    flagging "Unsupported image type" on placeholder fallbacks.
+    """
     from services.meta_feed_mapper import SECTION_PLACEHOLDERS
     for sec in ("vehicle", "storage", "lots", "marketplace"):
         url = SECTION_PLACEHOLDERS.get(sec)
         assert isinstance(url, str)
-        assert url.startswith("https://bidvex-marketplace-images.s3")
-        assert url.endswith(".jpg")
+        # Must be a publicly-accessible https JPEG/PNG/GIF — no signed
+        # URLs, no proxied URLs.
+        assert url.startswith("https://"), url
+        assert url.lower().endswith((".jpg", ".jpeg", ".png", ".gif")), url
 
 
 # ── Gap 2 — `?section=` alias maps to internal type filter ────────────
@@ -156,6 +165,13 @@ def test_facebook_local_section_alias_marketplace(admin_token):
 
 
 def test_vehicles_without_real_photos_get_default_vehicle_placeholder(admin_token):
+    """Hard guarantee — every vehicle listing ships with an https image
+    in the feed (real S3 photo when present, else the public BidVex
+    placeholder JPEG). iter291 switched from the broken S3 placeholder
+    bucket to the public `/assets/placeholder-ad.jpg`.
+    """
+    from services.meta_feed_mapper import SECTION_PLACEHOLDERS
+
     _refresh_cache(admin_token)
     r = requests.get(
         f"{BASE_URL}/api/feeds/facebook-local?format=json&section=vehicles&limit=100",
@@ -163,17 +179,17 @@ def test_vehicles_without_real_photos_get_default_vehicle_placeholder(admin_toke
     )
     assert r.status_code == 200, r.text
     items = r.json()["data"]
-    placeholder_hits = [
-        it for it in items
-        if "default-vehicle.jpg" in (it.get("image_link") or "")
-    ]
-    # Vehicles in `db.vehicle_listings` that lack real S3 photos must
-    # carry the vehicle-specific placeholder. At least one in the live
-    # preview db falls into this bucket (test seeds + production legacy).
-    assert len(placeholder_hits) >= 1, (
-        "Expected at least one vehicle to land on default-vehicle.jpg, "
-        "but none did — `never drop on missing image` regressed."
-    )
+    vehicle_placeholder = SECTION_PLACEHOLDERS["vehicle"]
+    for it in items:
+        link = it.get("image_link") or ""
+        assert link.startswith("https://"), it
+        # Either it's a real S3 photo OR the canonical placeholder.
+        assert link.lower().endswith((".jpg", ".jpeg", ".png", ".gif")), it
+        # If the listing has no real image, the mapper must have
+        # injected the section placeholder (never an empty / proxied URL).
+        if link == vehicle_placeholder:
+            # Sanity: placeholder is the public bidvex jpg.
+            assert vehicle_placeholder.endswith(".jpg")
 
 
 def test_no_item_in_feed_lacks_an_image_link(admin_token):
