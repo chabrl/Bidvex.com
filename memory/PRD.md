@@ -1,6 +1,114 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: iter291 — LIGHTBOX Z-INDEX + CATALOG FEED COMPLIANCE (Jun 08, 2026) 🛠️
+## Latest: iter292 — VEHICLE DEALER UI CROSS-BLEED + DEALER LIFECYCLE + LOTS MERGE (Jun 09, 2026) 🛠️
+
+Three surgical fixes plus one Multi-Lot Vehicle Auction sprint scoped
+for follow-up.
+
+### ✅ Directive 1 — Vehicle Dealer Badge + Fee Block Suppression
+**Root cause**: `resolve_seller_account_type` in
+`services/listing_seller_enrichment.py` keyed on the SELLER's role
+("is this seller a vehicle dealer?") instead of the LISTING's
+collection ("is this listing in the vehicle_listings collection?"). A
+licensed dealer listing a table on Marketplace got the "Vehicle Dealer
+Auction — Full taxes on hammer price" badge AND the
+hammer-price-tax-only fee block.
+
+**Fix**: General / marketplace / lots contexts no longer promote
+dealer/facility flags. Partner verification still dominates; otherwise
+fall through to individual (or business via `seller_is_business` for
+tax-registered sellers). Vehicle context still resolves dealers to
+`vehicle_dealer` and storage context still resolves facilities to
+`storage_facility` — the bleed only exists outside their dedicated
+listing surfaces.
+
+**Bonus**: `BidConfirmationDialog` switched from category-keyword
+matching (which misfired on "auto parts", "truck accessories") to an
+explicit `isVehicleListing` prop. Default is `false` so Marketplace
+and Lots call sites get the standard tax breakdown.
+
+**Tests**: 9/9 `test_iter292_seller_account_type.py` pass.
+
+### ✅ Directive 3 — Draft / Schedule / Go Live Now Lifecycle for Dealers
+Added `submission_intent: Optional[str] = "live"` to
+`VehicleListingCreate` and replaced the single "Submit Listing" button
+on `CreateVehicleListingPage.js` with three explicit lifecycle CTAs:
+
+  1. **Save as Draft** — `status=DRAFT`, hidden from public, dealer
+     can keep editing. Overrides the trusted-seller auto-promote.
+  2. **Schedule (Upcoming)** — `status=ACTIVE` with the supplied
+     future `start_time`. Public-visible with countdown. Frontend
+     guards: start_time must be ≥1 min in the future.
+  3. **Go Live Now** — `status=ACTIVE`, `start_time=now()`. Bidding
+     opens immediately. Default for legacy clients (no field passed).
+
+**Bidding gate**: `POST /api/vehicle-bids` now returns `409
+auction_not_started` when a buyer attempts to bid on an ACTIVE-but-
+Upcoming auction (start_time still in the future).
+
+**Tests**: 6/6 `test_iter292_dealer_lifecycle_intent.py` pass.
+
+### ✅ Directive 4 — Lots Moderation Duplicate Merged into Listings Moderation
+`/admin/listings/pending` already aggregated single + multi-item
+pending listings. The standalone "Lots Moderation" tab was a
+stripped-down duplicate (basic UI, no rejection-reason dialog, no
+seller enrichment). Removed the tab from `AdminDashboard.js`;
+`?tab=lots` legacy URL now transparently renders the unified
+`ListingsModeration` panel.
+
+**Files**: `AdminDashboard.js` (tab list + render switch + import).
+The old `LotsModeration.js` component stays in the repo (unused
+import surface) until a future cleanup sprint.
+
+**Verified visually**: admin dashboard screenshot confirms the
+"Lots Moderation" tab is no longer rendered AND `?tab=lots` shows the
+unified moderation UI.
+
+### 🚧 Directive 2 — Multi-Lot Vehicle Auction (Copart/Wholesale Style)
+**Scoped for a dedicated follow-up sprint.** This is a new-collection
+feature requiring:
+  - New `vehicle_multi_lot_auctions` collection + Pydantic model
+  - Sequential vs Staggered timing scheduler (background task)
+  - Per-lot bid endpoints + per-lot soft-close logic
+  - Frontend creation wizard (mirrors the existing single-vehicle
+    wizard, but per-lot)
+  - Frontend detail page (master event + per-lot cards)
+  - Admin moderation surface tag (`_section='vehicle_multi_lot'`)
+  - Regression test suite (lot transitions, snipe protection, deposit
+    application per lot)
+
+Estimated scope: 800-1500 LOC across ~12 files. Not partial-buildable
+without leaving the codebase in a broken interim state.
+
+### Constraints honoured (all iter292)
+- Vehicle Buyer Premium still 0% (no fee math touched)
+- Vehicle Platform Fee still 2.5%
+- Deposits unchanged
+- JWT / Stripe / SendGrid wiring untouched
+- No bid logic changed except the new `auction_not_started` gate
+
+### Test results — iter292
+- iter284 → iter292 sweep: 59 passed, 24 skipped, 0 failures (76s)
+- 15 new iter292 tests across two files: 15/15 pass
+
+### Files modified — iter292
+- `backend/services/listing_seller_enrichment.py` (-3/+10)
+- `backend/models/vehicle_models.py` (+11)
+- `backend/routes/vehicles.py` (+45 — `submission_intent` handling +
+  Upcoming bid gate)
+- `frontend/src/components/BidConfirmationDialog.js` (+10/-1 —
+  `isVehicleListing` prop)
+- `frontend/src/pages/vehicles/CreateVehicleListingPage.js` (+50/-15
+  — 3-button submit row + intent payload)
+- `frontend/src/pages/AdminDashboard.js` (-3/+9 — Lots merge)
+- `backend/tests/test_iter289_catalog_feed.py` (self-seeded vehicle
+  fixture to survive session-to-session cleanup)
+- `backend/tests/test_iter292_seller_account_type.py` (NEW — 9 tests)
+- `backend/tests/test_iter292_dealer_lifecycle_intent.py` (NEW — 6 tests)
+
+---
+
+## Previous: iter291 — LIGHTBOX Z-INDEX + CATALOG FEED COMPLIANCE (Jun 08, 2026) 🛠️
 
 Two production hot-patches:
 

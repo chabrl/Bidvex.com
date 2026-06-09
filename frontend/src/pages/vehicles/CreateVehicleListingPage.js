@@ -319,11 +319,26 @@ const CreateVehicleListingPage = () => {
     return Object.values(photos).reduce((sum, arr) => sum + arr.length, 0);
   };
 
-  // Submit listing
-  const handleSubmit = async () => {
+  // Submit listing — iter292 Directive 3: dealer-controlled lifecycle.
+  // `intent` carries the dealer's lifecycle choice from the submit-row
+  // buttons (Save as Draft / Schedule / Go Live Now). Falls back to
+  // "live" so older call sites that pass no arg keep the existing
+  // behaviour.
+  const handleSubmit = async (intent = 'live') => {
     if (getTotalPhotos() < 10) {
       toast.error('Please upload at least 10 photos');
       return;
+    }
+    // Guard: Schedule intent must have a future start_time.
+    if (intent === 'schedule') {
+      const startMs = new Date(formData.start_time).getTime();
+      if (!startMs || startMs <= Date.now() + 60_000) {
+        toast.error(t(
+          'vehicleListing.scheduleStartFutureRequired',
+          'Schedule (Upcoming) requires a Start Time at least 1 minute in the future.'
+        ));
+        return;
+      }
     }
     
     setLoading(true);
@@ -413,6 +428,8 @@ const CreateVehicleListingPage = () => {
         utm_source: (() => {
           try { return localStorage.getItem('bidvex.utm_source') || null; } catch (_e) { return null; }
         })(),
+        // iter292 — Directive 3: Dealer lifecycle intent.
+        submission_intent: intent,
       };
 
       // iter201 — Phase 2 — Validate category required (CEO constraint #3)
@@ -1593,22 +1610,49 @@ const CreateVehicleListingPage = () => {
               {t('vehicleListing.next', 'Next')} <ChevronRight className="h-4 w-4" />
             </Button>
           ) : (
-            <Button 
-              onClick={handleSubmit}
-              disabled={loading || getTotalPhotos() < 10}
-              className="w-full sm:w-auto gap-2 bg-green-600 hover:bg-green-700 min-h-[48px]"
-              data-testid="submit-listing-btn"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" /> {t('vehicleListing.submitting', 'Creating...')}
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="h-4 w-4" /> {t('vehicleListing.submitListing', 'Submit Listing')}
-                </>
-              )}
-            </Button>
+            /* iter292 — Directive 3: Three explicit lifecycle buttons so
+               dealers control whether a freshly-created vehicle listing
+               is hidden (Draft), publicly visible with a countdown
+               (Schedule / Upcoming), or open for bidding immediately
+               (Go Live Now). */
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+              <Button
+                variant="outline"
+                onClick={() => handleSubmit('draft')}
+                disabled={loading || getTotalPhotos() < 10}
+                className="w-full sm:w-auto gap-2 min-h-[48px]"
+                data-testid="submit-listing-draft-btn"
+              >
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                {t('vehicleListing.saveAsDraft', 'Save as Draft')}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => handleSubmit('schedule')}
+                disabled={loading || getTotalPhotos() < 10}
+                className="w-full sm:w-auto gap-2 min-h-[48px] border-blue-600 text-blue-700 hover:bg-blue-50"
+                data-testid="submit-listing-schedule-btn"
+              >
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Calendar className="h-4 w-4" />}
+                {t('vehicleListing.scheduleUpcoming', 'Schedule (Upcoming)')}
+              </Button>
+              <Button
+                onClick={() => handleSubmit('live')}
+                disabled={loading || getTotalPhotos() < 10}
+                className="w-full sm:w-auto gap-2 bg-green-600 hover:bg-green-700 min-h-[48px]"
+                data-testid="submit-listing-btn"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" /> {t('vehicleListing.submitting', 'Creating...')}
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="h-4 w-4" /> {t('vehicleListing.goLiveNow', 'Go Live Now')}
+                  </>
+                )}
+              </Button>
+            </div>
           )}
         </div>
       </div>

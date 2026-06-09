@@ -80,13 +80,18 @@ def resolve_seller_account_type(
             return "partner"
         return "individual"
 
-    # General / marketplace / lots auctions
+    # General / marketplace / lots auctions —
+    #
+    # iter292 — A vehicle dealer or storage facility selling a non-vehicle /
+    # non-storage item (e.g. a dealer listing a table on the Marketplace, or
+    # a storage facility running a Lots auction) is just a regular seller.
+    # The "Vehicle Dealer Auction — Full taxes on hammer price" badge and
+    # the vehicle fee block must NOT bleed into marketplace / lots
+    # listings. Dealer / facility flags only dominate inside their own
+    # dedicated listing surfaces (handled by the explicit `vehicle` /
+    # `storage` context branches above).
     if is_partner:
         return "partner"
-    if is_dealer:
-        return "vehicle_dealer"
-    if is_facility:
-        return "storage_facility"
     return "individual"
 
 

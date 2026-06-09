@@ -397,6 +397,17 @@ class VehicleListingCreate(BaseModel):
     carfax_file: Optional[str] = None
     inspection_file: Optional[str] = None
 
+    # iter292 — Directive 3: Dealer-controlled lifecycle intent at submit time.
+    # `submission_intent` drives the post-create status:
+    #   - "draft"    → status=DRAFT, hidden from public listings until edited
+    #                  forward; bypasses the trusted-seller auto-promote.
+    #   - "schedule" → status=ACTIVE with the supplied future start_time;
+    #                  visible publicly as Upcoming, bidding gated until
+    #                  start_time.
+    #   - "live"     → status=ACTIVE with start_time=now(); bidding opens
+    #                  immediately. Default — preserves existing behaviour.
+    submission_intent: Optional[str] = "live"
+
     @field_validator('vin')
     @classmethod
     def validate_vin_format(cls, v):

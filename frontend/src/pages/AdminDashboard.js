@@ -14,7 +14,8 @@ import EnhancedUserManager from './admin/EnhancedUserManager';
 import AdminFeedsPage from './admin/AdminFeedsPage';
 import AdminBrokersPage from './admin/AdminBrokersPage';
 import AdminSubscriptionsPage from './admin/AdminSubscriptionsPage';
-import LotsModeration from './admin/LotsModeration';
+// iter292 — LotsModeration is merged into ListingsModeration; the
+// `?tab=lots` URL alias now renders the unified panel.
 import ListingsModeration from './admin/ListingsModeration';
 import FlaggedListingsTab from './admin/FlaggedListingsTab';
 import ConversionFunnelDashboard from './admin/ConversionFunnelDashboard';
@@ -98,10 +99,13 @@ const PRIMARY_TABS = [
 const SECONDARY_TABS = {
   marketplace: [
     { id: 'users', label: 'User Management', icon: '👥', lucideIcon: Users },
+    // iter292 — Listings Moderation already aggregates single + multi (lots);
+    // the standalone "Lots Moderation" tab was a stripped-down duplicate
+    // and is now removed. Routes for ?tab=lots redirect transparently
+    // to ?tab=listings-moderation (handled in renderContent below).
     { id: 'listings-moderation', label: 'Listings Moderation', icon: '🛡️', lucideIcon: Shield },
     { id: 'flagged-listings',    label: 'Flagged Listings (AI Review)', icon: '🤖', lucideIcon: ShieldAlert },
     { id: 'disputed-settlements', label: 'Disputed Settlements', icon: '⚠️', lucideIcon: Shield },
-    { id: 'lots', label: 'Lots Moderation', icon: '📦', lucideIcon: Package },
     { id: 'all-auctions', label: 'Manage All Auctions', icon: '🏛️', lucideIcon: Package },
     { id: 'deletion-requests', label: 'Deletion Requests', icon: '🗑️', lucideIcon: AlertTriangle },
     // iter288 — Per-listing change-request inbox (edit / delete triage)
@@ -461,7 +465,10 @@ const AdminDashboard = () => {
           case 'listings-moderation': return <ListingsModeration />;
           case 'flagged-listings': return <FlaggedListingsTab />;
           case 'disputed-settlements': return <DisputedSettlements />;
-          case 'lots': return <LotsModeration />;
+          // iter292 — `?tab=lots` is a legacy alias. Listings Moderation
+          // already aggregates single + multi pending listings (lots);
+          // route both URLs to the unified UI.
+          case 'lots': return <ListingsModeration />;
           case 'all-auctions': return <ManageAllAuctions />;
           case 'deletion-requests': return <DeletionRequestsManager />;
           // iter288 — New listing-change request triage queue

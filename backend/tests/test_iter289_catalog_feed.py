@@ -116,20 +116,46 @@ def test_section_placeholders_constant_present():
 # ── Gap 2 — `?section=` alias maps to internal type filter ────────────
 
 
-def test_facebook_local_section_alias_maps_vehicles_to_vehicle_filter(admin_token):
-    _refresh_cache(admin_token)
-    r = requests.get(
-        f"{BASE_URL}/api/feeds/facebook-local?format=json&section=vehicles&limit=100",
-        timeout=15,
+def test_facebook_local_section_alias_maps_vehicles_to_vehicle_filter(admin_token, db):
+    """The `?section=vehicles` query param must filter to vehicle_listings
+    rows. This test seeds its own vehicle so it stays robust even when
+    the preview db has been cleaned up between sessions.
+
+    iter292 — Self-seeded; the original assertion `>= 1` relied on
+    legacy preview-db state and started failing once iter290 fixtures
+    cleaned up after themselves.
+    """
+    import uuid as _uuid
+    vid = f"iter292-feed-{_uuid.uuid4()}"
+    end_iso = (datetime.now(timezone.utc) + timedelta(days=3)).isoformat()
+    db.vehicle_listings.insert_one(
+        {
+            "id": vid,
+            "title": "iter292 Feed Vehicle Stub",
+            "make": "Ford", "model": "F-350", "year": 2020,
+            "status": "active",
+            "current_bid": 12000, "starting_price": 10000,
+            "end_time": end_iso, "auction_end_date": end_iso,
+            "location_city": "Montreal", "location_province": "QC",
+            "seller_id": "test-seller-iter292",
+            "media": [{"type": "image", "url": "https://bidvex-marketplace-images.s3.us-east-2.amazonaws.com/listings/x.jpg"}],
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
     )
-    assert r.status_code == 200, r.text
-    body = r.json()
-    items = body.get("data", [])
-    # In the live preview db there are 4 active vehicle_listings with
-    # required location fields — the post-fix feed must surface them.
-    assert len(items) >= 1, "No vehicles surfaced in the feed — collection wiring regressed"
-    for it in items:
-        assert it.get("custom_label_0") == "vehicle", it
+    try:
+        _refresh_cache(admin_token)
+        r = requests.get(
+            f"{BASE_URL}/api/feeds/facebook-local?format=json&section=vehicles&limit=100",
+            timeout=15,
+        )
+        assert r.status_code == 200, r.text
+        body = r.json()
+        items = body.get("data", [])
+        assert len(items) >= 1, "No vehicles surfaced in the feed — collection wiring regressed"
+        for it in items:
+            assert it.get("custom_label_0") == "vehicle", it
+    finally:
+        db.vehicle_listings.delete_one({"id": vid})
 
 
 def test_facebook_local_section_alias_lots(admin_token):

@@ -917,6 +917,32 @@ async def create_vehicle_listing(
     from services.demo_filter import tag_listing_if_demo
     await tag_listing_if_demo(db, user["id"], listing)
 
+    # iter292 — Directive 3: Dealer-controlled lifecycle intent.
+    # If the dealer chose "Save as Draft" the listing stays in DRAFT —
+    # even for trusted sellers — until they explicitly publish it. If
+    # the dealer chose "Go Live Now" we overwrite start_time so bidding
+    # opens immediately. "Schedule (Upcoming)" leaves start_time as
+    # supplied (must be future) and lets the auction surface render the
+    # Upcoming countdown card.
+    _intent = (getattr(listing_data, "submission_intent", None) or "live").lower().strip()
+    if _intent == "draft":
+        # Hard-pin to DRAFT; skip the trusted-seller auto-promote below.
+        listing["status"] = VehicleListingStatus.DRAFT.value
+        _force_draft = True
+    else:
+        _force_draft = False
+        if _intent == "live":
+            # Open bidding NOW.
+            _now = datetime.now(timezone.utc)
+            listing["start_time"] = _now
+            # Keep the original_end_time aligned to the (possibly larger) window.
+            if listing.get("end_time") and listing["end_time"] < _now:
+                # Auto-extend the window to 24 h so a "Go Live Now" with an
+                # accidentally past end_time still yields a sane auction.
+                from datetime import timedelta as _td
+                listing["end_time"] = _now + _td(hours=24)
+                listing["original_end_time"] = listing["end_time"]
+
     # iter283-hotfix-2 — Trusted-seller fast-track.
     # The strict DRAFT → PENDING → APPROVED → ACTIVE workflow makes
     # sense for unverified third-party sellers, but admins, verified
@@ -935,7 +961,10 @@ async def create_vehicle_listing(
         or user.get("is_vehicle_dealer") is True
         or user.get("is_storage_facility") is True
     )
-    if _trusted:
+    # iter292 — Honor dealer "Save as Draft" intent over the trusted
+    # fast-track. Dealers explicitly choosing draft must NOT be
+    # auto-promoted to ACTIVE.
+    if _trusted and not _force_draft:
         from models.vehicle_models import VehicleListingStatus as _VLS
         listing["status"] = _VLS.ACTIVE.value
         listing["approved_at"] = datetime.now(timezone.utc)
@@ -1499,6 +1528,26 @@ async def place_vehicle_bid(
     })
     if not listing:
         raise HTTPException(status_code=404, detail="Active auction not found")
+
+    # iter292 — Directive 3: Block bids before the dealer's scheduled
+    # start_time. ACTIVE-but-upcoming auctions render publicly with a
+    # countdown but bidding must stay gated until the start moment.
+    _start = listing.get("start_time")
+    if isinstance(_start, str):
+        try:
+            _start = datetime.fromisoformat(_start.replace("Z", "+00:00"))
+        except Exception:
+            _start = None
+    if isinstance(_start, datetime) and _start > datetime.now(timezone.utc):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "auction_not_started",
+                "message_en": "This auction is upcoming — bidding opens at the scheduled start time.",
+                "message_fr": "Cette enchère est à venir — les offres ouvriront à l'heure de début prévue.",
+                "start_time": _start.isoformat(),
+            },
+        )
     
     # Check auction visibility
     if listing["visibility"] == VehicleAuctionVisibility.DEALER_ONLY.value:

@@ -43,13 +43,21 @@ const BidConfirmationDialog = ({
   requiresDeposit = false,
   depositAmount = 0,
   depositType = 'fixed',
+  // iter292 — Explicit vehicle-listing flag derived from the LISTING'S
+  // collection (vehicle_listings) rather than category text. A dealer
+  // selling an "auto-grade tool" on Marketplace must NOT trigger the
+  // vehicle-only fee/tax block here.
+  isVehicleListing = false,
 }) => {
   const [costBreakdown, setCostBreakdown] = useState(null);
   const [calculating, setCalculating] = useState(false);
   const [error, setError] = useState(null);
 
-  const isVehicle = ['vehicle', 'car', 'auto', 'automobile', 'truck', 'motorcycle', 'suv', 'van']
-    .some(keyword => (category || '').toLowerCase().includes(keyword));
+  // iter292 — Authoritative source: the explicit prop set by the call
+  // site (true only on VehicleDetailPage). Category text matching
+  // bled into Marketplace/Lots listings whose names happened to
+  // include words like 'auto' or 'truck'.
+  const isVehicle = !!isVehicleListing;
 
   // iter221 Task 3 — Single source of truth for tier→buyer-premium-rate
   // resolution. Removes the legacy `|| 0.05` hardcoded fallback that masked
