@@ -334,6 +334,103 @@ async def place_lot_bid(
     if user["id"] == event.get("seller_id"):
         raise HTTPException(status_code=403, detail="Sellers cannot bid on their own event")
 
+    # ────────────────────────────────────────────────────────────────
+    # iter295 P0 — Province-gated buyer restrictions (single source of
+    # truth: routes/vehicle_buyer_verification.RESTRICTED_PROVINCES).
+    # Individual buyers in broker-gated provinces cannot bid unless
+    # they have an active approved broker relationship on file.
+    # Dealers / brokers / admins bypass.
+    # ────────────────────────────────────────────────────────────────
+    if user.get("role") not in ("admin", "super_admin") and not user.get("is_vehicle_dealer") and user.get("account_type") not in ("broker", "dealer"):
+        from routes.vehicle_buyer_verification import RESTRICTED_PROVINCES
+        buyer_prov = (user.get("province") or user.get("location_province") or "").upper()
+        if buyer_prov in RESTRICTED_PROVINCES:
+            rel = await _db.broker_buyer_relationships.find_one(
+                {"buyer_user_id": user["id"], "status": "active"},
+                {"_id": 0},
+            )
+            if not rel:
+                # Fetch the broker directory filtered to the buyer's
+                # province so the gate modal can render the picker
+                # without a follow-up roundtrip.
+                broker_cursor = _db.brokers.find(
+                    {"verification_status": "approved", "operating_province": buyer_prov},
+                    {"_id": 0, "id": 1, "broker_company_name": 1, "operating_province": 1, "broker_license_number": 1},
+                ).limit(20)
+                brokers_for_province = await broker_cursor.to_list(length=20)
+                raise HTTPException(
+                    status_code=403,
+                    detail={
+                        "code":         "broker_required",
+                        "province":     buyer_prov,
+                        "message_en":   f"A licensed broker is required to bid on vehicles in {buyer_prov}. Find a broker to represent you.",
+                        "message_fr":   f"Un courtier licencié est requis pour enchérir sur des véhicules en {buyer_prov}. Trouvez un courtier pour vous représenter.",
+                        "action_url":   "/brokers",
+                        "brokers":      brokers_for_province,
+                    },
+                )
+            # Has an active relationship — broker proxy bid path. Validate
+            # the broker is still approved, the bid cap hasn't been
+            # exceeded, and the proxy agreement is accepted (mirrors the
+            # single-vehicle path in routes/auctions_bids.py).
+            broker = await _db.brokers.find_one(
+                {"id": rel["broker_id"], "verification_status": "approved"},
+                {"_id": 0},
+            )
+            if not broker:
+                raise HTTPException(status_code=403, detail={
+                    "code":       "broker_not_active",
+                    "message_en": "Your broker is no longer authorized to place vehicle bids on your behalf.",
+                    "message_fr": "Votre courtier n'est plus autorisé à enchérir sur des véhicules en votre nom.",
+                })
+            cap = rel.get("bid_cap")
+            if cap is not None:
+                try:
+                    cap_f = float(cap)
+                except (TypeError, ValueError):
+                    cap_f = None
+                if cap_f is not None and float(payload.amount) > cap_f:
+                    raise HTTPException(status_code=400, detail={
+                        "code":       "bid_cap_exceeded",
+                        "message_en": f"This bid exceeds your pre-authorized broker bid cap of ${cap_f:.0f} CAD.",
+                        "bid_cap":    cap_f,
+                    })
+            if not rel.get("proxy_bid_agreement_accepted", False):
+                raise HTTPException(status_code=403, detail={
+                    "code":       "proxy_agreement_required",
+                    "message_en": "You must accept the proxy bid agreement before placing vehicle bids.",
+                })
+
+    # ────────────────────────────────────────────────────────────────
+    # iter295 P1 — Per-lot deposit gate. max($200, 10% * starting_price)
+    # of the LOT — not the event. Deposits live in vehicle_bid_deposits
+    # keyed by `lot_id` so each lot gets an independent hold + refund.
+    # Mirrors the single-vehicle deposit flow exactly.
+    # ────────────────────────────────────────────────────────────────
+    if user.get("role") not in ("admin", "super_admin"):
+        starting = float(lot.get("starting_price") or 0)
+        required_deposit = max(200.0, round(starting * 0.10, 2))
+        active = await _db.vehicle_bid_deposits.find_one({
+            "lot_id":   lot_id,
+            "event_id": event_id,
+            "bidder_id": user["id"],
+            "status":   {"$in": ["paid", "pending", "authorized", "held", "succeeded"]},
+        })
+        if not active:
+            raise HTTPException(
+                status_code=402,
+                detail={
+                    "code":             "deposit_required",
+                    "message_en":       f"A refundable ${required_deposit:,.2f} security deposit is required on Lot #{lot.get('lot_number', '?')} before bidding.",
+                    "message_fr":       f"Un dépôt remboursable de {required_deposit:,.2f} $ est requis sur le lot #{lot.get('lot_number', '?')} avant d'enchérir.",
+                    "deposit_amount":   required_deposit,
+                    "event_id":         event_id,
+                    "lot_id":           lot_id,
+                    "lot_number":       lot.get("lot_number"),
+                    "lot_title":        lot.get("title"),
+                },
+            )
+
     # Validate amount > current + bid_increment
     current = float(lot.get("current_bid") or 0)
     if current <= 0:
@@ -354,6 +451,8 @@ async def place_lot_bid(
         "lot_id":     lot_id,
         "user_id":    user["id"],
         "user_email": user.get("email"),
+        "user_first_name": user.get("first_name") or "",
+        "user_last_initial": ((user.get("last_name") or "")[:1].upper()),
         "amount":     payload.amount,
         "created_at": now,
     }
@@ -410,6 +509,83 @@ async def place_lot_bid(
         "new_lot_end":   new_lot_end.isoformat() if new_lot_end else None,
         "extended":      new_lot_end != lot_end,
     }
+
+
+# ── DEPOSIT (per lot) ────────────────────────────────────────────────
+
+@vehicle_multi_lot_router.post("/vehicle-multi-lot-auctions/{event_id}/lots/{lot_id}/deposit")
+async def pay_lot_deposit(
+    event_id: str,
+    lot_id: str,
+    user: dict = Depends(_get_user),
+):
+    """Pay the refundable bid deposit on a specific lot inside a
+    multi-lot event. iter295 P1 — Mirrors the single-vehicle deposit
+    flow exactly (max($200, 10% of starting_price)). Deposit is per-lot
+    so bidding on a different lot requires a separate deposit.
+
+    In production this will route through Stripe with a manual-capture
+    hold (matches the single-vehicle flow); the demo path inserts a
+    `paid` record so the gate doesn't block testing.
+    """
+    event = await _db.vehicle_multi_lot_auctions.find_one({"id": event_id})
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    lot = next((lt for lt in event.get("lots", []) if lt.get("id") == lot_id), None)
+    if not lot:
+        raise HTTPException(status_code=404, detail="Lot not found")
+
+    starting = float(lot.get("starting_price") or 0)
+    required = max(200.0, round(starting * 0.10, 2))
+
+    existing = await _db.vehicle_bid_deposits.find_one({
+        "lot_id":   lot_id,
+        "event_id": event_id,
+        "bidder_id": user["id"],
+        "status":   {"$in": ["paid", "authorized", "held", "succeeded"]},
+    })
+    if existing:
+        existing.pop("_id", None)
+        return {"message": "Deposit already paid", "deposit": existing}
+
+    deposit = {
+        "id":            str(uuid.uuid4()),
+        "event_id":      event_id,
+        "lot_id":        lot_id,
+        "vehicle_id":    None,   # multi-lot deposits key off lot_id
+        "lot_number":    lot.get("lot_number"),
+        "lot_title":     lot.get("title"),
+        "bidder_id":     user["id"],
+        "bidder_email":  user.get("email"),
+        "amount":        required,
+        "status":        "paid",   # demo; Stripe integration tracks 'authorized'
+        "payment_intent_id": f"demo_pi_multilot_{uuid.uuid4()}",
+        "created_at":    _now(),
+        "paid_at":       _now(),
+    }
+    await _db.vehicle_bid_deposits.insert_one(deposit)
+    deposit.pop("_id", None)
+    return {"message": "Deposit paid", "deposit": deposit}
+
+
+@vehicle_multi_lot_router.get("/vehicle-multi-lot-auctions/{event_id}/lots/{lot_id}/my-deposit")
+async def get_my_lot_deposit(
+    event_id: str,
+    lot_id: str,
+    user: dict = Depends(_get_user),
+):
+    """iter295 P1 — Surfaces the current buyer's deposit status on
+    a single lot so the frontend can render the lock indicator + the
+    "Deposit to Bid" CTA on the lot queue without a separate roundtrip
+    per row.
+    """
+    deposit = await _db.vehicle_bid_deposits.find_one({
+        "lot_id":   lot_id,
+        "event_id": event_id,
+        "bidder_id": user["id"],
+        "status":   {"$in": ["paid", "authorized", "held", "succeeded"]},
+    }, {"_id": 0})
+    return {"has_deposit": bool(deposit), "deposit": deposit}
 
 
 # ── ACTIVATE (dealer publishes a draft) ──────────────────────────────
