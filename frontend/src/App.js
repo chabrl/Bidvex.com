@@ -418,6 +418,8 @@ const App = () => {
           <Route path="/store/:userId" element={<StorefrontPage />} />
           <Route path="/bulk-import" element={<ProtectedRoute><BulkImportPage /></ProtectedRoute>} />
           <Route path="/auth" element={<AuthPage />} />
+          {/* iter293 — /login is a common deep link; redirect to /auth */}
+          <Route path="/login" element={<Navigate to="/auth" replace />} />
           <Route path="/auth/google/finish" element={<GoogleAuthFinishPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
@@ -638,6 +640,9 @@ const App = () => {
               </ErrorBoundary>
             </ProtectedRoute>
           } />
+          {/* iter293 — Convenience aliases for common deep-link URLs */}
+          <Route path="/vehicles/my-listings" element={<Navigate to="/vehicle-auctions/my-listings" replace />} />
+          <Route path="/my-vehicle-listings" element={<Navigate to="/vehicle-auctions/my-listings" replace />} />
           <Route path="/vehicle-auctions/invoices" element={
             <ProtectedRoute><VehicleInvoicesPage /></ProtectedRoute>
           } />

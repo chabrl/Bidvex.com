@@ -260,7 +260,30 @@ const MyVehicleListingsPage = () => {
       const listingsResp = await axios.get(`${API}/vehicles/my/listings`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setListings(listingsResp.data.listings || []);
+      const singles = (listingsResp.data.listings || []).map(l => ({ ...l, _kind: 'single' }));
+
+      // iter293 — Multi-lot drafts surface in the SAME Drafts tab so
+      // dealers don't have to hunt for them across pages.
+      let multiLotDrafts = [];
+      try {
+        const mlResp = await axios.get(`${API}/vehicle-multi-lot-auctions/my-drafts`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        multiLotDrafts = (mlResp.data?.data || []).map(e => ({
+          ...e,
+          // Project multi-lot event into the same shape MyVehicleListingsPage
+          // expects (year/make/model/media for the card).
+          _kind: 'multi_lot',
+          status: e.status,  // already 'draft'
+          year:    e.lots?.[0]?.year || '',
+          make:    `Multi-Lot · ${(e.lots || []).length} lot${(e.lots || []).length === 1 ? '' : 's'}`,
+          model:   e.title,
+          media:   e.lots?.[0]?.media || [],
+        }));
+      } catch (_e) {
+        // Endpoint is dealer-only; non-dealer accounts get 403 — silently ignore.
+      }
+      setListings([...singles, ...multiLotDrafts]);
       
     } catch (error) {
       if (error.response?.status === 404) {
@@ -296,15 +319,30 @@ const MyVehicleListingsPage = () => {
   };
 
   // iter293 — Drafts dashboard actions.
+  // For multi-lot drafts, route to the multi-lot endpoints; for single
+  // vehicle drafts, route to the existing /vehicles/{id}/activate
+  // endpoint.
   const handlePromote = async (listingId, intent, startISO) => {
+    const draft = listings.find(l => l.id === listingId);
+    const isMultiLot = draft?._kind === 'multi_lot';
     try {
-      const params = new URLSearchParams({ intent });
-      if (intent === 'schedule' && startISO) params.set('start_time', startISO);
-      await axios.post(
-        `${API}/vehicles/${listingId}/activate?${params.toString()}`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
+      if (isMultiLot) {
+        const params = new URLSearchParams({ intent });
+        if (intent === 'schedule' && startISO) params.set('start_time', startISO);
+        await axios.post(
+          `${API}/vehicle-multi-lot-auctions/${listingId}/activate?${params.toString()}`,
+          {},
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+      } else {
+        const params = new URLSearchParams({ intent });
+        if (intent === 'schedule' && startISO) params.set('start_time', startISO);
+        await axios.post(
+          `${API}/vehicles/${listingId}/activate?${params.toString()}`,
+          {},
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+      }
       toast.success(intent === 'live' ? 'Listing is now LIVE' : 'Listing scheduled');
       fetchData();
     } catch (err) {
@@ -313,11 +351,19 @@ const MyVehicleListingsPage = () => {
   };
 
   const handleDeleteDraft = async (listingId) => {
+    const draft = listings.find(l => l.id === listingId);
+    const isMultiLot = draft?._kind === 'multi_lot';
     if (!window.confirm('Delete this draft permanently? This cannot be undone.')) return;
     try {
-      await axios.delete(`${API}/vehicles/${listingId}/draft`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      if (isMultiLot) {
+        await axios.delete(`${API}/vehicle-multi-lot-auctions/${listingId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      } else {
+        await axios.delete(`${API}/vehicles/${listingId}/draft`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      }
       toast.success('Draft deleted');
       fetchData();
     } catch (err) {
@@ -449,7 +495,11 @@ const MyVehicleListingsPage = () => {
                     key={listing.id}
                     listing={listing}
                     isFr={isFr}
-                    onView={(id) => navigate(`/vehicle-auctions/${id}`)}
+                    onView={(id) => navigate(
+                      listing._kind === 'multi_lot'
+                        ? `/vehicle-multi-lot/${id}`
+                        : `/vehicle-auctions/${id}`
+                    )}
                     onEdit={(id) => navigate(`/vehicle-auctions/edit/${id}`)}
                     onPromote={handlePromote}
                     onDeleteDraft={handleDeleteDraft}

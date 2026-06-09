@@ -51,14 +51,16 @@ const emptyLot = () => ({
 const CreateVehicleMultiLotPage = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [event, setEvent] = useState({
+  const [event, setEvent] = useState(() => ({
     title: '',
     description: '',
     timing_mode: 'sequential',
+    // iter293 — Lazy useState initializer keeps Date.now() out of the
+    // render path (react-hooks/purity).
     start_time: new Date(Date.now() + 3600_000).toISOString().slice(0, 16),
     lot_duration_seconds: 120,
     stagger_offset_seconds: 60,
-  });
+  }));
   const [lots, setLots] = useState([emptyLot()]);
 
   const addLot = () => setLots(prev => [...prev, emptyLot()]);

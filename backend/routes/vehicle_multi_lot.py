@@ -53,7 +53,7 @@ async def _get_user(credentials: HTTPAuthorizationCredentials = Depends(security
         uid = payload.get("sub") or payload.get("user_id")
         if not uid:
             raise HTTPException(status_code=401, detail="Invalid token")
-        user = await _db.users.find_one({"id": uid})
+        user = await _db.users.find_one({"id": uid}, {"_id": 0})
         if not user:
             raise HTTPException(status_code=401, detail="User not found")
         return user
@@ -297,7 +297,7 @@ async def place_lot_bid(
         raise HTTPException(status_code=409, detail="Event is not accepting bids")
 
     # Resolve the lot
-    lot = next((l for l in event.get("lots", []) if l.get("id") == lot_id), None)
+    lot = next((lt for lt in event.get("lots", []) if lt.get("id") == lot_id), None)
     if not lot:
         raise HTTPException(status_code=404, detail="Lot not found inside this event")
 

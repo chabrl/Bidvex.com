@@ -47,31 +47,45 @@ const VehicleMultiLotDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [bidAmount, setBidAmount] = useState('');
   const [placing, setPlacing] = useState(false);
-  const [activeLotId, setActiveLotId] = useState(null);
+  // iter293 — activeLotId stores the dealer's manual override (clicking
+  // a row in the Lot Queue). Default selection is derived below via
+  // useMemo so we never call setState from inside an effect.
+  const [activeLotOverride, setActiveLotOverride] = useState(null);
   const [notifying, setNotifying] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
       const r = await axios.get(`${API}/vehicle-multi-lot-auctions/${eventId}`);
       setEvent(r.data);
-      if (!activeLotId && r.data?.lots?.length) {
-        // Pick the LIVE lot, fall back to the first UPCOMING.
-        const live = r.data.lots.find(l => l.status === 'live');
-        const upcoming = r.data.lots.find(l => l.status === 'upcoming');
-        setActiveLotId(live?.id || upcoming?.id || r.data.lots[0].id);
-      }
     } catch (e) {
       console.error(e);
     } finally {
       setLoading(false);
     }
-  }, [eventId, activeLotId]);
+  }, [eventId]);
 
+  // iter293 — Lifecycle: kickoff fetch + poll every 5s. The
+  // `setLoading(false)` lands inside `refresh()` (above) which is
+  // intentional — react-hooks/set-state-in-effect is suppressed here
+  // because the data fetcher MUST update state to render the page.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     refresh();
     const id = setInterval(refresh, 5000);
     return () => clearInterval(id);
   }, [refresh]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  // iter293 — Derived selection — pick the LIVE lot, fall back to
+  // UPCOMING, then the first one. Manual click in the Lot Queue
+  // overrides via `activeLotOverride`.
+  const activeLotId = React.useMemo(() => {
+    if (activeLotOverride) return activeLotOverride;
+    if (!event?.lots?.length) return null;
+    const live = event.lots.find(l => l.status === 'live');
+    const upcoming = event.lots.find(l => l.status === 'upcoming');
+    return live?.id || upcoming?.id || event.lots[0].id;
+  }, [event, activeLotOverride]);
 
   const activeLot = event?.lots?.find(l => l.id === activeLotId) || null;
 
@@ -251,7 +265,7 @@ const VehicleMultiLotDetailPage = () => {
                   <td className="p-2">{fmtCurrency(lot.current_bid)}</td>
                   <td className="p-2">{lot.bid_count || 0}</td>
                   <td className="p-2">
-                    <Button size="sm" variant="ghost" onClick={() => setActiveLotId(lot.id)} data-testid={`view-lot-${lot.lot_number}`}>
+                    <Button size="sm" variant="ghost" onClick={() => setActiveLotOverride(lot.id)} data-testid={`view-lot-${lot.lot_number}`}>
                       View
                     </Button>
                   </td>

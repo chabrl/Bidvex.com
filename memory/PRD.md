@@ -1,6 +1,137 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: iter292 — VEHICLE DEALER UI CROSS-BLEED + DEALER LIFECYCLE + LOTS MERGE (Jun 09, 2026) 🛠️
+## Latest: iter293 — MULTI-LOT VEHICLE AUCTION + UPCOMING COUNTDOWN + DEALER DRAFTS + ADMIN AUDIT (Jun 09, 2026) 🚀
+
+Full P0 + P1 + P2 sprint shipped end-to-end.
+
+### 🆕 P0 — Multi-Lot Vehicle Auction (Directive 2)
+**Copart / wholesale-style sequential auction events.** A single dealer
+runs one event containing multiple vehicle lots; lots activate
+sequentially (Copart default) or in parallel with staggered starts.
+
+**Backend (new):**
+- `backend/models/vehicle_multi_lot_models.py` — Pydantic models for
+  events + lots + bids; `MultiLotTimingMode` + `MultiLotEventStatus` +
+  `MultiLotItemStatus` enums.
+- `backend/routes/vehicle_multi_lot.py` — Endpoints:
+  - `POST /api/vehicle-multi-lot-auctions` (create — draft/schedule/live)
+  - `GET  /api/vehicle-multi-lot-auctions` (list)
+  - `GET  /api/vehicle-multi-lot-auctions/my-drafts` (dealer drafts)
+  - `GET  /api/vehicle-multi-lot-auctions/{id}` (detail)
+  - `POST /api/vehicle-multi-lot-auctions/{id}/lots/{lot_id}/bid`
+    (per-lot bid with soft-close +120s extension)
+  - `POST /api/vehicle-multi-lot-auctions/{id}/activate` (promote draft)
+  - `POST /api/vehicle-multi-lot-auctions/{id}/cancel`
+  - `DELETE /api/vehicle-multi-lot-auctions/{id}` (delete draft)
+- `backend/services/vehicle_multi_lot_scheduler.py` — APScheduler tick
+  (15s) that promotes UPCOMING→LIVE, ends expired lots, activates the
+  next sequential lot, and closes events when all lots finish.
+
+**Frontend (new):**
+- `frontend/src/pages/vehicles/CreateVehicleMultiLotPage.js` — Dealer
+  wizard with event details + dynamic per-lot cards + Draft/Schedule/
+  Live submit row.
+- `frontend/src/pages/vehicles/VehicleMultiLotDetailPage.js` — Live
+  detail page: active lot card with bid panel, lot queue table,
+  5-second polling to surface scheduler-driven transitions.
+- Route registration in `App.js`: `/vehicle-multi-lot/create` and
+  `/vehicle-multi-lot/:eventId`.
+
+**Admin surfacing:**
+- `routes/admin_oversight.py` + `routes/admin_ops.py` extended to
+  walk `vehicle_multi_lot_auctions` collection so events show up in
+  Manage All Auctions with the new `🚚 Multi-Lot Vehicle` indigo badge.
+- Cross-collection action dispatcher (status / feature / end-time)
+  extended in `admin_ops.py` + `admin_end_time.py`.
+
+**Soft-close:** Each lot honours the existing 2-min snipe rule —
+late bids extend the lot's end_time by +120s independently.
+
+**Deposit per lot:** Unchanged (max($200, 10%) — existing pipeline).
+
+### 🆕 P1 — Upcoming Countdown Badge + Notify Me (Directive P1)
+- `frontend/src/components/UpcomingCountdownBadge.jsx` — Reusable
+  badge that ticks every 1s and renders "Bidding opens in Xd Xh Xm".
+  Fires the `onLive` callback when the countdown reaches 0 so parent
+  pages auto-swap to live UI without a refresh.
+- Wired into `VehicleDetailPage.js` AND `VehicleMultiLotDetailPage.js`.
+- `backend/routes/upcoming_notify.py` — Subscribe endpoints
+  (`POST /api/upcoming-notify/subscribe`, idempotent; `GET /me`,
+  `DELETE /{id}`) plus a 30-second scheduler tick that fires SendGrid
+  emails when subscribed listings flip to live.
+
+### 🆕 P2 — Dealer Drafts Dashboard (Directive P2)
+- New "📝 Drafts" tab on `MyVehicleListingsPage.js` — counts both
+  single-vehicle drafts AND multi-lot drafts.
+- Per-card actions in the Drafts tab:
+  - **Go Live Now** — promotes draft → ACTIVE with `start_time=now()`.
+  - **Schedule** (inline datetime picker + button) — promotes to
+    ACTIVE with future start_time.
+  - **Delete Draft** — permanent delete (drafts + rejected only).
+- Backend endpoints: `POST /api/vehicles/{id}/activate?intent=live|schedule`
+  + `DELETE /api/vehicles/{id}/draft`. Multi-lot drafts use the existing
+  `/vehicle-multi-lot-auctions/{id}/activate` endpoint.
+- "Create Multi-Lot Auction" CTA added to the dealer dashboard header.
+
+### 🆕 P1 — Admin Panel Audit (Directive 4)
+Testing-agent driven audit of every tab. **Results: 13/16 PASS, 1
+PARTIAL (Admin Logs spinner needed >3.5s — backend returns 200 in
+99ms), 2 informational findings.**
+
+**Fixed during audit:**
+- `/login` URL → now redirects to `/auth` (was 404).
+- `/vehicles/my-listings` + `/my-vehicle-listings` → now redirect to
+  `/vehicle-auctions/my-listings` (was 404).
+- Multi-lot drafts now appear in the unified Drafts tab on the
+  dealer's "My Vehicle Listings" page (was: only single drafts).
+
+### Constraints honoured (all iter293)
+- Vehicle Buyer Premium still 0%, platform fee still 2.5%, deposits
+  unchanged (Storage $50, Vehicles max($200, 10%), Lots max($50, 10%)).
+- No bid math touched (only added an `auction_not_started` 409 gate
+  on Upcoming auctions in iter292).
+- JWT / Stripe / SendGrid wiring untouched.
+
+### Test results — iter293
+- 12/12 `test_iter293_multi_lot_vehicle.py` tests pass (CREATE in all
+  three intents, staggered timing geometry, soft-close-aware bid
+  validation, scheduler `upcoming→live` promotion, scheduler
+  `lot ended → next lot activated`, admin aggregator inclusion,
+  upcoming-notify idempotency, BP-still-zero guardrail).
+- iter284 → iter293 sweep: **71 passed, 24 skipped, 0 failures (80s)**.
+- Frontend lint clean on all new files.
+- Frontend E2E (testing_agent_v3_fork iteration_240): ~85% PASS,
+  remaining items either fixed in this session or non-blocking.
+
+### Files modified — iter293
+**New (5):**
+- `backend/models/vehicle_multi_lot_models.py`
+- `backend/routes/vehicle_multi_lot.py`
+- `backend/services/vehicle_multi_lot_scheduler.py`
+- `backend/routes/upcoming_notify.py`
+- `frontend/src/components/UpcomingCountdownBadge.jsx`
+- `frontend/src/pages/vehicles/CreateVehicleMultiLotPage.js`
+- `frontend/src/pages/vehicles/VehicleMultiLotDetailPage.js`
+- `backend/tests/test_iter293_multi_lot_vehicle.py`
+
+**Modified:**
+- `backend/server.py` (+30 — router registration + 2 scheduler jobs)
+- `backend/routes/vehicles.py` (+85 — activate/delete-draft endpoints
+  + Upcoming bid gate already in iter292)
+- `backend/routes/admin_oversight.py` + `admin_ops.py` +
+  `admin_end_time.py` (cross-collection extension to multi-lot)
+- `frontend/src/App.js` (+15 — multi-lot routes + login/my-listings
+  redirects)
+- `frontend/src/pages/vehicles/MyVehicleListingsPage.js` (+90 —
+  Drafts tab + multi-lot draft fetch + promote/delete handlers)
+- `frontend/src/pages/vehicles/VehicleDetailPage.js` (+1 import + 8
+  lines — UpcomingCountdownBadge wiring)
+- `frontend/src/pages/admin/ManageAllAuctions.js` (+8 — Multi-Lot
+  badge & view-route)
+
+---
+
+## Previous: iter292 — VEHICLE DEALER UI CROSS-BLEED + DEALER LIFECYCLE + LOTS MERGE (Jun 09, 2026) 🛠️
 
 Three surgical fixes plus one Multi-Lot Vehicle Auction sprint scoped
 for follow-up.

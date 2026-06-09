@@ -144,7 +144,7 @@ async def _progress_event(db, event: Dict[str, Any], now: datetime) -> tuple[int
     # Sequential mode: if no LIVE lot remains and there's a next
     # UPCOMING lot, activate it with a fresh 2-min window.
     if timing == "sequential":
-        any_live = any(l.get("status") == "live" for l in lots)
+        any_live = any(lt.get("status") == "live" for lt in lots)
         if not any_live:
             for idx, lot in enumerate(lots):
                 if lot.get("status") == "upcoming":
@@ -171,7 +171,7 @@ async def _progress_event(db, event: Dict[str, Any], now: datetime) -> tuple[int
                         event["current_active_lot_index"] = idx
 
     # All done?
-    completed = all(l.get("status") in ("ended", "sold") for l in lots) if lots else False
+    completed = all(lt.get("status") in ("ended", "sold") for lt in lots) if lots else False
     new_status = "ended" if completed else "live"
 
     if mutated or completed:

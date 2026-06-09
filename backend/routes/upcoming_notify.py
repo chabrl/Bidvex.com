@@ -54,7 +54,7 @@ async def _get_user(credentials: HTTPAuthorizationCredentials = Depends(security
         uid = payload.get("sub") or payload.get("user_id")
         if not uid:
             raise HTTPException(status_code=401, detail="Invalid token")
-        user = await _db.users.find_one({"id": uid})
+        user = await _db.users.find_one({"id": uid}, {"_id": 0})
         if not user:
             raise HTTPException(status_code=401, detail="User not found")
         return user
