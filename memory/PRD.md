@@ -1,5 +1,99 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter295 — MULTI-LOT COMPLIANCE + SETTLEMENT + PHOTOS + EMAIL MIGRATION (Jun 09, 2026) 🛡️
+
+Full iter295 sprint delivered — every directive shipped.
+
+### ✅ P0 — Province-Gated Buyer Restriction on Multi-Lot Bids
+- `place_lot_bid` in `routes/vehicle_multi_lot.py` now blocks individual
+  buyers in ON/NB/NS/PE/NL without an approved broker relationship —
+  returns 403 `broker_required` with the province-filtered broker
+  picker list so the gate modal renders instantly.
+- Single source of truth: `RESTRICTED_PROVINCES` consolidated into
+  new `services/province_compliance.py`. `vehicle_buyer_verification.py`
+  + `vehicles.py` + `vehicle_multi_lot.py` all import from there.
+  Legacy `from routes.vehicle_buyer_verification import RESTRICTED_PROVINCES`
+  still works via re-export shim — zero breaking change.
+
+### ✅ P1 — Per-Lot Deposit Gate
+- Bids without an active per-lot deposit return 402 `deposit_required`
+  with `deposit_amount = max($200, 10% × starting_price)` of the LOT
+  (not the event). Each lot needs its own deposit.
+- New endpoints:
+  - `POST /api/vehicle-multi-lot-auctions/{event_id}/lots/{lot_id}/deposit`
+  - `GET  /api/vehicle-multi-lot-auctions/{event_id}/lots/{lot_id}/my-deposit`
+- Frontend `VehicleMultiLotDetailPage.js` catches 402 → opens
+  `lot-deposit-modal` pre-filled with the required amount → confirm
+  payment → lock icon flips to "Bid-Enabled" on the lot queue.
+
+### ✅ P1 — Per-Lot Settlement (Real-Time)
+- New `services/vehicle_multi_lot_settlement.settle_lot()` wired into
+  the scheduler tick. When a lot closes:
+  - Generates **buyer + seller invoice pair** in `vehicle_invoices`
+    (BP=0%, Platform fee=2.5%, taxes via `PricingManager.vehicle_auction`).
+  - Emails winner (auction_won + invoice) + seller (auction_sold) immediately.
+  - Refunds losing-bidder deposits + every deposit on unsold lots.
+  - Idempotent via `lots.$.settled_at` stamp.
+
+### ✅ P1 — Per-Lot Bid History UI
+- `GET /api/vehicle-multi-lot-auctions/{event_id}/lots/{lot_id}/bid-history`
+  returns the last N bids (default 10) newest-first, anonymised as
+  "First L." — no user_id / email leakage.
+- Collapsible `BidHistoryPanel` component renders under EVERY lot in
+  the queue + under the active-lot card. Lazy-loads on first toggle.
+
+### ✅ P2 — Multi-Lot Photo Gallery Upload UI
+- `CreateVehicleMultiLotPage.js` now has a per-lot Photo Gallery block
+  with click-to-pick file input, instant thumbnails, left/right arrow
+  reorder, X to remove, **minimum 1 photo enforced** for Live /
+  Schedule submissions, **20-photo cap** enforced client + server-side.
+- Workflow: when ≥1 photo present, the wizard creates the event as
+  Draft → uploads each lot's photos via the new endpoint → calls
+  `/activate?intent={live|schedule}` to publish.
+- New backend endpoints:
+  - `POST /api/vehicle-multi-lot-auctions/{event_id}/lots/{lot_id}/photos`
+    (multipart upload, S3 via `services.s3_service.upload_image_to_s3`,
+    seller/admin-only, 400 on 21st photo)
+  - `DELETE /api/vehicle-multi-lot-auctions/{event_id}/lots/{lot_id}/photos/{photo_id}`
+  - `POST  /api/vehicle-multi-lot-auctions/{event_id}/lots/{lot_id}/photos/reorder`
+
+### ✅ P2 — Email Module Physical Migration
+- The 3,300-line `services/email_notifications.py` monolith has been
+  physically split:
+  - `services/emails/_email_core.py` — shared helpers + SendGrid
+    plumbing (`send_email`, `send_unified_email`, `_send_via_unified`,
+    `_format_currency`, `_format_date`, `_format_currency_fr`,
+    `_detect_language`, `_section_label`, `_base_template`,
+    `_storage_panel`, brand-FROM constants).
+  - `services/emails/email_vehicles.py` — 10 vehicle-specific senders
+    (deposit captured, dealer license approve/reject/expired/expiring,
+    seller-license-expired, seller-auction-sold/no-bids, listing-
+    requires-action, buyer-verification-decision).
+  - `services/emails/email_marketplace.py` — 18 marketplace+lots+storage
+    senders (bid_placed, outbid, auction_won/sold, storage_*, buyer/
+    seller pickup-code).
+  - `services/emails/email_system.py` — 22 cross-cutting senders
+    (welcome, invoices, subscriptions, payments, promotions, charges,
+    payouts, messaging, manual-subscription-active, auction-thread-
+    opened).
+- `services/email_notifications.py` is now a 25-line backward-compat
+  shim that re-exports all 50+ functions from the bucketed modules —
+  every existing caller keeps working unchanged.
+- Verified physical migration via `inspect.getmodule(fn).__name__`
+  identity check in iter295 test suite.
+
+### ✅ Tests
+- New `/app/backend/tests/test_iter295_multi_lot_compliance.py` — 7 tests:
+  - province SOT consolidation + legacy re-export
+  - 403 broker_required for restricted-province buyer
+  - 402 deposit_required + deposit_amount math
+  - Pay deposit → bid accepted; my-deposit reports correctly
+  - Bid history anonymisation (no PII leak)
+  - settle_lot generates invoice + refunds losers + idempotency
+  - Email function bodies physically migrated (not shims)
+- Combined iter293 + iter294 + iter295 run: **24/24 PASSED, 0 failures**.
+
+
 ## Latest: iter294 — TIMING RENAME + MULTI-LOT NOTIFICATIONS + LIVE WIDGET + EMAIL SPLIT (Jun 09, 2026) 🚀
 
 Full iter294 sprint delivered — every directive shipped.
