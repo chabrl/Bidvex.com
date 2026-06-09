@@ -1670,11 +1670,13 @@ async def place_vehicle_bid(
     listing_category = (listing.get("category_id") or "").lower()
     if listing_category != "parts_accessories":
         from routes.vehicle_buyer_verification import (
+            _get_buyer_province,
+        )
+        from services.province_compliance import (
             OPEN_PROVINCES,
             RESTRICTED_PROVINCES,
             QC_DISCLOSURE_PROVINCE,
             TERRITORY_PROVINCES,
-            _get_buyer_province,
         )
         buyer_doc = await db.users.find_one(
             {"id": user["id"]},

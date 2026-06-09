@@ -15,7 +15,7 @@ Scheduler-driven lot transitions live in
 `services/vehicle_multi_lot_scheduler.py` — bumped every 15 s by the
 existing APScheduler.
 """
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, UploadFile, File
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict, Any
@@ -272,6 +272,46 @@ async def get_multi_lot_auction(event_id: str):
     return _serialise(doc)
 
 
+# ── BID HISTORY (public, anonymised) ─────────────────────────────────
+
+@vehicle_multi_lot_router.get("/vehicle-multi-lot-auctions/{event_id}/lots/{lot_id}/bid-history")
+async def get_lot_bid_history(event_id: str, lot_id: str, limit: int = Query(10, ge=1, le=50)):
+    """iter295 P1 — Last N bids on a single lot, newest first.
+
+    Bidders are anonymised to "First L." (e.g. "Alex B.") to protect
+    PII while still letting other buyers gauge competition. Email and
+    user_id are never returned in this payload.
+    """
+    event = await _db.vehicle_multi_lot_auctions.find_one({"id": event_id}, {"_id": 0, "bids": 1})
+    if not event:
+        raise HTTPException(status_code=404, detail="Multi-lot event not found")
+
+    lot_bids = [b for b in (event.get("bids") or []) if b.get("lot_id") == lot_id]
+    lot_bids.sort(key=lambda b: b.get("created_at") or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+    lot_bids = lot_bids[:limit]
+
+    out = []
+    for b in lot_bids:
+        first = (b.get("user_first_name") or "").strip()
+        last_initial = (b.get("user_last_initial") or "").strip()
+        if first and last_initial:
+            alias = f"{first} {last_initial}."
+        elif first:
+            alias = first
+        else:
+            alias = "Bidder"
+        ts = b.get("created_at")
+        if isinstance(ts, datetime):
+            ts = ts.isoformat()
+        out.append({
+            "bid_id":     b.get("id"),
+            "alias":      alias,
+            "amount":     float(b.get("amount") or 0),
+            "created_at": ts,
+        })
+    return {"data": out, "total": len(out)}
+
+
 # ── BID ──────────────────────────────────────────────────────────────
 
 @vehicle_multi_lot_router.post("/vehicle-multi-lot-auctions/{event_id}/lots/{lot_id}/bid")
@@ -342,7 +382,7 @@ async def place_lot_bid(
     # Dealers / brokers / admins bypass.
     # ────────────────────────────────────────────────────────────────
     if user.get("role") not in ("admin", "super_admin") and not user.get("is_vehicle_dealer") and user.get("account_type") not in ("broker", "dealer"):
-        from routes.vehicle_buyer_verification import RESTRICTED_PROVINCES
+        from services.province_compliance import RESTRICTED_PROVINCES
         buyer_prov = (user.get("province") or user.get("location_province") or "").upper()
         if buyer_prov in RESTRICTED_PROVINCES:
             rel = await _db.broker_buyer_relationships.find_one(
@@ -586,6 +626,131 @@ async def get_my_lot_deposit(
         "status":   {"$in": ["paid", "authorized", "held", "succeeded"]},
     }, {"_id": 0})
     return {"has_deposit": bool(deposit), "deposit": deposit}
+
+
+# ── PHOTO UPLOAD (per-lot) ───────────────────────────────────────────
+
+_MAX_PHOTOS_PER_LOT = 20
+
+
+@vehicle_multi_lot_router.post("/vehicle-multi-lot-auctions/{event_id}/lots/{lot_id}/photos")
+async def upload_lot_photo(
+    event_id: str,
+    lot_id: str,
+    file: UploadFile = File(...),
+    user: dict = Depends(_get_user),
+):
+    """iter295 P2 — Upload a single photo to one lot inside a multi-lot
+    event. Only the event seller (or admin) may upload. Hard cap: 20
+    photos per lot. Uses the existing `services/s3_service` pipeline
+    (auto-rotate, resize ≤2000px, JPEG quality 85, public-read).
+    """
+    event = await _db.vehicle_multi_lot_auctions.find_one({"id": event_id})
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    if event.get("seller_id") != user["id"] and user.get("role") not in ("admin", "super_admin"):
+        raise HTTPException(status_code=403, detail="Only the seller (or admin) can upload photos to this event")
+
+    lot = next((lt for lt in event.get("lots", []) if lt.get("id") == lot_id), None)
+    if not lot:
+        raise HTTPException(status_code=404, detail="Lot not found")
+
+    existing = lot.get("media") or []
+    if len(existing) >= _MAX_PHOTOS_PER_LOT:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Maximum {_MAX_PHOTOS_PER_LOT} photos per lot",
+        )
+
+    from services.s3_service import upload_image_to_s3
+    try:
+        # Use a deterministic key under the event id so all photos for
+        # this event live in one S3 prefix. Index is photo count.
+        file_url = await upload_image_to_s3(
+            file,
+            f"{event_id}-{lot_id}",
+            len(existing),
+        )
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Photo upload failed: {type(e).__name__}: {e}")
+
+    media_item = {
+        "id":          str(uuid.uuid4()),
+        "type":        "photo",
+        "url":         file_url,
+        "thumbnail_url": file_url,
+        "order":       len(existing),
+        "uploaded_at": _now(),
+    }
+    await _db.vehicle_multi_lot_auctions.update_one(
+        {"id": event_id, "lots.id": lot_id},
+        {"$push": {"lots.$.media": media_item}, "$set": {"updated_at": _now()}},
+    )
+    return {"message": "Photo uploaded", "media": {**media_item, "uploaded_at": media_item["uploaded_at"].isoformat()}}
+
+
+@vehicle_multi_lot_router.delete("/vehicle-multi-lot-auctions/{event_id}/lots/{lot_id}/photos/{photo_id}")
+async def delete_lot_photo(
+    event_id: str,
+    lot_id: str,
+    photo_id: str,
+    user: dict = Depends(_get_user),
+):
+    event = await _db.vehicle_multi_lot_auctions.find_one({"id": event_id})
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    if event.get("seller_id") != user["id"] and user.get("role") not in ("admin", "super_admin"):
+        raise HTTPException(status_code=403, detail="Only the seller (or admin) may delete photos")
+
+    await _db.vehicle_multi_lot_auctions.update_one(
+        {"id": event_id, "lots.id": lot_id},
+        {"$pull": {"lots.$.media": {"id": photo_id}}, "$set": {"updated_at": _now()}},
+    )
+    return {"ok": True}
+
+
+@vehicle_multi_lot_router.post("/vehicle-multi-lot-auctions/{event_id}/lots/{lot_id}/photos/reorder")
+async def reorder_lot_photos(
+    event_id: str,
+    lot_id: str,
+    payload: dict,
+    user: dict = Depends(_get_user),
+):
+    """iter295 P2 — Persist a new photo order. Payload: `{"order": [photo_id, ...]}`."""
+    event = await _db.vehicle_multi_lot_auctions.find_one({"id": event_id})
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    if event.get("seller_id") != user["id"] and user.get("role") not in ("admin", "super_admin"):
+        raise HTTPException(status_code=403, detail="Only the seller (or admin) may reorder photos")
+
+    lot = next((lt for lt in event.get("lots", []) if lt.get("id") == lot_id), None)
+    if not lot:
+        raise HTTPException(status_code=404, detail="Lot not found")
+
+    order_ids = payload.get("order") or []
+    if not isinstance(order_ids, list):
+        raise HTTPException(status_code=400, detail="`order` must be a list of photo ids")
+
+    media = lot.get("media") or []
+    by_id = {m["id"]: m for m in media}
+    ordered: list = []
+    for idx, pid in enumerate(order_ids):
+        m = by_id.get(pid)
+        if m:
+            ordered.append({**m, "order": idx})
+    # Append any media not in the order payload (defensive)
+    seen = {m["id"] for m in ordered}
+    for m in media:
+        if m["id"] not in seen:
+            ordered.append({**m, "order": len(ordered)})
+
+    await _db.vehicle_multi_lot_auctions.update_one(
+        {"id": event_id, "lots.id": lot_id},
+        {"$set": {"lots.$.media": ordered, "updated_at": _now()}},
+    )
+    return {"ok": True, "count": len(ordered)}
 
 
 # ── ACTIVATE (dealer publishes a draft) ──────────────────────────────

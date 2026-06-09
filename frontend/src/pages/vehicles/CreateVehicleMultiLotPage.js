@@ -8,21 +8,21 @@ import { Label } from '../../components/ui/label';
 import { Card } from '../../components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../components/ui/tooltip';
-import { Plus, Trash2, Save, Calendar, CheckCircle, Loader2, Car, Layers, Waves, Target, Star } from 'lucide-react';
+import {
+  Plus, Trash2, Save, Calendar, CheckCircle, Loader2, Car, Layers, Waves, Target, Star,
+  Upload, ImageIcon, X, ArrowLeft, ArrowRight,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { TIMING_MODES } from '../../lib/vehicleMultiLotTimingModes';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 /**
- * CreateVehicleMultiLotPage — iter293 Directive 2
+ * CreateVehicleMultiLotPage — iter293 Directive 2 / iter295 P2
  *
- * Dealer wizard for creating a Copart/wholesale-style multi-lot vehicle
- * auction event. The dealer fills the event-level details (title, start
- * time, timing mode, lot duration) and adds N lots. Each lot is a
- * lightweight per-vehicle entry (VIN, year, make, model, starting price,
- * photos). On submit the dealer chooses: Save as Draft / Schedule
- * (Upcoming) / Go Live Now.
+ * iter295 P2 additions:
+ *   - Per-lot Photo Gallery (S3 upload, ≥1 photo enforced for Live/Schedule,
+ *     drag-to-reorder via arrow buttons, 20-photo cap).
  */
 const emptyLot = () => ({
   vin: '',
@@ -69,6 +69,44 @@ const CreateVehicleMultiLotPage = () => {
   const removeLot = (idx) => setLots(prev => prev.filter((_, i) => i !== idx));
   const updateLot = (idx, patch) => setLots(prev => prev.map((l, i) => i === idx ? { ...l, ...patch } : l));
 
+  // iter295 P2 — Photo staging (client-side until backend has lot ids)
+  const MAX_PHOTOS_PER_LOT = 20;
+  const onPickFiles = (idx, fileList) => {
+    if (!fileList || !fileList.length) return;
+    const existing = lots[idx].pendingPhotos || [];
+    const room = MAX_PHOTOS_PER_LOT - existing.length;
+    if (room <= 0) {
+      toast.error(`Maximum ${MAX_PHOTOS_PER_LOT} photos per lot`);
+      return;
+    }
+    const accepted = Array.from(fileList).slice(0, room).filter((f) => f.type.startsWith('image/'));
+    if (!accepted.length) {
+      toast.error('Please choose image files only');
+      return;
+    }
+    const next = [...existing];
+    accepted.forEach((file) => {
+      const url = URL.createObjectURL(file);
+      next.push({ id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, file, previewUrl: url });
+    });
+    updateLot(idx, { pendingPhotos: next });
+  };
+
+  const removePhoto = (lotIdx, photoId) => {
+    const pending = (lots[lotIdx].pendingPhotos || []).filter((p) => p.id !== photoId);
+    updateLot(lotIdx, { pendingPhotos: pending });
+  };
+
+  const movePhoto = (lotIdx, photoId, dir) => {
+    const pending = [...(lots[lotIdx].pendingPhotos || [])];
+    const at = pending.findIndex((p) => p.id === photoId);
+    if (at < 0) return;
+    const swap = dir === 'left' ? at - 1 : at + 1;
+    if (swap < 0 || swap >= pending.length) return;
+    [pending[at], pending[swap]] = [pending[swap], pending[at]];
+    updateLot(lotIdx, { pendingPhotos: pending });
+  };
+
   const handleSubmit = async (intent) => {
     // Client validation
     if (!event.title.trim()) { toast.error('Event title is required'); return; }
@@ -90,6 +128,11 @@ const CreateVehicleMultiLotPage = () => {
         toast.error(`Lot #${i + 1} — Starting price must be > 0`);
         return;
       }
+      // iter295 P2 — At least 1 photo per lot when going Live / Schedule.
+      if (intent !== 'draft' && (lot.pendingPhotos || []).length === 0) {
+        toast.error(`Lot #${i + 1} — At least 1 photo is required to go Live / Schedule`);
+        return;
+      }
     }
 
     if (intent === 'schedule') {
@@ -104,6 +147,13 @@ const CreateVehicleMultiLotPage = () => {
     try {
       const token = localStorage.getItem('token');
       const startISO = new Date(event.start_time).toISOString();
+      // iter295 P2 — When photos are present, ALWAYS create the event
+      // as draft first so we have lot ids to attach photos to. Then
+      // upload photos for each lot, then promote to the requested
+      // intent via the activate endpoint.
+      const hasAnyPhotos = lots.some((l) => (l.pendingPhotos || []).length > 0);
+      const createIntent = (intent !== 'draft' && hasAnyPhotos) ? 'draft' : intent;
+
       const payload = {
         title: event.title,
         description: event.description,
@@ -111,21 +161,86 @@ const CreateVehicleMultiLotPage = () => {
         start_time: startISO,
         lot_duration_seconds: Number(event.lot_duration_seconds) || 120,
         stagger_offset_seconds: Number(event.stagger_offset_seconds) || 60,
-        submission_intent: intent,
-        lots: lots.map(l => ({
-          ...l,
+        submission_intent: createIntent,
+        lots: lots.map((l) => ({
+          // strip client-only fields
+          vin: l.vin,
           year: Number(l.year),
+          make: l.make,
+          model: l.model,
+          title: l.title,
+          description: l.description,
           mileage: Number(l.mileage),
+          body_type: l.body_type,
+          transmission: l.transmission,
+          fuel_type: l.fuel_type,
+          drivetrain: l.drivetrain,
+          exterior_color: l.exterior_color,
+          interior_color: l.interior_color,
+          ownership_status: l.ownership_status,
+          title_status: l.title_status,
+          lien_status: l.lien_status,
+          location_city: l.location_city,
+          location_province: l.location_province,
+          location_postal_code: l.location_postal_code,
           starting_price: Number(l.starting_price),
           reserve_price: l.reserve_price ? Number(l.reserve_price) : null,
           bid_increment: Number(l.bid_increment) || 100,
+          media: [],
+          condition_report: l.condition_report || null,
         })),
       };
       const r = await axios.post(`${API}/vehicle-multi-lot-auctions`, payload, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      const eventId = r.data.id;
+      const createdLots = r.data.lots || [];
+
+      // iter295 P2 — Upload each lot's photos in order.
+      if (hasAnyPhotos) {
+        toast.message('Uploading photos…');
+        for (let i = 0; i < createdLots.length; i += 1) {
+          const lotId = createdLots[i].id;
+          const pending = lots[i]?.pendingPhotos || [];
+          for (const ph of pending) {
+            const fd = new FormData();
+            fd.append('file', ph.file);
+            try {
+              await axios.post(
+                `${API}/vehicle-multi-lot-auctions/${eventId}/lots/${lotId}/photos`,
+                fd,
+                {
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'multipart/form-data',
+                  },
+                },
+              );
+            } catch (uerr) {
+              console.error('photo upload failed', uerr);
+              toast.error(`Lot #${i + 1} — Photo upload failed (continuing)`);
+            }
+          }
+        }
+
+        // Promote to requested intent if it wasn't draft.
+        if (intent !== 'draft') {
+          try {
+            await axios.post(
+              `${API}/vehicle-multi-lot-auctions/${eventId}/activate?intent=${intent}` +
+                (intent === 'schedule' ? `&start_time=${encodeURIComponent(startISO)}` : ''),
+              {},
+              { headers: { Authorization: `Bearer ${token}` } },
+            );
+          } catch (aerr) {
+            console.error('activate failed', aerr);
+            toast.error('Event saved as draft, but activation failed — please publish from the drafts dashboard.');
+          }
+        }
+      }
+
       toast.success(`Multi-lot event ${intent === 'draft' ? 'saved as draft' : intent === 'schedule' ? 'scheduled' : 'live'}!`);
-      navigate(`/vehicle-multi-lot/${r.data.id}`);
+      navigate(`/vehicle-multi-lot/${eventId}`);
     } catch (err) {
       console.error(err);
       toast.error(err?.response?.data?.detail || 'Failed to create multi-lot event');
@@ -446,6 +561,96 @@ const CreateVehicleMultiLotPage = () => {
                   rows={2}
                   placeholder="Condition notes, options, equipment, defects..."
                 />
+              </div>
+
+              {/* iter295 P2 — Per-lot photo gallery */}
+              <div className="md:col-span-3 border-t pt-4 mt-2" data-testid={`lot-photos-block-${idx}`}>
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <Label className="inline-flex items-center gap-1">
+                      <ImageIcon className="h-4 w-4" /> Photos
+                      <span className="text-xs text-slate-500 font-normal ml-1">
+                        (min 1, max {MAX_PHOTOS_PER_LOT})
+                      </span>
+                    </Label>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {(lot.pendingPhotos || []).length === 0
+                        ? 'No photos yet — at least 1 required to go Live or Schedule.'
+                        : `${(lot.pendingPhotos || []).length} / ${MAX_PHOTOS_PER_LOT} selected.`}
+                    </p>
+                  </div>
+                  <label
+                    htmlFor={`lot-photo-input-${idx}`}
+                    className="inline-flex items-center gap-1 px-3 py-2 rounded-md bg-blue-600 text-white text-sm cursor-pointer hover:bg-blue-700"
+                    data-testid={`lot-photo-pick-btn-${idx}`}
+                  >
+                    <Upload className="h-4 w-4" /> Add Photos
+                  </label>
+                  <input
+                    id={`lot-photo-input-${idx}`}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => onPickFiles(idx, e.target.files)}
+                    data-testid={`lot-photo-input-${idx}`}
+                  />
+                </div>
+
+                {(lot.pendingPhotos || []).length > 0 && (
+                  <div
+                    className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2"
+                    data-testid={`lot-photo-grid-${idx}`}
+                  >
+                    {(lot.pendingPhotos || []).map((ph, pIdx) => (
+                      <div
+                        key={ph.id}
+                        className="relative rounded-md overflow-hidden border border-slate-200 bg-slate-50 aspect-square"
+                        data-testid={`lot-photo-thumb-${idx}-${pIdx}`}
+                      >
+                        <img
+                          src={ph.previewUrl}
+                          alt={`Lot ${idx + 1} photo ${pIdx + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute top-1 left-1 inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-bold text-white bg-black/60 rounded">
+                          {pIdx + 1}
+                        </div>
+                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-1 flex items-center justify-between">
+                          <button
+                            type="button"
+                            onClick={() => movePhoto(idx, ph.id, 'left')}
+                            className="p-1 rounded bg-white/90 hover:bg-white text-slate-700 disabled:opacity-50"
+                            disabled={pIdx === 0}
+                            data-testid={`lot-photo-left-${idx}-${pIdx}`}
+                            aria-label="Move left"
+                          >
+                            <ArrowLeft className="h-3 w-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removePhoto(idx, ph.id)}
+                            className="p-1 rounded bg-red-500/90 hover:bg-red-600 text-white"
+                            data-testid={`lot-photo-remove-${idx}-${pIdx}`}
+                            aria-label="Remove photo"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => movePhoto(idx, ph.id, 'right')}
+                            className="p-1 rounded bg-white/90 hover:bg-white text-slate-700 disabled:opacity-50"
+                            disabled={pIdx === (lot.pendingPhotos || []).length - 1}
+                            data-testid={`lot-photo-right-${idx}-${pIdx}`}
+                            aria-label="Move right"
+                          >
+                            <ArrowRight className="h-3 w-3" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </Card>

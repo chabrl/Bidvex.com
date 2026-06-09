@@ -128,6 +128,7 @@ async def _progress_event(db, event: Dict[str, Any], now: datetime) -> tuple[int
     activated_count = 0
     mutated = False
     just_sold: List[Dict[str, Any]] = []     # iter294 P1 — collect winners for email batch
+    just_ended_no_winner: List[Dict[str, Any]] = []  # iter295 P1 — refund deposits even on no-bid lots
 
     # End all expired LIVE lots.
     for lot in lots:
@@ -140,6 +141,7 @@ async def _progress_event(db, event: Dict[str, Any], now: datetime) -> tuple[int
                 just_sold.append(lot)
             else:
                 lot["status"] = "ended"
+                just_ended_no_winner.append(lot)
             ended_count += 1
             mutated = True
 
@@ -210,4 +212,27 @@ async def _progress_event(db, event: Dict[str, Any], now: datetime) -> tuple[int
                 ))
         except Exception as _e:
             logger.warning(f"multi-lot lot_won email failed: {_e}")
+
+    # iter295 P1 — Per-lot settlement: generate invoices for sold lots
+    # and refund deposits (winners' deposit stays applied; losers/
+    # unsold get refunded). Settlement is best-effort; errors log but
+    # never break the scheduler tick.
+    if just_sold or just_ended_no_winner:
+        try:
+            from services.vehicle_multi_lot_settlement import settle_lot
+            # Refresh the event with the post-update lots so winner data
+            # is consistent with what we just wrote to Mongo.
+            fresh = await db.vehicle_multi_lot_auctions.find_one(
+                {"id": event["id"]}, {"_id": 0},
+            ) or event
+            fresh_lots = fresh.get("lots") or lots
+            for slot in just_sold + just_ended_no_winner:
+                fresh_lot = next((lt for lt in fresh_lots if lt.get("id") == slot.get("id")), slot)
+                try:
+                    await settle_lot(db, event=fresh, lot=fresh_lot)
+                except Exception as _se:
+                    logger.warning(f"[multi_lot_settle] lot {slot.get('id')} failed: {_se}")
+        except Exception as _e:
+            logger.warning(f"multi-lot settlement init failed: {_e}")
+
     return ended_count, activated_count, completed

@@ -39,14 +39,15 @@ from deps import get_current_user
 
 buyer_verification_router = APIRouter(prefix="/api", tags=["vehicle-buyer-verification"])
 
-# Provinces where individual buyers are HARD-BLOCKED unless they verify as dealer / dealer-rep.
-RESTRICTED_PROVINCES = {"ON", "NB", "NS", "PE", "NL"}
-# Provinces where individual buyers are allowed without a gate.
-OPEN_PROVINCES = {"BC", "AB", "SK", "MB"}
-# Quebec — allowed but requires LPC disclosure ack per listing.
-QC_DISCLOSURE_PROVINCE = "QC"
-# Territories — advisory only.
-TERRITORY_PROVINCES = {"YT", "NT", "NU"}
+# iter295 P0 — Consolidated into services/province_compliance.py.
+# These re-exports keep every existing import (`from routes.vehicle_buyer_verification import RESTRICTED_PROVINCES`)
+# working unchanged; new code should import from `services.province_compliance` directly.
+from services.province_compliance import (  # noqa: F401
+    RESTRICTED_PROVINCES,
+    OPEN_PROVINCES,
+    QC_DISCLOSURE_PROVINCE,
+    TERRITORY_PROVINCES,
+)
 
 
 _db_ref: Optional[AsyncIOMotorDatabase] = None
