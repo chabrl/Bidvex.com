@@ -64,17 +64,13 @@ const VehicleMultiLotDetailPage = () => {
     }
   }, [eventId]);
 
-  // iter293 — Lifecycle: kickoff fetch + poll every 5s. The
-  // `setLoading(false)` lands inside `refresh()` (above) which is
-  // intentional — react-hooks/set-state-in-effect is suppressed here
-  // because the data fetcher MUST update state to render the page.
-  /* eslint-disable react-hooks/set-state-in-effect */
+  // iter293 — Lifecycle: kickoff fetch + poll every 5s. setLoading(false)
+  // lands inside refresh() so the spinner clears on first response.
   useEffect(() => {
     refresh();
     const id = setInterval(refresh, 5000);
     return () => clearInterval(id);
   }, [refresh]);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   // iter293 — Derived selection — pick the LIVE lot, fall back to
   // UPCOMING, then the first one. Manual click in the Lot Queue
