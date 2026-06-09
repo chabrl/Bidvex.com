@@ -379,10 +379,14 @@ async def list_admin_auctions(
         return q
 
     SECTION_SPECS = [
-        ("marketplace",     "listings",            ["title", "category"]),
-        ("vehicle",         "vehicle_listings",    ["title", "make", "model", "vin"]),
-        ("storage",         "storage_auctions",    ["unit_number", "facility_name", "facility_city"]),
-        ("lots",            "multi_item_listings", ["title", "category"]),
+        ("marketplace",       "listings",                    ["title", "category"]),
+        ("vehicle",           "vehicle_listings",            ["title", "make", "model", "vin"]),
+        ("storage",           "storage_auctions",            ["unit_number", "facility_name", "facility_city"]),
+        ("lots",              "multi_item_listings",         ["title", "category"]),
+        # iter293 — Multi-Lot Vehicle Auction events surface here so
+        # admins can pause / cancel / inspect the whole sequence and
+        # individual lots from the central oversight panel.
+        ("vehicle_multi_lot", "vehicle_multi_lot_auctions",  ["title"]),
     ]
     # Optional section filter — keep the list ordered + idempotent.
     if section:

@@ -200,10 +200,14 @@ def test_multi_item_listings_all_tags_section_lots(db, admin_token):
             db.multi_item_listings.delete_one({"id": mid})
     else:
         for row in rows:
-            assert row.get("_section") == "lots", (
+            # iter293 — `/admin/multi-item-listings/all` now also returns
+            # vehicle_multi_lot_auctions rows tagged 'vehicle_multi_lot'.
+            assert row.get("_section") in ("lots", "vehicle_multi_lot"), (
                 f"missing _section on multi row {row.get('id')}"
             )
-            assert row.get("_collection") == "multi_item_listings"
+            assert row.get("_collection") in (
+                "multi_item_listings", "vehicle_multi_lot_auctions"
+            )
 
 
 # ── Gap 3 — /admin/listings/{id}/status is cross-collection ──────────

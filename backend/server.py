@@ -1010,6 +1010,38 @@ try:
     from routes.listing_requests import router as listing_requests_router
     api_router.include_router(listing_requests_router)
 
+    # iter293 — Multi-Lot Vehicle Auction (Copart-style sequential events)
+    from routes.vehicle_multi_lot import vehicle_multi_lot_router, set_vehicle_multi_lot_db
+    set_vehicle_multi_lot_db(db)
+    app.include_router(vehicle_multi_lot_router)
+
+    # iter293 — Multi-Lot Vehicle Auction scheduler tick (every 15s)
+    from services.vehicle_multi_lot_scheduler import tick_once as _ml_tick
+    async def _ml_scheduler_tick():
+        try:
+            await _ml_tick(db)
+        except Exception as _e:
+            logger.warning(f"vehicle_multi_lot_scheduler tick error: {_e}")
+    scheduler.add_job(_ml_scheduler_tick, "interval", seconds=15,
+                      id="vehicle_multi_lot_progress",
+                      replace_existing=True, max_instances=1)
+
+    # iter293 — Upcoming-notify: "Notify me when live" email triggers
+    from routes.upcoming_notify import (
+        upcoming_notify_router, set_upcoming_notify_db,
+        fire_live_transitions_once as _notif_tick,
+    )
+    set_upcoming_notify_db(db)
+    app.include_router(upcoming_notify_router)
+    async def _notif_scheduler_tick():
+        try:
+            await _notif_tick(db)
+        except Exception as _e:
+            logger.warning(f"upcoming_notify tick error: {_e}")
+    scheduler.add_job(_notif_scheduler_tick, "interval", seconds=30,
+                      id="upcoming_notify_fire",
+                      replace_existing=True, max_instances=1)
+
     # SEO: Dynamic sitemap.xml + robots.txt (app-level, not /api)
     from routes.sitemap import sitemap_router
     app.include_router(sitemap_router, tags=["SEO"])

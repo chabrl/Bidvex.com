@@ -559,6 +559,7 @@ const ManageAllAuctions = () => {
                             listing._section === 'vehicle' ? 'border-blue-300 bg-blue-50 text-blue-900' :
                             listing._section === 'storage' ? 'border-teal-300 bg-teal-50 text-teal-900' :
                             listing._section === 'lots'    ? 'border-orange-300 bg-orange-50 text-orange-900' :
+                            listing._section === 'vehicle_multi_lot' ? 'border-indigo-300 bg-indigo-50 text-indigo-900' :
                             'border-slate-300 bg-slate-50 text-slate-700'
                           }
                           data-testid={`section-badge-${listing.id}`}
@@ -566,6 +567,7 @@ const ManageAllAuctions = () => {
                           {listing._section === 'vehicle' ? '🚗 Vehicle'
                             : listing._section === 'storage' ? '🏪 Storage'
                             : listing._section === 'lots'    ? '📦 Lots'
+                            : listing._section === 'vehicle_multi_lot' ? '🚚 Multi-Lot Vehicle'
                             : '🛒 Marketplace'}
                         </Badge>
                       )}
@@ -603,6 +605,7 @@ const ManageAllAuctions = () => {
                           sec === 'vehicle' ? `/vehicle-auctions/${listing.id}` :
                           sec === 'storage' ? `/storage-auctions/${listing.id}` :
                           sec === 'lots'    ? `/lots/${listing.id}` :
+                          sec === 'vehicle_multi_lot' ? `/vehicle-multi-lot/${listing.id}` :
                                               `/listing/${listing.id}`;
                         navigate(path);
                       }}

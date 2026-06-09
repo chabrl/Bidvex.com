@@ -302,18 +302,49 @@ async def get_all_listings_admin(current_user: User = Depends(require_admin)):
 
 @admin_ops_router.get("/admin/multi-item-listings/all")
 async def get_all_multi_listings_admin(current_user: User = Depends(require_admin)):
-    """Admin: Get all multi-item listings.
+    """Admin: Get all multi-item listings AND multi-lot vehicle auctions.
 
     iter290 — Tag every row with `_section='lots'` + `_collection` so the
     Manage All Auctions UI can render the orange 'Lots' badge and route
     the View / Edit / Delete CTAs at the multi_item_listings table.
+
+    iter293 — Surface vehicle_multi_lot_auctions here too so admins see
+    every multi-row event from one panel. Each row is tagged with
+    `_section='vehicle_multi_lot'` so the frontend can render a
+    "Vehicle Multi-Lot" badge and route the View CTA at
+    `/vehicle-multi-lot/:id`.
     """
     db = get_db()
+    merged: list = []
+
     listings = await db.multi_item_listings.find({}, {"_id": 0}).sort("created_at", -1).to_list(None)
     for d in listings:
         d["_section"]    = "lots"
         d["_collection"] = "multi_item_listings"
-    return listings
+        merged.append(d)
+
+    try:
+        ml_events = await db.vehicle_multi_lot_auctions.find({}, {"_id": 0}).sort("created_at", -1).to_list(None)
+    except Exception:
+        ml_events = []
+    for d in ml_events:
+        d["_section"]    = "vehicle_multi_lot"
+        d["_collection"] = "vehicle_multi_lot_auctions"
+        # The Manage All Auctions card reads `auction_end_date` /
+        # `current_price`. Surface the event-level end_time + first
+        # active lot's current_bid so the row renders cleanly.
+        lots = d.get("lots") or []
+        active = lots[d.get("current_active_lot_index", 0)] if lots and 0 <= d.get("current_active_lot_index", -1) < len(lots) else (lots[0] if lots else {})
+        d.setdefault("auction_end_date", active.get("end_time") or d.get("start_time"))
+        d.setdefault("current_price",    active.get("current_bid") or 0)
+        d.setdefault("category",         f"Multi-Lot · {len(lots)} vehicle(s)")
+        d.setdefault("city",             active.get("location_city") or "")
+        d.setdefault("region",           active.get("location_province") or "")
+        d.setdefault("bid_count",        sum((l.get("bid_count") or 0) for l in lots))
+        merged.append(d)
+
+    merged.sort(key=lambda x: str(x.get("created_at") or ""), reverse=True)
+    return merged
 
 
 
@@ -504,7 +535,7 @@ async def admin_feature_listing(listing_id: str, data: Dict[str, bool], current_
     update to whichever collection owns the listing id."""
     db = get_db()
     is_featured = data.get("is_featured", False)
-    for coll_name in ("listings", "vehicle_listings", "storage_auctions", "multi_item_listings"):
+    for coll_name in ("listings", "vehicle_listings", "storage_auctions", "multi_item_listings", "vehicle_multi_lot_auctions"):
         try:
             r = await db[coll_name].update_one({"id": listing_id}, {"$set": {"is_featured": is_featured}})
         except Exception:
@@ -1723,7 +1754,7 @@ async def admin_update_listing_status(listing_id: str, data: Dict[str, Any], cur
         raise HTTPException(status_code=400, detail=f"Invalid status: {new_status}")
 
     updated_collection = None
-    for coll_name in ("listings", "vehicle_listings", "storage_auctions", "multi_item_listings"):
+    for coll_name in ("listings", "vehicle_listings", "storage_auctions", "multi_item_listings", "vehicle_multi_lot_auctions"):
         try:
             r = await db[coll_name].update_one(
                 {"id": listing_id},

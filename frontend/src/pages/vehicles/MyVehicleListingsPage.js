@@ -66,11 +66,14 @@ const getStatusBadge = (status) => {
   );
 };
 
-const VehicleListingCard = ({ listing, onView, onEdit, isFr = false }) => {
+const VehicleListingCard = ({ listing, onView, onEdit, onPromote, onDeleteDraft, isFr = false }) => {
   // iter288 — Per-card request-change modal state.
   const [modal, setModal] = useState({ open: false, type: 'delete' });
+  // iter293 — Schedule-time picker for draft promotion.
+  const [scheduleTime, setScheduleTime] = useState('');
   const mainImage = listing.media?.find(m => m.category === 'front')?.url || 
                     listing.media?.[0]?.url;
+  const isDraft = listing.status === 'draft';
   
   return (
     <Card className="overflow-hidden hover:shadow-lg transition-shadow">
@@ -98,7 +101,7 @@ const VehicleListingCard = ({ listing, onView, onEdit, isFr = false }) => {
             
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" data-testid={`vehicle-card-menu-${listing.id}`}>
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
@@ -106,15 +109,34 @@ const VehicleListingCard = ({ listing, onView, onEdit, isFr = false }) => {
                 <DropdownMenuItem onClick={() => onView(listing.id)}>
                   <Eye className="h-4 w-4 mr-2" /> View
                 </DropdownMenuItem>
-                {listing.status === 'draft' && (
+                {isDraft && (
                   <DropdownMenuItem onClick={() => onEdit(listing.id)}>
                     <Edit className="h-4 w-4 mr-2" /> Edit
+                  </DropdownMenuItem>
+                )}
+                {/* iter293 — Drafts dashboard: promote + delete actions */}
+                {isDraft && onPromote && (
+                  <DropdownMenuItem
+                    onClick={() => onPromote(listing.id, 'live')}
+                    data-testid={`vehicle-promote-live-${listing.id}`}
+                    className="text-emerald-700 focus:text-emerald-800"
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" /> Go Live Now
+                  </DropdownMenuItem>
+                )}
+                {isDraft && onDeleteDraft && (
+                  <DropdownMenuItem
+                    onClick={() => onDeleteDraft(listing.id)}
+                    data-testid={`vehicle-delete-draft-${listing.id}`}
+                    className="text-rose-600 focus:text-rose-700"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" /> Delete Draft
                   </DropdownMenuItem>
                 )}
                 {/* iter288 — Active-auction self-service: request edit
                     or deletion via the admin moderation queue. The
                     actual modification never bypasses admin review. */}
-                {listing.status !== 'draft' && (
+                {!isDraft && (
                   <DropdownMenuItem
                     onClick={() => setModal({ open: true, type: 'edit' })}
                     data-testid={`vehicle-request-edit-${listing.id}`}
@@ -123,6 +145,7 @@ const VehicleListingCard = ({ listing, onView, onEdit, isFr = false }) => {
                     {isFr ? 'Demander une modification' : 'Edit Listing'}
                   </DropdownMenuItem>
                 )}
+                {!isDraft && (
                 <DropdownMenuItem
                   onClick={() => setModal({ open: true, type: 'delete' })}
                   data-testid={`vehicle-request-delete-${listing.id}`}
@@ -131,9 +154,36 @@ const VehicleListingCard = ({ listing, onView, onEdit, isFr = false }) => {
                   <Trash2 className="h-4 w-4 mr-2" />
                   {isFr ? 'Demande de suppression' : 'Request Deletion'}
                 </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+
+          {/* iter293 — Schedule promotion row (drafts only) */}
+          {isDraft && onPromote && (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="text-xs text-slate-500">Schedule:</span>
+              <input
+                type="datetime-local"
+                value={scheduleTime}
+                onChange={e => setScheduleTime(e.target.value)}
+                className="text-sm border rounded px-2 py-1"
+                data-testid={`vehicle-schedule-input-${listing.id}`}
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  if (!scheduleTime) return;
+                  onPromote(listing.id, 'schedule', new Date(scheduleTime).toISOString());
+                }}
+                disabled={!scheduleTime}
+                data-testid={`vehicle-schedule-promote-${listing.id}`}
+              >
+                <Clock className="h-3 w-3 mr-1" /> Schedule
+              </Button>
+            </div>
+          )}
           
           <div className="flex items-center gap-4 mt-3">
             {getStatusBadge(listing.status)}
@@ -230,17 +280,49 @@ const MyVehicleListingsPage = () => {
 
   const filteredListings = listings.filter(listing => {
     if (activeTab === 'all') return true;
+    if (activeTab === 'drafts') return listing.status === 'draft';
     if (activeTab === 'active') return listing.status === 'active';
-    if (activeTab === 'pending') return ['draft', 'pending_approval', 'approved'].includes(listing.status);
+    if (activeTab === 'pending') return ['pending_approval', 'approved'].includes(listing.status);
     if (activeTab === 'ended') return ['ended', 'sold', 'cancelled'].includes(listing.status);
     return true;
   });
 
   const stats = {
     total: listings.length,
+    drafts: listings.filter(l => l.status === 'draft').length,
     active: listings.filter(l => l.status === 'active').length,
-    pending: listings.filter(l => ['draft', 'pending_approval'].includes(l.status)).length,
+    pending: listings.filter(l => ['pending_approval'].includes(l.status)).length,
     sold: listings.filter(l => l.status === 'sold').length,
+  };
+
+  // iter293 — Drafts dashboard actions.
+  const handlePromote = async (listingId, intent, startISO) => {
+    try {
+      const params = new URLSearchParams({ intent });
+      if (intent === 'schedule' && startISO) params.set('start_time', startISO);
+      await axios.post(
+        `${API}/vehicles/${listingId}/activate?${params.toString()}`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      toast.success(intent === 'live' ? 'Listing is now LIVE' : 'Listing scheduled');
+      fetchData();
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Failed to activate draft');
+    }
+  };
+
+  const handleDeleteDraft = async (listingId) => {
+    if (!window.confirm('Delete this draft permanently? This cannot be undone.')) return;
+    try {
+      await axios.delete(`${API}/vehicles/${listingId}/draft`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      toast.success('Draft deleted');
+      fetchData();
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Failed to delete draft');
+    }
   };
 
   if (loading) {
@@ -270,8 +352,19 @@ const MyVehicleListingsPage = () => {
               onClick={() => navigate('/vehicle-auctions/create')}
               className="gap-2"
               disabled={sellerProfile?.verification_status !== 'approved'}
+              data-testid="create-vehicle-btn"
             >
               <Plus className="h-4 w-4" /> {t('vehicleListings.createVehicle')}
+            </Button>
+            {/* iter293 — Multi-Lot Vehicle Auction entry point */}
+            <Button
+              onClick={() => navigate('/vehicle-multi-lot/create')}
+              variant="outline"
+              className="gap-2 border-indigo-600 text-indigo-700 hover:bg-indigo-50"
+              disabled={sellerProfile?.verification_status !== 'approved'}
+              data-testid="create-multi-lot-btn"
+            >
+              <Plus className="h-4 w-4" /> Create Multi-Lot Auction
             </Button>
           </div>
           
@@ -322,11 +415,14 @@ const MyVehicleListingsPage = () => {
       {/* Content */}
       <div className="max-w-6xl mx-auto px-4 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList>
-            <TabsTrigger value="all">All ({stats.total})</TabsTrigger>
-            <TabsTrigger value="active">Active ({stats.active})</TabsTrigger>
-            <TabsTrigger value="pending">Pending ({stats.pending})</TabsTrigger>
-            <TabsTrigger value="ended">Ended ({listings.filter(l => ['ended', 'sold'].includes(l.status)).length})</TabsTrigger>
+          <TabsList data-testid="my-vehicles-tabs">
+            <TabsTrigger value="all" data-testid="tab-all">All ({stats.total})</TabsTrigger>
+            <TabsTrigger value="drafts" data-testid="tab-drafts" className="data-[state=active]:bg-slate-200">
+              📝 Drafts ({stats.drafts})
+            </TabsTrigger>
+            <TabsTrigger value="active" data-testid="tab-active">Active ({stats.active})</TabsTrigger>
+            <TabsTrigger value="pending" data-testid="tab-pending">Pending ({stats.pending})</TabsTrigger>
+            <TabsTrigger value="ended" data-testid="tab-ended">Ended ({listings.filter(l => ['ended', 'sold'].includes(l.status)).length})</TabsTrigger>
           </TabsList>
           
           <TabsContent value={activeTab} className="mt-6">
@@ -355,6 +451,8 @@ const MyVehicleListingsPage = () => {
                     isFr={isFr}
                     onView={(id) => navigate(`/vehicle-auctions/${id}`)}
                     onEdit={(id) => navigate(`/vehicle-auctions/edit/${id}`)}
+                    onPromote={handlePromote}
+                    onDeleteDraft={handleDeleteDraft}
                   />
                 ))}
               </div>

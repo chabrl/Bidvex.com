@@ -37,7 +37,7 @@ async def _resolve_collection(db, listing_id: str) -> tuple[str, dict]:
     multi-item, vehicle, storage). iter290 — vehicles + storage rows
     surface in the Manage All Auctions table and must respond to
     end-time edits the same way marketplace + lots do."""
-    for coll in ("listings", "multi_item_listings", "vehicle_listings", "storage_auctions"):
+    for coll in ("listings", "multi_item_listings", "vehicle_listings", "storage_auctions", "vehicle_multi_lot_auctions"):
         try:
             doc = await db[coll].find_one({"id": listing_id}, {"_id": 0})
         except Exception:

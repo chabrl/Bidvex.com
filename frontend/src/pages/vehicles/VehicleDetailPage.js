@@ -42,6 +42,8 @@ import {
 } from 'lucide-react';
 import useVehicleBidding from '../../hooks/useVehicleBidding';
 import { PricingEstimate } from '../../components/vehicles/PricingBreakdown';
+// iter293 — Directive P1: Upcoming countdown badge.
+import UpcomingCountdownBadge from '../../components/UpcomingCountdownBadge';
 import ListingLogisticsDetails from '../../components/ListingLogisticsDetails';
 import MessageSellerModal from '../../components/MessageSellerModal';
 import { MessageSquare, ShieldCheck } from 'lucide-react';
@@ -1139,6 +1141,14 @@ const VehicleDetailPage = () => {
                   {vehicle.year} {vehicle.make} {vehicle.model}
                 </h1>
                 {vehicle.auction_type === 'live' && <LiveAuctionBadge />}
+                {/* iter293 — Directive P1: Upcoming countdown badge. */}
+                {vehicle.status === 'active' && vehicle.start_time && (
+                  <UpcomingCountdownBadge
+                    startTime={vehicle.start_time}
+                    onLive={fetchVehicle}
+                    compact={false}
+                  />
+                )}
               </div>
               {vehicle.trim && (
                 <p className="text-base sm:text-lg text-slate-500 break-words">{vehicle.trim}</p>

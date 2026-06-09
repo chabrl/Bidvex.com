@@ -1498,6 +1498,82 @@ async def get_my_vehicle_listings(
     return {"listings": listings}
 
 
+# iter293 — Directive P2: Dealer Drafts dashboard helpers ────────────
+
+@vehicle_router.post("/vehicles/{vehicle_id}/activate")
+async def activate_vehicle_listing(
+    vehicle_id: str,
+    intent: str = "live",          # "live" | "schedule"
+    start_time: Optional[datetime] = None,
+    seller: dict = Depends(get_vehicle_seller),
+    user: dict = Depends(get_current_user),
+):
+    """Promote a DRAFT vehicle listing to ACTIVE (live) or ACTIVE-with-
+    future-start (upcoming). Dealers call this from the Drafts dashboard.
+    """
+    intent = (intent or "live").lower()
+    if intent not in ("live", "schedule"):
+        raise HTTPException(status_code=400, detail="intent must be 'live' or 'schedule'")
+
+    listing = await db.vehicle_listings.find_one({"id": vehicle_id, "seller_id": seller["id"]})
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    if listing.get("status") not in (VehicleListingStatus.DRAFT.value, VehicleListingStatus.PENDING_APPROVAL.value, VehicleListingStatus.APPROVED.value):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot activate listing in status '{listing.get('status')}'",
+        )
+
+    now = datetime.now(timezone.utc)
+    update: Dict[str, Any] = {
+        "status":       VehicleListingStatus.ACTIVE.value,
+        "approved_at":  now,
+        "approved_by":  user["id"],
+        "updated_at":   now,
+    }
+    if intent == "live":
+        update["start_time"] = now
+        # If the original end_time is in the past (24h+ since draft was
+        # created), extend to 24h from now so the auction lasts a sane
+        # amount of time.
+        end = listing.get("end_time")
+        if isinstance(end, str):
+            try:
+                end = datetime.fromisoformat(end.replace("Z", "+00:00"))
+            except Exception:
+                end = None
+        if not end or end <= now:
+            update["end_time"] = now + timedelta(hours=24)
+            update["original_end_time"] = update["end_time"]
+    else:  # schedule
+        if not start_time:
+            raise HTTPException(status_code=422, detail="Schedule requires a start_time")
+        if start_time.tzinfo is None:
+            start_time = start_time.replace(tzinfo=timezone.utc)
+        if start_time <= now + timedelta(minutes=1):
+            raise HTTPException(status_code=422, detail="start_time must be ≥1 min in the future")
+        update["start_time"] = start_time
+
+    await db.vehicle_listings.update_one({"id": vehicle_id}, {"$set": update})
+    return {"ok": True, "status": update["status"], "start_time": update["start_time"].isoformat()}
+
+
+@vehicle_router.delete("/vehicles/{vehicle_id}/draft")
+async def delete_draft_vehicle_listing(
+    vehicle_id: str,
+    seller: dict = Depends(get_vehicle_seller),
+    user: dict = Depends(get_current_user),
+):
+    """Dealer deletes their own draft listing."""
+    listing = await db.vehicle_listings.find_one({"id": vehicle_id, "seller_id": seller["id"]})
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    if listing.get("status") not in (VehicleListingStatus.DRAFT.value, VehicleListingStatus.REJECTED.value):
+        raise HTTPException(status_code=409, detail="Only draft or rejected listings can be deleted")
+    await db.vehicle_listings.delete_one({"id": vehicle_id})
+    return {"ok": True}
+
+
 # ============= BIDDING ENDPOINTS =============
 
 @vehicle_router.post("/vehicle-bids")

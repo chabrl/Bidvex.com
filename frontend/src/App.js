@@ -126,6 +126,9 @@ const SellerRegistrationPage = lazy(() => import('./pages/vehicles/SellerRegistr
 const MyVehicleListingsPage = lazy(() => import('./pages/vehicles/MyVehicleListingsPage'));
 const VehicleInvoicesPage = lazy(() => import('./pages/vehicles/VehicleInvoicesPage'));
 const SellerFinancialsPage = lazy(() => import('./pages/vehicles/SellerFinancialsPage'));
+// iter293 — Multi-Lot Vehicle Auction (Copart-style sequential events)
+const CreateVehicleMultiLotPage = lazy(() => import('./pages/vehicles/CreateVehicleMultiLotPage'));
+const VehicleMultiLotDetailPage = lazy(() => import('./pages/vehicles/VehicleMultiLotDetailPage'));
 
 // Lazy-loaded heavy components
 const AIAssistant = lazy(() => import('./components/AIAssistant'));
@@ -611,6 +614,19 @@ const App = () => {
           } />
           <Route path="/vehicle-auctions/:id/unlock" element={
             <ProtectedRoute><VehicleUnlockPage /></ProtectedRoute>
+          } />
+          {/* iter293 — Multi-Lot Vehicle Auction (Copart-style sequential events) */}
+          <Route path="/vehicle-multi-lot/create" element={
+            <ProtectedRoute>
+              <ErrorBoundary scope="vehicle-multi-lot-create">
+                <CreateVehicleMultiLotPage />
+              </ErrorBoundary>
+            </ProtectedRoute>
+          } />
+          <Route path="/vehicle-multi-lot/:eventId" element={
+            <ErrorBoundary scope="vehicle-multi-lot-detail">
+              <VehicleMultiLotDetailPage />
+            </ErrorBoundary>
           } />
           <Route path="/vehicle-auctions/seller/register" element={
             <ProtectedRoute><SellerRegistrationPage /></ProtectedRoute>
