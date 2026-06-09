@@ -364,6 +364,8 @@ async def place_lot_bid(
         new_lot_end = now + timedelta(seconds=120)
 
     # Atomic update — push bid, increment counter, set winner + extend.
+    prior_winner = lot.get("winner_user_id")
+    prior_amount = float(lot.get("current_bid") or 0)
     await _db.vehicle_multi_lot_auctions.update_one(
         {"id": event_id, "lots.id": lot_id},
         {
@@ -378,6 +380,29 @@ async def place_lot_bid(
             "$push": {"bids": bid_record},
         },
     )
+
+    # iter294 P1 — Outbid notification (multi-lot). Fire-and-forget so
+    # the bid response stays snappy. Reuses the existing
+    # send_outbid_email template — passes the event title + lot
+    # number so the buyer can jump straight back to the active lot.
+    if prior_winner and prior_winner != user["id"]:
+        try:
+            from services import email_notifications as _en
+            import asyncio as _aio
+            prior_doc = await _db.users.find_one({"id": prior_winner}, {"email": 1, "first_name": 1, "_id": 0})
+            if prior_doc and prior_doc.get("email"):
+                _aio.create_task(_en.send_outbid_email(
+                    user_email=prior_doc["email"],
+                    user_name=prior_doc.get("first_name") or "",
+                    listing_title=f"Lot #{lot.get('lot_number', '?')} — {lot.get('title', event.get('title', 'Multi-Lot Auction'))}",
+                    their_bid=prior_amount,
+                    new_high_bid=float(payload.amount),
+                    listing_id=event_id,
+                    auction_end_date=new_lot_end.isoformat() if new_lot_end else "",
+                    auction_type="vehicle_multi_lot",
+                ))
+        except Exception as _e:
+            logger.warning(f"multi-lot outbid email failed: {_e}")
 
     return {
         "ok":            True,

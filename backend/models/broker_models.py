@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Literal, Optional
 from uuid import uuid4
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 
 def _utcnow() -> datetime:
@@ -38,13 +38,15 @@ class BrokerFeeStructure(BaseModel):
     min_fee_cad: Optional[float] = None
     max_fee_cad: Optional[float] = None
 
-    @validator("percentage_rate")
+    @field_validator("percentage_rate")
+    @classmethod
     def _v_pct(cls, v: float) -> float:
         if v < 0 or v > 1:
             raise ValueError("percentage_rate must be between 0 and 1 (e.g. 0.03 for 3%)")
         return v
 
-    @validator("fixed_amount_cad")
+    @field_validator("fixed_amount_cad")
+    @classmethod
     def _v_fixed(cls, v: float) -> float:
         if v < 0:
             raise ValueError("fixed_amount_cad must be >= 0")

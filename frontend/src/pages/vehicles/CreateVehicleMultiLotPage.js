@@ -7,8 +7,10 @@ import { Textarea } from '../../components/ui/textarea';
 import { Label } from '../../components/ui/label';
 import { Card } from '../../components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
-import { Plus, Trash2, Save, Calendar, CheckCircle, Loader2, Car, Layers } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../components/ui/tooltip';
+import { Plus, Trash2, Save, Calendar, CheckCircle, Loader2, Car, Layers, Waves, Target, Star } from 'lucide-react';
 import { toast } from 'sonner';
+import { TIMING_MODES } from '../../lib/vehicleMultiLotTimingModes';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -140,7 +142,7 @@ const CreateVehicleMultiLotPage = () => {
           Create Multi-Lot Vehicle Auction
         </h1>
         <p className="text-sm text-gray-600 mt-1">
-          Copart-style sequential block — run multiple vehicle lots in one event.
+          Run multiple vehicle lots in one auction event — pick a timing mode below.
         </p>
       </div>
 
@@ -168,20 +170,84 @@ const CreateVehicleMultiLotPage = () => {
               onChange={e => setEvent({ ...event, start_time: e.target.value })}
             />
           </div>
-          <div>
-            <Label>Timing Mode *</Label>
-            <Select
+          <div className="md:col-span-2">
+            <Label className="mb-2 block">Timing Mode *</Label>
+            {/* iter294 ADDENDUM — Visual mode picker with icon, short
+                label, recommended-star, and tooltip carrying the full
+                description. Internal API value stays sequential /
+                staggered (DB unchanged). */}
+            <TooltipProvider delayDuration={150}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" role="radiogroup">
+                {/* Sequential Spotlight (default/recommended) */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={event.timing_mode === 'sequential'}
+                      onClick={() => setEvent({ ...event, timing_mode: 'sequential' })}
+                      className={`relative p-4 border-2 rounded-lg text-left transition-all hover:shadow-md ${
+                        event.timing_mode === 'sequential'
+                          ? 'border-indigo-600 bg-indigo-50 ring-2 ring-indigo-100'
+                          : 'border-slate-200 bg-white hover:border-indigo-300'
+                      }`}
+                      data-testid="timing-mode-sequential-card"
+                    >
+                      {TIMING_MODES.sequential.recommended && (
+                        <span className="absolute -top-2 -right-2 inline-flex items-center gap-1 px-2 py-0.5 bg-amber-400 text-amber-900 text-[10px] font-bold rounded-full shadow-sm">
+                          <Star className="h-3 w-3 fill-current" /> Recommended
+                        </span>
+                      )}
+                      <div className="flex items-center gap-2 mb-1">
+                        <Target className="h-5 w-5 text-indigo-600" aria-hidden="true" />
+                        <span className="font-semibold text-sm">{TIMING_MODES.sequential.label}</span>
+                      </div>
+                      <p className="text-xs text-slate-600 line-clamp-3">
+                        {TIMING_MODES.sequential.description}
+                      </p>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" align="start" className="max-w-xs text-xs">
+                    {TIMING_MODES.sequential.description}
+                  </TooltipContent>
+                </Tooltip>
+
+                {/* Synchronized Wave */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={event.timing_mode === 'staggered'}
+                      onClick={() => setEvent({ ...event, timing_mode: 'staggered' })}
+                      className={`relative p-4 border-2 rounded-lg text-left transition-all hover:shadow-md ${
+                        event.timing_mode === 'staggered'
+                          ? 'border-blue-600 bg-blue-50 ring-2 ring-blue-100'
+                          : 'border-slate-200 bg-white hover:border-blue-300'
+                      }`}
+                      data-testid="timing-mode-staggered-card"
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <Waves className="h-5 w-5 text-blue-600" aria-hidden="true" />
+                        <span className="font-semibold text-sm">{TIMING_MODES.staggered.label}</span>
+                      </div>
+                      <p className="text-xs text-slate-600 line-clamp-3">
+                        {TIMING_MODES.staggered.description}
+                      </p>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" align="start" className="max-w-xs text-xs">
+                    {TIMING_MODES.staggered.description}
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            </TooltipProvider>
+            <input
+              type="hidden"
+              data-testid="event-timing-mode-select"
               value={event.timing_mode}
-              onValueChange={v => setEvent({ ...event, timing_mode: v })}
-            >
-              <SelectTrigger data-testid="event-timing-mode-select">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="sequential">Sequential (Copart) — lot N+1 opens after lot N ends</SelectItem>
-                <SelectItem value="staggered">Staggered — each lot offset 1 min apart, run in parallel</SelectItem>
-              </SelectContent>
-            </Select>
+              readOnly
+            />
           </div>
           <div>
             <Label htmlFor="event-lot-duration">Per-Lot Duration (seconds)</Label>

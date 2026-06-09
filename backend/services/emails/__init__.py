@@ -1,14 +1,15 @@
 """
-iter241 Mission 2 — Modular email package.
+services/emails/__init__.py
 
-Per-type submodules that re-export the canonical helpers from the legacy
-`services.email_notifications` module. This gives callers a clean import
-path (`from services.emails.bidding import send_bid_placed_email`) without
-forcing a risky 3000-line mechanical refactor in a single sprint.
+Modular email package — was set up in iter241 (services.emails.bidding,
+send_email, send_unified_email re-exports). iter294 P2 added three
+type-bucketed submodules (vehicles / marketplace / system) so new code
+can target the right concern without fishing through the 3000-line
+legacy `services/email_notifications.py`.
 
 Migration tracking
 ==================
-- `send_unified_email()` is now the canonical entry-point for ALL new
+- `send_unified_email()` is the canonical entry-point for ALL new
   transactional emails — see services/email_notifications.py.
 - Legacy helpers that already route through `send_unified_email()`
   (bid_placed, outbid, the 3 storage variants, etc.) are listed in
@@ -18,7 +19,10 @@ Migration tracking
   `send_email()` directly until iter242 expands the unified template
   registry to cover their rich content.
 """
-
 from services.email_notifications import send_email, send_unified_email
+# iter294 P2 — type-bucketed submodules (re-exports for clean imports).
+from services.emails.email_vehicles    import *  # noqa: F401, F403
+from services.emails.email_marketplace import *  # noqa: F401, F403
+from services.emails.email_system      import *  # noqa: F401, F403
 
 __all__ = ["send_email", "send_unified_email"]

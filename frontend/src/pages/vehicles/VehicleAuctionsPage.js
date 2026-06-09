@@ -48,6 +48,8 @@ import VehicleEmptyState from '../../components/vehicles/VehicleEmptyState';
 import VehicleLegalFooter from '../../components/vehicles/VehicleLegalFooter';
 import VehicleSidebar from '../../components/vehicles/VehicleSidebar';
 import useVehicleCountdown from '../../hooks/useVehicleCountdown';
+// iter294 P1 — Live multi-lot feed widget.
+import LiveMultiLotFeedWidget from '../../components/LiveMultiLotFeedWidget';
 
 const API = API_BASE;
 
@@ -231,6 +233,12 @@ const VehicleAuctionsPage = () => {
         setSearchQuery={setSearchQuery}
         onSearch={handleSearch}
       />
+
+      {/* iter294 P1 — Live multi-lot feed widget. Renders nothing
+          when there are zero live AND zero upcoming events. */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-2 sm:-mt-4">
+        <LiveMultiLotFeedWidget />
+      </div>
 
       {/* SELLER CTA STRIP */}
       <div className="bg-gradient-to-r from-emerald-600 to-teal-600 dark:from-emerald-700 dark:to-teal-700 py-4" data-testid="seller-cta-section">

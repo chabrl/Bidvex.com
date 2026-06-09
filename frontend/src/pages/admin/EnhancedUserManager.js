@@ -1151,8 +1151,8 @@ const EnhancedUserManager = () => {
                 </tr>
               </thead>
               <tbody>
-                {txnRows.map((t) => (
-                  <tr key={t.id} className="border-b">
+                {txnRows.map((t, idx) => (
+                  <tr key={t.id || `txn-${idx}`} className="border-b">
                     <td className="p-1 font-mono">{(t.id || '').slice(0, 8)}</td>
                     <td className="p-1 truncate max-w-[180px]">{t.listing_title || t.listing_id}</td>
                     <td className="p-1">{viewTxnModal.user?.id === t.buyer_id ? 'Buyer' : 'Seller'}</td>
@@ -1552,7 +1552,7 @@ const EnhancedUserManager = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {reqPayHistory.map((pr) => {
+                  {reqPayHistory.map((pr, idx) => {
                     const desc = (pr.description || '');
                     const shortDesc = desc.length > 40 ? `${desc.slice(0, 40)}…` : desc;
                     const badgeStyle = pr.status === 'paid' ? {
@@ -1569,7 +1569,7 @@ const EnhancedUserManager = () => {
                       padding: '2px 8px', fontWeight: 700, fontSize: 11,
                     };
                     return (
-                      <tr key={pr.id} className="border-b border-slate-100" data-testid={`payment-request-row-${pr.id}`}>
+                      <tr key={pr.id || `req-${idx}`} className="border-b border-slate-100" data-testid={`payment-request-row-${pr.id}`}>
                         <td className="py-2 text-xs">{(pr.created_at || '').slice(0, 10)}</td>
                         <td className="text-right font-mono font-bold" data-testid={`payment-request-amount-${pr.id}`}>
                           ${Number(pr.total_amount).toFixed(2)}

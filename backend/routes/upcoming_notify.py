@@ -22,7 +22,7 @@ emails any subscriber whose listing just turned live.
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Literal, Optional
 import logging
 import os
@@ -116,7 +116,11 @@ async def unsubscribe(sub_id: str, user: dict = Depends(_get_user)):
 async def fire_live_transitions_once(db) -> int:
     """Find every pending subscription whose target listing just went
     LIVE, send a SendGrid 'auction is open' email, and mark the
-    subscription notified."""
+    subscription notified.
+
+    iter294 P1 — Also fires a 15-minute pre-start warning email exactly
+    once per subscription so subscribers don't miss the kickoff.
+    """
     now = _now()
     pending = await db.upcoming_notify_subscribers.find(
         {"notified_at": None}
@@ -134,43 +138,83 @@ async def fire_live_transitions_once(db) -> int:
         lid  = sub["listing_id"]
         ltyp = sub.get("listing_type", "vehicle")
         live = False
+        starting_soon = False
         title = None
         link = None
         if ltyp == "vehicle":
             doc = await db.vehicle_listings.find_one({"id": lid})
             if doc and doc.get("status") == "active":
                 start = doc.get("start_time")
-                # ACTIVE + start_time elapsed = LIVE
                 if isinstance(start, str):
                     try:
                         start = datetime.fromisoformat(start.replace("Z", "+00:00"))
                     except Exception:
                         start = None
+                if isinstance(start, datetime) and start.tzinfo is None:
+                    start = start.replace(tzinfo=timezone.utc)
                 if not start or start <= now:
                     live = True
-                    title = doc.get("title") or f"{doc.get('year', '')} {doc.get('make', '')} {doc.get('model', '')}".strip()
-                    link  = f"/vehicle-auctions/{lid}"
+                # 15-min pre-start warning window (once per subscriber).
+                elif start - now <= timedelta(minutes=15) and not sub.get("warned_at"):
+                    starting_soon = True
+                title = doc.get("title") or f"{doc.get('year', '')} {doc.get('make', '')} {doc.get('model', '')}".strip()
+                link  = f"/vehicle-auctions/{lid}"
         elif ltyp == "vehicle_multi_lot":
             doc = await db.vehicle_multi_lot_auctions.find_one({"id": lid})
-            if doc and doc.get("status") == "live":
-                live = True
+            if doc:
+                if doc.get("status") == "live":
+                    live = True
+                elif doc.get("status") == "upcoming":
+                    start = doc.get("start_time")
+                    if isinstance(start, str):
+                        try:
+                            start = datetime.fromisoformat(start.replace("Z", "+00:00"))
+                        except Exception:
+                            start = None
+                    if isinstance(start, datetime) and start.tzinfo is None:
+                        start = start.replace(tzinfo=timezone.utc)
+                    if isinstance(start, datetime) and start - now <= timedelta(minutes=15) and not sub.get("warned_at"):
+                        starting_soon = True
                 title = doc.get("title")
                 link  = f"/vehicle-multi-lot/{lid}"
+
+        # 15-min pre-start warning (independent of live-flip)
+        if starting_soon:
+            try:
+                if _en and hasattr(_en, "send_unified_email"):
+                    await _en.send_unified_email(
+                        "generic",
+                        user={"email": sub["user_email"], "first_name": ""},
+                        data={
+                            "subject":      f"Starts in 15 minutes: {title}",
+                            "preheader":    "An auction you're watching is about to open.",
+                            "headline":     "Starting soon",
+                            "body_html":    f"<p><strong>{title}</strong> opens for bidding in 15 minutes.</p><p><a href='{link}'>Open auction →</a></p>",
+                        },
+                    )
+            except Exception as e:
+                logger.warning(f"upcoming_notify pre-start send error sub={sub['id']}: {e}")
+            await db.upcoming_notify_subscribers.update_one(
+                {"id": sub["id"]},
+                {"$set": {"warned_at": now}},
+            )
 
         if not live:
             continue
 
-        # Send email (best-effort; subscription still gets marked so we
-        # never spam the user with a stale reminder).
+        # Send live-now email (best-effort; subscription still gets
+        # marked so we never spam the user with a stale reminder).
         try:
-            if _en and hasattr(_en, "send_generic"):
-                await _en.send_generic(
-                    to_email=sub["user_email"],
-                    subject=f"Bidding open: {title}",
-                    html_body=(
-                        f"<p>The auction you asked us to watch is now open for bidding.</p>"
-                        f'<p><a href="{link}">Open auction →</a></p>'
-                    ),
+            if _en and hasattr(_en, "send_unified_email"):
+                await _en.send_unified_email(
+                    "generic",
+                    user={"email": sub["user_email"], "first_name": ""},
+                    data={
+                        "subject":   f"Bidding open: {title}",
+                        "preheader": "An auction you're watching is now open.",
+                        "headline":  "Bidding is open",
+                        "body_html": f"<p>The auction you asked us to watch is now open for bidding.</p><p><a href='{link}'>Open auction →</a></p>",
+                    },
                 )
         except Exception as e:
             logger.warning(f"upcoming_notify send error sub={sub['id']}: {e}")

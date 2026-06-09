@@ -26,6 +26,8 @@ import SafeImage from '../SafeImage';
 import { formatListingPrice } from '../../utils/currencyFormatter';
 // iter286 — Bug 5 — Carfax badge needs viewer's broker status.
 import { useAuth } from '../../contexts/AuthContext';
+// iter294 P1 — Upcoming countdown badge on index cards.
+import UpcomingCountdownBadge from '../UpcomingCountdownBadge';
 
 const PROVINCE_LABEL = {
   BC: 'BC', AB: 'AB', SK: 'SK', MB: 'MB', ON: 'ON', QC: 'QC',
@@ -200,6 +202,15 @@ const VehicleListingCard = ({ vehicle, countdown, onClick, onQuickView, compact 
               <Flame className="h-3 w-3" />
               {t('vehicleCard.live', 'Live')}
             </span>
+          )}
+          {/* iter294 P1 — Upcoming countdown on index cards. Computed
+              client-side from start_time; NO per-card polling. */}
+          {!isLive && vehicle.status === 'active' && vehicle.start_time && new Date(vehicle.start_time).getTime() > Date.now() && (
+            <UpcomingCountdownBadge
+              startTime={vehicle.start_time}
+              compact
+              className="shadow"
+            />
           )}
           {isEndingSoon && (
             <span className="inline-flex items-center gap-1 rounded-md bg-orange-500 text-white text-[10px] font-bold uppercase tracking-wider px-2 py-1 shadow animate-pulse">

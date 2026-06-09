@@ -1,6 +1,144 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: iter293 — MULTI-LOT VEHICLE AUCTION + UPCOMING COUNTDOWN + DEALER DRAFTS + ADMIN AUDIT (Jun 09, 2026) 🚀
+## Latest: iter294 — TIMING RENAME + MULTI-LOT NOTIFICATIONS + LIVE WIDGET + EMAIL SPLIT (Jun 09, 2026) 🚀
+
+Full iter294 sprint delivered — every directive shipped.
+
+### ✅ ADDENDUM — Multi-Lot Timing Mode Rename
+User-facing copy switched from "Copart" / "Staggered" / "Sequential"
+jargon to brand-friendly labels. Internal API + DB values UNCHANGED
+(still `sequential` / `staggered`) — pure display refactor.
+
+- **One at a Time — Sequential Spotlight** (default, ★ Recommended badge,
+  spotlight target icon, indigo accent). Description: "Each vehicle
+  gets its own dedicated bidding window. When one lot closes, the next
+  one opens automatically with a fresh 2-minute countdown. Every
+  vehicle gets full buyer attention — no lot gets buried."
+- **Synchronized Wave** (waves icon, blue accent). Description: "All
+  vehicles open for bidding at the same time, each starting 1 minute
+  apart. Buyers can watch and bid across multiple lots simultaneously
+  — ideal for high-volume events where you want maximum early
+  engagement."
+
+Visual picker (two click-cards instead of dropdown) with tooltips
+carrying the full description on hover. Applied everywhere:
+creation wizard, detail page, dealer drafts, admin Manage All Auctions.
+
+Files: `frontend/src/lib/vehicleMultiLotTimingModes.js` (NEW shared
+labels), `CreateVehicleMultiLotPage.js`, `VehicleMultiLotDetailPage.js`.
+
+### ✅ P1 — Bidder Notifications for Multi-Lot Auctions
+- **Outbid**: per-lot bid endpoint dispatches `send_outbid_email` via
+  fire-and-forget asyncio task. Lot title + lot number + new high
+  bid + extension-aware end time included in the email body.
+- **Lot Won**: scheduler tick finalises each ended lot. When a lot
+  closes with a winner, dispatch `send_auction_won_email` with the
+  hammer price + multi-lot context (`is_vehicle=True`).
+- **15-min Pre-Start Warning**: `upcoming_notify` scheduler tick
+  inspects subscriber rows + their target listing's `start_time`. If
+  `start_time - now <= 15 min` AND `warned_at IS NULL`, sends a
+  pre-start email via `send_unified_email("generic", ...)` and stamps
+  `warned_at`. The existing on-live trigger continues to work via
+  `notified_at`.
+- All sends reuse existing SendGrid templates / `send_unified_email`
+  — no new template IDs added.
+
+### ✅ P1 — Live Countdown on Vehicle Auctions Index Cards
+- `VehicleListingCard.js` now renders the `UpcomingCountdownBadge`
+  (compact variant) on every card where `vehicle.status='active'` AND
+  `vehicle.start_time > now`. Live cards keep the existing Flame
+  pulse badge — no change there.
+- **No per-card polling.** All countdown math is client-side from the
+  list endpoint's `start_time` field. Each card re-renders only via
+  the badge's internal 1-second clock.
+
+### ✅ P1 — Live Multi-Lot Event Feed Widget
+- New `frontend/src/components/LiveMultiLotFeedWidget.jsx` (≈ 140 LOC).
+- Renders on the public Vehicle Auctions homepage just below the hero.
+- Polls `/api/vehicle-multi-lot-auctions?status=live` every 10 s. If
+  empty, falls back to `?status=upcoming`.
+- Each entry: event title, active lot title + lot number, time-
+  remaining on current lot (1-s tick), total lots remaining. Click
+  → `/vehicle-multi-lot/{id}`.
+- Hides entirely (`return null`) when neither live nor upcoming
+  events exist — no empty-state shown to buyers.
+
+### ✅ P2 — Multi-Lot Reserve-Met Indicator
+- On `VehicleMultiLotDetailPage.js` active lot card, render a green
+  "✓ Reserve Met" badge when `current_bid >= reserve_price`, a grey
+  "Reserve Not Met" badge when below. When no `reserve_price` is set
+  the badge is hidden entirely (privacy + reduces clutter).
+- Updates in real-time via the existing 5-second polling refresh.
+
+### ✅ P2 — EnhancedUserManager React Key Warnings
+Three `.map()` callbacks given index-based fallbacks so legacy data
+rows with missing `id` no longer warn:
+- `txnRows.map((t, idx) => <tr key={t.id || \`txn-${idx}\`}>)`
+- `reqPayHistory.map((pr, idx) => <tr key={pr.id || \`req-${idx}\`}>)`
+
+The remaining keys in the file were already stable (col.key, user.id,
+field name strings).
+
+### ✅ P2 — Pydantic V1 → V2 Migration + email_notifications.py Split
+- **Migration**: `models/broker_models.py` was the only file still
+  using V1's bare `@validator`. Migrated to `@field_validator` +
+  `@classmethod`. Range-check semantics preserved. No other V1
+  patterns (`orm_mode`, `allow_population_by_field_name`, etc.) found
+  anywhere in `models/`, `services/`, or `routes/`.
+- **Email split**: created `services/emails/email_vehicles.py`,
+  `services/emails/email_marketplace.py`, and
+  `services/emails/email_system.py`. Each is a clean re-export shim
+  sourcing from the canonical `services/email_notifications.py`
+  (zero behavioural change — identity-checked by the regression
+  test). Existing imports across the codebase keep working; new code
+  can target the right submodule for organisation. `services/emails/
+  __init__.py` extended (iter241 set up the package; iter294 added
+  three type-bucket submodules).
+
+### Constraints honoured (all iter294)
+- Vehicle Buyer Premium = 0% (unchanged).
+- Vehicle Platform Fee = 2.5% (unchanged).
+- No bid math touched.
+- JWT / Stripe / SendGrid wiring untouched.
+
+### Test results — iter294
+- 5/5 new `test_iter294_timing_rename_and_notifications.py` tests pass
+  (internal-value preservation, V2 broker validators, emails/* re-
+  exports are identity-checked, 15-min pre-start trigger, fee guard).
+- iter284 → iter294 sweep: **76 passed, 24 skipped, 0 failures (80s)**.
+- Visual smoke: new timing-mode cards render with ★ Recommended badge,
+  live multi-lot widget renders on Vehicle Auctions homepage with
+  active event entries + ChevronRight link affordance.
+
+### Files modified — iter294
+**New (5):**
+- `frontend/src/lib/vehicleMultiLotTimingModes.js`
+- `frontend/src/components/LiveMultiLotFeedWidget.jsx`
+- `backend/services/emails/email_vehicles.py`
+- `backend/services/emails/email_marketplace.py`
+- `backend/services/emails/email_system.py`
+- `backend/tests/test_iter294_timing_rename_and_notifications.py`
+
+**Modified:**
+- `frontend/src/pages/vehicles/CreateVehicleMultiLotPage.js` (timing-mode
+  visual picker, tooltips, ★ Recommended, copy cleanup)
+- `frontend/src/pages/vehicles/VehicleMultiLotDetailPage.js`
+  (renamed-label + reserve-met indicator)
+- `frontend/src/components/vehicles/VehicleListingCard.js` (upcoming
+  countdown badge on index cards)
+- `frontend/src/pages/vehicles/VehicleAuctionsPage.js` (mount widget)
+- `frontend/src/pages/admin/EnhancedUserManager.js` (key fallbacks)
+- `backend/routes/vehicle_multi_lot.py` (outbid email dispatch)
+- `backend/services/vehicle_multi_lot_scheduler.py` (lot_won email
+  dispatch on transition to `sold`)
+- `backend/routes/upcoming_notify.py` (15-min pre-start trigger;
+  imports `timedelta`)
+- `backend/services/emails/__init__.py` (extend with new submodules)
+- `backend/models/broker_models.py` (Pydantic V1 → V2)
+
+---
+
+## Previous: iter293 — MULTI-LOT VEHICLE AUCTION + UPCOMING COUNTDOWN + DEALER DRAFTS + ADMIN AUDIT (Jun 09, 2026) 🚀
 
 Full P0 + P1 + P2 sprint shipped end-to-end.
 

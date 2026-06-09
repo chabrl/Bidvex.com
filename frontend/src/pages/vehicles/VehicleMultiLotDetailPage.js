@@ -8,6 +8,7 @@ import { Input } from '../../components/ui/input';
 import { Layers, Car, Gavel, Loader2, Clock, CheckCircle, BellRing, Trophy } from 'lucide-react';
 import { toast } from 'sonner';
 import UpcomingCountdownBadge from '../../components/UpcomingCountdownBadge';
+import { getTimingModeShortLabel } from '../../lib/vehicleMultiLotTimingModes';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -149,7 +150,7 @@ const VehicleMultiLotDetailPage = () => {
               <h1 className="text-2xl sm:text-3xl font-bold">{event.title}</h1>
               <StatusBadge status={event.status} />
               <Badge variant="outline" className="border-blue-300 text-blue-700">
-                {event.timing_mode === 'sequential' ? 'Copart Sequential' : 'Staggered'}
+                {getTimingModeShortLabel(event.timing_mode)}
               </Badge>
             </div>
             <p className="text-sm text-gray-600">
@@ -174,10 +175,29 @@ const VehicleMultiLotDetailPage = () => {
         <Card className="p-6 border-blue-200 bg-gradient-to-r from-white to-blue-50" data-testid="active-lot-card">
           <div className="flex flex-col lg:flex-row gap-4 justify-between">
             <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
                 <Car className="h-5 w-5 text-blue-600" />
                 <h2 className="text-xl font-semibold">Lot #{activeLot.lot_number} — {activeLot.title}</h2>
                 <StatusBadge status={activeLot.status} />
+                {/* iter294 P2 — Reserve-Met indicator. Hidden when no
+                    reserve is set (privacy + reduces clutter). */}
+                {activeLot.reserve_price > 0 && (
+                  Number(activeLot.current_bid) >= Number(activeLot.reserve_price) ? (
+                    <Badge
+                      data-testid="reserve-met-badge"
+                      className="bg-green-100 text-green-800 border border-green-300"
+                    >
+                      ✓ Reserve Met
+                    </Badge>
+                  ) : (
+                    <Badge
+                      data-testid="reserve-not-met-badge"
+                      className="bg-slate-100 text-slate-600 border border-slate-300"
+                    >
+                      Reserve Not Met
+                    </Badge>
+                  )
+                )}
               </div>
               <p className="text-sm text-gray-700">
                 {activeLot.year} {activeLot.make} {activeLot.model} · {activeLot.mileage?.toLocaleString()} km · {activeLot.location_city}, {activeLot.location_province}

@@ -127,6 +127,7 @@ async def _progress_event(db, event: Dict[str, Any], now: datetime) -> tuple[int
     ended_count = 0
     activated_count = 0
     mutated = False
+    just_sold: List[Dict[str, Any]] = []     # iter294 P1 — collect winners for email batch
 
     # End all expired LIVE lots.
     for lot in lots:
@@ -136,6 +137,7 @@ async def _progress_event(db, event: Dict[str, Any], now: datetime) -> tuple[int
         if end and end <= now:
             if lot.get("winner_user_id"):
                 lot["status"] = "sold"
+                just_sold.append(lot)
             else:
                 lot["status"] = "ended"
             ended_count += 1
@@ -184,4 +186,28 @@ async def _progress_event(db, event: Dict[str, Any], now: datetime) -> tuple[int
                 "updated_at":               now,
             }},
         )
+
+    # iter294 P1 — Lot-won notifications. Fire AFTER the write so the
+    # buyer-facing page sees status=sold before the email arrives.
+    if just_sold:
+        try:
+            from services import email_notifications as _en
+            import asyncio as _aio
+            for slot in just_sold:
+                winner_id = slot.get("winner_user_id")
+                if not winner_id:
+                    continue
+                w = await db.users.find_one({"id": winner_id}, {"email": 1, "first_name": 1, "_id": 0})
+                if not w or not w.get("email"):
+                    continue
+                _aio.create_task(_en.send_auction_won_email(
+                    winner_email=w["email"],
+                    winner_name=w.get("first_name") or "",
+                    item_title=f"Lot #{slot.get('lot_number', '?')} — {slot.get('title', event.get('title', 'Multi-Lot Auction'))}",
+                    final_price=float(slot.get("current_bid") or 0),
+                    listing_id=event["id"],
+                    is_vehicle=True,
+                ))
+        except Exception as _e:
+            logger.warning(f"multi-lot lot_won email failed: {_e}")
     return ended_count, activated_count, completed
