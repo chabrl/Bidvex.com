@@ -233,6 +233,36 @@ def test_seller_dashboard_counters_union_both_end_conventions(db):
     assert counts["sold"]  >= 1, f"counts={counts}"
 
 
+def test_dashboard_seller_endpoint_reflects_ended_with_winner(db):
+    """The actual user-visible seller dashboard binds to
+    `/api/dashboard/seller` (NOT my-listings). The Articles Vendus /
+    Sold Items card reads `dashboard.sold_listings`. After iter296 the
+    endpoint MUST union `status=ended + winner_user_id` so the card
+    no longer shows 0 for marketplace listings closed with a winner."""
+    r_login = requests.post(
+        f"{BASE_URL}/api/auth/login",
+        json={"email": "charbel911@gmail.com", "password": "Anderosli123!@#"},
+        timeout=15,
+    )
+    assert r_login.status_code == 200
+    token = r_login.json().get("access_token") or r_login.json().get("token")
+    r = requests.get(
+        f"{BASE_URL}/api/dashboard/seller",
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=15,
+    )
+    assert r.status_code == 200, r.text[:300]
+    d = r.json()
+    assert d["sold_listings"] >= 1, (
+        f"dashboard/seller did NOT count the marketplace ended-with-winner "
+        f"listing — Articles Vendus card will still be stuck at 0. d={d}"
+    )
+    assert d["counts"]["sold"] >= 1
+    assert d["counts"]["ended"] >= 1
+    # total_sales must also reflect the marketplace listing's final price.
+    assert d["total_sales"] > 0
+
+
 # ── BUG 1 / iter296_data_repair backfill ───────────────────────────────
 
 @pytest.mark.asyncio

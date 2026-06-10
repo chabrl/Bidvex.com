@@ -69,8 +69,21 @@ async def get_seller_dashboard(
     _PENDING_STATUSES = ("pending_ai_review", "pending_admin_review", "pending_review")
     _ENDED_STATUSES = ("sold", "ended", "expired", "completed")
 
+    # iter296 P0 BUG 5 — Same union as routes/listings.py + routes/users.py:
+    # a listing is "sold" if EITHER `status: "sold"` (vehicle/storage
+    # convention) OR (`status: "ended"` + `winner_user_id` is set —
+    # marketplace + lots convention). The old code only checked the
+    # first half so the user-visible Articles Vendus / Sold Items card
+    # was stuck at 0 for marketplace listings.
+    def _is_sold(l: dict) -> bool:
+        if l.get("status") == "sold":
+            return True
+        if l.get("status") == "ended" and l.get("winner_user_id"):
+            return True
+        return False
+
     active_listings = [l for l in all_listings if l.get("status") == "active"]
-    sold_listings = [l for l in all_listings if l.get("status") == "sold"]
+    sold_listings = [l for l in all_listings if _is_sold(l)]
     draft_listings = [l for l in all_listings if l.get("status") == "draft"]
     pending_review_listings = [l for l in all_listings if l.get("status") in _PENDING_STATUSES]
     ended_listings = [l for l in all_listings if l.get("status") in _ENDED_STATUSES]
@@ -87,7 +100,11 @@ async def get_seller_dashboard(
     # Post-sale Contact Info — enrich every sold/ended listing with the
     # buyer's contact details so the seller can complete the transaction.
     # Only sold (transaction confirmed) — no info leaked for active listings.
-    buyer_ids = {l.get("highest_bidder_id") or l.get("winner_id") for l in sold_listings if l.get("highest_bidder_id") or l.get("winner_id")}
+    buyer_ids = {
+        l.get("winner_user_id") or l.get("highest_bidder_id") or l.get("winner_id")
+        for l in sold_listings
+        if l.get("winner_user_id") or l.get("highest_bidder_id") or l.get("winner_id")
+    }
     buyer_lookup = {}
     if buyer_ids:
         buyer_docs = await rdb.users.find(
@@ -96,7 +113,7 @@ async def get_seller_dashboard(
         ).to_list(len(buyer_ids))
         buyer_lookup = {u["id"]: u for u in buyer_docs}
     for l in sold_listings:
-        bid = l.get("highest_bidder_id") or l.get("winner_id")
+        bid = l.get("winner_user_id") or l.get("highest_bidder_id") or l.get("winner_id")
         b = buyer_lookup.get(bid) if bid else None
         if b:
             l["buyer_contact"] = {
@@ -105,7 +122,13 @@ async def get_seller_dashboard(
                 "phone": b.get("phone", ""),
             }
 
-    total_sales = sum(l.get("current_price", 0) for l in sold_listings)
+    # iter296 — prefer `final_price` (snapshot at end time) over the
+    # live `current_price` so the total doesn't drift if `current_price`
+    # is later mutated by an admin tool.
+    total_sales = sum(
+        float(l.get("final_price") or l.get("current_price") or 0)
+        for l in sold_listings
+    )
 
     return {
         "active_listings": len(active_listings),

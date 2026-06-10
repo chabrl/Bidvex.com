@@ -1,5 +1,73 @@
 # BidVex — Auction Marketplace PRD
 
+## iter296 — P0 EMERGENCY: Auction Lifecycle, Bilingual Notifications, Dashboard Counters (Jun 10, 2026) 🚨🔧
+
+User reported 5 production bugs via bidvex.com screenshots. All 5 root-caused and fixed in a single focused pass.
+
+### 🔴 BUG 1 — Auction end never propagated (RCA + Fix)
+- **Root cause**: `server.py:621-644` registered 8 scheduler jobs as
+  sync lambdas (`lambda: safe_run(...)`). APScheduler treats sync
+  lambdas as sync — the returned coroutine was **never awaited**.
+  Confirmed via `RuntimeWarning: coroutine 'run_process_ended_auctions'
+  was never awaited` in backend logs. The marketplace + lots auction-
+  end job was effectively dead since registration. Vehicle + storage
+  jobs worked because they were registered via `services/scheduler.py`'s
+  `_tracked()` async wrapper.
+- **Fix**: Replaced 8 sync lambdas with named `async def` wrappers
+  (`_job_process_ended_auctions`, `_job_transition_upcoming_auctions`,
+  etc.). APScheduler now awaits each tick correctly.
+- **Stripe SDK compat secondary defect**: 6 production files used
+  `stripe.error.StripeError` which was removed in stripe v8+ —
+  AttributeError crashed mid-settlement. Replaced with `stripe.StripeError`
+  / `stripe.CardError` / `stripe.InvalidRequestError`.
+
+### 🔴 BUG 2/3 — Winner + Seller emails not sent
+- Direct consequence of Bug 1. After fixing the scheduler, verified
+  `send_auction_won_email` + `send_seller_auction_sold_email` fire
+  immediately on lot/listing close.
+- Added the same email fan-out + bilingual notifications to the
+  vehicle-end and multi-item-lots flows (which previously had no
+  winner email at all).
+- Vehicle BP=0% / Platform Fee=2.5% invariant preserved.
+
+### 🔴 BUG 4 — Bilingual platform notifications (single source of truth)
+- New `services/notifications_i18n.py` with `build_notification()` +
+  `create_notification()`. Every notification doc now ships with
+  `title_en`, `title_fr`, `message_en`, `message_fr`, plus legacy
+  `title` / `message` for backward compat with pre-iter296 frontend
+  builds. 11 notification kinds supported: auction_won, auction_ended,
+  auction_ended_no_winner, outbid, ending_soon, deposit_required,
+  broker_request_received, broker_request_approved,
+  broker_request_rejected, new_bid, winner_payment_due.
+- Unknown-kind fallback never produces an empty body — defaults to
+  "Update" / "Mise à jour".
+- Frontend `NotificationCenter.js` + `NotificationsPage.jsx` now
+  read `title_fr` / `message_fr` when i18n.language is FR, with a
+  fallback chain to legacy English fields.
+
+### 🔴 BUG 5 — Seller dashboard counters stuck at 0
+- **Root cause**: 5 endpoints filtered `{status: "sold"}` only, but
+  the marketplace flow ends auctions with `status: "ended"` +
+  `winner_user_id` set. So "Articles Vendus / Sold Items" + "Ended"
+  counters were always 0 for marketplace sellers.
+- **Fix**: Added a union `status: "sold"` OR (`status: "ended"` +
+  `winner_user_id` exists) in:
+  - `routes/dashboard.py` /api/dashboard/seller (the actual frontend-
+    visible endpoint — caught in testing-agent's iter296 sweep)
+  - `routes/listings.py` /api/listings/my-listings
+  - `routes/users.py` /api/users/me/stats, /api/users/sellers/{id}
+- **Data-repair script**: `services/iter296_data_repair.py` runs on
+  startup, scans for legacy ended listings with `highest_bidder_id`
+  but no `winner_user_id`, and backfills `winner_user_id` / `sold_at`
+  / `final_price`. Idempotent.
+
+### ✅ Tests
+- 7 new tests in `/app/backend/tests/test_iter296_auction_lifecycle.py`
+  covering all 5 bugs + Stripe SDK compat audit + data-repair
+  idempotency.
+- **Combined iter290-296 suite: 60+7=67 tests, ALL PASSING**.
+
+
 ## Latest: iter295 — MULTI-LOT COMPLIANCE + SETTLEMENT + PHOTOS + EMAIL MIGRATION (Jun 09, 2026) 🛡️
 
 Full iter295 sprint delivered — every directive shipped.
