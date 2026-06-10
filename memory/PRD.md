@@ -10109,6 +10109,21 @@ Facility chooses payment method per listing (Stripe / Cash / E-Transfer). Option
 - Stripe Connect destination charges for partners
 - Subscription lifecycle, branded PDF invoices, price-breakdown UI
 
+
+---
+
+## iter298 (Jun 10, 2026) — FINAL PRE-LAUNCH HARDENING — DONE ✅ (see CHANGELOG.md for full detail)
+- CLEANUP: ESLint clean (ListingDetailPage), `email_notifications.py` shim DELETED (all callers + tests migrated to services/emails/*)
+- BUG1: "Ending Soon" dynamic 24h filter — all 4 sections + EndingSoonStrip on Marketplace homepage
+- BUG2: zero-bid → `ended_no_sale` + relist email (3 CTAs) + `POST /api/listings/{id}/relist` + dashboard buttons + ?relist= prefill
+- BUG3: auto-charge at close (marketplace/lots-per-lot/storage/vehicles+multi-lot), payment_collected/pending_payment(48h link)/payment_failed, NON-CUSTODIAL payout_pending queue (`pending_payouts`)
+- BUG4: receipts + statements (db.receipts, GET /api/receipts/mine, bilingual letterhead emails, dashboard surfaces)
+- BUG5: buyer dashboard (winning/lost/won detail/deposits) + seller ended-split counters + net_payout_total
+- BONUS launch-blocker: phone-less registration 500 fixed (partial-unique mobile index + register omits null)
+- Tests: 92 iter29x + 219 legacy + 23 new iter298 — ALL GREEN. Testing agent E2E 14/14 (iteration_244.json)
+- DEPLOY: user must redeploy preview → production (bidvex.com) — all checks green
+- Known debt: BIDVEX-EMAIL-TABLES (legacy div templates in _email_core/email_marketplace senders)
+
 ## Backlog
 - (P1) Marketplace approve/reject status workflow (architecture decision needed)
 - (P1) Advanced analytics aggregation (top sellers, conversion rate)
