@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 try:
     import stripe  # type: ignore
-    StripeError = stripe.error.StripeError  # type: ignore
+    StripeError = stripe.StripeError  # type: ignore
 except Exception:
     stripe = None  # type: ignore
     class StripeError(Exception):

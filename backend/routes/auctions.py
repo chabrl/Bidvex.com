@@ -112,12 +112,22 @@ async def process_ended_auctions():
                 continue
 
             listing_id = listing["id"]
+            # iter296 P0 BUG 1 + 5 — write all dashboard-counter fields
+            # atomically with the status transition. `sold_at` and
+            # `winner_user_id` let the seller dashboard's "Sold" counter
+            # and the "Ended" counter compute correctly from MongoDB
+            # without needing a separate denormalised counter table.
+            winner_id = listing.get("highest_bidder_id")
+            _update_set = {"status": "ended", "ended_at": now_str}
+            if winner_id:
+                _update_set["winner_user_id"] = winner_id
+                _update_set["sold_at"] = now_str
+                _update_set["final_price"] = float(listing.get("current_price") or 0)
             await db.listings.update_one(
                 {"id": listing_id, "status": "active"},
-                {"$set": {"status": "ended", "ended_at": now_str}}
+                {"$set": _update_set}
             )
 
-            winner_id = listing.get("highest_bidder_id")
             seller_id = listing.get("seller_id")
 
             # ─── STRICT PAYMENT SYSTEM (Spec Features 1-3) ───
@@ -245,17 +255,19 @@ async def process_ended_auctions():
                     )
                     
                     import uuid as _uuid
+                    # iter296 P0 BUG 4 — Bilingual platform notifications.
+                    from services.notifications_i18n import create_notification
+                    _final = float(listing.get("current_price", 0) or 0)
+                    _title_item = listing.get("title", "Item")
                     # Winner notification
-                    await db.notifications.insert_one({
-                        "id": str(_uuid.uuid4()),
-                        "user_id": winner_id,
-                        "type": "auction_won",
-                        "title": "You Won!",
-                        "message": f"Congratulations! You won '{listing.get('title', 'Item')}' for ${listing.get('current_price', 0):.2f}",
-                        "data": {"listing_id": listing_id, "amount": listing.get("current_price", 0)},
-                        "read": False,
-                        "created_at": now_str
-                    })
+                    await create_notification(
+                        db,
+                        user_id=winner_id,
+                        kind="auction_won",
+                        params={"title": _title_item, "amount": _final},
+                        data={"listing_id": listing_id, "amount": _final,
+                              "action_url": f"/listings/{listing_id}"},
+                    )
                     
                     # Persist to Winner's Circle (30-day retention)
                     try:
@@ -264,17 +276,15 @@ async def process_ended_auctions():
                     except Exception as winner_err:
                         logger.warning(f"Winner persistence failed: {winner_err}")
                     
-                    # Seller notification  
-                    await db.notifications.insert_one({
-                        "id": str(_uuid.uuid4()),
-                        "user_id": seller_id,
-                        "type": "auction_ended",
-                        "title": "Auction Ended",
-                        "message": f"'{listing.get('title', 'Item')}' sold for ${listing.get('current_price', 0):.2f}",
-                        "data": {"listing_id": listing_id, "amount": listing.get("current_price", 0)},
-                        "read": False,
-                        "created_at": now_str
-                    })
+                    # Seller notification (bilingual)
+                    await create_notification(
+                        db,
+                        user_id=seller_id,
+                        kind="auction_ended",
+                        params={"title": _title_item, "amount": _final},
+                        data={"listing_id": listing_id, "amount": _final,
+                              "action_url": f"/seller/dashboard"},
+                    )
 
                     # ===== BUG 5: POST-AUCTION EMAILS =====
                     # Derive auction_type for consistent branding (Bug 1)
@@ -494,32 +504,113 @@ async def process_ended_auctions():
                 continue
 
             auction_id = auction["id"]
+            # iter296 P0 BUG 1 + 5 — write per-lot winner data + sold/ended
+            # counters so the seller dashboard reflects this auction
+            # within one scheduler tick.
+            _has_any_winner = any((lot.get("highest_bidder_id") for lot in auction.get("lots") or []))
+            _mi_update = {"status": "ended", "ended_at": now_str}
+            if _has_any_winner:
+                _mi_update["sold_at"] = now_str
             await db.multi_item_listings.update_one(
                 {"id": auction_id, "status": "active"},
-                {"$set": {"status": "ended", "ended_at": now_str}}
+                {"$set": _mi_update}
             )
 
             seller_id = auction.get("seller_id")
             
+            # iter296 P0 BUG 2/3/4 — Lot-level emails + bilingual platform
+            # notifications for the multi-item-listing flow. Mirrors the
+            # single-listing branch above.
+            from services.notifications_i18n import create_notification
+
             # Process each lot's winner
             for lot in auction.get("lots", []):
                 winner_id = lot.get("highest_bidder_id")
+                lot_final = float(lot.get("current_price", 0) or 0)
+                lot_title = f"{auction.get('title', 'Auction')} — Lot #{lot.get('lot_number','?')}"
+                # Persist lot winner on the document for dashboard counters
+                try:
+                    await db.multi_item_listings.update_one(
+                        {"id": auction_id, "lots.lot_number": lot.get("lot_number")},
+                        {"$set": {
+                            "lots.$.winner_user_id": winner_id,
+                            "lots.$.final_price": lot_final,
+                            "lots.$.sold_at": now_str if winner_id else None,
+                            "lots.$.status": "sold" if winner_id else "ended",
+                        }},
+                    )
+                except Exception as we:
+                    logger.warning(f"[lots-end] could not stamp lot winner: {we}")
+
                 if winner_id and seller_id:
                     try:
-                        winner = await db.users.find_one({"id": winner_id}, {"_id": 0, "name": 1, "email": 1, "phone": 1})
-                        seller = await db.users.find_one({"id": seller_id}, {"_id": 0, "name": 1, "email": 1, "phone": 1})
+                        winner = await db.users.find_one({"id": winner_id}, {"_id": 0, "name": 1, "email": 1, "phone": 1, "subscription_tier": 1, "province": 1})
+                        seller = await db.users.find_one({"id": seller_id}, {"_id": 0, "name": 1, "email": 1, "phone": 1, "subscription_tier": 1})
                         
                         await create_auction_won_conversation(
                             db=db,
                             listing_id=auction_id,
-                            listing_title=f"{auction.get('title', 'Auction')} - Lot #{lot['lot_number']}",
+                            listing_title=lot_title,
                             winner_id=winner_id,
                             seller_id=seller_id,
-                            winning_amount=lot.get("current_price", 0),
+                            winning_amount=lot_final,
                             winner_info=winner,
                             seller_info=seller,
                             lot_number=lot["lot_number"]
                         )
+
+                        # Bilingual platform notification — winner
+                        await create_notification(
+                            db, user_id=winner_id, kind="auction_won",
+                            params={"title": lot_title, "amount": lot_final},
+                            data={"listing_id": auction_id, "lot_number": lot.get("lot_number"),
+                                  "amount": lot_final, "action_url": f"/listings/{auction_id}"},
+                        )
+                        # Bilingual platform notification — seller
+                        await create_notification(
+                            db, user_id=seller_id, kind="auction_ended",
+                            params={"title": lot_title, "amount": lot_final},
+                            data={"listing_id": auction_id, "lot_number": lot.get("lot_number"),
+                                  "amount": lot_final, "action_url": "/seller/dashboard"},
+                        )
+
+                        # Winner + seller emails (best-effort, non-blocking)
+                        try:
+                            if winner and winner.get("email"):
+                                from services.email_notifications import send_auction_won_email
+                                await send_auction_won_email(
+                                    to_email=winner["email"],
+                                    to_name=winner.get("name", "Winner"),
+                                    item_name=lot_title,
+                                    auction_id=auction_id,
+                                    hammer_price=lot_final,
+                                    platform_fee=0.0,
+                                    is_vehicle=False,
+                                )
+                        except Exception as we_err:
+                            logger.warning(f"[lots-end] winner email failed: {we_err}")
+                        try:
+                            if seller and seller.get("email"):
+                                from services.email_notifications import send_seller_auction_sold_email
+                                # Best-effort 2.5% platform fee math
+                                _comm = round(lot_final * 0.025, 2)
+                                _net  = round(lot_final - _comm, 2)
+                                _w_raw = (winner.get("name") if winner else "") or "Winner"
+                                _parts = _w_raw.split()
+                                _alias = f"{_parts[0]} {_parts[1][0]}." if len(_parts) >= 2 else _parts[0]
+                                await send_seller_auction_sold_email(
+                                    seller_email=seller["email"],
+                                    seller_name=seller.get("name", "Seller"),
+                                    listing_title=lot_title,
+                                    listing_id=auction_id,
+                                    hammer_price=lot_final,
+                                    platform_fee=_comm,
+                                    net_payout=_net,
+                                    winning_bidder_alias=_alias,
+                                    auction_type="marketplace",
+                                )
+                        except Exception as se_err:
+                            logger.warning(f"[lots-end] seller-sold email failed: {se_err}")
                     except Exception as e:
                         logger.error(f"Failed to process winner for {auction_id} lot {lot['lot_number']}: {e}")
 

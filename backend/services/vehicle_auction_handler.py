@@ -132,6 +132,10 @@ async def process_ended_auction(db, vehicle_listing: dict) -> AuctionEndResult:
                 "$set": {
                     "status": "sold",
                     "winner_id": winner_id,
+                    # iter296 P0 BUG 5 — also store under `winner_user_id`
+                    # to match the marketplace + storage convention so
+                    # the seller dashboard counter logic is uniform.
+                    "winner_user_id": winner_id,
                     "final_price": final_price,
                     "sold_at": now,
                     "buyer_invoice_id": invoices["buyer_invoice"]["id"],
@@ -140,6 +144,66 @@ async def process_ended_auction(db, vehicle_listing: dict) -> AuctionEndResult:
                 }
             }
         )
+
+        # iter296 P0 BUG 2 + 3 + 4 — Winner email + seller email +
+        # bilingual platform notifications. Best-effort; never block
+        # invoice creation.
+        try:
+            from services.notifications_i18n import create_notification
+            from services.email_notifications import (
+                send_auction_won_email,
+                send_seller_auction_sold_email,
+            )
+            _veh_title = vehicle_listing.get("title") or (
+                f"{vehicle_listing.get('year','')} {vehicle_listing.get('make','')} "
+                f"{vehicle_listing.get('model','')}"
+            ).strip() or "Vehicle"
+
+            await create_notification(
+                db, user_id=winner_id, kind="auction_won",
+                params={"title": _veh_title, "amount": final_price},
+                data={"vehicle_id": vehicle_listing["id"], "amount": final_price,
+                      "action_url": f"/vehicles/{vehicle_listing['id']}"},
+            )
+            if vehicle_listing.get("seller_user_id"):
+                await create_notification(
+                    db, user_id=vehicle_listing["seller_user_id"],
+                    kind="auction_ended",
+                    params={"title": _veh_title, "amount": final_price},
+                    data={"vehicle_id": vehicle_listing["id"], "amount": final_price,
+                          "action_url": "/seller/dashboard"},
+                )
+            if winner_user and winner_user.get("email"):
+                # Vehicle BP = 0%; platform fee = 2.5% surfaced for clarity.
+                _plat = round(float(final_price) * 0.025, 2)
+                await send_auction_won_email(
+                    to_email=winner_user["email"],
+                    to_name=winner_user.get("name") or winner_user.get("full_name") or "Winner",
+                    item_name=_veh_title,
+                    auction_id=vehicle_listing["id"],
+                    hammer_price=float(final_price),
+                    platform_fee=_plat,
+                    is_vehicle=True,
+                )
+            if seller_user and seller_user.get("email"):
+                _comm = round(float(final_price) * 0.025, 2)
+                _net  = float(final_price) - _comm
+                _w_raw = (winner_user.get("name") if winner_user else "") or "Winner"
+                _parts = _w_raw.split()
+                _alias = f"{_parts[0]} {_parts[1][0]}." if len(_parts) >= 2 else _parts[0]
+                await send_seller_auction_sold_email(
+                    seller_email=seller_user["email"],
+                    seller_name=seller_user.get("name") or seller_user.get("full_name") or "Seller",
+                    listing_title=_veh_title,
+                    listing_id=vehicle_listing["id"],
+                    hammer_price=float(final_price),
+                    platform_fee=_comm,
+                    net_payout=_net,
+                    winning_bidder_alias=_alias,
+                    auction_type="vehicle",
+                )
+        except Exception as e_notif:
+            logger.warning(f"[vehicle-end] notif/email dispatch failed: {e_notif}")
         
         # Update winning bid status
         await db.vehicle_bids.update_one(

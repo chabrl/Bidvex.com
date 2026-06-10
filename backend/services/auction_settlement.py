@@ -410,7 +410,7 @@ async def settle_cash_or_etransfer(
                         )
                     except Exception:
                         pass
-                except stripe.error.StripeError as exc:
+                except stripe.StripeError as exc:
                     await mark_charge_failed(db, charge_row["id"], error=str(exc))
                     result["warnings"].append(f"buyer_charge_failed: {exc}")
 
@@ -469,7 +469,7 @@ async def settle_cash_or_etransfer(
                         )
                     except Exception:
                         pass
-                except stripe.error.StripeError as exc:
+                except stripe.StripeError as exc:
                     await mark_charge_failed(db, seller_charge_row["id"], error=str(exc))
                     result["warnings"].append(f"seller_charge_failed: {exc}")
 
@@ -673,7 +673,7 @@ async def settle_stripe_full(
                 amount=seller_payout, currency=currency,
             )
             result["warnings"].append("seller_no_connect_account")
-    except stripe.error.StripeError as exc:
+    except stripe.StripeError as exc:
         await mark_charge_failed(db, charge_row["id"], error=str(exc))
         result["warnings"].append(f"buyer_charge_failed: {exc}")
 

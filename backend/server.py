@@ -208,6 +208,17 @@ async def lifespan(app):
     except Exception as e:
         logger.warning(f"Strict payment indexes registration failed (non-fatal): {e}")
 
+    # iter296 P0 BUG 5 — One-shot backfill of `winner_user_id` /
+    # `sold_at` / `final_price` for marketplace + multi-item listings
+    # that ended before the iter296 fix shipped. Idempotent — second
+    # run is a no-op.
+    try:
+        from services.iter296_data_repair import run_iter296_listing_repair
+        repair = await run_iter296_listing_repair(db)
+        logger.info(f"[iter296_repair] {repair}")
+    except Exception as e:
+        logger.warning(f"[iter296_repair] failed (non-fatal): {e}")
+
     # iter283 — Idempotent listing-section backfill. Tags every active
     # listing with `section` + canonical `listing_type` so the storage,
     # vehicle, and lots section pages see EVERY listing they should.
@@ -618,29 +629,68 @@ async def run_process_ended_auctions():
     from routes.auctions import process_ended_auctions
     await process_ended_auctions()
 
+
+# iter296 P0 — FIX BUG 1: Sync lambdas returning coroutines were never
+# awaited by APScheduler's AsyncIOExecutor → the marketplace
+# `process_ended_auctions` job (and 6 others) were dead since
+# registration. Each job below is now an `async def` wrapper that
+# APScheduler awaits correctly.
+
+async def _job_transition_upcoming_auctions():
+    await safe_run("transition_upcoming_auctions", transition_upcoming_auctions(db))
+
+
+async def _job_process_ended_auctions():
+    await safe_run("process_ended_auctions", run_process_ended_auctions())
+
+
+async def _job_expire_partner_pro_trials():
+    await safe_run("expire_partner_pro_trials", expire_partner_pro_trials(db))
+
+
+async def _job_send_trial_reminder_emails():
+    await safe_run("send_trial_reminder_emails", send_trial_reminder_emails(db))
+
+
+async def _job_send_auction_payment_reminders():
+    await safe_run("send_auction_payment_reminders", send_auction_payment_reminders(db))
+
+
+async def _job_process_overdue_auction_payments():
+    await safe_run("process_overdue_auction_payments", process_overdue_auction_payments(db))
+
+
+async def _job_send_review_request_emails():
+    await safe_run("send_review_request_emails", send_review_request_emails(db))
+
+
+async def _job_keepalive_ping():
+    await safe_run("keepalive_ping", keepalive_ping())
+
+
 scheduler.add_job(
-    lambda: safe_run("transition_upcoming_auctions", transition_upcoming_auctions(db)),
+    _job_transition_upcoming_auctions,
     trigger=IntervalTrigger(minutes=5), id='transition_upcoming_auctions', replace_existing=True)
 scheduler.add_job(
-    lambda: safe_run("process_ended_auctions", run_process_ended_auctions()),
+    _job_process_ended_auctions,
     trigger=IntervalTrigger(minutes=1), id='process_ended_auctions', replace_existing=True)
 scheduler.add_job(
-    lambda: safe_run("expire_partner_pro_trials", expire_partner_pro_trials(db)),
+    _job_expire_partner_pro_trials,
     trigger=IntervalTrigger(hours=1), id='expire_trials', replace_existing=True)
 scheduler.add_job(
-    lambda: safe_run("send_trial_reminder_emails", send_trial_reminder_emails(db)),
+    _job_send_trial_reminder_emails,
     trigger=IntervalTrigger(hours=1), id='trial_reminders', replace_existing=True)
 scheduler.add_job(
-    lambda: safe_run("send_auction_payment_reminders", send_auction_payment_reminders(db)),
+    _job_send_auction_payment_reminders,
     trigger=IntervalTrigger(hours=6), id='payment_reminders', replace_existing=True)
 scheduler.add_job(
-    lambda: safe_run("process_overdue_auction_payments", process_overdue_auction_payments(db)),
+    _job_process_overdue_auction_payments,
     trigger=IntervalTrigger(hours=6), id='overdue_payments', replace_existing=True)
 scheduler.add_job(
-    lambda: safe_run("send_review_request_emails", send_review_request_emails(db)),
+    _job_send_review_request_emails,
     trigger=IntervalTrigger(hours=1), id='review_requests', replace_existing=True)
 scheduler.add_job(
-    lambda: safe_run("keepalive_ping", keepalive_ping()),
+    _job_keepalive_ping,
     trigger=IntervalTrigger(minutes=4), id='keepalive_ping', replace_existing=True)
 
 # Watchlist expiry push alerts — check every 2 minutes for items ending within 5 min

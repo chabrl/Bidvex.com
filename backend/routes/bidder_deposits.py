@@ -259,7 +259,7 @@ async def _charge_deposit_for_user(db, user, auction_id: str) -> dict:
             },
             idempotency_key=charge_row["idempotency_key"],
         )
-    except stripe.error.CardError as exc:
+    except stripe.CardError as exc:
         await mark_charge_failed(db, charge_row["id"], error=str(exc))
         raise HTTPException(status_code=402, detail={
             "error": "card_declined",

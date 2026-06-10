@@ -518,7 +518,15 @@ const NotificationCenter = () => {
                                 style={notification.type === 'payment_request' ? { color: typeConfig.titleColor } : undefined}
                                 data-testid={`notif-title-${notification.id}`}
                               >
-                                {typeConfig.emoji ? `${typeConfig.emoji} ` : ''}{notification.title}
+                                {typeConfig.emoji ? `${typeConfig.emoji} ` : ''}
+                                {/* iter296 P0 BUG 4 — bilingual fallback chain.
+                                    Prefer the localised field when present;
+                                    fall back to legacy `title` so older
+                                    notification docs (pre-iter296) still
+                                    render rather than appearing empty. */}
+                                {(isFrench ? notification.title_fr : notification.title_en)
+                                  || notification.title
+                                  || (isFrench ? 'Mise à jour' : 'Update')}
                               </p>
                               {/* iter261 Mission 1.5 — Payment Request gets
                                   an amount pill + inline Pay Now CTA. */}
@@ -535,8 +543,15 @@ const NotificationCenter = () => {
                                   ${Number(notification.amount_cad).toFixed(2)} CAD
                                 </span>
                               )}
-                              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-1">
-                                {notification.message}
+                              <p
+                                className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-1"
+                                data-testid={`notif-message-${notification.id}`}
+                              >
+                                {(isFrench ? notification.message_fr : notification.message_en)
+                                  || notification.message
+                                  || (isFrench
+                                    ? 'Vous avez une nouvelle mise à jour sur BidVex.'
+                                    : 'You have a new update on BidVex.')}
                               </p>
                               {notification.type === 'payment_request' && notification.link && (
                                 <a

@@ -148,7 +148,7 @@ async def _process_single_refund(db, job: Dict[str, Any]) -> None:
         try:
             stripe.PaymentIntent.cancel(pi_id)
             stripe_op = "canceled"
-        except stripe.error.InvalidRequestError as exc:
+        except stripe.InvalidRequestError as exc:
             # Already captured → refund the captured amount
             if "cannot be canceled" in str(exc).lower() or "already" in str(exc).lower():
                 stripe.Refund.create(payment_intent=pi_id, reason="requested_by_customer")

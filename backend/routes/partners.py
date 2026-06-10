@@ -88,7 +88,7 @@ def _ensure_stripe_coupon_for_promotion(
             name=f"BidVex {coupon_label or 'Promo'} — {int(round(pct))}% off",
             metadata={"bidvex_promotion_id": promotion_id, "label": coupon_label or ""},
         )
-    except stripe.error.InvalidRequestError as exc:
+    except stripe.InvalidRequestError as exc:
         # The coupon already exists — that's fine, we re-use it.
         if "already exists" not in str(exc).lower() and "resource_already_exists" not in str(exc).lower():
             logger.warning(f"Stripe coupon create failed for {stripe_coupon_id}: {exc}")

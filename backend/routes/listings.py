@@ -152,13 +152,23 @@ async def get_my_listings(current_user: User = Depends(get_current_user)):
     _PENDING = ("pending_ai_review", "pending_admin_review", "pending_review")
     _ENDED = ("sold", "ended", "expired", "completed")
 
+    # iter296 P0 BUG 5 — sold counter unions both end-state conventions
+    # so the marketplace flow (`status: "ended"` + `winner_user_id`)
+    # counts alongside vehicle/storage (`status: "sold"`).
+    def _is_sold(l: dict) -> bool:
+        if l.get("status") == "sold":
+            return True
+        if l.get("status") == "ended" and l.get("winner_user_id"):
+            return True
+        return False
+
     counts = {
         "total":          len(all_listings),
         "active":         sum(1 for l in all_listings if l.get("status") == "active"),
         "pending_review": sum(1 for l in all_listings if l.get("status") in _PENDING),
         "draft":          sum(1 for l in all_listings if l.get("status") == "draft"),
         "ended":          sum(1 for l in all_listings if l.get("status") in _ENDED),
-        "sold":           sum(1 for l in all_listings if l.get("status") == "sold"),
+        "sold":           sum(1 for l in all_listings if _is_sold(l)),
     }
     return {"listings": all_listings, "counts": counts}
 

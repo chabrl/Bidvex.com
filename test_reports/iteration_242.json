@@ -1,0 +1,58 @@
+{
+  "summary": "iter296 P0 backend regression — 6/6 new iter296 tests PASSED, 60/60 combined iter290-296 PASSED. Bilingual notifications (BUG 4) verified end-to-end in DB + UI bell. Auction-end propagation (BUG 1), winner email (BUG 2), seller email (BUG 3), and Stripe SDK v8 compat fix all confirmed. Data repair script idempotent. CRITICAL REGRESSION FOUND on BUG 5: the actual seller dashboard widget consumes `/api/dashboard/seller` (NOT `/api/listings/my-listings`) — and the dashboard endpoint was NOT updated with the iter296 union convention. As a result, the user-visible 'Articles Vendus / Sold Items' counter still shows 0 for charbel911@gmail.com despite the my-listings API returning counts.sold=1. This is the very symptom the user reported. Main agent must extend the union to /api/dashboard/seller.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "/api/dashboard/seller",
+        "issue": "BUG 5 REGRESSION — `routes/dashboard.py:73` still filters `sold_listings = [l for l in all_listings if l.get('status') == 'sold']`. Same line 70 (_ENDED_STATUSES) lists 'sold','ended','expired','completed' for the ENDED tab, but the SOLD bucket only accepts literal status=='sold'. Marketplace listings end with status='ended' + winner_user_id set, so they are excluded. The frontend SellerDashboard.js binds `dashboard?.sold_listings || 0` for the 'Articles Vendus' card — verified 0 on UI for charbel911 even though /api/listings/my-listings reports counts.sold=1. Also total_sales (line 108) is summed from sold_listings only, so 'Ventes Totales' / 'Paiement Net' cards are also 0. Same listing 'table test' (id 8d9ece47-13c4-4b1b-86fa-1eb43e52ad19) ended with bidder 0f258fed-... but is invisible to the dashboard.",
+        "priority": "CRITICAL"
+      }
+    ],
+    "minor": [
+      {
+        "endpoint": "/api/users/me/stats",
+        "issue": "Two routes are registered at the same path: routes/profiles.py:262 (annual_volume shape, registered first → WINS) and routes/users.py:150 (listings/bidding/financials shape with the iter296 union fix). The users.py fix on lines 169-194 is unreachable in production because profiles.py shadows the route. If the dashboard ever switches to /me/stats, the iter296 union will not take effect."
+      },
+      {
+        "endpoint": "/api/auth/login",
+        "issue": "Confirmed flaky-only: re-running the entire iter290-296 suite hits a 429 rate-limit on the dashboard counter test (test runs ~60 logins in ~20s). Not a real bug — single-run gives 200 OK. Suggest spacing iter296's seller-login test or using a long-lived token fixture to harden CI."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "SellerDashboard.js (Articles Vendus / Sold Items card)",
+        "issue": "Card stuck at '0' for charbel911@gmail.com even though the 'table test' listing ended with a winner. Backend bug above is the root cause; frontend code itself is correct (line 343 binds dashboard?.sold_listings).",
+        "selector": "SellerDashboard.js:342-345",
+        "priority": "CRITICAL"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter296_auction_lifecycle.py",
+    "/app/test_reports/pytest/iter296_results.xml",
+    "/app/test_reports/pytest/iter290_to_296.xml"
+  ],
+  "action_items": [
+    "URGENT — patch /app/backend/routes/dashboard.py lines 70-114 to apply the same `$or:[{status:'sold'},{status:'ended',winner_user_id:{$exists:true,$ne:null}}]` union as routes/listings.py:140-180 and routes/users.py:169-194. After that, `sold_listings`, `total_sales`, `counts.sold`, and `buyer_lookup` enrichment must all reflect the marketplace ended-with-winner convention.",
+    "Remove duplicate /api/users/me/stats registration (routes/profiles.py vs routes/users.py) — the users.py iter296 fix is currently dead code due to route shadowing.",
+    "Add an iter296 frontend e2e test that logs in as charbel911 and asserts the 'Articles Vendus' card is >= 1, to lock down the regression."
+  ],
+  "critical_code_review_comments": [
+    "routes/dashboard.py duplicates the listing/multi-item aggregation logic already in routes/listings.py:my-listings. Both endpoints compute 'sold/active/ended' over the same collections — DRY violation. Consider extracting a `compute_seller_listing_counts(seller_id, db)` helper used by both.",
+    "/api/users/me/stats is defined twice (profiles.py and users.py). Whichever router is included last wins; this is a silent bug surface. Add a startup assertion that detects duplicate path+method pairs.",
+    "services/notifications_i18n.py is the right pattern — single source of truth for all 11 bilingual kinds. Confirmed every kind produces non-empty title_en/title_fr/message_en/message_fr, including the unknown-kind fallback ('Update' / 'Mise à jour').",
+    "test_iter296_auction_lifecycle.py line 219 logs in fresh on every run — when the suite runs back-to-back, the login is hit 60+ times and trips the rate limiter. Use a session-scoped fixture that caches the token once per test session."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "98%", "frontend": "80%"},
+  "test_credentials": "Used /app/memory/test_credentials.md → charbel911@gmail.com / Anderosli123!@# (admin + seller of the production 'table test' listing). Login works; rate-limit at ~30 logins/min observed.",
+  "seed_data_creation": "Tests create + cleanup their own ephemeral listings/users prefixed iter296-* (deleted in test teardown). No seed data left behind.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Once main agent extends the $or union to routes/dashboard.py, re-run `pytest /app/backend/tests/test_iter296_auction_lifecycle.py` + curl `/api/dashboard/seller` as charbel911 → expect `sold_listings >= 1`, `total_sales > 0`. Also verify the seller dashboard UI card 'Articles Vendus' shows 1. The combined iter290-296 suite should keep passing 60/60. Don't forget to also dedupe the /api/users/me/stats route shadowing.",
+  "rca of the issue": "The iter296 P0 patch fixed BUG 5 partially: routes/listings.py (my-listings), routes/users.py (sellers/{id}, me/stats) were updated with the new union. routes/dashboard.py (/api/dashboard/seller) was NOT updated. Since the actual Seller Dashboard page (frontend/src/pages/SellerDashboard.js) consumes the latter endpoint via `axios.get(API+'/dashboard/seller')` and binds `dashboard.sold_listings` to the visible 'Articles Vendus / Sold Items' card, the user still sees 0 even with the patch deployed. Reproduction: login as charbel911@gmail.com → /seller/dashboard → 'Articles Vendus' card shows 0; curl /api/dashboard/seller returns sold_listings: 0; but curl /api/listings/my-listings returns counts.sold: 1. Mitigation: apply the same $or union to routes/dashboard.py lines 73, 76, 83-84, 90 so sold/ended/total_sales/buyer_contact all reflect marketplace ended-with-winner items."
+}

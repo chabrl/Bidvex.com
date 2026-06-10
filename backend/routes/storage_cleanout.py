@@ -112,7 +112,7 @@ async def create_storage_cleanout_hold(
         await db.users.update_one({"id": buyer_id}, {"$set": {"stripe_customer_id": customer_id}})
     try:
         sg.PaymentMethod.attach(payment_method_id, customer=customer_id)
-    except stripe.error.InvalidRequestError:
+    except stripe.InvalidRequestError:
         # already attached
         pass
 
@@ -136,7 +136,7 @@ async def create_storage_cleanout_hold(
                 "deadline_hours":   str((listing.get("storage_metadata") or {}).get("cleanout_deadline_hours", 72)),
             },
         )
-    except stripe.error.StripeError as exc:
+    except stripe.StripeError as exc:
         logger.error(f"[storage_cleanout] Stripe error creating hold: {exc}")
         raise HTTPException(status_code=502, detail={
             "error":      "stripe_create_failed",
@@ -364,7 +364,7 @@ async def admin_release_cleanout_deposit(
                 "released_at": now,
                 "stripe_status": pi.status,
             }
-    except stripe.error.StripeError as exc:
+    except stripe.StripeError as exc:
         logger.error(f"[storage_cleanout] Stripe error during release: {exc}")
         raise HTTPException(status_code=502, detail={
             "error":      "stripe_action_failed",

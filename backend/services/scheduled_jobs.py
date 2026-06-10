@@ -220,20 +220,14 @@ async def process_overdue_auction_payments(db):
                     }},
                 )
 
-                await db.notifications.insert_one({
-                    "id": str(uuid.uuid4()),
-                    "user_id": winner_id,
-                    "type": "payment_overdue",
-                    "title": "Payment Overdue",
-                    "message": f"Your payment for {listing.get('title')} is overdue. A late penalty of ${penalty_amount:.2f} has been applied.",
-                    "listing_id": listing_id,
-                    "data": {
-                        "checkout_url": f"/checkout/{listing_id}",
-                        "penalty_amount": penalty_amount,
-                    },
-                    "read": False,
-                    "created_at": now_str,
-                })
+                # iter296 P0 BUG 4 — bilingual
+                from services.notifications_i18n import create_notification
+                await create_notification(
+                    db, user_id=winner_id, kind="winner_payment_due",
+                    params={"title": listing.get("title", "your item"), "amount": penalty_amount, "days": 14},
+                    data={"listing_id": listing_id, "checkout_url": f"/checkout/{listing_id}",
+                          "penalty_amount": penalty_amount},
+                )
 
                 winner = await db.users.find_one({"id": winner_id}, {"_id": 0, "email": 1, "name": 1})
                 if winner and winner.get("email"):
@@ -497,6 +491,13 @@ async def process_ended_storage_auctions(db):
                     "closed_at": now.isoformat(),
                     "updated_at": now.isoformat(),
                 }
+                # iter296 P0 BUG 1 + 5 — propagate winner + sold marker
+                # so seller dashboard counters reflect the close within
+                # one tick.
+                if new_status == "sold" and winner_id:
+                    set_update["winner_user_id"] = winner_id
+                    set_update["sold_at"] = now.isoformat()
+                    set_update["final_price"] = current_bid
                 if pickup_code:
                     set_update["pickup_code"] = pickup_code
                     set_update["pickup_code_used"] = False
@@ -618,6 +619,29 @@ async def process_ended_storage_auctions(db):
                     "bids_count": len(bids),
                     "closed_at": now.isoformat(),
                 })
+
+                # iter296 P0 BUG 4 — Bilingual platform notifications.
+                try:
+                    from services.notifications_i18n import create_notification
+                    _storage_title = auction.get("unit_label") or auction.get("title") or auction.get("unit_number") or "Storage Unit"
+                    if new_status == "sold" and winner_id:
+                        await create_notification(
+                            db, user_id=winner_id, kind="auction_won",
+                            params={"title": _storage_title, "amount": current_bid},
+                            data={"auction_id": auction_id, "amount": current_bid,
+                                  "action_url": f"/storage-auctions/{auction_id}"},
+                        )
+                    facility_user_id = facility.get("user_id") or facility.get("id")
+                    if facility_user_id:
+                        await create_notification(
+                            db, user_id=facility_user_id,
+                            kind=("auction_ended" if new_status == "sold" else "auction_ended_no_winner"),
+                            params={"title": _storage_title, "amount": current_bid},
+                            data={"auction_id": auction_id, "amount": current_bid,
+                                  "action_url": "/storage-facility-dashboard"},
+                        )
+                except Exception as e:
+                    logger.warning(f"[STORAGE_CLOSE] bilingual notif failed for {auction_id}: {e}")
 
                 closed += 1
             except Exception as e:

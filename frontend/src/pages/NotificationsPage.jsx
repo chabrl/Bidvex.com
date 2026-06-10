@@ -197,13 +197,16 @@ const NotificationsPage = () => {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className={`text-sm ${n.read ? 'font-medium text-slate-700' : 'font-bold text-slate-900'}`}>
-                          {n.title || t('notifications.noTitle', '(no title)')}
+                          {/* iter296 P0 BUG 4 — bilingual fallback chain. */}
+                          {(isFr ? n.title_fr : n.title_en)
+                            || n.title
+                            || t('notifications.noTitle', '(no title)')}
                         </h3>
                         {!n.read && <Badge className="bg-blue-600 text-white text-[10px] px-1.5 py-0">{t('notifications.new', 'New')}</Badge>}
                       </div>
-                      {n.message && (
+                      {((isFr ? n.message_fr : n.message_en) || n.message) && (
                         <p className="text-sm" style={{ color: '#475569', lineHeight: 1.5 }}>
-                          {n.message}
+                          {(isFr ? n.message_fr : n.message_en) || n.message}
                         </p>
                       )}
                       <p className="text-xs mt-2" style={{ color: '#94a3b8' }}>

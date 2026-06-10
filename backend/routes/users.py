@@ -62,9 +62,17 @@ async def get_user_profile_summary(user_id: str):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    # Get seller stats
+    # iter296 P0 BUG 5 — union "sold" status (vehicles/storage) with
+    # "ended + winner_user_id" (marketplace/lots) so the public seller
+    # profile sold count is accurate.
     listings_count = await db.listings.count_documents({"seller_id": user_id})
-    sold_count = await db.listings.count_documents({"seller_id": user_id, "status": "sold"})
+    sold_count = await db.listings.count_documents({
+        "seller_id": user_id,
+        "$or": [
+            {"status": "sold"},
+            {"status": "ended", "winner_user_id": {"$exists": True, "$ne": None}},
+        ],
+    })
     
     # Get ratings
     ratings = await db.ratings.find({"seller_id": user_id}).to_list(100)
@@ -151,26 +159,46 @@ async def get_user_stats(
     current_user = await _get_current_user(credentials)
     user_id = current_user.id
     
-    # Get various stats
+    # iter296 P0 BUG 5 — "Sold" counters union BOTH conventions:
+    #   • vehicle/storage flow: `status: "sold"`
+    #   • marketplace/lots flow: `status: "ended"` + `winner_user_id` set
+    # Without this union the marketplace seller dashboard reports
+    # `sold_items: 0` even for auctions that closed with a winner.
     listings_count = await db.listings.count_documents({"seller_id": user_id})
     active_listings = await db.listings.count_documents({"seller_id": user_id, "status": "active"})
-    sold_listings = await db.listings.count_documents({"seller_id": user_id, "status": "sold"})
-    
+    sold_listings = await db.listings.count_documents({
+        "seller_id": user_id,
+        "$or": [
+            {"status": "sold"},
+            {"status": "ended", "winner_user_id": {"$exists": True, "$ne": None}},
+        ],
+    })
+    ended_count = await db.listings.count_documents({
+        "seller_id": user_id, "status": {"$in": ["ended", "sold"]},
+    })
+
     bids_placed = await db.bids.count_documents({"bidder_id": user_id})
     auctions_won = await db.listings.count_documents({"winning_bidder_id": user_id})
     
-    # Calculate total sales
+    # Calculate total sales — union of both conventions
     sold = await db.listings.find(
-        {"seller_id": user_id, "status": "sold"},
-        {"current_price": 1}
+        {
+            "seller_id": user_id,
+            "$or": [
+                {"status": "sold"},
+                {"status": "ended", "winner_user_id": {"$exists": True, "$ne": None}},
+            ],
+        },
+        {"current_price": 1, "final_price": 1}
     ).to_list(None)
-    total_sales = sum(l.get("current_price", 0) for l in sold)
+    total_sales = sum((l.get("final_price") or l.get("current_price") or 0) for l in sold)
     
     return {
         "listings": {
             "total": listings_count,
             "active": active_listings,
-            "sold": sold_listings
+            "sold": sold_listings,
+            "ended": ended_count,
         },
         "bidding": {
             "bids_placed": bids_placed,
@@ -308,10 +336,14 @@ async def get_seller_profile(seller_id: str):
     if not user:
         raise HTTPException(status_code=404, detail="Seller not found")
     
-    # Get stats
+    # Get stats — iter296 P0 BUG 5 — union both end-status conventions.
     listings = await db.listings.find({"seller_id": seller_id}).to_list(None)
     active = [l for l in listings if l.get("status") == "active"]
-    sold = [l for l in listings if l.get("status") == "sold"]
+    sold = [
+        l for l in listings
+        if l.get("status") == "sold"
+        or (l.get("status") == "ended" and l.get("winner_user_id"))
+    ]
     
     # Get ratings
     ratings = await db.ratings.find({"seller_id": seller_id}).to_list(None)
