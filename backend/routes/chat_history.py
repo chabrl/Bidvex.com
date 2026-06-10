@@ -168,7 +168,7 @@ async def send_ai_notification(
     # Email via unified template (best-effort).
     try:
         from services.email_templates import build_email_payload
-        from services.email_notifications import send_email
+        from services.emails._email_core import send_email
         user = await _db.users.find_one({"id": user_id}, {"_id": 0, "email": 1, "first_name": 1})
         if user and user.get("email"):
             payload = build_email_payload(

@@ -265,7 +265,7 @@ class TestJourneyDispatch:
         async def fake_send_email(**k):
             called["send"] = True
             return True
-        monkeypatch.setattr("services.email_notifications.send_email", fake_send_email)
+        monkeypatch.setattr("services.emails._email_core.send_email", fake_send_email)
 
         ok = await dispatch_journey_email(FakeDB(), {"id": "u1", "email": "x@x.com"}, email_number=6)
         assert ok is False

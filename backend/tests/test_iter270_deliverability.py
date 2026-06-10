@@ -39,7 +39,7 @@ def _login_admin():
 
 
 def test_iter270_canonical_from_is_noreply_dotcom():
-    src = _read("services/email_notifications.py")
+    src = _read("services/emails/_email_core.py")
     # The default FROM falls back to noreply@bidvex.com.
     assert 'FROM_EMAIL = os.environ.get("SENDGRID_FROM_EMAIL", "noreply@bidvex.com")' in src
     # FROM_NAME is "BidVex Canada" per spec.
@@ -47,7 +47,7 @@ def test_iter270_canonical_from_is_noreply_dotcom():
 
 
 def test_iter270_partner_from_collapsed_to_noreply():
-    src = _read("services/email_notifications.py")
+    src = _read("services/emails/_email_core.py")
     # Partner B2B FROM is now noreply@bidvex.com (was partners@bidvex.ca).
     assert 'B2B_PARTNER_FROM_EMAIL = "noreply@bidvex.com"' in src
     # Reply-To stays partners@bidvex.ca.
@@ -57,14 +57,17 @@ def test_iter270_partner_from_collapsed_to_noreply():
 def test_iter270_send_email_forces_canonical_sender():
     """`send_email()` ignores any `from_email` override and always
     sends as the unified noreply@ address so DKIM is consistent."""
-    src = _read("services/email_notifications.py")
+    src = _read("services/emails/_email_core.py")
     assert "_from = FROM_EMAIL  # Force canonical sender" in src
 
 
 def test_iter270_no_legacy_dotca_support_in_outbound_templates():
     """Email body templates must reference support@bidvex.com — not .ca."""
     for path in (
-        "services/email_notifications.py",
+        "services/emails/_email_core.py",
+        "services/emails/email_marketplace.py",
+        "services/emails/email_system.py",
+        "services/emails/email_vehicles.py",
         "services/email_journey.py",
         "services/partner_outreach.py",
         "services/pickup_coordination_service.py",
@@ -107,7 +110,7 @@ def test_iter270_pdf_footers_use_dotcom_support():
 
 
 def test_iter270_send_email_attaches_list_unsubscribe_on_marketing():
-    src = _read("services/email_notifications.py")
+    src = _read("services/emails/_email_core.py")
     assert "List-Unsubscribe" in src
     assert "List-Unsubscribe-Post" in src
     assert "List-Unsubscribe=One-Click" in src
@@ -115,14 +118,14 @@ def test_iter270_send_email_attaches_list_unsubscribe_on_marketing():
 
 
 def test_iter270_send_email_attaches_x_entity_ref_id():
-    src = _read("services/email_notifications.py")
+    src = _read("services/emails/_email_core.py")
     assert "X-Entity-Ref-ID" in src
     assert "hashlib" in src
     assert "X-Mailer" in src
 
 
 def test_iter270_click_tracking_disabled_in_tracking_settings():
-    src = _read("services/email_notifications.py")
+    src = _read("services/emails/_email_core.py")
     # ClickTracking is constructed with `False, False` (enable + enable_text).
     assert "_SgClickTracking(False, False)" in src
     # Open tracking on, subscription tracking off.
@@ -131,7 +134,7 @@ def test_iter270_click_tracking_disabled_in_tracking_settings():
 
 
 def test_iter270_send_email_attaches_sendgrid_categories():
-    src = _read("services/email_notifications.py")
+    src = _read("services/emails/_email_core.py")
     assert "add_category" in src
     # Default category logic.
     assert '"marketing", "promotional"' in src

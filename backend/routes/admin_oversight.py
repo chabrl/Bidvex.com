@@ -610,7 +610,7 @@ async def admin_test_email(
         }
 
     try:
-        from services.email_notifications import send_unified_email
+        from services.emails._email_core import send_unified_email
         result = await send_unified_email(
             email_type="new_feature",
             user={"email": recipient, "first_name": "Admin", "name": "Admin"},
@@ -869,7 +869,7 @@ async def approve_affiliate_payout(
     user = affiliate  # alias used by email block below.
     if user and user.get("email"):
         try:
-            from services.email_notifications import send_unified_email
+            from services.emails._email_core import send_unified_email
             await send_unified_email(
                 email_type="payment_confirmed",
                 user=user,
@@ -934,7 +934,7 @@ async def reject_affiliate_payout(
     ) if uid else None
     if user and user.get("email"):
         try:
-            from services.email_notifications import send_unified_email
+            from services.emails._email_core import send_unified_email
             await send_unified_email(
                 email_type="new_feature",
                 user=user,
@@ -1106,7 +1106,7 @@ async def send_stripe_onboarding_link(
         raise HTTPException(status_code=502, detail=f"Stripe error: {exc}") from exc
 
     try:
-        from services.email_notifications import send_unified_email
+        from services.emails._email_core import send_unified_email
         await send_unified_email(
             email_type="new_feature",
             user=affiliate,

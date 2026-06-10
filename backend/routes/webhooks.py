@@ -986,7 +986,7 @@ async def _handle_admin_payment_request_paid(db, session):
     target = await db.users.find_one({"id": user_id or doc.get("user_id")}, {"_id": 0}) if (user_id or doc.get("user_id")) else None
     if target:
         try:
-            from services.email_notifications import send_unified_email
+            from services.emails._email_core import send_unified_email
             await send_unified_email(
                 user=dict(target),
                 email_type="payment_confirmed",
@@ -1106,7 +1106,7 @@ async def _handle_listing_promotion_paid(db, session):
         listing_doc = await listings_coll.find_one({"id": listing_id}, {"_id": 0})
         seller_doc = await db.users.find_one({"id": seller_id}, {"_id": 0, "name": 1, "email": 1})
         if seller_doc and seller_doc.get("email"):
-            from services.email_notifications import send_promotion_confirmation_email
+            from services.emails.email_system import send_promotion_confirmation_email
             await send_promotion_confirmation_email(
                 seller_email=seller_doc["email"],
                 seller_name=seller_doc.get("name", "Seller"),
@@ -1311,7 +1311,7 @@ async def _handle_checkout_completed(db, session):
             listing = await db.vehicle_listings.find_one({"id": listing_id}, {"_id": 0})
             seller_doc = await db.users.find_one({"id": listing.get("seller_id")}, {"_id": 0}) if listing else None
             if buyer and buyer.get("email"):
-                from services.email_notifications import send_auction_won_email
+                from services.emails.email_marketplace import send_auction_won_email
                 await send_auction_won_email(
                     to_email=buyer["email"],
                     to_name=buyer.get("name", "Buyer"),
@@ -1364,7 +1364,7 @@ async def _handle_checkout_completed(db, session):
                     buyer = await db.users.find_one({"id": buyer_id}, {"_id": 0})
                     seller_doc = await db.users.find_one({"id": auction.get("seller_id")}, {"_id": 0})
                     if buyer and buyer.get("email"):
-                        from services.email_notifications import send_auction_won_email
+                        from services.emails.email_marketplace import send_auction_won_email
                         lot_number = metadata.get("lot_number", "")
                         lot_title = f"{auction.get('title', 'Auction')} — Lot #{lot_number}" if lot_number else auction.get("title", "Auction")
                         # Derive figures from the breakdown
@@ -1893,7 +1893,7 @@ async def _handle_affiliate_transfer_event(db, event_type: str, data: Dict[str, 
     # Admin alert on failure / reversal.
     if event_type in ("transfer.failed", "transfer.reversed"):
         try:
-            from services.email_notifications import send_unified_email
+            from services.emails._email_core import send_unified_email
             admin = await db.users.find_one(
                 {"$or": [{"role": "admin"}, {"is_admin": True}]},
                 {"_id": 0, "id": 1, "email": 1, "name": 1, "preferred_language": 1},

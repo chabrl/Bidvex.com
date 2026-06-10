@@ -175,7 +175,7 @@ async def confirm_pickup_code(
 
     # Notify both parties — best-effort email
     try:
-        from services.email_notifications import send_email
+        from services.emails._email_core import send_email
         body = (
             f"<p>Pickup code <code>{code}</code> was confirmed at {now}.</p>"
             f"<p>The seller has confirmed payment. The BidVex commission will "

@@ -1,5 +1,5 @@
 """iter241 Mission 2 — Subscription lifecycle emails."""
-from services.email_notifications import (
+from services.emails.email_system import (
     send_welcome_email,
     send_subscription_reminder_email,
     send_subscription_expired_email,

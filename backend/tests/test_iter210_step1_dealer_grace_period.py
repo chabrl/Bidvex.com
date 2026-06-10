@@ -73,7 +73,7 @@ async def test_day1_starts_grace_writes_log_sends_email(db):
     }
     user = await db.users.find_one({"id": uid}, {"_id": 0})
     try:
-        from services import email_notifications
+        from services.emails import _email_core as email_notifications
         with patch.object(email_notifications, "send_email", new=AsyncMock(return_value=True)) as mock_send:
             r = await svc.handle_dealer_subscription_payment_failed(
                 db, event_id=event_id, invoice=invoice, user=user,
@@ -107,7 +107,7 @@ async def test_same_event_id_processed_twice_is_noop(db):
     invoice = {"id": "in_x", "customer": "cus_x", "subscription": sub_id, "amount_due": 20000}
     user = await db.users.find_one({"id": uid}, {"_id": 0})
     try:
-        from services import email_notifications
+        from services.emails import _email_core as email_notifications
         with patch.object(email_notifications, "send_email", new=AsyncMock(return_value=True)) as mock_send:
             r1 = await svc.handle_dealer_subscription_payment_failed(db, event_id=event_id, invoice=invoice, user=user)
             r2 = await svc.handle_dealer_subscription_payment_failed(db, event_id=event_id, invoice=invoice, user=user)
@@ -136,7 +136,7 @@ async def test_grace_expired_triggers_suspension(db):
     await db.vehicles.insert_one({"id": listing_id, "seller_id": sid, "status": "active"})
 
     try:
-        from services import email_notifications
+        from services.emails import _email_core as email_notifications
         with patch.object(email_notifications, "send_email", new=AsyncMock(return_value=True)):
             result = await enforce_dealer_grace_period(db)
         assert result["suspended_count"] >= 1
@@ -160,7 +160,7 @@ async def test_grace_still_active_does_not_suspend(db):
 
     uid, sub_id = await _seed_dealer(db, grace_days_ago=3)
     try:
-        from services import email_notifications
+        from services.emails import _email_core as email_notifications
         with patch.object(email_notifications, "send_email", new=AsyncMock(return_value=True)):
             await enforce_dealer_grace_period(db)
         u2 = await db.users.find_one({"id": uid})

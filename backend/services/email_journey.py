@@ -392,7 +392,7 @@ async def dispatch_journey_email(db, user: dict, *, email_number: int) -> bool:
 
     # Send
     try:
-        from services.email_notifications import send_email
+        from services.emails._email_core import send_email
         ok = await send_email(to_email=user["email"], subject=subject, html_content=html)
     except Exception as e:
         logger.error(f"[journey:E{email_number}] send failed for {user.get('email')}: {e}")

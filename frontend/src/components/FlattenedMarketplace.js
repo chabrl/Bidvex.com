@@ -14,6 +14,7 @@ import { Separator } from './ui/separator';
 import BidConfirmationDialog from './BidConfirmationDialog';
 import SafeImage from './SafeImage';
 import FilterBar from './FilterBar/FilterBar';
+import EndingSoonStrip from './EndingSoonStrip';
 import { 
   Clock, 
   Gavel, 
@@ -415,6 +416,11 @@ const FlattenedMarketplace = ({
 
       {/* iter239 Mission 5 — Featured Listings horizontal snap-scroll carousel. */}
       <FeaturedListingsBanner section="marketplace" limit={8} />
+
+      {/* iter298 BUG 1 — "Ending Soon" strip: active listings ending
+          within 24h, computed dynamically server-side. Renders only
+          when qualifying listings exist. */}
+      <EndingSoonStrip />
 
       {/* iter283-hotfix Mission 4 — Section-filter chip row.
           Lets buyers narrow the universal-feed instantly without a

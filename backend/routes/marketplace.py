@@ -445,6 +445,7 @@ async def get_marketplace_items(
     private_sales_only: Optional[str] = None,  # iter217 Phase 4
     partner_only: Optional[str] = None,        # iter217 Phase 4
     lots_auction_only: Optional[str] = None,   # iter217 Phase 4 — items from multi-lot auctions
+    ending_soon: Optional[str] = None,         # iter298 BUG 1 — active items ending within 24h (dynamic)
     buyer_province: Optional[str] = None,    # for "nearby_first" geo-sort
     sort: str = "nearby_first",
     limit: int = 20,
@@ -604,6 +605,19 @@ async def get_marketplace_items(
     # iter217 Phase 4 — Lot Auction pill (only items that come from multi-lot auctions)
     if lots_auction_only and str(lots_auction_only).lower() == 'true':
         items = [i for i in items if i.get("auction_id")]
+
+    # iter298 BUG 1 — "Ending Soon" filter, computed DYNAMICALLY at
+    # query time from `auction_end_date` (never a scheduler flag):
+    # active listings ending within the next 24 hours.
+    if ending_soon and str(ending_soon).lower() == 'true':
+        _es_cutoff = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
+        items = [
+            i for i in items
+            if i.get("auction_end_date")
+            and _now_iso < str(i.get("auction_end_date")) <= _es_cutoff
+        ]
+        # Soonest-ending first.
+        items = sorted(items, key=lambda x: str(x.get("auction_end_date") or ""))
 
     # ── Tax Status filter (partner vs standard listings) ──
     if tax_status == "partner":

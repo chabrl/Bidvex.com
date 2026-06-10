@@ -374,7 +374,7 @@ async def dealer_confirm_settlement(
 async def _notify_buyer_of_dealer_confirmation(buyer: dict, vehicle_id: str, settlement: dict, payload: DealerConfirmPayload):
     """Bilingual email — dealer has confirmed receipt; buyer can optionally acknowledge."""
     try:
-        from services.email_notifications import send_email
+        from services.emails._email_core import send_email
         email = (buyer or {}).get("email")
         if not email:
             return

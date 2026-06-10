@@ -1,5 +1,5 @@
 """iter241 Mission 2 — Payment & invoice emails."""
-from services.email_notifications import (
+from services.emails.email_system import (
     send_invoice_created_email,
     send_payment_confirmation_email,
     send_invoice_overdue_email,

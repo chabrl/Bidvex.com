@@ -181,6 +181,46 @@ const CreateListingPage = () => {
     }
   }, [searchParams, isFacilityOrAdmin]);
 
+  // iter298 BUG 2 — "Edit & Relist": pre-populate the form from an ended
+  // listing (?relist=<listing_id>). The seller can adjust title / price /
+  // duration / photos before republishing as a brand-new auction.
+  useEffect(() => {
+    const relistId = searchParams.get('relist');
+    if (!relistId) return;
+    let cancelled = false;
+    axios.get(`${API}/listings/${relistId}`)
+      .then((res) => {
+        if (cancelled) return;
+        const src = res.data || {};
+        const nextWeek = new Date();
+        nextWeek.setDate(nextWeek.getDate() + 7);
+        setFormData((prev) => ({
+          ...prev,
+          title: src.title || prev.title,
+          description: src.description || prev.description,
+          category: src.category || prev.category,
+          condition: src.condition || prev.condition,
+          starting_price: src.starting_price != null ? String(src.starting_price) : prev.starting_price,
+          buy_now_price: src.buy_now_price != null ? String(src.buy_now_price) : prev.buy_now_price,
+          images: Array.isArray(src.images) ? src.images : prev.images,
+          country: src.country || prev.country,
+          region: src.region || prev.region,
+          city: src.city || prev.city,
+          postal_code: src.postal_code || prev.postal_code,
+          location: src.location || prev.location,
+          currency: src.currency || prev.currency,
+          auction_end_date: nextWeek.toISOString().slice(0, 16),
+        }));
+        toast.info(isFr
+          ? 'Formulaire pré-rempli depuis votre annonce terminée — modifiez puis republiez.'
+          : 'Form pre-filled from your ended listing — adjust anything, then republish.');
+      })
+      .catch(() => {
+        toast.error(isFr ? 'Annonce source introuvable.' : 'Source listing not found.');
+      });
+    return () => { cancelled = true; };
+  }, [searchParams]);
+
   const fetchCategories = async () => {
     try {
       const response = await axios.get(`${API}/categories`);

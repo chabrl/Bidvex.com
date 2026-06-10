@@ -13,6 +13,21 @@ Coverage:
 from __future__ import annotations
 
 import asyncio
+
+def _run(coro):
+    """Robust runner — earlier files in a batch may close the shared loop
+    via asyncio.run(); recreate one when needed (iter298 hygiene)."""
+    import asyncio as _aio
+    try:
+        loop = _aio.get_event_loop()
+        if loop.is_closed():
+            raise RuntimeError("closed")
+    except RuntimeError:
+        loop = _aio.new_event_loop()
+        _aio.set_event_loop(loop)
+    return loop.run_until_complete(coro)
+
+
 from unittest.mock import patch, AsyncMock
 
 import pytest
@@ -36,7 +51,7 @@ def test_unread_count_endpoint_anon_returns_401():
 # ---------------------------------------------------------------------------
 def test_genai_chat_resolve_user_id_anonymous():
     from routes.genai_chat import _resolve_user_id
-    out = asyncio.get_event_loop().run_until_complete(_resolve_user_id(None))
+    out = _run(_resolve_user_id(None))
     assert out is None
 
 
@@ -44,7 +59,7 @@ def test_genai_chat_resolve_user_id_malformed_token():
     from routes.genai_chat import _resolve_user_id
     from fastapi.security import HTTPAuthorizationCredentials
     bad = HTTPAuthorizationCredentials(scheme="Bearer", credentials="not-a-jwt")
-    out = asyncio.get_event_loop().run_until_complete(_resolve_user_id(bad))
+    out = _run(_resolve_user_id(bad))
     assert out is None
 
 
@@ -52,10 +67,10 @@ def test_genai_chat_resolve_user_id_malformed_token():
 # Unified email dispatch
 # ---------------------------------------------------------------------------
 def test_send_unified_email_routes_through_build_email_payload():
-    from services.email_notifications import send_unified_email
-    with patch("services.email_notifications.send_email", new_callable=AsyncMock) as mock_send:
+    from services.emails._email_core import send_unified_email
+    with patch("services.emails._email_core.send_email", new_callable=AsyncMock) as mock_send:
         mock_send.return_value = {"status": "sent", "to": "x@y.z"}
-        asyncio.get_event_loop().run_until_complete(
+        _run(
             send_unified_email(
                 "welcome",
                 user={"email": "alice@example.com", "first_name": "Alice"},
@@ -70,10 +85,10 @@ def test_send_unified_email_routes_through_build_email_payload():
 
 
 def test_legacy_send_bid_placed_email_uses_unified_template():
-    from services.email_notifications import send_bid_placed_email
-    with patch("services.email_notifications.send_email", new_callable=AsyncMock) as mock_send:
+    from services.emails.email_marketplace import send_bid_placed_email
+    with patch("services.emails._email_core.send_email", new_callable=AsyncMock) as mock_send:
         mock_send.return_value = {"status": "sent"}
-        asyncio.get_event_loop().run_until_complete(send_bid_placed_email(
+        _run(send_bid_placed_email(
             bidder_email="bob@example.com",
             bidder_name="Bob",
             listing_title="Vintage Coin",
@@ -94,10 +109,10 @@ def test_legacy_send_bid_placed_email_uses_unified_template():
 
 
 def test_legacy_send_outbid_email_uses_unified_template():
-    from services.email_notifications import send_outbid_email
-    with patch("services.email_notifications.send_email", new_callable=AsyncMock) as mock_send:
+    from services.emails.email_marketplace import send_outbid_email
+    with patch("services.emails._email_core.send_email", new_callable=AsyncMock) as mock_send:
         mock_send.return_value = {"status": "sent"}
-        asyncio.get_event_loop().run_until_complete(send_outbid_email(
+        _run(send_outbid_email(
             user_email="carol@example.com",
             user_name="Carol",
             listing_title="Rare Watch",
@@ -115,10 +130,10 @@ def test_legacy_send_outbid_email_uses_unified_template():
 
 
 def test_legacy_send_storage_bid_placed_returns_bool():
-    from services.email_notifications import send_storage_bid_placed_email
-    with patch("services.email_notifications.send_email", new_callable=AsyncMock) as mock_send:
+    from services.emails.email_marketplace import send_storage_bid_placed_email
+    with patch("services.emails._email_core.send_email", new_callable=AsyncMock) as mock_send:
         mock_send.return_value = {"status": "sent"}
-        out = asyncio.get_event_loop().run_until_complete(send_storage_bid_placed_email(
+        out = _run(send_storage_bid_placed_email(
             buyer={"email": "dave@example.com", "name": "Dave"},
             auction={"id": "auction-uuid-here"},
             bid_state={"current_bid": 250.0, "you_are_winning": True},
@@ -129,8 +144,8 @@ def test_legacy_send_storage_bid_placed_returns_bool():
 
 
 def test_legacy_send_storage_outbid_returns_bool_false_when_no_email():
-    from services.email_notifications import send_storage_outbid_email
-    out = asyncio.get_event_loop().run_until_complete(send_storage_outbid_email(
+    from services.emails.email_marketplace import send_storage_outbid_email
+    out = _run(send_storage_outbid_email(
         buyer={},
         auction={"id": "a"},
         new_current=99.0,
@@ -143,7 +158,7 @@ def test_legacy_send_storage_outbid_returns_bool_false_when_no_email():
 # ---------------------------------------------------------------------------
 def test_persist_chat_turn_skips_anonymous():
     from routes.chat_history import persist_chat_turn
-    out = asyncio.get_event_loop().run_until_complete(persist_chat_turn(
+    out = _run(persist_chat_turn(
         user_id=None,
         session_id=None,
         listing_id=None,

@@ -41,7 +41,7 @@ class TestBidEmailNotificationFunctions:
         sys.path.insert(0, '/app/backend')
         
         try:
-            from services.email_notifications import send_bid_placed_email, send_outbid_email
+            from services.emails.email_marketplace import send_bid_placed_email, send_outbid_email
             print("✅ send_bid_placed_email function exists")
             print("✅ send_outbid_email function exists")
             
@@ -61,7 +61,7 @@ class TestBidEmailNotificationFunctions:
         import sys
         sys.path.insert(0, '/app/backend')
         
-        from services.email_notifications import SENDGRID_AVAILABLE
+        from services.emails._email_core import SENDGRID_AVAILABLE
         
         # Since SendGrid API key is placeholder, SENDGRID_AVAILABLE should be False
         print(f"   SENDGRID_AVAILABLE: {SENDGRID_AVAILABLE}")
@@ -78,7 +78,7 @@ class TestBidEmailNotificationFunctions:
         import sys
         sys.path.insert(0, '/app/backend')
         
-        from services.email_notifications import send_bid_placed_email
+        from services.emails.email_marketplace import send_bid_placed_email
         import inspect
         
         sig = inspect.signature(send_bid_placed_email)
@@ -100,7 +100,7 @@ class TestBidEmailNotificationFunctions:
         import sys
         sys.path.insert(0, '/app/backend')
         
-        from services.email_notifications import send_outbid_email
+        from services.emails.email_marketplace import send_outbid_email
         import inspect
         
         sig = inspect.signature(send_outbid_email)
@@ -128,7 +128,7 @@ class TestBidEmailNotificationFunctions:
         import sys
         sys.path.insert(0, '/app/backend')
         
-        from services.email_notifications import send_bid_placed_email
+        from services.emails.email_marketplace import send_bid_placed_email
         import inspect
         
         # Get the source code of the function to verify template content
@@ -173,7 +173,7 @@ class TestBidEmailNotificationFunctions:
         import sys
         sys.path.insert(0, '/app/backend')
         
-        from services.email_notifications import send_outbid_email
+        from services.emails.email_marketplace import send_outbid_email
         import inspect
         
         # Get the source code of the function to verify template content
@@ -287,7 +287,8 @@ class TestEmailNotificationDirectCall:
         import sys
         sys.path.insert(0, '/app/backend')
         
-        from services.email_notifications import send_bid_placed_email, SENDGRID_AVAILABLE
+        from services.emails._email_core import SENDGRID_AVAILABLE
+        from services.emails.email_marketplace import send_bid_placed_email
         
         # Run async function using asyncio
         result = asyncio.get_event_loop().run_until_complete(
@@ -316,7 +317,8 @@ class TestEmailNotificationDirectCall:
         import sys
         sys.path.insert(0, '/app/backend')
         
-        from services.email_notifications import send_outbid_email, SENDGRID_AVAILABLE
+        from services.emails._email_core import SENDGRID_AVAILABLE
+        from services.emails.email_marketplace import send_outbid_email
         
         # Run async function using asyncio
         result = asyncio.get_event_loop().run_until_complete(

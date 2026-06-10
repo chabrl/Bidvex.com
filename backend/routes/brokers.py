@@ -1435,7 +1435,7 @@ async def buyer_terminate_relationship(
     buyer_name   = getattr(current_user, "full_name", None) or buyer_email
 
     try:
-        from services.email_notifications import send_email
+        from services.emails._email_core import send_email
         if buyer_email:
             await send_email(
                 buyer_email,

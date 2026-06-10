@@ -354,7 +354,7 @@ async def _send_manual_settlement_email(
 
     html = body_fr if is_fr else body_en
     try:
-        from services.email_notifications import send_email
+        from services.emails._email_core import send_email
         send_email(to_email=user["email"], subject=subject, html_content=html)
         return True
     except Exception as exc:

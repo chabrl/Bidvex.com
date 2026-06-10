@@ -2442,7 +2442,7 @@ async def vehicle_buy_now_checkout(
 
     # Send the standard winner email (is_vehicle=True inserts the bilingual non-custodial notice)
     try:
-        from services.email_notifications import send_auction_won_email
+        from services.emails.email_marketplace import send_auction_won_email
         seller = await db.users.find_one({"id": listing.get("seller_id")}, {"_id": 0})
         await send_auction_won_email(
             to_email=user_doc.get("email", current_user.email),

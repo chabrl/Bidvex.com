@@ -970,7 +970,7 @@ class EmailService:
         if not to_email:
             return {"success": False, "status": "no_recipient"}
         try:
-            from services.email_notifications import send_unified_email
+            from services.emails._email_core import send_unified_email
             res = await send_unified_email(
                 "new_feature",
                 user={"email": to_email, "first_name": ""},

@@ -256,7 +256,7 @@ async def _notify_admin_resubmission(
 
     send_results: list[dict] = []
     try:
-        from services.email_notifications import send_email
+        from services.emails._email_core import send_email
         for to_email in recipients:
             res = await send_email(to_email=to_email, subject=subject, html_content=body_html)
             send_results.append({"to": to_email, "result": res})

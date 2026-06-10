@@ -46,7 +46,7 @@ async def db():
 @pytest.mark.asyncio
 @pytest.mark.parametrize("account_type", ["vehicle_dealer", "partner", "storage_facility"])
 async def test_create_demo_account_each_type(db, account_type):
-    from services import email_notifications
+    from services.emails import _email_core as email_notifications
     from services.demo_account_service import create_demo_account
 
     email = f"demo-{account_type}-{uuid.uuid4().hex[:6]}@example.com"
@@ -102,7 +102,7 @@ async def test_create_demo_rejects_invalid_account_type(db):
 @pytest.mark.asyncio
 async def test_extend_pushes_expiry_out(db):
     from services.demo_account_service import create_demo_account, extend_demo_account
-    from services import email_notifications
+    from services.emails import _email_core as email_notifications
 
     email = f"demo-ext-{uuid.uuid4().hex[:6]}@example.com"
     try:
@@ -125,7 +125,7 @@ async def test_extend_pushes_expiry_out(db):
 @pytest.mark.asyncio
 async def test_convert_to_real_strips_bypass_flags(db):
     from services.demo_account_service import create_demo_account, convert_demo_to_real
-    from services import email_notifications
+    from services.emails import _email_core as email_notifications
 
     email = f"demo-conv-{uuid.uuid4().hex[:6]}@example.com"
     try:
@@ -148,7 +148,7 @@ async def test_convert_to_real_strips_bypass_flags(db):
 async def test_check_demo_expiry_flips_status(db):
     """Force expiry by backdating demo_expires_at and run the cron."""
     from services.demo_account_service import create_demo_account, check_demo_account_expiry
-    from services import email_notifications
+    from services.emails import _email_core as email_notifications
 
     email = f"demo-exp-{uuid.uuid4().hex[:6]}@example.com"
     try:
@@ -177,7 +177,7 @@ async def test_check_demo_expiry_flips_status(db):
 async def test_demo_user_cannot_create_listing(db):
     """A logged-in demo user creating a listing → 403 demo_mode_payments_disabled."""
     from services.demo_account_service import create_demo_account
-    from services import email_notifications
+    from services.emails import _email_core as email_notifications
 
     email = f"demo-pay-{uuid.uuid4().hex[:6]}@example.com"
     try:
@@ -195,7 +195,8 @@ async def test_demo_user_cannot_create_listing(db):
         assert r.status_code == 200, f"demo login failed: {r.text[:200]}"
         token = r.json().get("access_token") or r.json().get("token")
         listing_payload = {
-            "title": "Demo listing", "description": "x" * 30,
+            "title": "Demo listing", "title_fr": "Annonce d\u00e9mo",
+            "description": "x" * 30, "description_fr": "d" * 30,
             "category": "lots:test", "condition": "new",
             "starting_price": 100, "auction_end_date": "2027-01-01T00:00:00Z",
             "agreement_accepted": True, "payment_method": "stripe",
@@ -206,11 +207,14 @@ async def test_demo_user_cannot_create_listing(db):
             headers={"Authorization": f"Bearer {token}"},
             json=listing_payload, timeout=20,
         )
-        assert r2.status_code == 403, f"expected 403, got {r2.status_code}: {r2.text[:200]}"
-        detail = r2.json().get("detail")
-        assert isinstance(detail, dict)
-        assert detail.get("error") == "demo_mode_payments_disabled"
-        assert "message_en" in detail and "message_fr" in detail
+        # iter223 — demo accounts now BYPASS the payment gate so leads can
+        # experience the full create-listing flow. Their listings are
+        # sandbox-stamped `is_demo: true` backend-side and never shown to
+        # the public. (Originally iter210 returned 403 here.)
+        assert r2.status_code == 200, f"expected 200, got {r2.status_code}: {r2.text[:200]}"
+        body = r2.json()
+        assert body.get("is_demo") is True, "demo listing must be sandbox-stamped is_demo"
+        await db.listings.delete_one({"id": body.get("id")})
     finally:
         await db.users.delete_one({"email": email})
 

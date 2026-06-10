@@ -67,9 +67,34 @@ _TEMPLATES = {
     ),
     "auction_ended_no_winner": (
         lambda p: "Auction Ended — No Bids",
-        lambda p: f"Your auction '{p.get('title','your item')}' ended without bids. You can relist for free.",
+        lambda p: f"Your listing '{p.get('title','your item')}' ended with no bids. Relist it to reach more buyers.",
         lambda p: "Enchère terminée — sans mise",
-        lambda p: f"Votre enchère « {p.get('title','votre article')} » s'est terminée sans mise. Vous pouvez la republier gratuitement.",
+        lambda p: f"Votre annonce « {p.get('title','votre article')} » s'est terminée sans mise. Republiez-la pour atteindre plus d'acheteurs.",
+    ),
+    # iter298 BUG 3/4 — payment lifecycle notifications.
+    "payment_collected": (
+        lambda p: "Payment Confirmed",
+        lambda p: f"Your payment of {_fmt_money(p.get('amount'))} for '{p.get('title','your item')}' was processed. Your receipt is in your dashboard.",
+        lambda p: "Paiement confirmé",
+        lambda p: f"Votre paiement de {_fmt_money(p.get('amount'))} pour « {p.get('title','votre article')} » a été traité. Votre reçu est dans votre tableau de bord.",
+    ),
+    "payment_collected_seller": (
+        lambda p: "Sale Payment Collected",
+        lambda p: f"Payment for '{p.get('title','your item')}' was collected. Net payout: {_fmt_money(p.get('amount'))}. Your statement is in your dashboard.",
+        lambda p: "Paiement de la vente encaissé",
+        lambda p: f"Le paiement pour « {p.get('title','votre article')} » a été encaissé. Versement net : {_fmt_money(p.get('amount'))}. Votre relevé est dans votre tableau de bord.",
+    ),
+    "payment_link_sent": (
+        lambda p: "Payment Required — 48 Hours",
+        lambda p: f"You won '{p.get('title','this item')}'. Pay {_fmt_money(p.get('amount'))} within 48 hours via the link sent to your email.",
+        lambda p: "Paiement requis — 48 heures",
+        lambda p: f"Vous avez remporté « {p.get('title','cet article')} ». Payez {_fmt_money(p.get('amount'))} sous 48 heures via le lien envoyé par courriel.",
+    ),
+    "payment_failed": (
+        lambda p: "Payment Failed",
+        lambda p: f"Your payment of {_fmt_money(p.get('amount'))} for '{p.get('title','this item')}' failed. Please update your payment method.",
+        lambda p: "Échec du paiement",
+        lambda p: f"Votre paiement de {_fmt_money(p.get('amount'))} pour « {p.get('title','cet article')} » a échoué. Veuillez mettre à jour votre méthode de paiement.",
     ),
     "outbid": (
         lambda p: "You've been outbid",

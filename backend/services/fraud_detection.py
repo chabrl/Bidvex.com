@@ -673,7 +673,7 @@ Provide a brief fraud analysis summary with risk assessment and recommended acti
             import sendgrid  # noqa: F401 — kept import for back-compat
             # iter244 Mission 2 — Route through canonical pipeline. The
             # rich risk-alert HTML is preserved verbatim via html_full_override.
-            from services.email_notifications import send_unified_email
+            from services.emails._email_core import send_unified_email
             await send_unified_email(
                 "new_feature",
                 user={"email": to_email, "first_name": "Risk Officer"},

@@ -146,28 +146,65 @@ async def send_seller_auction_no_bids_email(
     listing_title: str,
     listing_id: str,
     auction_type: Optional[str] = None,
+    auction_end_time: Optional[str] = None,
+    bid_count: int = 0,
 ) -> Dict[str, Any]:
-    """Sent to the seller when their auction ends with zero bids."""
+    """Sent to the seller when their auction ends with zero bids.
+
+    iter298 BUG 2 — Includes auction end time + final bid count and three
+    clear CTAs: Relist Now · Edit & Relist · Promote This Listing. All
+    three deep-link into the seller dashboard's Ended tab where the
+    one-click actions live."""
     label = _section_label(auction_type)
+    end_h = _format_date(auction_end_time) if auction_end_time else "—"
+    dash = f"{FRONTEND_URL}/seller/dashboard?filter=ended"
+
+    def _cta(href: str, text_en: str, text_fr: str, bg: str) -> str:
+        return f"""
+      <td align="center" style="padding: 0 6px;">
+        <table cellpadding="0" cellspacing="0" border="0"><tr>
+          <td align="center" style="background-color: {bg}; padding: 12px 18px; border-radius: 8px;">
+            <a href="{href}" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 14px;">{text_en}<br/><span style="font-weight: 400; font-size: 12px;">{text_fr}</span></a>
+          </td>
+        </tr></table>
+      </td>"""
+
     content = f"""
     <h2 style="margin: 0 0 20px 0; color: #f59e0b;">Your auction ended — no bids / Votre enchère s'est terminée sans enchères</h2>
 
     <p style="color: #475569; line-height: 1.6;">Hi {seller_name},</p>
     <p style="color: #475569; line-height: 1.6;">
         Your {label['name_en']} auction for <strong>{listing_title}</strong> ended without any bids.
-        You can relist it — sometimes a fresh title, better photos, or a lower starting price makes the difference.
+        Relist it to reach more buyers — sometimes a fresh title, better photos, or a lower starting price makes the difference.
     </p>
 
-    <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 30px auto;">
-      <tr><td align="center" style="background-color: #0ea5e9; padding: 14px 30px; border-radius: 8px;">
-        <a href="{FRONTEND_URL}/listing/{listing_id}/edit" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px;">Edit & Relist</a>
-      </td></tr>
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 16px 0;">
+      <tr>
+        <td style="padding: 6px 0; color: #64748b; font-size: 13px;">Item / Article</td>
+        <td align="right" style="padding: 6px 0; color: #0f172a; font-size: 13px; font-weight: 700;">{listing_title}</td>
+      </tr>
+      <tr>
+        <td style="padding: 6px 0; color: #64748b; font-size: 13px;">Auction ended / Fin de l'enchère</td>
+        <td align="right" style="padding: 6px 0; color: #0f172a; font-size: 13px; font-weight: 700;">{end_h}</td>
+      </tr>
+      <tr>
+        <td style="padding: 6px 0; color: #64748b; font-size: 13px;">Final bid count / Nombre de mises</td>
+        <td align="right" style="padding: 6px 0; color: #0f172a; font-size: 13px; font-weight: 700;">{bid_count}</td>
+      </tr>
+    </table>
+
+    <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 26px auto;">
+      <tr>
+        {_cta(f"{dash}&action=relist&listing={listing_id}", "Relist Now", "Republier", "#0ea5e9")}
+        {_cta(f"{dash}&action=edit_relist&listing={listing_id}", "Edit &amp; Relist", "Modifier et republier", "#6366f1")}
+        {_cta(f"{dash}&action=promote&listing={listing_id}", "Promote This Listing", "Promouvoir", "#f59e0b")}
+      </tr>
     </table>
 
     <hr style="border:0;border-top:1px solid #e2e8f0;margin:24px 0;" />
     <p style="color:#475569;line-height:1.6;">
-        Bonjour {seller_name}, votre enchère {label['name_fr']} pour <strong>{listing_title}</strong> s'est terminée sans enchères.
-        Vous pouvez la republier depuis votre tableau de bord vendeur.
+        Bonjour {seller_name}, votre enchère {label['name_fr']} pour <strong>{listing_title}</strong> s'est terminée sans enchères ({bid_count} mise).
+        Republiez-la pour atteindre plus d'acheteurs — depuis l'onglet « Terminées » de votre tableau de bord vendeur.
     </p>
     """
     return await _send_via_unified(

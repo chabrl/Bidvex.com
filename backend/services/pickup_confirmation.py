@@ -211,7 +211,7 @@ async def _send_rating_requests(db, *, listing: Dict[str, Any], kind: str) -> No
     rating_url = f"{os.environ.get('FRONTEND_URL', 'https://bidvex.com')}/rate/{kind}/{listing_id}"
 
     try:
-        from services.email_notifications import send_unified_email
+        from services.emails._email_core import send_unified_email
         # Buyer → Seller
         if winner and winner.get("email"):
             await send_unified_email(

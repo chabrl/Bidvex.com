@@ -50,7 +50,7 @@ def _send_bilingual_pickup_email(
 ) -> bool:
     """Send the bilingual pickup-coordination email via SendGrid."""
     try:
-        from services.email_notifications import send_email  # type: ignore
+        from services.emails._email_core import send_email
     except Exception:
         try:
             from services.email_service import send_email  # type: ignore

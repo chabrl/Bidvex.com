@@ -225,7 +225,7 @@ async def _build_payment_request(
     # iter258 — Fan-out: email + in-app notification (both opt-in).
     if body.send_email:
         try:
-            from services.email_notifications import send_unified_email
+            from services.emails._email_core import send_unified_email
             await send_unified_email(
                 user=dict(target),
                 email_type="payment_request",

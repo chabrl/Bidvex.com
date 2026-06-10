@@ -526,7 +526,7 @@ async def place_lot_bid(
     # number so the buyer can jump straight back to the active lot.
     if prior_winner and prior_winner != user["id"]:
         try:
-            from services import email_notifications as _en
+            from services.emails import email_marketplace as _en
             import asyncio as _aio
             prior_doc = await _db.users.find_one({"id": prior_winner}, {"email": 1, "first_name": 1, "_id": 0})
             if prior_doc and prior_doc.get("email"):
@@ -758,7 +758,7 @@ async def reorder_lot_photos(
 @vehicle_multi_lot_router.post("/vehicle-multi-lot-auctions/{event_id}/activate")
 async def activate_event(
     event_id: str,
-    intent: str = Query("live", regex="^(live|schedule)$"),
+    intent: str = Query("live", pattern="^(live|schedule)$"),
     start_time: Optional[datetime] = Query(None),
     user: dict = Depends(_get_user),
 ):

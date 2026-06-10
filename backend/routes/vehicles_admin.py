@@ -78,14 +78,13 @@ from services.pdf_invoice import (
     generate_invoice_pdf,
     generate_settlement_pdf
 )
-from services.email_notifications import (
+from services.emails.email_marketplace import send_auction_won_email, send_auction_sold_email
+from services.emails.email_system import (
     send_document_approved_email,
     send_document_rejected_email,
     send_seller_approved_email,
     send_invoice_created_email,
     send_payment_confirmation_email,
-    send_auction_won_email,
-    send_auction_sold_email
 )
 
 logger = logging.getLogger(__name__)

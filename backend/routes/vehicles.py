@@ -98,14 +98,13 @@ from services.pdf_invoice import (
     generate_invoice_pdf,
     generate_settlement_pdf
 )
-from services.email_notifications import (
+from services.emails.email_marketplace import send_auction_won_email, send_auction_sold_email
+from services.emails.email_system import (
     send_document_approved_email,
     send_document_rejected_email,
     send_seller_approved_email,
     send_invoice_created_email,
     send_payment_confirmation_email,
-    send_auction_won_email,
-    send_auction_sold_email
 )
 
 logger = logging.getLogger(__name__)
@@ -1135,7 +1134,8 @@ async def list_vehicles(
     fuel_type: str = None,
     drivetrain: str = None,
     title_status: str = None,
-    seller_type: str = None
+    seller_type: str = None,
+    ending_soon: bool = False  # iter298 BUG 1 — active auctions ending within 24h (dynamic)
 ):
     """
     List public vehicle auctions
@@ -1186,6 +1186,19 @@ async def list_vehicles(
     # iter202 Phase B — exclude a specific listing (for related-vehicles)
     if exclude_id:
         query["id"] = {"$ne": exclude_id}
+    # iter298 BUG 1 — "Ending Soon": active vehicle auctions whose
+    # end_time falls within the next 24 hours. Computed dynamically at
+    # query time (ISO-string OR datetime storage conventions).
+    if ending_soon:
+        _es_now = datetime.now(timezone.utc)
+        _es_cutoff = _es_now + timedelta(hours=24)
+        query["status"] = _VLS.ACTIVE.value
+        query["$and"] = (query.get("$and") or []) + [{
+            "$or": [
+                {"end_time": {"$gt": _es_now.isoformat(), "$lte": _es_cutoff.isoformat()}},
+                {"end_time": {"$gt": _es_now, "$lte": _es_cutoff}},
+            ]
+        }]
     # iter202 Phase B — sidebar filters
     if auction_status:
         query["auction_type"] = auction_status if auction_status != "scheduled" else "scheduled"

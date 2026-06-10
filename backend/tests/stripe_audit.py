@@ -315,7 +315,7 @@ try:
         lw("Payment Failed Email", "No direct email trigger found in payment_failed handler")
 
     # Check if email_notifications has a send_payment_overdue function
-    with open("/app/backend/services/email_notifications.py") as f:
+    with open("/app/backend/services/emails/email_system.py") as f:
         en_content = f.read()
     if "send_payment_overdue_email" in en_content or "send_payment_reminder_email" in en_content:
         lp("Overdue Email Template", "send_payment_overdue_email/send_payment_reminder_email exists")

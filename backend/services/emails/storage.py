@@ -1,5 +1,5 @@
 """iter241 Mission 2 — Storage-auction emails (winner, sold, pickup, ending)."""
-from services.email_notifications import (
+from services.emails.email_marketplace import (
     send_storage_bid_placed_email,
     send_storage_outbid_email,
     send_storage_auction_won_email,

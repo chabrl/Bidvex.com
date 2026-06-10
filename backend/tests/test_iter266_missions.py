@@ -79,7 +79,7 @@ def test_iter266_admin_dashboard_has_payouts_tab():
 
 
 def test_iter266_send_email_has_suppression_gate():
-    src = _read("services/email_notifications.py")
+    src = _read("services/emails/_email_core.py")
     assert "email-suppressed" in src
     assert "email_suppressions" in src
     # Both unsubscribe + marketing branches.
@@ -88,7 +88,7 @@ def test_iter266_send_email_has_suppression_gate():
 
 
 def test_iter266_send_unified_email_threads_is_marketing():
-    src = _read("services/email_notifications.py")
+    src = _read("services/emails/_email_core.py")
     assert "is_marketing: bool = False" in src
     # Must forward into the low-level dispatcher.
     assert "is_marketing=is_marketing" in src

@@ -232,7 +232,7 @@ async def test_refund_queue_processes_and_marks_succeeded():
     with patch("services.deposit_refund_queue.stripe") as fake_stripe:
         fake_stripe.PaymentIntent.cancel.return_value = MagicMock(id="pi_1")
         # Mock email send
-        with patch("services.email_notifications.send_deposit_refunded_email", new=AsyncMock(return_value=True)):
+        with patch("services.emails.email_system.send_deposit_refunded_email", new=AsyncMock(return_value=True)):
             out = await process_deposit_refund_queue(db)
     assert out["processed"] == 1
     assert out["succeeded"] == 1

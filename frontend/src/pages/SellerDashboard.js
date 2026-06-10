@@ -7,7 +7,7 @@ import CommissionPayoutMethodCard from '../components/CommissionPayoutMethodCard
 import { PayoutSummary } from '../components/PayoutSummary'; // iter210 Step 6
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
 import TaxInterviewModal from '../components/TaxInterviewModal';
@@ -29,7 +29,7 @@ import PendingAiReviewBanner from '../components/PendingAiReviewBanner';
 import PendingPaymentsCard from '../components/PendingPaymentsCard';
 // iter239 Mission 5 — Seller "Promote" modal.
 import PromoteListingModal from '../components/PromoteListingModal';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, RefreshCw, Pencil, Receipt } from 'lucide-react';
 
 const API = API_BASE;
 
@@ -48,8 +48,13 @@ const SellerDashboard = () => {
   const [dealerSubStatus, setDealerSubStatus] = useState(null);
   // HOTFIX v9.1 / Fix 3 — Filter tab selection for "Your Listings"
   const [listingsFilter, setListingsFilter] = useState('all'); // all|active|pending_review|draft|ended
+  // iter298 BUG 5 — Ended bucket split: all|sold|no_sale|payment_collected|payment_failed|completed
+  const [endedSplit, setEndedSplit] = useState('all');
+  // iter298 BUG 2 — relist-in-flight guard (one listing at a time).
+  const [relistingId, setRelistingId] = useState(null);
   // iter239 Mission 5 — Promote modal state.
   const [promoteModalListing, setPromoteModalListing] = useState(null);
+  const [searchParams] = useSearchParams();
 
   useEffect(() => {
     fetchDashboard();
@@ -59,7 +64,24 @@ const SellerDashboard = () => {
         .then(r => setDealerSubStatus(r.data))
         .catch(() => setDealerSubStatus(null));
     }
+    // iter298 BUG 2 — deep links from the no-bids email
+    // (?filter=ended&action=...&listing=...).
+    const urlFilter = searchParams.get('filter');
+    if (urlFilter && ['all', 'active', 'pending_review', 'draft', 'ended'].includes(urlFilter)) {
+      setListingsFilter(urlFilter);
+    }
   }, []);
+
+  // iter298 BUG 2 — auto-open the Promote modal when arriving from the
+  // "Promote This Listing" email CTA.
+  useEffect(() => {
+    if (!dashboard) return;
+    if (searchParams.get('action') !== 'promote') return;
+    const targetId = searchParams.get('listing');
+    if (!targetId) return;
+    const target = (dashboard.all_listings || []).find((l) => l.id === targetId);
+    if (target) setPromoteModalListing(target);
+  }, [dashboard]);
 
   const fetchDashboard = async () => {
     try {
@@ -109,6 +131,47 @@ const SellerDashboard = () => {
     } finally {
       setDeletionSubmitting(false);
     }
+  };
+
+  // iter298 BUG 2 — One-click "Relist Now" for zero-bid ended listings.
+  const handleRelistNow = async (listing) => {
+    setRelistingId(listing.id);
+    try {
+      const res = await axios.post(`${API}/listings/${listing.id}/relist?mode=now`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const fr = (i18n.language || 'en').startsWith('fr');
+      toast.success(fr
+        ? 'Annonce republiée ! Elle est de nouveau en ligne.'
+        : 'Listing relisted! It is live again.');
+      fetchDashboard();
+      if (res.data?.status === 'draft') {
+        toast.info(fr
+          ? 'Cette annonce passera par le processus d\u2019approbation standard.'
+          : 'This listing will go through the standard approval process.');
+      }
+    } catch (error) {
+      const detail = error.response?.data?.detail;
+      const msg = typeof detail === 'string' ? detail : (detail?.message || 'Relist failed');
+      toast.error(msg);
+    } finally {
+      setRelistingId(null);
+    }
+  };
+
+  // iter298 BUG 2 — "Edit & Relist": open the create form pre-populated.
+  const handleEditRelist = (listing) => {
+    navigate(`/create-listing?relist=${listing.id}`);
+  };
+
+  // iter298 BUG 2 — A listing qualifies for the relist actions when it
+  // ended without a winner (zero bids / unsold) and wasn't already relisted.
+  const isNoSaleListing = (l) => {
+    if (l?.relisted_to) return false;
+    const s = l?.status;
+    const hasWinner = !!(l?.winner_user_id || l?.winner_id || l?.winning_bidder_id);
+    return (s === 'ended_no_sale' || s === 'unsold'
+      || ((s === 'ended' || s === 'expired') && !hasWinner));
   };
 
   if (loading) {
@@ -316,6 +379,8 @@ const SellerDashboard = () => {
             {/* iter211 Task 2 — Commission payout method toggle (only for eligible accounts) */}
             <CommissionPayoutMethodCard user={user} />
             <SellerEarningsDashboard />
+            {/* iter298 BUG 4 — My Sales → Statements. */}
+            <StatementsPanel />
           </div>
         ) : activeTab === 'analytics' ? (
           <SellerAnalyticsDashboard />
@@ -576,7 +641,7 @@ const SellerDashboard = () => {
                       <button
                         type="button"
                         key={tab.key}
-                        onClick={() => setListingsFilter(tab.key)}
+                        onClick={() => { setListingsFilter(tab.key); setEndedSplit('all'); }}
                         data-testid={`listings-filter-tab-${tab.key}`}
                         className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
                           isActive
@@ -591,11 +656,47 @@ const SellerDashboard = () => {
                 </div>
               </div>
             )}
+
+            {/* iter298 BUG 5 — Ended bucket split chips (sold / no-sale /
+                payment collected / payment failed / completed). */}
+            {listingsFilter === 'ended' && dashboard?.counts && (
+              <div className="mt-2 -mx-2 px-2 overflow-x-auto" data-testid="ended-split-chips">
+                <div className="flex items-center gap-2 min-w-max">
+                  {[
+                    { key: 'all',               label_en: 'All Ended',        label_fr: 'Toutes terminées', count: dashboard.counts.ended ?? 0 },
+                    { key: 'sold',              label_en: 'Sold',             label_fr: 'Vendues',          count: dashboard.counts.sold ?? 0 },
+                    { key: 'no_sale',           label_en: 'No Sale',          label_fr: 'Invendues',        count: dashboard.counts.ended_no_sale ?? 0 },
+                    { key: 'payment_collected', label_en: 'Payment Collected', label_fr: 'Paiement reçu',   count: dashboard.counts.payment_collected ?? 0 },
+                    { key: 'payment_failed',    label_en: 'Payment Failed',   label_fr: 'Paiement échoué',  count: dashboard.counts.payment_failed ?? 0 },
+                    { key: 'completed',         label_en: 'Completed',        label_fr: 'Complétées',       count: dashboard.counts.completed ?? 0 },
+                  ].map((chip) => {
+                    const isActive = endedSplit === chip.key;
+                    const label = (i18n.language || 'en').startsWith('fr') ? chip.label_fr : chip.label_en;
+                    return (
+                      <button
+                        type="button"
+                        key={chip.key}
+                        onClick={() => setEndedSplit(chip.key)}
+                        data-testid={`ended-split-chip-${chip.key}`}
+                        className={`whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                          isActive
+                            ? 'bg-cyan-600 text-white border-cyan-600'
+                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        {label} ({chip.count})
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </CardHeader>
           <CardContent>
             {(() => {
               const _PENDING = new Set(['pending_ai_review', 'pending_admin_review', 'pending_review']);
-              const _ENDED = new Set(['sold', 'ended', 'expired', 'completed']);
+              // iter298 BUG 2/5 — ended bucket includes ended_no_sale + unsold.
+              const _ENDED = new Set(['sold', 'ended', 'expired', 'completed', 'ended_no_sale', 'unsold']);
               const all = dashboard?.all_listings || [];
               const filtered = all.filter((l) => {
                 const s = l?.status;
@@ -603,7 +704,17 @@ const SellerDashboard = () => {
                 if (listingsFilter === 'active') return s === 'active';
                 if (listingsFilter === 'pending_review') return _PENDING.has(s);
                 if (listingsFilter === 'draft') return s === 'draft';
-                if (listingsFilter === 'ended') return _ENDED.has(s);
+                if (listingsFilter === 'ended') {
+                  if (!_ENDED.has(s)) return false;
+                  // iter298 BUG 5 — Ended split sub-filter.
+                  const hasWinner = !!(l?.winner_user_id || l?.winner_id || l?.winning_bidder_id);
+                  if (endedSplit === 'sold') return s === 'sold' || (s === 'ended' && hasWinner);
+                  if (endedSplit === 'no_sale') return isNoSaleListing(l) || l?.relisted_to;
+                  if (endedSplit === 'payment_collected') return l?.payment_status === 'payment_collected';
+                  if (endedSplit === 'payment_failed') return l?.payment_status === 'payment_failed';
+                  if (endedSplit === 'completed') return s === 'completed';
+                  return true;
+                }
                 return true;
               });
               return (
@@ -670,6 +781,8 @@ const SellerDashboard = () => {
                           >
                             {(listing.status === 'pending_admin_review' || listing.status === 'pending_ai_review')
                               ? '⏳ Under Review — Verification takes 5–50 minutes.'
+                              : listing.status === 'ended_no_sale' || listing.status === 'unsold'
+                              ? ((i18n.language || 'en').startsWith('fr') ? 'Terminée — invendue' : 'Ended — No Sale')
                               : t(`dashboard.seller.status${listing.status.charAt(0).toUpperCase() + listing.status.slice(1)}`, listing.status)}
                           </Badge>
                         </div>
@@ -800,6 +913,65 @@ const SellerDashboard = () => {
                                   : ((i18n.language || 'en').startsWith('fr') ? 'Promouvoir' : 'Promote')}
                               </Button>
                             )}
+                            {/* iter298 BUG 2 — Relist actions for zero-bid ended listings. */}
+                            {isNoSaleListing(listing) && !isMultiItem && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleRelistNow(listing)}
+                                  disabled={relistingId === listing.id}
+                                  data-testid={`relist-now-btn-${listing.id}`}
+                                  className="w-full lg:w-auto bg-cyan-600 hover:bg-cyan-700 text-white border-0"
+                                >
+                                  {relistingId === listing.id
+                                    ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                                    : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
+                                  {(i18n.language || 'en').startsWith('fr') ? 'Republier' : 'Relist Now'}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleEditRelist(listing)}
+                                  data-testid={`edit-relist-btn-${listing.id}`}
+                                  className="w-full lg:w-auto border-indigo-300 text-indigo-700 hover:bg-indigo-50"
+                                >
+                                  <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                                  {(i18n.language || 'en').startsWith('fr') ? 'Modifier et republier' : 'Edit & Relist'}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setPromoteModalListing(listing)}
+                                  data-testid={`promote-relist-btn-${listing.id}`}
+                                  className="w-full lg:w-auto border-amber-300 text-amber-700 hover:bg-amber-50"
+                                >
+                                  <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                                  {(i18n.language || 'en').startsWith('fr') ? 'Promouvoir' : 'Promote'}
+                                </Button>
+                              </>
+                            )}
+                            {isNoSaleListing(listing) && isMultiItem && (
+                              <Button
+                                size="sm"
+                                onClick={() => handleRelistNow(listing)}
+                                disabled={relistingId === listing.id}
+                                data-testid={`relist-now-btn-${listing.id}`}
+                                className="w-full lg:w-auto bg-cyan-600 hover:bg-cyan-700 text-white border-0"
+                              >
+                                {relistingId === listing.id
+                                  ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                                  : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
+                                {(i18n.language || 'en').startsWith('fr') ? 'Republier' : 'Relist Now'}
+                              </Button>
+                            )}
+                            {listing.relisted_to && (
+                              <span
+                                className="inline-flex items-center text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-1"
+                                data-testid={`relisted-badge-${listing.id}`}
+                              >
+                                ✓ {(i18n.language || 'en').startsWith('fr') ? 'Déjà republiée' : 'Already relisted'}
+                              </span>
+                            )}
                             <Button
                               size="sm"
                               variant="outline"
@@ -822,6 +994,21 @@ const SellerDashboard = () => {
                             <div className="flex justify-between"><dt className="text-muted-foreground">Email</dt><dd className="font-medium"><a className="text-emerald-700 hover:underline" href={`mailto:${listing.buyer_contact.email}`}>{listing.buyer_contact.email || '—'}</a></dd></div>
                             <div className="flex justify-between"><dt className="text-muted-foreground">Phone</dt><dd className="font-medium">{listing.buyer_contact.phone ? <a className="text-emerald-700 hover:underline" href={`tel:${listing.buyer_contact.phone}`}>{listing.buyer_contact.phone}</a> : '—'}</dd></div>
                           </dl>
+                        </div>
+                      )}
+
+                      {/* iter298 BUG 4 — Statement link for paid-out sales. */}
+                      {listing.seller_statement_id && (
+                        <div className="mt-2">
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab('earnings')}
+                            className="inline-flex items-center gap-1.5 text-xs font-semibold text-cyan-700 hover:text-cyan-900 underline"
+                            data-testid={`statement-link-${listing.id}`}
+                          >
+                            <Receipt className="h-3.5 w-3.5" />
+                            {(i18n.language || 'en').startsWith('fr') ? 'Voir le relevé de vente' : 'View Sale Statement'}
+                          </button>
                         </div>
                       )}
 
@@ -1037,6 +1224,66 @@ export default function SellerDashboardWithErrorBoundary(props) {
     </ErrorBoundary>
   );
 }
+
+// ========== iter298 BUG 4 — My Sales → Statements ==========
+const StatementsPanel = () => {
+  const { i18n } = useTranslation();
+  const fr = (i18n.language || 'en').startsWith('fr');
+  const [rows, setRows] = useState(null);
+
+  useEffect(() => {
+    axios.get(`${API}/receipts/mine`, { params: { role: 'seller' } })
+      .then((r) => setRows(r.data?.receipts || []))
+      .catch(() => setRows([]));
+  }, []);
+
+  return (
+    <Card data-testid="seller-statements-panel">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-lg">
+          <Receipt className="h-5 w-5 text-cyan-600" />
+          {fr ? 'Mes ventes — Relevés' : 'My Sales — Statements'}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {rows === null ? (
+          <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
+        ) : rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-6">
+            {fr ? 'Aucun relevé pour le moment. Les relevés apparaissent dès qu\u2019un paiement est encaissé.' : 'No statements yet. Statements appear as soon as a sale payment is collected.'}
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {rows.map((s) => (
+              <div
+                key={s.id}
+                className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 border rounded-lg"
+                data-testid={`statement-row-${s.id}`}
+              >
+                <div className="min-w-0">
+                  <p className="font-semibold text-sm truncate">{s.listing_title}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {s.created_at ? new Date(s.created_at).toLocaleDateString() : ''}
+                    {s.buyer_first_name ? ` · ${fr ? 'Acheteur' : 'Buyer'}: ${s.buyer_first_name}` : ''}
+                    {s.lot_number != null && s.lot_number !== '' ? ` · Lot #${s.lot_number}` : ''}
+                  </p>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <p className="text-xs text-muted-foreground">
+                    {fr ? 'Adjudication' : 'Hammer'}: {formatCurrency(s.hammer_price)} · {fr ? 'Frais' : 'Fee'}: -{formatCurrency(s.platform_fee)}
+                  </p>
+                  <p className="text-sm font-bold text-emerald-600">
+                    {fr ? 'Versement net' : 'Net payout'}: {formatCurrency(s.net_payout)} CAD
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
 
 // ========== Seller Ratings Panel ==========
 const SellerRatingsPanel = ({ userId, token }) => {

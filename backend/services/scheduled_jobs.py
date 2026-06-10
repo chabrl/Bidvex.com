@@ -159,7 +159,7 @@ async def send_auction_payment_reminders(db):
                 deadline_dt = datetime.fromisoformat(listing["payment_deadline"])
                 days_remaining = max(0, (deadline_dt - now).days)
 
-                from services.email_notifications import send_payment_reminder_email
+                from services.emails.email_system import send_payment_reminder_email
                 await send_payment_reminder_email(
                     winner_email=winner["email"],
                     winner_name=winner.get("name", "Winner"),
@@ -231,7 +231,7 @@ async def process_overdue_auction_payments(db):
 
                 winner = await db.users.find_one({"id": winner_id}, {"_id": 0, "email": 1, "name": 1})
                 if winner and winner.get("email"):
-                    from services.email_notifications import send_payment_overdue_email
+                    from services.emails.email_system import send_payment_overdue_email
                     await send_payment_overdue_email(
                         winner_email=winner["email"],
                         winner_name=winner.get("name", "Winner"),
@@ -263,7 +263,7 @@ async def send_review_request_emails(db):
             try:
                 buyer = await db.users.find_one({"id": req["buyer_id"]}, {"_id": 0})
                 if buyer and buyer.get("email"):
-                    from services.email_notifications import send_review_request_email
+                    from services.emails.email_system import send_review_request_email
                     await send_review_request_email(
                         buyer_email=buyer["email"],
                         buyer_name=buyer.get("name", "Buyer"),
@@ -558,7 +558,7 @@ async def process_ended_storage_auctions(db):
                 # ── Emails (non-blocking in practice; awaited for reliability here) ──
                 if new_status == "sold":
                     try:
-                        from services.email_notifications import (
+                        from services.emails.email_marketplace import (
                             send_storage_auction_won_email,
                             send_storage_auction_sold_email,
                             send_storage_seller_commission_invoice,
@@ -581,6 +581,58 @@ async def process_ended_storage_auctions(db):
                                 await send_storage_seller_commission_invoice(facility, auction, seller_invoice_compat)
                     except Exception as e:
                         logger.error(f"[STORAGE_CLOSE] email dispatch failed for {auction_id}: {e}")
+
+                # iter298 BUG 3/4 — Storage Stripe path: auto-charge the
+                # winner (hammer + 5% fee + processing + tax − $50
+                # deposit) at close, stamp the payment lifecycle, flag
+                # payout_pending, and issue receipts/statements.
+                if new_status == "sold" and winner_id and pricing and (auction.get("payment_method") or "stripe").lower() == "stripe":
+                    try:
+                        from services.payment_collection import (
+                            settle_storage_stripe, finalize_auction_payment,
+                        )
+                        storage_settlement = await settle_storage_stripe(
+                            db, auction=auction, pricing=pricing,
+                        )
+                        _facility_user_id = facility.get("user_id") or auction.get("facility_owner_id") or facility.get("id")
+                        await finalize_auction_payment(
+                            db,
+                            listing={**auction, "winner_user_id": winner_id,
+                                     "final_price": current_bid,
+                                     "seller_id": _facility_user_id},
+                            collection="storage_auctions",
+                            settlement=storage_settlement,
+                            section="storage",
+                            listing_title=auction.get("title") or auction.get("unit_label") or auction.get("unit_number") or "Storage Unit",
+                            hammer_override=current_bid,
+                            winner_override=winner_id,
+                        )
+                    except Exception as e:
+                        logger.error(f"[STORAGE_CLOSE] stripe auto-charge failed for {auction_id}: {e}")
+
+                # iter298 BUG 2 — unsold storage auction → relist email +
+                # bilingual notification to the facility owner.
+                if new_status == "unsold":
+                    try:
+                        _fac_user_id = facility.get("user_id") or auction.get("facility_owner_id") or facility.get("id")
+                        _fac_user = await db.users.find_one(
+                            {"id": _fac_user_id}, {"_id": 0, "name": 1, "email": 1}) or {}
+                        _st_title = auction.get("unit_label") or auction.get("title") or auction.get("unit_number") or "Storage Unit"
+                        if _fac_user.get("email"):
+                            from services.emails.email_vehicles import (
+                                send_seller_auction_no_bids_email,
+                            )
+                            await send_seller_auction_no_bids_email(
+                                seller_email=_fac_user["email"],
+                                seller_name=_fac_user.get("name", "Seller"),
+                                listing_title=_st_title,
+                                listing_id=auction_id,
+                                auction_type="storage",
+                                auction_end_time=str(auction.get("end_time") or now.isoformat()),
+                                bid_count=len(bids),
+                            )
+                    except Exception as e:
+                        logger.warning(f"[STORAGE_CLOSE] unsold relist email failed for {auction_id}: {e}")
 
                 # iter211 Task 2 — Hybrid commission routing for storage facilities.
                 # If the facility opted into manual payouts AND this is a cash/etransfer
@@ -726,7 +778,7 @@ async def process_expired_promotions(db):
         # Send expiry notification emails (iter189 Feature 1 — fire-and-forget, batch)
         if expired_listings:
             try:
-                from services.email_notifications import send_promotion_expired_email
+                from services.emails.email_system import send_promotion_expired_email
                 for d in expired_listings[:50]:  # cap to avoid scheduler overruns
                     try:
                         seller = await db.users.find_one(
@@ -795,7 +847,7 @@ async def process_expired_dealer_licenses(db):
 
         # Send notification emails
         try:
-            from services.email_notifications import send_dealer_license_expired_email
+            from services.emails.email_vehicles import send_dealer_license_expired_email
             for lic in expired_ids:
                 try:
                     target_user = await db.users.find_one(

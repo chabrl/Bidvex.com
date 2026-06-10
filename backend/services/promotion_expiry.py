@@ -90,7 +90,7 @@ async def expire_listing_promotions(db) -> Dict[str, Any]:
                     )
                     if not user or not user.get("email"):
                         continue
-                    from services.email_notifications import send_unified_email
+                    from services.emails._email_core import send_unified_email
                     await send_unified_email(
                         "promotion_expired",
                         user={

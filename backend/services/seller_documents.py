@@ -296,7 +296,7 @@ async def approve_document(
     try:
         user = await db.users.find_one({"id": document.get("user_id")})
         if user and user.get("email"):
-            from services.email_notifications import send_document_approved_email
+            from services.emails.email_system import send_document_approved_email
             await send_document_approved_email(
                 user_email=user["email"],
                 user_name=user.get("full_name", user.get("email")),
@@ -355,7 +355,7 @@ async def reject_document(
     try:
         user = await db.users.find_one({"id": document.get("user_id")})
         if user and user.get("email"):
-            from services.email_notifications import send_document_rejected_email
+            from services.emails.email_system import send_document_rejected_email
             await send_document_rejected_email(
                 user_email=user["email"],
                 user_name=user.get("full_name", user.get("email")),
@@ -415,7 +415,7 @@ async def check_seller_verification_status(db, seller_id: str) -> Dict[str, Any]
         try:
             user = await db.users.find_one({"id": seller.get("user_id")})
             if user and user.get("email"):
-                from services.email_notifications import send_seller_approved_email
+                from services.emails.email_system import send_seller_approved_email
                 await send_seller_approved_email(
                     user_email=user["email"],
                     user_name=user.get("full_name", user.get("email")),

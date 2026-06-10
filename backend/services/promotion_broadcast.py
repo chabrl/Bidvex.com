@@ -138,7 +138,7 @@ async def broadcast_promotion_activation(
     via the `promotion_broadcasts` collection (a doc is inserted ONCE per
     promotion; subsequent calls short-circuit).
     """
-    from services.email_notifications import send_unified_email
+    from services.emails._email_core import send_unified_email
 
     promo = await db.promotions.find_one({"id": promotion_id}, {"_id": 0})
     if not promo:

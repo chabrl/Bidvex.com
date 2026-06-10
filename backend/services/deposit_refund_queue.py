@@ -178,7 +178,7 @@ async def _process_single_refund(db, job: Dict[str, Any]) -> None:
         )
         # Send email (best effort)
         try:
-            from services.email_notifications import send_deposit_refunded_email
+            from services.emails.email_system import send_deposit_refunded_email
             await send_deposit_refunded_email(
                 db=db,
                 user_id=job["user_id"],

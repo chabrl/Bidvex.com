@@ -66,7 +66,7 @@ const BuyerDashboard = () => {
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-6">
           <StatCard
             icon={<Gavel className="h-6 w-6" />}
             title={t('dashboard.buyer.activeBids')}
@@ -75,6 +75,16 @@ const BuyerDashboard = () => {
             tip={{
               en: "Number of auctions where you currently hold the highest bid or are still actively bidding.",
               fr: "Nombre d'enchères où vous détenez actuellement la mise la plus élevée ou enchérissez encore activement.",
+            }}
+          />
+          <StatCard
+            icon={<TrendingUp className="h-6 w-6" />}
+            title={t('dashboard.buyer.winning', 'Winning')}
+            value={dashboard?.winning_bids || 0}
+            color="emerald"
+            tip={{
+              en: "Live auctions where you are currently the highest bidder.",
+              fr: "Enchères en cours où vous êtes actuellement le plus offrant.",
             }}
           />
           <StatCard
@@ -88,6 +98,16 @@ const BuyerDashboard = () => {
             }}
           />
           <StatCard
+            icon={<TrendingDown className="h-6 w-6" />}
+            title={t('dashboard.buyer.lostBids', 'Lost')}
+            value={dashboard?.lost_bids || 0}
+            color="red"
+            tip={{
+              en: "Ended auctions where you bid but didn't win.",
+              fr: "Enchères terminées où vous avez misé sans gagner.",
+            }}
+          />
+          <StatCard
             icon={<DollarSign className="h-6 w-6" />}
             title="Total Bids"
             value={dashboard?.total_bids || 0}
@@ -98,6 +118,13 @@ const BuyerDashboard = () => {
             }}
           />
         </div>
+
+        {/* iter298 BUG 4/5 — My Purchases: won items with payment status,
+            pickup status, and itemized receipts. */}
+        <PurchasesAndReceiptsCard wonItems={dashboard?.won_items_detail || []} />
+
+        {/* iter298 BUG 5 — Active deposits with status + refund timeline. */}
+        <DepositsCard deposits={dashboard?.deposits || []} />
 
         <Card className="glassmorphism">
           <CardHeader>
@@ -539,3 +566,181 @@ const StatCard = ({ icon, title, value, color, tip }) => (
 );
 
 export default BuyerDashboard;
+
+// ========== iter298 BUG 4/5 — My Purchases → Receipts ==========
+const PAYMENT_BADGES = {
+  payment_collected: { en: 'Paid', fr: 'Payé', cls: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
+  pending_payment: { en: 'Payment due', fr: 'Paiement dû', cls: 'bg-amber-100 text-amber-800 border-amber-300' },
+  payment_failed: { en: 'Payment failed', fr: 'Paiement échoué', cls: 'bg-red-100 text-red-800 border-red-300' },
+  overdue: { en: 'Overdue', fr: 'En retard', cls: 'bg-red-100 text-red-800 border-red-300' },
+};
+
+const PurchasesAndReceiptsCard = ({ wonItems }) => {
+  const { i18n } = useTranslation();
+  const navigate = useNavigate();
+  const fr = (i18n.language || 'en').startsWith('fr');
+  const [receipts, setReceipts] = useState(null);
+  const [showReceipts, setShowReceipts] = useState(false);
+
+  useEffect(() => {
+    axios.get(`${API}/receipts/mine`, { params: { role: 'buyer' } })
+      .then((r) => setReceipts(r.data?.receipts || []))
+      .catch(() => setReceipts([]));
+  }, []);
+
+  if (!wonItems.length && !(receipts || []).length) return null;
+
+  return (
+    <Card className="glassmorphism" data-testid="buyer-purchases-card">
+      <CardHeader>
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <CardTitle className="flex items-center gap-2">
+            <Trophy className="h-5 w-5 text-amber-500" />
+            {fr ? 'Mes achats' : 'My Purchases'}
+          </CardTitle>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setShowReceipts((v) => !v)}
+            data-testid="toggle-receipts-btn"
+          >
+            {fr ? 'Reçus' : 'Receipts'} ({(receipts || []).length})
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {wonItems.map((w) => {
+          const badge = PAYMENT_BADGES[w.payment_status] || PAYMENT_BADGES.pending_payment;
+          return (
+            <div
+              key={w.listing_id}
+              className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 border rounded-lg"
+              data-testid={`won-item-${w.listing_id}`}
+            >
+              <div className="min-w-0">
+                <p className="font-semibold text-sm truncate">{w.title}</p>
+                <p className="text-xs text-muted-foreground">
+                  {formatCurrency(w.final_price)} CAD
+                  {w.sold_at ? ` · ${new Date(w.sold_at).toLocaleDateString()}` : ''}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge className={`border text-xs ${badge.cls}`} data-testid={`payment-status-${w.listing_id}`}>
+                  {fr ? badge.fr : badge.en}
+                </Badge>
+                {w.pickup_confirmed ? (
+                  <Badge className="border text-xs bg-cyan-100 text-cyan-800 border-cyan-300">
+                    {fr ? 'Ramassage confirmé' : 'Pickup confirmed'}
+                  </Badge>
+                ) : (
+                  <Badge className="border text-xs bg-slate-100 text-slate-600 border-slate-300">
+                    {fr ? 'Ramassage en attente' : 'Pickup pending'}
+                  </Badge>
+                )}
+                {w.payment_status === 'pending_payment' && w.payment_link_url && (
+                  <a
+                    href={w.payment_link_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs font-bold text-white bg-amber-500 hover:bg-amber-600 rounded-full px-3 py-1"
+                    data-testid={`pay-now-link-${w.listing_id}`}
+                  >
+                    {fr ? 'Payer maintenant' : 'Pay Now'}
+                  </a>
+                )}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => navigate(`/listing/${w.listing_id}`)}
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+          );
+        })}
+
+        {showReceipts && (
+          <div className="pt-3 border-t" data-testid="buyer-receipts-list">
+            <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">
+              {fr ? 'Reçus' : 'Receipts'}
+            </p>
+            {(receipts || []).length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                {fr ? 'Aucun reçu pour le moment.' : 'No receipts yet.'}
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {receipts.map((r) => (
+                  <div key={r.id} className="flex items-center justify-between gap-2 text-sm p-2.5 bg-slate-50 dark:bg-slate-800 rounded-md" data-testid={`receipt-row-${r.id}`}>
+                    <div className="min-w-0">
+                      <p className="font-medium truncate">{r.listing_title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {r.created_at ? new Date(r.created_at).toLocaleDateString() : ''}
+                        {r.transaction_id ? ` · ${String(r.transaction_id).slice(0, 18)}…` : ''}
+                      </p>
+                    </div>
+                    <div className="text-right text-xs flex-shrink-0">
+                      <p>{fr ? 'Adjudication' : 'Hammer'}: {formatCurrency(r.hammer_price)}</p>
+                      <p>{fr ? 'Frais + taxes' : 'Fees + taxes'}: {formatCurrency((r.platform_fee || 0) + (r.taxes || 0) + (r.processing_fee || 0))}</p>
+                      <p className="font-bold">{fr ? 'Total' : 'Total charged'}: {formatCurrency(r.total_charged)} CAD</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+// ========== iter298 BUG 5 — Deposits ==========
+const DepositsCard = ({ deposits }) => {
+  const { i18n } = useTranslation();
+  const fr = (i18n.language || 'en').startsWith('fr');
+  if (!deposits.length) return null;
+  const statusCls = (s) => (
+    s === 'refunded' || s === 'released' ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+    : s === 'applied' || s === 'captured' ? 'bg-blue-100 text-blue-800 border-blue-300'
+    : 'bg-amber-100 text-amber-800 border-amber-300'
+  );
+  return (
+    <Card className="glassmorphism" data-testid="buyer-deposits-card">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Lock className="h-5 w-5 text-cyan-600" />
+          {fr ? 'Mes dépôts' : 'My Deposits'}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          {deposits.slice(0, 10).map((d) => (
+            <div key={d.id || `${d.auction_id}-${d.created_at}`} className="flex items-center justify-between gap-2 p-2.5 border rounded-md text-sm" data-testid={`deposit-row-${d.id || d.auction_id}`}>
+              <div className="min-w-0">
+                <p className="font-medium truncate">
+                  {d.deposit_type === 'storage' ? (fr ? 'Dépôt entreposage' : 'Storage deposit') : (fr ? 'Dépôt d\u2019enchère' : 'Bidding deposit')}
+                  {' · '}{formatCurrency(d.amount || 0)}
+                </p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {d.auction_id ? `${fr ? 'Enchère' : 'Auction'} ${String(d.auction_id).slice(0, 8)}…` : ''}
+                  {d.created_at ? ` · ${new Date(d.created_at).toLocaleDateString()}` : ''}
+                </p>
+              </div>
+              <div className="text-right flex-shrink-0">
+                <Badge className={`border text-xs ${statusCls(d.status)}`}>{d.status || 'held'}</Badge>
+                {(d.status === 'held' || d.status === 'authorized') && (
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    {fr ? 'Remboursé sous 5-7 jours après l\u2019enchère' : 'Refunded 5-7 days after auction'}
+                  </p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+

@@ -121,7 +121,7 @@ async def notify_nearby_users(
                 logger.warning(f"[geo-notify] notif insert failed for {uid}: {exc}")
             # Email — fire-and-forget; honor the per-user nearby pref.
             try:
-                from services.email_notifications import send_unified_email
+                from services.emails._email_core import send_unified_email
                 await send_unified_email(
                     user=dict(user),
                     email_type="nearby_listing",

@@ -172,11 +172,11 @@ async def generate_vehicle_invoice(
 
     # Send email notifications
     try:
-        from services.email_notifications import (
-            send_invoice_created_email,
+        from services.emails.email_marketplace import (
             send_auction_won_email,
-            send_auction_sold_email
+            send_auction_sold_email,
         )
+        from services.emails.email_system import send_invoice_created_email
         
         # Send invoice email to buyer
         await send_invoice_created_email(buyer_invoice)
@@ -338,7 +338,7 @@ async def process_invoice_payment(
     # Send payment confirmation email if fully paid
     if new_status == InvoiceStatus.PAID and invoice["invoice_type"] == "buyer":
         try:
-            from services.email_notifications import send_payment_confirmation_email
+            from services.emails.email_system import send_payment_confirmation_email
             # Update invoice with paid_at for the email
             updated_invoice = await db.vehicle_invoices.find_one({"id": invoice_id}, {"_id": 0})
             await send_payment_confirmation_email(updated_invoice)

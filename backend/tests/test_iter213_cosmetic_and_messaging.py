@@ -88,7 +88,7 @@ class TestMessagesSignatureFix:
         msgs.ws_manager = None
         async def _noop(*a, **k): return True
         monkeypatch.setattr(
-            "services.email_notifications.send_auction_thread_opened_email",
+            "services.emails.email_system.send_auction_thread_opened_email",
             _noop,
             raising=False,
         )
@@ -121,7 +121,7 @@ class TestMessagesSignatureFix:
         msgs.ws_manager = None
         async def _noop(*a, **k): return True
         monkeypatch.setattr(
-            "services.email_notifications.send_auction_thread_opened_email",
+            "services.emails.email_system.send_auction_thread_opened_email",
             _noop,
             raising=False,
         )
@@ -145,14 +145,14 @@ class TestMessagesSignatureFix:
 class TestBilingualThreadEmail:
     @pytest.mark.asyncio
     async def test_winner_email_bilingual_and_link(self, monkeypatch):
-        from services import email_notifications as en
+        from services.emails import email_system as en
         captured = {}
 
         async def fake_send_email(*, to_email, subject, html_content):
             captured.update(to_email=to_email, subject=subject, html=html_content)
             return True
 
-        monkeypatch.setattr(en, "send_email", fake_send_email)
+        monkeypatch.setattr(en, "_send_via_unified", fake_send_email)
 
         ok = await en.send_auction_thread_opened_email(
             recipient={"email": "alice@x.com", "name": "Alice"},
@@ -178,14 +178,14 @@ class TestBilingualThreadEmail:
 
     @pytest.mark.asyncio
     async def test_seller_email_bilingual(self, monkeypatch):
-        from services import email_notifications as en
+        from services.emails import email_system as en
         captured = {}
 
         async def fake_send_email(*, to_email, subject, html_content):
             captured.update(to_email=to_email, subject=subject, html=html_content)
             return True
 
-        monkeypatch.setattr(en, "send_email", fake_send_email)
+        monkeypatch.setattr(en, "_send_via_unified", fake_send_email)
 
         ok = await en.send_auction_thread_opened_email(
             recipient={"email": "bob@x.com", "name": "Bob"},

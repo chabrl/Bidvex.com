@@ -352,7 +352,9 @@ async def list_storage_auctions(
             query["$or"] = or_clauses
 
     if status == "ending_soon":
-        cutoff = (now + timedelta(hours=1)).isoformat()
+        # iter298 BUG 1 — window widened 1h → 24h to match the
+        # platform-wide "Ending Soon" definition (computed dynamically).
+        cutoff = (now + timedelta(hours=24)).isoformat()
         query["end_time"] = {"$lte": cutoff, "$gt": now.isoformat()}
         query["status"] = "active"
     elif status == "upcoming":
@@ -692,7 +694,10 @@ async def place_storage_bid(
 
     # Send bid-confirmation + outbid emails (non-blocking)
     try:
-        from services.email_notifications import send_storage_bid_placed_email, send_storage_outbid_email
+        from services.emails.email_marketplace import (
+            send_storage_bid_placed_email,
+            send_storage_outbid_email,
+        )
         a = await db.storage_auctions.find_one({"id": auction_id}, {"_id": 0})
         user_payload = current_user.model_dump() if hasattr(current_user, "model_dump") else (current_user.dict() if hasattr(current_user, "dict") else dict(current_user))
         background_tasks.add_task(send_storage_bid_placed_email, user_payload, a, result)
@@ -956,7 +961,7 @@ async def register_facility(
 
     # Notify admin (non-blocking)
     try:
-        from services.email_notifications import (
+        from services.emails.email_marketplace import (
             send_storage_facility_registration_admin_alert,
             send_storage_facility_pending_user_email,
         )
@@ -1526,7 +1531,7 @@ async def admin_verify_facility(
             }},
         )
     try:
-        from services.email_notifications import send_storage_facility_approved_email
+        from services.emails.email_marketplace import send_storage_facility_approved_email
         background_tasks.add_task(send_storage_facility_approved_email, fac)
     except Exception as e:
         logger.error(f"[STORAGE] approve email failed: {e}")
@@ -1565,7 +1570,9 @@ async def admin_verify_facility_registration(
     )
     # Best-effort bilingual email notice
     try:
-        from services.email_notifications import send_storage_facility_registration_verified_email
+        from services.emails.email_marketplace import (
+            send_storage_facility_registration_verified_email,
+        )
         background_tasks.add_task(send_storage_facility_registration_verified_email, fac)
     except Exception as e:
         logger.warning(f"[STORAGE] verify-registration email failed: {e}")
@@ -1609,7 +1616,9 @@ async def admin_reject_facility_registration(
         }},
     )
     try:
-        from services.email_notifications import send_storage_facility_registration_rejected_email
+        from services.emails.email_marketplace import (
+            send_storage_facility_registration_rejected_email,
+        )
         background_tasks.add_task(send_storage_facility_registration_rejected_email, fac, reason)
     except Exception as e:
         logger.warning(f"[STORAGE] reject-registration email failed: {e}")
@@ -1652,7 +1661,9 @@ async def admin_request_facility_resubmission(
 
     email_sent = False
     try:
-        from services.email_notifications import send_storage_facility_registration_rejected_email
+        from services.emails.email_marketplace import (
+            send_storage_facility_registration_rejected_email,
+        )
         reason = (
             "Your previously uploaded business registration document is no "
             "longer available on our servers (it may have been lost during a "
@@ -2395,7 +2406,7 @@ async def admin_regenerate_pickup_code(
     )
     # Re-fire the winner email with the new code (best effort)
     try:
-        from services.email_notifications import send_storage_auction_won_email
+        from services.emails.email_marketplace import send_storage_auction_won_email
         buyer = await db.users.find_one({"id": auction["winning_bidder_id"]}, {"_id": 0}) or {}
         facility = await db.storage_facilities.find_one({"id": auction["facility_id"]}, {"_id": 0}) or {}
         auction["pickup_code"] = new_code

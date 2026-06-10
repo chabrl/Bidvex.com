@@ -80,11 +80,9 @@ def test_emails_package_re_exports_public_senders():
     # Identity check — the new modules MUST be re-exporting the
     # legacy implementations, not redefining them. This guarantees
     # zero behavioural change.
-    from services.email_notifications import (
-        send_email as _se,
-        send_outbid_email as _so,
-        send_dealer_license_approved_email as _sd,
-    )
+    from services.emails._email_core import send_email as _se
+    from services.emails.email_vehicles import send_dealer_license_approved_email as _sd
+    from services.emails.email_marketplace import send_outbid_email as _so
     assert send_email is _se
     assert send_outbid_email is _so
     assert send_dealer_license_approved_email is _sd

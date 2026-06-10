@@ -527,7 +527,7 @@ async def send_partner_outreach_blast(
         build_partner_outreach_pdf_fr,
         detect_partner_language,
     )
-    from services.email_notifications import send_unified_email
+    from services.emails._email_core import send_unified_email
     import base64 as _b64
 
     coupon_code = payload.coupon_code
@@ -692,7 +692,7 @@ async def send_partner_outreach_blast(
             # now ship FROM the unified noreply@bidvex.com sender for
             # DKIM alignment. Reply-To routes partner replies to the
             # partners@bidvex.ca inbox.
-            from services.email_notifications import (
+            from services.emails._email_core import (
                 B2B_PARTNER_REPLY_TO as _B2B_REPLY,
                 B2B_PARTNER_REPLY_TO_NAME as _B2B_REPLY_NAME,
                 B2B_PARTNER_FROM_NAME as _B2B_FROM_NAME,

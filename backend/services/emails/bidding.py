@@ -1,5 +1,5 @@
 """iter241 Mission 2 — Bidding emails (bid placed, outbid, won)."""
-from services.email_notifications import (
+from services.emails.email_marketplace import (
     send_bid_placed_email,
     send_outbid_email,
     send_auction_won_email,

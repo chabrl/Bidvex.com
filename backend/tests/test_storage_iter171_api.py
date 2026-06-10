@@ -193,7 +193,7 @@ class TestSchedulerRegistration:
 # ──────────────────────────────────────────────────────────────
 class TestStorageEmails:
     def test_won_and_sold_email_signatures(self):
-        from services.email_notifications import (
+        from services.emails.email_marketplace import (
             send_storage_auction_won_email,
             send_storage_auction_sold_email,
         )
@@ -207,7 +207,7 @@ class TestStorageEmails:
 
     @pytest.mark.parametrize("pm", ["stripe", "cash", "etransfer"])
     def test_won_email_branches_per_payment_method(self, pm):
-        from services.email_notifications import send_storage_auction_won_email
+        from services.emails.email_marketplace import send_storage_auction_won_email
         buyer = {"email": "test_iter171@example.com", "name": "Test Buyer"}
         auction = {
             "unit_number": "A-1",
@@ -236,7 +236,7 @@ class TestStorageEmails:
         assert isinstance(result, (bool, dict)), f"unexpected type: {type(result).__name__}: {result}"
 
     def test_sold_email_callable(self):
-        from services.email_notifications import send_storage_auction_sold_email
+        from services.emails.email_marketplace import send_storage_auction_sold_email
         facility = {"email": "fac@example.com", "company_name": "TEST_Facility", "contact_name": "Owner"}
         auction = {"unit_number": "A-1", "winning_bid": 800, "payment_method": "stripe"}
         buyer = {"email": "b@example.com", "name": "Buyer"}

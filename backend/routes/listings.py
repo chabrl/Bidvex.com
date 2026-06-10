@@ -150,7 +150,9 @@ async def get_my_listings(current_user: User = Depends(get_current_user)):
     all_listings = single + multi
 
     _PENDING = ("pending_ai_review", "pending_admin_review", "pending_review")
-    _ENDED = ("sold", "ended", "expired", "completed")
+    # iter298 BUG 2/5 — zero-bid `ended_no_sale` + storage `unsold` join
+    # the ended bucket.
+    _ENDED = ("sold", "ended", "expired", "completed", "ended_no_sale", "unsold")
 
     # iter296 P0 BUG 5 — sold counter unions both end-state conventions
     # so the marketplace flow (`status: "ended"` + `winner_user_id`)
@@ -1348,9 +1350,10 @@ async def get_multi_item_listings(
     max_price: Optional[float] = None,
     seller_account_type: Optional[str] = None,  # iter217 — partner / vehicle_dealer / storage_facility / individual
     promoted_first: bool = False,
+    ending_soon: bool = False,  # iter298 BUG 1 — active lots ending within 24h (dynamic)
 ):
     db = get_read_db()
-    has_filters = any([category, region, city, currency, search, seller_id, min_price, max_price, seller_account_type, promoted_first])
+    has_filters = any([category, region, city, currency, search, seller_id, min_price, max_price, seller_account_type, promoted_first, ending_soon])
 
     # Use cache for default (unfiltered) requests
     now = _time.time()
@@ -1367,6 +1370,20 @@ async def get_multi_item_listings(
     # Phase 6.2 Task 1 — Storage locker auctions are walled off from the
     # multi-item listings feed. Visible only on /storage-auctions.
     query["listing_type"] = {"$ne": "storage_locker"}
+
+    # iter298 BUG 1 — "Ending Soon": active events whose auction_end_date
+    # falls within the next 24 hours. Computed dynamically at query time
+    # (handles both ISO-string and datetime storage conventions).
+    if ending_soon:
+        _es_now = datetime.now(timezone.utc)
+        _es_cutoff = _es_now + timedelta(hours=24)
+        query["status"] = "active"
+        query["$and"] = (query.get("$and") or []) + [{
+            "$or": [
+                {"auction_end_date": {"$gt": _es_now.isoformat(), "$lte": _es_cutoff.isoformat()}},
+                {"auction_end_date": {"$gt": _es_now, "$lte": _es_cutoff}},
+            ]
+        }]
 
     if category:
         # Phase 5 Hotfix v5 — support comma-separated list + case/whitespace

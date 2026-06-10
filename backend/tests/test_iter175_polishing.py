@@ -175,7 +175,7 @@ class TestDepositAutoCapture:
         assert "error" in result or "processed" in result
 
     def test_email_helper_exists(self):
-        from services.email_notifications import send_vehicle_deposit_captured_email
+        from services.emails.email_vehicles import send_vehicle_deposit_captured_email
         import inspect
         assert callable(send_vehicle_deposit_captured_email)
         sig = inspect.signature(send_vehicle_deposit_captured_email)

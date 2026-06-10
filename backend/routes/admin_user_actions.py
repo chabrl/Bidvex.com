@@ -184,7 +184,7 @@ async def admin_send_notification(
     # ── Email via SendGrid ──
     if payload.send_via in {"email", "both"} and user_doc.get("email"):
         try:
-            from services.email_notifications import send_email
+            from services.emails._email_core import send_email
             body_fr = payload.body_fr or payload.body_en
             html = f"""
             <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;background:#f8fafc;border-radius:12px;">
@@ -323,7 +323,7 @@ async def admin_request_documents(
 
     # ── Email ──
     try:
-        from services.email_notifications import send_email
+        from services.emails._email_core import send_email
         list_html_en = "".join(f"<li>{t}</li>" for t in titles)
         list_html_fr = "".join(f"<li>{t}</li>" for t in titles_fr)
         msg_block = f"<p>{payload.message}</p>" if payload.message else ""
@@ -465,7 +465,7 @@ async def admin_reset_password(
                 "expires_at": datetime.now(timezone.utc).isoformat(),
                 "issued_by_admin": current_user.id,
             })
-            from services.email_notifications import send_email
+            from services.emails._email_core import send_email
             url = f"https://www.bidvex.com/reset-password?token={token}"
             html = f"""
             <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;background:#f8fafc;border-radius:12px;">

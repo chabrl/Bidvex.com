@@ -310,11 +310,11 @@ async def test_iter244_send_via_unified_dispatches_through_send_email():
     """`_send_via_unified` is the consolidation shim. Verify it calls
     `send_email` with the EXACT html_content + subject from the
     `html_full_override` path (no extra wrapping, no template munging)."""
-    from services import email_notifications as en
+    from services.emails import _email_core as en
 
     captured = {}
 
-    async def _fake_send_email(to_email, subject, html_content, attachments=None):
+    async def _fake_send_email(to_email, subject, html_content, attachments=None, **kwargs):
         captured["to_email"] = to_email
         captured["subject"] = subject
         captured["html_content"] = html_content
@@ -339,11 +339,11 @@ async def test_iter244_send_via_unified_dispatches_through_send_email():
 
 def test_iter244_email_notifications_has_single_canonical_sg_send():
     """Grep guarantee: there must be EXACTLY ONE `sg.send(` callsite
-    in `services/email_notifications.py` — the canonical send_email()
+    in `services/emails/_email_core.py` — the canonical send_email()
     bottom-of-stack dispatcher. Every other legacy helper goes through
     `_send_via_unified`."""
     path = os.path.join(
-        os.path.dirname(__file__), "..", "services", "email_notifications.py"
+        os.path.dirname(__file__), "..", "services", "emails", "_email_core.py"
     )
     with open(path, "r", encoding="utf-8") as fh:
         src = fh.read()
@@ -449,7 +449,7 @@ def test_iter244_csv_export_404_for_unknown_promo():
 async def test_iter244_bid_placed_email_still_routes_through_send_unified():
     """Regression: the legacy `send_bid_placed_email` helper must still
     dispatch via the unified path (iter239 behaviour preserved)."""
-    from services import email_notifications as en
+    from services.emails import email_marketplace as en
 
     captured = {}
 

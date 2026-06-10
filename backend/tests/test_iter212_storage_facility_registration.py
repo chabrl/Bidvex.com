@@ -321,14 +321,14 @@ class TestEmailTemplates:
 
     @pytest.mark.asyncio
     async def test_rejection_email_helper_includes_reason_and_resubmit_link(self, monkeypatch):
-        from services import email_notifications as en
+        from services.emails import email_marketplace as en
         captured = {}
 
-        async def fake_send_email(*, to_email, subject, html_content):
+        async def fake_send_email(*, to_email, subject, html_content, **kwargs):
             captured.update(to_email=to_email, subject=subject, html=html_content)
             return True
 
-        monkeypatch.setattr(en, "send_email", fake_send_email)
+        monkeypatch.setattr(en, "_send_via_unified", fake_send_email)
         ok = await en.send_storage_facility_registration_rejected_email(
             {"email": "f@x.com", "company_name": "Acme"},
             "Document is illegible.",
@@ -344,14 +344,14 @@ class TestEmailTemplates:
 
     @pytest.mark.asyncio
     async def test_verified_email_helper_renders(self, monkeypatch):
-        from services import email_notifications as en
+        from services.emails import email_marketplace as en
         captured = {}
 
-        async def fake_send_email(*, to_email, subject, html_content):
+        async def fake_send_email(*, to_email, subject, html_content, **kwargs):
             captured.update(to_email=to_email, subject=subject, html=html_content)
             return True
 
-        monkeypatch.setattr(en, "send_email", fake_send_email)
+        monkeypatch.setattr(en, "_send_via_unified", fake_send_email)
         ok = await en.send_storage_facility_registration_verified_email(
             {"email": "f@x.com", "company_name": "Acme"},
         )

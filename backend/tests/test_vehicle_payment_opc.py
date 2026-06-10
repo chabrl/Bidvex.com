@@ -65,11 +65,11 @@ class TestVehiclePricing:
 @pytest.fixture
 def captured_email(monkeypatch):
     """Monkeypatch send_email to capture html_content instead of sending."""
-    from services import email_notifications as en
+    from services.emails import _email_core as en
 
     captured = {}
 
-    async def fake_send_email(to_email, subject, html_content, attachments=None):
+    async def fake_send_email(to_email, subject, html_content, attachments=None, **kwargs):
         captured["to_email"] = to_email
         captured["subject"] = subject
         captured["html_content"] = html_content
@@ -82,7 +82,7 @@ def captured_email(monkeypatch):
 class TestAuctionWonEmail:
     @pytest.mark.asyncio
     async def test_vehicle_notice_bilingual(self, captured_email):
-        from services.email_notifications import send_auction_won_email
+        from services.emails.email_marketplace import send_auction_won_email
         await send_auction_won_email(
             to_email="buyer@example.com",
             to_name="Alice",
@@ -110,11 +110,13 @@ class TestAuctionWonEmail:
         assert re.search(r"10\s000,00\s?\$", html), "FR hammer format missing"
         assert "250,00" in html and "$" in html
         # Subject indicates vehicle
-        assert "Vehicle" in captured_email["subject"]
+        # iter249 — subjects are single-language per buyer province
+        # (QC → French). Accept either language's vehicle marker.
+        assert ("Vehicle" in captured_email["subject"]) or ("V\u00e9hicule" in captured_email["subject"])
 
     @pytest.mark.asyncio
     async def test_non_vehicle_no_notice(self, captured_email):
-        from services.email_notifications import send_auction_won_email
+        from services.emails.email_marketplace import send_auction_won_email
         await send_auction_won_email(
             to_email="b@x.com",
             to_name="Bob",
@@ -131,7 +133,7 @@ class TestAuctionWonEmail:
 
     @pytest.mark.asyncio
     async def test_cross_border_notice(self, captured_email):
-        from services.email_notifications import send_auction_won_email
+        from services.emails.email_marketplace import send_auction_won_email
         await send_auction_won_email(
             to_email="b@x.com",
             to_name="Bob",
@@ -151,7 +153,7 @@ class TestAuctionWonEmail:
 
     @pytest.mark.asyncio
     async def test_back_compat_legacy_kwargs(self, captured_email):
-        from services.email_notifications import send_auction_won_email
+        from services.emails.email_marketplace import send_auction_won_email
         # Legacy caller — uses winner_email/winner_name/item_title/final_price/listing_id
         result = await send_auction_won_email(
             winner_email="legacy@x.com",

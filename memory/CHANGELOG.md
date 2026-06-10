@@ -1,6 +1,52 @@
 # BidVex Changelog
 
 
+## Jun 10, 2026 — iter298 FINAL PRE-LAUNCH HARDENING (launch gate) — DONE
+
+### Cleanup
+- ESLint clean: `ListingDetailPage.js` warnings fixed (useCallback fetchers, deferred effects); verified 0 warnings with eslint9 + react-hooks plugin.
+- `services/email_notifications.py` shim FULLY DELETED. ~35 runtime callers + ~20 test files migrated to `services/emails/{_email_core,email_marketplace,email_system,email_vehicles}`. Patch targets in tests updated. `tests/conftest.py` now caches successful logins (requests + httpx) to stop 429 sweep flakes.
+
+### BUG 1 — Ending Soon (all 4 sections)
+- Dynamic `ending_soon` filter (end_time <= now+24h, active only — NEVER a scheduler flag): `/api/marketplace/items?ending_soon=true`, `/api/multi-item-listings?ending_soon=true`, `/api/vehicles?ending_soon=true`, storage `status=ending_soon` window widened 1h → 24h.
+- NEW `components/EndingSoonStrip.jsx` mounted on Marketplace homepage (FlattenedMarketplace) — renders only when qualifying listings exist; data-testid `ending-soon-section`.
+
+### BUG 2 — Zero-bid relist flow
+- Zero-bid closes now set status `ended_no_sale` (marketplace listings + multi-item events + vehicles; storage keeps `unsold`, treated equivalently).
+- Seller email upgraded: end time + bid count + 3 CTAs (Relist Now / Edit & Relist / Promote) → deep-link `/seller/dashboard?filter=ended&action=...`.
+- Bilingual notification `auction_ended_no_winner` copy: "ended with no bids. Relist it to reach more buyers."
+- NEW `routes/relist.py`: `POST /api/listings/{id}/relist?mode=now|draft` — resolves across all 4 collections, duplicates with start=now / end=now+original_duration, resets bids, blocks double-relist (409), vehicles gate untrusted sellers to draft+approval.
+- SellerDashboard Ended tab: Relist Now / Edit & Relist / Promote buttons on no-sale cards + "Already relisted" badge; `CreateListingPage?relist=<id>` pre-fills the form.
+
+### BUG 3 — Automatic charge on close (revenue-critical)
+- `auction_settlement.settle_stripe_full`: NON-CUSTODIAL — Stripe Connect destination charges removed; full charge lands on platform account; `fee_breakdown` exposed; deposit credit also reads `storage_deposits`.
+- NEW `services/payment_collection.py` — `finalize_auction_payment`:
+  - success → `payment_status=payment_collected`, `net_payout_amount`, `pending_payouts` row (status `payout_pending`, admin manual payout), receipts issued, bilingual notifications.
+  - no PM → Stripe PaymentLink + email with 48h `payment_deadline` (`pending_payment`; overdue cron flags it).
+  - failure → `payment_failed` + buyer email/notification + `admin_alerts` row.
+  - `settle_storage_stripe`: storage Stripe path charges hammer+5% fee+processing+tax − $50 deposit at close.
+- Wired into: marketplace single close, multi-item PER-LOT close (synthetic `{id}:lot{n}` settle), storage close, vehicle close (fee charge → stamps + receipts), vehicle multi-lot `settle_lot` (per-lot `create_vehicle_fee_charge` at LOT close).
+
+### BUG 4 — Receipts & statements
+- NEW `services/receipts.py` (`db.receipts`, idempotent per listing+lot+type) + `routes/receipts.py` (`GET /api/receipts/mine?role=buyer|seller`, `GET /api/receipts/{id}`).
+- 4 new bilingual table-only senders in `email_system.py` with BidVex Inc. letterhead (761 Rue Chalifoux, Sherbrooke (Québec) J1G 0A8, Corp #1175253974): buyer receipt (itemized + last4 + txn id), seller statement (hammer − 2.5%, net payout, 14-day timeline, buyer first name), payment link (48h), payment failed.
+- BuyerDashboard: "My Purchases" card (payment/pickup badges, Pay Now link, receipts list); SellerDashboard: StatementsPanel under Earnings + per-listing statement link.
+
+### BUG 5 — Dashboard correctness
+- Buyer endpoint: fixed `won_items` (winner_user_id/winner_id/highest_bidder on sold|ended|completed), added `winning_bids`, `lost_bids`, `won_items_detail` (payment/pickup/receipt), `deposits` (bidding + storage).
+- Seller endpoint: counts split `ended_no_sale` / `payment_collected` / `payment_failed` / `completed`; `collected_sales` + `net_payout_total`; `_ENDED` unions include `ended_no_sale`+`unsold` (also dashboard.py + listings.py my-listings).
+- BuyerDashboard 5 stat cards (Active/Winning/Won/Lost/Total); SellerDashboard ended-split chip row.
+
+### BONUS — Launch-blocker fixed
+- Phone-less registration 500'd (`DuplicateKeyError` on sparse-unique `mobile_number_normalized` with explicit nulls). Fixed: register omits the field when no phone; index migrated to partial-unique (`$type: string`); startup self-heals the index (server.py); existing nulls unset.
+- Legacy test debt cleared: outdated creds/specs in p3/iteration_58/iter254/iter269/opc/210s5 fixed; event-loop hygiene in iter239; FastAPI `regex=`→`pattern=`; `fetchpriority`→`fetchPriority`.
+
+### Tests
+- NEW `tests/test_iter298_launch_gate.py` (23 tests). iter29x sweep: 92 passed / 0 failed. Legacy batch: 217+ passed.
+- Known legacy debt (tracked BIDVEX-EMAIL-TABLES): div-based templates remain in `_email_core`/`email_marketplace` legacy senders; Outlook-safety invariant scoped to email_vehicles + iter298 additions.
+- Seed data: 3 `iter298_seed: true` marketplace listings (2 ending <24h) for QA.
+
+
 ## Feb, 2026 — P1 Vehicle Settlement Confirmation Workflow — DONE
 
 ### Problem

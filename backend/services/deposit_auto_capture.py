@@ -94,7 +94,7 @@ async def run_auto_capture_overdue_deposits(db) -> dict:
 
             # Notify buyer in EN+FR (bilingual per Bill 96)
             try:
-                from services.email_notifications import send_vehicle_deposit_captured_email
+                from services.emails.email_vehicles import send_vehicle_deposit_captured_email
                 buyer = await db.users.find_one({"id": buyer_id}, {"_id": 0})
                 if buyer and buyer.get("email"):
                     await send_vehicle_deposit_captured_email(

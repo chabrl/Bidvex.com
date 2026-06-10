@@ -237,11 +237,11 @@ async def settle_lot(db, *, event: Dict[str, Any], lot: Dict[str, Any]) -> Dict[
 
                 # Fire emails (best-effort; never block settlement).
                 try:
-                    from services.email_notifications import (
-                        send_invoice_created_email,
+                    from services.emails.email_marketplace import (
                         send_auction_won_email,
                         send_auction_sold_email,
                     )
+                    from services.emails.email_system import send_invoice_created_email
                     await send_invoice_created_email(invoice)
                     await send_auction_won_email(
                         to_email=winner.get("email"),
@@ -270,6 +270,68 @@ async def settle_lot(db, *, event: Dict[str, Any], lot: Dict[str, Any]) -> Dict[
                         )
                 except Exception as e:  # noqa: BLE001
                     logger.warning(f"[multi_lot_settle] email dispatch failed: {e}")
+
+                # iter298 BUG 3/4 — Per-lot automatic platform-fee charge
+                # (2.5% + Stripe recovery, BP=0%) fired at LOT close, not
+                # event end. Stamps the payment lifecycle on the lot and
+                # issues buyer receipt + seller statement.
+                try:
+                    from services.vehicle_fee_service import (
+                        calculate_vehicle_fee, create_vehicle_fee_charge,
+                    )
+                    hammer = float(invoice["hammer_price"])
+                    fee_result = await create_vehicle_fee_charge(
+                        db,
+                        auction_id=f"{event_id}:lot:{lot_id}",
+                        buyer_id=winner_id,
+                        hammer_price=hammer,
+                    )
+                    _fees = calculate_vehicle_fee(hammer)
+                    lot_stamp: Dict[str, Any] = {}
+                    if fee_result.get("success"):
+                        lot_stamp = {
+                            "lots.$.payment_status": "payment_collected",
+                            "lots.$.payment_collected_at": _now(),
+                            "lots.$.payment_transaction_id": fee_result.get("payment_intent_id"),
+                            "lots.$.net_payout_amount": hammer,
+                        }
+                        from services.receipts import issue_transaction_records
+                        await issue_transaction_records(
+                            db, section="vehicles",
+                            listing_id=event_id,
+                            listing_title=invoice["vehicle_title"],
+                            buyer_id=winner_id,
+                            seller_id=event.get("seller_id"),
+                            hammer_price=hammer,
+                            platform_fee=float(_fees["net_commission"]),
+                            taxes=float(invoice.get("tax_total") or 0),
+                            processing_fee=float(_fees["stripe_processing_fee"]),
+                            total_charged=float(_fees["total_charge"]),
+                            transaction_id=fee_result.get("payment_intent_id"),
+                            net_payout=hammer,
+                            lot_number=lot.get("lot_number"),
+                        )
+                    else:
+                        lot_stamp = {
+                            "lots.$.payment_status": "payment_failed",
+                            "lots.$.payment_failed_at": _now(),
+                            "lots.$.payment_failure_reason": str(fee_result.get("error"))[:300],
+                        }
+                        from services.notifications_i18n import create_notification
+                        await create_notification(
+                            db, user_id=winner_id, kind="payment_failed",
+                            params={"title": invoice["vehicle_title"],
+                                    "amount": float(_fees["total_charge"])},
+                            data={"event_id": event_id, "lot_id": lot_id,
+                                  "action_url": "/settings?tab=payments"},
+                        )
+                    if lot_stamp:
+                        await db.vehicle_multi_lot_auctions.update_one(
+                            {"id": event_id, "lots.id": lot_id},
+                            {"$set": lot_stamp},
+                        )
+                except Exception as e:  # noqa: BLE001
+                    logger.warning(f"[multi_lot_settle] per-lot fee charge failed: {e}")
 
     # 3) Stamp the lot as settled (idempotent guard for next ticks).
     now = _now()

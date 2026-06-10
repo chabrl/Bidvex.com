@@ -4,7 +4,7 @@ Marketing campaigns are sent through `services.email_marketing` not
 through these helpers. This module exists as a stable namespace for any
 future bulk-campaign helper that wants to use the unified template.
 """
-from services.email_notifications import send_unified_email
+from services.emails._email_core import send_unified_email
 
 
 async def send_new_feature_announcement(user: dict, data: dict | None = None):

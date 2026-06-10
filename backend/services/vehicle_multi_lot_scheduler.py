@@ -193,7 +193,7 @@ async def _progress_event(db, event: Dict[str, Any], now: datetime) -> tuple[int
     # buyer-facing page sees status=sold before the email arrives.
     if just_sold:
         try:
-            from services import email_notifications as _en
+            from services.emails import email_marketplace as _en
             import asyncio as _aio
             for slot in just_sold:
                 winner_id = slot.get("winner_user_id")

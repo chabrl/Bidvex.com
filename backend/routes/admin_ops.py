@@ -2042,7 +2042,7 @@ async def admin_decide_buyer_verification(
 
     # Fire bilingual email (best-effort)
     try:
-        from services.email_notifications import send_buyer_verification_decision_email
+        from services.emails.email_vehicles import send_buyer_verification_decision_email
         await send_buyer_verification_decision_email(
             recipient=user_doc,
             decision=decision.decision,

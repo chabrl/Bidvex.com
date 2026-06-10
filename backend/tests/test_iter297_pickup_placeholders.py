@@ -87,7 +87,7 @@ async def test_pickup_confirm_marketplace_releases_deposit_and_closes(db):
 
     try:
         # Buyer confirms.
-        with patch("services.email_notifications.send_unified_email",
+        with patch("services.emails._email_core.send_unified_email",
                    new=AsyncMock(return_value={"ok": True})):
             result = await confirm_pickup(
                 mdb,
@@ -158,7 +158,7 @@ async def test_pickup_confirm_vehicle_holds_deposit_for_admin(db):
     })
 
     try:
-        with patch("services.email_notifications.send_unified_email",
+        with patch("services.emails._email_core.send_unified_email",
                    new=AsyncMock(return_value={"ok": True})):
             result = await confirm_pickup(
                 mdb, listing_id=vid,
@@ -319,20 +319,16 @@ async def test_feed_placeholder_sweep_stamps_url(db):
         await mdb.listings.delete_one({"id": lid_w_img})
 
 
-# ── P2 / Deprecation warning ──────────────────────────────────────────
+# ── P2 / Shim removal (iter298) ──────────────────────────────────────
 
-def test_email_notifications_emits_deprecation_warning():
-    """Importing `services.email_notifications` (the shim) must emit a
-    DeprecationWarning so the migration to bucketed modules is
-    visible in CI / dev logs."""
+def test_email_notifications_shim_removed():
+    """iter298 — the legacy `services/email_notifications.py` shim is
+    fully deleted. Importing it must fail and no caller may reference it."""
+    import os
     import sys
-    # Force a fresh import so the module-level warnings.warn fires.
     for mod_name in list(sys.modules):
         if mod_name.endswith("email_notifications"):
             del sys.modules[mod_name]
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
+    with pytest.raises(ModuleNotFoundError):
         importlib.import_module("services.email_notifications")
-        dep = [w for w in caught if issubclass(w.category, DeprecationWarning)]
-        assert dep, "expected DeprecationWarning on import of services.email_notifications"
-        assert "deprecated" in str(dep[0].message).lower()
+    assert not os.path.exists("/app/backend/services/email_notifications.py")

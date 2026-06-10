@@ -41,7 +41,7 @@ async def db():
 @pytest.mark.asyncio
 async def test_partner_resubmit_fires_admin_email_to_env_var_recipient(db):
     """Partner resubmission MUST dispatch a SendGrid email to ADMIN_NOTIFICATION_EMAIL."""
-    from services import email_notifications
+    from services.emails import _email_core as email_notifications
     from services.resubmission_service import resubmit_application
 
     uid = f"iter210-pmail-{uuid.uuid4().hex[:8]}"
@@ -103,7 +103,7 @@ async def test_partner_resubmit_fires_admin_email_to_env_var_recipient(db):
 @pytest.mark.asyncio
 async def test_dealer_resubmit_fires_admin_email_to_env_var_recipient(db):
     """Dealer resubmission MUST dispatch a SendGrid email to ADMIN_NOTIFICATION_EMAIL (same code path)."""
-    from services import email_notifications
+    from services.emails import _email_core as email_notifications
     from services.resubmission_service import resubmit_application
 
     uid = f"iter210-dmail-{uuid.uuid4().hex[:8]}"
@@ -144,7 +144,7 @@ async def test_dealer_resubmit_fires_admin_email_to_env_var_recipient(db):
 @pytest.mark.asyncio
 async def test_admin_email_failure_does_not_break_resubmit(db):
     """A SendGrid crash MUST NOT propagate to the caller."""
-    from services import email_notifications
+    from services.emails import _email_core as email_notifications
     from services.resubmission_service import resubmit_application
 
     uid = f"iter210-crash-{uuid.uuid4().hex[:8]}"
@@ -175,7 +175,7 @@ async def test_admin_email_failure_does_not_break_resubmit(db):
 @pytest.mark.asyncio
 async def test_recipient_fallback_chain_uses_admin_email_first(db):
     """When BOTH ADMIN_NOTIFICATION_EMAIL and PARTNERS_ALERT_EMAIL are set, ADMIN wins."""
-    from services import email_notifications
+    from services.emails import _email_core as email_notifications
     from services.resubmission_service import resubmit_application
 
     uid = f"iter210-fallback-{uuid.uuid4().hex[:8]}"

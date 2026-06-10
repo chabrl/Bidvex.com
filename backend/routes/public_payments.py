@@ -170,7 +170,7 @@ async def confirm_payment_success(payment_request_id: str):
     target = await db.users.find_one({"id": doc.get("user_id")}, {"_id": 0}) if doc.get("user_id") else None
     if target:
         try:
-            from services.email_notifications import send_unified_email
+            from services.emails._email_core import send_unified_email
             await send_unified_email(
                 user=dict(target),
                 email_type="payment_confirmed",

@@ -117,8 +117,13 @@ async def process_ended_auctions():
             # `winner_user_id` let the seller dashboard's "Sold" counter
             # and the "Ended" counter compute correctly from MongoDB
             # without needing a separate denormalised counter table.
+            # iter298 BUG 2 — zero-bid auctions get the dedicated
+            # `ended_no_sale` status so the relist flow can target them.
             winner_id = listing.get("highest_bidder_id")
-            _update_set = {"status": "ended", "ended_at": now_str}
+            _update_set = {
+                "status": "ended" if winner_id else "ended_no_sale",
+                "ended_at": now_str,
+            }
             if winner_id:
                 _update_set["winner_user_id"] = winner_id
                 _update_set["sold_at"] = now_str
@@ -159,6 +164,21 @@ async def process_ended_auctions():
                     logger.info(
                         f"[auction-settle] {listing_id} → {settlement.get('scenario')}: {settlement}"
                     )
+                    # iter298 BUG 3/4 — payment lifecycle: stamp
+                    # payment_collected / pending_payment(+link) /
+                    # payment_failed, flag payout_pending, issue
+                    # receipts + statements.
+                    try:
+                        from services.payment_collection import finalize_auction_payment
+                        await finalize_auction_payment(
+                            db,
+                            listing={**listing, **_update_set, "id": listing_id},
+                            collection="listings",
+                            settlement=settlement,
+                            section="marketplace",
+                        )
+                    except Exception as fin_err:
+                        logger.exception(f"[payment-finalize] failed for {listing_id}: {fin_err}")
                 except Exception as settle_err:
                     logger.exception(f"[auction-settle] failed for {listing_id}: {settle_err}")
 
@@ -213,7 +233,7 @@ async def process_ended_auctions():
                         try:
                             buyer_doc = await db.users.find_one({"id": winner_id}, {"_id": 0}) or {}
                             seller_full = await db.users.find_one({"id": seller_id}, {"_id": 0}) or {}
-                            from services.email_notifications import (
+                            from services.emails.email_marketplace import (
                                 send_buyer_pickup_code_email,
                                 send_seller_pickup_instructions_email,
                             )
@@ -299,7 +319,7 @@ async def process_ended_auctions():
                     # Winner email (Bug 5A)
                     try:
                         if winner and winner.get("email"):
-                            from services.email_notifications import send_auction_won_email
+                            from services.emails.email_marketplace import send_auction_won_email
                             # Seller-held platform fee estimate (best-effort, non-blocking)
                             _plat_fee = 0.0
                             try:
@@ -327,7 +347,9 @@ async def process_ended_auctions():
                     # Seller sold email (Bug 5B)
                     try:
                         if seller and seller.get("email"):
-                            from services.email_notifications import send_seller_auction_sold_email
+                            from services.emails.email_vehicles import (
+                                send_seller_auction_sold_email,
+                            )
                             # Seller commission (best-effort)
                             _commission = 0.0
                             _net_payout = final_price
@@ -437,25 +459,37 @@ async def process_ended_auctions():
                 except Exception as e:
                     logger.error(f"Failed to process winner for listing {listing_id}: {e}")
             else:
-                # ===== BUG 5: No-bid ending email to seller =====
+                # ===== iter298 BUG 2: Zero-bid end → relist email + notification =====
                 try:
                     if seller_id:
                         _seller_no_bids = await db.users.find_one(
                             {"id": seller_id}, {"_id": 0, "name": 1, "email": 1}
                         )
+                        _cat_nb = (listing.get("category") or "").lower()
+                        _at_nb = "vehicle" if any(
+                            v in _cat_nb for v in ("vehicle", "car", "auto", "truck", "motorcycle")
+                        ) else "marketplace"
                         if _seller_no_bids and _seller_no_bids.get("email"):
-                            _cat_nb = (listing.get("category") or "").lower()
-                            _at_nb = "vehicle" if any(
-                                v in _cat_nb for v in ("vehicle", "car", "auto", "truck", "motorcycle")
-                            ) else "marketplace"
-                            from services.email_notifications import send_seller_auction_no_bids_email
+                            from services.emails.email_vehicles import (
+                                send_seller_auction_no_bids_email,
+                            )
                             await send_seller_auction_no_bids_email(
                                 seller_email=_seller_no_bids["email"],
                                 seller_name=_seller_no_bids.get("name", "Seller"),
                                 listing_title=listing.get("title", "Item"),
                                 listing_id=listing_id,
                                 auction_type=_at_nb,
+                                auction_end_time=str(listing.get("auction_end_date") or now_str),
+                                bid_count=int(listing.get("bid_count") or 0),
                             )
+                        # Bilingual in-platform notification (EN/FR).
+                        from services.notifications_i18n import create_notification
+                        await create_notification(
+                            db, user_id=seller_id, kind="auction_ended_no_winner",
+                            params={"title": listing.get("title", "Item")},
+                            data={"listing_id": listing_id,
+                                  "action_url": "/seller/dashboard?filter=ended"},
+                        )
                 except Exception as nb_err:
                     logger.warning(f"[auction-end] no-bids seller email failed: {nb_err}")
 
@@ -507,8 +541,12 @@ async def process_ended_auctions():
             # iter296 P0 BUG 1 + 5 — write per-lot winner data + sold/ended
             # counters so the seller dashboard reflects this auction
             # within one scheduler tick.
+            # iter298 BUG 2 — zero-bid events flip to `ended_no_sale`.
             _has_any_winner = any((lot.get("highest_bidder_id") for lot in auction.get("lots") or []))
-            _mi_update = {"status": "ended", "ended_at": now_str}
+            _mi_update = {
+                "status": "ended" if _has_any_winner else "ended_no_sale",
+                "ended_at": now_str,
+            }
             if _has_any_winner:
                 _mi_update["sold_at"] = now_str
             await db.multi_item_listings.update_one(
@@ -517,6 +555,35 @@ async def process_ended_auctions():
             )
 
             seller_id = auction.get("seller_id")
+
+            # iter298 BUG 2 — zero-bid multi-item event → relist email +
+            # bilingual notification to the seller.
+            if not _has_any_winner and seller_id:
+                try:
+                    _seller_nb = await db.users.find_one(
+                        {"id": seller_id}, {"_id": 0, "name": 1, "email": 1})
+                    if _seller_nb and _seller_nb.get("email"):
+                        from services.emails.email_vehicles import (
+                            send_seller_auction_no_bids_email,
+                        )
+                        await send_seller_auction_no_bids_email(
+                            seller_email=_seller_nb["email"],
+                            seller_name=_seller_nb.get("name", "Seller"),
+                            listing_title=auction.get("title", "Auction"),
+                            listing_id=auction_id,
+                            auction_type="lots",
+                            auction_end_time=str(auction.get("auction_end_date") or now_str),
+                            bid_count=0,
+                        )
+                    from services.notifications_i18n import create_notification as _cn
+                    await _cn(
+                        db, user_id=seller_id, kind="auction_ended_no_winner",
+                        params={"title": auction.get("title", "Auction")},
+                        data={"listing_id": auction_id,
+                              "action_url": "/seller/dashboard?filter=ended"},
+                    )
+                except Exception as nb_err:
+                    logger.warning(f"[lots-end] no-bids seller email failed: {nb_err}")
             
             # iter296 P0 BUG 2/3/4 — Lot-level emails + bilingual platform
             # notifications for the multi-item-listing flow. Mirrors the
@@ -577,7 +644,7 @@ async def process_ended_auctions():
                         # Winner + seller emails (best-effort, non-blocking)
                         try:
                             if winner and winner.get("email"):
-                                from services.email_notifications import send_auction_won_email
+                                from services.emails.email_marketplace import send_auction_won_email
                                 await send_auction_won_email(
                                     to_email=winner["email"],
                                     to_name=winner.get("name", "Winner"),
@@ -591,7 +658,9 @@ async def process_ended_auctions():
                             logger.warning(f"[lots-end] winner email failed: {we_err}")
                         try:
                             if seller and seller.get("email"):
-                                from services.email_notifications import send_seller_auction_sold_email
+                                from services.emails.email_vehicles import (
+                                    send_seller_auction_sold_email,
+                                )
                                 # Best-effort 2.5% platform fee math
                                 _comm = round(lot_final * 0.025, 2)
                                 _net  = round(lot_final - _comm, 2)
@@ -611,6 +680,45 @@ async def process_ended_auctions():
                                 )
                         except Exception as se_err:
                             logger.warning(f"[lots-end] seller-sold email failed: {se_err}")
+
+                        # iter298 BUG 3/4 — Per-lot automatic charge at
+                        # lot close + payment lifecycle + receipts.
+                        try:
+                            from services.auction_settlement import settle_auction
+                            from services.payment_collection import finalize_auction_payment
+                            _lot_synthetic = {
+                                "id": f"{auction_id}:lot{lot.get('lot_number')}",
+                                "title": lot_title,
+                                "winner_id": winner_id,
+                                "seller_id": seller_id,
+                                "final_price": lot_final,
+                                "current_price": lot_final,
+                                "payment_method": auction.get("payment_method", "stripe"),
+                                "currency": auction.get("currency", "CAD"),
+                                "auction_end_date": auction.get("auction_end_date"),
+                                "listing_type": "lots",
+                            }
+                            lot_settlement = await settle_auction(
+                                db,
+                                auction_id=_lot_synthetic["id"],
+                                listing=_lot_synthetic,
+                            )
+                            await finalize_auction_payment(
+                                db,
+                                listing={**_lot_synthetic, "id": auction_id,
+                                         "winner_user_id": winner_id},
+                                collection="multi_item_listings",
+                                settlement=lot_settlement,
+                                section="lots",
+                                lot_number=lot.get("lot_number"),
+                                listing_title=lot_title,
+                                hammer_override=lot_final,
+                                winner_override=winner_id,
+                            )
+                        except Exception as lot_settle_err:
+                            logger.exception(
+                                f"[lots-settle] failed for {auction_id} lot {lot.get('lot_number')}: {lot_settle_err}"
+                            )
                     except Exception as e:
                         logger.error(f"Failed to process winner for {auction_id} lot {lot['lot_number']}: {e}")
 

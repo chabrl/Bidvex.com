@@ -56,19 +56,54 @@ async def process_ended_auction(db, vehicle_listing: dict) -> AuctionEndResult:
         
         if not highest_bid:
             # No bids - auction ended without winner
+            # iter298 BUG 2 — dedicated `ended_no_sale` status + relist
+            # email (3 CTAs) + bilingual platform notification.
             result.status = "no_bids"
             
             await db.vehicle_listings.update_one(
                 {"id": vehicle_listing["id"]},
                 {
                     "$set": {
-                        "status": "ended",
+                        "status": "ended_no_sale",
                         "end_reason": "no_bids",
+                        "ended_at": now,
                         "updated_at": now
                     }
                 }
             )
-            
+
+            try:
+                seller_uid = vehicle_listing.get("seller_user_id")
+                _v_title = vehicle_listing.get("title") or (
+                    f"{vehicle_listing.get('year','')} {vehicle_listing.get('make','')} "
+                    f"{vehicle_listing.get('model','')}"
+                ).strip() or "Vehicle"
+                if seller_uid:
+                    seller_doc = await db.users.find_one(
+                        {"id": seller_uid}, {"_id": 0, "name": 1, "email": 1}) or {}
+                    if seller_doc.get("email"):
+                        from services.emails.email_vehicles import (
+                            send_seller_auction_no_bids_email,
+                        )
+                        await send_seller_auction_no_bids_email(
+                            seller_email=seller_doc["email"],
+                            seller_name=seller_doc.get("name", "Seller"),
+                            listing_title=_v_title,
+                            listing_id=vehicle_listing["id"],
+                            auction_type="vehicle",
+                            auction_end_time=str(vehicle_listing.get("end_time") or now),
+                            bid_count=0,
+                        )
+                    from services.notifications_i18n import create_notification
+                    await create_notification(
+                        db, user_id=seller_uid, kind="auction_ended_no_winner",
+                        params={"title": _v_title},
+                        data={"vehicle_id": vehicle_listing["id"],
+                              "action_url": "/vehicle-auctions/my-listings"},
+                    )
+            except Exception as nb_err:
+                logger.warning(f"[vehicle-end] no-bids relist dispatch failed: {nb_err}")
+
             logger.info(f"Auction {vehicle_listing['id']} ended with no bids")
             return result
         
@@ -150,10 +185,8 @@ async def process_ended_auction(db, vehicle_listing: dict) -> AuctionEndResult:
         # invoice creation.
         try:
             from services.notifications_i18n import create_notification
-            from services.email_notifications import (
-                send_auction_won_email,
-                send_seller_auction_sold_email,
-            )
+            from services.emails.email_vehicles import send_seller_auction_sold_email
+            from services.emails.email_marketplace import send_auction_won_email
             _veh_title = vehicle_listing.get("title") or (
                 f"{vehicle_listing.get('year','')} {vehicle_listing.get('make','')} "
                 f"{vehicle_listing.get('model','')}"
@@ -300,17 +333,94 @@ async def process_ended_auction(db, vehicle_listing: dict) -> AuctionEndResult:
         
         # ── AUTO-CHARGE: Platform Fee (2.5% + Stripe recovery) ──
         try:
-            from services.vehicle_fee_service import create_vehicle_fee_charge
+            from services.vehicle_fee_service import create_vehicle_fee_charge, calculate_vehicle_fee
             fee_result = await create_vehicle_fee_charge(
                 db,
                 auction_id=vehicle_listing["id"],
                 buyer_id=winner_id,
                 hammer_price=final_price,
             )
+            _vfees = calculate_vehicle_fee(final_price)
             if fee_result.get("success"):
                 logger.info(f"Platform fee charged for auction {vehicle_listing['id']}: PI={fee_result['payment_intent_id']}")
+                # iter298 BUG 3/4 — stamp payment lifecycle + issue the
+                # buyer receipt + seller statement. For vehicles BidVex
+                # charges ONLY the 2.5% platform fee (BP=0%, hammer is
+                # settled directly between buyer and seller).
+                try:
+                    await db.vehicle_listings.update_one(
+                        {"id": vehicle_listing["id"]},
+                        {"$set": {
+                            "payment_status": "payment_collected",
+                            "payment_collected_at": now,
+                            "net_payout_amount": float(final_price),
+                            "payment_transaction_id": fee_result.get("payment_intent_id"),
+                        }},
+                    )
+                    from services.receipts import issue_transaction_records
+                    _veh_title = vehicle_listing.get("title") or (
+                        f"{vehicle_listing.get('year','')} {vehicle_listing.get('make','')} "
+                        f"{vehicle_listing.get('model','')}"
+                    ).strip() or "Vehicle"
+                    await issue_transaction_records(
+                        db, section="vehicles",
+                        listing_id=vehicle_listing["id"],
+                        listing_title=_veh_title,
+                        buyer_id=winner_id,
+                        seller_id=vehicle_listing.get("seller_user_id"),
+                        hammer_price=float(final_price),
+                        platform_fee=float(_vfees["net_commission"]),
+                        taxes=0.0,
+                        processing_fee=float(_vfees["stripe_processing_fee"]),
+                        total_charged=float(_vfees["total_charge"]),
+                        transaction_id=fee_result.get("payment_intent_id"),
+                        net_payout=float(final_price),
+                    )
+                except Exception as rcpt_err:
+                    logger.warning(f"[vehicle-end] receipt issuance failed: {rcpt_err}")
             else:
                 logger.error(f"Platform fee charge FAILED for auction {vehicle_listing['id']}: {fee_result.get('error')}")
+                # iter298 BUG 3 — payment_failed stamping + buyer email +
+                # notification + admin alert.
+                try:
+                    await db.vehicle_listings.update_one(
+                        {"id": vehicle_listing["id"]},
+                        {"$set": {
+                            "payment_status": "payment_failed",
+                            "payment_failed_at": now,
+                            "payment_failure_reason": str(fee_result.get("error"))[:300],
+                        }},
+                    )
+                    buyer_doc = await db.users.find_one({"id": winner_id}, {"_id": 0}) or {}
+                    if buyer_doc.get("email"):
+                        from services.emails.email_system import send_payment_failed_email
+                        await send_payment_failed_email(
+                            buyer=buyer_doc,
+                            listing_title=vehicle_listing.get("title", "Vehicle"),
+                            listing_id=vehicle_listing["id"],
+                            amount=float(_vfees["total_charge"]),
+                        )
+                    from services.notifications_i18n import create_notification
+                    await create_notification(
+                        db, user_id=winner_id, kind="payment_failed",
+                        params={"title": vehicle_listing.get("title", "Vehicle"),
+                                "amount": float(_vfees["total_charge"])},
+                        data={"vehicle_id": vehicle_listing["id"],
+                              "action_url": "/settings?tab=payments"},
+                    )
+                    await db.admin_alerts.insert_one({
+                        "id": str(uuid.uuid4()),
+                        "type": "payment_failed",
+                        "listing_id": vehicle_listing["id"],
+                        "section": "vehicles",
+                        "buyer_id": winner_id,
+                        "amount": float(_vfees["total_charge"]),
+                        "reason": str(fee_result.get("error"))[:300],
+                        "created_at": now,
+                        "resolved": False,
+                    })
+                except Exception as pf_err:
+                    logger.warning(f"[vehicle-end] payment-failed dispatch failed: {pf_err}")
         except Exception as fee_err:
             logger.error(f"Platform fee charge exception for auction {vehicle_listing['id']}: {fee_err}")
 

@@ -130,7 +130,7 @@ async def fire_live_transitions_once(db) -> int:
 
     sent = 0
     try:
-        from services import email_notifications as _en  # local import to avoid cycles
+        from services.emails import _email_core as _en  # local import to avoid cycles
     except Exception:
         _en = None
 

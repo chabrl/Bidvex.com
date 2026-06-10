@@ -1109,6 +1109,14 @@ try:
 
     api_router.include_router(listing_requests_router)
 
+    # iter298 BUG 2 — Relist flow for zero-bid ended auctions.
+    from routes.relist import relist_router
+    api_router.include_router(relist_router)
+
+    # iter298 BUG 4 — Buyer receipts + seller statements.
+    from routes.receipts import receipts_router
+    api_router.include_router(receipts_router)
+
     # iter293 — Multi-Lot Vehicle Auction (Copart-style sequential events)
     from routes.vehicle_multi_lot import vehicle_multi_lot_router, set_vehicle_multi_lot_db
     set_vehicle_multi_lot_db(db)
@@ -1200,8 +1208,14 @@ async def create_critical_indexes(database):
         ("listings", [("status", 1), ("end_time", 1)], {"background": True}),
         ("storage_auctions", [("status", 1), ("end_time", 1)], {"background": True}),
         ("users", [("email", 1)], {"unique": True, "background": True}),
-        # Phase 6.0 / Task 2 — Unique-when-set mobile number (sparse so null is allowed)
-        ("users", [("mobile_number_normalized", 1)], {"unique": True, "sparse": True, "background": True}),
+        # Phase 6.0 / Task 2 + iter298 — Unique-when-set mobile number.
+        # PARTIAL (not sparse): sparse unique indexes treat explicit
+        # `null` values as duplicate keys, which 500'd every phone-less
+        # registration after the first. The partial filter only indexes
+        # real string values.
+        ("users", [("mobile_number_normalized", 1)],
+         {"unique": True, "background": True,
+          "partialFilterExpression": {"mobile_number_normalized": {"$type": "string"}}}),
         ("deposits", [("auction_id", 1), ("status", 1)], {"background": True}),
         # TTL — auto-deletes expired refresh tokens
         ("refresh_tokens", [("expires_at", 1)], {"expireAfterSeconds": 0, "background": True}),
@@ -1220,6 +1234,20 @@ async def create_critical_indexes(database):
             await database[coll].create_index(keys, **opts)
             ok += 1
         except Exception as e:
+            # iter298 — self-heal the mobile_number_normalized index: the
+            # legacy sparse-unique version conflicts with the new partial
+            # spec. Drop the stale index once and recreate.
+            if coll == "users" and "mobile_number_normalized" in str(keys) and (
+                "IndexOptionsConflict" in str(e) or "already exists with different options" in str(e)
+            ):
+                try:
+                    await database.users.drop_index("mobile_number_normalized_1")
+                    await database[coll].create_index(keys, **opts)
+                    ok += 1
+                    logger.info("[critical-index] migrated mobile_number_normalized_1 to partial-unique")
+                    continue
+                except Exception as e2:
+                    logger.warning(f"[critical-index] mobile index migration failed: {e2}")
             logger.warning(f"[critical-index] {coll} {keys}: {e}")
     logger.info(f"✅ Critical database indexes verified ({ok}/{len(critical)} ok)")
 

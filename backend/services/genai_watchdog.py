@@ -210,7 +210,7 @@ async def send_watchdog_email(
     recipient: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Email the report via SendGrid (uses services.email_notifications.send_email)."""
-    from services.email_notifications import send_email  # local import to avoid circular load
+    from services.emails._email_core import send_email
 
     recipient = (recipient or WATCHDOG_RECIPIENT_EMAIL).strip()
     subject = f"[BidVex Watchdog] Daily Security Report — {window_end_iso[:10]}"

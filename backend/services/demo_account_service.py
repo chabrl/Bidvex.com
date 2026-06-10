@@ -127,7 +127,7 @@ async def create_demo_account(
     # Welcome email
     email_sent = False
     try:
-        from services.email_notifications import send_email
+        from services.emails._email_core import send_email
         await send_email(
             to_email=contact_email,
             subject="Your BidVex Demo Account is Ready · Votre compte de démonstration BidVex est prêt",
@@ -273,7 +273,7 @@ async def convert_demo_to_real(db, user_id: str) -> dict:
     )
     # Notify
     try:
-        from services.email_notifications import send_email
+        from services.emails._email_core import send_email
         await send_email(
             to_email=u.get("email"),
             subject="Welcome to BidVex — Complete Your Verification · Complétez votre vérification",
@@ -325,7 +325,7 @@ async def check_demo_account_expiry(db) -> dict:
         )
         # Send expiry email
         try:
-            from services.email_notifications import send_email
+            from services.emails._email_core import send_email
             await send_email(
                 to_email=u.get("email"),
                 subject="Your BidVex demo has ended · Votre démonstration est terminée",

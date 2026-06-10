@@ -1391,3 +1391,222 @@ async def send_new_message_email(
         ),
     )
 
+
+
+# ═══════════════════════════════════════════════════════════════════
+# iter298 BUG 4 — Buyer receipts + seller statements + payment links
+# ═══════════════════════════════════════════════════════════════════
+
+def _letterhead() -> str:
+    """BidVex Inc. legal letterhead — appended to every receipt/statement."""
+    return """
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top: 28px; border-top: 1px solid #e2e8f0;">
+      <tr><td style="padding-top: 14px; color: #94a3b8; font-size: 12px; line-height: 1.6;">
+        <strong style="color: #64748b;">BidVex Inc.</strong><br/>
+        761 Rue Chalifoux, Sherbrooke (Qu&eacute;bec) J1G 0A8, Canada<br/>
+        Corporation Number 1175253974
+      </td></tr>
+    </table>
+    """
+
+
+def _money_row(label: str, amount: float, bold: bool = False, color: str = "#0f172a") -> str:
+    weight = "700" if bold else "400"
+    return f"""
+      <tr>
+        <td style="padding: 8px 0; color: #475569; font-size: 14px; border-bottom: 1px solid #f1f5f9;">{label}</td>
+        <td align="right" style="padding: 8px 0; color: {color}; font-size: 14px; font-weight: {weight}; border-bottom: 1px solid #f1f5f9;">${amount:,.2f} CAD</td>
+      </tr>
+    """
+
+
+async def send_buyer_receipt_email(buyer: dict, receipt: dict) -> Dict[str, Any]:
+    """Itemized payment receipt for the winning buyer (EN or FR based on
+    the buyer's platform language)."""
+    lang = _detect_language(buyer)
+    title = receipt.get("listing_title", "Item")
+    last4 = receipt.get("payment_method_last4")
+    txn = receipt.get("transaction_id") or receipt.get("id", "")
+
+    if lang == "fr":
+        heading = "Re&ccedil;u de paiement"
+        intro = (f"Bonjour {buyer.get('name', '')}, voici votre re&ccedil;u pour "
+                 f"<strong>{title}</strong>. Merci d'avoir ench&eacute;ri sur BidVex.")
+        rows = (
+            _money_row("Prix d'adjudication", receipt.get("hammer_price", 0))
+            + _money_row("Frais de plateforme", receipt.get("platform_fee", 0))
+            + _money_row("Taxes", receipt.get("taxes", 0))
+            + _money_row("Frais de traitement", receipt.get("processing_fee", 0))
+            + _money_row("Total factur&eacute;", receipt.get("total_charged", 0), bold=True, color="#0ea5e9")
+        )
+        meta = (
+            (f"<p style='color:#64748b;font-size:13px;'>Carte se terminant par <strong>{last4}</strong></p>" if last4 else "")
+            + f"<p style='color:#64748b;font-size:13px;'>ID de transaction&nbsp;: <strong>{txn}</strong></p>"
+        )
+        subject = f"Re\u00e7u BidVex — {title}"
+    else:
+        heading = "Payment Receipt"
+        intro = (f"Hi {buyer.get('name', '')}, here is your receipt for "
+                 f"<strong>{title}</strong>. Thank you for bidding on BidVex.")
+        rows = (
+            _money_row("Hammer price", receipt.get("hammer_price", 0))
+            + _money_row("Platform fee", receipt.get("platform_fee", 0))
+            + _money_row("Taxes", receipt.get("taxes", 0))
+            + _money_row("Payment processing", receipt.get("processing_fee", 0))
+            + _money_row("Total charged", receipt.get("total_charged", 0), bold=True, color="#0ea5e9")
+        )
+        meta = (
+            (f"<p style='color:#64748b;font-size:13px;'>Card ending in <strong>{last4}</strong></p>" if last4 else "")
+            + f"<p style='color:#64748b;font-size:13px;'>Transaction ID: <strong>{txn}</strong></p>"
+        )
+        subject = f"BidVex Receipt — {title}"
+
+    content = f"""
+    <h2 style="margin: 0 0 20px 0; color: #0f172a;">{heading}</h2>
+    <p style="color: #475569; line-height: 1.6;">{intro}</p>
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 20px 0;">
+      {rows}
+    </table>
+    {meta}
+    {_letterhead()}
+    """
+    return await _send_via_unified(
+        to_email=buyer["email"],
+        subject=subject,
+        html_content=_base_template(content, heading,
+                                    auction_type=receipt.get("section")),
+    )
+
+
+async def send_seller_statement_email(seller: dict, statement: dict) -> Dict[str, Any]:
+    """Sale statement for the seller — hammer, 2.5% platform fee deducted,
+    net payout, payout timeline, buyer first name."""
+    lang = _detect_language(seller)
+    title = statement.get("listing_title", "Item")
+    buyer_first = statement.get("buyer_first_name") or "—"
+
+    if lang == "fr":
+        heading = "Relev&eacute; de vente"
+        intro = (f"Bonjour {seller.get('name', '')}, votre article <strong>{title}</strong> "
+                 f"a &eacute;t&eacute; vendu &agrave; <strong>{buyer_first}</strong>.")
+        rows = (
+            _money_row("Prix d'adjudication", statement.get("hammer_price", 0))
+            + _money_row("Frais de plateforme d&eacute;duits (2,5\u00a0%)", -abs(statement.get("platform_fee", 0)), color="#dc2626")
+            + _money_row("Versement net", statement.get("net_payout", 0), bold=True, color="#059669")
+        )
+        timeline = ("<p style='color:#64748b;font-size:13px;'>D&eacute;lai de versement&nbsp;: "
+                    "sous <strong>14 jours</strong> apr&egrave;s confirmation de la transaction.</p>")
+        subject = f"Relev\u00e9 de vente BidVex — {title}"
+    else:
+        heading = "Sale Statement"
+        intro = (f"Hi {seller.get('name', '')}, your item <strong>{title}</strong> "
+                 f"was sold to <strong>{buyer_first}</strong>.")
+        rows = (
+            _money_row("Hammer price", statement.get("hammer_price", 0))
+            + _money_row("Platform fee deducted (2.5%)", -abs(statement.get("platform_fee", 0)), color="#dc2626")
+            + _money_row("Net payout", statement.get("net_payout", 0), bold=True, color="#059669")
+        )
+        timeline = ("<p style='color:#64748b;font-size:13px;'>Payout timeline: within "
+                    "<strong>14 days</strong> after transaction confirmation.</p>")
+        subject = f"BidVex Sale Statement — {title}"
+
+    content = f"""
+    <h2 style="margin: 0 0 20px 0; color: #0f172a;">{heading}</h2>
+    <p style="color: #475569; line-height: 1.6;">{intro}</p>
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 20px 0;">
+      {rows}
+    </table>
+    {timeline}
+    {_letterhead()}
+    """
+    return await _send_via_unified(
+        to_email=seller["email"],
+        subject=subject,
+        html_content=_base_template(content, heading,
+                                    auction_type=statement.get("section")),
+    )
+
+
+async def send_payment_link_email(
+    buyer: dict, listing_title: str, listing_id: str,
+    total_due: float, payment_link_url: Optional[str], deadline_iso: str,
+) -> Dict[str, Any]:
+    """Buyer has no saved payment method — email a Stripe payment link
+    with a 48-hour deadline."""
+    lang = _detect_language(buyer)
+    link = payment_link_url or f"{FRONTEND_URL}/dashboard/buyer"
+    deadline_h = _format_date(deadline_iso)
+
+    if lang == "fr":
+        heading = "Paiement requis — 48 heures"
+        body = (f"F&eacute;licitations, vous avez remport&eacute; <strong>{listing_title}</strong>&nbsp;! "
+                f"Aucune carte n'est enregistr&eacute;e sur votre compte. Veuillez payer "
+                f"<strong>${total_due:,.2f} CAD</strong> avant le <strong>{deadline_h}</strong> "
+                f"pour finaliser votre achat. Pass&eacute; ce d&eacute;lai, l'annonce sera signal&eacute;e en retard de paiement.")
+        cta = "Payer maintenant"
+        subject = f"Paiement requis sous 48 h — {listing_title}"
+    else:
+        heading = "Payment Required — 48 Hours"
+        body = (f"Congratulations, you won <strong>{listing_title}</strong>! "
+                f"There is no payment method saved on your account. Please pay "
+                f"<strong>${total_due:,.2f} CAD</strong> before <strong>{deadline_h}</strong> "
+                f"to complete your purchase. After the deadline this purchase will be flagged as payment overdue.")
+        cta = "Pay Now"
+        subject = f"Payment required within 48h — {listing_title}"
+
+    content = f"""
+    <h2 style="margin: 0 0 20px 0; color: #d97706;">{heading}</h2>
+    <p style="color: #475569; line-height: 1.6;">{body}</p>
+    <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 30px auto;">
+      <tr><td align="center" style="background-color: #0ea5e9; padding: 14px 30px; border-radius: 8px;">
+        <a href="{link}" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px;">{cta}</a>
+      </td></tr>
+    </table>
+    {_letterhead()}
+    """
+    return await _send_via_unified(
+        to_email=buyer["email"],
+        subject=subject,
+        html_content=_base_template(content, heading),
+    )
+
+
+async def send_payment_failed_email(
+    buyer: dict, listing_title: str, listing_id: str, amount: float,
+) -> Dict[str, Any]:
+    """Stripe charge on the saved card failed — ask the buyer to update
+    their payment method."""
+    lang = _detect_language(buyer)
+    settings_url = f"{FRONTEND_URL}/settings?tab=payments"
+
+    if lang == "fr":
+        heading = "&Eacute;chec du paiement"
+        body = (f"Le paiement de <strong>${amount:,.2f} CAD</strong> pour "
+                f"<strong>{listing_title}</strong> a &eacute;chou&eacute;. "
+                f"Veuillez mettre &agrave; jour votre m&eacute;thode de paiement pour finaliser votre achat.")
+        cta = "Mettre &agrave; jour ma carte"
+        subject = f"\u00c9chec du paiement — {listing_title}"
+    else:
+        heading = "Payment Failed"
+        body = (f"The payment of <strong>${amount:,.2f} CAD</strong> for "
+                f"<strong>{listing_title}</strong> could not be processed. "
+                f"Please update your payment method to complete your purchase.")
+        cta = "Update Payment Method"
+        subject = f"Payment failed — {listing_title}"
+
+    content = f"""
+    <h2 style="margin: 0 0 20px 0; color: #dc2626;">{heading}</h2>
+    <p style="color: #475569; line-height: 1.6;">{body}</p>
+    <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 30px auto;">
+      <tr><td align="center" style="background-color: #dc2626; padding: 14px 30px; border-radius: 8px;">
+        <a href="{settings_url}" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px;">{cta}</a>
+      </td></tr>
+    </table>
+    {_letterhead()}
+    """
+    return await _send_via_unified(
+        to_email=buyer["email"],
+        subject=subject,
+        html_content=_base_template(content, heading),
+    )
+

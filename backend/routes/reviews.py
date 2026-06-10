@@ -318,7 +318,7 @@ async def create_review(
         })
         seller = await db.users.find_one({"id": seller_id}, {"_id": 0})
         if seller and seller.get("email"):
-            from services.email_notifications import send_email, _base_template
+            from services.emails._email_core import send_email, _base_template
             stars = "&#9733;" * data.rating + "&#9734;" * (5 - data.rating)
             html = f"""
             <h2 style="margin: 0 0 20px 0; color: #1e3a8a;">New Review Received</h2>

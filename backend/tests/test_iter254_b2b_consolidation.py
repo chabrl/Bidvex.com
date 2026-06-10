@@ -368,12 +368,18 @@ def test_iter254_blast_response_surfaces_forced_lang_for_ui_toast():
 # ─── Mission 4 — Email branding constants & override propagation ─────
 
 def test_iter254_email_branding_constants_match_spec():
-    from services.email_notifications import (
-        B2B_PARTNER_FROM_EMAIL, B2B_PARTNER_FROM_NAME,
-        TRANSACTIONAL_FROM_EMAIL, TRANSACTIONAL_FROM_NAME,
+    from services.emails._email_core import (
+        B2B_PARTNER_FROM_EMAIL,
+        B2B_PARTNER_FROM_NAME,
+        TRANSACTIONAL_FROM_EMAIL,
+        TRANSACTIONAL_FROM_NAME,
     )
-    assert B2B_PARTNER_FROM_EMAIL == "partners@bidvex.ca"
-    assert TRANSACTIONAL_FROM_EMAIL == "support@bidvex.com"
+    # iter270 collapsed all outbound FROMs to noreply@bidvex.com (DKIM);
+    # partners@bidvex.ca lives on as the Reply-To.
+    assert B2B_PARTNER_FROM_EMAIL == "noreply@bidvex.com"
+    assert TRANSACTIONAL_FROM_EMAIL == "noreply@bidvex.com"
+    from services.emails._email_core import TRANSACTIONAL_REPLY_TO
+    assert TRANSACTIONAL_REPLY_TO == "support@bidvex.com"
     assert B2B_PARTNER_FROM_NAME  # non-empty
     assert TRANSACTIONAL_FROM_NAME  # non-empty
 
@@ -383,7 +389,7 @@ async def test_iter254_send_email_accepts_branding_overrides():
     """`send_email` propagates `from_email`/`from_name`/`reply_to` into
     the response envelope. In the SendGrid-unavailable test env, the
     logged-only fallback returns the resolved overrides for assertion."""
-    from services import email_notifications as en
+    from services.emails import _email_core as en
     res = await en.send_email(
         to_email="test@example.com",
         subject="iter254 branding test",

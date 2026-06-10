@@ -100,7 +100,7 @@ async def process_promotion_email_blast_queue(db) -> Dict[str, int]:
         recipients = await _find_interested_recipients(db, listing_type, category)
         sent_for_job = 0
         try:
-            from services.email_notifications import send_promotion_email_blast
+            from services.emails.email_system import send_promotion_email_blast
             for u in recipients:
                 if not u.get("email"):
                     continue

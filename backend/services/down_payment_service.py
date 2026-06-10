@@ -285,7 +285,7 @@ async def _promote_runner_up(db, expired_dp) -> bool:
 
     # Email the new winner
     try:
-        from services.email_notifications import send_auction_won_email  # already exists
+        from services.emails.email_marketplace import send_auction_won_email
         await send_auction_won_email(
             to_email=new_buyer["email"],
             to_name=new_buyer.get("name", "Winner"),

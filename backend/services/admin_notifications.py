@@ -57,7 +57,7 @@ async def _send_admin_raw(subject, html):
     """
     admin_email = _resolve_admin_email()
     try:
-        from services.email_notifications import send_unified_email
+        from services.emails._email_core import send_unified_email
         result = await send_unified_email(
             "new_feature",
             user={"email": admin_email, "first_name": "BidVex Admin"},

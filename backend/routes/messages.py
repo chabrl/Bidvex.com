@@ -261,7 +261,7 @@ async def send_message(request: Request, msg: MessageCreate, current_user: User 
         if not recipient_globally_online:
             recipient = await db.users.find_one({"id": msg.receiver_id}, {"_id": 0, "email": 1, "name": 1, "preferred_language": 1})
             if recipient and recipient.get("email"):
-                from services.email_notifications import send_new_message_email
+                from services.emails.email_system import send_new_message_email
                 await send_new_message_email(
                     recipient=recipient,
                     sender_name=current_user.name,
@@ -665,7 +665,7 @@ async def create_auction_won_conversation(
 
         # iter213 — Bilingual EN+FR email to both parties
         try:
-            from services.email_notifications import send_auction_thread_opened_email
+            from services.emails.email_system import send_auction_thread_opened_email
             if (winner or {}).get("email"):
                 await send_auction_thread_opened_email(
                     recipient=winner, role="winner",

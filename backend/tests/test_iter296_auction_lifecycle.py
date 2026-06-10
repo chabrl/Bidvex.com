@@ -111,10 +111,10 @@ async def test_marketplace_listing_transitions_to_ended_and_stamps_winner(db):
         # Patch the offline-invoice fee_calculator branch + emails so the
         # test focuses on the status transition (Bug 1) without making
         # real Stripe/SendGrid calls.
-        with patch("services.email_notifications.send_auction_won_email", new=AsyncMock(return_value={"ok": True})), \
-             patch("services.email_notifications.send_seller_auction_sold_email", new=AsyncMock(return_value={"ok": True})), \
-             patch("services.email_notifications.send_buyer_pickup_code_email", new=AsyncMock(return_value={"ok": True})), \
-             patch("services.email_notifications.send_seller_pickup_instructions_email", new=AsyncMock(return_value={"ok": True})), \
+        with patch("services.emails.email_marketplace.send_auction_won_email", new=AsyncMock(return_value={"ok": True})), \
+             patch("services.emails.email_vehicles.send_seller_auction_sold_email", new=AsyncMock(return_value={"ok": True})), \
+             patch("services.emails.email_marketplace.send_buyer_pickup_code_email", new=AsyncMock(return_value={"ok": True})), \
+             patch("services.emails.email_marketplace.send_seller_pickup_instructions_email", new=AsyncMock(return_value={"ok": True})), \
              patch("services.auction_settlement.settle_auction", new=AsyncMock(return_value={"scenario": "skipped"})):
             await process_ended_auctions()
 
@@ -177,8 +177,8 @@ async def test_multi_item_listing_transitions_with_per_lot_winner(db):
     })
 
     try:
-        with patch("services.email_notifications.send_auction_won_email", new=AsyncMock(return_value={"ok": True})), \
-             patch("services.email_notifications.send_seller_auction_sold_email", new=AsyncMock(return_value={"ok": True})):
+        with patch("services.emails.email_marketplace.send_auction_won_email", new=AsyncMock(return_value={"ok": True})), \
+             patch("services.emails.email_vehicles.send_seller_auction_sold_email", new=AsyncMock(return_value={"ok": True})):
             await process_ended_auctions()
 
         doc = await mdb.multi_item_listings.find_one({"id": listing_id}, {"_id": 0})

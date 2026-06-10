@@ -264,6 +264,17 @@ async def settle_cash_or_etransfer(
     buyer_commission = float(fee["buyer_premium"]) + float(fee["buyer_taxes"])
     seller_commission = float(fee["seller_commission"])
 
+    # iter298 BUG 3/4 — expose the fee breakdown for receipts/statements.
+    result["fee_breakdown"] = {
+        "hammer_price": float(hammer_price),
+        "buyer_premium": float(fee["buyer_premium"]),
+        "buyer_taxes": float(fee["buyer_taxes"]),
+        "buyer_stripe_fee": float(fee["buyer_stripe_fee"]),
+        "buyer_total_charged": buyer_commission,
+        "seller_commission": seller_commission,
+        "seller_payout": float(fee["seller_payout"]),
+    }
+
     # iter244 Mission 1 — Apply active promotion overrides at settlement.
     # Discounts are computed BEFORE deposit credits so the savings are
     # always visible in the audit ledger. Promotion_id + discount metadata
@@ -402,7 +413,7 @@ async def settle_cash_or_etransfer(
                         "stripe_pi": pi.id,
                     }
                     try:
-                        from services.email_notifications import send_charge_confirmation_email
+                        from services.emails.email_system import send_charge_confirmation_email
                         await send_charge_confirmation_email(
                             db, user_id=winner_user_id, auction_id=auction_id,
                             amount=remaining_buyer, currency=currency,
@@ -461,7 +472,7 @@ async def settle_cash_or_etransfer(
                     )
                     result["seller_charge"] = {"amount": seller_commission, "stripe_pi": pi.id}
                     try:
-                        from services.email_notifications import send_charge_confirmation_email
+                        from services.emails.email_system import send_charge_confirmation_email
                         await send_charge_confirmation_email(
                             db, user_id=seller_id, auction_id=auction_id,
                             amount=seller_commission, currency=currency,
@@ -542,11 +553,29 @@ async def settle_stripe_full(
     buyer_total = max(0.0, round(buyer_total - promo_meta["buyer_discount_amount"], 2))
     seller_payout = round(seller_payout + promo_meta["seller_discount_amount"], 2)
 
-    # Deposit credit
+    # iter298 BUG 3/4 — expose the full fee breakdown so the
+    # payment-collection layer can stamp `net_payout_amount` and issue
+    # itemized receipts without re-running the fee engine.
+    result["fee_breakdown"] = {
+        "hammer_price": float(hammer_price),
+        "buyer_premium": float(fee["buyer_premium"]),
+        "buyer_taxes": float(fee["buyer_taxes"]),
+        "buyer_stripe_fee": float(fee["buyer_stripe_fee"]),
+        "buyer_total_charged": buyer_total,
+        "seller_commission": float(fee["seller_commission"]),
+        "seller_payout": seller_payout,
+    }
+
+    # Deposit credit — bidding deposits (marketplace/lots) OR storage deposits.
     deposit_doc = await db.bidding_deposits.find_one(
         {"auction_id": auction_id, "user_id": winner_user_id, "status": {"$in": ["held", "authorized"]}},
         {"_id": 0},
     )
+    if not deposit_doc:
+        deposit_doc = await db.storage_deposits.find_one(
+            {"auction_id": auction_id, "user_id": winner_user_id, "status": {"$in": ["held", "authorized"]}},
+            {"_id": 0},
+        )
     deposit_amount = float(deposit_doc.get("amount", 0)) if deposit_doc else 0.0
     final_charge = max(0.0, round(buyer_total - deposit_amount, 2))
 
@@ -587,7 +616,13 @@ async def settle_stripe_full(
         return result
 
     try:
-        application_fee_cents = _to_cents(buyer_total - seller_payout) if seller_connect_id else None
+        # iter298 BUG 3 — NON-CUSTODIAL GUARD: never route funds to the
+        # seller automatically. The full buyer charge lands on the BidVex
+        # platform account; the seller's net payout is flagged
+        # `payout_pending` for admin review + manual payout (see
+        # services.payment_collection). Stripe Connect destination
+        # charges are disabled until Connect is fully configured.
+        _ = seller_connect_id  # retained for observability/logging only
 
         if final_charge > 0:
             pi = await _charge_card(
@@ -607,8 +642,6 @@ async def settle_stripe_full(
                     "scenario": "stripe_full",
                 },
                 idempotency_key=charge_row["idempotency_key"],
-                transfer_destination=seller_connect_id,
-                application_fee_amount_cents=application_fee_cents,
             )
             db_writes = []
             if deposit_doc:
@@ -634,7 +667,7 @@ async def settle_stripe_full(
                     "deposit_credit": deposit_amount,
                 }
                 try:
-                    from services.email_notifications import send_charge_confirmation_email
+                    from services.emails.email_system import send_charge_confirmation_email
                     await send_charge_confirmation_email(
                         db, user_id=winner_user_id, auction_id=auction_id,
                         amount=final_charge, currency=currency,
@@ -643,36 +676,14 @@ async def settle_stripe_full(
                 except Exception:
                     pass
 
-        if seller_connect_id:
-            result["seller_payout"] = {
-                "amount": seller_payout,
-                "method": "stripe_connect_destination_charge",
-                "destination": seller_connect_id,
-            }
-            try:
-                from services.email_notifications import send_payout_confirmation_email
-                await send_payout_confirmation_email(
-                    db, seller_id=seller_id, auction_id=auction_id,
-                    amount=seller_payout, currency=currency,
-                )
-            except Exception:
-                pass
-        else:
-            await db.payout_queue.insert_one({
-                "id": str(uuid.uuid4()),
-                "auction_id": auction_id,
-                "seller_id": seller_id,
-                "amount": seller_payout,
-                "currency": currency,
-                "status": "pending_connect_setup",
-                "created_at": datetime.now(timezone.utc).isoformat(),
-            })
-            await _log_payment_event(
-                db, event="PAYOUT_QUEUED_NO_CONNECT",
-                auction_id=auction_id, seller_id=seller_id,
-                amount=seller_payout, currency=currency,
-            )
-            result["warnings"].append("seller_no_connect_account")
+        # iter298 BUG 3 — payout is ALWAYS pending admin review now
+        # (non-custodial). Record the obligation; payment_collection
+        # owns the `pending_payouts` admin-review queue.
+        result["seller_payout"] = {
+            "amount": seller_payout,
+            "method": "payout_pending_admin_review",
+            "status": "payout_pending",
+        }
     except stripe.StripeError as exc:
         await mark_charge_failed(db, charge_row["id"], error=str(exc))
         result["warnings"].append(f"buyer_charge_failed: {exc}")

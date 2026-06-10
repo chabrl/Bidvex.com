@@ -42,7 +42,7 @@ async def _send_admin_email(*, recipients: list[str], subject: str, html: str) -
     if not recipients:
         return False
     try:
-        from services.email_notifications import send_email
+        from services.emails._email_core import send_email
     except Exception as e:
         logger.warning("[notify] no email sender available: %s", e)
         return False
@@ -193,7 +193,7 @@ async def _dispatch_seller_pause_notification(
         return
     # Email
     try:
-        from services.email_notifications import send_email
+        from services.emails._email_core import send_email
     except Exception:
         return
     is_fr = lang.startswith("fr")
@@ -298,7 +298,7 @@ async def notify_seller_of_resolution(
     if not seller_email:
         return
     try:
-        from services.email_notifications import send_email
+        from services.emails._email_core import send_email
     except Exception:
         return
     if decision == "approved":

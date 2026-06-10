@@ -1,7 +1,7 @@
 import API_BASE from '../config';
 import ErrorBoundary from '../components/ErrorBoundary';
 import SafeImage from '../components/SafeImage';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
@@ -97,22 +97,16 @@ const ListingDetailPage = () => {
     timeExtended
   } = useRealtimeBidding(id);
 
-  useEffect(() => {
-    fetchListing();
-    fetchBids();
-    fetchFeatureFlags();
-  }, [id]);
-
-  const fetchFeatureFlags = async () => {
+  const fetchFeatureFlags = useCallback(async () => {
     try {
       const response = await axios.get(`${API}/marketplace/feature-flags`);
       setFeatureFlags(response.data);
     } catch (error) {
       console.error('Failed to fetch feature flags:', error);
     }
-  };
+  }, []);
 
-  const fetchListing = async (retryCount = 0) => {
+  const fetchListing = useCallback(async (retryCount = 0) => {
     try {
       const response = await axios.get(`${API}/listings/${id}`);
       const data = response.data;
@@ -147,19 +141,30 @@ const ListingDetailPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, navigate]);
 
-  const fetchBids = async () => {
+  const fetchBids = useCallback(async () => {
     try {
       const response = await axios.get(`${API}/bids/listing/${id}`);
       setBids(response.data);
     } catch (error) {
       console.error('Failed to fetch bids:', error);
     }
-  };
+  }, [id]);
+
+  // Initial data load — runs once per listing id. Deferred a tick so no
+  // state setters fire synchronously inside the effect body.
+  useEffect(() => {
+    const initTimer = setTimeout(() => {
+      fetchListing();
+      fetchBids();
+      fetchFeatureFlags();
+    }, 0);
+    return () => clearTimeout(initTimer);
+  }, [fetchListing, fetchBids, fetchFeatureFlags]);
 
   // Fetch settlement status for won auctions
-  const fetchSettlement = async () => {
+  const fetchSettlement = useCallback(async () => {
     if (!token || !id) return;
     try {
       const res = await axios.get(`${API}/vehicle-settlement/${id}/status`, {
@@ -173,29 +178,32 @@ const ListingDetailPage = () => {
         setSellerContactData(contactRes.data?.seller);
       }
     } catch { /* no settlement yet */ }
-  };
+  }, [token, id]);
 
   // Fetch fee preview for vehicle-category listings
-  const fetchFeePreview = async (price) => {
+  const fetchFeePreview = useCallback(async (price) => {
     if (!price || price <= 0) return;
     try {
       const res = await axios.get(`${API}/vehicle-settlement/fee-preview/${price}`);
       setFeePreview(res.data);
     } catch { /* silent */ }
-  };
+  }, []);
 
   // Check if listing is cross-border (non-Canadian)
   const isCrossBorder = listing && listing.country && listing.country !== 'CA' && listing.country !== 'Canada';
   const isVehicleCategory = listing && ['vehicle', 'vehicles', 'vehicle parts'].includes((listing.category || '').toLowerCase());
   const isAuctionWon = listing && listing.status === 'sold' && listing.winner_id === user?.id;
 
-  // Fetch settlement when auction is won
+  // Fetch settlement when auction is won. The fetchers are async
+  // (state updates land in a later microtask, not synchronously).
   useEffect(() => {
-    if (isAuctionWon) {
+    if (!isAuctionWon) return;
+    const settlementTimer = setTimeout(() => {
       fetchSettlement();
       if (listing?.current_price) fetchFeePreview(listing.current_price);
-    }
-  }, [isAuctionWon, listing?.current_price]);
+    }, 0);
+    return () => clearTimeout(settlementTimer);
+  }, [isAuctionWon, listing?.current_price, fetchSettlement, fetchFeePreview]);
 
   const handlePlaceBid = async (e) => {
     e.preventDefault();
@@ -422,7 +430,7 @@ const ListingDetailPage = () => {
                   className="w-full h-full object-cover"
                   data-testid="listing-detail-primary-image"
                   loading="eager"
-                  fetchpriority="high"
+                  fetchPriority="high"
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/10 to-accent/10">

@@ -204,7 +204,7 @@ async def handle_vehicle_fee_succeeded(db, payment_intent_id: str):
         seller = await db.users.find_one({"id": seller_id}, {"_id": 0, "name": 1, "email": 1, "phone": 1, "company_name": 1}) if seller_id else None
 
         if buyer and buyer.get("email") and seller:
-            from services.email_notifications import send_email
+            from services.emails._email_core import send_email
             hammer = settlement["hammer_price"]
             fee_amount = settlement["net_commission_amount"]
             seller_name = seller.get("company_name") or seller.get("name", "Seller")

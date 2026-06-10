@@ -741,7 +741,7 @@ async def cron_partner_outreach_followup(
     promo_start_iso = f"{promotion_start}T00:00:00"
 
     if send_callable is None:
-        from services.email_notifications import send_unified_email as _sender
+        from services.emails._email_core import send_unified_email as _sender
         send_callable = _sender
 
     partners_cur = db.users.find({

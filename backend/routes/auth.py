@@ -472,7 +472,13 @@ async def register(user_data: UserCreate, request: Request, background_tasks: Ba
         "created_at": now.isoformat(),
         "updated_at": None
     }
-    
+
+    # iter298 — when no phone is provided, OMIT the normalized field
+    # entirely. Explicit nulls collide on the unique mobile index and
+    # 500'd every phone-less registration after the first one.
+    if not has_phone:
+        user_doc.pop("mobile_number_normalized", None)
+
     await db.users.insert_one(user_doc)
 
     # iter272 — Campaign attribution binding. The frontend sends the

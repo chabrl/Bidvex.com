@@ -368,7 +368,7 @@ async def place_bid(request: Request, bid_data: BidCreate, current_user: User = 
         try:
             outbid_user = await db.users.find_one({"id": previous_highest_bidder}, {"_id": 0, "email": 1, "name": 1})
             if outbid_user and outbid_user.get("email"):
-                from services.email_notifications import send_outbid_email
+                from services.emails.email_marketplace import send_outbid_email
                 await send_outbid_email(
                     user_email=outbid_user["email"],
                     user_name=outbid_user.get("name", "Bidder"),
@@ -401,7 +401,7 @@ async def place_bid(request: Request, bid_data: BidCreate, current_user: User = 
 
     # Bid placed email confirmation
     try:
-        from services.email_notifications import send_bid_placed_email
+        from services.emails.email_marketplace import send_bid_placed_email
         await send_bid_placed_email(
             bidder_email=current_user.email,
             bidder_name=current_user.name or "Bidder",
@@ -419,7 +419,7 @@ async def place_bid(request: Request, bid_data: BidCreate, current_user: User = 
     try:
         seller = await db.users.find_one({"id": listing.get("seller_id")}, {"_id": 0, "email": 1, "name": 1})
         if seller and seller.get("email"):
-            from services.email_notifications import send_seller_bid_received_email
+            from services.emails.email_marketplace import send_seller_bid_received_email
             # Privacy-preserving bidder alias (first name + last initial)
             raw_name = (current_user.name or current_user.email.split("@")[0] or "Bidder").strip()
             parts = raw_name.split()
@@ -500,7 +500,7 @@ async def _process_auto_bids(db, listing_id: str, current_price: float, manual_b
             try:
                 outbid_user = await db.users.find_one({"id": ab["user_id"]}, {"_id": 0, "email": 1, "name": 1})
                 if outbid_user and outbid_user.get("email"):
-                    from services.email_notifications import send_outbid_email
+                    from services.emails.email_marketplace import send_outbid_email
                     await send_outbid_email(
                         user_email=outbid_user["email"],
                         user_name=outbid_user.get("name", "Bidder"),

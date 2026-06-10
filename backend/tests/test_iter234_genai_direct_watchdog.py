@@ -228,7 +228,7 @@ def test_run_daily_watchdog_cycle_emits_email():
     db = _FakeDB({"user_sessions": _FakeCollection([])})
     # Patch genai client + send_email
     with patch.object(svc, "get_genai_client", return_value=fake_client):
-        with patch("services.email_notifications.send_email", side_effect=fake_send_email):
+        with patch("services.emails._email_core.send_email", side_effect=fake_send_email):
             result = asyncio.run(svc.run_daily_watchdog_cycle(db))
 
     assert result["status"] == "ok"

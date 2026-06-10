@@ -230,7 +230,7 @@ async def manual_settle_subscription(
 
     # iter216 — Send bilingual confirmation email to the user
     try:
-        from services.email_notifications import send_manual_subscription_active_email
+        from services.emails.email_system import send_manual_subscription_active_email
         await send_manual_subscription_active_email(
             user=user, account_kind=account_kind,
             amount_cad=float(amount_cad), method=pm,

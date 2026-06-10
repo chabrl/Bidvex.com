@@ -149,7 +149,7 @@ async def handle_dealer_subscription_payment_failed(
     # Send Day-1 warning email
     email_sent = False
     try:
-        from services.email_notifications import send_email
+        from services.emails._email_core import send_email
         dealer_name = (user_doc or {}).get("name") or user.get("email") or "Dealer"
         await send_email(
             to_email=user.get("email") or (user_doc or {}).get("email"),
@@ -198,7 +198,7 @@ async def enforce_dealer_grace_period(db) -> dict:
             from services.dealer_subscription_service import suspend_dealer_for_failed_payment
             await suspend_dealer_for_failed_payment(db, u["id"], reason="annual_fee_failed_after_grace")
             try:
-                from services.email_notifications import send_email
+                from services.emails._email_core import send_email
                 await send_email(
                     to_email=u.get("email"),
                     subject="BidVex Vehicle Dealer — Listings Suspended · Annonces suspendues",

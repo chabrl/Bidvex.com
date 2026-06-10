@@ -158,7 +158,7 @@ def test_iter249_projected_gmv_lift_is_non_negative():
 # ─── Mission 3: Bilingual transactional emails ───────────────────────
 
 def test_iter249_detect_language_matrix():
-    from services.email_notifications import _detect_language
+    from services.emails._email_core import _detect_language
 
     assert _detect_language({"province": "QC"}) == "fr"
     assert _detect_language({"province": "qc"}) == "fr"
@@ -176,7 +176,7 @@ def test_iter249_detect_language_matrix():
 
 @pytest.mark.asyncio
 async def test_iter249_invoice_created_email_french_subject_for_qc():
-    from services import email_notifications as en
+    from services.emails import email_system as en
 
     inv = {
         "invoice_number": "INV-249-FR",
@@ -205,7 +205,7 @@ async def test_iter249_invoice_created_email_french_subject_for_qc():
 
 @pytest.mark.asyncio
 async def test_iter249_invoice_created_email_english_subject_for_ontario():
-    from services import email_notifications as en
+    from services.emails import email_system as en
 
     inv = {
         "invoice_number": "INV-249-EN",
@@ -230,7 +230,7 @@ async def test_iter249_invoice_created_email_english_subject_for_ontario():
 
 @pytest.mark.asyncio
 async def test_iter249_payment_confirmation_french_subject_for_qc():
-    from services import email_notifications as en
+    from services.emails import email_system as en
 
     inv = {
         "invoice_number": "INV-249-PMT",
@@ -255,7 +255,7 @@ async def test_iter249_payment_confirmation_french_subject_for_qc():
 
 @pytest.mark.asyncio
 async def test_iter249_payment_confirmation_english_subject_for_alberta():
-    from services import email_notifications as en
+    from services.emails import email_system as en
 
     inv = {
         "invoice_number": "INV-249-PMT-EN",
@@ -280,7 +280,7 @@ async def test_iter249_payment_confirmation_english_subject_for_alberta():
 
 @pytest.mark.asyncio
 async def test_iter249_auction_won_french_subject_for_qc():
-    from services import email_notifications as en
+    from services.emails import email_marketplace as en
 
     captured = {}
 
@@ -302,7 +302,7 @@ async def test_iter249_auction_won_french_subject_for_qc():
 
 @pytest.mark.asyncio
 async def test_iter249_auction_won_english_subject_for_ontario():
-    from services import email_notifications as en
+    from services.emails import email_marketplace as en
 
     captured = {}
 
@@ -325,7 +325,7 @@ async def test_iter249_auction_won_english_subject_for_ontario():
 
 @pytest.mark.asyncio
 async def test_iter249_dealer_license_approved_french_subject_for_qc():
-    from services import email_notifications as en
+    from services.emails import email_vehicles as en
 
     captured = {}
 

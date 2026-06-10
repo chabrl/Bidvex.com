@@ -19,10 +19,10 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from services.email_notifications import (
+from services.emails._email_core import send_email
+from services.emails.email_vehicles import (
     send_dealer_license_approved_email,
     send_dealer_license_rejected_email,
-    send_email,
 )
 
 logger = logging.getLogger(__name__)

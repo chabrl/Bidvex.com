@@ -67,7 +67,9 @@ async def get_seller_dashboard(
     # review-pending statuses surfaced by the AI Watchdog or Manual Review
     # flow: pending_ai_review, pending_admin_review, pending_review.
     _PENDING_STATUSES = ("pending_ai_review", "pending_admin_review", "pending_review")
-    _ENDED_STATUSES = ("sold", "ended", "expired", "completed")
+    # iter298 BUG 2/5 — `ended_no_sale` (zero-bid) + storage `unsold`
+    # join the Ended bucket.
+    _ENDED_STATUSES = ("sold", "ended", "expired", "completed", "ended_no_sale", "unsold")
 
     # iter296 P0 BUG 5 — Same union as routes/listings.py + routes/users.py:
     # a listing is "sold" if EITHER `status: "sold"` (vehicle/storage
@@ -82,19 +84,41 @@ async def get_seller_dashboard(
             return True
         return False
 
+    # iter298 BUG 3/5 — payment lifecycle splits within the Ended bucket.
+    def _is_payment_collected(l: dict) -> bool:
+        return l.get("payment_status") == "payment_collected"
+
+    def _is_payment_failed(l: dict) -> bool:
+        return l.get("payment_status") == "payment_failed"
+
+    def _is_no_sale(l: dict) -> bool:
+        return (
+            l.get("status") in ("ended_no_sale", "unsold")
+            or (l.get("status") in ("ended", "expired") and not l.get("winner_user_id"))
+        )
+
     active_listings = [l for l in all_listings if l.get("status") == "active"]
     sold_listings = [l for l in all_listings if _is_sold(l)]
     draft_listings = [l for l in all_listings if l.get("status") == "draft"]
     pending_review_listings = [l for l in all_listings if l.get("status") in _PENDING_STATUSES]
     ended_listings = [l for l in all_listings if l.get("status") in _ENDED_STATUSES]
+    no_sale_listings = [l for l in ended_listings if _is_no_sale(l)]
+    payment_collected_listings = [l for l in ended_listings if _is_payment_collected(l)]
+    payment_failed_listings = [l for l in ended_listings if _is_payment_failed(l)]
+    completed_listings = [l for l in all_listings if l.get("status") == "completed"]
 
     counts = {
-        "total":          len(all_listings),
-        "active":         len(active_listings),
-        "pending_review": len(pending_review_listings),
-        "draft":          len(draft_listings),
-        "ended":          len(ended_listings),
-        "sold":           len(sold_listings),
+        "total":             len(all_listings),
+        "active":            len(active_listings),
+        "pending_review":    len(pending_review_listings),
+        "draft":             len(draft_listings),
+        "ended":             len(ended_listings),
+        "sold":              len(sold_listings),
+        # iter298 BUG 5 — Ended split.
+        "ended_no_sale":     len(no_sale_listings),
+        "payment_collected": len(payment_collected_listings),
+        "payment_failed":    len(payment_failed_listings),
+        "completed":         len(completed_listings),
     }
 
     # Post-sale Contact Info — enrich every sold/ended listing with the
@@ -130,11 +154,27 @@ async def get_seller_dashboard(
         for l in sold_listings
     )
 
+    # iter298 BUG 5 — payment-collected revenue metrics. `total_sales`
+    # above remains the legacy all-sold metric; these two only count
+    # listings whose payment has actually been collected.
+    collected_sales = sum(
+        float(l.get("final_price") or l.get("current_price") or 0)
+        for l in payment_collected_listings
+    )
+    net_payout_total = sum(
+        float(l.get("net_payout_amount")
+              or round(float(l.get("final_price") or l.get("current_price") or 0) * 0.975, 2))
+        for l in payment_collected_listings
+    )
+
     return {
         "active_listings": len(active_listings),
         "sold_listings": len(sold_listings),
         "draft_listings": len(draft_listings),
         "total_sales": total_sales,
+        # iter298 BUG 5 — payment-collected metrics + statement links.
+        "collected_sales": collected_sales,
+        "net_payout_total": round(net_payout_total, 2),
         "listings": listings,
         "multi_item_listings": multi_listings,
         "all_listings": all_listings,
@@ -173,15 +213,24 @@ async def get_buyer_dashboard(
         {"_id": 0},
     ).to_list(100)
 
-    # Post-sale Contact Info — for each WON listing (user is the highest bidder
-    # AND status is sold/ended), surface the seller's contact details so the
+    # Post-sale Contact Info — for each WON listing (user is the winner
+    # AND auction has ended), surface the seller's contact details so the
     # buyer can complete the transaction. Pulled from existing user profile;
     # no info leaked for active listings.
-    won_listings = [
-        l for l in listings
-        if l.get("status") == "sold"
-        and (l.get("highest_bidder_id") == current_user.id or l.get("winner_id") == current_user.id)
-    ]
+    # iter298 BUG 5 — winner detection covers all conventions:
+    # `winner_user_id` (canonical since iter296), legacy `winner_id`,
+    # and `highest_bidder_id` on ended/sold docs.
+    def _is_won_by_me(l: dict) -> bool:
+        if l.get("status") not in ("sold", "ended", "completed"):
+            return False
+        me = current_user.id
+        return (
+            l.get("winner_user_id") == me
+            or l.get("winner_id") == me
+            or l.get("highest_bidder_id") == me
+        )
+
+    won_listings = [l for l in listings if _is_won_by_me(l)]
     seller_ids = {l.get("seller_id") for l in won_listings if l.get("seller_id")}
     seller_lookup = {}
     if seller_ids:
@@ -199,6 +248,66 @@ async def get_buyer_dashboard(
                 "phone": s.get("phone", ""),
             }
 
+    # iter298 BUG 5 — attach receipt link + payment/pickup status to won rows.
+    won_ids = [l["id"] for l in won_listings]
+    receipt_rows = []
+    if won_ids:
+        receipt_rows = await rdb.receipts.find(
+            {"user_id": current_user.id, "type": "buyer_receipt",
+             "listing_id": {"$in": won_ids}},
+            {"_id": 0, "id": 1, "listing_id": 1},
+        ).to_list(200)
+    receipt_by_listing = {r["listing_id"]: r["id"] for r in receipt_rows}
+    won_items_detail = []
+    for l in won_listings:
+        won_items_detail.append({
+            "listing_id": l["id"],
+            "title": l.get("title", "Item"),
+            "final_price": l.get("final_price") or l.get("current_price") or 0,
+            "payment_status": l.get("payment_status") or ("pending_payment" if not l.get("payment_collected_at") else "payment_collected"),
+            "payment_link_url": l.get("payment_link_url"),
+            "pickup_confirmed": bool(l.get("pickup_confirmed")),
+            "pickup_confirmed_at": l.get("pickup_confirmed_at"),
+            "receipt_id": receipt_by_listing.get(l["id"]),
+            "sold_at": l.get("sold_at") or l.get("ended_at"),
+        })
+
+    # iter298 BUG 5 — winning (live high-bidder), lost, and deposits.
+    listings_by_id = {l["id"]: l for l in listings}
+    my_max_bid: dict = {}
+    for b in bids:
+        lid = b.get("listing_id")
+        if lid:
+            my_max_bid[lid] = max(my_max_bid.get(lid, 0), float(b.get("amount") or 0))
+
+    winning_bid_ids = []
+    lost_bid_ids = []
+    for lid, my_max in my_max_bid.items():
+        l = listings_by_id.get(lid)
+        if not l:
+            continue
+        if l.get("status") == "active":
+            is_leader = (
+                l.get("highest_bidder_id") == current_user.id
+                or float(l.get("current_price") or 0) == my_max
+            )
+            if is_leader:
+                winning_bid_ids.append(lid)
+        elif l.get("status") in ("sold", "ended", "completed", "ended_no_sale"):
+            if not _is_won_by_me(l):
+                lost_bid_ids.append(lid)
+
+    deposits = await rdb.bidding_deposits.find(
+        {"user_id": current_user.id}, {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    storage_deps = await rdb.storage_deposits.find(
+        {"user_id": current_user.id}, {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    for d in storage_deps:
+        d["deposit_type"] = "storage"
+    for d in deposits:
+        d.setdefault("deposit_type", "bidding")
+
     return {
         "total_bids": len(bids),
         "active_bids": len(
@@ -212,7 +321,14 @@ async def get_buyer_dashboard(
                 )
             ]
         ),
-        "won_items": len([l for l in listings if l["status"] == "sold"]),
+        # iter298 BUG 5 — corrected won counter + new winning/lost/deposits.
+        "won_items": len(won_listings),
+        "won_items_detail": won_items_detail,
+        "winning_bids": len(winning_bid_ids),
+        "winning_listing_ids": winning_bid_ids,
+        "lost_bids": len(lost_bid_ids),
+        "lost_listing_ids": lost_bid_ids,
+        "deposits": deposits + storage_deps,
         "bids": bids,
         "listings": listings,
         "watchlist": watchlist_listings,

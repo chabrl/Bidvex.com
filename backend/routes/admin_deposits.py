@@ -254,7 +254,7 @@ async def admin_send_invoice_reminder(
 
     # Reminder via existing transactional email service
     try:
-        from services.email_notifications import send_email, _base_template, _format_currency
+        from services.emails._email_core import send_email, _base_template, _format_currency
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Email service unavailable: {e}")
 

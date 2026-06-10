@@ -359,7 +359,7 @@ async def check_subscription_expirations_job():
                 
                 # Send expiration email
                 try:
-                    from services.email_notifications import send_subscription_expired_email
+                    from services.emails.email_system import send_subscription_expired_email
                     await send_subscription_expired_email(
                         user_email=user.get("email"),
                         user_name=user.get("name", user.get("email")),
@@ -427,7 +427,7 @@ async def send_subscription_reminders_job():
                 
                 # Send reminder email
                 try:
-                    from services.email_notifications import send_subscription_reminder_email
+                    from services.emails.email_system import send_subscription_reminder_email
                     await send_subscription_reminder_email(
                         user_email=user.get("email"),
                         user_name=user.get("name", user.get("email")),
@@ -555,7 +555,7 @@ async def _send_settlement_reminder_emails():
     db = db_instance
     if db is None:
         return
-    from services.email_notifications import send_email
+    from services.emails._email_core import send_email
     from datetime import timedelta
     import os as _os
     now = datetime.now(timezone.utc)
@@ -993,7 +993,7 @@ def init_scheduler(database):
         if db_instance is None:
             return
         from datetime import datetime as _dt, timezone as _tz, timedelta as _td
-        from services.email_notifications import (
+        from services.emails.email_vehicles import (
             send_dealer_license_expiring_email,
             send_seller_license_expired_email,
         )

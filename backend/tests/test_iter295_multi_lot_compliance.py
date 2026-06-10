@@ -387,11 +387,9 @@ def test_email_function_bodies_physically_migrated():
             f"{fn} is not physically migrated to {mod.__name__}"
 
     # Legacy import path still resolves (backward-compat shim).
-    from services.email_notifications import (
-        send_dealer_license_approved_email,
-        send_auction_won_email,
-        send_welcome_email,
-    )
+    from services.emails.email_vehicles import send_dealer_license_approved_email
+    from services.emails.email_marketplace import send_auction_won_email
+    from services.emails.email_system import send_welcome_email
     assert callable(send_dealer_license_approved_email)
     assert callable(send_auction_won_email)
     assert callable(send_welcome_email)

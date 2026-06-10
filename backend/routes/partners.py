@@ -483,7 +483,7 @@ async def request_partner_resubmission(
 
     # Best-effort bilingual email
     try:
-        from services.email_notifications import send_email
+        from services.emails._email_core import send_email
         frontend_url = _os.environ.get("FRONTEND_URL", "https://bidvex.com")
         applicant_lang = (partner.get("preferred_language") or "en").lower()
         is_fr = applicant_lang.startswith("fr")

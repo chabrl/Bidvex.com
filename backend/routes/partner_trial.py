@@ -113,7 +113,7 @@ async def activate_partner_trial(
     await db.users.update_one({"id": body.user_id}, {"$set": user_updates})
 
     try:
-        from services.email_notifications import send_unified_email
+        from services.emails._email_core import send_unified_email
         await send_unified_email(
             user=dict(target),
             email_type="partner_welcome",
@@ -252,7 +252,7 @@ async def revoke_partner_trial(
     try:
         target = await db.users.find_one({"id": doc.get("user_id")}, {"_id": 0})
         if target:
-            from services.email_notifications import send_unified_email
+            from services.emails._email_core import send_unified_email
             await send_unified_email(
                 user=dict(target),
                 email_type="trial_revoked",
