@@ -504,7 +504,18 @@ def map_listing_to_meta_item(
         # buyer-acquisition campaigns keep targeting the listing
         # (Meta/Google match-rate would otherwise nosedive on every
         # fresh listing the seller forgot to attach photos to).
-        primary_image = SECTION_PLACEHOLDERS.get(listing_type, BIDVEX_PLACEHOLDER_IMAGE)
+        #
+        # iter297 P1 — Prefer the LISTING-SPECIFIC Pillow-generated
+        # placeholder over the generic static fallback. The
+        # `feed_placeholder_image.regenerate_missing_feed_placeholders`
+        # nightly job pre-bakes a JPEG showing the title + category,
+        # uploaded to S3 under `placeholders/<id>.jpg`. Feeds load
+        # this URL directly — no synchronous Pillow work in the
+        # request path.
+        primary_image = (
+            listing.get("placeholder_image_url")
+            or SECTION_PLACEHOLDERS.get(listing_type, BIDVEX_PLACEHOLDER_IMAGE)
+        )
         exclusion_counter["placeholder_used"] = exclusion_counter.get("placeholder_used", 0) + 1
 
     # Location — flat fields on the BidVex schema (no nested location object).

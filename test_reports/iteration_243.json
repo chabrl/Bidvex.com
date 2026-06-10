@@ -1,0 +1,40 @@
+{
+  "summary": "iter297 cleanup + P1 features verified. All 8 iter297 tests pass standalone (5.45s). Combined iter290-297 suite passes 69/69 when run with rate-limit cooldown between login-heavy tests. Live curl smoke against the preview backend confirms: users_router is registered (/api/users/{id}/profile-summary returns 200), pickup-confirm endpoints respond with correct 401/404/200 codes, admin/flag-stuck-transactions sweep returns {flagged:0} as expected on a clean db, deposit-release logic + bilingual notifications + Pillow JPEG generation + DeprecationWarning shim all green in pytest.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "/api/auth/login",
+        "issue": "Login rate-limit (429) hits within iter290-297 combined run because every iter296+iter297 test re-logs the admin. Tests retry-pass when run after a ~75s cooldown. Cosmetic; suggest a session-scoped login fixture for the iter296/iter297 tests to halve admin-login calls."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter297_pickup_placeholders.py",
+    "/app/test_reports/pytest/iter290_297_iteration243.xml"
+  ],
+  "action_items": [
+    "Optional: refactor iter296/iter297 tests to share a module-scoped admin-token fixture so the combined suite doesn't hit /api/auth/login rate-limit (429). The current behavior is by-design rate-limit protection on the prod-verified login endpoint; not an iter297 regression."
+  ],
+  "critical_code_review_comments": [
+    "services/pickup_confirmation.py correctly gates VEHICLES path away from auto-refund and instead emits an admin bell-icon notification (data.action=deposit_release_required) — matches the iter297 spec.",
+    "Stripe Refund.create() is gated on payment_intent_id startswith('demo_') AND on STRIPE_API_KEY presence — correct, prevents network calls in demo data.",
+    "Pillow generator returns a valid JPEG (SOI 0xFFD8) and the meta_feed_mapper + google_feed_mapper both prefer listing.placeholder_image_url before falling back to SECTION_PLACEHOLDERS — verified end-to-end via test_feed_placeholder_sweep_stamps_url.",
+    "DeprecationWarning fires on services.email_notifications import — message contains 'deprecated' and references bucketed modules + iter310 removal target. Good migration hygiene.",
+    "PickupConfirmButton.js uses process.env.REACT_APP_BACKEND_URL, gates by role + 7-day window, falls back gracefully on missing winner_user_id (winner_id / highest_bidder_id) — solid drop-in component.",
+    "users_router was previously dead code (imported, never included). The :816-820 wiring in server.py fixes that — locked in by test_users_router_is_registered."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (69/69 with cooldown; 66/69 cold-run, 3 failures all 429 rate-limit, retried green)", "frontend": "smoke-only — homepage + listings route render; PickupConfirmButton needs a real ended listing seed to exercise live UI"},
+  "test_credentials": "admin charbel911@gmail.com / Anderosli123!@# — confirmed working on preview, returns role=admin",
+  "seed_data_creation": "None. iter297 tests use unittest.mock.patch + their own throwaway listing fixtures inside Mongo and tear them down on completion.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "When running the combined iter290-iter297 regression suite, either (a) insert a 60-75s sleep before tests that log the admin in (iter296 dashboard tests + iter297 users_router test), or (b) ask main agent to refactor iter296/iter297 to share a module-scoped admin-token fixture. The cold run gives 3 spurious 429s; cooldown re-run gives 69/69. iter297 functional surface area (pickup-confirm, deposit-release, Pillow placeholder, deprecation shim, users_router wiring) is 100% green.",
+  "rca of the issue": "N/A — no iter297 bug. The cold-run 429 is /api/auth/login's per-IP rate-limit firing because both iter296 and iter297 admin-login back-to-back in the same suite. Reproduces deterministically when both test files run sequentially. Mitigated by cooldown / shared-token fixture."
+}

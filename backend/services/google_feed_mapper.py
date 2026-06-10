@@ -160,12 +160,17 @@ def meta_item_to_google_xml(item: Dict[str, Any]) -> str:
     # drop any URL that still ends in `.webp` after sanitization.
     sanitized_primary = _sanitize_google_image_url(image_link)
     if not sanitized_primary:
-        # Fall back to the per-section S3 placeholder (always JPEG) so
-        # the product still ingests instead of failing with "missing
-        # image_link". `custom_label_0` carries the section key.
-        sanitized_primary = _SECTION_PLACEHOLDERS.get(
-            (custom_0 or "").lower(),
-            _SECTION_PLACEHOLDERS["marketplace"],
+        # iter297 P1 — Prefer the LISTING-SPECIFIC Pillow placeholder
+        # over the generic section fallback (see meta_feed_mapper for
+        # the matching change). The mapper receives the placeholder
+        # URL on the `placeholder_image_link` key when the meta-feed
+        # builder enriches the item dict for both feeds.
+        sanitized_primary = (
+            item.get("placeholder_image_link")
+            or _SECTION_PLACEHOLDERS.get(
+                (custom_0 or "").lower(),
+                _SECTION_PLACEHOLDERS["marketplace"],
+            )
         )
     image_link = sanitized_primary
 

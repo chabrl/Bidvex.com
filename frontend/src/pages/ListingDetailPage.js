@@ -38,6 +38,8 @@ import QuickBidButtons from '../components/QuickBidButtons';
 import { useTrustStatus, BidBlocker } from '../components/TrustVerification';
 import { SellerReputationCard, SellerReviewsList } from '../components/SellerReputation';
 import { CrossBorderAdvisoryPanel, CrossBorderBidModal } from '../components/legal/LegalComplianceSections';
+// iter297 P1 — Buyer Confirm Pickup CTA + deposit-release flow.
+import PickupConfirmButton from '../components/PickupConfirmButton';
 import { VehicleFeeBreakdown, SellerContactGate } from '../components/vehicles/VehicleFeeBreakdown';
 import { CostBreakdown } from '../components/CostBreakdown'; // iter210 Step 6
 import Lightbox from 'yet-another-react-lightbox';
@@ -683,6 +685,18 @@ const ListingDetailPage = () => {
               </div>
             </div>
 
+            {/* iter297 P1 — Buyer Confirm Pickup CTA (auto-hides when
+                the actor isn't a party or the listing isn't ended). */}
+            {isAuctionEnded && (
+              <div className="mt-4">
+                <PickupConfirmButton
+                  listing={listing}
+                  currentUser={user}
+                  onConfirmed={() => fetchListing()}
+                />
+              </div>
+            )}
+
             {user && listing.seller_id === user.id && !listing.is_promoted && (
               <Card className="glassmorphism border-2 border-primary/20">
                 <CardContent className="p-6">
@@ -1024,7 +1038,7 @@ const ListingDetailPage = () => {
               <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950/20" data-testid="buyers-premium-banner">
                 <DollarSign className="h-4 w-4 text-amber-600" />
                 <AlertDescription className="text-amber-800 dark:text-amber-300 text-sm font-medium">
-                  A {formatPercent(listing.custom_buyer_premium_rate * 100, 1)} buyer's premium applies to this lot
+                  A {formatPercent(listing.custom_buyer_premium_rate * 100, 1)} buyer&apos;s premium applies to this lot
                   <InfoTip en="The buyer's premium is an additional fee on top of the hammer price, paid by the buyer. It covers platform services and seller-set premiums." fr="La prime acheteur est un frais supplémentaire au prix marteau, payé par l'acheteur. Elle couvre les services de la plateforme et les primes fixées par le vendeur." />
                 </AlertDescription>
               </Alert>

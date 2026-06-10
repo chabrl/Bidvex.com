@@ -668,6 +668,23 @@ async def _job_keepalive_ping():
     await safe_run("keepalive_ping", keepalive_ping())
 
 
+# iter297 P1 — Nightly sweep for ended-with-winner listings whose
+# pickup wasn't confirmed within 7 days → flag pending_review + ping
+# admins.
+async def _job_flag_stuck_transactions():
+    from services.pickup_confirmation import flag_stuck_transactions
+    await safe_run("flag_stuck_transactions", flag_stuck_transactions(db))
+
+
+# iter297 P1 — Nightly Pillow placeholder regeneration for the
+# Meta/Google feeds. Pre-bakes a branded JPEG for every active/upcoming
+# listing missing a valid image URL.
+async def _job_regenerate_feed_placeholders():
+    from services.feed_placeholder_image import regenerate_missing_feed_placeholders
+    await safe_run("regenerate_feed_placeholders",
+                   regenerate_missing_feed_placeholders(db))
+
+
 scheduler.add_job(
     _job_transition_upcoming_auctions,
     trigger=IntervalTrigger(minutes=5), id='transition_upcoming_auctions', replace_existing=True)
@@ -692,6 +709,17 @@ scheduler.add_job(
 scheduler.add_job(
     _job_keepalive_ping,
     trigger=IntervalTrigger(minutes=4), id='keepalive_ping', replace_existing=True)
+# iter297 P1 — nightly sweep at 3:00 UTC.
+from apscheduler.triggers.cron import CronTrigger
+scheduler.add_job(
+    _job_flag_stuck_transactions,
+    trigger=CronTrigger(hour=3, minute=0),
+    id='flag_stuck_transactions', replace_existing=True)
+# iter297 P1 — nightly Pillow placeholder regeneration at 3:30 UTC.
+scheduler.add_job(
+    _job_regenerate_feed_placeholders,
+    trigger=CronTrigger(hour=3, minute=30),
+    id='regenerate_feed_placeholders', replace_existing=True)
 
 # Watchlist expiry push alerts — check every 2 minutes for items ending within 5 min
 async def run_watchlist_expiry_alerts():
@@ -866,9 +894,15 @@ try:
         pass
 
     # Include core routers
+    # iter297 cleanup #1 — users_router was imported at line 814 but
+    # never registered. Routes like /api/users/me/stats were only being
+    # served by profiles.py's catch-all because users_router was dead.
+    # Registering it makes /api/users/* endpoints (sold-counter union,
+    # profile-summary, /me PATCH, etc.) actually reachable.
     for router in [analytics_router, auctions_router, bids_router, listings_router,
                    auth_router, sms_router, payments_router, webhooks_router,
                    marketplace_router, admin_router, dashboard_router, profiles_router,
+                   users_router,
                    deposits_router, insights_router, community_router, escrow_router]:
         api_router.include_router(router)
 
@@ -1058,6 +1092,21 @@ try:
 
     # iter288 — Listing change-request pipeline (user self-service + admin triage)
     from routes.listing_requests import router as listing_requests_router
+    # iter297 P1 — Pickup-confirmation router (closes auction-end
+    # transaction loop with deposit release + rating-request emails).
+    try:
+        from routes.pickup_confirm import (
+            pickup_confirm_router,
+            set_pickup_confirm_db,
+            set_pickup_confirm_auth_and_bind,
+        )
+        set_pickup_confirm_db(db)
+        set_pickup_confirm_auth_and_bind(get_current_user)
+        api_router.include_router(pickup_confirm_router)
+        logger.info("✅ Pickup-confirmation routes mounted")
+    except Exception as e:
+        logger.error(f"Pickup-confirmation router mount failed: {e}")
+
     api_router.include_router(listing_requests_router)
 
     # iter293 — Multi-Lot Vehicle Auction (Copart-style sequential events)

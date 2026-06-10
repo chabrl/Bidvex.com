@@ -1,5 +1,27 @@
 """
-services/email_notifications.py — iter295 P2
+services/email_notifications.py — iter295 P2 / iter297 P2
+
+# ============================================================ #
+#                                                              #
+#  DEPRECATED — DO NOT USE THIS MODULE IN NEW CODE.            #
+#                                                              #
+#  Use the bucketed modules directly:                          #
+#    services.emails.email_vehicles     — vehicle-specific     #
+#    services.emails.email_marketplace  — marketplace + lots   #
+#                                          + storage senders   #
+#    services.emails.email_system       — welcome, invoices,   #
+#                                          subscriptions, ...  #
+#                                                              #
+#  This file remains as a backward-compat shim ONLY so the     #
+#  ~80 legacy `from services.email_notifications import …`     #
+#  call sites keep working. A DeprecationWarning is emitted on #
+#  EVERY import so the migration to the bucketed modules is    #
+#  visible in logs.                                            #
+#                                                              #
+#  TODO(iter310): remove this shim once every caller is        #
+#  migrated. Tracking ticket: BIDVEX-EMAIL-SHIM-REMOVAL.       #
+#                                                              #
+# ============================================================ #
 
 BACKWARD-COMPAT SHIM. The function bodies have been physically
 migrated to services/emails/{email_vehicles,email_marketplace,email_system}.py.
@@ -11,7 +33,23 @@ New callers should import from the bucketed modules directly:
     from services.emails.email_marketplace import send_auction_won_email
     from services.emails.email_system      import send_welcome_email
 """
-from services.emails._email_core import (  # noqa: F401 — re-export
+import warnings as _warnings
+import logging as _logging
+
+_warnings.warn(
+    "services.email_notifications is deprecated — import from "
+    "services.emails.email_{vehicles,marketplace,system} directly. "
+    "This shim will be removed in iter310 (tracking ticket "
+    "BIDVEX-EMAIL-SHIM-REMOVAL).",
+    DeprecationWarning,
+    stacklevel=2,
+)
+_logging.getLogger(__name__).info(
+    "[DEPRECATED] services.email_notifications imported — migrate "
+    "caller to services.emails.email_{vehicles,marketplace,system}"
+)
+
+from services.emails._email_core import (  # noqa: F401, E402 — re-export
     SENDGRID_API_KEY, SENDGRID_AVAILABLE, sg, FRONTEND_URL,
     FROM_EMAIL, FROM_NAME,
     TRANSACTIONAL_FROM_EMAIL, TRANSACTIONAL_FROM_NAME,
