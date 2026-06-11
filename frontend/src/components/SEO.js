@@ -41,6 +41,13 @@ const SEO = ({
       <meta name="twitter:image" content={image} />
       
       {noindex && <meta name="robots" content="noindex, nofollow" />}
+
+      {/* Bilingual hreflang — BidVex is one URL with client-side language
+          toggle, so EN/FR alternates point at the same canonical URL and
+          x-default resolves to the EN version. */}
+      <link rel="alternate" hrefLang="en-ca" href={fullUrl} />
+      <link rel="alternate" hrefLang="fr-ca" href={fullUrl} />
+      <link rel="alternate" hrefLang="x-default" href={fullUrl} />
       
       {/* JSON-LD Structured Data */}
       {jsonLd && (

@@ -251,7 +251,7 @@ const BuyerDashboard = () => {
                                 className="w-full sm:flex-1 gradient-button text-white border-0 font-semibold" 
                                 onClick={() => navigate(`/listing/${bid.listing_id}`)}
                               >
-                                Place Higher Bid
+                                {t('buyerDash.placeHigherBid')}
                               </Button>
                             )}
                           </CardFooter>
@@ -266,8 +266,8 @@ const BuyerDashboard = () => {
                         <Gavel className="h-10 w-10 text-primary" />
                       </div>
                       <div>
-                        <h3 className="text-xl font-semibold mb-2">No Active Bids</h3>
-                        <p className="text-muted-foreground">Start bidding on auctions to see them here!</p>
+                        <h3 className="text-xl font-semibold mb-2">{t('buyerDash.noActiveBids')}</h3>
+                        <p className="text-muted-foreground">{t('buyerDash.startBidding')}</p>
                       </div>
                       <Button className="gradient-button text-white border-0" onClick={() => navigate('/marketplace')}>
                         Browse Marketplace
@@ -317,7 +317,7 @@ const BuyerDashboard = () => {
                             <h3 className="font-bold text-lg">{listing?.title}</h3>
                             <div className="flex items-center justify-between p-4 bg-green-50 dark:bg-green-950 rounded-lg">
                               <div>
-                                <p className="text-xs text-muted-foreground uppercase font-semibold mb-1">Your Winning Bid</p>
+                                <p className="text-xs text-muted-foreground uppercase font-semibold mb-1">{t('buyerDash.yourWinningBid')}</p>
                                 <p className="text-3xl font-bold text-green-600">{formatCurrency(bid.amount)}</p>
                               </div>
                             </div>
@@ -340,7 +340,7 @@ const BuyerDashboard = () => {
                           </CardContent>
                           <CardFooter className="p-4 pt-0 flex-col sm:flex-row gap-2">
                             <Button className="w-full sm:flex-1" variant="outline" onClick={() => navigate(`/listing/${bid.listing_id}`)}>
-                              View Listing Details
+                              {t('buyerDash.viewListingDetails')}
                             </Button>
                           </CardFooter>
                         </Card>
@@ -354,8 +354,8 @@ const BuyerDashboard = () => {
                         <Trophy className="h-10 w-10 text-green-600" />
                       </div>
                       <div>
-                        <h3 className="text-xl font-semibold mb-2">No Winning Bids Yet</h3>
-                        <p className="text-muted-foreground">Keep bidding to win amazing items!</p>
+                        <h3 className="text-xl font-semibold mb-2">{t('buyerDash.noWinningBids')}</h3>
+                        <p className="text-muted-foreground">{t('buyerDash.keepBidding')}</p>
                       </div>
                       <Button className="gradient-button text-white border-0" onClick={() => navigate('/marketplace')}>
                         Browse Marketplace
@@ -421,7 +421,7 @@ const BuyerDashboard = () => {
                           <CardFooter className="p-4 pt-0 flex-col sm:flex-row gap-2">
                             {!isEnded ? (
                               <Button className="w-full gradient-button text-white border-0 font-semibold" onClick={() => navigate(`/listing/${bid.listing_id}`)}>
-                                Place Higher Bid Now
+                                {t('buyerDash.placeHigherBidNow')}
                               </Button>
                             ) : (
                               <Button className="w-full" variant="outline" onClick={() => navigate(`/listing/${bid.listing_id}`)}>
@@ -440,8 +440,8 @@ const BuyerDashboard = () => {
                         <TrendingUp className="h-10 w-10 text-blue-600" />
                       </div>
                       <div>
-                        <h3 className="text-xl font-semibold mb-2">All Your Bids Are Leading!</h3>
-                        <p className="text-muted-foreground">Great job! Keep an eye on your auctions.</p>
+                        <h3 className="text-xl font-semibold mb-2">{t('buyerDash.allBidsLeading')}</h3>
+                        <p className="text-muted-foreground">{t('buyerDash.greatJob')}</p>
                       </div>
                     </div>
                   </Card>
@@ -455,9 +455,9 @@ const BuyerDashboard = () => {
                       <Heart className="h-10 w-10 text-pink-600 fill-pink-600" />
                     </div>
                     <div>
-                      <h3 className="text-2xl font-semibold mb-2">View Your Watchlist</h3>
+                      <h3 className="text-2xl font-semibold mb-2">{t('buyerDash.viewYourWatchlist')}</h3>
                       <p className="text-muted-foreground max-w-md mx-auto">
-                        Track all your favorite auctions, lots, and marketplace listings in one place. Get notifications when auctions are ending soon!
+                        {t('buyerDash.watchlistDesc')}
                       </p>
                     </div>
                     <div className="flex gap-3 justify-center">
@@ -467,7 +467,7 @@ const BuyerDashboard = () => {
                         size="lg"
                       >
                         <Heart className="h-5 w-5 mr-2 fill-white" />
-                        View My Watchlist
+                        {t('buyerDash.viewMyWatchlist')}
                       </Button>
                       <Button 
                         variant="outline" 
@@ -546,7 +546,7 @@ const BuyerDashboard = () => {
             ) : (
               <div className="text-center py-12">
                 <Gavel className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground mb-4">No bids yet</p>
+                <p className="text-muted-foreground mb-4">{t('buyerDash.noBidsYet')}</p>
                 <Button onClick={() => navigate('/marketplace')} className="gradient-button text-white border-0">
                   Start Bidding
                 </Button>

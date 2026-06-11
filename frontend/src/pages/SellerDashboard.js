@@ -332,7 +332,7 @@ const SellerDashboard = () => {
             data-testid="ratings-tab"
           >
             <TrendingUp className="h-4 w-4 inline mr-1.5 sm:mr-2" />
-            Ratings & Reviews
+            {t('sellerDash.ratingsReviews')}
           </button>
           <button
             onClick={() => setActiveTab('trends')}
@@ -1312,7 +1312,7 @@ const SellerRatingsPanel = ({ userId, token }) => {
       <Card data-testid="ratings-empty">
         <CardContent className="py-12 text-center">
           <TrendingUp className="h-10 w-10 mx-auto text-slate-300 mb-3" />
-          <p className="text-slate-500">No ratings yet. Complete transactions to build your reputation.</p>
+          <p className="text-slate-500">{t('sellerDash.noRatingsYet')}</p>
         </CardContent>
       </Card>
     );
@@ -1389,6 +1389,7 @@ const SellerRatingsPanel = ({ userId, token }) => {
 
 
 const RegionalTrendsPanel = ({ token }) => {
+  const { t } = useTranslation();
   const [trends, setTrends] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -1444,7 +1445,7 @@ const RegionalTrendsPanel = ({ token }) => {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
-              <BarChart3 className="h-4 w-4 text-cyan-500" /> Top Performing Categories
+              <BarChart3 className="h-4 w-4 text-cyan-500" /> {t('sellerDash.topCategories')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -1505,7 +1506,7 @@ const RegionalTrendsPanel = ({ token }) => {
                 })}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground py-4 text-center">No regional data yet.</p>
+              <p className="text-sm text-muted-foreground py-4 text-center">{t('sellerDash.noRegionalData')}</p>
             )}
           </CardContent>
         </Card>

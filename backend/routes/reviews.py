@@ -67,7 +67,10 @@ def _make_display_name(name: str) -> str:
 async def recalculate_seller_reputation(db, seller_id: str):
     """Recalculate and cache seller reputation from all active reviews."""
     pipeline = [
-        {"$match": {"seller_id": seller_id, "status": "active"}},
+        {"$match": {"seller_id": seller_id, "status": "active",
+                    # iter301 — seller→buyer reviews never count toward
+                    # seller reputation (legacy docs have no role field).
+                    "role": {"$ne": "seller"}}},
         {"$group": {
             "_id": None,
             "avg_rating": {"$avg": "$rating"},
@@ -151,6 +154,215 @@ class UpdateReviewRequest(BaseModel):
     communication: Optional[int] = Field(None, ge=1, le=5)
     shipping_speed: Optional[int] = Field(None, ge=1, le=5)
     comment: Optional[str] = Field(None, min_length=20, max_length=500)
+
+
+# ===== iter301 — Bidirectional review submission (/review/submit) =====
+
+_LISTING_COLLECTIONS = ("listings", "multi_item_listings", "storage_auctions", "vehicle_listings")
+
+
+def _listing_winner_id(doc: Dict) -> Optional[str]:
+    return doc.get("winner_user_id") or doc.get("winner_id") or doc.get("highest_bidder_id")
+
+
+def _listing_seller_id(doc: Dict) -> Optional[str]:
+    return doc.get("seller_id") or doc.get("user_id") or doc.get("seller_user_id") or doc.get("facility_id")
+
+
+async def _resolve_review_listing(db, listing_id: str):
+    """Find the listing across the 4 auction collections."""
+    for coll in _LISTING_COLLECTIONS:
+        doc = await db[coll].find_one({"id": listing_id}, {"_id": 0})
+        if doc:
+            return doc, coll
+    return None, None
+
+
+class SubmitReviewRequest(BaseModel):
+    listing_id: str
+    role: str = Field(..., pattern="^(buyer|seller)$")
+    rating: int = Field(..., ge=1, le=5)
+    comment: Optional[str] = Field(None, max_length=500)
+
+
+async def _review_context(db, user: Dict, listing_id: str, role: str):
+    """Shared eligibility resolution for submit-context + submit."""
+    listing, coll = await _resolve_review_listing(db, listing_id)
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+
+    winner_id = _listing_winner_id(listing)
+    seller_id = _listing_seller_id(listing)
+    if not winner_id:
+        raise HTTPException(status_code=400, detail="This auction has no winner yet — reviews open after the transaction completes")
+
+    if role == "buyer":
+        if user["id"] != winner_id:
+            raise HTTPException(status_code=403, detail="Only the winning buyer can review the seller for this listing")
+        reviewee_id = seller_id
+    else:  # seller reviews buyer
+        if user["id"] != seller_id:
+            raise HTTPException(status_code=403, detail="Only the seller can review the buyer for this listing")
+        reviewee_id = winner_id
+
+    if not reviewee_id:
+        raise HTTPException(status_code=400, detail="Counterparty could not be resolved for this listing")
+    if reviewee_id == user["id"]:
+        raise HTTPException(status_code=400, detail="You cannot review yourself")
+
+    # Idempotency — one review per transaction per direction.
+    existing = await db.reviews.find_one(
+        {"listing_id": listing_id, "reviewer_id": user["id"],
+         "role": role, "status": {"$ne": "removed"}}, {"_id": 0}
+    )
+    if not existing and role == "buyer":
+        # Legacy buyer-direction docs created via /reviews/create
+        existing = await db.reviews.find_one(
+            {"transaction_id": listing_id, "buyer_id": user["id"],
+             "status": {"$ne": "removed"}}, {"_id": 0}
+        )
+    return listing, coll, reviewee_id, existing
+
+
+@reviews_router.get("/submit-context")
+async def get_submit_context(
+    listing_id: str = Query(...),
+    role: str = Query(..., pattern="^(buyer|seller)$"),
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    """iter301 — Context for the /review/submit form (either direction)."""
+    user = await _get_current_user(credentials)
+    db = get_db()
+    listing, _coll, reviewee_id, existing = await _review_context(db, user, listing_id, role)
+
+    counterparty = await db.users.find_one({"id": reviewee_id}, {"_id": 0, "name": 1, "business_name": 1})
+    images = listing.get("images") or []
+    if not images and listing.get("lots"):
+        images = (listing["lots"][0] or {}).get("images") or []
+
+    return {
+        "item_title": listing.get("title") or "Item",
+        "item_image": images[0] if images else None,
+        "counterparty_name": (counterparty or {}).get("business_name") or (counterparty or {}).get("name") or "",
+        "role": role,
+        "listing_id": listing_id,
+        "existing_review": existing,
+    }
+
+
+@reviews_router.post("/submit")
+async def submit_review(
+    data: SubmitReviewRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    """iter301 — Submit a review for either direction (buyer→seller or
+    seller→buyer). Idempotent per (listing, reviewer, direction)."""
+    user = await _get_current_user(credentials)
+    db = get_db()
+    listing, _coll, reviewee_id, existing = await _review_context(db, user, data.listing_id, data.role)
+    if existing:
+        raise HTTPException(status_code=409, detail="You have already submitted a review for this transaction")
+
+    # Rate limit: 10 reviews per user per hour (matches /reviews/create)
+    one_hour_ago = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+    recent_count = await db.reviews.count_documents({
+        "reviewer_id": user["id"], "created_at": {"$gte": one_hour_ago}
+    })
+    if recent_count >= 10:
+        raise HTTPException(status_code=429, detail="Rate limit: max 10 reviews per hour")
+
+    comment = _sanitize_text(data.comment) if data.comment else None
+    now = datetime.now(timezone.utc)
+    display_name = _make_display_name(user.get("name", ""))
+
+    review = {
+        "id": str(uuid.uuid4()),
+        "transaction_id": data.listing_id,
+        "listing_id": data.listing_id,
+        "reviewer_id": user["id"],
+        "reviewee_id": reviewee_id,
+        "role": data.role,
+        "rating": data.rating,
+        "comment": comment,
+        "reviewer_display_name": display_name,
+        "status": "active",
+        "created_at": now.isoformat(),
+        "updated_at": now.isoformat(),
+        "editable_until": (now + timedelta(hours=48)).isoformat(),
+    }
+    if data.role == "buyer":
+        # Legacy-compatible fields so reputation + public seller lists work
+        review["buyer_id"] = user["id"]
+        review["seller_id"] = reviewee_id
+        review["buyer_display_name"] = display_name
+        review["buyer_avatar"] = user.get("avatar_url")
+
+    await db.reviews.insert_one(review)
+
+    reputation = None
+    if data.role == "buyer":
+        reputation = await recalculate_seller_reputation(db, reviewee_id)
+
+    # Notify the reviewee (bell + best-effort email)
+    try:
+        from services.notifications_i18n import create_notification
+        await create_notification(
+            db,
+            user_id=reviewee_id,
+            kind="new_review",
+            params={"reviewer_name": display_name, "rating": data.rating},
+            data={"review_id": review["id"], "listing_id": data.listing_id, "role": data.role},
+        )
+        reviewee = await db.users.find_one({"id": reviewee_id}, {"_id": 0, "email": 1, "name": 1})
+        if reviewee and reviewee.get("email"):
+            from services.emails._email_core import send_email, _base_template
+            stars = "&#9733;" * data.rating + "&#9734;" * (5 - data.rating)
+            html = f"""
+            <h2 style="margin: 0 0 20px 0; color: #1e3a8a;">New Review Received / Nouvel avis re&ccedil;u</h2>
+            <p>Hi {reviewee.get('name', '')},</p>
+            <p>{display_name} left you a review / vous a laiss&eacute; un avis :</p>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fef3c7;border-radius:8px;margin:20px 0;">
+              <tr><td align="center" style="padding:16px;">
+                <p style="font-size: 28px; margin: 0;">{stars}</p>
+                <p style="font-size: 18px; font-weight: bold; margin: 8px 0;">{data.rating}/5</p>
+              </td></tr>
+            </table>
+            """
+            if comment:
+                html += f'<blockquote style="border-left: 3px solid #ddd; padding-left: 16px; color: #555;">&ldquo;{comment}&rdquo;</blockquote>'
+            await send_email(
+                to_email=reviewee["email"],
+                subject=f"New {data.rating}-star review / Nouvel avis de {data.rating} \u00e9toiles \u2014 {display_name}",
+                html_content=_base_template(html, "New Review"),
+            )
+    except Exception as e:
+        logger.warning(f"[iter301] review notification failed: {e}")
+
+    review.pop("_id", None)
+    return {"success": True, "review": review, "reputation": reputation}
+
+
+@reviews_router.get("/buyer/{buyer_id}")
+async def get_buyer_reviews(
+    buyer_id: str,
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=50),
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    """iter301 — Admin-only: reviews a user received AS A BUYER
+    (seller→buyer direction). Soft-deleted reviews included, marked."""
+    user = await _get_current_user(credentials)
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    db = get_db()
+    skip = (page - 1) * limit
+    query = {"role": "seller", "reviewee_id": buyer_id}
+    reviews = await db.reviews.find(query, {"_id": 0}).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    total = await db.reviews.count_documents(query)
+    active = [r for r in reviews if r.get("status") == "active"]
+    avg = round(sum(r["rating"] for r in active) / len(active), 2) if active else None
+    return {"reviews": reviews, "total": total, "page": page, "average_rating": avg}
 
 
 # ===== Endpoints =====
@@ -376,7 +588,8 @@ async def update_review(
         update_fields["comment"] = _sanitize_text(data.comment)
 
     await db.reviews.update_one({"id": review_id}, {"$set": update_fields})
-    await recalculate_seller_reputation(db, review["seller_id"])
+    if review.get("seller_id"):
+        await recalculate_seller_reputation(db, review["seller_id"])
 
     updated = await db.reviews.find_one({"id": review_id}, {"_id": 0})
     return {"success": True, "review": updated}
@@ -498,7 +711,8 @@ async def admin_remove_review(
             "removed_by": user["id"],
         }}
     )
-    await recalculate_seller_reputation(db, review["seller_id"])
+    if review.get("seller_id"):
+        await recalculate_seller_reputation(db, review["seller_id"])
     return {"success": True, "message": "Review removed"}
 
 
@@ -527,7 +741,8 @@ async def admin_flag_review(
             "flagged_by": user["id"],
         }}
     )
-    await recalculate_seller_reputation(db, review["seller_id"])
+    if review.get("seller_id"):
+        await recalculate_seller_reputation(db, review["seller_id"])
     return {"success": True, "message": "Review flagged"}
 
 
@@ -551,7 +766,8 @@ async def admin_unflag_review(
         {"$set": {"status": "active"},
          "$unset": {"flagged_reason": "", "flagged_at": "", "flagged_by": ""}}
     )
-    await recalculate_seller_reputation(db, review["seller_id"])
+    if review.get("seller_id"):
+        await recalculate_seller_reputation(db, review["seller_id"])
     return {"success": True, "message": "Review restored"}
 
 

@@ -37,24 +37,40 @@ async def _can_open_thread(
     receiver_id: str,
     listing_id: Optional[str],
     is_admin: bool = False,
+    conversation_id: Optional[str] = None,
 ) -> Optional[str]:
     """
     Returns None if the thread can be opened; otherwise an error code.
-    Rules:
+    Rules (iter301 update):
       • Admins always allowed.
-      • Existing conversation? Allow replies (no re-check).
+      • Existing conversation (explicit id, legacy pair id, or per-listing id)?
+        Allow replies (no re-check).
       • Vehicle listing: sender must be `winner_id` AND `unlock_paid_at` set,
         OR sender must be the seller and the buyer is `winner_id`.
-      • Marketplace / Lots / Storage listings: auction must have ended AND
-        sender must be the winner or the seller.
+        (Monetized contact gate — unchanged.)
+      • Marketplace / Lots / Storage listings:
+          – While ACTIVE: any signed-in user may message the SELLER
+            (pre-sale Q&A — iter301 P1).
+          – After END: sender must be the winner or the seller.
       • Listing-less ad-hoc messages (no listing_id) are allowed only for admins.
     """
     if is_admin:
         return None
 
-    # Allow replies on existing conversations
-    conv_id = "_".join(sorted([sender_id, receiver_id]))
-    existing = await db.conversations.find_one({"id": conv_id}, {"_id": 0})
+    # Allow replies on an explicitly-targeted existing conversation
+    if conversation_id:
+        existing = await db.conversations.find_one(
+            {"id": conversation_id}, {"_id": 0, "participants": 1}
+        )
+        if existing and sender_id in existing.get("participants", []):
+            return None
+
+    # Allow replies on existing conversations (legacy pair id OR per-listing id)
+    pair_id = "_".join(sorted([sender_id, receiver_id]))
+    candidate_ids = [pair_id]
+    if listing_id:
+        candidate_ids.append(f"{pair_id}__{listing_id}")
+    existing = await db.conversations.find_one({"id": {"$in": candidate_ids}}, {"_id": 0})
     if existing:
         return None
 
@@ -91,12 +107,12 @@ async def _can_open_thread(
             return None
         return "not_party_to_transaction"
 
-    # Marketplace / Lots / Storage / Multi-item — single common check: auction ended
-    # + sender is winner or seller
+    # Marketplace / Lots / Storage / Multi-item — iter301: pre-sale Q&A with
+    # the seller while active; winner/seller only after the auction ends.
     for coll in ("listings", "multi_item_listings", "storage_auctions"):
         doc = await db[coll].find_one(
             {"id": listing_id},
-            {"_id": 0, "winner_id": 1, "seller_id": 1, "user_id": 1, "status": 1, "ended_at": 1, "end_time": 1},
+            {"_id": 0, "winner_id": 1, "winner_user_id": 1, "seller_id": 1, "user_id": 1, "status": 1, "ended_at": 1, "end_time": 1},
         )
         if doc:
             now = datetime.now(timezone.utc)
@@ -112,11 +128,17 @@ async def _can_open_thread(
                 if et and et.tzinfo is None:
                     et = et.replace(tzinfo=timezone.utc)
                 ended = bool(et and et < now)
-            if not ended:
-                return "auction_not_ended"
 
             seller_user_id = doc.get("seller_id") or doc.get("user_id")
-            winner_id = doc.get("winner_id")
+            winner_id = doc.get("winner_id") or doc.get("winner_user_id")
+
+            if not ended:
+                # iter301 P1 — pre-sale Q&A: any signed-in buyer may open a
+                # thread WITH THE SELLER while the listing is live.
+                if receiver_id == seller_user_id and sender_id != seller_user_id:
+                    return None
+                return "presale_must_message_seller"
+
             allowed_pair = {seller_user_id, winner_id} - {None}
             if sender_id not in allowed_pair or receiver_id not in allowed_pair:
                 return "not_party_to_transaction"
@@ -156,9 +178,18 @@ def set_message_managers(msg_manager, global_manager):
 @_limiter.limit("20/minute")
 async def send_message(request: Request, msg: MessageCreate, current_user: User = Depends(get_current_user)):
     """Send a text message to another user."""
+    # iter301 — enforce admin messaging suspension
+    sender_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0, "messaging_suspended": 1})
+    if sender_doc and sender_doc.get("messaging_suspended"):
+        raise HTTPException(status_code=403, detail={
+            "code": "messaging_suspended",
+            "message_en": "Your messaging privileges have been suspended. Contact support@bidvex.com.",
+            "message_fr": "Vos privilèges de messagerie ont été suspendus. Contactez support@bidvex.com.",
+        })
+
     # iter196 — gate thread creation
     is_admin = (current_user.role or "").lower() in ("admin", "superadmin") if hasattr(current_user, "role") else False
-    gate_error = await _can_open_thread(current_user.id, msg.receiver_id, msg.listing_id, is_admin)
+    gate_error = await _can_open_thread(current_user.id, msg.receiver_id, msg.listing_id, is_admin, msg.conversation_id)
     if gate_error:
         ERROR_DETAILS = {
             "thread_requires_listing_context": {
@@ -170,6 +201,11 @@ async def send_message(request: Request, msg: MessageCreate, current_user: User 
                 "code": "vehicle_unlock_fee_unpaid",
                 "message_en": "The platform unlock fee must be paid before messaging the dealer.",
                 "message_fr": "Les frais de plateforme doivent être payés avant de contacter le concessionnaire.",
+            },
+            "presale_must_message_seller": {
+                "code": "presale_must_message_seller",
+                "message_en": "Questions before the auction ends can only be sent to the seller of this listing.",
+                "message_fr": "Avant la fin de l'enchère, les questions ne peuvent être envoyées qu'au vendeur de cette annonce.",
             },
             "auction_not_ended": {
                 "code": "auction_not_ended",
@@ -194,7 +230,24 @@ async def send_message(request: Request, msg: MessageCreate, current_user: User 
         }
         raise HTTPException(status_code=403, detail=ERROR_DETAILS.get(gate_error, {"code": gate_error}))
 
-    conversation_id = "_".join(sorted([current_user.id, msg.receiver_id]))
+    # iter301 — conversation resolution: explicit reply target > existing
+    # legacy pair thread for this listing > new per-listing thread.
+    pair_id = "_".join(sorted([current_user.id, msg.receiver_id]))
+    conversation_id = None
+    if msg.conversation_id:
+        target = await db.conversations.find_one(
+            {"id": msg.conversation_id}, {"_id": 0, "participants": 1}
+        )
+        if target and current_user.id in target.get("participants", []) and msg.receiver_id in target.get("participants", []):
+            conversation_id = msg.conversation_id
+    if not conversation_id:
+        if msg.listing_id:
+            legacy = await db.conversations.find_one(
+                {"id": pair_id, "listing_id": msg.listing_id}, {"_id": 0, "id": 1}
+            )
+            conversation_id = pair_id if legacy else f"{pair_id}__{msg.listing_id}"
+        else:
+            conversation_id = pair_id
 
     message = Message(
         conversation_id=conversation_id,
@@ -272,7 +325,72 @@ async def send_message(request: Request, msg: MessageCreate, current_user: User 
     except Exception as exc:
         logger.warning(f"[iter196] new-message email failed: {exc}")
 
+    # iter301 — persistent bilingual bell notification (only when the
+    # recipient isn't actively viewing the thread, to avoid spam).
+    if not recipient_online:
+        try:
+            from services.notifications_i18n import create_notification
+            await create_notification(
+                db,
+                user_id=msg.receiver_id,
+                kind="new_message",
+                params={"sender_name": current_user.name, "preview": msg.content[:80]},
+                data={"conversation_id": conversation_id, "listing_id": msg.listing_id,
+                      "action_url": "/messages"},
+            )
+        except Exception as exc:
+            logger.warning(f"[iter301] new-message bell notification failed: {exc}")
+
     return message
+
+
+# ---------------------------------------------------------------------------
+# iter301 — Abuse reporting (either party flags a thread → admin queue)
+# ---------------------------------------------------------------------------
+
+@messages_router.post("/conversations/{conversation_id}/report")
+async def report_conversation(
+    conversation_id: str,
+    data: Dict[str, Any],
+    current_user: User = Depends(get_current_user),
+):
+    """Flag a conversation as abusive. Participant-only. Lands in the
+    admin reported-threads queue and notifies all admins."""
+    conv = await db.conversations.find_one({"id": conversation_id}, {"_id": 0})
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    if current_user.id not in conv.get("participants", []):
+        raise HTTPException(status_code=403, detail="Only participants can report this thread")
+
+    reason = (data.get("reason") or "").strip()[:500] or "No reason provided"
+    now_iso = datetime.now(timezone.utc).isoformat()
+    await db.conversations.update_one(
+        {"id": conversation_id},
+        {"$set": {
+            "flagged": True,
+            "flag_status": "pending",
+            "flag_reason": reason,
+            "flagged_by": current_user.id,
+            "flagged_at": now_iso,
+        }}
+    )
+
+    # Notify admins (best-effort)
+    try:
+        from services.notifications_i18n import create_notification
+        admins = await db.users.find({"role": {"$in": ["admin", "super_admin"]}}, {"_id": 0, "id": 1}).to_list(20)
+        for a in admins:
+            await create_notification(
+                db,
+                user_id=a["id"],
+                kind="message_thread_reported",
+                params={"reporter_name": current_user.name, "reason": reason},
+                data={"conversation_id": conversation_id, "action_url": "/admin?tab=messages-oversight"},
+            )
+    except Exception as exc:
+        logger.warning(f"[iter301] thread-report admin notify failed: {exc}")
+
+    return {"success": True, "message": "Thread reported. Our team will review it."}
 
 
 @messages_router.get("/messages/unread-count")
@@ -800,6 +918,56 @@ async def admin_get_flagged_messages(current_user: User = Depends(get_current_us
 
     messages = await db.messages.find({"flagged": True}, {"_id": 0}).sort("created_at", -1).to_list(100)
     return messages
+
+
+@messages_router.get("/admin/messages/reported-threads")
+async def admin_get_reported_threads(
+    status: Optional[str] = "pending",
+    current_user: User = Depends(get_current_user),
+):
+    """iter301 — Admin: reported (abusive) conversation queue.
+    ?status=pending|resolved|all (default pending)."""
+    if getattr(current_user, "role", None) not in ("admin", "super_admin"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    query: Dict[str, Any] = {"flagged": True}
+    if status == "pending":
+        query["flag_status"] = "pending"
+    elif status == "resolved":
+        query["flag_status"] = "resolved"
+
+    threads = await db.conversations.find(query, {"_id": 0}).sort("flagged_at", -1).to_list(100)
+    out = []
+    for t in threads:
+        users_docs = []
+        for uid in t.get("participants", []) or []:
+            doc = await db.users.find_one({"id": uid}, {"_id": 0, "id": 1, "name": 1, "email": 1})
+            if doc:
+                users_docs.append(doc)
+        out.append({**t, "participants_detail": users_docs})
+    return {"threads": out, "total": len(out)}
+
+
+@messages_router.post("/admin/messages/reported-threads/{conversation_id}/resolve")
+async def admin_resolve_reported_thread(
+    conversation_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """iter301 — Admin: mark a reported thread as reviewed/resolved."""
+    if getattr(current_user, "role", None) not in ("admin", "super_admin"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    result = await db.conversations.update_one(
+        {"id": conversation_id, "flagged": True},
+        {"$set": {
+            "flag_status": "resolved",
+            "flag_resolved_by": current_user.id,
+            "flag_resolved_at": datetime.now(timezone.utc).isoformat(),
+        }}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Reported thread not found")
+    return {"success": True}
 
 
 @messages_router.delete("/admin/messages/{message_id}")

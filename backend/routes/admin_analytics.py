@@ -71,6 +71,13 @@ async def get_admin_analytics(
     db = get_db()
     now = datetime.now(timezone.utc)
 
+    # ── iter301 P2 — 60-second response cache (range-keyed).
+    from services.api_cache import cache_get, cache_set
+    _cache_key = f"admin_analytics:overview:{from_date or 'default'}:{to_date or 'default'}"
+    _cached = await cache_get(_cache_key)
+    if _cached:
+        return _cached
+
     # ── iter300 P2 — optional custom date range (?from=YYYY-MM-DD&to=YYYY-MM-DD).
     # Defaults to the last 30 days. Range-scoped metrics: GMV(range),
     # revenue(range + per-day series), signups series, top sellers, avg
@@ -217,7 +224,7 @@ async def get_admin_analytics(
     conv_rate = (round(100.0 * conversion["ended_with_bids"] / conversion["ended_total"], 1)
                  if conversion["ended_total"] else 0.0)
 
-    return {
+    result = {
         "generated_at": now.isoformat(),
         "range": {"from": range_from.strftime("%Y-%m-%d"),
                   "to": range_to.strftime("%Y-%m-%d"), "days": span_days},
@@ -240,3 +247,5 @@ async def get_admin_analytics(
         "signups_per_day": [{"date": k, "count": signups_by_day[k]} for k in day_keys],
         "revenue_per_day": [{"date": k, "amount": round(revenue_by_day[k], 2)} for k in day_keys],
     }
+    await cache_set(_cache_key, result, ttl=60)
+    return result

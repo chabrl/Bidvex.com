@@ -151,10 +151,10 @@ const CompareListingsPage = () => {
       {listings.length === 0 && !loading && (
         <div className="max-w-2xl mx-auto px-4 py-20 text-center" data-testid="compare-empty-state">
           <Scale className="h-16 w-16 mx-auto mb-6 text-slate-300 dark:text-slate-600" />
-          <h2 className="text-xl font-semibold text-slate-700 dark:text-slate-200 mb-2">No items to compare</h2>
-          <p className="text-slate-500 dark:text-slate-400 mb-8">Search for listings to start a side-by-side comparison.</p>
+          <h2 className="text-xl font-semibold text-slate-700 dark:text-slate-200 mb-2">{t('compare.noItems')}</h2>
+          <p className="text-slate-500 dark:text-slate-400 mb-8">{t('compare.searchToStart')}</p>
           <Button onClick={() => setShowSearch(true)} className="bg-cyan-600 hover:bg-cyan-700 text-white" data-testid="compare-add-first-btn">
-            <Plus className="h-4 w-4 mr-2" /> Add First Listing
+            <Plus className="h-4 w-4 mr-2" /> {t('compare.addFirst')}
           </Button>
         </div>
       )}
@@ -262,7 +262,7 @@ const CompareListingsPage = () => {
                 <Search className="h-5 w-5 text-slate-400" />
                 <Input
                   autoFocus
-                  placeholder="Search listings to compare..."
+                  placeholder={t('compare.searchPlaceholder')}
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                   className="border-0 focus-visible:ring-0 text-base"
@@ -276,7 +276,7 @@ const CompareListingsPage = () => {
             <div className="overflow-y-auto max-h-[55vh] p-2">
               {searching && <p className="text-center text-sm text-slate-500 py-4">Searching...</p>}
               {!searching && searchResults.length === 0 && searchQuery.length >= 2 && (
-                <p className="text-center text-sm text-slate-500 py-4">No results found</p>
+                <p className="text-center text-sm text-slate-500 py-4">{t('compare.noResults')}</p>
               )}
               {searchResults.map(item => (
                 <button

@@ -166,7 +166,7 @@ const AuthPage = () => {
     }
     
     if (newPassword !== confirmPassword) {
-      toast.error('Passwords do not match');
+      toast.error(t('auth.passwordsNoMatch'));
       return;
     }
 
@@ -213,10 +213,10 @@ const AuthPage = () => {
               </div>
             </div>
             <CardTitle className="text-2xl font-bold text-center">
-              Password Reset Required
+              {t('auth.passwordResetRequired')}
             </CardTitle>
             <CardDescription className="text-center">
-              Your account requires a password reset. Please choose a new secure password.
+              {t('auth.passwordResetDesc')}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -225,7 +225,7 @@ const AuthPage = () => {
               <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5" />
               <div className="text-amber-700 dark:text-amber-300">
                 <p className="font-medium">First-time login</p>
-                <p>An administrator created your account. You must set a new password before accessing your dashboard.</p>
+                <p>{t('auth.adminCreatedAccount')}</p>
               </div>
             </div>
 
@@ -268,7 +268,7 @@ const AuthPage = () => {
                   placeholder="Confirm new password"
                 />
                 {confirmPassword && newPassword !== confirmPassword && (
-                  <p className="text-sm text-red-500">Passwords do not match</p>
+                  <p className="text-sm text-red-500">{t('auth.passwordsNoMatch')}</p>
                 )}
                 {confirmPassword && newPassword === confirmPassword && newPassword.length >= 8 && (
                   <p className="text-sm text-green-600 flex items-center gap-1">
@@ -299,7 +299,7 @@ const AuthPage = () => {
                 }}
                 className="text-muted-foreground hover:underline"
               >
-                Cancel and return to login
+                {t('auth.cancelReturnLogin')}
               </button>
             </div>
           </CardContent>
@@ -482,7 +482,7 @@ const AuthPage = () => {
                         <strong> $100.00 CAD/year</strong> platform access fee + <strong>3% commission</strong> on the final hammer price per item.
                         You set your own Buyer's Premium independently. All fees are subject to GST/QST.
                       </p>
-                      <p className="text-[10px] text-amber-600 dark:text-amber-400">Partner accounts require manual verification of your federal or provincial business registration before listing.</p>
+                      <p className="text-[10px] text-amber-600 dark:text-amber-400">{t('auth.partnerVerificationNote')}</p>
                     </div>
                   </>
                 )}

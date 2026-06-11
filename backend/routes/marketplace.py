@@ -8,7 +8,7 @@ Handles all marketplace browsing, searching, and filtering:
 - Click tracking for analytics
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime, timezone, timedelta
@@ -450,8 +450,8 @@ async def get_marketplace_items(
     ending_soon: Optional[str] = None,         # iter298 BUG 1 — active items ending within 24h (dynamic)
     buyer_province: Optional[str] = None,    # for "nearby_first" geo-sort
     sort: str = "nearby_first",
-    limit: int = 20,
-    skip: int = 0,
+    limit: int = Query(20, ge=1, le=100),
+    skip: int = Query(0, ge=0),
     cursor: Optional[str] = None,
     track_impression: bool = False,
     # iter223 — Owner-self-include for demo sandbox. When the requester is a
@@ -673,6 +673,10 @@ async def get_marketplace_items(
     return {
         "items": paginated_items,
         "total": total_items,
+        # iter301 P2 — spec-compliant aliases (total_count + page) alongside
+        # the legacy keys so existing consumers don't break.
+        "total_count": total_items,
+        "page": (offset // limit) + 1 if limit else 1,
         "limit": limit,
         "skip": offset,
         "has_more": has_more,

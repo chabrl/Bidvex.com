@@ -73,8 +73,8 @@ localStorage.setItem('bidvex_cookie_consent', JSON.stringify({version: 1, accept
 ```
 Otherwise the Law-25 consent banner intercepts the Sign-In click.
 
-## iter225 Buyer Test Account (added 2026-02-24 — works on preview)
+## iter225 Buyer Test Account (re-seeded 2026-06-11 — verified working on preview)
 - Email: iter225buyer@bidvex.com
 - Password: TestBuyer225!
 - Role: user (regular buyer)
-- Notes: created to unblock E2E broker-binding-request UI flow tests (refundable badges, custom terms modal, authorize-deposit gate). User id 3b07c46e-998c-4f1f-915d-cdba43e40c5b.
+- Notes: re-registered on this preview DB during iter301 (old account didn't exist → 401). New user id 85b3ce59-f264-4d43-8d12-19b3449ec8b3. Login verified via API on 2026-06-11.

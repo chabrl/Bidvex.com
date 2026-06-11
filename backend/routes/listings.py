@@ -4,7 +4,7 @@ Handles all listing CRUD operations for both single-item and multi-item auctions
 including terms management and deletion requests.
 """
 
-from fastapi import APIRouter, HTTPException, Depends, Request, BackgroundTasks, UploadFile, File
+from fastapi import APIRouter, HTTPException, Depends, Request, BackgroundTasks, UploadFile, File, Query
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone, timedelta
@@ -659,7 +659,8 @@ async def create_listing(
 async def get_listings(
     category: Optional[str] = None, city: Optional[str] = None, region: Optional[str] = None,
     condition: Optional[str] = None, min_price: Optional[float] = None, max_price: Optional[float] = None,
-    search: Optional[str] = None, sort: str = "created_at", limit: int = 50, skip: int = 0,
+    search: Optional[str] = None, sort: str = "created_at",
+    limit: int = Query(50, ge=1, le=100), skip: int = Query(0, ge=0),
     currency: Optional[str] = None,
     tax_status: Optional[str] = None,        # "partner" | "standard" — UI filter
     buyer_province: Optional[str] = None,    # for "nearby_first" geo-sort
@@ -1367,8 +1368,8 @@ async def create_multi_item_listing(
 
 @listings_router.get("/multi-item-listings")
 async def get_multi_item_listings(
-    limit: int = 50,
-    skip: int = 0,
+    limit: int = Query(50, ge=1, le=100),
+    skip: int = Query(0, ge=0),
     status: Optional[str] = None,
     category: Optional[str] = None,
     region: Optional[str] = None,

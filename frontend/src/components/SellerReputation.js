@@ -1,23 +1,24 @@
 import API_BASE from '../config';
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useTranslation } from 'react-i18next';
 import { Star, Award, Trophy, ShieldCheck } from 'lucide-react';
 
 const API = API_BASE;
 
 const badgeConfig = {
   top_rated: {
-    label: 'Top Rated',
+    label: 'reputation.topRated',
     icon: Trophy,
     className: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 border-amber-300',
   },
   trusted_seller: {
-    label: 'Trusted Seller',
+    label: 'reputation.trustedSeller',
     icon: ShieldCheck,
     className: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 border-blue-300',
   },
   new_seller: {
-    label: 'New Seller',
+    label: 'reputation.newSeller',
     icon: Award,
     className: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 border-slate-300',
   },
@@ -30,6 +31,7 @@ const badgeConfig = {
  * Accepts optional pre-fetched `reputation` prop to avoid N+1 requests.
  */
 export const SellerRatingInline = ({ sellerId, reputation }) => {
+  const { t } = useTranslation();
   const [rep, setRep] = useState(reputation || null);
 
   useEffect(() => {
@@ -47,7 +49,7 @@ export const SellerRatingInline = ({ sellerId, reputation }) => {
     return (
       <div className="flex items-center gap-1 text-xs" data-testid="seller-rating-inline-new">
         <Award className="h-3.5 w-3.5 text-slate-400" />
-        <span className="text-slate-500 font-medium">New Seller</span>
+        <span className="text-slate-500 font-medium">{t('reputation.newSeller')}</span>
       </div>
     );
   }
@@ -66,6 +68,7 @@ export const SellerRatingInline = ({ sellerId, reputation }) => {
  * Shows: badge + average + count + 5-star breakdown bars
  */
 export const SellerReputationCard = ({ sellerId }) => {
+  const { t } = useTranslation();
   const [rep, setRep] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -94,9 +97,9 @@ export const SellerReputationCard = ({ sellerId }) => {
       <div className="flex items-center justify-between">
         <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${badge.className}`}>
           <BadgeIcon className="h-3.5 w-3.5" />
-          {badge.label}
+          {t(badge.label)}
         </div>
-        <span className="text-xs text-slate-400">{total} review{total !== 1 ? 's' : ''}</span>
+        <span className="text-xs text-slate-400">{t('reputation.reviewCount', { count: total })}</span>
       </div>
 
       {/* Score */}
@@ -116,14 +119,14 @@ export const SellerReputationCard = ({ sellerId }) => {
                 />
               ))}
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">Based on {total} reviews</p>
+            <p className="text-xs text-slate-500 mt-0.5">{t('reputation.basedOn', { count: total })}</p>
           </div>
         </div>
       ) : (
         <p className="text-sm text-slate-500">
           {total > 0
-            ? `${3 - total} more review${3 - total > 1 ? 's' : ''} needed to display rating`
-            : 'No reviews yet'}
+            ? t('reputation.moreNeeded', { count: 3 - total })
+            : t('reputation.noReviewsYet')}
         </p>
       )}
 
@@ -155,19 +158,19 @@ export const SellerReputationCard = ({ sellerId }) => {
         <div className="pt-2 border-t space-y-1.5">
           {rep.category_averages.item_accuracy && (
             <div className="flex justify-between text-xs">
-              <span className="text-slate-500">Item Accuracy</span>
+              <span className="text-slate-500">{t('reputation.itemAccuracy')}</span>
               <span className="font-medium">{rep.category_averages.item_accuracy.toFixed(1)}/5</span>
             </div>
           )}
           {rep.category_averages.communication && (
             <div className="flex justify-between text-xs">
-              <span className="text-slate-500">Communication</span>
+              <span className="text-slate-500">{t('reputation.communication')}</span>
               <span className="font-medium">{rep.category_averages.communication.toFixed(1)}/5</span>
             </div>
           )}
           {rep.category_averages.shipping_speed && (
             <div className="flex justify-between text-xs">
-              <span className="text-slate-500">Shipping Speed</span>
+              <span className="text-slate-500">{t('reputation.shippingSpeed')}</span>
               <span className="font-medium">{rep.category_averages.shipping_speed.toFixed(1)}/5</span>
             </div>
           )}
@@ -181,11 +184,12 @@ export const SellerReputationCard = ({ sellerId }) => {
  * Review list with pagination for seller profile pages.
  */
 export const SellerReviewsList = ({ sellerId }) => {
+  const { t } = useTranslation();
   const [reviews, setReviews] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
-  const limit = 5;
+  const limit = 10; // iter301 — spec: 10 reviews per page
 
   useEffect(() => {
     if (!sellerId) return;
@@ -213,7 +217,7 @@ export const SellerReviewsList = ({ sellerId }) => {
   return (
     <div className="space-y-4" data-testid="seller-reviews-list">
       <h3 className="font-semibold text-lg">
-        Buyer Reviews <span className="text-slate-400 font-normal">({total})</span>
+        {t('reputation.buyerReviews')} <span className="text-slate-400 font-normal">({total})</span>
       </h3>
 
       <div className="space-y-3">
@@ -249,9 +253,9 @@ export const SellerReviewsList = ({ sellerId }) => {
             )}
             {(review.item_accuracy || review.communication || review.shipping_speed) && (
               <div className="flex gap-4 mt-2 text-xs text-slate-400">
-                {review.item_accuracy && <span>Accuracy: {review.item_accuracy}/5</span>}
-                {review.communication && <span>Communication: {review.communication}/5</span>}
-                {review.shipping_speed && <span>Shipping: {review.shipping_speed}/5</span>}
+                {review.item_accuracy && <span>{t('reputation.itemAccuracy')}: {review.item_accuracy}/5</span>}
+                {review.communication && <span>{t('reputation.communication')}: {review.communication}/5</span>}
+                {review.shipping_speed && <span>{t('reputation.shippingSpeed')}: {review.shipping_speed}/5</span>}
               </div>
             )}
           </div>
@@ -265,7 +269,7 @@ export const SellerReviewsList = ({ sellerId }) => {
             disabled={page === 1}
             className="px-3 py-1.5 text-sm border rounded disabled:opacity-50 min-h-[44px]"
           >
-            Previous
+            {t('reputation.previous')}
           </button>
           <span className="flex items-center text-sm text-slate-500">
             {page} / {totalPages}
@@ -275,7 +279,7 @@ export const SellerReviewsList = ({ sellerId }) => {
             disabled={page === totalPages}
             className="px-3 py-1.5 text-sm border rounded disabled:opacity-50 min-h-[44px]"
           >
-            Next
+            {t('reputation.next')}
           </button>
         </div>
       )}

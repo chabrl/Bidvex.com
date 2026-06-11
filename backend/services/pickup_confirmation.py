@@ -208,40 +208,52 @@ async def _send_rating_requests(db, *, listing: Dict[str, Any], kind: str) -> No
 
     title = _title(listing)
     listing_id = listing["id"]
-    rating_url = f"{os.environ.get('FRONTEND_URL', 'https://bidvex.com')}/rate/{kind}/{listing_id}"
+    base = os.environ.get('FRONTEND_URL', 'https://bidvex.com')
+    # iter301 — direct links to the live review form (was /rate/... which had
+    # no frontend route).
+    buyer_url = f"{base}/review/submit?listing_id={listing_id}&role=buyer"
+    seller_url = f"{base}/review/submit?listing_id={listing_id}&role=seller"
 
     try:
-        from services.emails._email_core import send_unified_email
+        from services.emails._email_core import send_email, _base_template
         # Buyer → Seller
         if winner and winner.get("email"):
-            await send_unified_email(
+            await send_email(
                 to_email=winner["email"],
-                to_name=winner.get("first_name") or winner.get("name") or "",
-                subject="How was your experience? Rate the seller.",
-                html_body=(
+                subject="How was your experience? Rate the seller. / Comment s'est passée votre expérience ? Évaluez le vendeur.",
+                html_content=_base_template(
+                    f"<h2 style=\"margin:0 0 20px 0;color:#1e3a8a;\">Rate Your Experience / &Eacute;valuez votre exp&eacute;rience</h2>"
+                    f"<p>Hi {winner.get('first_name') or winner.get('name') or ''},</p>"
                     f"<p>Now that you've received <strong>{title}</strong>, please take 30 seconds "
                     f"to rate your experience.</p>"
-                    f"<p><a href='{rating_url}' style='display:inline-block;padding:10px 18px;"
+                    f"<p style='color:#555;'>Maintenant que vous avez re&ccedil;u <strong>{title}</strong>, prenez 30 secondes "
+                    f"pour &eacute;valuer votre exp&eacute;rience.</p>"
+                    f"<p><a href='{buyer_url}' style='display:inline-block;padding:10px 18px;"
                     f"background:#0B2545;color:#fff;text-decoration:none;border-radius:6px;'>"
-                    f"Rate Seller</a></p>"
+                    f"Rate Seller / &Eacute;valuer le vendeur</a></p>",
+                    "Rate the Seller",
                 ),
-                category="rating_request_buyer",
+                categories=["rating_request_buyer"],
             )
         # Seller → Buyer
         if seller and seller.get("email"):
             buyer_first = (winner.get("first_name") or (winner.get("name") or "").split(" ")[0]) if winner else "your buyer"
-            await send_unified_email(
+            await send_email(
                 to_email=seller["email"],
-                to_name=seller.get("first_name") or seller.get("name") or seller.get("business_name") or "",
-                subject=f"Rate your buyer {buyer_first}",
-                html_body=(
+                subject=f"Rate your buyer {buyer_first} / Évaluez votre acheteur {buyer_first}",
+                html_content=_base_template(
+                    f"<h2 style=\"margin:0 0 20px 0;color:#1e3a8a;\">Rate Your Buyer / &Eacute;valuez votre acheteur</h2>"
+                    f"<p>Hi {seller.get('first_name') or seller.get('name') or seller.get('business_name') or ''},</p>"
                     f"<p>The transaction for <strong>{title}</strong> is now complete.</p>"
                     f"<p>Please leave a quick rating for your buyer.</p>"
-                    f"<p><a href='{rating_url}' style='display:inline-block;padding:10px 18px;"
+                    f"<p style='color:#555;'>La transaction pour <strong>{title}</strong> est maintenant termin&eacute;e. "
+                    f"Veuillez laisser une &eacute;valuation rapide pour votre acheteur.</p>"
+                    f"<p><a href='{seller_url}' style='display:inline-block;padding:10px 18px;"
                     f"background:#0B2545;color:#fff;text-decoration:none;border-radius:6px;'>"
-                    f"Rate Buyer</a></p>"
+                    f"Rate Buyer / &Eacute;valuer l'acheteur</a></p>",
+                    "Rate the Buyer",
                 ),
-                category="rating_request_seller",
+                categories=["rating_request_seller"],
             )
     except Exception as ex:
         logger.warning(f"[pickup_confirm] rating-request emails failed: {ex}")

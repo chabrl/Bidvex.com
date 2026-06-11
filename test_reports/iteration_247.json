@@ -1,0 +1,36 @@
+{
+  "summary": "Iter301 review_request validation. Backend: 15/15 new integration tests PASS (messaging gate + per-listing conv_id, conversation report → admin reported-threads list + resolve, reviews submit-context/submit bidirectional/duplicate-409/buyer-only-admin, reputation excludes seller role, marketplace pagination, sitemap/robots, admin analytics 60s cache). Pre-existing iter301 suite still 19/19 PASS. Frontend: FR storefront localization ALL markers present + document.lang='fr'; /review/submit page works (star picker, comment, submit, confirmation, idempotency on revisit verified); Admin Users buyer-reviews modal opens correctly with NO React 'unique key' warning. Two issues found: (1) /messages page is blocked by phone-verification gate for buyer iter225buyer@bidvex.com — buyer cannot reach the report-abuse '...' menu UI; (2) /admin?tab=messaging deep-link did NOT activate the Messaging Oversight subtab — landed on User Management tab instead, so [data-testid='reported-threads-section'] was not visible in DOM via that URL.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "MessagesPage report-abuse UI flow", "issue": "Buyer iter225buyer@bidvex.com is redirected to 'Verify Your Phone' page when visiting /messages, blocking access to thread list and report-thread-menu-item. Either the buyer fixture needs phone_verified=true or the report-abuse flow should be reachable on a phone-verified test buyer. Backend report API (POST /api/conversations/{id}/report) verified working (200 OK).", "selector": "[data-testid='report-thread-menu-item']", "priority": "MEDIUM"},
+      {"component": "Admin Control Panel deep-link", "issue": "/admin?tab=messaging URL does NOT pre-select the Messaging Oversight subtab — page renders User Management tab. Could not locate [data-testid='reported-threads-section'] on the visible page. Either the query-param routing is broken for the 'messaging' subtab or it lives under a different parent (e.g., need to click an overflow tab). Backend admin endpoints work (GET /api/admin/messages/reported-threads, POST .../resolve both 200).", "selector": "[data-testid='reported-threads-section']", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter301_review_request.py",
+    "/app/test_reports/pytest/iter301_review_request.xml",
+    "/app/backend/tests/test_iter301_features.py"
+  ],
+  "action_items": [
+    "Verify /admin?tab=messaging URL deep-linking actually selects the Messaging Oversight subtab (currently lands on User Management). If the deep-link uses different param like tab=messaging-oversight or subtab=messaging, document the correct URL and ensure ReportedThreadsSection mounts.",
+    "For E2E coverage of MessagesPage report-abuse UI: either provide a phone-verified test buyer credential, or skip the phone gate for E2E test accounts (cookie/localStorage flag). The backend flow is verified working."
+  ],
+  "critical_code_review_comments": [
+    "Per-listing conversation_id format '{sorted_pair}__{listing_id}' confirmed at the API; ensure frontend MessagesPage threadlist groups/parses by this format consistently — verify after fixing phone-gate path.",
+    "Reputation endpoint correctly excludes seller→buyer reviews (average_rating reflects only buyer→seller 5★ added, count not exposed under 3 reviews due to badge='new_seller' gating — UI behavior is consistent with 'Nouveau vendeur / 2 avis de plus requis pour afficher la note').",
+    "Idempotency on /review/submit verified — revisiting same URL after submission shows confirmation immediately (no double submission)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter301_review_request.py (new)"
+  ],
+  "success_rate": {"backend": "100% (15/15 new + 19/19 iter301 suite)", "frontend": "80% (4/5 flows verified end-to-end; messages report-abuse UI blocked by phone-gate; admin messaging subtab deep-link issue)"},
+  "test_credentials": "Admin charbel911@gmail.com / Anderosli123!@# • Buyer iter225buyer@bidvex.com / TestBuyer225! (NOTE: phone NOT verified → blocked from /messages UI)",
+  "seed_data_creation": "Seeded TEST_uifr301_ended_222a7ab1 and TEST_uifr301_active_ef844f0b listings + buyer review + conversation + reported_thread (cleaned up at end). Backend pytest also seeds/cleans its own TEST_iter301_* listings per module.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend is fully green for iter301. Two UI gaps to retest after main agent fix: (1) MessagesPage report-abuse — needs phone-verified buyer or E2E phone-gate bypass; (2) Admin Messaging Oversight deep-link — verify the correct URL/query param to mount ReportedThreadsSection and check data-testid='reported-threads-section' is rendered. FR storefront, /review/submit, and admin users buyer-reviews modal are all confirmed working.",
+  "rca of the issue": "(1) Phone-gate on /messages: iter225buyer user document likely has phone_verified=false; the global messaging route requires phone verification before showing the inbox. Mitigation: either flip phone_verified=true on the test buyer in mongo OR have main agent add an E2E bypass when localStorage['bidvex_e2e_auto_accept_cookies']==='true'. (2) Admin subtab deep-link: the AdminControlPanel reads ?tab= but 'messaging' may not match the registered subtab key (the visible subtabs are user-management/listings-moderation/flagged-listings/disputed-settlements/manage-all-auctions/deletion-requests + scrollable overflow). Likely fix: confirm the exact tab key (e.g., 'messaging-oversight') and align review_request docs OR add 'messaging' alias in the tab resolver."
+}

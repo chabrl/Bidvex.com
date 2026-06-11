@@ -28,7 +28,7 @@ import {
   Users, CheckCircle, MessageCircleOff, Search, UserPlus, Gavel, 
   Copy, Check, Eye, EyeOff, Building2, User, Shield, Mail,
   Phone, AlertTriangle, X, Ban, Trash2, MapPin, MoreVertical,
-  Key, Edit, Crown, Theater, CreditCard, Receipt,
+  Key, Edit, Crown, Theater, CreditCard, Receipt, Star,
 } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
@@ -62,6 +62,34 @@ const EnhancedUserManager = () => {
 
   // Validation State
   const [validationErrors, setValidationErrors] = useState({});
+
+  // iter301 — Buyer Reviews modal (reviews received as a buyer; admin view)
+  const [buyerReviewsModal, setBuyerReviewsModal] = useState({ open: false, user: null, data: null, loading: false });
+
+  const openBuyerReviews = async (user) => {
+    setBuyerReviewsModal({ open: true, user, data: null, loading: true });
+    try {
+      const res = await axios.get(`${API}/reviews/buyer/${user.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setBuyerReviewsModal({ open: true, user, data: res.data, loading: false });
+    } catch (e) {
+      toast.error('Failed to load buyer reviews');
+      setBuyerReviewsModal({ open: false, user: null, data: null, loading: false });
+    }
+  };
+
+  const softDeleteReview = async (reviewId) => {
+    try {
+      await axios.delete(`${API}/reviews/${reviewId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      toast.success('Review removed');
+      if (buyerReviewsModal.user) openBuyerReviews(buyerReviewsModal.user);
+    } catch (e) {
+      toast.error('Failed to remove review');
+    }
+  };
 
   // Success Dialog State (shows temporary password)
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
@@ -836,9 +864,9 @@ const EnhancedUserManager = () => {
         </CardHeader>
         <CardContent className="p-3 sm:p-6 pt-0">
           <div className="space-y-3">
-            {filteredUsers.map(user => (
+            {filteredUsers.map((user, userIdx) => (
               <div 
-                key={user.id} 
+                key={user.id || user.email || `user-${userIdx}`} 
                 className="flex flex-col gap-3 p-3 sm:p-4 border rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
                 data-testid={`user-row-${user.id}`}
               >
@@ -1023,6 +1051,10 @@ const EnhancedUserManager = () => {
                       <DropdownMenuItem onClick={() => openPaymentHistory(user)} data-testid={`view-payment-requests-${user.id}`}>
                         <Receipt className="h-3.5 w-3.5 mr-2" /> Payment Requests
                       </DropdownMenuItem>
+                      {/* iter301 — reviews received as a buyer (seller→buyer) */}
+                      <DropdownMenuItem onClick={() => openBuyerReviews(user)} data-testid={`view-buyer-reviews-${user.id}`}>
+                        <Star className="h-3.5 w-3.5 mr-2" /> Buyer Reviews
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -1036,6 +1068,56 @@ const EnhancedUserManager = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* iter301 — Buyer Reviews Modal (admin view) */}
+      <Dialog open={buyerReviewsModal.open} onOpenChange={(o) => !o && setBuyerReviewsModal({ open: false, user: null, data: null, loading: false })}>
+        <DialogContent className="sm:max-w-[560px] max-h-[80vh] overflow-y-auto" data-testid="buyer-reviews-modal">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Star className="h-5 w-5 text-amber-500" /> Buyer Reviews
+            </DialogTitle>
+            <DialogDescription>
+              Reviews <strong>{buyerReviewsModal.user?.name}</strong> received as a buyer (from sellers).
+              {buyerReviewsModal.data?.average_rating != null && (
+                <span className="ml-2 font-semibold text-amber-600">★ {buyerReviewsModal.data.average_rating}/5</span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          {buyerReviewsModal.loading ? (
+            <div className="py-8 text-center text-muted-foreground">Loading…</div>
+          ) : (buyerReviewsModal.data?.reviews || []).length === 0 ? (
+            <div className="py-8 text-center text-muted-foreground" data-testid="buyer-reviews-empty">
+              No buyer reviews yet
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {buyerReviewsModal.data.reviews.map((r) => (
+                <div key={r.id} className={`p-3 border rounded-lg ${r.status !== 'active' ? 'opacity-50' : ''}`}
+                  data-testid={`buyer-review-${r.id}`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1">
+                      {[1, 2, 3, 4, 5].map((s) => (
+                        <Star key={s} className={`h-4 w-4 ${s <= r.rating ? 'fill-amber-400 text-amber-400' : 'text-slate-300'}`} />
+                      ))}
+                      {r.status !== 'active' && <Badge variant="outline" className="ml-2 text-xs">Removed</Badge>}
+                    </div>
+                    {r.status === 'active' && (
+                      <Button size="sm" variant="ghost" className="text-red-600 hover:text-red-700 h-7 px-2"
+                        onClick={() => softDeleteReview(r.id)} data-testid={`delete-review-${r.id}`}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                  {r.comment && <p className="text-sm mt-1">{r.comment}</p>}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    By {r.reviewer_display_name || r.reviewer_id?.slice(0, 8)} · {r.created_at ? new Date(r.created_at).toLocaleDateString() : ''}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Delete User Confirmation Modal */}
       {deleteUserModal.open && deleteUserModal.user && (

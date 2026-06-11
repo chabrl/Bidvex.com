@@ -21,7 +21,7 @@ const API = API_BASE;
 const StorefrontPage = () => {
   const { userId } = useParams();
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -97,7 +97,7 @@ const StorefrontPage = () => {
             )}
             {seller.joined && (
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1" data-testid="storefront-member-since">
-                {t('storefront.memberSince', 'Member since')} {new Date(seller.joined).toLocaleDateString(undefined, { year: 'numeric', month: 'long' })}
+                {t('storefront.memberSince', 'Member since')} {new Date(seller.joined).toLocaleDateString(i18n.language === 'fr' ? 'fr-CA' : 'en-CA', { year: 'numeric', month: 'long' })}
               </p>
             )}
           </div>

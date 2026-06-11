@@ -26,6 +26,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from '../components/ui/dialog';
+import { Textarea } from '../components/ui/textarea';
+import { Flag } from 'lucide-react';
 
 const API = API_BASE;
 
@@ -106,6 +111,7 @@ const ProductMiniCard = ({ info, navigate }) => {
 
 // ========== SYSTEM MESSAGE CARD (WINNING HANDSHAKE) ==========
 const SystemMessageCard = ({ message }) => {
+  const { t } = useTranslation();
   const data = message.system_data || {};
   
   if (message.message_type === 'auction_won') {
@@ -114,17 +120,17 @@ const SystemMessageCard = ({ message }) => {
         <Card className="overflow-hidden border-2 border-[#06B6D4]/30 bg-gradient-to-br from-[#1E3A8A]/5 to-[#06B6D4]/5 dark:from-[#1E3A8A]/20 dark:to-[#06B6D4]/20">
           <div className="bg-gradient-to-r from-[#1E3A8A] to-[#06B6D4] p-4 text-center">
             <Award className="h-10 w-10 text-white mx-auto mb-2" />
-            <h3 className="text-white font-bold text-lg">🎉 Congratulations!</h3>
-            <p className="text-white/80 text-sm">Auction Won</p>
+            <h3 className="text-white font-bold text-lg">🎉 {t('messaging.congrats')}</h3>
+            <p className="text-white/80 text-sm">{t('messaging.auctionWon')}</p>
           </div>
           <CardContent className="p-5 space-y-4">
             <p className="text-slate-700 dark:text-slate-200 text-center">
-              You won the auction for <span className="font-bold text-[#1E3A8A] dark:text-[#06B6D4]">{data.item_title}</span>
+              {t('messaging.youWonAuctionFor')} <span className="font-bold text-[#1E3A8A] dark:text-[#06B6D4]">{data.item_title}</span>
             </p>
             
             {data.final_price && (
               <div className="text-center py-3 bg-slate-100 dark:bg-slate-800 rounded-lg">
-                <p className="text-sm text-slate-500 dark:text-slate-400">Final Price</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">{t('messaging.finalPrice')}</p>
                 <p className="text-3xl font-bold text-[#06B6D4]">{formatCurrency(data.final_price)}</p>
               </div>
             )}
@@ -421,6 +427,10 @@ const MessagesPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  // iter301 — report-thread (abuse) dialog state
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportReason, setReportReason] = useState('');
+  const [reportBusy, setReportBusy] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [uploadProgress, setUploadProgress] = useState(null);
   const [lightboxAttachment, setLightboxAttachment] = useState(null);
@@ -616,7 +626,9 @@ const MessagesPage = () => {
       await axios.post(`${API}/messages`, {
         receiver_id: receiverId,
         content: messageContent,
-        listing_id: selectedConversation.listing_id || null
+        listing_id: selectedConversation.listing_id || null,
+        // iter301 — replies target the exact thread (per-listing threading)
+        conversation_id: selectedConversation.id
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -778,7 +790,7 @@ const MessagesPage = () => {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
-              placeholder="Search conversations..."
+              placeholder={t('messaging.searchConversations')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-white/60 focus:bg-white/20"
@@ -804,8 +816,8 @@ const MessagesPage = () => {
           ) : (
             <div className="p-8 text-center">
               <MessageSquare className="h-16 w-16 mx-auto mb-4 text-slate-300 dark:text-slate-600" />
-              <p className="text-slate-500 dark:text-slate-400">No conversations yet</p>
-              <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">Start by messaging a seller</p>
+              <p className="text-slate-500 dark:text-slate-400">{t('messaging.noConversations')}</p>
+              <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">{t('messaging.startByMessaging')}</p>
             </div>
           )}
         </ScrollArea>
@@ -873,7 +885,7 @@ const MessagesPage = () => {
                       className="border-[#06B6D4] text-[#06B6D4] hover:bg-[#06B6D4]/10"
                     >
                       <Share2 className="h-4 w-4 mr-1" />
-                      Share Details
+                      {t('messaging.shareDetails')}
                     </Button>
                   )}
                   
@@ -885,13 +897,21 @@ const MessagesPage = () => {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onClick={() => navigate(`/profile/${otherUser?.id || selectedConversation.other_user?.id}`)}>
-                        <User className="h-4 w-4 mr-2" /> View Profile
+                        <User className="h-4 w-4 mr-2" /> {t('messaging.viewProfile')}
                       </DropdownMenuItem>
                       {listingInfo && (
                         <DropdownMenuItem onClick={() => navigate(`/auction/${listingInfo.id}`)}>
-                          <Package className="h-4 w-4 mr-2" /> View Listing
+                          <Package className="h-4 w-4 mr-2" /> {t('messaging.viewListing')}
                         </DropdownMenuItem>
                       )}
+                      {/* iter301 — report abusive thread */}
+                      <DropdownMenuItem
+                        onClick={() => { setReportReason(''); setReportOpen(true); }}
+                        className="text-red-600 focus:text-red-600"
+                        data-testid="report-thread-menu-item"
+                      >
+                        <Flag className="h-4 w-4 mr-2" /> {t('messaging.reportThread')}
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -1026,6 +1046,55 @@ const MessagesPage = () => {
           </div>
         )}
       </div>
+
+      {/* iter301 — Report Thread dialog */}
+      <Dialog open={reportOpen} onOpenChange={(o) => !reportBusy && setReportOpen(o)}>
+        <DialogContent className="sm:max-w-[440px]" data-testid="report-thread-dialog">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Flag className="h-5 w-5 text-red-600" /> {t('messaging.reportThread')}
+            </DialogTitle>
+            <DialogDescription>{t('messaging.reportThreadDesc')}</DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={reportReason}
+            onChange={(e) => setReportReason(e.target.value.slice(0, 500))}
+            placeholder={t('messaging.reportReasonPlaceholder')}
+            rows={4}
+            data-testid="report-thread-reason"
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReportOpen(false)} disabled={reportBusy}>
+              {t('messaging.cancel')}
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={reportBusy || !reportReason.trim()}
+              data-testid="report-thread-submit"
+              onClick={async () => {
+                if (!selectedConversation) return;
+                setReportBusy(true);
+                try {
+                  await axios.post(
+                    `${API}/conversations/${selectedConversation.id}/report`,
+                    { reason: reportReason.trim() },
+                    { headers: { Authorization: `Bearer ${token}` } }
+                  );
+                  toast.success(t('messaging.reportSubmitted'));
+                  setReportOpen(false);
+                } catch (err) {
+                  toast.error(err.response?.data?.detail || t('messaging.reportFailed'));
+                } finally {
+                  setReportBusy(false);
+                }
+              }}
+            >
+              {reportBusy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Flag className="h-4 w-4 mr-2" />}
+              {t('messaging.reportSubmit')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

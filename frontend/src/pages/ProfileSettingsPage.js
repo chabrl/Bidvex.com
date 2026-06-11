@@ -632,15 +632,15 @@ const ProfileSettingsPage = () => {
           <TabsContent value="notifications">
             <div className="rounded-2xl bg-white/70 dark:bg-slate-800/50 backdrop-blur-xl border border-slate-200/80 dark:border-slate-700/60 shadow-sm">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-slate-900 dark:text-white"><Bell className="h-5 w-5 text-blue-500" />Notification Preferences</CardTitle>
-                <CardDescription className="text-slate-600 dark:text-slate-400">Choose how you want to be notified</CardDescription>
+                <CardTitle className="flex items-center gap-2 text-slate-900 dark:text-white"><Bell className="h-5 w-5 text-blue-500" />{t('profileSettings.notifPrefs')}</CardTitle>
+                <CardDescription className="text-slate-600 dark:text-slate-400">{t('profileSettings.notifPrefsDesc')}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-4">
                   <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
                     <div>
-                      <p className="font-medium text-slate-900 dark:text-white">Email Summaries</p>
-                      <p className="text-sm text-slate-600 dark:text-slate-400">Receive periodic email summaries (digests)</p>
+                      <p className="font-medium text-slate-900 dark:text-white">{t('profileSettings.emailSummaries')}</p>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">{t('profileSettings.emailSummariesDesc')}</p>
                     </div>
                     <Switch
                       checked={notificationSettings.email_summaries}
@@ -652,8 +652,8 @@ const ProfileSettingsPage = () => {
                   </div>
                   <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
                     <div>
-                      <p className="font-medium text-slate-900 dark:text-white">Bid Notifications</p>
-                      <p className="text-sm text-slate-600 dark:text-slate-400">Get notified when someone bids on your items</p>
+                      <p className="font-medium text-slate-900 dark:text-white">{t('profileSettings.bidNotifs')}</p>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">{t('profileSettings.bidNotifsDesc')}</p>
                     </div>
                     <Switch
                       checked={notificationSettings.bid_alerts}
@@ -665,8 +665,8 @@ const ProfileSettingsPage = () => {
                   </div>
                   <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
                     <div>
-                      <p className="font-medium text-slate-900 dark:text-white">Message Notifications</p>
-                      <p className="text-sm text-slate-600 dark:text-slate-400">Get notified of new messages</p>
+                      <p className="font-medium text-slate-900 dark:text-white">{t('profileSettings.messageNotifs')}</p>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">{t('profileSettings.messageNotifsDesc')}</p>
                     </div>
                     <Switch
                       checked={notificationSettings.message_alerts}
@@ -678,8 +678,8 @@ const ProfileSettingsPage = () => {
                   </div>
                   <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
                     <div>
-                      <p className="font-medium text-slate-900 dark:text-white">Auction Wins</p>
-                      <p className="text-sm text-slate-600 dark:text-slate-400">Get notified when you win an auction</p>
+                      <p className="font-medium text-slate-900 dark:text-white">{t('profileSettings.auctionWins')}</p>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">{t('profileSettings.auctionWinsDesc')}</p>
                     </div>
                     <Switch
                       checked={notificationSettings.auction_win_alerts}
@@ -696,10 +696,10 @@ const ProfileSettingsPage = () => {
 
                 {/* Push Notifications */}
                 <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
-                  <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-3">Browser Push Notifications</h3>
+                  <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-3">{t('profileSettings.pushNotifs')}</h3>
                   <PushNotificationToggle variant="settings" />
                   <p className="text-xs text-slate-500 dark:text-slate-500 mt-2 pl-1">
-                    Receive instant browser alerts for outbids, watchlist items ending, and auction wins.
+                    {t('profileSettings.pushNotifsDesc')}
                   </p>
                 </div>
 
@@ -709,7 +709,7 @@ const ProfileSettingsPage = () => {
                   <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700" data-testid="recommendations-toggle-row">
                     <div>
                       <p className="font-medium text-slate-900 dark:text-white">Personalized Recommendations</p>
-                      <p className="text-sm text-slate-600 dark:text-slate-400">Receive AI-powered item suggestions based on your browsing and bidding activity</p>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">{t('profileSettings.aiSuggestionsDesc')}</p>
                     </div>
                     <Switch
                       checked={recommendationsEnabled}
@@ -735,7 +735,7 @@ const ProfileSettingsPage = () => {
                   Subscription Management
                 </CardTitle>
                 <CardDescription>
-                  Upgrade your plan to unlock premium features and lower fees
+                  {t('profileSettings.upgradeDesc')}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-8">
@@ -896,6 +896,7 @@ const ProfileSettingsPage = () => {
 };
 
 const ChangePasswordForm = () => {
+  const { t } = useTranslation();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -940,15 +941,15 @@ const ChangePasswordForm = () => {
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
           <Lock className="h-5 w-5 text-blue-600" />
-          Change Password
+          {t('profileSettings.changePassword')}
         </CardTitle>
-        <CardDescription>Update your password to keep your account secure.</CardDescription>
+        <CardDescription>{t('profileSettings.changePasswordDesc')}</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-5 max-w-md">
           {/* Current Password */}
           <div className="space-y-2">
-            <Label htmlFor="current-password">Current Password</Label>
+            <Label htmlFor="current-password">{t('profileSettings.currentPassword')}</Label>
             <div className="relative">
               <Input
                 id="current-password"
@@ -956,7 +957,7 @@ const ChangePasswordForm = () => {
                 type={showCurrent ? 'text' : 'password'}
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
-                placeholder="Enter current password"
+                placeholder={t('profileSettings.enterCurrentPassword')}
                 required
                 className="pr-10"
               />
@@ -968,7 +969,7 @@ const ChangePasswordForm = () => {
 
           {/* New Password */}
           <div className="space-y-2">
-            <Label htmlFor="new-password">New Password</Label>
+            <Label htmlFor="new-password">{t('profileSettings.newPassword')}</Label>
             <div className="relative">
               <Input
                 id="new-password"
@@ -976,7 +977,7 @@ const ChangePasswordForm = () => {
                 type={showNew ? 'text' : 'password'}
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Enter new password"
+                placeholder={t('profileSettings.enterNewPassword')}
                 required
                 className="pr-10"
               />
@@ -988,14 +989,14 @@ const ChangePasswordForm = () => {
 
           {/* Confirm New Password */}
           <div className="space-y-2">
-            <Label htmlFor="confirm-password">Confirm New Password</Label>
+            <Label htmlFor="confirm-password">{t('profileSettings.confirmNewPassword')}</Label>
             <Input
               id="confirm-password"
               data-testid="confirm-password-input"
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Confirm new password"
+              placeholder={t('profileSettings.confirmNewPasswordPh')}
               required
             />
           </div>

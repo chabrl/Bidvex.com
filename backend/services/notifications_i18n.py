@@ -116,6 +116,27 @@ _TEMPLATES = {
         lambda p: "Annonce refusée",
         lambda p: f"Votre annonce « {p.get('title','votre article')} » a été refusée. Raison : {p.get('reason','—')}",
     ),
+    # iter301 — Buyer ↔ Seller messaging bell notification.
+    "new_message": (
+        lambda p: "New Message",
+        lambda p: f"{p.get('sender_name','Someone')} sent you a message: \"{(p.get('preview') or '')[:80]}\"",
+        lambda p: "Nouveau message",
+        lambda p: f"{p.get('sender_name') or 'Quelqu’un'} vous a envoyé un message : « {(p.get('preview') or '')[:80]} »",
+    ),
+    # iter301 — Review received (either direction).
+    "new_review": (
+        lambda p: "New Review Received",
+        lambda p: f"{p.get('reviewer_name','Someone')} left you a {p.get('rating','5')}-star review.",
+        lambda p: "Nouvel avis reçu",
+        lambda p: f"{p.get('reviewer_name') or 'Quelqu’un'} vous a laissé un avis de {p.get('rating','5')} étoile(s).",
+    ),
+    # iter301 — Abusive message thread reported (admin-facing, EN ok but bilingual for consistency).
+    "message_thread_reported": (
+        lambda p: "Message Thread Reported",
+        lambda p: f"A conversation was reported by {p.get('reporter_name','a user')}. Reason: {p.get('reason','—')}",
+        lambda p: "Fil de discussion signalé",
+        lambda p: f"Une conversation a été signalée par {p.get('reporter_name','un utilisateur')}. Raison : {p.get('reason','—')}",
+    ),
     "outbid": (
         lambda p: "You've been outbid",
         lambda p: f"Someone bid {_fmt_money(p.get('new_bid'))} on '{p.get('title','this item')}'. Place a higher bid to stay in the lead.",

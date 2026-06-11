@@ -13,15 +13,15 @@ import { Send, Loader2 } from 'lucide-react';
 const API = API_BASE;
 
 const MessageSellerModal = ({ isOpen, onClose, sellerId, listingId, listingTitle }) => {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const isFr = (i18n.language || 'en').toLowerCase().startsWith('fr');
-  const [subject, setSubject] = useState(`Inquiry about: ${listingTitle || 'Auction'}`);
+  const [subject, setSubject] = useState(`${t('messageSeller.inquiryPrefix')}: ${listingTitle || t('messageSeller.auction')}`);
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
 
   const handleSend = async () => {
     if (!message.trim()) {
-      toast.error(isFr ? 'Veuillez saisir un message' : 'Please enter a message');
+      toast.error(t('messageSeller.enterMessage'));
       return;
     }
 
@@ -40,9 +40,9 @@ const MessageSellerModal = ({ isOpen, onClose, sellerId, listingId, listingTitle
         }
       );
 
-      toast.success(isFr ? 'Message envoyé avec succès !' : 'Message sent successfully!');
+      toast.success(t('messageSeller.sentSuccess'));
       setMessage('');
-      setSubject(`Inquiry about: ${listingTitle || 'Auction'}`);
+      setSubject(`${t('messageSeller.inquiryPrefix')}: ${listingTitle || t('messageSeller.auction')}`);
       onClose();
     } catch (error) {
       console.error('Failed to send message:', error);
@@ -56,7 +56,7 @@ const MessageSellerModal = ({ isOpen, onClose, sellerId, listingId, listingTitle
       } else if (typeof detail === 'string') {
         msg = detail;
       } else {
-        msg = isFr ? "Échec de l'envoi du message" : 'Failed to send message';
+        msg = t('messageSeller.sendFailed');
       }
       toast.error(msg, { duration: 6000 });
     } finally {
@@ -68,35 +68,37 @@ const MessageSellerModal = ({ isOpen, onClose, sellerId, listingId, listingTitle
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>📨 Message Seller</DialogTitle>
+          <DialogTitle>📨 {t('messageSeller.title')}</DialogTitle>
           <DialogDescription>
-            Send a message to the seller about this auction
+            {t('messageSeller.description')}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label htmlFor="subject">Subject</Label>
+            <Label htmlFor="subject">{t('messageSeller.subject')}</Label>
             <Input
               id="subject"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              placeholder="Enter subject"
+              placeholder={t('messageSeller.subjectPlaceholder')}
+              data-testid="message-seller-subject"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="message">Message</Label>
+            <Label htmlFor="message">{t('messageSeller.message')}</Label>
             <Textarea
               id="message"
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              placeholder="Type your message here..."
+              placeholder={t('messageSeller.messagePlaceholder')}
               rows={6}
               required
+              data-testid="message-seller-content"
             />
             <p className="text-xs text-muted-foreground">
-              {message.length} / 1000 characters
+              {message.length} / 1000 {t('messageSeller.characters')}
             </p>
           </div>
         </div>
@@ -106,23 +108,25 @@ const MessageSellerModal = ({ isOpen, onClose, sellerId, listingId, listingTitle
             variant="outline"
             onClick={onClose}
             disabled={sending}
+            data-testid="message-seller-cancel"
           >
-            Cancel
+            {t('messageSeller.cancel')}
           </Button>
           <Button
             onClick={handleSend}
             disabled={sending || !message.trim()}
             className="gradient-button text-white"
+            data-testid="message-seller-send"
           >
             {sending ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Sending...
+                {t('messageSeller.sending')}
               </>
             ) : (
               <>
                 <Send className="mr-2 h-4 w-4" />
-                Send Message
+                {t('messageSeller.send')}
               </>
             )}
           </Button>

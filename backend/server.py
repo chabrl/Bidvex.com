@@ -1272,6 +1272,30 @@ async def create_critical_indexes(database):
         ("ai_chat_sessions", [("user_id", 1), ("updated_at", -1)], {"background": True}),
         ("ai_chat_sessions", [("user_id", 1), ("session_id", 1)], {"unique": True, "background": True}),
         ("notifications", [("user_id", 1), ("created_at", -1)], {"background": True}),
+        # iter301 P2 — high-frequency query fields across the 4 listing
+        # collections + bids + messaging + reviews + follows.
+        ("listings", [("seller_id", 1)], {"background": True}),
+        ("listings", [("winner_id", 1)], {"background": True}),
+        ("listings", [("winner_user_id", 1)], {"background": True}),
+        ("multi_item_listings", [("status", 1), ("end_time", 1)], {"background": True}),
+        ("multi_item_listings", [("seller_id", 1)], {"background": True}),
+        ("vehicle_listings", [("status", 1), ("end_time", 1)], {"background": True}),
+        ("vehicle_listings", [("seller_id", 1)], {"background": True}),
+        ("vehicle_listings", [("winner_id", 1)], {"background": True}),
+        ("storage_auctions", [("seller_id", 1)], {"background": True}),
+        ("storage_auctions", [("facility_id", 1)], {"background": True}),
+        ("bids", [("user_id", 1)], {"background": True}),
+        ("bids", [("listing_id", 1), ("created_at", -1)], {"background": True}),
+        ("lot_bids", [("user_id", 1)], {"background": True}),
+        ("vehicle_bids", [("user_id", 1)], {"background": True}),
+        ("messages", [("conversation_id", 1), ("created_at", -1)], {"background": True}),
+        ("messages", [("receiver_id", 1), ("is_read", 1)], {"background": True}),
+        ("conversations", [("participants", 1)], {"background": True}),
+        ("reviews", [("seller_id", 1), ("status", 1)], {"background": True}),
+        ("reviews", [("listing_id", 1)], {"background": True}),
+        ("reviews", [("reviewee_id", 1), ("role", 1)], {"background": True}),
+        ("follows", [("seller_id", 1)], {"background": True}),
+        ("follows", [("follower_id", 1)], {"background": True}),
     ]
     ok = 0
     for coll, keys, opts in critical:

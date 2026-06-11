@@ -12,6 +12,10 @@ class MessageCreate(BaseModel):
     receiver_id: str
     content: str
     listing_id: Optional[str] = None
+    # iter301 — explicit reply target. When set (and the sender is a
+    # participant), the message lands in this exact thread instead of a
+    # recomputed pair/listing id. Keeps legacy pair-id threads working.
+    conversation_id: Optional[str] = None
 
 
 class Message(BaseModel):

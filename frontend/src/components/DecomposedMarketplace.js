@@ -131,7 +131,7 @@ const DecomposedMarketplace = () => {
       <div className="mb-6">
         <h1 className="text-3xl font-bold">Marketplace</h1>
         <p className="text-muted-foreground">
-          Browse individual items from active auctions
+          {t('decomposed.browseItems')}
         </p>
       </div>
 
@@ -140,7 +140,7 @@ const DecomposedMarketplace = () => {
         <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide items-center" style={{ WebkitOverflowScrolling: 'touch' }}>
           <input
             type="text"
-            placeholder="Search items..."
+            placeholder={t('decomposed.searchItems')}
             value={filters.search}
             onChange={(e) => setFilters({...filters, search: e.target.value})}
             className="border rounded px-3 py-1.5 text-xs h-9 flex-shrink-0 w-44 sm:w-56 bg-background"
@@ -191,9 +191,9 @@ const DecomposedMarketplace = () => {
       ) : items.length === 0 ? (
         <div className="text-center py-12 bg-gray-50 rounded-lg">
           <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <p className="text-lg text-muted-foreground">No items found</p>
+          <p className="text-lg text-muted-foreground">{t('decomposed.noItemsFound')}</p>
           <p className="text-sm text-muted-foreground mt-2">
-            Try adjusting your filters
+            {t('decomposed.tryAdjusting')}
           </p>
         </div>
       ) : (
@@ -334,7 +334,7 @@ const DecomposedMarketplace = () => {
                       onClick={() => trackClick(item.id)}
                     >
                       <Gavel className="h-4 w-4 mr-2" />
-                      View & Bid
+                      {t('decomposed.viewAndBid')}
                     </Button>
                   </Link>
                 </div>
@@ -348,7 +348,7 @@ const DecomposedMarketplace = () => {
       {hasMore && !loading && (
         <div className="text-center mt-8">
           <Button onClick={fetchItems} variant="outline">
-            Load More Items
+            {t('decomposed.loadMore')}
           </Button>
         </div>
       )}

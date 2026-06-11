@@ -156,7 +156,7 @@ const RealtimeBiddingPanel = ({ listing, onBidPlaced }) => {
           {isConnected ? (
             <>
               <Wifi className="h-4 w-4 text-green-500" />
-              <span className="text-xs text-green-600 font-medium">Live Updates Active</span>
+              <span className="text-xs text-green-600 font-medium">{t('bidding.liveUpdatesActive')}</span>
             </>
           ) : (
             <>
@@ -208,7 +208,7 @@ const RealtimeBiddingPanel = ({ listing, onBidPlaced }) => {
               )}
               {userBidStatus === 'NO_BIDS' && (
                 <Badge variant="secondary" className="px-4 py-2 text-sm">
-                  No Bids Yet
+                  {t('bidding.noBidsYet')}
                 </Badge>
               )}
             </div>
@@ -286,7 +286,7 @@ const RealtimeBiddingPanel = ({ listing, onBidPlaced }) => {
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1 text-center">
-                    You will be required to pay this amount if you win
+                    {t('bidding.payIfWin')}
                   </p>
                 </div>
               </div>
@@ -316,10 +316,10 @@ const RealtimeBiddingPanel = ({ listing, onBidPlaced }) => {
               </div>
               <div className="flex-1">
                 <h3 className="text-lg font-bold text-gray-900">
-                  Confirm Multi-Item Purchase
+                  {t('bidding.confirmMultiPurchase')}
                 </h3>
                 <p className="text-sm text-gray-600 mt-1">
-                  Please review your total commitment before proceeding.
+                  {t('bidding.reviewCommitment')}
                 </p>
               </div>
             </div>

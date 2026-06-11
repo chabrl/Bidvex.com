@@ -1,6 +1,7 @@
 import API_BASE from '../config';
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
@@ -17,11 +18,12 @@ const API = API_BASE;
  * SellOptionsModal Component
  * Displays modal with two listing type options:
  * 1. Create Single Item Listing
- * 2. Create Multi-Item Auction
+ * 2. {t('sellOptions.createMulti')}
  * 
  * Partner accounts with unpaid fees see a lockdown banner instead.
  */
 const SellOptionsModal = ({ isOpen, onClose }) => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { user, token } = useAuth();
   const { canCreateMultiLot } = useFeatureFlags();
@@ -32,11 +34,11 @@ const SellOptionsModal = ({ isOpen, onClose }) => {
 
   const handleSelectOption = (path) => {
     if (isPartnerLocked) {
-      toast.error('Please complete your annual partner fee payment first.');
+      toast.error(t('sellOptions.completeFeeFirst'));
       return;
     }
     if (path === '/create-multi-item-listing' && !canCreateMultiLot(user)) {
-      toast.error('Multi-lot auctions are restricted to business accounts. Please upgrade your account.');
+      toast.error(t('sellOptions.multiRestricted'));
       return;
     }
     onClose();
@@ -67,9 +69,9 @@ const SellOptionsModal = ({ isOpen, onClose }) => {
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-2xl max-w-[calc(100vw-1.5rem)] p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl sm:text-2xl font-bold">Choose Listing Type</DialogTitle>
+          <DialogTitle className="text-xl sm:text-2xl font-bold">{t('sellOptions.chooseType')}</DialogTitle>
           <DialogDescription className="text-xs sm:text-sm">
-            Select the type of auction you want to create
+            {t('sellOptions.selectType')}
           </DialogDescription>
         </DialogHeader>
 
@@ -80,9 +82,9 @@ const SellOptionsModal = ({ isOpen, onClose }) => {
               <div className="flex items-start gap-3">
                 <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
                 <div className="flex-1">
-                  <h3 className="font-semibold text-amber-900 text-sm">Annual Partner Fee Required</h3>
+                  <h3 className="font-semibold text-amber-900 text-sm">{t('sellOptions.partnerFeeRequired')}</h3>
                   <p className="text-sm text-amber-700 mt-1">
-                    Your partner application has been approved, but your annual fee of <strong>$100 CAD/year + taxes</strong> is required to activate listing capabilities.
+                    {t('sellOptions.partnerFeeDesc')}
                   </p>
                   <Button
                     onClick={handlePayPartnerFee}
@@ -92,9 +94,9 @@ const SellOptionsModal = ({ isOpen, onClose }) => {
                     data-testid="partner-pay-fee-btn"
                   >
                     {paymentLoading ? (
-                      <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Processing...</>
+                      <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> {t('sellOptions.processing')}</>
                     ) : (
-                      <><CreditCard className="h-4 w-4 mr-1.5" /> Pay Annual Fee &rarr;</>
+                      <><CreditCard className="h-4 w-4 mr-1.5" /> {t('sellOptions.payAnnualFee')} &rarr;</>
                     )}
                   </Button>
                 </div>
@@ -117,26 +119,26 @@ const SellOptionsModal = ({ isOpen, onClose }) => {
                 <div className="p-3 sm:p-4 bg-primary/10 rounded-full">
                   <Package className="h-9 w-9 sm:h-12 sm:w-12 text-primary" />
                 </div>
-                <h3 className="text-lg sm:text-xl font-semibold">Single Item Listing</h3>
+                <h3 className="text-lg sm:text-xl font-semibold">{t('sellOptions.singleTitle')}</h3>
                 <p className="text-xs sm:text-sm text-muted-foreground">
-                  Perfect for selling individual items or single products
+                  {t('sellOptions.singleDesc')}
                 </p>
                 <ul className="text-xs sm:text-sm text-left space-y-1.5 sm:space-y-2 w-full">
                   <li className="flex items-center gap-2">
                     <ArrowRight className="h-4 w-4 text-primary flex-shrink-0" />
-                    One item per auction
+                    {t('sellOptions.oneItem')}
                   </li>
                   <li className="flex items-center gap-2">
                     <ArrowRight className="h-4 w-4 text-primary flex-shrink-0" />
-                    Simple setup process
+                    {t('sellOptions.simpleSetup')}
                   </li>
                   <li className="flex items-center gap-2">
                     <ArrowRight className="h-4 w-4 text-primary flex-shrink-0" />
-                    Quick to create
+                    {t('sellOptions.quickCreate')}
                   </li>
                 </ul>
                 <Button className="w-full gradient-button text-white border-0" data-testid="single-listing-cta">
-                  Create Single Listing
+                  {t('sellOptions.createSingle')}
                 </Button>
               </div>
             </CardContent>
@@ -153,14 +155,14 @@ const SellOptionsModal = ({ isOpen, onClose }) => {
                 <div className="p-3 sm:p-4 rounded-full bg-purple-500/10">
                   <Layers className="h-9 w-9 sm:h-12 sm:w-12 text-purple-600" />
                 </div>
-                <h3 className="text-lg sm:text-xl font-semibold">Multi-Item Auction</h3>
+                <h3 className="text-lg sm:text-xl font-semibold">{t('sellOptions.multiTitle')}</h3>
                 <p className="text-xs sm:text-sm text-muted-foreground">
-                  Ideal for bulk sales, liquidations, or multiple related items
+                  {t('sellOptions.multiDesc')}
                 </p>
                 <ul className="text-xs sm:text-sm text-left space-y-1.5 sm:space-y-2 w-full">
                   <li className="flex items-center gap-2">
                     <ArrowRight className="h-4 w-4 text-purple-600 flex-shrink-0" />
-                    Multiple lots in one auction
+                    {t('sellOptions.multipleLots')}
                   </li>
                   <li className="flex items-center gap-2">
                     <ArrowRight className="h-4 w-4 text-purple-600 flex-shrink-0" />
@@ -175,7 +177,7 @@ const SellOptionsModal = ({ isOpen, onClose }) => {
                   className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white border-0 hover:opacity-90"
                   data-testid="multi-listing-cta"
                 >
-                  Create Multi-Item Auction
+                  {t('sellOptions.createMulti')}
                 </Button>
               </div>
             </CardContent>

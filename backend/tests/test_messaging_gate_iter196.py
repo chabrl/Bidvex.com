@@ -89,6 +89,9 @@ async def test_listing_not_found():
 
 @pytest.mark.asyncio
 async def test_marketplace_active_blocks():
+    """iter301 update: while a listing is ACTIVE, any signed-in user may
+    message the SELLER (pre-sale Q&A), but messaging anyone else in the
+    context of that listing is blocked."""
     from routes.messages import _can_open_thread, set_messages_db
     cli = AsyncIOMotorClient(os.environ["MONGO_URL"])
     database = cli[os.environ["DB_NAME"]]
@@ -98,8 +101,12 @@ async def test_marketplace_active_blocks():
                              seller_id="seller-A", winner_id=None,
                              status="active", end_time=future)
     try:
+        # Pre-sale Q&A with the seller — now allowed (iter301 P1)
         err = await _can_open_thread("buyer-X", "seller-A", doc["id"], is_admin=False)
-        assert err == "auction_not_ended"
+        assert err is None
+        # Messaging a non-seller third party on the active listing — blocked
+        err2 = await _can_open_thread("buyer-X", "random-user-Z", doc["id"], is_admin=False)
+        assert err2 == "presale_must_message_seller"
     finally:
         await _cleanup(database, [doc["id"]])
         cli.close()

@@ -109,6 +109,7 @@ const CompareListingsPage = lazy(() => import('./pages/CompareListingsPage'));
 const StorefrontPage = lazy(() => import('./pages/StorefrontPage'));
 const BulkImportPage = lazy(() => import('./pages/BulkImportPage'));
 const ReviewPage = lazy(() => import('./pages/ReviewPage'));
+const ReviewSubmitPage = lazy(() => import('./pages/ReviewSubmitPage'));
 const CommunityPage = lazy(() => import('./pages/CommunityPage'));
 const AboutUsPage = lazy(() => import('./pages/AboutUsPage'));
 const UnsubscribePage = lazy(() => import('./pages/UnsubscribePage'));
@@ -348,6 +349,16 @@ const App = () => {
   useEffect(() => {
     import('./utils/metaPixel').then(({ initMetaPixel }) => initMetaPixel());
   }, []);
+
+  // iter301 P2 — bilingual SEO: keep <html lang> in sync with the active language
+  useEffect(() => {
+    const apply = (lng) => {
+      document.documentElement.lang = (lng || 'en').toLowerCase().startsWith('fr') ? 'fr' : 'en';
+    };
+    apply(i18n.language);
+    i18n.on('languageChanged', apply);
+    return () => i18n.off('languageChanged', apply);
+  }, [i18n]);
 
   useEffect(() => {
     const checkForSession = async () => {
@@ -589,6 +600,9 @@ const App = () => {
           <Route path="/subscription/success" element={<PaymentSuccessPage />} />
           <Route path="/checkout/:listingId" element={
             <ProtectedRoute><CheckoutPage /></ProtectedRoute>
+          } />
+          <Route path="/review/submit" element={
+            <ProtectedRoute><ReviewSubmitPage /></ProtectedRoute>
           } />
           <Route path="/review/:transactionId" element={
             <ProtectedRoute><ReviewPage /></ProtectedRoute>
