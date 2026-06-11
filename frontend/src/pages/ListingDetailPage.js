@@ -50,6 +50,8 @@ import 'yet-another-react-lightbox/styles.css';
 import InfoTip from '../components/InfoTip';
 import ListingLogisticsDetails from '../components/ListingLogisticsDetails';
 import { useRealtimeBidding } from '../hooks/useRealtimeBidding';
+// iter302 Directive 1 — Winner & Settlement Panel (seller view, ended listings)
+import SettlementPanel from '../components/SettlementPanel';
 
 const API = API_BASE;
 
@@ -731,7 +733,11 @@ const ListingDetailPage = () => {
               </div>
             )}
 
-            {user && listing.seller_id === user.id && !listing.is_promoted && (
+            {/* iter302 Directive 1 — ended listing with a winner: the Promote
+                block is replaced by the Winner & Settlement Panel. */}
+            {user && listing.seller_id === user.id && isAuctionEnded && (listing.winner_id || listing.status === 'sold') ? (
+              <SettlementPanel listingId={id} />
+            ) : user && listing.seller_id === user.id && !listing.is_promoted ? (
               <Card className="glassmorphism border-2 border-primary/20">
                 <CardContent className="p-6">
                   <div className="flex items-start gap-4">
@@ -752,7 +758,7 @@ const ListingDetailPage = () => {
                   </div>
                 </CardContent>
               </Card>
-            )}
+            ) : null}
 
             {!isAuctionEnded && user && listing.seller_id !== user.id && (
               <Card className="glassmorphism">

@@ -500,6 +500,9 @@ async def place_lot_bid(
         "user_last_initial": ((user.get("last_name") or "")[:1].upper()),
         "amount":     payload.amount,
         "created_at": now,
+        # iter302 — payment authorization consent stamped at placement
+        "payment_authorization_consented": True,
+        "payment_authorization_consented_at": now.isoformat() if hasattr(now, "isoformat") else str(now),
     }
 
     # Soft-close: if within last 120s, extend the lot end_time by +120s

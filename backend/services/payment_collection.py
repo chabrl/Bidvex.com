@@ -36,6 +36,57 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+async def _ensure_stripe_pickup_code(
+    db, *, collection: str, listing_id: str, listing_title: str,
+    buyer_id: str, seller_id, hammer: float, stripe_pi, lot_number=None,
+) -> str:
+    """iter302 — idempotent pickup code for a Stripe-collected win.
+
+    Creates/reuses a db.transactions row (so the iter297 seller
+    confirm-pickup-code flow works) with commission_already_collected=True
+    (Stripe already took the platform fee — the confirm flow must not
+    enqueue a second commission charge). Also stamps the code on the
+    listing doc for buyer-dashboard display."""
+    from routes.transaction_pickup_code import generate_pickup_code
+
+    existing = await db.transactions.find_one(
+        {"listing_id": listing_id, "lot_number": lot_number, "pickup_code": {"$exists": True}},
+        {"_id": 0, "pickup_code": 1},
+    )
+    if existing and existing.get("pickup_code"):
+        code = existing["pickup_code"]
+    else:
+        code = generate_pickup_code()
+        buyer = await db.users.find_one({"id": buyer_id}, {"_id": 0, "email": 1, "name": 1})
+        seller = await db.users.find_one({"id": seller_id}, {"_id": 0, "email": 1, "name": 1}) if seller_id else None
+        await db.transactions.insert_one({
+            "id": str(uuid.uuid4()),
+            "listing_id": listing_id,
+            "pickup_code_listing_id": listing_id,
+            "lot_number": lot_number,
+            "listing_title": listing_title,
+            "buyer_id": buyer_id,
+            "buyer_email": (buyer or {}).get("email"),
+            "seller_id": seller_id,
+            "seller_email": (seller or {}).get("email"),
+            "pickup_code_seller_id": seller_id,
+            "hammer_price": hammer,
+            "amount": hammer,
+            "payment_method": "stripe",
+            "stripe_payment_intent": stripe_pi,
+            "status": "paid",
+            "payment_confirmed": True,
+            "commission_already_collected": True,
+            "pickup_code": code,
+            "pickup_code_issued_at": _now_iso(),
+            "created_at": _now_iso(),
+        })
+    await db[collection].update_one(
+        {"id": listing_id}, {"$set": {"pickup_code": code}}
+    )
+    return code
+
+
 async def _stamp(db, collection: str, listing_id: str, fields: Dict[str, Any],
                  lot_number: Optional[Any] = None):
     coll = db[collection]
@@ -262,11 +313,38 @@ async def finalize_auction_payment(
             }, lot_number=lot_number)
             out["payment_status"] = "payment_collected"
 
-            await _enqueue_payout_pending(
-                db, listing_id=listing_id, seller_id=seller_id,
-                amount=net_payout, section=section, listing_title=title,
-                lot_number=lot_number,
-            )
+            # iter302 — automatic Connect payout (falls back to the
+            # pending-payouts queue + admin notification internally).
+            try:
+                from services.seller_payouts import process_seller_payout
+                payout = await process_seller_payout(
+                    db, section=section, listing_id=listing_id, listing_title=title,
+                    seller_id=seller_id, net_amount=net_payout, lot_number=lot_number,
+                    source_transaction_id=stripe_pi,
+                )
+                out["payout_status"] = payout.get("status")
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"[payment-collection] payout dispatch failed for {listing_id}: {e}")
+                await _enqueue_payout_pending(
+                    db, listing_id=listing_id, seller_id=seller_id,
+                    amount=net_payout, section=section, listing_title=title,
+                    lot_number=lot_number,
+                )
+
+            # iter302 — pickup code for every winning transaction (Stripe
+            # path). Stored on a db.transactions row (so the existing
+            # seller confirm-pickup-code flow works) + stamped on the
+            # listing for dashboard display + included in receipt email.
+            pickup_code = None
+            try:
+                pickup_code = await _ensure_stripe_pickup_code(
+                    db, collection=collection, listing_id=listing_id,
+                    listing_title=title, buyer_id=winner_id, seller_id=seller_id,
+                    hammer=hammer, stripe_pi=stripe_pi, lot_number=lot_number,
+                )
+                out["pickup_code"] = pickup_code
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"[payment-collection] pickup code failed for {listing_id}: {e}")
 
             # PM last4 (best-effort)
             last4 = None
@@ -284,6 +362,7 @@ async def finalize_auction_payment(
                 platform_fee=platform_fee, taxes=taxes, processing_fee=processing,
                 total_charged=total_charged or None, payment_method_last4=last4,
                 transaction_id=stripe_pi, net_payout=net_payout, lot_number=lot_number,
+                pickup_code=pickup_code,
             )
             out.update(records)
             await _stamp(db, collection, listing_id, {
@@ -310,14 +389,14 @@ async def finalize_auction_payment(
                 logger.warning(f"[payment-collection] notif failed for {listing_id}: {e}")
             return out
 
-        # ── NO PAYMENT METHOD → Payment link, 48h deadline ───────────
+        # ── NO PAYMENT METHOD → Payment link, 72h deadline (iter302) ──
         if "buyer_no_pm" in warnings:
             buyer_total = total_charged or round(hammer + platform_fee + taxes, 2)
             link_url = await create_buyer_payment_link(
                 db, listing_id=listing_id, listing_title=title, buyer_id=winner_id,
                 amount_cad=buyer_total, section=section, lot_number=lot_number,
             )
-            deadline = (datetime.now(timezone.utc) + timedelta(hours=48)).isoformat()
+            deadline = (datetime.now(timezone.utc) + timedelta(hours=72)).isoformat()
             await _stamp(db, collection, listing_id, {
                 "payment_status": "pending_payment",
                 "payment_deadline": deadline,

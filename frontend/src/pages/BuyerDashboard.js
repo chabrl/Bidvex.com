@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '../compone
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { DollarSign, Gavel, Trophy, Heart, TrendingUp, TrendingDown, Eye, AlertTriangle, Clock, Lock } from 'lucide-react';
+import { DollarSign, Gavel, Trophy, Heart, TrendingUp, TrendingDown, Eye, AlertTriangle, Clock, Lock, CreditCard, ShieldCheck, KeyRound } from 'lucide-react';
 import { toast } from 'sonner';
 import Countdown from 'react-countdown';
 import { formatCurrency } from '../utils/currencyFormatter';
@@ -17,6 +17,8 @@ import { BuyerEscrowPanel } from '../components/EscrowPickupPanel';
 import { FollowedSellersList } from '../components/FollowedSellersList';
 import InfoTip from '../components/InfoTip';
 import PendingPaymentsCard from '../components/PendingPaymentsCard';
+// iter302 Directive 2 — buyer Settle Payment flow
+import SettlePaymentModal from '../components/SettlePaymentModal';
 
 const API = API_BASE;
 
@@ -123,7 +125,7 @@ const BuyerDashboard = () => {
 
         {/* iter298 BUG 4/5 — My Purchases: won items with payment status,
             pickup status, and itemized receipts. */}
-        <PurchasesAndReceiptsCard wonItems={dashboard?.won_items_detail || []} />
+        <PurchasesAndReceiptsCard wonItems={dashboard?.won_items_detail || []} onRefresh={fetchDashboard} />
 
         {/* iter298 BUG 5 — Active deposits with status + refund timeline. */}
         <DepositsCard deposits={dashboard?.deposits || []} />
@@ -584,12 +586,14 @@ const PAYMENT_BADGES = {
   overdue: { en: 'Overdue', fr: 'En retard', cls: 'bg-red-100 text-red-800 border-red-300' },
 };
 
-const PurchasesAndReceiptsCard = ({ wonItems }) => {
+const PurchasesAndReceiptsCard = ({ wonItems, onRefresh }) => {
   const { i18n } = useTranslation();
   const navigate = useNavigate();
   const fr = (i18n.language || 'en').startsWith('fr');
   const [receipts, setReceipts] = useState(null);
   const [showReceipts, setShowReceipts] = useState(false);
+  // iter302 Directive 2 — listing currently being settled (modal target)
+  const [settleFor, setSettleFor] = useState(null);
 
   useEffect(() => {
     axios.get(`${API}/receipts/mine`, { params: { role: 'buyer' } })
@@ -646,16 +650,28 @@ const PurchasesAndReceiptsCard = ({ wonItems }) => {
                     {fr ? 'Ramassage en attente' : 'Pickup pending'}
                   </Badge>
                 )}
-                {w.payment_status === 'pending_payment' && w.payment_link_url && (
-                  <a
-                    href={w.payment_link_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-xs font-bold text-white bg-amber-500 hover:bg-amber-600 rounded-full px-3 py-1"
-                    data-testid={`pay-now-link-${w.listing_id}`}
+                {/* iter302 Directive 2 — Settle Payment (charges the saved
+                    card off-session through /api/settlement/settle). */}
+                {['pending_payment', 'payment_failed', 'overdue'].includes(w.payment_status) && (
+                  <Button
+                    size="sm"
+                    className="h-7 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-full px-3"
+                    onClick={() => setSettleFor(w.listing_id)}
+                    data-testid={`settle-payment-btn-${w.listing_id}`}
                   >
-                    {fr ? 'Payer maintenant' : 'Pay Now'}
-                  </a>
+                    <CreditCard className="h-3.5 w-3.5 mr-1" />
+                    {fr ? 'Régler le paiement' : 'Settle Payment'}
+                  </Button>
+                )}
+                {/* iter302 Directive 2 — pickup code, winner-only surface */}
+                {w.payment_status === 'payment_collected' && w.pickup_code && (
+                  <Badge
+                    className="border text-xs bg-indigo-100 text-indigo-800 border-indigo-300 font-mono"
+                    data-testid={`pickup-code-${w.listing_id}`}
+                  >
+                    <KeyRound className="h-3 w-3 mr-1" />
+                    {fr ? 'Code' : 'Code'}: {w.pickup_code}
+                  </Badge>
                 )}
                 <Button
                   size="sm"
@@ -668,6 +684,24 @@ const PurchasesAndReceiptsCard = ({ wonItems }) => {
             </div>
           );
         })}
+
+        {/* iter302 — escrow clarity trust line (display only) */}
+        {wonItems.length > 0 && (
+          <p className="text-xs text-muted-foreground flex items-center gap-1.5 pt-2 border-t" data-testid="escrow-clarity-note">
+            <ShieldCheck className="h-3.5 w-3.5 text-emerald-600 flex-shrink-0" />
+            {fr
+              ? "Les fonds sont détenus par BidVex Inc. jusqu'à la confirmation de la collecte"
+              : 'Funds are held securely by BidVex Inc. until pickup is confirmed'}
+          </p>
+        )}
+
+        {/* iter302 Directive 2 — Settle Payment modal */}
+        <SettlePaymentModal
+          listingId={settleFor}
+          open={!!settleFor}
+          onOpenChange={(o) => { if (!o) setSettleFor(null); }}
+          onPaid={() => { if (onRefresh) onRefresh(); }}
+        />
 
         {showReceipts && (
           <div className="pt-3 border-t" data-testid="buyer-receipts-list">

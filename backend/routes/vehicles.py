@@ -1802,7 +1802,10 @@ async def place_vehicle_bid(
         "max_bid": bid_data.max_bid,
         "status": BidStatus.WINNING.value,
         "deposit_paid": listing["requires_deposit"],
-        "created_at": datetime.now(timezone.utc)
+        "created_at": datetime.now(timezone.utc),
+        # iter302 — payment authorization consent stamped at placement
+        "payment_authorization_consented": True,
+        "payment_authorization_consented_at": datetime.now(timezone.utc).isoformat(),
     }
     
     await db.vehicle_bids.insert_one(bid)

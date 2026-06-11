@@ -142,7 +142,8 @@ class MultiLotAuctionCreate(BaseModel):
     description: Optional[str] = ""
     timing_mode: MultiLotTimingMode = MultiLotTimingMode.SEQUENTIAL
     start_time: datetime
-    lot_duration_seconds: int = Field(120, ge=30, le=3600)
+    # iter302 Directive 3 — 60s hard minimum per lot (server-side enforcement).
+    lot_duration_seconds: int = Field(120, ge=60, le=3600)
     stagger_offset_seconds: int = Field(60, ge=30, le=600)
     lots: List[MultiLotItemCreate] = Field(..., min_length=1, max_length=200)
     submission_intent: Optional[str] = "live"   # draft / schedule / live

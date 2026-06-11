@@ -277,6 +277,9 @@ async def place_bid(db, auction_id: str, bidder_id: str, max_bid: float) -> Dict
         "max_bid": float(max_bid),
         "placed_at": now_dt.isoformat(),
         "is_proxy": False,
+        # iter302 — payment authorization consent stamped at placement
+        "payment_authorization_consented": True,
+        "payment_authorization_consented_at": now_dt.isoformat(),
     }
 
     await db.storage_auctions.update_one(

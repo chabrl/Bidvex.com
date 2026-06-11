@@ -78,3 +78,22 @@ Otherwise the Law-25 consent banner intercepts the Sign-In click.
 - Password: TestBuyer225!
 - Role: user (regular buyer)
 - Notes: re-registered on this preview DB during iter301 (old account didn't exist → 401). New user id 85b3ce59-f264-4d43-8d12-19b3449ec8b3. Login verified via API on 2026-06-11. phone_verified=true set (phone +15145550199) so /messages UI is reachable for E2E.
+
+## iter302 Buyer Test Account (created 2026-06-11 — settlement flow buyer)
+- Email: iter302buyer@test.com
+- Password: TestBuyer123!
+- Role: user (regular buyer); phone_verified, email_verified, id_verified all true
+- User id: eaf07e4e-052c-4ee9-932c-14609fa65743
+- Stripe TEST customer cus_UgXyebdBBfbh49 with saved visa •••• 4242 (pm in `payment_methods` collection)
+- Notes: This buyer WON the seeded listing `iter302-settle-test` (seller = admin) and already settled it via POST /api/settlement/settle — payment_collected, pickup code BVX-1H1J5GC9, payout queued (payout_pending). Used by the iter302 Directive 2 E2E tests.
+
+## Re-seeded 2026-06-11 (accounts referenced by older suites — now working again on preview)
+- p0bugtest@example.com / TestBuyer123! (phone+email+id verified)
+- iter189buyer@test.com / TestBuyer123! (phone+email+id verified)
+
+## ⚠️ Stripe key state on PREVIEW (2026-06-11, iter302)
+- `STRIPE_API_KEY` in /app/backend/.env was TEMPORARILY swapped to the TEST key
+  (value of STRIPE_TEST_SECRET_KEY) so settlement charge flows can be tested
+  without real money movement. The original LIVE key line is backed up at
+  `/tmp/stripe_key_backup.txt` and MUST be restored before any production
+  deploy from this workspace. Production (bidvex.com) carries its own env.

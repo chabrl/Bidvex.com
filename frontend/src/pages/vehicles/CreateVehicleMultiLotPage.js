@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -8,21 +9,28 @@ import { Label } from '../../components/ui/label';
 import { Card } from '../../components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../components/ui/tooltip';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../../components/ui/sheet';
 import {
   Plus, Trash2, Save, Calendar, CheckCircle, Loader2, Car, Layers, Waves, Target, Star,
-  Upload, ImageIcon, X, ArrowLeft, ArrowRight,
+  Upload, ImageIcon, X, ArrowLeft, ArrowRight, Info,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { TIMING_MODES } from '../../lib/vehicleMultiLotTimingModes';
+import { TIMING_MODES, getTimingModeLabel, getTimingModeDescription } from '../../lib/vehicleMultiLotTimingModes';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 /**
- * CreateVehicleMultiLotPage — iter293 Directive 2 / iter295 P2
+ * CreateVehicleMultiLotPage — iter293 Directive 2 / iter295 P2 / iter302 Directive 3
  *
  * iter295 P2 additions:
  *   - Per-lot Photo Gallery (S3 upload, ≥1 photo enforced for Live/Schedule,
  *     drag-to-reorder via arrow buttons, 20-photo cap).
+ *
+ * iter302 Directive 3:
+ *   - Full French (FR) translation of all strings via the i18n language flag.
+ *   - 60-second minimum per-lot duration (client + server enforced).
+ *   - Mobile/tablet responsive: single column on mobile, bottom-sheet
+ *     descriptions for the timing-mode cards on touch screens.
  */
 const emptyLot = () => ({
   vin: '',
@@ -50,9 +58,17 @@ const emptyLot = () => ({
   media: [],
 });
 
+const MIN_LOT_DURATION_SECONDS = 60;
+
 const CreateVehicleMultiLotPage = () => {
   const navigate = useNavigate();
+  const { i18n } = useTranslation();
+  const fr = (i18n.language || 'en').startsWith('fr');
+  // iter302 Directive 3 — inline bilingual helper.
+  const L = (en, frTxt) => (fr ? frTxt : en);
   const [loading, setLoading] = useState(false);
+  // iter302 Directive 3 — mobile bottom-sheet for timing-mode descriptions.
+  const [infoSheet, setInfoSheet] = useState(null); // 'sequential' | 'staggered' | null
   const [event, setEvent] = useState(() => ({
     title: '',
     description: '',
@@ -76,12 +92,12 @@ const CreateVehicleMultiLotPage = () => {
     const existing = lots[idx].pendingPhotos || [];
     const room = MAX_PHOTOS_PER_LOT - existing.length;
     if (room <= 0) {
-      toast.error(`Maximum ${MAX_PHOTOS_PER_LOT} photos per lot`);
+      toast.error(L(`Maximum ${MAX_PHOTOS_PER_LOT} photos per lot`, `Maximum ${MAX_PHOTOS_PER_LOT} photos par lot`));
       return;
     }
     const accepted = Array.from(fileList).slice(0, room).filter((f) => f.type.startsWith('image/'));
     if (!accepted.length) {
-      toast.error('Please choose image files only');
+      toast.error(L('Please choose image files only', 'Veuillez choisir uniquement des fichiers image'));
       return;
     }
     const next = [...existing];
@@ -109,15 +125,23 @@ const CreateVehicleMultiLotPage = () => {
 
   const handleSubmit = async (intent) => {
     // Client validation
-    if (!event.title.trim()) { toast.error('Event title is required'); return; }
-    if (lots.length === 0) { toast.error('Add at least one lot'); return; }
+    if (!event.title.trim()) { toast.error(L('Event title is required', "Le titre de l'événement est requis")); return; }
+    if (lots.length === 0) { toast.error(L('Add at least one lot', 'Ajoutez au moins un lot')); return; }
+    // iter302 Directive 3 — enforce the 60s per-lot duration floor client-side.
+    if (Number(event.lot_duration_seconds) < MIN_LOT_DURATION_SECONDS) {
+      toast.error(L(
+        `Per-lot duration must be at least ${MIN_LOT_DURATION_SECONDS} seconds`,
+        `La durée par lot doit être d'au moins ${MIN_LOT_DURATION_SECONDS} secondes`,
+      ));
+      return;
+    }
     for (const [i, lot] of lots.entries()) {
       if (!lot.vin || lot.vin.length !== 17) {
-        toast.error(`Lot #${i + 1} — VIN must be exactly 17 characters`);
+        toast.error(L(`Lot #${i + 1} — VIN must be exactly 17 characters`, `Lot n°${i + 1} — Le NIV doit contenir exactement 17 caractères`));
         return;
       }
       if (!lot.title) {
-        toast.error(`Lot #${i + 1} — Title is required`);
+        toast.error(L(`Lot #${i + 1} — Title is required`, `Lot n°${i + 1} — Le titre est requis`));
         return;
       }
       // iter299 P0 — Bill 96: QC-located lots require a French title.
@@ -126,16 +150,19 @@ const CreateVehicleMultiLotPage = () => {
         return;
       }
       if (!lot.location_city || !lot.location_province) {
-        toast.error(`Lot #${i + 1} — Location city + province required`);
+        toast.error(L(`Lot #${i + 1} — Location city + province required`, `Lot n°${i + 1} — Ville et province requises`));
         return;
       }
       if (!lot.starting_price || Number(lot.starting_price) <= 0) {
-        toast.error(`Lot #${i + 1} — Starting price must be > 0`);
+        toast.error(L(`Lot #${i + 1} — Starting price must be > 0`, `Lot n°${i + 1} — Le prix de départ doit être > 0`));
         return;
       }
       // iter295 P2 — At least 1 photo per lot when going Live / Schedule.
       if (intent !== 'draft' && (lot.pendingPhotos || []).length === 0) {
-        toast.error(`Lot #${i + 1} — At least 1 photo is required to go Live / Schedule`);
+        toast.error(L(
+          `Lot #${i + 1} — At least 1 photo is required to go Live / Schedule`,
+          `Lot n°${i + 1} — Au moins 1 photo est requise pour publier ou programmer`,
+        ));
         return;
       }
     }
@@ -143,7 +170,10 @@ const CreateVehicleMultiLotPage = () => {
     if (intent === 'schedule') {
       const startMs = new Date(event.start_time).getTime();
       if (!startMs || startMs <= Date.now() + 60_000) {
-        toast.error('Schedule requires Start Time ≥1 min in the future');
+        toast.error(L(
+          'Schedule requires Start Time ≥1 min in the future',
+          "La programmation exige une heure de début ≥ 1 min dans le futur",
+        ));
         return;
       }
     }
@@ -164,7 +194,7 @@ const CreateVehicleMultiLotPage = () => {
         description: event.description,
         timing_mode: event.timing_mode,
         start_time: startISO,
-        lot_duration_seconds: Number(event.lot_duration_seconds) || 120,
+        lot_duration_seconds: Math.max(MIN_LOT_DURATION_SECONDS, Number(event.lot_duration_seconds) || 120),
         stagger_offset_seconds: Number(event.stagger_offset_seconds) || 60,
         submission_intent: createIntent,
         lots: lots.map((l) => ({
@@ -204,7 +234,7 @@ const CreateVehicleMultiLotPage = () => {
 
       // iter295 P2 — Upload each lot's photos in order.
       if (hasAnyPhotos) {
-        toast.message('Uploading photos…');
+        toast.message(L('Uploading photos…', 'Téléversement des photos…'));
         for (let i = 0; i < createdLots.length; i += 1) {
           const lotId = createdLots[i].id;
           const pending = lots[i]?.pendingPhotos || [];
@@ -224,7 +254,10 @@ const CreateVehicleMultiLotPage = () => {
               );
             } catch (uerr) {
               console.error('photo upload failed', uerr);
-              toast.error(`Lot #${i + 1} — Photo upload failed (continuing)`);
+              toast.error(L(
+                `Lot #${i + 1} — Photo upload failed (continuing)`,
+                `Lot n°${i + 1} — Échec du téléversement d'une photo (on continue)`,
+              ));
             }
           }
         }
@@ -240,16 +273,22 @@ const CreateVehicleMultiLotPage = () => {
             );
           } catch (aerr) {
             console.error('activate failed', aerr);
-            toast.error('Event saved as draft, but activation failed — please publish from the drafts dashboard.');
+            toast.error(L(
+              'Event saved as draft, but activation failed — please publish from the drafts dashboard.',
+              "Événement enregistré comme brouillon, mais l'activation a échoué — publiez-le depuis vos brouillons.",
+            ));
           }
         }
       }
 
-      toast.success(`Multi-lot event ${intent === 'draft' ? 'saved as draft' : intent === 'schedule' ? 'scheduled' : 'live'}!`);
+      toast.success(L(
+        `Multi-lot event ${intent === 'draft' ? 'saved as draft' : intent === 'schedule' ? 'scheduled' : 'live'}!`,
+        `Événement multi-lots ${intent === 'draft' ? 'enregistré comme brouillon' : intent === 'schedule' ? 'programmé' : 'en direct'} !`,
+      ));
       navigate(`/vehicle-multi-lot/${eventId}`);
     } catch (err) {
       console.error(err);
-      toast.error(err?.response?.data?.detail || 'Failed to create multi-lot event');
+      toast.error(err?.response?.data?.detail || L('Failed to create multi-lot event', "Échec de la création de l'événement multi-lots"));
     } finally {
       setLoading(false);
     }
@@ -258,31 +297,34 @@ const CreateVehicleMultiLotPage = () => {
   return (
     <div className="max-w-5xl mx-auto p-4 sm:p-6 space-y-6" data-testid="create-multi-lot-page">
       <div>
-        <h1 className="text-3xl font-bold flex items-center gap-2">
-          <Layers className="h-7 w-7 text-blue-600" />
-          Create Multi-Lot Vehicle Auction
+        <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
+          <Layers className="h-7 w-7 text-blue-600 flex-shrink-0" />
+          {L('Create Multi-Lot Vehicle Auction', 'Créer une enchère multi-lots de véhicules')}
         </h1>
         <p className="text-sm text-gray-600 mt-1">
-          Run multiple vehicle lots in one auction event — pick a timing mode below.
+          {L(
+            'Run multiple vehicle lots in one auction event — pick a timing mode below.',
+            'Organisez plusieurs lots de véhicules dans un même événement — choisissez un mode de chronométrage ci-dessous.',
+          )}
         </p>
       </div>
 
       {/* Event-level details */}
-      <Card className="p-6 space-y-4" data-testid="event-details-card">
-        <h2 className="text-xl font-semibold">Event Details</h2>
+      <Card className="p-4 sm:p-6 space-y-4" data-testid="event-details-card">
+        <h2 className="text-xl font-semibold">{L('Event Details', "Détails de l'événement")}</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="event-title">Event Title *</Label>
+            <Label htmlFor="event-title">{L('Event Title *', "Titre de l'événement *")}</Label>
             <Input
               id="event-title"
               data-testid="event-title-input"
               value={event.title}
               onChange={e => setEvent({ ...event, title: e.target.value })}
-              placeholder="e.g. March Wholesale Block — 12 Trucks"
+              placeholder={L('e.g. March Wholesale Block — 12 Trucks', 'ex. Bloc de gros de mars — 12 camions')}
             />
           </div>
           <div>
-            <Label htmlFor="event-start">Start Time *</Label>
+            <Label htmlFor="event-start">{L('Start Time *', 'Heure de début *')}</Label>
             <Input
               id="event-start"
               data-testid="event-start-input"
@@ -292,11 +334,13 @@ const CreateVehicleMultiLotPage = () => {
             />
           </div>
           <div className="md:col-span-2">
-            <Label className="mb-2 block">Timing Mode *</Label>
+            <Label className="mb-2 block">{L('Timing Mode *', 'Mode de chronométrage *')}</Label>
             {/* iter294 ADDENDUM — Visual mode picker with icon, short
                 label, recommended-star, and tooltip carrying the full
                 description. Internal API value stays sequential /
-                staggered (DB unchanged). */}
+                staggered (DB unchanged).
+                iter302 — single column on mobile + bottom-sheet info
+                button (Radix tooltips don't fire on touch screens). */}
             <TooltipProvider delayDuration={150}>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" role="radiogroup">
                 {/* Sequential Spotlight (default/recommended) */}
@@ -316,20 +360,31 @@ const CreateVehicleMultiLotPage = () => {
                     >
                       {TIMING_MODES.sequential.recommended && (
                         <span className="absolute -top-2 -right-2 inline-flex items-center gap-1 px-2 py-0.5 bg-amber-400 text-amber-900 text-[10px] font-bold rounded-full shadow-sm">
-                          <Star className="h-3 w-3 fill-current" /> Recommended
+                          <Star className="h-3 w-3 fill-current" /> {L('Recommended', 'Recommandé')}
                         </span>
                       )}
                       <div className="flex items-center gap-2 mb-1">
-                        <Target className="h-5 w-5 text-indigo-600" aria-hidden="true" />
-                        <span className="font-semibold text-sm">{TIMING_MODES.sequential.label}</span>
+                        <Target className="h-5 w-5 text-indigo-600 flex-shrink-0" aria-hidden="true" />
+                        <span className="font-semibold text-sm">{getTimingModeLabel('sequential', i18n.language)}</span>
                       </div>
-                      <p className="text-xs text-slate-600 line-clamp-3">
-                        {TIMING_MODES.sequential.description}
+                      <p className="text-xs text-slate-600 line-clamp-3 pr-7 sm:pr-0">
+                        {getTimingModeDescription('sequential', i18n.language)}
                       </p>
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        className="sm:hidden absolute bottom-2 right-2 p-1.5 rounded-full bg-slate-100 text-slate-600"
+                        onClick={(e) => { e.stopPropagation(); setInfoSheet('sequential'); }}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); setInfoSheet('sequential'); } }}
+                        data-testid="timing-info-sequential-btn"
+                        aria-label={L('More info', "Plus d'infos")}
+                      >
+                        <Info className="h-4 w-4" />
+                      </span>
                     </button>
                   </TooltipTrigger>
                   <TooltipContent side="bottom" align="start" className="max-w-xs text-xs">
-                    {TIMING_MODES.sequential.description}
+                    {getTimingModeDescription('sequential', i18n.language)}
                   </TooltipContent>
                 </Tooltip>
 
@@ -349,16 +404,27 @@ const CreateVehicleMultiLotPage = () => {
                       data-testid="timing-mode-staggered-card"
                     >
                       <div className="flex items-center gap-2 mb-1">
-                        <Waves className="h-5 w-5 text-blue-600" aria-hidden="true" />
-                        <span className="font-semibold text-sm">{TIMING_MODES.staggered.label}</span>
+                        <Waves className="h-5 w-5 text-blue-600 flex-shrink-0" aria-hidden="true" />
+                        <span className="font-semibold text-sm">{getTimingModeLabel('staggered', i18n.language)}</span>
                       </div>
-                      <p className="text-xs text-slate-600 line-clamp-3">
-                        {TIMING_MODES.staggered.description}
+                      <p className="text-xs text-slate-600 line-clamp-3 pr-7 sm:pr-0">
+                        {getTimingModeDescription('staggered', i18n.language)}
                       </p>
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        className="sm:hidden absolute bottom-2 right-2 p-1.5 rounded-full bg-slate-100 text-slate-600"
+                        onClick={(e) => { e.stopPropagation(); setInfoSheet('staggered'); }}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); setInfoSheet('staggered'); } }}
+                        data-testid="timing-info-staggered-btn"
+                        aria-label={L('More info', "Plus d'infos")}
+                      >
+                        <Info className="h-4 w-4" />
+                      </span>
                     </button>
                   </TooltipTrigger>
                   <TooltipContent side="bottom" align="start" className="max-w-xs text-xs">
-                    {TIMING_MODES.staggered.description}
+                    {getTimingModeDescription('staggered', i18n.language)}
                   </TooltipContent>
                 </Tooltip>
               </div>
@@ -371,21 +437,30 @@ const CreateVehicleMultiLotPage = () => {
             />
           </div>
           <div>
-            <Label htmlFor="event-lot-duration">Per-Lot Duration (seconds)</Label>
+            <Label htmlFor="event-lot-duration">{L('Per-Lot Duration (seconds)', 'Durée par lot (secondes)')}</Label>
             <Input
               id="event-lot-duration"
               data-testid="event-lot-duration-input"
               type="number"
-              min={30}
+              min={MIN_LOT_DURATION_SECONDS}
               max={3600}
               value={event.lot_duration_seconds}
               onChange={e => setEvent({ ...event, lot_duration_seconds: e.target.value })}
             />
-            <p className="text-xs text-gray-500 mt-1">Default 120s. Soft-close extends by +120s on late bids.</p>
+            {/* iter302 Directive 3 — explicit 60s floor, shown in both languages */}
+            <p className="text-xs font-medium text-slate-700 mt-1" data-testid="lot-duration-min-note">
+              Minimum: 60 seconds / Minimum : 60 secondes
+            </p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {L(
+                'Default 120s. Soft-close extends by +120s on late bids.',
+                'Par défaut 120 s. La clôture progressive ajoute +120 s lors d\u2019enchères tardives.',
+              )}
+            </p>
           </div>
           {event.timing_mode === 'staggered' && (
             <div>
-              <Label htmlFor="event-stagger">Stagger Offset (seconds)</Label>
+              <Label htmlFor="event-stagger">{L('Stagger Offset (seconds)', 'Décalage entre lots (secondes)')}</Label>
               <Input
                 id="event-stagger"
                 data-testid="event-stagger-input"
@@ -395,17 +470,22 @@ const CreateVehicleMultiLotPage = () => {
                 value={event.stagger_offset_seconds}
                 onChange={e => setEvent({ ...event, stagger_offset_seconds: e.target.value })}
               />
-              <p className="text-xs text-gray-500 mt-1">Time between consecutive lot starts. Default 60s.</p>
+              <p className="text-xs text-gray-500 mt-1">
+                {L('Time between consecutive lot starts. Default 60s.', 'Temps entre les débuts de lots consécutifs. Par défaut 60 s.')}
+              </p>
             </div>
           )}
           <div className="md:col-span-2">
-            <Label htmlFor="event-desc">Description</Label>
+            <Label htmlFor="event-desc">{L('Description', 'Description')}</Label>
             <Textarea
               id="event-desc"
               data-testid="event-desc-input"
               value={event.description}
               onChange={e => setEvent({ ...event, description: e.target.value })}
-              placeholder="Event description, viewing details, payment terms, etc."
+              placeholder={L(
+                'Event description, viewing details, payment terms, etc.',
+                "Description de l'événement, détails de visite, modalités de paiement, etc.",
+              )}
               rows={3}
             />
           </div>
@@ -413,21 +493,21 @@ const CreateVehicleMultiLotPage = () => {
       </Card>
 
       {/* Lots */}
-      <Card className="p-6 space-y-4" data-testid="lots-card">
-        <div className="flex items-center justify-between">
+      <Card className="p-4 sm:p-6 space-y-4" data-testid="lots-card">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
           <h2 className="text-xl font-semibold flex items-center gap-2">
             <Car className="h-5 w-5" />
             Lots ({lots.length})
           </h2>
           <Button onClick={addLot} variant="outline" size="sm" data-testid="add-lot-btn">
-            <Plus className="h-4 w-4 mr-1" /> Add Lot
+            <Plus className="h-4 w-4 mr-1" /> {L('Add Lot', 'Ajouter un lot')}
           </Button>
         </div>
 
         {lots.map((lot, idx) => (
           <Card key={idx} className="p-4 bg-gray-50 border-gray-200" data-testid={`lot-card-${idx}`}>
             <div className="flex items-center justify-between mb-3">
-              <h3 className="font-medium">Lot #{idx + 1}</h3>
+              <h3 className="font-medium">{L(`Lot #${idx + 1}`, `Lot n°${idx + 1}`)}</h3>
               {lots.length > 1 && (
                 <Button
                   onClick={() => removeLot(idx)}
@@ -436,23 +516,23 @@ const CreateVehicleMultiLotPage = () => {
                   className="text-red-600 hover:bg-red-50"
                   data-testid={`remove-lot-btn-${idx}`}
                 >
-                  <Trash2 className="h-4 w-4 mr-1" /> Remove
+                  <Trash2 className="h-4 w-4 mr-1" /> {L('Remove', 'Retirer')}
                 </Button>
               )}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div>
-                <Label>VIN *</Label>
+                <Label>{L('VIN *', 'NIV *')}</Label>
                 <Input
                   data-testid={`lot-vin-${idx}`}
                   value={lot.vin}
                   maxLength={17}
                   onChange={e => updateLot(idx, { vin: e.target.value.toUpperCase() })}
-                  placeholder="17-char VIN"
+                  placeholder={L('17-char VIN', 'NIV à 17 caractères')}
                 />
               </div>
               <div>
-                <Label>Year *</Label>
+                <Label>{L('Year *', 'Année *')}</Label>
                 <Input
                   data-testid={`lot-year-${idx}`}
                   type="number" min={1900} max={2100}
@@ -461,7 +541,7 @@ const CreateVehicleMultiLotPage = () => {
                 />
               </div>
               <div>
-                <Label>Make *</Label>
+                <Label>{L('Make *', 'Marque *')}</Label>
                 <Input
                   data-testid={`lot-make-${idx}`}
                   value={lot.make}
@@ -470,7 +550,7 @@ const CreateVehicleMultiLotPage = () => {
                 />
               </div>
               <div>
-                <Label>Model *</Label>
+                <Label>{L('Model *', 'Modèle *')}</Label>
                 <Input
                   data-testid={`lot-model-${idx}`}
                   value={lot.model}
@@ -479,12 +559,12 @@ const CreateVehicleMultiLotPage = () => {
                 />
               </div>
               <div className="md:col-span-2">
-                <Label>Title *</Label>
+                <Label>{L('Title *', 'Titre *')}</Label>
                 <Input
                   data-testid={`lot-title-${idx}`}
                   value={lot.title}
                   onChange={e => updateLot(idx, { title: e.target.value })}
-                  placeholder="e.g. 2020 Ford F-350 XL Crew Cab"
+                  placeholder={L('e.g. 2020 Ford F-350 XL Crew Cab', 'ex. Ford F-350 XL Crew Cab 2020')}
                 />
               </div>
               {/* iter299 P0 — Bill 96 French lot title (required for QC-located lots). */}
@@ -509,7 +589,7 @@ const CreateVehicleMultiLotPage = () => {
                 )}
               </div>
               <div>
-                <Label>Mileage</Label>
+                <Label>{L('Mileage', 'Kilométrage')}</Label>
                 <Input
                   data-testid={`lot-mileage-${idx}`}
                   type="number" min={0}
@@ -518,7 +598,7 @@ const CreateVehicleMultiLotPage = () => {
                 />
               </div>
               <div>
-                <Label>Starting Price (CAD) *</Label>
+                <Label>{L('Starting Price (CAD) *', 'Prix de départ (CAD) *')}</Label>
                 <Input
                   data-testid={`lot-starting-price-${idx}`}
                   type="number" min={1}
@@ -527,17 +607,17 @@ const CreateVehicleMultiLotPage = () => {
                 />
               </div>
               <div>
-                <Label>Reserve Price</Label>
+                <Label>{L('Reserve Price', 'Prix de réserve')}</Label>
                 <Input
                   data-testid={`lot-reserve-${idx}`}
                   type="number" min={0}
                   value={lot.reserve_price}
                   onChange={e => updateLot(idx, { reserve_price: e.target.value })}
-                  placeholder="(optional)"
+                  placeholder={L('(optional)', '(optionnel)')}
                 />
               </div>
               <div>
-                <Label>Bid Increment</Label>
+                <Label>{L('Bid Increment', "Incrément d'enchère")}</Label>
                 <Input
                   data-testid={`lot-bid-increment-${idx}`}
                   type="number" min={1}
@@ -546,12 +626,12 @@ const CreateVehicleMultiLotPage = () => {
                 />
               </div>
               <div>
-                <Label>City *</Label>
+                <Label>{L('City *', 'Ville *')}</Label>
                 <Input
                   data-testid={`lot-city-${idx}`}
                   value={lot.location_city}
                   onChange={e => updateLot(idx, { location_city: e.target.value })}
-                  placeholder="Montreal"
+                  placeholder={L('Montreal', 'Montréal')}
                 />
               </div>
               <div>
@@ -565,34 +645,37 @@ const CreateVehicleMultiLotPage = () => {
                 />
               </div>
               <div>
-                <Label>Title Status</Label>
+                <Label>{L('Title Status', 'Statut du titre')}</Label>
                 <Select
                   value={lot.title_status}
                   onValueChange={v => updateLot(idx, { title_status: v })}
                 >
                   <SelectTrigger data-testid={`lot-title-status-${idx}`}><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="clean">Clean</SelectItem>
-                    <SelectItem value="salvage">Salvage</SelectItem>
-                    <SelectItem value="rebuilt">Rebuilt</SelectItem>
-                    <SelectItem value="lemon">Lemon</SelectItem>
+                    <SelectItem value="clean">{L('Clean', 'Propre')}</SelectItem>
+                    <SelectItem value="salvage">{L('Salvage', 'Récupération')}</SelectItem>
+                    <SelectItem value="rebuilt">{L('Rebuilt', 'Reconstruit')}</SelectItem>
+                    <SelectItem value="lemon">{L('Lemon', 'Citron')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="md:col-span-3">
-                <Label>Description</Label>
+                <Label>{L('Description', 'Description')}</Label>
                 <Textarea
                   data-testid={`lot-desc-${idx}`}
                   value={lot.description}
                   onChange={e => updateLot(idx, { description: e.target.value })}
                   rows={2}
-                  placeholder="Condition notes, options, equipment, defects..."
+                  placeholder={L(
+                    'Condition notes, options, equipment, defects...',
+                    "Notes sur l'état, options, équipements, défauts...",
+                  )}
                 />
               </div>
 
               {/* iter295 P2 — Per-lot photo gallery */}
               <div className="md:col-span-3 border-t pt-4 mt-2" data-testid={`lot-photos-block-${idx}`}>
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
                   <div>
                     <Label className="inline-flex items-center gap-1">
                       <ImageIcon className="h-4 w-4" /> Photos
@@ -602,16 +685,22 @@ const CreateVehicleMultiLotPage = () => {
                     </Label>
                     <p className="text-xs text-slate-500 mt-0.5">
                       {(lot.pendingPhotos || []).length === 0
-                        ? 'No photos yet — at least 1 required to go Live or Schedule.'
-                        : `${(lot.pendingPhotos || []).length} / ${MAX_PHOTOS_PER_LOT} selected.`}
+                        ? L(
+                            'No photos yet — at least 1 required to go Live or Schedule.',
+                            'Aucune photo — au moins 1 requise pour publier ou programmer.',
+                          )
+                        : L(
+                            `${(lot.pendingPhotos || []).length} / ${MAX_PHOTOS_PER_LOT} selected.`,
+                            `${(lot.pendingPhotos || []).length} / ${MAX_PHOTOS_PER_LOT} sélectionnées.`,
+                          )}
                     </p>
                   </div>
                   <label
                     htmlFor={`lot-photo-input-${idx}`}
-                    className="inline-flex items-center gap-1 px-3 py-2 rounded-md bg-blue-600 text-white text-sm cursor-pointer hover:bg-blue-700"
+                    className="inline-flex items-center justify-center gap-1 px-3 py-2 rounded-md bg-blue-600 text-white text-sm cursor-pointer hover:bg-blue-700 w-full sm:w-auto"
                     data-testid={`lot-photo-pick-btn-${idx}`}
                   >
-                    <Upload className="h-4 w-4" /> Add Photos
+                    <Upload className="h-4 w-4" /> {L('Add Photos', 'Ajouter des photos')}
                   </label>
                   <input
                     id={`lot-photo-input-${idx}`}
@@ -637,7 +726,7 @@ const CreateVehicleMultiLotPage = () => {
                       >
                         <img
                           src={ph.previewUrl}
-                          alt={`Lot ${idx + 1} photo ${pIdx + 1}`}
+                          alt={L(`Lot ${idx + 1} photo ${pIdx + 1}`, `Lot ${idx + 1} photo ${pIdx + 1}`)}
                           className="w-full h-full object-cover"
                         />
                         <div className="absolute top-1 left-1 inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-bold text-white bg-black/60 rounded">
@@ -650,7 +739,7 @@ const CreateVehicleMultiLotPage = () => {
                             className="p-1 rounded bg-white/90 hover:bg-white text-slate-700 disabled:opacity-50"
                             disabled={pIdx === 0}
                             data-testid={`lot-photo-left-${idx}-${pIdx}`}
-                            aria-label="Move left"
+                            aria-label={L('Move left', 'Déplacer à gauche')}
                           >
                             <ArrowLeft className="h-3 w-3" />
                           </button>
@@ -659,7 +748,7 @@ const CreateVehicleMultiLotPage = () => {
                             onClick={() => removePhoto(idx, ph.id)}
                             className="p-1 rounded bg-red-500/90 hover:bg-red-600 text-white"
                             data-testid={`lot-photo-remove-${idx}-${pIdx}`}
-                            aria-label="Remove photo"
+                            aria-label={L('Remove photo', 'Supprimer la photo')}
                           >
                             <X className="h-3 w-3" />
                           </button>
@@ -669,7 +758,7 @@ const CreateVehicleMultiLotPage = () => {
                             className="p-1 rounded bg-white/90 hover:bg-white text-slate-700 disabled:opacity-50"
                             disabled={pIdx === (lot.pendingPhotos || []).length - 1}
                             data-testid={`lot-photo-right-${idx}-${pIdx}`}
-                            aria-label="Move right"
+                            aria-label={L('Move right', 'Déplacer à droite')}
                           >
                             <ArrowRight className="h-3 w-3" />
                           </button>
@@ -690,32 +779,46 @@ const CreateVehicleMultiLotPage = () => {
           variant="outline"
           onClick={() => handleSubmit('draft')}
           disabled={loading}
-          className="min-h-[48px]"
+          className="min-h-[48px] w-full sm:w-auto"
           data-testid="submit-multi-lot-draft-btn"
         >
           {loading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
-          Save as Draft
+          {L('Save as Draft', 'Enregistrer comme brouillon')}
         </Button>
         <Button
           variant="outline"
           onClick={() => handleSubmit('schedule')}
           disabled={loading}
-          className="min-h-[48px] border-blue-600 text-blue-700 hover:bg-blue-50"
+          className="min-h-[48px] w-full sm:w-auto border-blue-600 text-blue-700 hover:bg-blue-50"
           data-testid="submit-multi-lot-schedule-btn"
         >
           {loading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Calendar className="h-4 w-4 mr-1" />}
-          Schedule (Upcoming)
+          {L('Schedule (Upcoming)', 'Programmer (À venir)')}
         </Button>
         <Button
           onClick={() => handleSubmit('live')}
           disabled={loading}
-          className="min-h-[48px] bg-green-600 hover:bg-green-700"
+          className="min-h-[48px] w-full sm:w-auto bg-green-600 hover:bg-green-700"
           data-testid="submit-multi-lot-live-btn"
         >
           {loading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <CheckCircle className="h-4 w-4 mr-1" />}
-          Go Live Now
+          {L('Go Live Now', 'Mettre en ligne')}
         </Button>
       </div>
+
+      {/* iter302 Directive 3 — mobile bottom-sheet for timing-mode info */}
+      <Sheet open={!!infoSheet} onOpenChange={(o) => { if (!o) setInfoSheet(null); }}>
+        <SheetContent side="bottom" className="rounded-t-2xl" data-testid="timing-info-sheet">
+          <SheetHeader className="text-left">
+            <SheetTitle>
+              {infoSheet ? getTimingModeLabel(infoSheet, i18n.language) : ''}
+            </SheetTitle>
+            <SheetDescription className="text-sm">
+              {infoSheet ? getTimingModeDescription(infoSheet, i18n.language) : ''}
+            </SheetDescription>
+          </SheetHeader>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 };

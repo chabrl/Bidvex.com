@@ -259,6 +259,11 @@ async def place_bid(request: Request, bid_data: BidCreate, current_user: User = 
     bid = Bid(listing_id=bid_data.listing_id, bidder_id=current_user.id, amount=bid_data.amount)
     bid_dict = bid.model_dump()
     bid_dict["created_at"] = bid_dict["created_at"].isoformat()
+    # iter302 — payment authorization consent (FCAC/Payments Canada Rule H1):
+    # the bid UI displays the standing authorization statement; placing the
+    # bid constitutes explicit consent to off-session capture if winning.
+    bid_dict["payment_authorization_consented"] = True
+    bid_dict["payment_authorization_consented_at"] = datetime.now(timezone.utc).isoformat()
     # iter229 — proxy compliance stamps (vehicle bids only)
     if proxy_compliance_stamps:
         bid_dict["proxy_compliance"]          = proxy_compliance_stamps
@@ -537,6 +542,9 @@ async def _process_auto_bids(db, listing_id: str, current_price: float, manual_b
         )
         bid_dict = auto_bid_obj.model_dump()
         bid_dict["created_at"] = bid_dict["created_at"].isoformat()
+        # iter302 — auto-bids inherit the consent given at auto-bid setup
+        bid_dict["payment_authorization_consented"] = True
+        bid_dict["payment_authorization_consented_at"] = datetime.now(timezone.utc).isoformat()
         await db.bids.insert_one(bid_dict)
 
         await db.listings.update_one(

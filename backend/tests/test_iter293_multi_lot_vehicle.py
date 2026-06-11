@@ -103,7 +103,7 @@ def _build_minimal_event(*, intent: str, lots_n: int = 3, timing: str = "sequent
         "description":   "Regression test event",
         "timing_mode":   timing,
         "start_time":    start_iso,
-        "lot_duration_seconds":   30,    # short window so scheduler ticks fire fast
+        "lot_duration_seconds":   60,    # iter302 — 60s is the new API minimum
         "stagger_offset_seconds": 30,
         "submission_intent": intent,
         "lots": [

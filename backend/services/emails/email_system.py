@@ -1475,12 +1475,39 @@ async def send_buyer_receipt_email(buyer: dict, receipt: dict) -> Dict[str, Any]
         )
         subject = f"BidVex Receipt — {title}"
 
+    pickup_code = receipt.get("pickup_code")
+    if lang == "fr":
+        pickup_block = ""
+        if pickup_code:
+            pickup_block = (
+                f"<table role='presentation' width='100%' cellpadding='0' cellspacing='0' "
+                f"style='background:#eff6ff;border:1px dashed #2563eb;border-radius:8px;margin:18px 0;'>"
+                f"<tr><td align='center' style='padding:16px;'>"
+                f"<p style='margin:0;color:#1e3a8a;font-size:13px;'>Votre code de collecte / Your pickup code</p>"
+                f"<p style='margin:6px 0 0 0;font-size:24px;font-weight:bold;letter-spacing:2px;color:#1d4ed8;font-family:monospace;'>{pickup_code}</p>"
+                f"<p style='margin:6px 0 0 0;color:#64748b;font-size:12px;'>Pr&eacute;sentez ce code au vendeur lors de la collecte de votre article.</p>"
+                f"</td></tr></table>"
+            )
+    else:
+        pickup_block = ""
+        if pickup_code:
+            pickup_block = (
+                f"<table role='presentation' width='100%' cellpadding='0' cellspacing='0' "
+                f"style='background:#eff6ff;border:1px dashed #2563eb;border-radius:8px;margin:18px 0;'>"
+                f"<tr><td align='center' style='padding:16px;'>"
+                f"<p style='margin:0;color:#1e3a8a;font-size:13px;'>Your pickup code / Votre code de collecte</p>"
+                f"<p style='margin:6px 0 0 0;font-size:24px;font-weight:bold;letter-spacing:2px;color:#1d4ed8;font-family:monospace;'>{pickup_code}</p>"
+                f"<p style='margin:6px 0 0 0;color:#64748b;font-size:12px;'>Present this code to the seller when collecting your item.</p>"
+                f"</td></tr></table>"
+            )
+
     content = f"""
     <h2 style="margin: 0 0 20px 0; color: #0f172a;">{heading}</h2>
     <p style="color: #475569; line-height: 1.6;">{intro}</p>
     <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 20px 0;">
       {rows}
     </table>
+    {pickup_block}
     {meta}
     {_letterhead()}
     """
@@ -1546,13 +1573,13 @@ async def send_payment_link_email(
     total_due: float, payment_link_url: Optional[str], deadline_iso: str,
 ) -> Dict[str, Any]:
     """Buyer has no saved payment method — email a Stripe payment link
-    with a 48-hour deadline."""
+    with a 72-hour deadline (iter302)."""
     lang = _detect_language(buyer)
     link = payment_link_url or f"{FRONTEND_URL}/dashboard/buyer"
     deadline_h = _format_date(deadline_iso)
 
     if lang == "fr":
-        heading = "Paiement requis — 48 heures"
+        heading = "Paiement requis — 72 heures"
         body = (f"F&eacute;licitations, vous avez remport&eacute; <strong>{listing_title}</strong>&nbsp;! "
                 f"Aucune carte n'est enregistr&eacute;e sur votre compte. Veuillez payer "
                 f"<strong>${total_due:,.2f} CAD</strong> avant le <strong>{deadline_h}</strong> "

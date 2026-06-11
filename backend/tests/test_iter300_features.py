@@ -310,6 +310,14 @@ def test_overdue_autocapture_three_strikes_and_suspension(buyer, admin_token):
             "payment_status": "overdue",
             "overdue_at": old, "sold_at": old, "created_at": old,
         })
+        # iter302 — autocapture only fires with standing payment
+        # authorization consent on the winning buyer's bid.
+        await db.bids.insert_one({
+            "id": str(uuid.uuid4()), "listing_id": lid,
+            "bidder_id": buyer["id"], "amount": 80.0,
+            "payment_authorization_consented": True,
+            "created_at": old,
+        })
     _run(seed())
 
     async def tick_and_get(attempt_reset=False):
@@ -323,9 +331,9 @@ def test_overdue_autocapture_three_strikes_and_suspension(buyer, admin_token):
         usr = await db.users.find_one({"id": buyer["id"]}, {"_id": 0, "bidding_suspended": 1})
         return out, doc, usr
 
-    # attempt 1 — no saved payment method → payment_failed_final
+    # attempt 1 — no saved payment method → payment_overdue (iter302 semantics)
     out, doc, usr = _run(tick_and_get())
-    assert doc["payment_status"] == "payment_failed_final", doc.get("payment_status")
+    assert doc["payment_status"] == "payment_overdue", doc.get("payment_status")
     assert doc["payment_retry_attempts"] == 1
     assert not (usr or {}).get("bidding_suspended")
 
@@ -358,6 +366,7 @@ def test_overdue_autocapture_three_strikes_and_suspension(buyer, admin_token):
         db = _db()
         u = await db.users.find_one({"id": buyer["id"]}, {"_id": 0, "bidding_suspended": 1})
         await db.listings.delete_one({"id": lid})  # cleanup
+        await db.bids.delete_many({"listing_id": lid})
         return u
     u = _run(check_lifted())
     assert u.get("bidding_suspended") is False

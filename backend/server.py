@@ -699,7 +699,7 @@ scheduler.add_job(
     trigger=IntervalTrigger(hours=1), id='trial_reminders', replace_existing=True)
 scheduler.add_job(
     _job_send_auction_payment_reminders,
-    trigger=IntervalTrigger(hours=6), id='payment_reminders', replace_existing=True)
+    trigger=IntervalTrigger(hours=1), id='payment_reminders', replace_existing=True)
 scheduler.add_job(
     _job_process_overdue_auction_payments,
     trigger=IntervalTrigger(hours=6), id='overdue_payments', replace_existing=True)
@@ -1157,6 +1157,10 @@ try:
     # iter300 P1 — Dispute resolution (file + admin tooling).
     from routes.disputes import disputes_router
     api_router.include_router(disputes_router)
+
+    # iter302 — Winner & Settlement panel + buyer Settle Payment flow.
+    from routes.settlement import settlement_router
+    api_router.include_router(settlement_router)
 
     # iter298 BUG 4 — Buyer receipts + seller statements.
     from routes.receipts import receipts_router

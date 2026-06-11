@@ -396,7 +396,7 @@ async def test_finalize_payment_no_pm_sets_48h_deadline():
         assert doc["payment_link_url"] == "https://pay.stripe.test/link298"
         deadline = datetime.fromisoformat(doc["payment_deadline"])
         delta = deadline - datetime.now(timezone.utc)
-        assert timedelta(hours=47) < delta <= timedelta(hours=48), f"deadline {delta}"
+        assert timedelta(hours=71) < delta <= timedelta(hours=72), f"deadline {delta}"  # iter302: 72h
         # Overdue cron compatibility: winner_id stamped.
         assert doc["winner_id"] == buyer_id
     finally:

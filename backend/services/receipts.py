@@ -48,6 +48,7 @@ async def issue_transaction_records(
     transaction_id: Optional[str] = None,
     net_payout: Optional[float] = None,
     lot_number: Optional[Any] = None,
+    pickup_code: Optional[str] = None,
 ) -> Dict[str, Optional[str]]:
     """Create buyer-receipt + seller-statement rows and dispatch both
     emails. Idempotent per (listing_id, lot_number, type). Never raises —
@@ -75,6 +76,7 @@ async def issue_transaction_records(
         "currency": currency.upper(),
         "payment_method_last4": payment_method_last4,
         "transaction_id": transaction_id,
+        "pickup_code": pickup_code,
         "created_at": now_iso,
     }
 

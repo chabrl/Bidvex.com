@@ -268,6 +268,9 @@ async def get_buyer_dashboard(
             "payment_link_url": l.get("payment_link_url"),
             "pickup_confirmed": bool(l.get("pickup_confirmed")),
             "pickup_confirmed_at": l.get("pickup_confirmed_at"),
+            # iter302 Directive 2 — winner-only surface (this endpoint only
+            # returns listings won by the current user).
+            "pickup_code": l.get("pickup_code"),
             "receipt_id": receipt_by_listing.get(l["id"]),
             "sold_at": l.get("sold_at") or l.get("ended_at"),
         })

@@ -101,7 +101,7 @@ def test_iter248_french_email_carries_locked_subject_and_translated_bullets():
     assert "votre première annonce entièrement gratuite" in html
     assert "sans risque" in html
     assert "infrastructure d'enchères en temps réel" in html
-    assert "support@bidvex.ca" in html
+    assert "support@bidvex.com" in html
     assert "BIDVEX-PARTNERS" in html
 
 

@@ -400,6 +400,20 @@ class TestManualSettlementLive:
     def test_manual_subscription_settle_via_http(self):
         """Live end-to-end test of admin manual settle."""
         import requests
+        # iter302 — the legacy prod user id doesn't exist on every env;
+        # seed a minimal target user so the test stays self-contained.
+        import os as _os
+        from pymongo import MongoClient as _MC
+        from dotenv import load_dotenv as _ld
+        _ld("/app/backend/.env")
+        _db = _MC(_os.environ["MONGO_URL"])[_os.environ["DB_NAME"]]
+        target_id = "d000524d-82f3-42d9-8a5a-e7c7f19d7546"
+        if not _db.users.find_one({"id": target_id}):
+            _db.users.insert_one({
+                "id": target_id, "email": "iter211-settle-target@example.com",
+                "name": "Iter211 Settle Target", "role": "user",
+                "created_at": "2026-01-01T00:00:00+00:00",
+            })
         token = _admin_token()
         # Use a stable user id (alexboul1993)
         body = {

@@ -134,49 +134,122 @@ async def send_trial_reminder_emails(db):
         logger.error(f"Error in send_trial_reminder_emails: {e}")
 
 
+_REMINDER_COLLECTIONS = [
+    ("listings", "marketplace"),
+    ("multi_item_listings", "lots"),
+    ("storage_auctions", "storage"),
+    ("vehicle_listings", "vehicles"),
+]
+
+
 async def send_auction_payment_reminders(db):
-    """Send payment reminders for auctions where deadline is in ~4 days (day 10 of 14)."""
+    """iter302 — T+24h and T+48h automated payment reminders.
+
+    The 72h payment clock starts when the listing is stamped
+    `payment_status=pending_payment` with a `payment_deadline` (deadline−72h
+    = T0). Runs hourly across all 4 sections:
+      • ≥24h elapsed → reminder #1 (flag payment_reminder_24_sent)
+      • ≥48h elapsed → reminder #2 with escalation warning
+        (flag payment_reminder_48_sent)
+    """
     try:
         now = datetime.now(timezone.utc)
-        reminder_window_start = (now + timedelta(days=3)).isoformat()
-        reminder_window_end = (now + timedelta(days=5)).isoformat()
+        from services.emails.email_system import send_payment_reminder_email
 
-        pending_listings = await db.listings.find({
-            "payment_status": "pending_payment",
-            "payment_deadline": {"$gte": reminder_window_start, "$lte": reminder_window_end},
-            "reminder_sent": {"$ne": True},
-        }, {"_id": 0}).to_list(100)
+        for coll, _section in _REMINDER_COLLECTIONS:
+            pending = await db[coll].find({
+                "payment_status": "pending_payment",
+                "payment_deadline": {"$exists": True, "$ne": None},
+                "$or": [
+                    {"payment_reminder_24_sent": {"$ne": True}},
+                    {"payment_reminder_48_sent": {"$ne": True}},
+                ],
+            }, {"_id": 0}).to_list(200)
 
-        for listing in pending_listings:
-            try:
-                winner_id = listing.get("winner_id")
-                if not winner_id:
-                    continue
-                winner = await db.users.find_one({"id": winner_id}, {"_id": 0, "email": 1, "name": 1})
-                if not winner or not winner.get("email"):
-                    continue
+            for listing in pending:
+                try:
+                    winner_id = (listing.get("winner_id") or listing.get("winner_user_id")
+                                 or listing.get("highest_bidder_id"))
+                    if not winner_id:
+                        continue
+                    try:
+                        deadline_dt = datetime.fromisoformat(
+                            str(listing["payment_deadline"]).replace("Z", "+00:00"))
+                        if deadline_dt.tzinfo is None:
+                            deadline_dt = deadline_dt.replace(tzinfo=timezone.utc)
+                    except Exception:
+                        continue
+                    t0 = deadline_dt - timedelta(hours=72)
+                    elapsed_h = (now - t0).total_seconds() / 3600
+                    if elapsed_h < 24:
+                        continue
 
-                deadline_dt = datetime.fromisoformat(listing["payment_deadline"])
-                days_remaining = max(0, (deadline_dt - now).days)
+                    stage = None
+                    if elapsed_h >= 48 and not listing.get("payment_reminder_48_sent"):
+                        stage = "48"
+                    elif elapsed_h >= 24 and not listing.get("payment_reminder_24_sent"):
+                        stage = "24"
+                    if not stage:
+                        continue
 
-                from services.emails.email_system import send_payment_reminder_email
-                await send_payment_reminder_email(
-                    winner_email=winner["email"],
-                    winner_name=winner.get("name", "Winner"),
-                    item_title=listing.get("title", "Item"),
-                    final_price=listing.get("final_price", 0),
-                    listing_id=listing["id"],
-                    days_remaining=days_remaining,
-                    payment_deadline=listing["payment_deadline"],
-                )
+                    winner = await db.users.find_one(
+                        {"id": winner_id}, {"_id": 0, "email": 1, "name": 1})
+                    hammer = float(listing.get("final_price") or listing.get("current_price")
+                                   or listing.get("current_bid") or 0)
+                    hours_remaining = max(0, (deadline_dt - now).total_seconds() / 3600)
 
-                await db.listings.update_one(
-                    {"id": listing["id"]},
-                    {"$set": {"reminder_sent": True}},
-                )
-                logger.info(f"Payment reminder sent for listing {listing['id']} to {winner['email']}")
-            except Exception as e:
-                logger.error(f"Failed to send payment reminder for listing {listing.get('id')}: {e}")
+                    if winner and winner.get("email"):
+                        await send_payment_reminder_email(
+                            winner_email=winner["email"],
+                            winner_name=winner.get("name", "Winner"),
+                            item_title=listing.get("title", "Item"),
+                            final_price=hammer,
+                            listing_id=listing["id"],
+                            days_remaining=int(hours_remaining // 24),
+                            payment_deadline=str(listing["payment_deadline"]),
+                        )
+                        # Escalation warning on the 48h reminder
+                        if stage == "48":
+                            try:
+                                from services.emails._email_core import send_email, _base_template
+                                await send_email(
+                                    to_email=winner["email"],
+                                    subject="Final notice before auto-charge / Dernier avis avant prélèvement automatique",
+                                    html_content=_base_template(
+                                        f"<h2 style='margin:0 0 16px 0;color:#b91c1c;'>Escalation Warning / Avertissement</h2>"
+                                        f"<p>Payment for <strong>{listing.get('title','your item')}</strong> remains outstanding. "
+                                        f"If unpaid by the deadline, BidVex will charge your saved payment method for the "
+                                        f"full amount owing, as authorized when you placed your bid.</p>"
+                                        f"<p style='color:#555;'>Le paiement pour <strong>{listing.get('title','votre article')}</strong> est "
+                                        f"toujours impay&eacute;. S'il n'est pas r&eacute;gl&eacute; avant l'&eacute;ch&eacute;ance, BidVex pr&eacute;l&egrave;vera votre moyen de "
+                                        f"paiement enregistr&eacute; pour le montant total d&ucirc;, tel qu'autoris&eacute; lors de votre mise.</p>",
+                                        "Escalation Warning",
+                                    ),
+                                )
+                            except Exception as esc_err:  # noqa: BLE001
+                                logger.warning(f"[reminders] escalation email failed: {esc_err}")
+
+                    # Bilingual bell notification
+                    try:
+                        from services.notifications_i18n import create_notification
+                        await create_notification(
+                            db, user_id=winner_id, kind="payment_reminder",
+                            params={"title": listing.get("title", "your item"),
+                                    "amount": f"{hammer:,.2f}"},
+                            data={"listing_id": listing["id"], "stage": stage,
+                                  "action_url": "/dashboard/buyer"},
+                        )
+                    except Exception:  # noqa: BLE001
+                        pass
+
+                    await db[coll].update_one(
+                        {"id": listing["id"]},
+                        {"$set": {f"payment_reminder_{stage}_sent": True,
+                                  f"payment_reminder_{stage}_sent_at": now.isoformat()}},
+                    )
+                    logger.info(f"[reminders] T+{stage}h reminder sent for {listing['id']}")
+                except Exception as e:
+                    logger.error(f"Failed payment reminder for {listing.get('id')}: {e}")
     except Exception as e:
         logger.error(f"Error in send_auction_payment_reminders: {e}")
 

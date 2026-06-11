@@ -156,20 +156,25 @@ async def confirm_pickup_code(
     # Best-effort commission charge to seller card on file. The hybrid
     # manual-settlement queue from iter211 will handle Stripe failures by
     # creating an outstanding-balance entry that admins can review.
+    # iter302 — Stripe-collected transactions already paid the platform fee
+    # at capture time; never double-charge commission for those.
     try:
-        from services.manual_settlement_service import enqueue_manual_commission
-        hammer = float(txn.get("hammer_price") or 0)
-        commission_cad = round(hammer * 0.05, 2)  # individual default — refine via fee_calculator if needed
-        if commission_cad > 0:
-            await enqueue_manual_commission(
-                db,
-                user_id=current_user.id,
-                auction_id=txn.get("auction_id"),
-                listing_id=txn.get("pickup_code_listing_id") or txn.get("listing_id"),
-                listing_title=txn.get("listing_title", "Auction item"),
-                commission_amount_cad=commission_cad,
-                notes=f"Pickup-code confirmed for transaction {txn['id']}",
-            )
+        if txn.get("commission_already_collected") or txn.get("payment_method") == "stripe":
+            logger.info(f"[pickup_code] commission skip for {txn['id']} (already collected via Stripe)")
+        else:
+            from services.manual_settlement_service import enqueue_manual_commission
+            hammer = float(txn.get("hammer_price") or 0)
+            commission_cad = round(hammer * 0.05, 2)  # individual default — refine via fee_calculator if needed
+            if commission_cad > 0:
+                await enqueue_manual_commission(
+                    db,
+                    user_id=current_user.id,
+                    auction_id=txn.get("auction_id"),
+                    listing_id=txn.get("pickup_code_listing_id") or txn.get("listing_id"),
+                    listing_title=txn.get("listing_title", "Auction item"),
+                    commission_amount_cad=commission_cad,
+                    notes=f"Pickup-code confirmed for transaction {txn['id']}",
+                )
     except Exception as e:
         logger.warning(f"[pickup_code] commission enqueue failed (will retry later): {e}")
 

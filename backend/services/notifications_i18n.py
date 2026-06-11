@@ -116,6 +116,25 @@ _TEMPLATES = {
         lambda p: "Annonce refusée",
         lambda p: f"Votre annonce « {p.get('title','votre article')} » a été refusée. Raison : {p.get('reason','—')}",
     ),
+    # iter302 — manual + automated payment reminders / payouts.
+    "payment_reminder": (
+        lambda p: "Payment Reminder",
+        lambda p: f"Friendly reminder: payment of ${p.get('amount','0')} CAD is due for \"{p.get('title','your item')}\".",
+        lambda p: "Rappel de paiement",
+        lambda p: f"Rappel amical : un paiement de {p.get('amount','0')} $ CAD est dû pour « {p.get('title','votre article')} ».",
+    ),
+    "payout_sent": (
+        lambda p: "Payout Sent",
+        lambda p: f"Your payout of ${p.get('amount','0')} CAD for \"{p.get('title','your item')}\" is on its way to your bank account.",
+        lambda p: "Versement envoyé",
+        lambda p: f"Votre versement de {p.get('amount','0')} $ CAD pour « {p.get('title','votre article')} » est en route vers votre compte bancaire.",
+    ),
+    "payout_pending_admin": (
+        lambda p: "Manual Payout Required",
+        lambda p: f"Seller has no Stripe Connect account — manual payout of ${p.get('amount','0')} CAD needed for \"{p.get('title','item')}\".",
+        lambda p: "Versement manuel requis",
+        lambda p: f"Le vendeur n'a pas de compte Stripe Connect — versement manuel de {p.get('amount','0')} $ CAD requis pour « {p.get('title','article')} ».",
+    ),
     # iter301 — Buyer ↔ Seller messaging bell notification.
     "new_message": (
         lambda p: "New Message",

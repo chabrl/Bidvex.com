@@ -27,6 +27,8 @@ import { LoadingTimeout } from '../components/LoadingTimeout';
 import InfoTip from '../components/InfoTip';
 import PendingAiReviewBanner from '../components/PendingAiReviewBanner';
 import PendingPaymentsCard from '../components/PendingPaymentsCard';
+// iter302 Directive 2 — Stripe Connect instant-payout onboarding banner
+import StripeConnectBanner from '../components/StripeConnectBanner';
 // iter239 Mission 5 — Seller "Promote" modal.
 import PromoteListingModal from '../components/PromoteListingModal';
 import { Sparkles, RefreshCw, Pencil, Receipt } from 'lucide-react';
@@ -282,6 +284,9 @@ const SellerDashboard = () => {
             </Button>
           </div>
         </div>
+
+        {/* iter302 Directive 2 — Stripe Connect onboarding for instant payouts */}
+        <StripeConnectBanner />
 
         {/* Tab Navigation — horizontally scrollable on mobile */}
         <div className="border-b border-slate-200 dark:border-slate-700 -mx-4 sm:mx-0 px-4 sm:px-0">
