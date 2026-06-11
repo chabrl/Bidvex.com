@@ -77,4 +77,4 @@ Otherwise the Law-25 consent banner intercepts the Sign-In click.
 - Email: iter225buyer@bidvex.com
 - Password: TestBuyer225!
 - Role: user (regular buyer)
-- Notes: re-registered on this preview DB during iter301 (old account didn't exist → 401). New user id 85b3ce59-f264-4d43-8d12-19b3449ec8b3. Login verified via API on 2026-06-11.
+- Notes: re-registered on this preview DB during iter301 (old account didn't exist → 401). New user id 85b3ce59-f264-4d43-8d12-19b3449ec8b3. Login verified via API on 2026-06-11. phone_verified=true set (phone +15145550199) so /messages UI is reachable for E2E.

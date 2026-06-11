@@ -10147,3 +10147,15 @@ Facility chooses payment method per listing (Stripe / Cash / E-Transfer). Option
 
 ## Test credentials
 - Admin: `charbel911@gmail.com` / `Anderosli123!@#` (role=admin)
+
+## iter300 (Jun 11, 2026) — Top Sellers / Disputes / Auto-Capture / Analytics Range / Storefront — DONE ✅ (see CHANGELOG.md)
+- P1 Top Seller badge (nightly GMV top-5, bilingual gold badge, mint notification), P1 Admin General Dispute Queue (+ buyer File-a-Dispute 7-day window), P1 hourly overdue-deposit auto-capture (3 strikes → bidding suspension), P2 analytics custom date range, P2 storefront /seller/{id} + Follow Seller. Testing agent iteration_246.json all green; 3 P3 polish items fixed in iter301 session.
+
+## iter301 (Jun 11, 2026) — Bilingual Audit + Reviews + Messaging + SEO + Perf — DONE ✅ (full detail in CHANGELOG.md)
+- P0 FR audit: 12 high-traffic user-facing components i18n-ified + new locale namespaces; new bilingual notification kinds (new_message/new_review/message_thread_reported). Backlog: legal pages need lawyer-approved FR; admin stays EN by design.
+- P1 Reviews: /review/submit page + bidirectional submit-context/submit APIs (idempotent 409), admin buyer-reviews modal + soft delete, reputation excludes seller→buyer, FIXED broken rating-request emails (wrong send_unified_email signature + dead /rate/ link).
+- P1 Messaging: pre-sale Q&A to seller on active listings (vehicles gate unchanged), per-listing threads ({pair}__{listing_id}), messaging_suspended enforced, bell notif, abuse report → admin Reported Threads queue (+resolve), /admin?tab=messaging deep-link fixed.
+- P2 SEO: dynamic html lang, hreflang en-ca/fr-ca/x-default; robots/sitemap verified.
+- P2 Perf: 27 new Mongo indexes, total_count+page pagination metadata, limit caps (≤100), 60s analytics cache, bundle 358.5KB gz.
+- QA: 53 pytest green (iter300+301+messaging suites); testing agent iteration_247.json backend 100%, both frontend flags fixed + re-verified E2E. Legacy full-suite 429/event-loop artifacts documented (pre-existing).
+- NOT YET DEPLOYED to production (bidvex.com) — user to deploy.

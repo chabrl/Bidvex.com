@@ -806,3 +806,50 @@ EMERGENT_LLM_KEY=sk-emergent-…         (optional; preview uses it. If missing 
 ---
 
 ## Earlier Sessions - See PRD.md for full history
+
+## June 11, 2026 — Iteration 301 (P0 Bilingual Audit + Reviews + Messaging + SEO + Performance)
+
+### Iter300 closeout (3 polish items)
+- Storefront FR labels fixed: storefront.memberSince/completedAuctions/itemsSold/followers/verified added to en+fr locales; member-since date now locale-aware (fr-CA)
+- React key warning fixed in EnhancedUserManager (contact-only records have no id → key fallback email/index)
+- test_credentials.md corrected: iter225buyer re-seeded on preview (new id 85b3ce59-…, phone_verified=true)
+
+### P0 — Bilingual audit (FR)
+- i18n-ified: MessageSellerModal, MessagesPage (system card, empty states, dropdown, toasts), SellerReputation (badges, counts, "No reviews yet", review list), SellOptionsModal, ProfileSettingsPage (notif prefs + change password), AuthPage (reset flow), BuyerDashboard (14 strings), SellerDashboard (5), DecomposedMarketplace, RealtimeBiddingPanel, CompareListingsPage
+- New locale namespaces: reviewSubmit, messageSeller, messaging, reputation, sellOptions, profileSettings, buyerDash, sellerDash, decomposed, bidding, compare
+- notifications_i18n: new bilingual kinds new_message / new_review / message_thread_reported
+- Rating-request emails now bilingual EN+FR (and previously broken — see P1 reviews)
+- NOT translated (documented backlog): full legal pages (need lawyer-approved FR), admin panel (English-only by design)
+
+### P1 — Review system (full build)
+- NEW GET /api/reviews/submit-context + POST /api/reviews/submit — bidirectional (buyer→seller and seller→buyer), idempotent per (listing, reviewer, direction) → 409, rating 1-5, comment ≤500
+- NEW GET /api/reviews/buyer/{buyer_id} (admin-only) — reviews received as buyer; admin soft-delete retained (status=removed, excluded from averages)
+- seller_reputation pipeline excludes role="seller" docs; min-3-reviews threshold + New Seller badge unchanged
+- FIXED latent bug: rating-request emails called send_unified_email with wrong signature (silently failing) AND linked to non-existent /rate/... route → now send via send_email/_base_template with links to /review/submit?listing_id=&role=
+- NEW frontend /review/submit (ReviewSubmitPage.js, lazy) — star picker, comment, bilingual confirmation; storefront reviews paginated 10/page
+- Admin → Users → actions → "Buyer Reviews" modal with soft-delete
+
+### P1 — Messaging completion
+- Pre-sale Q&A: active marketplace/lots/storage listings — any signed-in user may message the SELLER (vehicle unlock-fee gate unchanged); non-seller receivers → 403 presale_must_message_seller
+- Per-listing threads: conversation_id = "{sorted pair}__{listing_id}" for new threads; replies pass explicit conversation_id (legacy pair threads still work)
+- messaging_suspended now enforced at POST /api/messages (bilingual 403)
+- Bell notification (new_message kind) when recipient not in thread
+- Abuse reporting: POST /api/conversations/{id}/report (participant-only) → admin queue GET /api/admin/messages/reported-threads (+/resolve); MessagesPage "Report Thread" dialog; Admin Messaging Oversight now has Reported Threads section + thread viewer
+- FIXED /admin?tab=messaging deep-link (cross-cutting tabs were reset to users; StrictMode-safe param-clearing fix)
+
+### P2 — SEO
+- Dynamic <html lang> synced to active language (App.js effect)
+- hreflang en-ca / fr-ca / x-default added to SEO.js (all pages via Helmet)
+- robots.txt + sitemap.xml verified (already present, dynamic)
+
+### P2 — Performance
+- Mongo indexes added (server.py): listings/multi_item/vehicle/storage seller_id+winner+status/end_time, bids/lot_bids/vehicle_bids user_id, messages, conversations, reviews, follows (29/31 created)
+- /api/marketplace/items returns total_count + page (aliases, non-breaking); GET /listings + /multi-item-listings limits capped (Query le=100)
+- 60s TTL cache on GET /api/admin/analytics/overview (range-keyed)
+- Main bundle 358.5 KB gz (<500 KB target); admin already code-split; images already native-lazy via OptimizedImage
+
+### Testing
+- 19/19 tests/test_iter301_features.py + 15/15 testing-agent test_iter301_review_request.py + iter300 + messaging-gate suites = 53 green
+- Testing agent iteration_247.json: backend 100%; frontend issues (admin deep-link, phone-gated buyer) both FIXED and re-verified via UI smoke (review submit E2E, report-thread E2E, FR storefront, admin oversight)
+- Known env artifacts in full 3300-test legacy run: login rate-limit 429s + event-loop pollution (pre-existing; suites green standalone)
+

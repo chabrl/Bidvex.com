@@ -341,6 +341,10 @@ const AdminDashboard = () => {
   }, [user, navigate]);
 
   // Update secondary tab when primary changes — but respect any ?tab= override.
+  // iter301 — cross-cutting tabs (Marketing/Financial groups) live outside the
+  // SECONDARY_TABS map; honour them on deep-link (?tab=messaging etc.). The
+  // param is cleared when the user manually picks a primary tab (see onClick),
+  // so this stays StrictMode-safe without one-shot refs.
   useEffect(() => {
     const secondaryOptions = SECONDARY_TABS[primaryTab];
     if (!secondaryOptions || secondaryOptions.length === 0) return;
@@ -351,8 +355,31 @@ const AdminDashboard = () => {
       setSecondaryTab(urlTab);
       return;
     }
+    // Cross-cutting deep-link (e.g. /admin?tab=messaging) — keep it active.
+    if (urlTab && [...MARKETING_TABS, ...FINANCIAL_TABS].some((t) => t.id === urlTab)) {
+      setSecondaryTab(urlTab);
+      return;
+    }
     setSecondaryTab(secondaryOptions[0].id);
   }, [primaryTab]);
+
+  // iter301 — manual primary-tab navigation clears any ?tab= deep-link so the
+  // effect above falls back to the primary's default subtab.
+  const handlePrimaryTabClick = (tabId) => {
+    try {
+      const u = new URL(window.location.href);
+      if (u.searchParams.has('tab')) {
+        u.searchParams.delete('tab');
+        window.history.replaceState({}, '', u.toString());
+      }
+    } catch { /* noop */ }
+    if (tabId === primaryTab) {
+      const opts = SECONDARY_TABS[tabId];
+      if (opts && opts.length > 0) setSecondaryTab(opts[0].id);
+    } else {
+      setPrimaryTab(tabId);
+    }
+  };
 
   // Scroll to top when navigating between admin tabs
   useEffect(() => {
@@ -761,7 +788,7 @@ const AdminDashboard = () => {
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setPrimaryTab(tab.id)}
+                  onClick={() => handlePrimaryTabClick(tab.id)}
                   className={`relative flex items-center gap-2 px-4 py-2.5 rounded-full font-medium transition-all whitespace-nowrap ${
                     isActive 
                       ? 'bg-primary text-white shadow-lg' 
