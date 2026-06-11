@@ -117,6 +117,8 @@ def enrich_listing_with_seller(
     listing["seller_partner_company_name"] = (
         seller.get("partner_company_name") if account_type == "partner" else None
     )
+    # iter300 — merit-based Top Seller badge (nightly GMV ranking).
+    listing["seller_is_top_seller"] = bool(seller.get("is_top_seller"))
     # iter283 — Public seller-info fields surfaced on the listing detail
     # "Seller Information" card. None when missing so the FE can hide the
     # row cleanly. Only forwarded for non-individual sellers to avoid
@@ -181,6 +183,7 @@ async def enrich_listings_bulk_async(
                 "subscription_tier": 1,
                 "platform_fee_paid": 1,
                 "partner_subscription_active": 1,
+                "is_top_seller": 1,
                 # iter283 — Public seller-info fields (website + company)
                 # used by the listing detail "Seller Information" card.
                 "website": 1,
@@ -236,6 +239,7 @@ async def enrich_listing_async(
             "subscription_tier": 1,
             "platform_fee_paid": 1,
             "partner_subscription_active": 1,
+            "is_top_seller": 1,
             # iter283 — Public seller-info fields.
             "website": 1,
             "company_name": 1,

@@ -668,6 +668,10 @@ async def place_storage_bid(
 ):
     db = get_db()
 
+    # iter300 P1 — suspended buyers cannot bid (overdue-payment escalation).
+    from services.bid_guard import ensure_bidding_allowed
+    await ensure_bidding_allowed(db, current_user.id)
+
     # ── Deposit guard ──
     # iter285 — Use the dual-visibility bridge so cross-collection storage
     # units (authored via /create-listing) load correctly here too.

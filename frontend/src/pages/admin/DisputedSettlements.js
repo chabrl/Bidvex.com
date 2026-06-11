@@ -1,6 +1,7 @@
 import API_BASE from '../../config';
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import GeneralDisputeQueue from './GeneralDisputeQueue';
 import { useAuth } from '../../contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -88,10 +89,10 @@ const DisputedSettlements = () => {
         <div>
           <h2 className="text-2xl font-bold flex items-center gap-2">
             <AlertTriangle className="h-6 w-6 text-rose-600" />
-            Disputed Vehicle Settlements
+            Disputed Settlements
           </h2>
           <p className="text-muted-foreground text-sm mt-1">
-            Review and resolve disputes between buyers and dealers regarding vehicle settlements.
+            Review and resolve disputes — general transaction disputes (marketplace, lots, storage) and vehicle settlement disputes.
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={() => fetchData(true)} disabled={refreshing}>
@@ -99,8 +100,11 @@ const DisputedSettlements = () => {
         </Button>
       </div>
 
+      {/* iter300 P1 — general dispute queue with release / refund / escalate / notes */}
+      <GeneralDisputeQueue />
+
       <Card>
-        <CardHeader><CardTitle className="text-base">Open Disputes ({data.total})</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-base">Vehicle Settlement Disputes ({data.total})</CardTitle></CardHeader>
         <CardContent>
           {data.disputes.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground" data-testid="no-disputes-empty">

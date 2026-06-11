@@ -12,6 +12,9 @@ import {
 } from 'lucide-react';
 import SEO from '../components/SEO';
 import { SellerReputationCard, SellerReviewsList } from '../components/SellerReputation';
+// iter300 — Top Seller badge + Follow Seller
+import { TopSellerBadge } from '../components/TopSellerBadge';
+import { FollowSellerButton } from '../components/FollowSellerButton';
 
 const API = API_BASE;
 
@@ -47,7 +50,7 @@ const StorefrontPage = () => {
     );
   }
 
-  const { seller, storefront, listings, has_storefront } = data;
+  const { seller, storefront, listings, stats, has_storefront } = data;
   const accentColor = storefront?.accent_color || '#06b6d4';
 
   return (
@@ -74,20 +77,52 @@ const StorefrontPage = () => {
               </div>
             )}
           </div>
-          <div className="pb-1">
-            <div className="flex items-center gap-2">
+          <div className="pb-1 min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">{seller.name}</h1>
+              {seller.is_top_seller && <TopSellerBadge size="md" data-testid="storefront-top-seller-badge" />}
               {has_storefront && (
                 <Badge className="text-xs font-semibold" style={{ background: accentColor, color: 'white' }}>
                   <Star className="h-3 w-3 mr-1" /> {t('storefront.proSeller')}
+                </Badge>
+              )}
+              {seller.is_verified && (
+                <Badge className="bg-blue-100 text-blue-700 border-blue-200 text-xs font-semibold" data-testid="storefront-verified-badge">
+                  ✓ {t('storefront.verified', 'Verified')}
                 </Badge>
               )}
             </div>
             {storefront?.tagline && (
               <p className="text-slate-600 dark:text-slate-300 text-sm mt-1">{storefront.tagline}</p>
             )}
+            {seller.joined && (
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1" data-testid="storefront-member-since">
+                {t('storefront.memberSince', 'Member since')} {new Date(seller.joined).toLocaleDateString(undefined, { year: 'numeric', month: 'long' })}
+              </p>
+            )}
+          </div>
+          <div className="pb-1 shrink-0">
+            <FollowSellerButton sellerId={userId} />
           </div>
         </div>
+
+        {/* iter300 — public seller stats */}
+        {stats && (
+          <div className="grid grid-cols-3 gap-3 mb-6" data-testid="storefront-stats">
+            {[
+              { label: t('storefront.completedAuctions', 'Completed auctions'), value: stats.completed_auctions },
+              { label: t('storefront.itemsSold', 'Items sold'), value: stats.items_sold },
+              { label: t('storefront.followers', 'Followers'), value: stats.followers },
+            ].map((s) => (
+              <Card key={s.label} className="border-0 shadow-sm dark:bg-slate-800/50">
+                <CardContent className="py-3 text-center">
+                  <p className="text-xl font-bold" style={{ color: accentColor }}>{s.value ?? 0}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">{s.label}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
 
         {storefront?.about && (
           <Card className="mb-6 border-0 shadow-sm dark:bg-slate-800/50">
@@ -123,7 +158,7 @@ const StorefrontPage = () => {
               <Card
                 key={item.id}
                 className="cursor-pointer overflow-hidden border-0 shadow-md hover:shadow-xl transition-all duration-300 dark:bg-slate-800/50 group"
-                onClick={() => navigate(`/listing/${item.id}`)}
+                onClick={() => navigate(item._url || `/listing/${item.id}`)}
                 data-testid={`storefront-listing-${item.id}`}
               >
                 <div className="relative aspect-square bg-slate-100 dark:bg-slate-700 overflow-hidden">
@@ -135,6 +170,12 @@ const StorefrontPage = () => {
                   {item.is_featured && (
                     <Badge className="absolute top-2 left-2 bg-amber-500 text-white border-0 text-xs">
                       <Star className="h-3 w-3 mr-1" /> {t('storefront.featured')}
+                    </Badge>
+                  )}
+                  {/* iter300 — section chip (storefront aggregates all 4 sections) */}
+                  {item._section && item._section !== 'marketplace' && (
+                    <Badge className="absolute top-2 right-2 bg-slate-900/70 text-white border-0 text-[10px] uppercase tracking-wide">
+                      {item._section}
                     </Badge>
                   )}
                 </div>

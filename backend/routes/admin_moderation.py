@@ -137,6 +137,17 @@ async def approve_listing(listing_id: str, admin: User = Depends(require_admin))
         invalidate_listing_caches()
     except Exception:  # noqa: BLE001
         pass
+
+    # iter300 P2 — listing just became publicly visible: alert followers.
+    if seller_id:
+        try:
+            from services.follower_notify import notify_followers
+            await notify_followers(
+                db, seller_id=seller_id, listing_id=listing_id,
+                listing_title=doc.get("title", "New listing"), section=section)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[moderation] follower fan-out failed: {e}")
+
     logger.info(f"[moderation] {listing_id} APPROVED by {admin.email}")
     return {"success": True, "listing_id": listing_id, "status": "active"}
 

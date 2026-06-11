@@ -511,6 +511,8 @@ async def get_seller_profile(
             "bio": seller_doc.get("bio"),
             "bio_fr": seller_doc.get("bio_fr"),
             "subscription_tier": seller_doc.get("subscription_tier", "free"),
+            "is_top_seller": bool(seller_doc.get("is_top_seller")),
+            "trusted_seller": bool(seller_doc.get("trusted_seller")),
             "member_since": seller_doc.get("created_at"),
             "average_rating": avg_rating,
             "total_ratings": len(ratings),

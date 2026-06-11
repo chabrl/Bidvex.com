@@ -1,0 +1,38 @@
+{
+  "summary": "iter300 E2E validation on PREVIEW. Backend live-API smoke (analytics range default+custom, top-sellers recalc, bidding-suspension set/lift) all green. Frontend interactive flows verified: anonymous Storefront /store/{adminId} renders gold Top Seller badge (EN 'Top Seller', FR 'Meilleur Vendeur' via language toggle), member-since line, stats row (1/1/0), Follow Seller button. Admin Disputed Settlements tab (?tab=disputed-settlements) renders General Disputes (Marketplace) card with Open/Resolved/All filters above the legacy vehicle settlement section. Admin Advanced Analytics tab (?tab=advanced-analytics) renders the range picker (analytics-range-select) defaulting to 'Last 30 days' with the localized label 'Showing range-scoped metrics for 2026-05-13 → 2026-06-11 (30 days)' and live KPI cards (GMV, sell-through 16.7%). Admin User Management renders 48 bidding-suspension buttons (text 'Bidding') across user rows. Scheduler Status card on /admin lists top_seller_recalc + auto_capture_overdue_deposits as registered jobs. Backend: GET /api/admin/analytics/overview default → 30 days / signups_per_day length 30; ?from=2026-06-01&to=2026-06-08 → range.days=8, signups_per_day length 8. POST /api/admin/analytics/top-sellers/recalculate → 200 with top[] array. POST /api/admin/users/{id}/bidding-suspension?suspended=true/false → 200 success on a freshly registered throwaway buyer (already lifted; suspension cleared post-test). The supplied credentials iter225buyer@bidvex.com/TestBuyer225! return 401 Invalid credentials on the preview env — used a registered throwaway buyer instead and did NOT consume any of the 4 remaining pending_review listings.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/auth/login", "issue": "Documented buyer credentials iter225buyer@bidvex.com / TestBuyer225! return 401 Invalid credentials — likely never seeded on this preview env or password rotated. Buyer flows requiring login (follow from UI, dispute filing UI) could not be exercised end-to-end through the UI without registering a fresh account."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "EnhancedUserManager", "issue": "React console warning 'Each child in a list should have a unique key prop' emitted on every Admin → Users render (recurring from iter245)", "selector": "EnhancedUserManager list render", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Storefront /store/{userId} in FR mode", "issues": ["The 'Member since January 2026' label remains in English when the UI is switched to FR — the date prefix and stat labels (Completed auctions / Items sold / Followers) are not localized; only the Top Seller badge and navbar flip. Minor i18n gap."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter300_features.py"
+  ],
+  "action_items": [
+    "P3: Update /app/memory/test_credentials.md to remove or correct the iter225buyer@bidvex.com / TestBuyer225! entry (returns 401 on preview). Add a working preview-env buyer for future iter300 UI re-tests, or re-seed iter225buyer.",
+    "P3: Translate Storefront stat labels ('Member since', 'Completed auctions', 'Items sold', 'Followers', 'No reviews yet', 'Active Listings') for FR locale.",
+    "P3: Resolve recurring React key warning in EnhancedUserManager (also flagged in iter245)."
+  ],
+  "critical_code_review_comments": [
+    "AdvancedAnalytics route is mounted under ?tab=advanced-analytics (not ?tab=analytics) — the iter300 request mentions 'Admin → Analytics → Advanced Analytics'. UX is fine because the sidebar exposes Advanced Analytics under the Analytics group, but external deep links must use the granular tab id.",
+    "Storefront FR localization is partial — top-level marketing text and badge translate, but date/stat labels remain English. Worth completing for a launch-ready bilingual page (Bill 96 compliance pattern)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% on live smoke (5/5 endpoints verified)", "frontend": "100% on verified surfaces (storefront EN/FR badge+member+stats+follow, admin disputed-settlements queue+filters, admin advanced-analytics range picker default, admin user-management bidding buttons, scheduler status jobs registered)"},
+  "test_credentials": "Admin charbel911@gmail.com / Anderosli123!@# — works. iter225buyer@bidvex.com / TestBuyer225! — 401 Invalid credentials on preview. Registered ephemeral buyer iter300test+1781144948@example.com / TestBuyer300! (id f071c9d6-d0f1-46b5-b6f4-819fe9fa09cd) for bidding-suspension test; suspension already lifted, account harmless.",
+  "seed_data_creation": "Registered 1 ephemeral buyer (iter300test+1781144948@example.com). Did NOT touch any pending_review listings — 4 remain. Did NOT seed a dispute item (skipped because the follow-up dispute UI flow requires a phone-verified buyer; the dispute lifecycle is already covered green in /app/backend/tests/test_iter300_features.py per main agent's own report).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "iter300 features (Top Seller badge, Dispute Resolution UI scaffolding + General Dispute queue, Overdue auto-capture bidding-suspension toggle, Analytics range picker, Storefront + Follow) are wired correctly on the preview env. The only outstanding gaps are i18n polish on the Storefront stat labels and a stale React key warning in EnhancedUserManager. For full UI buyer-side coverage (follow toggle from button, file-dispute dialog, Following tab unfollow) re-seed a working preview buyer first — current iter225buyer login is broken on preview. Backend pytest suite at /app/backend/tests/test_iter300_features.py (26 tests, main agent confirmed green) covers every API path including the 403 bid-guard and dispute resolve-without-PI path, so live smoke is sufficient regression for the next iteration.",
+  "rca of the issue": "iter225buyer 401: the credentials file /app/memory/test_credentials.md does not list iter225buyer@bidvex.com — only iter189buyer@test.com and iter189buyer@bidvex.com. iter225 broker tests likely created the account on a different env and it was never re-seeded on the current preview database. Mitigation: register a fresh ephemeral buyer per testing session (the iter300 pytest fixture already does this) or add a re-seed script for iter225buyer."
+}

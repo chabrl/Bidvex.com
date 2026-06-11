@@ -47,6 +47,10 @@ def get_db():
 async def place_bid(request: Request, bid_data: BidCreate, current_user: User = Depends(get_current_user)):
     db = get_db()
 
+    # iter300 P1 — suspended buyers cannot bid (overdue-payment escalation).
+    from services.bid_guard import ensure_bidding_allowed
+    await ensure_bidding_allowed(db, current_user.id)
+
     # ========== HIGH-TRUST GATEKEEPING ==========
     if current_user.role != 'admin':
         if not current_user.phone_verified:

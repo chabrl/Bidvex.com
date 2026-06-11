@@ -14,7 +14,7 @@ from collections import defaultdict
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 from deps import get_db, require_admin, User
 
@@ -23,6 +23,14 @@ analytics_router = APIRouter(prefix="/admin/analytics", tags=["admin-analytics"]
 
 _SOLD_UNION = ["sold", "ended", "completed"]
 _ENDED_UNION = ["sold", "ended", "expired", "completed", "ended_no_sale", "unsold", "no_sale"]
+
+
+@analytics_router.post("/top-sellers/recalculate")
+async def trigger_top_seller_recalc(admin: User = Depends(require_admin)):
+    """iter300 — manually trigger the nightly Top Seller badge job."""
+    db = get_db()
+    from services.top_sellers import recalculate_top_sellers
+    return await recalculate_top_sellers(db)
 
 
 def _parse_dt(v) -> Optional[datetime]:
@@ -55,10 +63,25 @@ def _day(dt: Optional[datetime]) -> Optional[str]:
 
 
 @analytics_router.get("/overview")
-async def get_admin_analytics(admin: User = Depends(require_admin)):
+async def get_admin_analytics(
+    admin: User = Depends(require_admin),
+    from_date: Optional[str] = Query(None, alias="from"),
+    to_date: Optional[str] = Query(None, alias="to"),
+):
     db = get_db()
     now = datetime.now(timezone.utc)
-    cutoff_30d = now - timedelta(days=30)
+
+    # ── iter300 P2 — optional custom date range (?from=YYYY-MM-DD&to=YYYY-MM-DD).
+    # Defaults to the last 30 days. Range-scoped metrics: GMV(range),
+    # revenue(range + per-day series), signups series, top sellers, avg
+    # hammer, conversion. All-time KPIs are always included alongside.
+    range_to = _parse_dt(to_date) or now
+    if to_date:  # include the full "to" day
+        range_to = range_to.replace(hour=23, minute=59, second=59)
+    range_from = _parse_dt(from_date) or (range_to - timedelta(days=29))
+    if range_from > range_to:
+        range_from, range_to = range_to, range_from
+    span_days = min(366, max(1, (range_to.date() - range_from.date()).days + 1))
 
     sections = {
         "marketplace": ("listings", "auction_end_date"),
@@ -68,7 +91,7 @@ async def get_admin_analytics(admin: User = Depends(require_admin)):
     }
 
     gmv_all = 0.0
-    gmv_30d = 0.0
+    gmv_range = 0.0
     auctions_by_section: Dict[str, Dict[str, int]] = {}
     hammer_sums: Dict[str, List[float]] = defaultdict(list)
     seller_gmv: Dict[str, float] = defaultdict(float)
@@ -87,7 +110,9 @@ async def get_admin_analytics(admin: User = Depends(require_admin)):
         by_status: Dict[str, int] = defaultdict(int)
         for d in docs:
             by_status[d.get("status") or "unknown"] += 1
-            if d.get("status") in _ENDED_UNION:
+            end_dt = _parse_dt(d.get("sold_at") or d.get("ended_at"))
+            end_in_range = (end_dt is None) or (range_from <= end_dt <= range_to)
+            if d.get("status") in _ENDED_UNION and end_in_range:
                 conversion["ended_total"] += 1
                 bid_count = d.get("bid_count")
                 if bid_count is None:
@@ -97,13 +122,13 @@ async def get_admin_analytics(admin: User = Depends(require_admin)):
             if _is_sold(d):
                 amount = _hammer(d)
                 gmv_all += amount
-                hammer_sums[section].append(amount)
-                seller = d.get("seller_id") or d.get("facility_owner_id")
-                if seller:
-                    seller_gmv[seller] += amount
                 sold_dt = _parse_dt(d.get("sold_at") or d.get("ended_at"))
-                if sold_dt and sold_dt >= cutoff_30d:
-                    gmv_30d += amount
+                if sold_dt and range_from <= sold_dt <= range_to:
+                    gmv_range += amount
+                    hammer_sums[section].append(amount)
+                    seller = d.get("seller_id") or d.get("facility_owner_id")
+                    if seller:
+                        seller_gmv[seller] += amount
         auctions_by_section[section] = dict(by_status)
 
     # ── Platform revenue: actual collected fees from receipts; fall back
@@ -113,9 +138,9 @@ async def get_admin_analytics(admin: User = Depends(require_admin)):
         {"_id": 0, "platform_fee": 1, "created_at": 1},
     ).to_list(50000)
     fees_collected_all = round(sum(float(r.get("platform_fee") or 0) for r in receipts), 2)
-    fees_collected_30d = round(sum(
+    fees_collected_range = round(sum(
         float(r.get("platform_fee") or 0) for r in receipts
-        if (_parse_dt(r.get("created_at")) or now) >= cutoff_30d
+        if range_from <= (_parse_dt(r.get("created_at")) or now) <= range_to
     ), 2)
 
     # ── Users by role ──
@@ -137,7 +162,7 @@ async def get_admin_analytics(admin: User = Depends(require_admin)):
         else:
             users_by_role["individual"] += 1
 
-    # ── Top 5 sellers by GMV ──
+    # ── Top 5 sellers by GMV (within the selected range) ──
     top_seller_rows = sorted(seller_gmv.items(), key=lambda kv: kv[1], reverse=True)[:5]
     top_seller_docs = {}
     if top_seller_rows:
@@ -171,8 +196,9 @@ async def get_admin_analytics(admin: User = Depends(require_admin)):
                 break
         top_listings.append({"listing_id": lid, "title": title or lid[:8], "bids": n})
 
-    # ── Daily series (last 30 days) ──
-    day_keys = [(now - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(29, -1, -1)]
+    # ── Daily series (selected range, capped at 366 buckets) ──
+    day_keys = [(range_to - timedelta(days=i)).strftime("%Y-%m-%d")
+                for i in range(span_days - 1, -1, -1)]
     signups_by_day = {k: 0 for k in day_keys}
     for u in users:
         d = _day(_parse_dt(u.get("created_at")))
@@ -193,10 +219,14 @@ async def get_admin_analytics(admin: User = Depends(require_admin)):
 
     return {
         "generated_at": now.isoformat(),
-        "gmv": {"all_time": round(gmv_all, 2), "last_30d": round(gmv_30d, 2)},
+        "range": {"from": range_from.strftime("%Y-%m-%d"),
+                  "to": range_to.strftime("%Y-%m-%d"), "days": span_days},
+        "gmv": {"all_time": round(gmv_all, 2), "range": round(gmv_range, 2),
+                "last_30d": round(gmv_range, 2)},
         "platform_revenue": {
             "all_time": fees_collected_all,
-            "last_30d": fees_collected_30d,
+            "range": fees_collected_range,
+            "last_30d": fees_collected_range,
             "estimated_all_time": round(gmv_all * 0.025, 2),
         },
         "auctions_by_section": auctions_by_section,

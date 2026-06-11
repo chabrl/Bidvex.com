@@ -337,6 +337,10 @@ async def place_lot_bid(
     if event.get("status") not in ("live", "upcoming"):
         raise HTTPException(status_code=409, detail="Event is not accepting bids")
 
+    # iter300 P1 — suspended buyers cannot bid (overdue-payment escalation).
+    from services.bid_guard import ensure_bidding_allowed
+    await ensure_bidding_allowed(_db, user.get("id") if isinstance(user, dict) else user.id)
+
     # Resolve the lot
     lot = next((lt for lt in event.get("lots", []) if lt.get("id") == lot_id), None)
     if not lot:

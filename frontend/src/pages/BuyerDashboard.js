@@ -13,6 +13,8 @@ import Countdown from 'react-countdown';
 import { formatCurrency } from '../utils/currencyFormatter';
 import { LoadingTimeout } from '../components/LoadingTimeout';
 import { BuyerEscrowPanel } from '../components/EscrowPickupPanel';
+// iter300 P2 — "Sellers I Follow" tab
+import { FollowedSellersList } from '../components/FollowedSellersList';
 import InfoTip from '../components/InfoTip';
 import PendingPaymentsCard from '../components/PendingPaymentsCard';
 
@@ -145,6 +147,9 @@ const BuyerDashboard = () => {
                 <TabsTrigger value="watching" className="flex-shrink-0 min-w-[80px] bg-transparent">{t('watchlist.title', 'Watching')}</TabsTrigger>
                 <TabsTrigger value="escrow" className="flex-shrink-0 min-w-[80px] bg-transparent" data-testid="buyer-escrow-tab">
                   <Lock className="h-3 w-3 mr-1 inline" /> {t('dashboard.buyer.escrow', 'Escrow')}
+                </TabsTrigger>
+                <TabsTrigger value="following" className="flex-shrink-0 min-w-[80px] bg-transparent" data-testid="buyer-following-tab">
+                  {t('dashboard.buyer.following', 'Following')}
                 </TabsTrigger>
               </TabsList>
 
@@ -478,6 +483,10 @@ const BuyerDashboard = () => {
 
               <TabsContent value="escrow" data-testid="buyer-escrow-content">
                 <BuyerEscrowPanel />
+              </TabsContent>
+
+              <TabsContent value="following" data-testid="buyer-following-content">
+                <FollowedSellersList />
               </TabsContent>
 
              </Tabs>

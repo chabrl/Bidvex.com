@@ -701,3 +701,52 @@ async def admin_reset_journey(
     )
     return {"success": True, "journey_id": journey_id}
 
+
+# ───────────────────────────────────────────────────────────────────────
+# iter300 P1 — Bidding suspension lift / set (overdue-payment escalation)
+# ───────────────────────────────────────────────────────────────────────
+
+@router.post("/{user_id}/bidding-suspension")
+async def admin_set_bidding_suspension(
+    user_id: str,
+    suspended: bool = True,
+    current_user: User = Depends(_require_admin),
+):
+    """Set or lift a buyer's bidding suspension.
+
+    `?suspended=false` lifts the suspension (the common admin action after
+    the buyer settles an overdue payment). Lifting notifies the buyer.
+    """
+    db = get_db()
+    user_doc = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1, "email": 1, "name": 1})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    if suspended:
+        update = {"$set": {"bidding_suspended": True,
+                           "bidding_suspended_at": now_iso,
+                           "bidding_suspended_reason": "manual_admin"}}
+    else:
+        update = {"$set": {"bidding_suspended": False,
+                           "bidding_suspension_lifted_at": now_iso,
+                           "bidding_suspension_lifted_by": current_user.id},
+                  "$unset": {"bidding_suspended_reason": ""}}
+    await db.users.update_one({"id": user_id}, update)
+
+    if not suspended:
+        try:
+            from services.notifications_i18n import create_notification
+            await create_notification(
+                db, user_id=user_id, kind="bidding_suspension_lifted",
+                params={}, data={})
+        except Exception as e:
+            logger.warning(f"[bidding-suspension] lift notification failed: {e}")
+
+    await _record_admin_action(
+        db, admin_id=current_user.id, admin_email=current_user.email,
+        action="bidding_suspended" if suspended else "bidding_suspension_lifted",
+        target_user_id=user_id, content={"suspended": suspended},
+    )
+    return {"success": True, "user_id": user_id, "bidding_suspended": suspended}
+

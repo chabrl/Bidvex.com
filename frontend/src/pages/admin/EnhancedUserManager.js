@@ -25,7 +25,7 @@ import {
 } from '../../components/ui/select';
 import { toast } from 'sonner';
 import { 
-  Users, CheckCircle, MessageCircleOff, Search, UserPlus, 
+  Users, CheckCircle, MessageCircleOff, Search, UserPlus, Gavel, 
   Copy, Check, Eye, EyeOff, Building2, User, Shield, Mail,
   Phone, AlertTriangle, X, Ban, Trash2, MapPin, MoreVertical,
   Key, Edit, Crown, Theater, CreditCard, Receipt,
@@ -153,6 +153,21 @@ const EnhancedUserManager = () => {
       fetchData();
     } catch (error) {
       toast.error('Failed to update messaging status');
+    }
+  };
+
+  // iter300 P1 — lift (or set) a buyer's bidding suspension (overdue-payment escalation)
+  const handleBiddingSuspension = async (userId, isSuspended) => {
+    if (!window.confirm(isSuspended
+      ? 'Lift this user\'s bidding suspension? They will be notified and can bid again.'
+      : 'Suspend this user\'s bidding privileges?')) return;
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      await axios.post(`${API}/admin/users/${userId}/bidding-suspension?suspended=${!isSuspended}`, {}, { headers });
+      toast.success(isSuspended ? 'Bidding suspension lifted — user notified' : 'Bidding privileges suspended');
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to update bidding suspension');
     }
   };
 
@@ -901,6 +916,18 @@ const EnhancedUserManager = () => {
                     title="Suspend/restore messaging"
                   >
                     <MessageCircleOff className="h-3.5 w-3.5" />
+                  </Button>
+                  {/* iter300 P1 — bidding suspension (overdue-payment escalation) */}
+                  <Button
+                    size="sm"
+                    variant={user.bidding_suspended ? 'destructive' : 'outline'}
+                    onClick={() => handleBiddingSuspension(user.id, user.bidding_suspended)}
+                    title={user.bidding_suspended ? 'Lift bidding suspension' : 'Suspend bidding privileges'}
+                    data-testid={`bidding-suspension-${user.id}`}
+                    className="text-xs sm:text-sm"
+                  >
+                    <Gavel className="h-3.5 w-3.5 mr-1" />
+                    {user.bidding_suspended ? 'Bid Locked' : 'Bidding'}
                   </Button>
                   <Button 
                     size="sm" 

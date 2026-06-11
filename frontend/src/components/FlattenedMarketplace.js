@@ -45,6 +45,8 @@ import { formatCurrency } from '../utils/currencyFormatter';
 // iter233 — Display-only "Lot price × Quantity" multiplier helper.
 import { computeDisplayPrice } from '../utils/priceUtils';
 import { SellerAccountBadge } from './PrivateSaleBadge';
+// iter300 — Top Seller merit badge on listing cards
+import { TopSellerBadge } from './TopSellerBadge';
 import { getLocalized } from '../utils/localization';
 // iter238 Mission 1.3 — Dismissible location banner shown for signed-in users without a city on file.
 import LocationBanner from './LocationBanner';
@@ -975,6 +977,8 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
               companyName={item.seller_partner_company_name}
               variant="compact"
             />
+            {/* iter300 — merit-based Top Seller badge on the seller info line */}
+            {item.seller_is_top_seller && <TopSellerBadge size="xs" />}
             {acctType === 'business' && (
               <Badge className="bg-blue-100 text-blue-700 border-blue-200 text-xs">
                 <ShieldCheck className="h-3 w-3 mr-1" />

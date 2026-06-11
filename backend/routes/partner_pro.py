@@ -391,10 +391,47 @@ async def get_storefront(user_id: str):
     tier = user.get("subscription_tier", "free")
     storefront = await db.storefronts.find_one({"user_id": user_id}, {"_id": 0})
 
+    # ── iter300 P2 — active listings across ALL FOUR sections ──
     listings = await db.listings.find(
         {"seller_id": user_id, "status": "active"},
         {"_id": 0},
     ).sort("created_at", -1).limit(50).to_list(50)
+    for l in listings:
+        l["_section"] = "marketplace"
+        l["_url"] = f"/listing/{l.get('id')}"
+    for coll, section, url_prefix, owner_field in (
+        ("multi_item_listings", "lots", "/lots/", "seller_id"),
+        ("vehicle_listings", "vehicles", "/vehicles/", "seller_id"),
+        ("storage_auctions", "storage", "/storage-auctions/", "facility_owner_id"),
+    ):
+        extra = await db[coll].find(
+            {"$or": [{"seller_id": user_id}, {owner_field: user_id}], "status": "active"},
+            {"_id": 0},
+        ).sort("created_at", -1).limit(30).to_list(30)
+        for l in extra:
+            l["_section"] = section
+            l["_url"] = f"{url_prefix}{l.get('id')}"
+        listings.extend(extra)
+
+    # ── iter300 P2 — seller stats: completed auctions / items sold ──
+    _ended_union = ["ended", "sold", "completed", "ended_no_sale", "expired"]
+    completed_auctions = 0
+    items_sold = 0
+    for coll, owner_field in (("listings", "seller_id"), ("multi_item_listings", "seller_id"),
+                              ("vehicle_listings", "seller_id"), ("storage_auctions", "facility_owner_id")):
+        owner_q = {"$or": [{"seller_id": user_id}, {owner_field: user_id}]}
+        completed_auctions += await db[coll].count_documents(
+            {**owner_q, "status": {"$in": _ended_union}})
+        items_sold += await db[coll].count_documents({
+            **owner_q,
+            "$and": [{"$or": [
+                {"status": "sold"},
+                {"status": {"$in": ["ended", "completed"]},
+                 "$or": [{"winner_user_id": {"$nin": [None, ""]}},
+                         {"winner_id": {"$nin": [None, ""]}}]},
+            ]}],
+        })
+    followers_count = await db.seller_follows.count_documents({"seller_id": user_id})
 
     return {
         "seller": {
@@ -403,6 +440,11 @@ async def get_storefront(user_id: str):
             "picture": user.get("picture"),
             "subscription_tier": tier,
             "joined": user.get("created_at"),
+            # iter300 — public badges
+            "is_top_seller": bool(user.get("is_top_seller")),
+            "is_verified": bool(user.get("identity_verified") or user.get("is_verified")),
+            "account_type": user.get("account_type"),
+            "role": user.get("role"),
         },
         "storefront": storefront or {
             "banner_url": None,
@@ -411,6 +453,11 @@ async def get_storefront(user_id: str):
             "accent_color": "#06b6d4",
         },
         "listings": listings,
+        "stats": {
+            "completed_auctions": completed_auctions,
+            "items_sold": items_sold,
+            "followers": followers_count,
+        },
         "has_storefront": tier in PARTNER_PRO_TIERS,
     }
 

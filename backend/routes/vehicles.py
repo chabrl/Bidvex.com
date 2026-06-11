@@ -1609,6 +1609,10 @@ async def place_vehicle_bid(
             status_code=403,
             detail="Vehicle bidding is currently disabled. Vehicle auctions are pending permit approval."
         )
+
+    # iter300 P1 — suspended buyers cannot bid (overdue-payment escalation).
+    from services.bid_guard import ensure_bidding_allowed
+    await ensure_bidding_allowed(db, user.id if hasattr(user, "id") else user.get("id"))
     
     # Get listing
     listing = await db.vehicle_listings.find_one({

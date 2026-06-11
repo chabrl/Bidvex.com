@@ -4,6 +4,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
+// iter300 — Top Seller badge + Follow Seller
+import { TopSellerBadge } from '../components/TopSellerBadge';
+import { FollowSellerButton } from '../components/FollowSellerButton';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -126,6 +129,7 @@ const SellerProfilePage = () => {
                 <div>
                   <div className="flex items-center gap-3 flex-wrap mb-2">
                     <h1 className="text-3xl font-bold">{seller.name}</h1>
+                    {seller.is_top_seller && <TopSellerBadge size="md" />}
                     {seller.subscription_tier === 'vip' && (
                       <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white">
                         ⭐ VIP Seller
@@ -136,6 +140,7 @@ const SellerProfilePage = () => {
                         ✨ Premium Seller
                       </Badge>
                     )}
+                    <FollowSellerButton sellerId={seller.id || sellerId} size="sm" />
                   </div>
                   
                   {seller.company_name && (

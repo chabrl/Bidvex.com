@@ -198,6 +198,7 @@ async def _build_marketplace_items():
                 "account_type": 1,
                 "platform_fee_paid": 1,
                 "partner_subscription_active": 1,
+                "is_top_seller": 1,
             }
         ).to_list(len(all_seller_ids))
         sellers_full = {s["id"]: s for s in seller_docs}
@@ -212,6 +213,7 @@ async def _build_marketplace_items():
         seller = sellers_full.get(source_listing.get("seller_id"), {})
         acct = resolve_seller_account_type(seller, context)
         target_doc["seller_account_type"] = acct
+        target_doc["seller_is_top_seller"] = bool(seller.get("is_top_seller"))
         target_doc["seller_is_partner"] = acct == "partner"
         target_doc["seller_is_vehicle_dealer"] = acct == "vehicle_dealer"
         target_doc["seller_is_storage_facility"] = acct == "storage_facility"

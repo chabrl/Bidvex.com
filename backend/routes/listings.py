@@ -636,6 +636,22 @@ async def create_listing(
         except Exception as e:  # noqa: BLE001
             logger.warning(f"[geo-notify] skipped for {result.get('id')}: {e}")
 
+    # iter300 P2 — "Follow Seller" fan-out: alert followers when this
+    # seller's listing goes live immediately (active). Pending-review
+    # listings notify on admin approval instead (routes/admin_moderation.py).
+    if result.get("status") == "active" and not result.get("is_demo_sandbox"):
+        try:
+            from services.follower_notify import notify_followers
+            background_tasks.add_task(
+                notify_followers, db,
+                seller_id=current_user.id,
+                listing_id=result["id"],
+                listing_title=result.get("title", "New listing"),
+                section="marketplace",
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[follow-notify] skipped for {result.get('id')}: {e}")
+
     return result
 
 
@@ -1331,6 +1347,20 @@ async def create_multi_item_listing(
             db, listing.id, listing_data.title, listing_data.description,
             raw_lots, listing_data.content_language or "en"
         ))
+
+    # iter300 P2 — "Follow Seller" fan-out for immediately-active lots.
+    if listing_dict.get("status") == "active" and not listing_dict.get("is_demo_sandbox"):
+        try:
+            from services.follower_notify import notify_followers
+            background_tasks.add_task(
+                notify_followers, db,
+                seller_id=current_user.id,
+                listing_id=listing.id,
+                listing_title=listing_dict.get("title", "New listing"),
+                section="lots",
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[follow-notify] skipped for {listing.id}: {e}")
 
     return listing
 

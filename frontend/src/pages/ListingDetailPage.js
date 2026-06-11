@@ -29,6 +29,9 @@ import AuctioneerInfo from '../components/AuctioneerInfo';
 import BidConfirmationDialog from '../components/BidConfirmationDialog';
 import PriceBreakdown from '../components/PriceBreakdown';
 import PrivateSaleBadge, { BusinessSellerBadge, SellerAccountBadge } from '../components/PrivateSaleBadge';
+// iter300 — Top Seller merit badge + dispute filing
+import { TopSellerBadge } from '../components/TopSellerBadge';
+import { FileDisputeButton } from '../components/FileDisputeButton';
 import { VerifiedBadge } from '../components/VerifiedBadge';
 import PartnerBadge from '../components/PartnerBadge';
 import SEO from '../components/SEO';
@@ -546,6 +549,19 @@ const ListingDetailPage = () => {
                   />
                 );
               })()}
+
+              {/* iter300 — merit-based Top Seller badge (prominent in seller panel) */}
+              {listing?.seller_is_top_seller && (
+                <div className="mb-4"><TopSellerBadge size="md" /></div>
+              )}
+
+              {/* iter300 P1 — File a Dispute (buyer/seller of payment_collected
+                  listings, 7-day window — the button self-hides otherwise) */}
+              {user && listing?.id && (
+                <div className="mb-4">
+                  <FileDisputeButton listingId={listing.id} section="marketplace" />
+                </div>
+              )}
 
               {/* Verified Auction Firm Badge — fetched from API (compact, sits below the main badge) */}
               {listing?.seller_id && !listing?.seller_is_partner && (

@@ -10,8 +10,12 @@ import {
   XAxis, YAxis, Tooltip, CartesianGrid, Legend,
 } from 'recharts';
 import {
-  TrendingUp, DollarSign, Users, Gavel, RefreshCw, Loader2, Trophy, Flame,
+  TrendingUp, DollarSign, Users, Gavel, RefreshCw, Loader2, Trophy, Flame, CalendarRange,
 } from 'lucide-react';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '../../components/ui/select';
+import { Input } from '../../components/ui/input';
 import { toast } from 'sonner';
 
 const API = API_BASE;
@@ -59,6 +63,29 @@ const AdvancedAnalytics = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  // iter300 P2 — date range picker: 7d / 30d / 90d / all / custom
+  const [rangePreset, setRangePreset] = useState('30d');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
+
+  const buildRangeParams = useCallback(() => {
+    const today = new Date();
+    const iso = (d) => d.toISOString().slice(0, 10);
+    if (rangePreset === '7d') {
+      const from = new Date(today); from.setDate(from.getDate() - 6);
+      return { from: iso(from), to: iso(today) };
+    }
+    if (rangePreset === '30d') return {}; // backend default = last 30 days
+    if (rangePreset === '90d') {
+      const from = new Date(today); from.setDate(from.getDate() - 89);
+      return { from: iso(from), to: iso(today) };
+    }
+    if (rangePreset === 'all') return { from: '2020-01-01', to: iso(today) };
+    if (rangePreset === 'custom' && customFrom && customTo) {
+      return { from: customFrom, to: customTo };
+    }
+    return {};
+  }, [rangePreset, customFrom, customTo]);
 
   const fetchData = useCallback(async (silent = false) => {
     if (silent) setRefreshing(true);
@@ -66,6 +93,7 @@ const AdvancedAnalytics = () => {
     try {
       const res = await axios.get(`${API}/admin/analytics/overview`, {
         headers: { Authorization: `Bearer ${token}` },
+        params: buildRangeParams(),
       });
       setData(res.data);
     } catch (err) {
@@ -75,7 +103,7 @@ const AdvancedAnalytics = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [token]);
+  }, [token, buildRangeParams]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -117,23 +145,53 @@ const AdvancedAnalytics = () => {
             Generated {data.generated_at ? new Date(data.generated_at).toLocaleString() : '—'}.
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => fetchData(true)} disabled={refreshing}
-          data-testid="advanced-analytics-refresh-btn">
-          <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* iter300 P2 — date range picker */}
+          <CalendarRange className="h-4 w-4 text-muted-foreground" />
+          <Select value={rangePreset} onValueChange={setRangePreset}>
+            <SelectTrigger className="w-[150px]" data-testid="analytics-range-select">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7d" data-testid="range-7d">Last 7 days</SelectItem>
+              <SelectItem value="30d" data-testid="range-30d">Last 30 days</SelectItem>
+              <SelectItem value="90d" data-testid="range-90d">Last 90 days</SelectItem>
+              <SelectItem value="all" data-testid="range-all">All Time</SelectItem>
+              <SelectItem value="custom" data-testid="range-custom">Custom Range</SelectItem>
+            </SelectContent>
+          </Select>
+          {rangePreset === 'custom' && (
+            <>
+              <Input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)}
+                className="w-[150px]" data-testid="analytics-range-from" />
+              <span className="text-muted-foreground text-sm">→</span>
+              <Input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)}
+                className="w-[150px]" data-testid="analytics-range-to" />
+            </>
+          )}
+          <Button variant="outline" size="sm" onClick={() => fetchData(true)} disabled={refreshing}
+            data-testid="advanced-analytics-refresh-btn">
+            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
       </div>
+      {data.range && (
+        <p className="text-xs text-muted-foreground -mt-3" data-testid="analytics-range-label">
+          Showing range-scoped metrics for <strong>{data.range.from}</strong> → <strong>{data.range.to}</strong> ({data.range.days} days)
+        </p>
+      )}
 
       {/* KPI cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <KpiCard icon={DollarSign} label="GMV (all time)" value={fmtMoney(data.gmv?.all_time)}
           color="text-emerald-600" testId="kpi-gmv-alltime" />
-        <KpiCard icon={DollarSign} label="GMV (30 days)" value={fmtMoney(data.gmv?.last_30d)}
+        <KpiCard icon={DollarSign} label="GMV (range)" value={fmtMoney(data.gmv?.range ?? data.gmv?.last_30d)}
           color="text-emerald-500" testId="kpi-gmv-30d" />
         <KpiCard icon={TrendingUp} label="Revenue (all time)" value={fmtMoney(data.platform_revenue?.all_time)}
           sub={`est. ${fmtMoney(data.platform_revenue?.estimated_all_time)} @2.5%`}
           color="text-blue-600" testId="kpi-revenue-alltime" />
-        <KpiCard icon={TrendingUp} label="Revenue (30 days)" value={fmtMoney(data.platform_revenue?.last_30d)}
+        <KpiCard icon={TrendingUp} label="Revenue (range)" value={fmtMoney(data.platform_revenue?.range ?? data.platform_revenue?.last_30d)}
           color="text-blue-500" testId="kpi-revenue-30d" />
         <KpiCard icon={Users} label="Total Users" value={(data.total_users || 0).toLocaleString()}
           color="text-violet-600" testId="kpi-total-users" />
@@ -146,7 +204,7 @@ const AdvancedAnalytics = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card data-testid="chart-revenue-per-day">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Platform Revenue — last 30 days</CardTitle>
+            <CardTitle className="text-base">Platform Revenue — selected range</CardTitle>
           </CardHeader>
           <CardContent className="h-64">
             <ResponsiveContainer width="100%" height="100%">
@@ -163,7 +221,7 @@ const AdvancedAnalytics = () => {
 
         <Card data-testid="chart-signups-per-day">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">New Signups — last 30 days</CardTitle>
+            <CardTitle className="text-base">New Signups — selected range</CardTitle>
           </CardHeader>
           <CardContent className="h-64">
             <ResponsiveContainer width="100%" height="100%">

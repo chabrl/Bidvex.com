@@ -811,6 +811,26 @@ scheduler.add_job(
     _last_chance_tick,
     trigger=IntervalTrigger(minutes=10), id='last_chance_nudges', replace_existing=True)
 
+# ─── iter300 P1 — Nightly Top Seller badge recalculation (04:15 UTC) ───
+async def _top_seller_recalc_tick():
+    from services.top_sellers import recalculate_top_sellers
+    await safe_run("top_seller_recalc", recalculate_top_sellers(db))
+
+from apscheduler.triggers.cron import CronTrigger as _CronTrigger
+scheduler.add_job(
+    _top_seller_recalc_tick,
+    trigger=_CronTrigger(hour=4, minute=15, timezone="UTC"),
+    id='top_seller_recalc', replace_existing=True)
+
+# ─── iter300 P1 — Hourly overdue-payment auto-capture ───
+async def _overdue_autocapture_tick():
+    from services.overdue_autocapture import process_overdue_autocapture
+    await safe_run("overdue_autocapture", process_overdue_autocapture(db))
+
+scheduler.add_job(
+    _overdue_autocapture_tick,
+    trigger=IntervalTrigger(hours=1), id='overdue_autocapture', replace_existing=True)
+
 # ─── Phase 5 — Meta product feed cache warming (every 10 min) ───
 async def _fb_feed_cache_warm_tick():
     """Pre-builds the unfiltered feed so Meta's crawler always hits warm cache.
@@ -1129,6 +1149,14 @@ try:
     # iter299 P2 — Admin advanced analytics.
     from routes.admin_analytics import analytics_router
     api_router.include_router(analytics_router)
+
+    # iter300 P2 — Follow Seller.
+    from routes.follows import follows_router
+    api_router.include_router(follows_router)
+
+    # iter300 P1 — Dispute resolution (file + admin tooling).
+    from routes.disputes import disputes_router
+    api_router.include_router(disputes_router)
 
     # iter298 BUG 4 — Buyer receipts + seller statements.
     from routes.receipts import receipts_router

@@ -168,6 +168,76 @@ _TEMPLATES = {
         lambda p: "Paiement dû",
         lambda p: f"Réglez {_fmt_money(p.get('amount'))} pour « {p.get('title','cet article')} » dans les {p.get('days', 14)} jours pour éviter les pénalités.",
     ),
+    # iter300 — Top Seller merit badge.
+    "top_seller_earned": (
+        lambda p: "⭐ You're a Top Seller!",
+        lambda p: "Congratulations — you are now one of BidVex's top 5 sellers by total sales volume. The Top Seller badge now appears on your storefront and listings.",
+        lambda p: "⭐ Vous êtes un Meilleur Vendeur !",
+        lambda p: "Félicitations — vous faites maintenant partie des 5 meilleurs vendeurs BidVex par volume de ventes. L'insigne Meilleur Vendeur apparaît désormais sur votre vitrine et vos annonces.",
+    ),
+    # iter300 — Follow Seller fan-out.
+    "followed_seller_new_listing": (
+        lambda p: "New listing from a seller you follow",
+        lambda p: f"{p.get('seller_name','A seller you follow')} just listed '{p.get('title','an item')}' — bid now!",
+        lambda p: "Nouvelle annonce d'un vendeur que vous suivez",
+        lambda p: f"{p.get('seller_name','Un vendeur que vous suivez')} vient de publier « {p.get('title','un article')} » — misez maintenant !",
+    ),
+    # iter300 — Dispute lifecycle.
+    "dispute_received": (
+        lambda p: "Dispute Under Review",
+        lambda p: f"A dispute on '{p.get('title','a transaction')}' has been received and is under review. Our team will contact you with the outcome.",
+        lambda p: "Litige en cours d'examen",
+        lambda p: f"Un litige concernant « {p.get('title','une transaction')} » a été reçu et est en cours d'examen. Notre équipe vous contactera avec le résultat.",
+    ),
+    "dispute_filed_admin": (
+        lambda p: "🚨 New Dispute Filed",
+        lambda p: f"{p.get('filer','A user')} filed a dispute on '{p.get('title','a listing')}'. Review it in the Disputed Settlements tab.",
+        lambda p: "🚨 Nouveau litige déposé",
+        lambda p: f"{p.get('filer','Un utilisateur')} a déposé un litige concernant « {p.get('title','une annonce')} ». Examinez-le dans l'onglet Litiges.",
+    ),
+    "dispute_resolved": (
+        lambda p: "Dispute Resolved",
+        lambda p: (f"The dispute on '{p.get('title','your transaction')}' has been resolved — "
+                   + ("funds released to the seller." if p.get('outcome') == 'release_to_seller'
+                      else "the buyer has been refunded." if p.get('outcome') == 'refund_buyer'
+                      else "see your email for details.")),
+        lambda p: "Litige résolu",
+        lambda p: (f"Le litige concernant « {p.get('title','votre transaction')} » a été résolu — "
+                   + ("fonds libérés au vendeur." if p.get('outcome') == 'release_to_seller'
+                      else "l'acheteur a été remboursé." if p.get('outcome') == 'refund_buyer'
+                      else "consultez votre courriel pour les détails.")),
+    ),
+    # iter300 — Overdue auto-capture escalation.
+    "payment_final_warning": (
+        lambda p: "⚠️ Final Warning — Payment Overdue",
+        lambda p: f"Your payment of {_fmt_money(p.get('amount'))} for '{p.get('title','this item')}' is overdue. Your account may be suspended if not resolved within 24 hours.",
+        lambda p: "⚠️ Dernier avertissement — Paiement en retard",
+        lambda p: f"Votre paiement de {_fmt_money(p.get('amount'))} pour « {p.get('title','cet article')} » est en retard. Votre compte pourrait être suspendu si la situation n'est pas résolue dans les 24 heures.",
+    ),
+    "bidding_suspended": (
+        lambda p: "Bidding Privileges Suspended",
+        lambda p: f"After 3 failed payment attempts for '{p.get('title','an item')}', your bidding privileges have been suspended. Contact support@bidvex.com to resolve.",
+        lambda p: "Privilèges d'enchères suspendus",
+        lambda p: f"Après 3 tentatives de paiement échouées pour « {p.get('title','un article')} », vos privilèges d'enchères ont été suspendus. Contactez support@bidvex.com pour résoudre.",
+    ),
+    "bidding_suspension_lifted": (
+        lambda p: "Bidding Privileges Restored",
+        lambda p: "Your bidding privileges have been restored by our team. You can bid again on BidVex.",
+        lambda p: "Privilèges d'enchères rétablis",
+        lambda p: "Vos privilèges d'enchères ont été rétablis par notre équipe. Vous pouvez de nouveau miser sur BidVex.",
+    ),
+    "overdue_capture_failed_admin": (
+        lambda p: "Overdue Auto-Capture Failed",
+        lambda p: f"Automatic charge of {_fmt_money(p.get('amount'))} for '{p.get('title','a listing')}' failed. Review in the admin panel.",
+        lambda p: "Échec du prélèvement automatique",
+        lambda p: f"Le prélèvement automatique de {_fmt_money(p.get('amount'))} pour « {p.get('title','une annonce')} » a échoué. Vérifiez dans le panneau admin.",
+    ),
+    "bidding_suspended_admin": (
+        lambda p: "Buyer Bidding Suspended",
+        lambda p: f"A buyer was suspended after 3 failed payment attempts on '{p.get('title','a listing')}' ({_fmt_money(p.get('amount'))}). You can lift the suspension in User Management.",
+        lambda p: "Acheteur suspendu",
+        lambda p: f"Un acheteur a été suspendu après 3 tentatives de paiement échouées sur « {p.get('title','une annonce')} » ({_fmt_money(p.get('amount'))}). Vous pouvez lever la suspension dans Gestion des utilisateurs.",
+    ),
 }
 
 
