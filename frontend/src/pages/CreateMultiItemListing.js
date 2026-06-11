@@ -26,6 +26,8 @@ import CategorySelector from '../components/CategorySelector';
 import InfoTip from '../components/InfoTip';
 import useGeoLocation from '../hooks/useGeoLocation';
 import { formatCurrency } from '../utils/currencyFormatter';
+import { isQuebecListing, validateFrenchTitle, humanizeQcError } from '../utils/bill96';
+import FrenchTitleField from '../components/FrenchTitleField';
 
 const API = API_BASE;
 
@@ -39,6 +41,8 @@ const CreateMultiItemListing = () => {
   const [loading, setLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [languageReady, setLanguageReady] = useState(false);
+  // iter299 P0 — Bill 96 inline error for the French title field.
+  const [frTitleError, setFrTitleError] = useState(null);
   
   // Step 1: Basic Info
   const [formData, setFormData] = useState({
@@ -441,11 +445,23 @@ const CreateMultiItemListing = () => {
     return Object.keys(errors).length === 0;
   };
 
+  // iter299 P0 — Bill 96 applies when the seller's province OR listing
+  // location is Quebec.
+  const isQuebec = isQuebecListing(user?.province, formData.region, formData.city);
+
   const validateStep = (step) => {
     if (step === 1) {
       if (!formData.title || !formData.description || !formData.category || 
           !formData.city || !formData.region || !formData.postal_code || !formData.auction_end_date) {
         toast.error(t('createListing.fillRequired', 'Please fill all required fields'));
+        return false;
+      }
+      // iter299 P0 — Bill 96: Quebec lots auctions require a French title.
+      const bill96Error = validateFrenchTitle({ isQuebec, titleFr: formData.title_fr });
+      if (bill96Error) {
+        const msg = (i18n.language || 'en').startsWith('fr') ? bill96Error.fr : bill96Error.en;
+        setFrTitleError(msg);
+        toast.error(msg);
         return false;
       }
       return true;
@@ -638,7 +654,19 @@ const CreateMultiItemListing = () => {
       navigate(`/lots/${response.data.id}`);
     } catch (error) {
       console.error('Failed:', error);
-      toast.error(error.response?.data?.detail || t('createListing.createFailed', 'Failed to create listing'));
+      // iter299 P0 — humanize Bill 96 errors; never toast a raw object.
+      const qcMsg = humanizeQcError(error, (i18n.language || 'en').startsWith('fr'));
+      if (qcMsg) {
+        setFrTitleError(qcMsg);
+        setCurrentStep(1);
+        toast.error(qcMsg);
+      } else {
+        const detail = error.response?.data?.detail;
+        const readable = typeof detail === 'string'
+          ? detail
+          : (detail?.message_en || detail?.message || null);
+        toast.error(readable || t('createListing.createFailed', 'Failed to create listing'));
+      }
     } finally {
       setLoading(false);
     }
@@ -685,6 +713,18 @@ const CreateMultiItemListing = () => {
           required 
         />
       </div>
+      {/* iter299 P0 — Bill 96 French title (required for Quebec listings). */}
+      <FrenchTitleField
+        idPrefix="lots-"
+        value={formData.title_fr}
+        onChange={(e) => {
+          setFormData((prev) => ({ ...prev, title_fr: e.target.value }));
+          if (frTitleError) setFrTitleError(null);
+        }}
+        isQuebec={isQuebec}
+        error={frTitleError}
+        isFr={(i18n.language || 'en').startsWith('fr')}
+      />
       <div className="space-y-2">
         <Label htmlFor="description">{t('createListing.description')} *
           <InfoTip en="Describe your auction lot collection. Include overall condition and highlights." fr="Décrivez votre collection de lots. Incluez l'état général et les points saillants." />

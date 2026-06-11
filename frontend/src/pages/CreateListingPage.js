@@ -49,6 +49,9 @@ const CreateListingPage = () => {
   // i18n language flips. Use this instead of inline `i18n.language?.startsWith(...)`.
   const isFr = (i18n.language || 'en').toLowerCase().startsWith('fr');
   const { user } = useAuth();
+
+  // iter299 P0 — Bill 96: Quebec listings require a French title.
+  const [frTitleError, setFrTitleError] = useState(null);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const geo = useGeoLocation();
@@ -57,6 +60,7 @@ const CreateListingPage = () => {
   const [cfiaDeclaration, setCfiaDeclaration] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
+    title_fr: '',
     description: '',
     category: '',
     condition: 'good',
@@ -197,7 +201,9 @@ const CreateListingPage = () => {
         setFormData((prev) => ({
           ...prev,
           title: src.title || prev.title,
+          title_fr: src.title_fr || prev.title_fr,
           description: src.description || prev.description,
+          description_fr: src.description_fr || prev.description_fr,
           category: src.category || prev.category,
           condition: src.condition || prev.condition,
           starting_price: src.starting_price != null ? String(src.starting_price) : prev.starting_price,
@@ -276,11 +282,24 @@ const CreateListingPage = () => {
         setVehicleComplianceOpen(true);
         return null;
       }
+      // iter299 P0 — Bill 96 errors become readable inline form errors,
+      // never a raw JSON popup.
+      const qcMessage = humanizeQcError(error, isFr);
+      if (qcMessage) {
+        setFrTitleError(qcMessage);
+        toast.error(qcMessage);
+        document.getElementById('title-fr')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return null;
+      }
       const errorMessage = extractErrorMessage(error);
       toast.error(errorMessage || 'Failed to create listing');
       return null;
     }
   };
+
+  // iter299 P0 — Bill 96 applies when the seller's registered province OR
+  // the listing location is Quebec.
+  const isQuebec = isQuebecListing(user?.province, formData.region, formData.city);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -289,6 +308,17 @@ const CreateListingPage = () => {
       toast.error('Please complete your tax declaration before publishing your listing.');
       return;
     }
+
+    // iter299 P0 — Bill 96 client-side gate. Never let a Quebec seller hit
+    // the API and bounce off a raw qc_french_title_required JSON error.
+    const bill96Error = validateFrenchTitle({ isQuebec, titleFr: formData.title_fr });
+    if (bill96Error) {
+      setFrTitleError(isFr ? bill96Error.fr : bill96Error.en);
+      toast.error(isFr ? bill96Error.fr : bill96Error.en);
+      document.getElementById('title-fr')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -525,6 +555,18 @@ const CreateListingPage = () => {
                   placeholder={t('createListing.auctionTitlePlaceholder', 'Enter a descriptive title')}
                 />
               </div>
+
+              {/* iter299 P0 — Bill 96 French title (required for Quebec listings). */}
+              <FrenchTitleField
+                value={formData.title_fr}
+                onChange={(e) => {
+                  setFormData((prev) => ({ ...prev, title_fr: e.target.value }));
+                  if (frTitleError) setFrTitleError(null);
+                }}
+                isQuebec={isQuebec}
+                error={frTitleError}
+                isFr={isFr}
+              />
 
               <div className="space-y-2">
                 <Label htmlFor="description">{t('createListing.description', 'Description')} *

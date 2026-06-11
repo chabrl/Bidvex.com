@@ -489,7 +489,17 @@ const ListingDetailPage = () => {
                 }}
               />
               <div className="flex items-start justify-between gap-4 mb-2">
-                <h1 className="text-3xl font-bold flex-1" data-testid="listing-title">{getLocalized(listing, 'title')}</h1>
+                <div className="flex-1 min-w-0">
+                  <h1 className="text-3xl font-bold" data-testid="listing-title">{getLocalized(listing, 'title')}</h1>
+                  {/* iter299 P0 — Bill 96: surface the French title as a
+                      subtitle whenever it exists and isn't already the
+                      main displayed title. */}
+                  {listing.title_fr && listing.title_fr !== getLocalized(listing, 'title') && (
+                    <p className="text-lg text-slate-500 mt-0.5" data-testid="listing-title-fr-subtitle">
+                      {listing.title_fr}
+                    </p>
+                  )}
+                </div>
                 <div className="flex items-center gap-3">
                   {/* Watchlist Button */}
                   <WatchlistButton listingId={listing.id} size="large" showLabel={true} />

@@ -23,6 +23,7 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
+import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
@@ -72,6 +73,9 @@ export default function ListingChangeRequestModal({
 }) {
   const t = COPY[isFr ? 'fr' : 'en'];
   const [reason, setReason]   = useState('');
+  // iter299 P0 — Bill 96: let sellers add/fix the French title on
+  // existing listings through the edit-request pipeline.
+  const [titleFr, setTitleFr] = useState('');
   const [busy, setBusy]       = useState(false);
 
   const handleSubmit = async () => {
@@ -82,12 +86,16 @@ export default function ListingChangeRequestModal({
     setBusy(true);
     try {
       const token = localStorage.getItem('access_token') || localStorage.getItem('token');
+      const delta = { ...(defaultDelta || {}) };
+      if (!isDelete && titleFr.trim()) {
+        delta.title_fr = titleFr.trim();
+      }
       const { data } = await axios.post(
         `${API_BASE}/listings/${listingId}/request-change`,
         {
           request_type:          requestType,
           reason:                reason.trim(),
-          current_payload_delta: defaultDelta || {},
+          current_payload_delta: delta,
         },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -138,6 +146,26 @@ export default function ListingChangeRequestModal({
             disabled={busy}
           />
         </div>
+        {!isDelete && (
+          <div className="space-y-2 mt-2">
+            <Label htmlFor="listing-request-title-fr">
+              {isFr ? 'Titre (français) — optionnel' : 'French Title (optional) / Titre français (optionnel)'}
+            </Label>
+            <Input
+              id="listing-request-title-fr"
+              data-testid="listing-change-request-title-fr"
+              placeholder="ex: Table en bois massif, véhicule de travail..."
+              value={titleFr}
+              onChange={(e) => setTitleFr(e.target.value)}
+              disabled={busy}
+            />
+            <p className="text-xs text-slate-500">
+              {isFr
+                ? 'Ajoutez ou corrigez le titre français (Loi 96).'
+                : 'Add or fix the French title (Bill 96). / Ajoutez ou corrigez le titre français (Loi 96).'}
+            </p>
+          </div>
+        )}
         <DialogFooter>
           <Button
             variant="outline"

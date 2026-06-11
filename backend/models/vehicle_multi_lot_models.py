@@ -105,6 +105,8 @@ class MultiLotItemCreate(BaseModel):
     make: str = Field(..., min_length=1, max_length=64)
     model: str = Field(..., min_length=1, max_length=64)
     title: str = Field(..., min_length=3, max_length=200)
+    # iter299 P0 — Bill 96: French lot title (required for QC-located lots).
+    title_fr: Optional[str] = Field(None, max_length=200)
     description: Optional[str] = ""
     mileage: int = Field(..., ge=0)
     body_type: str = "sedan"

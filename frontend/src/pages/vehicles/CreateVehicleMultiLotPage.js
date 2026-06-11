@@ -120,6 +120,11 @@ const CreateVehicleMultiLotPage = () => {
         toast.error(`Lot #${i + 1} — Title is required`);
         return;
       }
+      // iter299 P0 — Bill 96: QC-located lots require a French title.
+      if (String(lot.location_province || '').toUpperCase() === 'QC' && !String(lot.title_fr || '').trim()) {
+        toast.error(`Lot #${i + 1} — A French title is required for Quebec listings under Bill 96 / Un titre en français est obligatoire (Loi 96)`);
+        return;
+      }
       if (!lot.location_city || !lot.location_province) {
         toast.error(`Lot #${i + 1} — Location city + province required`);
         return;
@@ -169,6 +174,7 @@ const CreateVehicleMultiLotPage = () => {
           make: l.make,
           model: l.model,
           title: l.title,
+          title_fr: l.title_fr || null,
           description: l.description,
           mileage: Number(l.mileage),
           body_type: l.body_type,
@@ -480,6 +486,27 @@ const CreateVehicleMultiLotPage = () => {
                   onChange={e => updateLot(idx, { title: e.target.value })}
                   placeholder="e.g. 2020 Ford F-350 XL Crew Cab"
                 />
+              </div>
+              {/* iter299 P0 — Bill 96 French lot title (required for QC-located lots). */}
+              <div className="md:col-span-2">
+                <Label>
+                  {String(lot.location_province || '').toUpperCase() === 'QC' ? (
+                    <>Title (French) / Titre (fran&ccedil;ais) <span className="text-red-600">*</span></>
+                  ) : (
+                    <>French Title (optional) / Titre fran&ccedil;ais (optionnel)</>
+                  )}
+                </Label>
+                <Input
+                  data-testid={`lot-title-fr-${idx}`}
+                  value={lot.title_fr || ''}
+                  onChange={e => updateLot(idx, { title_fr: e.target.value })}
+                  placeholder="ex: 2020 Ford F-350 XL Crew Cab — véhicule de travail"
+                />
+                {String(lot.location_province || '').toUpperCase() === 'QC' && (
+                  <p className="text-xs text-slate-500 mt-1">
+                    Required for Quebec listings under Bill 96 / Obligatoire pour les annonces qu&eacute;b&eacute;coises (Loi 96)
+                  </p>
+                )}
               </div>
               <div>
                 <Label>Mileage</Label>

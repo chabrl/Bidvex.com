@@ -229,19 +229,15 @@ async def resolve_listing_status(db, current_user: User, settings: Dict) -> str:
 # ─── Multi-Item Creation ─────────────────────────────────────────────
 
 async def resolve_multi_item_status(db, current_user: User, listing_data, settings: Dict) -> str:
-    """Determine listing status based on marketplace settings and seller history."""
+    """Determine listing status — iter299 P1: moderation always on for
+    non-trusted sellers (mirrors resolve_listing_status)."""
     status = "active"
-    if settings.get("require_approval_new_sellers", False):
-        completed_count = await db.multi_item_listings.count_documents({
-            "seller_id": current_user.id,
-            "status": "completed"
-        })
-        if completed_count < 1:
-            status = "pending"
-            logger.info(f"New seller {current_user.email} listing set to PENDING for approval")
+    if not await _is_trusted_marketplace_seller(db, current_user):
+        status = "pending_review"
+        logger.info(f"[MODERATION] Non-trusted seller {current_user.email} multi-item → PENDING_REVIEW")
     if listing_data.auction_start_date:
         now = datetime.now(timezone.utc)
-        if listing_data.auction_start_date > now and status != "pending":
+        if listing_data.auction_start_date > now and status == "active":
             status = "upcoming"
     return status
 
@@ -314,6 +310,25 @@ def serialise_datetimes(listing_dict: Dict):
     for key in ("auction_end_date", "created_at", "auction_start_date",
                 "promotion_expiry", "promotion_start", "promotion_end"):
         if listing_dict.get(key):
+            val = listing_dict[key]
+            if hasattr(val, 'isoformat'):
+                listing_dict[key] = val.isoformat()
+    for lot in listing_dict.get("lots", []):
+        if lot.get("lot_end_time") and hasattr(lot["lot_end_time"], 'isoformat'):
+            lot["lot_end_time"] = lot["lot_end_time"].isoformat()
+
+
+# ─── Read Helpers ─────────────────────────────────────────────────────
+
+def parse_listing_dates(listing: Dict):
+    """Convert ISO string dates back to datetime objects (in-place)."""
+    for key in ("created_at", "auction_end_date", "auction_start_date"):
+        if isinstance(listing.get(key), str):
+            listing[key] = datetime.fromisoformat(listing[key])
+    for lot in listing.get("lots", []):
+        if isinstance(lot.get("lot_end_time"), str):
+            lot["lot_end_time"] = datetime.fromisoformat(lot["lot_end_time"])
+      if listing_dict.get(key):
             val = listing_dict[key]
             if hasattr(val, 'isoformat'):
                 listing_dict[key] = val.isoformat()

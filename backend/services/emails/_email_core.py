@@ -493,29 +493,44 @@ def _base_template(content: str, title: str = "BidVex Notification",
 
 
 def _storage_panel(title_en: str, title_fr: str, body_en: str, body_fr: str, cta_url: str = "", cta_en: str = "", cta_fr: str = "") -> str:
+    # Outlook-safe: strict table layout, inline CSS, solid colors (no
+    # gradients / flex / grid / structural divs).
     cta_block = ""
     if cta_url and cta_en:
         cta_block = f"""
-        <div style="text-align:center;margin:20px 0;">
-          <a href="{cta_url}" style="background:#0F3060;color:#fff;text-decoration:none;font-weight:700;padding:12px 26px;border-radius:24px;display:inline-block;">
-            {cta_en} / {cta_fr}
-          </a>
-        </div>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+          <tr><td align="center" style="padding:20px 0;">
+            <a href="{cta_url}" style="background-color:#0F3060;color:#ffffff;text-decoration:none;font-weight:700;padding:12px 26px;border-radius:24px;display:inline-block;font-family:Arial,sans-serif;">
+              {cta_en} / {cta_fr}
+            </a>
+          </td></tr>
+        </table>
         """
     return f"""
-    <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;padding:24px;background:#fff;">
-      <div style="background:linear-gradient(135deg,#0B2545,#0F3060);color:#fff;padding:24px;border-radius:12px;margin-bottom:16px;">
-        <p style="margin:0;font-size:11px;letter-spacing:2px;opacity:0.7;">🔒 BIDVEX STORAGE AUCTIONS</p>
-        <h2 style="margin:6px 0 0 0;font-size:22px;">{title_en}</h2>
-        <p style="margin:4px 0 0 0;font-size:14px;color:#3FB4CB;">{title_fr}</p>
-      </div>
-      <div style="color:#1e293b;font-size:14px;line-height:1.55;">
-        <p><strong>EN:</strong> {body_en}</p>
-        <hr style="border:none;border-top:1px solid #e5e7eb;margin:12px 0;"/>
-        <p><strong>FR:</strong> {body_fr}</p>
-      </div>
-      {cta_block}
-      <p style="font-size:11px;color:#94a3b8;text-align:center;margin-top:24px;">BidVex Canada — bilingual auction marketplace</p>
-    </div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#ffffff;">
+      <tr><td align="center" style="padding:24px;">
+        <table role="presentation" width="640" cellpadding="0" cellspacing="0" border="0" style="max-width:640px;font-family:Arial,sans-serif;">
+          <tr>
+            <td bgcolor="#0B2545" style="background-color:#0B2545;color:#ffffff;padding:24px;border-radius:12px;">
+              <p style="margin:0;font-size:11px;letter-spacing:2px;color:#9fb3c8;">🔒 BIDVEX STORAGE AUCTIONS</p>
+              <h2 style="margin:6px 0 0 0;font-size:22px;color:#ffffff;">{title_en}</h2>
+              <p style="margin:4px 0 0 0;font-size:14px;color:#3FB4CB;">{title_fr}</p>
+            </td>
+          </tr>
+          <tr><td style="height:16px;line-height:16px;font-size:1px;">&nbsp;</td></tr>
+          <tr>
+            <td style="color:#1e293b;font-size:14px;line-height:1.55;">
+              <p style="margin:0 0 12px 0;"><strong>EN:</strong> {body_en}</p>
+              <hr style="border:none;border-top:1px solid #e5e7eb;margin:12px 0;"/>
+              <p style="margin:12px 0 0 0;"><strong>FR:</strong> {body_fr}</p>
+            </td>
+          </tr>
+          <tr><td>{cta_block}</td></tr>
+          <tr>
+            <td align="center" style="font-size:11px;color:#94a3b8;padding-top:24px;">BidVex Canada — bilingual auction marketplace</td>
+          </tr>
+        </table>
+      </td></tr>
+    </table>
     """
 

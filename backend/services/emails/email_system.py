@@ -51,7 +51,7 @@ async def send_welcome_email(user_email: str, user_name: str) -> Dict[str, Any]:
 
   <!-- Logo Header -->
   <tr>
-    <td style="background:linear-gradient(135deg,#1e40af 0%,#2563eb 100%);padding:28px 32px;text-align:center;">
+    <td style="background-color:#1e40af;padding:28px 32px;text-align:center;">
       <h1 style="margin:0;color:#ffffff;font-size:28px;font-weight:800;letter-spacing:-0.5px;">
         BidVex
       </h1>
@@ -212,7 +212,7 @@ async def send_welcome_email(user_email: str, user_name: str) -> Dict[str, Any]:
     <td style="padding:0 32px 40px;text-align:center;">
       <table cellpadding="0" cellspacing="0" align="center">
         <tr>
-          <td style="background:linear-gradient(135deg,#1e40af 0%,#2563eb 100%);border-radius:12px;padding:18px 48px;">
+          <td style="background-color:#1e40af;border-radius:12px;padding:18px 48px;">
             <a href="{MARKETPLACE_URL}" style="color:#ffffff;text-decoration:none;font-size:16px;font-weight:700;display:inline-block;letter-spacing:0.3px;">
               Explorer le marché / Explore the Marketplace
             </a>
@@ -987,17 +987,21 @@ async def send_manual_subscription_active_email(
     renewal_short = (renewal_until or "")[:10]
     ref_html = f"<p style='margin:6px 0;font-size:12px;color:#64748b;'>Reference / Référence: <code>{reference}</code></p>" if reference else ""
     html = f"""
-    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;background:#f8fafc;">
-      <div style="padding:24px;background:white;border-radius:12px;border:1px solid #e2e8f0;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f8fafc;">
+      <tr><td align="center" style="padding:20px;">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;background-color:#ffffff;border:1px solid #e2e8f0;border-radius:12px;font-family:Arial,sans-serif;">
+          <tr><td style="padding:24px;">
         <h2 style="color:#16a34a;margin:0 0 10px;">✅ Your annual subscription is active</h2>
         <p style="color:#334155;line-height:1.6;">Hi <strong>{name}</strong>,</p>
         <p style="color:#334155;line-height:1.6;">Your <strong>BidVex {kind_label_en}</strong> annual subscription payment has been confirmed by our team.</p>
-        <div style="background:#ecfdf5;border:1px solid #16a34a;border-radius:8px;padding:14px;margin:12px 0;">
-          <p style="margin:4px 0;"><strong>Amount paid:</strong> CA${amount_cad:,.2f}</p>
-          <p style="margin:4px 0;"><strong>Method:</strong> {method_label_en}</p>
-          <p style="margin:4px 0;"><strong>Active until:</strong> {renewal_short}</p>
-          {ref_html}
-        </div>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:12px 0;">
+          <tr><td bgcolor="#ecfdf5" style="background-color:#ecfdf5;border:1px solid #16a34a;border-radius:8px;padding:14px;">
+            <p style="margin:4px 0;"><strong>Amount paid:</strong> CA${amount_cad:,.2f}</p>
+            <p style="margin:4px 0;"><strong>Method:</strong> {method_label_en}</p>
+            <p style="margin:4px 0;"><strong>Active until:</strong> {renewal_short}</p>
+            {ref_html}
+          </td></tr>
+        </table>
         <p style="color:#334155;line-height:1.6;">All features are now unlocked on your dashboard.</p>
 
         <hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0;">
@@ -1005,18 +1009,22 @@ async def send_manual_subscription_active_email(
         <h2 style="color:#16a34a;margin:0 0 10px;">✅ Votre abonnement annuel est actif</h2>
         <p style="color:#334155;line-height:1.6;">Bonjour <strong>{name}</strong>,</p>
         <p style="color:#334155;line-height:1.6;">Votre paiement d'abonnement annuel BidVex <strong>{kind_label_fr}</strong> a été confirmé par notre équipe.</p>
-        <div style="background:#ecfdf5;border:1px solid #16a34a;border-radius:8px;padding:14px;margin:12px 0;">
-          <p style="margin:4px 0;"><strong>Montant payé :</strong> {amount_cad:,.2f} $ CAD</p>
-          <p style="margin:4px 0;"><strong>Méthode :</strong> {method_label_fr}</p>
-          <p style="margin:4px 0;"><strong>Actif jusqu'au :</strong> {renewal_short}</p>
-        </div>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:12px 0;">
+          <tr><td bgcolor="#ecfdf5" style="background-color:#ecfdf5;border:1px solid #16a34a;border-radius:8px;padding:14px;">
+            <p style="margin:4px 0;"><strong>Montant payé :</strong> {amount_cad:,.2f} $ CAD</p>
+            <p style="margin:4px 0;"><strong>Méthode :</strong> {method_label_fr}</p>
+            <p style="margin:4px 0;"><strong>Actif jusqu'au :</strong> {renewal_short}</p>
+          </td></tr>
+        </table>
         <p style="color:#334155;line-height:1.6;">Toutes les fonctionnalités sont maintenant débloquées sur votre tableau de bord.</p>
 
         <p style="color:#94a3b8;font-size:11px;text-align:center;margin-top:24px;">
           BidVex Inc. · GST# 706766367RT0001 · QST# 1233530880TQ0001 · All amounts in CAD
         </p>
-      </div>
-    </div>
+          </td></tr>
+        </table>
+      </td></tr>
+    </table>
     """
     return await _send_via_unified(
         to_email=user["email"],
@@ -1077,22 +1085,28 @@ async def send_auction_thread_opened_email(
         )
 
     html = f"""
-    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;background:#f8fafc;border-radius:12px;">
-      <div style="padding:20px;background:white;border-radius:8px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f8fafc;">
+      <tr><td align="center" style="padding:20px;">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;background-color:#ffffff;border-radius:8px;font-family:Arial,sans-serif;">
+          <tr><td style="padding:20px;">
         <h2 style="color:#1e40af;margin:0 0 12px;">{subject}</h2>
         <p style="color:#334155;line-height:1.6;">{body_en}</p>
         <hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0;">
         <p style="color:#334155;line-height:1.6;">{body_fr}</p>
-        <div style="text-align:center;margin-top:20px;">
-          <a href="{msg_link}" style="display:inline-block;padding:12px 28px;background:#2563eb;color:white;text-decoration:none;border-radius:8px;font-weight:600;">
-            Open message thread · Ouvrir le fil
-          </a>
-        </div>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+          <tr><td align="center" style="padding-top:20px;">
+            <a href="{msg_link}" style="display:inline-block;padding:12px 28px;background-color:#2563eb;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;">
+              Open message thread · Ouvrir le fil
+            </a>
+          </td></tr>
+        </table>
         <p style="color:#64748b;font-size:11px;text-align:center;margin-top:24px;">
           BidVex — Listing #{listing_id[:8]}
         </p>
-      </div>
-    </div>
+          </td></tr>
+        </table>
+      </td></tr>
+    </table>
     """
     return await _send_via_unified(to_email=recipient["email"], subject=subject, html_content=html)
 
@@ -1606,6 +1620,95 @@ async def send_payment_failed_email(
     """
     return await _send_via_unified(
         to_email=buyer["email"],
+        subject=subject,
+        html_content=_base_template(content, heading),
+    )
+
+
+
+# ═══════════════════════════════════════════════════════════════════
+# iter299 P1 — Marketplace moderation decision emails
+# ═══════════════════════════════════════════════════════════════════
+
+async def send_listing_approved_email(
+    seller: dict, listing_title: str, listing_id: str, section: str = "marketplace",
+) -> Dict[str, Any]:
+    """Listing approved by the moderation team — it is now live."""
+    lang = _detect_language(seller)
+    link = f"{FRONTEND_URL}/listing/{listing_id}" if section == "marketplace" else f"{FRONTEND_URL}/lots/{listing_id}"
+
+    if lang == "fr":
+        subject = f"Annonce approuvée — {listing_title}"
+        heading = "Votre annonce est en ligne&nbsp;!"
+        body = (f"Bonne nouvelle, {seller.get('name','')}&nbsp;! Votre annonce "
+                f"<strong>{listing_title}</strong> a &eacute;t&eacute; approuv&eacute;e et est maintenant visible par les acheteurs.")
+        cta = "Voir mon annonce"
+    else:
+        subject = f"Listing approved — {listing_title}"
+        heading = "Your listing is live!"
+        body = (f"Good news, {seller.get('name','')}! Your listing "
+                f"<strong>{listing_title}</strong> was approved and is now visible to buyers.")
+        cta = "View My Listing"
+
+    content = f"""
+    <h2 style="margin: 0 0 20px 0; color: #059669;">{heading}</h2>
+    <p style="color: #475569; line-height: 1.6;">{body}</p>
+    <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 30px auto;">
+      <tr><td align="center" style="background-color: #2B8FD0; padding: 14px 30px; border-radius: 8px;">
+        <a href="{link}" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px;">{cta}</a>
+      </td></tr>
+    </table>
+    """
+    return await _send_via_unified(
+        to_email=seller["email"],
+        subject=subject,
+        html_content=_base_template(content, heading),
+    )
+
+
+async def send_listing_rejected_email(
+    seller: dict, listing_title: str, listing_id: str, reason: str,
+    section: str = "marketplace",
+) -> Dict[str, Any]:
+    """Listing rejected by the moderation team — includes the admin's reason."""
+    lang = _detect_language(seller)
+    link = f"{FRONTEND_URL}/seller/dashboard"
+
+    if lang == "fr":
+        subject = f"Annonce refusée — {listing_title}"
+        heading = "Votre annonce n'a pas &eacute;t&eacute; approuv&eacute;e"
+        body = (f"Bonjour {seller.get('name','')}, votre annonce "
+                f"<strong>{listing_title}</strong> n'a pas pass&eacute; la mod&eacute;ration.")
+        reason_label = "Raison"
+        cta = "Voir mon tableau de bord"
+        footer = "Corrigez le probl&egrave;me et soumettez une nouvelle annonce quand vous &ecirc;tes pr&ecirc;t."
+    else:
+        subject = f"Listing rejected — {listing_title}"
+        heading = "Your listing was not approved"
+        body = (f"Hi {seller.get('name','')}, your listing "
+                f"<strong>{listing_title}</strong> did not pass moderation.")
+        reason_label = "Reason"
+        cta = "Go to My Dashboard"
+        footer = "Fix the issue and submit a new listing when you're ready."
+
+    content = f"""
+    <h2 style="margin: 0 0 20px 0; color: #dc2626;">{heading}</h2>
+    <p style="color: #475569; line-height: 1.6;">{body}</p>
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 16px 0; background-color: #fef2f2; border-radius: 8px;">
+      <tr><td style="padding: 14px 16px;">
+        <p style="margin: 0; color: #991b1b; font-size: 13px; font-weight: 700;">{reason_label}</p>
+        <p style="margin: 6px 0 0 0; color: #7f1d1d; font-size: 14px; line-height: 1.5;">{reason}</p>
+      </td></tr>
+    </table>
+    <p style="color: #475569; line-height: 1.6;">{footer}</p>
+    <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 30px auto;">
+      <tr><td align="center" style="background-color: #0B2545; padding: 14px 30px; border-radius: 8px;">
+        <a href="{link}" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px;">{cta}</a>
+      </td></tr>
+    </table>
+    """
+    return await _send_via_unified(
+        to_email=seller["email"],
         subject=subject,
         html_content=_base_template(content, heading),
     )

@@ -568,36 +568,39 @@ async def send_storage_auction_won_email(buyer: dict, auction: dict, facility: d
             qr_bytes = _generate_pickup_qr_png_bytes(pickup_code)
             qr_b64 = _b64.b64encode(qr_bytes).decode("ascii")
             qr_img_tag = (
-                f"<div style='margin:12px auto;display:inline-block;background:#FFFFFF;"
+                f"<table role='presentation' cellpadding='0' cellspacing='0' border='0' align='center' style='margin:12px auto;'>"
+                f"<tr><td bgcolor='#FFFFFF' style='background-color:#FFFFFF;"
                 f"padding:12px;border-radius:8px;border:2px solid #fde68a'>"
                 f"<img src='data:image/png;base64,{qr_b64}' alt='Scan for pickup verification / Scanner pour vérification de ramassage' "
                 f"width='180' height='180' "
                 f"style='display:block;width:180px;height:180px;image-rendering:pixelated;background:#FFFFFF'/>"
-                f"</div>"
+                f"</td></tr></table>"
             )
         except Exception as e:
             logger.error(f"[STORAGE_EMAIL] QR embed failed: {e}")
 
         pickup_en = (
             f"<hr style='margin:16px 0;border:none;border-top:1px solid #e2e8f0'/>"
-            f"<div style='background:#fef3c7;border:2px dashed #d97706;border-radius:10px;padding:16px;text-align:center;margin:12px 0'>"
-            f"<div style='font-size:11px;letter-spacing:2px;color:#92400e;font-weight:700'>YOUR PICKUP CODE</div>"
-            f"<div style='font-size:28px;font-weight:900;color:#78350f;letter-spacing:3px;font-family:monospace;margin-top:6px'>{pickup_code}</div>"
+            f"<table role='presentation' width='100%' cellpadding='0' cellspacing='0' border='0' style='margin:12px 0'>"
+            f"<tr><td bgcolor='#fef3c7' align='center' style='background-color:#fef3c7;border:2px dashed #d97706;border-radius:10px;padding:16px'>"
+            f"<p style='margin:0;font-size:11px;letter-spacing:2px;color:#92400e;font-weight:700'>YOUR PICKUP CODE</p>"
+            f"<p style='margin:6px 0 0 0;font-size:28px;font-weight:900;color:#78350f;letter-spacing:3px;font-family:monospace'>{pickup_code}</p>"
             f"{qr_img_tag}"
-            f"<div style='font-size:11px;color:#92400e;margin-top:4px'>Scan at pickup · Show code to staff</div>"
-            f"</div>"
+            f"<p style='margin:4px 0 0 0;font-size:11px;color:#92400e'>Scan at pickup · Show code to staff</p>"
+            f"</td></tr></table>"
             f"Present this code (or the QR) to facility staff when you arrive for pickup. "
             f"The facility will mark this code as used upon verification. "
             f"<strong>Do not share this code</strong> — it authorizes access to the unit."
         )
         pickup_fr = (
             f"<hr style='margin:16px 0;border:none;border-top:1px solid #e2e8f0'/>"
-            f"<div style='background:#fef3c7;border:2px dashed #d97706;border-radius:10px;padding:16px;text-align:center;margin:12px 0'>"
-            f"<div style='font-size:11px;letter-spacing:2px;color:#92400e;font-weight:700'>VOTRE CODE DE RÉCUPÉRATION</div>"
-            f"<div style='font-size:28px;font-weight:900;color:#78350f;letter-spacing:3px;font-family:monospace;margin-top:6px'>{pickup_code}</div>"
+            f"<table role='presentation' width='100%' cellpadding='0' cellspacing='0' border='0' style='margin:12px 0'>"
+            f"<tr><td bgcolor='#fef3c7' align='center' style='background-color:#fef3c7;border:2px dashed #d97706;border-radius:10px;padding:16px'>"
+            f"<p style='margin:0;font-size:11px;letter-spacing:2px;color:#92400e;font-weight:700'>VOTRE CODE DE RÉCUPÉRATION</p>"
+            f"<p style='margin:6px 0 0 0;font-size:28px;font-weight:900;color:#78350f;letter-spacing:3px;font-family:monospace'>{pickup_code}</p>"
             f"{qr_img_tag}"
-            f"<div style='font-size:11px;color:#92400e;margin-top:4px'>Scanner à la récupération · Présentez le code</div>"
-            f"</div>"
+            f"<p style='margin:4px 0 0 0;font-size:11px;color:#92400e'>Scanner à la récupération · Présentez le code</p>"
+            f"</td></tr></table>"
             f"Présentez ce code (ou le QR) au personnel de la facilité lors de votre arrivée. "
             f"La facilité marquera ce code comme utilisé après vérification. "
             f"<strong>Ne partagez pas ce code</strong> — il autorise l'accès à l'unité."
@@ -796,17 +799,21 @@ async def send_buyer_pickup_code_email(
     seller_name = (seller or {}).get("name") or "the seller"
     seller_contact = (seller or {}).get("email") or (seller or {}).get("phone") or "—"
     html = f"""
-    <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;padding:20px;background:#f8fafc;">
-      <div style="background:white;padding:24px;border-radius:12px;border:1px solid #e2e8f0;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f8fafc;">
+      <tr><td align="center" style="padding:20px;">
+        <table role="presentation" width="640" cellpadding="0" cellspacing="0" border="0" style="max-width:640px;background-color:#ffffff;border:1px solid #e2e8f0;border-radius:12px;font-family:Arial,sans-serif;">
+          <tr><td style="padding:24px;">
         <h2 style="color:#1e40af;margin:0 0 8px;">🎉 Congratulations — you won an auction!</h2>
         <p style="color:#475569;margin:0 0 12px;">Item: <strong>{listing_title}</strong> · Final bid: <strong>CA${hammer_price:,.2f}</strong></p>
         <p style="color:#475569;margin:0 0 16px;">Payment method: <strong>{method_label_en}</strong> — pay <strong>{seller_name}</strong> directly ({seller_contact}).</p>
 
-        <div style="background:#fffbeb;border:2px solid #f59e0b;border-radius:12px;padding:18px;text-align:center;margin:16px 0;">
-          <p style="margin:0;color:#92400e;text-transform:uppercase;font-size:11px;letter-spacing:0.05em;font-weight:bold;">🔑 Pickup Code / Code de collecte</p>
-          <p style="margin:8px 0 4px;font-size:28px;font-weight:bold;color:#1e3a8a;letter-spacing:0.15em;font-family:'Courier New',monospace;">{pickup_code}</p>
-          <p style="margin:0;color:#92400e;font-size:11px;">Transaction #{transaction_id[:8]}</p>
-        </div>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:16px 0;">
+          <tr><td bgcolor="#fffbeb" align="center" style="background-color:#fffbeb;border:2px solid #f59e0b;border-radius:12px;padding:18px;">
+            <p style="margin:0;color:#92400e;text-transform:uppercase;font-size:11px;letter-spacing:0.05em;font-weight:bold;">🔑 Pickup Code / Code de collecte</p>
+            <p style="margin:8px 0 4px;font-size:28px;font-weight:bold;color:#1e3a8a;letter-spacing:0.15em;font-family:'Courier New',monospace;">{pickup_code}</p>
+            <p style="margin:0;color:#92400e;font-size:11px;">Transaction #{transaction_id[:8]}</p>
+          </td></tr>
+        </table>
 
         <p style="color:#334155;line-height:1.6;font-size:13px;">
           <strong>EN:</strong> Share this code with the seller <strong>ONLY after</strong> you have completed your payment.
@@ -824,8 +831,10 @@ async def send_buyer_pickup_code_email(
           BidVex Inc. · GST# 706766367RT0001 · QST# 1233530880TQ0001 · All amounts in CAD<br>
           ({method_label_fr} — Montants en CAD)
         </p>
-      </div>
-    </div>
+          </td></tr>
+        </table>
+      </td></tr>
+    </table>
     """
     return await _send_via_unified(
         to_email=buyer["email"],
@@ -843,40 +852,48 @@ async def send_seller_pickup_instructions_email(
     method_label_en = "Interac e-Transfer" if payment_method == "etransfer" else "Cash"
     method_label_fr = "Virement Interac" if payment_method == "etransfer" else "Comptant"
     html = f"""
-    <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;padding:20px;background:#f8fafc;">
-      <div style="background:white;padding:24px;border-radius:12px;border:1px solid #e2e8f0;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f8fafc;">
+      <tr><td align="center" style="padding:20px;">
+        <table role="presentation" width="640" cellpadding="0" cellspacing="0" border="0" style="max-width:640px;background-color:#ffffff;border:1px solid #e2e8f0;border-radius:12px;font-family:Arial,sans-serif;">
+          <tr><td style="padding:24px;">
         <h2 style="color:#16a34a;margin:0 0 8px;">✅ Your item has sold!</h2>
         <p style="color:#475569;margin:0 0 12px;">Item: <strong>{listing_title}</strong> · Sold for: <strong>CA${hammer_price:,.2f}</strong></p>
         <p style="color:#475569;margin:0 0 16px;">Payment method chosen by the buyer: <strong>{method_label_en}</strong>.</p>
 
-        <div style="background:#ecfdf5;border:2px solid #16a34a;border-radius:12px;padding:18px;margin:16px 0;">
-          <p style="margin:0 0 8px;color:#166534;text-transform:uppercase;font-size:11px;letter-spacing:0.05em;font-weight:bold;">🔑 How to release your funds / Libération des fonds</p>
-          <p style="color:#334155;line-height:1.6;font-size:13px;margin:0 0 10px;">
-            <strong>EN:</strong> Once you have received payment from the buyer, ask them for their <strong>Pickup Code</strong>
-            (format <code>BVX-XXXXXXXX</code>) and enter it at
-            <a href="https://www.bidvex.com/confirm-payment">bidvex.com/confirm-payment</a>.
-            This confirms payment received and completes the transaction on BidVex.
-            Your funds will be marked as settled.
-          </p>
-          <p style="color:#334155;line-height:1.6;font-size:13px;margin:0;">
-            <strong>FR :</strong> Une fois le paiement reçu, demandez le <strong>Code de collecte</strong> à l'acheteur
-            et saisissez-le sur
-            <a href="https://www.bidvex.com/confirmer-paiement">bidvex.com/confirmer-paiement</a>.
-            Cela confirme la réception et complète la transaction.
-          </p>
-        </div>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:16px 0;">
+          <tr><td bgcolor="#ecfdf5" style="background-color:#ecfdf5;border:2px solid #16a34a;border-radius:12px;padding:18px;">
+            <p style="margin:0 0 8px;color:#166534;text-transform:uppercase;font-size:11px;letter-spacing:0.05em;font-weight:bold;">🔑 How to release your funds / Libération des fonds</p>
+            <p style="color:#334155;line-height:1.6;font-size:13px;margin:0 0 10px;">
+              <strong>EN:</strong> Once you have received payment from the buyer, ask them for their <strong>Pickup Code</strong>
+              (format <code>BVX-XXXXXXXX</code>) and enter it at
+              <a href="https://www.bidvex.com/confirm-payment">bidvex.com/confirm-payment</a>.
+              This confirms payment received and completes the transaction on BidVex.
+              Your funds will be marked as settled.
+            </p>
+            <p style="color:#334155;line-height:1.6;font-size:13px;margin:0;">
+              <strong>FR :</strong> Une fois le paiement reçu, demandez le <strong>Code de collecte</strong> à l'acheteur
+              et saisissez-le sur
+              <a href="https://www.bidvex.com/confirmer-paiement">bidvex.com/confirmer-paiement</a>.
+              Cela confirme la réception et complète la transaction.
+            </p>
+          </td></tr>
+        </table>
 
-        <p style="color:#92400e;font-size:12px;background:#fef3c7;padding:12px;border-radius:6px;">
-          ⚠️ The BidVex commission will be charged to your card on file within 24 hours of pickup-code confirmation.<br>
-          La commission BidVex sera prélevée sur votre carte enregistrée dans les 24 heures.
-        </p>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+          <tr><td bgcolor="#fef3c7" style="background-color:#fef3c7;padding:12px;border-radius:6px;color:#92400e;font-size:12px;">
+            ⚠️ The BidVex commission will be charged to your card on file within 24 hours of pickup-code confirmation.<br>
+            La commission BidVex sera prélevée sur votre carte enregistrée dans les 24 heures.
+          </td></tr>
+        </table>
 
         <p style="color:#94a3b8;font-size:11px;text-align:center;margin-top:24px;">
           BidVex Inc. · GST# 706766367RT0001 · QST# 1233530880TQ0001 · Tx #{transaction_id[:8]}<br>
           ({method_label_fr})
         </p>
-      </div>
-    </div>
+          </td></tr>
+        </table>
+      </td></tr>
+    </table>
     """
     return await _send_via_unified(
         to_email=seller["email"],
@@ -937,5 +954,49 @@ async def send_storage_facility_registration_rejected_email(facility: dict, reas
             cta_url="https://www.bidvex.com/storage-auctions/register-facility?resubmit=1",
             cta_en="Resubmit document", cta_fr="Soumettre à nouveau",
         ),
+    )
+
+
+
+# ═══════════════════════════════════════════════════════════════════
+# iter299 P1 — "Last Chance" 1-hour nudge (watchers + trailing bidders)
+# ═══════════════════════════════════════════════════════════════════
+
+async def send_last_chance_email(
+    user: dict, listing_title: str, listing_id: str, action_url: str,
+) -> Dict[str, Any]:
+    """⏰ Sent when an auction the user watches (or bid on without
+    leading) ends within the next hour. Single-language per the user's
+    platform setting. Table-only layout (Outlook-safe)."""
+    lang = _detect_language(user)
+    link = f"{FRONTEND_URL}{action_url}"
+
+    if lang == "fr":
+        subject = f"⏰ Dernière chance — {listing_title} se termine dans moins d'une heure"
+        heading = "Derni&egrave;re chance de miser&nbsp;!"
+        body = (f"L'ench&egrave;re pour <strong>{listing_title}</strong> se termine dans "
+                f"<strong>moins d'une heure</strong>. C'est votre derni&egrave;re chance de placer une mise.")
+        cta = "Miser maintenant"
+    else:
+        subject = f"⏰ Last Chance — {listing_title} ends in under 1 hour"
+        heading = "Last chance to bid!"
+        body = (f"The auction for <strong>{listing_title}</strong> ends in "
+                f"<strong>under 1 hour</strong>. This is your last chance to place a bid.")
+        cta = "Bid Now"
+
+    content = f"""
+    <h2 style="margin: 0 0 20px 0; color: #d97706;">{heading}</h2>
+    <p style="color: #475569; line-height: 1.6;">{body}</p>
+    <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 30px auto;">
+      <tr><td align="center" style="background-color: #2B8FD0; padding: 14px 30px; border-radius: 8px;">
+        <a href="{link}" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px;">{cta}</a>
+      </td></tr>
+    </table>
+    <p style="color: #94a3b8; font-size: 12px; text-align: center;">BidVex — {listing_id}</p>
+    """
+    return await _send_via_unified(
+        to_email=user["email"],
+        subject=subject,
+        html_content=_base_template(content, heading),
     )
 

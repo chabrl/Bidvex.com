@@ -34,6 +34,8 @@ import AdminAffiliatePayouts from './admin/AdminAffiliatePayouts';
 import AdminExternalCampaigns from './admin/AdminExternalCampaigns';
 import ReportManager from './admin/ReportManager';
 import AnalyticsDashboard from './admin/AnalyticsDashboard';
+// iter299 P2 — Advanced Analytics (GMV, revenue, usage charts)
+import AdvancedAnalytics from './admin/AdvancedAnalytics';
 import MessagingOversight from './admin/MessagingOversight';
 import TrustSafetyDashboard from './admin/TrustSafetyDashboard';
 import AnnouncementManager from './admin/AnnouncementManager';
@@ -158,6 +160,8 @@ const SECONDARY_TABS = {
   ],
   analytics: [
     { id: 'dashboard', label: 'Dashboard', icon: '📈', lucideIcon: TrendingUp },
+    // iter299 P2 — GMV / revenue / usage deep-dive
+    { id: 'advanced-analytics', label: 'Advanced Analytics', icon: '📊', lucideIcon: BarChart3 },
     { id: 'conversion-funnel', label: 'Conversion Funnel', icon: '🪜', lucideIcon: TrendingUp },
     { id: 'reports', label: 'Reports', icon: '📑', lucideIcon: FileText },
     { id: 'system-monitoring', label: 'System Monitoring', icon: '🔧', lucideIcon: Activity },
@@ -218,6 +222,7 @@ const AdminDashboard = () => {
         'flagged-listings':   'marketplace',
         'listings-moderation': 'marketplace',
         'conversion-funnel':  'analytics',
+        'advanced-analytics': 'analytics',
         'dashboard':          'analytics',
         'reports':            'analytics',
         'system-monitoring':  'analytics',
@@ -527,6 +532,7 @@ const AdminDashboard = () => {
       case 'analytics':
         switch (secondaryTab) {
           case 'dashboard': return <AnalyticsDashboard />;
+          case 'advanced-analytics': return <AdvancedAnalytics />;
           case 'conversion-funnel': return <ConversionFunnelDashboard />;
           case 'reports': return <ReportManager />;
           case 'system-monitoring': return <SystemMonitoringDashboard />;

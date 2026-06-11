@@ -1,0 +1,38 @@
+{
+  "summary": "iter299 post-launch validation on PREVIEW. Backend: 12/13 PASSED, 1 SKIPPED (no buyer notifications). E2E moderation approve+reject succeeded with full DB state verification (status flips, 409 on re-approve, removal from pending queue). Frontend: Advanced Analytics tab + deep-link + ALL 11 KPI/chart/card testids verified. Moderation tab renders 3 remaining pending listings with FR titles, seller/province enrichment, approve+reject buttons. FR-mode listing detail title shows French title correctly (matches title_fr). CRITICAL P0 BUG: /create-listing crashes with `ReferenceError: isQuebecListing is not defined` — entire create form unusable, FrenchTitleField never renders. /create-multi-item-listing also missing title-fr-input. EN-mode listing-title-fr-subtitle is not rendering (empty) even when title_fr exists.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "CreateListingPage.js", "issue": "Uncaught runtime ReferenceError: `isQuebecListing is not defined` — page crashes on load, FrenchTitleField (title-fr-input) never mounts. Bill 96 P0 feature is completely non-functional on the marketplace listing creation form. Stack: CreateListingPage at static/js/src_pages_CreateListingPage_js-...chunk.js:521:20. Likely the variable was renamed/removed but a JSX expression still references it.", "selector": "[data-testid=title-fr-input] on /create-listing", "priority": "CRITICAL"},
+      {"component": "CreateMultiItemListingPage", "issue": "title-fr-input not present on /create-multi-item-listing (lots form). Bill 96 FrenchTitleField missing or also crashing.", "selector": "[data-testid=title-fr-input] on /create-multi-item-listing", "priority": "HIGH"},
+      {"component": "ListingDetailPage.js (lines 491-501)", "issue": "EN-mode FR subtitle [data-testid=listing-title-fr-subtitle] is not rendering when title_fr exists. Verified on listing 42efe7b0-b430-4cb4-9505-2c474bc1fb61 (title_fr='Apple iPad 9e gén 64 Go'): in EN mode the H1 shows the FR text (because EN title equals FR title for this seed) but the dedicated FR subtitle element is empty/absent.", "selector": "[data-testid=listing-title-fr-subtitle]", "priority": "MEDIUM"},
+      {"component": "EnhancedUserManagement (Admin → Users)", "issue": "React console warning: 'Each child in a list should have a unique \"key\" prop.' (cosmetic, but should be cleaned up)", "selector": "EnhancedUserManagement list render", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter299_e2e_preview.py",
+    "/app/test_reports/pytest/iter299_e2e_preview.xml"
+  ],
+  "action_items": [
+    "P0: Fix `isQuebecListing is not defined` ReferenceError in /app/frontend/src/pages/CreateListingPage.js — likely a stale identifier from a refactor; either define the helper (`const isQuebecListing = (province === 'QC')` or use bill96 util) or remove the reference. This single bug blocks the entire Bill 96 P0 feature on the marketplace create form.",
+    "P1: Verify FrenchTitleField is wired into /create-multi-item-listing (CreateMultiItemListingPage). title-fr-input testid was not found.",
+    "P1: Fix EN-mode FR subtitle rendering in ListingDetailPage.js lines 491-501 — listing-title-fr-subtitle testid never appears even when title_fr is set.",
+    "P3: Clean up React key warning in EnhancedUserManagement list."
+  ],
+  "critical_code_review_comments": [
+    "CreateListingPage runtime error indicates a missing CI check — there should be at least a smoke playwright test that hits /create-listing logged in and asserts no console errors, since this is a P0 conversion surface.",
+    "ListingDetailPage should expose listing-title-fr-subtitle unconditionally when title_fr exists and current locale=en, with hidden via CSS when equal to title; current absence makes verification impossible."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter299_e2e_preview.py (new — 13 live tests against preview URL)"
+  ],
+  "success_rate": {"backend": "92% (12/13, 1 skipped due to no notifications, 0 failed)", "frontend": "60% (Analytics + Moderation + FR-mode title OK; CreateListing crashes; multi-item + subtitle missing)"},
+  "test_credentials": "admin charbel911@gmail.com / Anderosli123!@# — used; iter225buyer@bidvex.com / TestBuyer225! — used (no notifications). Created new account ta299+<ts>@example.com during register-no-phone test.",
+  "seed_data_creation": "Consumed exactly 2 of the 5 seeded pending_review listings (1 approve, 1 reject) as authorized — 3 pending listings remain for subsequent UI verification.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend iter299 E2E suite at /app/backend/tests/test_iter299_e2e_preview.py is green and idempotent except for the approve/reject tests which consume pending listings. Re-seed pending listings before re-running the E2E suite. The P0 CreateListingPage ReferenceError is blocking — verify the fix by loading /create-listing with admin token and asserting [data-testid=title-fr-input] exists and no console errors. Also re-verify /create-multi-item-listing and the FR subtitle on a listing whose EN title differs from title_fr to disambiguate the subtitle bug.",
+  "rca of the issue": "RCA — CreateListingPage.js: A reference to `isQuebecListing` exists in JSX (likely a conditional render for the Bill 96 helper/asterisk), but the symbol was never declared in scope. The page is wrapped in an error boundary that shows the 'Uncaught runtime errors' overlay; nothing below the crash point renders, which is why title-fr-input is absent. Reproduction: navigate to /create-listing while authenticated → red overlay appears immediately. Fix: import/derive `isQuebecListing` from province state (e.g., `const isQuebecListing = useMemo(() => province === 'QC', [province])`) or replace with the canonical helper from /app/frontend/src/utils/bill96.js."
+}

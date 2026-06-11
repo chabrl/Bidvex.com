@@ -145,6 +145,7 @@ async def create_multi_lot_auction(
             "make":             lot_in.make,
             "model":            lot_in.model,
             "title":            lot_in.title,
+            "title_fr":         lot_in.title_fr,
             "description":      lot_in.description,
             "mileage":          lot_in.mileage,
             "body_type":        lot_in.body_type,

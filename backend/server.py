@@ -802,6 +802,15 @@ scheduler.add_job(
     _dealer_license_expiry_tick,
     trigger=IntervalTrigger(hours=6), id='dealer_license_expiry', replace_existing=True)
 
+# ─── iter299 P1 — "Last Chance" 1-hour nudge (every 10 min) ───
+async def _last_chance_tick():
+    from services.last_chance import process_last_chance_nudges
+    await safe_run("last_chance_nudges", process_last_chance_nudges(db))
+
+scheduler.add_job(
+    _last_chance_tick,
+    trigger=IntervalTrigger(minutes=10), id='last_chance_nudges', replace_existing=True)
+
 # ─── Phase 5 — Meta product feed cache warming (every 10 min) ───
 async def _fb_feed_cache_warm_tick():
     """Pre-builds the unfiltered feed so Meta's crawler always hits warm cache.
@@ -1112,6 +1121,14 @@ try:
     # iter298 BUG 2 — Relist flow for zero-bid ended auctions.
     from routes.relist import relist_router
     api_router.include_router(relist_router)
+
+    # iter299 P1 — Marketplace listings moderation (approve / reject).
+    from routes.admin_moderation import moderation_router
+    api_router.include_router(moderation_router)
+
+    # iter299 P2 — Admin advanced analytics.
+    from routes.admin_analytics import analytics_router
+    api_router.include_router(analytics_router)
 
     # iter298 BUG 4 — Buyer receipts + seller statements.
     from routes.receipts import receipts_router

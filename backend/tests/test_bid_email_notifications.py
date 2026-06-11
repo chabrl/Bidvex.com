@@ -147,9 +147,10 @@ class TestBidEmailNotificationFunctions:
         for field in required_content:
             assert field in source, f"Template should include {field}"
         
-        # Check for formatting
-        assert '_format_currency' in source, "Should format currency amounts"
+        # Check for formatting / date handling (iter239 unified template:
+        # currency is f-string formatted inline, dates via _format_date).
         assert '_format_date' in source, "Should format dates"
+        assert 'send_unified_email' in source, "Should route through the unified template"
         
         print("✅ Bid confirmation email includes all required fields")
         print("   - Bidder name ✓")
@@ -192,14 +193,16 @@ class TestBidEmailNotificationFunctions:
         for field in required_content:
             assert field in source, f"Template should include {field}"
         
-        # Check for strike-through styling on previous bid
-        assert 'line-through' in source, "Previous bid should have line-through styling"
-        
+        # Check for strike-through styling on previous bid (iter239 unified
+        # template uses the <strike> element rather than CSS line-through).
+        assert ('line-through' in source or '<strike>' in source), \
+            "Previous bid should have strike-through styling"
+
         # Check for suggested bid
-        assert 'suggested_bid' in source, "Should include suggested next bid"
-        
-        # Check for Bid Again CTA
-        assert 'Bid Again' in source, "Should include 'Bid Again' CTA"
+        assert 'suggested' in source, "Should include suggested next bid"
+
+        # CTA is rendered by the unified template ("outbid" kind).
+        assert 'send_unified_email' in source, "Should route through the unified template"
         
         print("✅ Outbid email includes all required fields")
         print("   - User name ✓")
@@ -213,33 +216,32 @@ class TestBidEmailNotificationFunctions:
     def test_email_functions_are_nonblocking_in_server(self):
         """
         Verify that email functions are wrapped in try-except
-        so bid still succeeds even if email fails
+        so bid still succeeds even if email fails.
+
+        iter299 update: `place_bid` moved from server.py to
+        routes/auctions_bids.py during the backend refactor.
         """
-        # Read the server.py to check the try-except wrapping
-        with open('/app/backend/server.py', 'r') as f:
+        with open('/app/backend/routes/auctions_bids.py', 'r') as f:
             content = f.read()
-        
-        # Find the place_bid function and check email handling
+
         place_bid_start = content.find("async def place_bid(")
-        place_bid_end = content.find("@api_router.post(\"/buy-now\")")
-        place_bid_code = content[place_bid_start:place_bid_end]
-        
-        # Check for both email sections with try-except
-        # Bid confirmation email
-        assert "BID PLACED EMAIL CONFIRMATION" in place_bid_code, "Bid email section should exist"
-        bid_email_start = place_bid_code.find("BID PLACED EMAIL CONFIRMATION")
-        bid_email_section = place_bid_code[bid_email_start:bid_email_start+1000]
-        assert "try:" in bid_email_section, "Bid email should be wrapped in try"
-        assert "except" in bid_email_section, "Bid email should have except handler"
-        
-        # Outbid notification email
-        assert "OUTBID EMAIL NOTIFICATION" in place_bid_code, "Outbid email section should exist"
-        outbid_email_start = place_bid_code.find("OUTBID EMAIL NOTIFICATION")
-        # Get a larger section to include the except handler
-        outbid_email_section = place_bid_code[outbid_email_start:outbid_email_start+1200]
-        assert "try:" in outbid_email_section, "Outbid email should be wrapped in try"
-        assert "except" in outbid_email_section, "Outbid email should have except handler"
-        
+        assert place_bid_start != -1, "place_bid should live in routes/auctions_bids.py"
+        place_bid_code = content[place_bid_start:]
+
+        # Bid confirmation email — wrapped in try/except
+        assert "send_bid_placed_email" in place_bid_code, "Bid email dispatch should exist"
+        bid_email_start = place_bid_code.find("send_bid_placed_email")
+        bid_email_context = place_bid_code[max(0, bid_email_start - 400):bid_email_start + 800]
+        assert "try:" in bid_email_context, "Bid email should be wrapped in try"
+        assert "except" in bid_email_context, "Bid email should have except handler"
+
+        # Outbid notification email — wrapped in try/except
+        assert "send_outbid_email" in place_bid_code, "Outbid email dispatch should exist"
+        outbid_start = place_bid_code.find("send_outbid_email")
+        outbid_context = place_bid_code[max(0, outbid_start - 400):outbid_start + 1000]
+        assert "try:" in outbid_context, "Outbid email should be wrapped in try"
+        assert "except" in outbid_context, "Outbid email should have except handler"
+
         print("✅ Both email functions are non-blocking (wrapped in try-except)")
         print("   - Bid confirmation email: try-except ✓")
         print("   - Outbid notification email: try-except ✓")
@@ -282,7 +284,8 @@ class TestEmailNotificationDirectCall:
     
     def test_send_bid_placed_email_logging(self):
         """
-        Test that send_bid_placed_email logs the email when SendGrid is not configured
+        Test that send_bid_placed_email logs the email when SendGrid is not configured.
+        Skipped when SendGrid IS configured (would send a real email to a fake address).
         """
         import sys
         sys.path.insert(0, '/app/backend')
@@ -290,8 +293,10 @@ class TestEmailNotificationDirectCall:
         from services.emails._email_core import SENDGRID_AVAILABLE
         from services.emails.email_marketplace import send_bid_placed_email
         
-        # Run async function using asyncio
-        result = asyncio.get_event_loop().run_until_complete(
+        if SENDGRID_AVAILABLE:
+            pytest.skip("SendGrid configured — skipping log-fallback unit test (avoids real sends)")
+
+        result = asyncio.run(
             send_bid_placed_email(
                 bidder_email="test@example.com",
                 bidder_name="Test User",
@@ -302,17 +307,13 @@ class TestEmailNotificationDirectCall:
                 is_leading=True
             )
         )
-        
-        if not SENDGRID_AVAILABLE:
-            assert result["status"] == "logged", f"Expected logged status, got: {result}"
-            print("✅ Bid placed email was logged (SendGrid not configured)")
-            print(f"   Result: {result}")
-        else:
-            print(f"⚠️ SendGrid is configured, result: {result}")
+        assert result["status"] == "logged", f"Expected logged status, got: {result}"
+        print("✅ Bid placed email was logged (SendGrid not configured)")
     
     def test_send_outbid_email_logging(self):
         """
-        Test that send_outbid_email logs the email when SendGrid is not configured
+        Test that send_outbid_email logs the email when SendGrid is not configured.
+        Skipped when SendGrid IS configured (would send a real email to a fake address).
         """
         import sys
         sys.path.insert(0, '/app/backend')
@@ -320,8 +321,10 @@ class TestEmailNotificationDirectCall:
         from services.emails._email_core import SENDGRID_AVAILABLE
         from services.emails.email_marketplace import send_outbid_email
         
-        # Run async function using asyncio
-        result = asyncio.get_event_loop().run_until_complete(
+        if SENDGRID_AVAILABLE:
+            pytest.skip("SendGrid configured — skipping log-fallback unit test (avoids real sends)")
+
+        result = asyncio.run(
             send_outbid_email(
                 user_email="outbid@example.com",
                 user_name="Outbid User",
@@ -332,13 +335,8 @@ class TestEmailNotificationDirectCall:
                 auction_end_date=datetime.now(timezone.utc).isoformat()
             )
         )
-        
-        if not SENDGRID_AVAILABLE:
-            assert result["status"] == "logged", f"Expected logged status, got: {result}"
-            print("✅ Outbid email was logged (SendGrid not configured)")
-            print(f"   Result: {result}")
-        else:
-            print(f"⚠️ SendGrid is configured, result: {result}")
+        assert result["status"] == "logged", f"Expected logged status, got: {result}"
+        print("✅ Outbid email was logged (SendGrid not configured)")
 
 
 class TestEmailNotificationIntegration:

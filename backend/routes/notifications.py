@@ -136,6 +136,20 @@ async def get_notifications(limit: int = 15, current_user: User = Depends(get_cu
         {"user_id": current_user.id}, {"_id": 0}
     ).sort("created_at", -1).limit(limit).to_list(limit)
 
+    # iter299 — bilingual guarantee: legacy rows (pre-iter296) may lack the
+    # *_en / *_fr companions. Never return an empty title/message in either
+    # language — fall back to the base copy so FR users always see text.
+    for n in notifications:
+        base_title = n.get("title") or n.get("title_en") or n.get("title_fr") or ""
+        base_msg = n.get("message") or n.get("message_en") or n.get("message_fr") or ""
+        n["title"] = base_title
+        n["message"] = base_msg
+        for lang in ("en", "fr"):
+            if not (n.get(f"title_{lang}") or "").strip():
+                n[f"title_{lang}"] = base_title
+            if not (n.get(f"message_{lang}") or "").strip():
+                n[f"message_{lang}"] = base_msg
+
     unread_count = await db.notifications.count_documents({
         "user_id": current_user.id, "read": False
     })
@@ -414,16 +428,29 @@ async def submit_notification_attachment(
     if admin_id:
         try:
             user_name = getattr(current_user, "name", None) or getattr(current_user, "email", "User")
+            _t_en = f"📎 {user_name} submitted an attachment"
+            _m_en = (
+                f"User {user_name} responded to notification "
+                f"'{(notif.get('title') or '')[:80]}' with a file "
+                f"({filename}, {size_mb:.2f} MB)."
+            )
+            _t_fr = f"📎 {user_name} a soumis une pièce jointe"
+            _m_fr = (
+                f"L'utilisateur {user_name} a répondu à la notification "
+                f"« {(notif.get('title') or '')[:80]} » avec un fichier "
+                f"({filename}, {size_mb:.2f} Mo)."
+            )
             await db.notifications.insert_one({
                 "id": str(uuid.uuid4()),
                 "user_id": admin_id,
                 "type": "admin_attachment_received",
-                "title": f"📎 {user_name} submitted an attachment",
-                "message": (
-                    f"User {user_name} responded to notification "
-                    f"'{(notif.get('title') or '')[:80]}' with a file "
-                    f"({filename}, {size_mb:.2f} MB)."
-                ),
+                "title": _t_en,
+                "message": _m_en,
+                # iter299 — bilingual companions (EN/FR always present)
+                "title_en": _t_en,
+                "message_en": _m_en,
+                "title_fr": _t_fr,
+                "message_fr": _m_fr,
                 "data": {
                     "source_notification_id": notification_id,
                     "attachment_url": attachment_url,

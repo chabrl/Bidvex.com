@@ -1285,6 +1285,16 @@ async def admin_advanced_analytics(
         "top_categories": top_categories,
         "conversion": conversion,
     }
+    # iter299 — merge the GMV / platform-revenue block from the new
+    # deep-dive analytics so /advanced also exposes a non-empty `gmv`
+    # field (required by scripts/verify_production_iter299.py).
+    try:
+        from routes.admin_analytics import get_admin_analytics as _iter299_overview
+        overview = await _iter299_overview(admin=current_user)
+        payload["gmv"] = overview.get("gmv")
+        payload["platform_revenue"] = overview.get("platform_revenue")
+    except Exception as _e:  # noqa: BLE001
+        logger.warning(f"[advanced-analytics] gmv merge failed: {_e}")
     _cache_set(cache_key, payload)
     return payload
 

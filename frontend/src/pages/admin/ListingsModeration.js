@@ -40,10 +40,23 @@ const ListingsModeration = () => {
     if (!silent) setLoading(true);
     else setRefreshing(true);
     try {
-      const res = await axios.get(`${API}/admin/listings/pending`, {
+      // iter299 P1 — new unified moderation API (approve → seller becomes
+      // trusted + bilingual email/notification; reject → reason email).
+      const res = await axios.get(`${API}/admin/moderation/pending`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setData(res.data);
+      const rows = (res.data.listings || []).map((r) => ({
+        ...r,
+        _listing_type: r.section === 'lots' ? 'multi' : 'single',
+        _seller_name: r.seller_name,
+        _seller_email: r.seller_email,
+      }));
+      setData({
+        total: res.data.total ?? rows.length,
+        single_count: rows.filter((r) => r._listing_type === 'single').length,
+        multi_count: rows.filter((r) => r._listing_type === 'multi').length,
+        listings: rows,
+      });
     } catch (err) {
       console.error(err);
       toast.error('Failed to load pending listings');
@@ -59,11 +72,11 @@ const ListingsModeration = () => {
     setActionLoading(prev => ({ ...prev, [listing.id]: 'approve' }));
     try {
       await axios.post(
-        `${API}/admin/listings/${listing.id}/approve`,
+        `${API}/admin/moderation/${listing.id}/approve`,
         {},
         { headers: { Authorization: `Bearer ${token}` } },
       );
-      toast.success(`"${listing.title}" approved — seller has been notified.`);
+      toast.success(`"${listing.title}" approved — listing is live and the seller is now trusted.`);
       setData(prev => ({
         ...prev,
         total: prev.total - 1,
@@ -97,7 +110,7 @@ const ListingsModeration = () => {
     setSubmittingReject(true);
     try {
       await axios.post(
-        `${API}/admin/listings/${listing.id}/reject`,
+        `${API}/admin/moderation/${listing.id}/reject`,
         { reason },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -249,11 +262,23 @@ const ListingsModeration = () => {
                       <h3 className="font-semibold text-base truncate" title={listing.title}>
                         {listing.title || 'Untitled'}
                       </h3>
+                      {listing.title_fr && (
+                        <p
+                          className="text-sm text-blue-700 truncate"
+                          title={listing.title_fr}
+                          data-testid={`pending-title-fr-${listing.id}`}
+                        >
+                          FR&nbsp;: {listing.title_fr}
+                        </p>
+                      )}
                       <p className="text-sm text-muted-foreground line-clamp-2 mt-0.5">
                         {listing.description || '(no description)'}
                       </p>
                       <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-muted-foreground">
                         <span><strong>Seller:</strong> {listing._seller_name || '—'} &lt;{listing._seller_email || '—'}&gt;</span>
+                        {listing.seller_province && (
+                          <span><strong>Province:</strong> {listing.seller_province}</span>
+                        )}
                         <span><strong>Start price:</strong> {priceDisplay}</span>
                         {listing.location && <span><strong>Location:</strong> {listing.location}</span>}
                         <span><strong>Created:</strong> {listing.created_at ? new Date(listing.created_at).toLocaleString() : '—'}</span>

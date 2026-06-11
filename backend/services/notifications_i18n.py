@@ -96,6 +96,26 @@ _TEMPLATES = {
         lambda p: "Échec du paiement",
         lambda p: f"Votre paiement de {_fmt_money(p.get('amount'))} pour « {p.get('title','cet article')} » a échoué. Veuillez mettre à jour votre méthode de paiement.",
     ),
+    # iter299 P1 — "Last Chance" 1-hour nudge for watchers + trailing bidders.
+    "last_chance": (
+        lambda p: "⏰ Last Chance",
+        lambda p: f"Last chance to bid on '{p.get('title','this item')}' — auction closes soon.",
+        lambda p: "⏰ Dernière chance",
+        lambda p: f"Dernière chance de miser sur « {p.get('title','cet article')} » — l'enchère se termine bientôt.",
+    ),
+    # iter299 P1 — Marketplace moderation decisions.
+    "listing_approved": (
+        lambda p: "Listing Approved",
+        lambda p: f"Your listing '{p.get('title','your item')}' was approved and is now live.",
+        lambda p: "Annonce approuvée",
+        lambda p: f"Votre annonce « {p.get('title','votre article')} » a été approuvée et est maintenant en ligne.",
+    ),
+    "listing_rejected": (
+        lambda p: "Listing Rejected",
+        lambda p: f"Your listing '{p.get('title','your item')}' was rejected. Reason: {p.get('reason','—')}",
+        lambda p: "Annonce refusée",
+        lambda p: f"Votre annonce « {p.get('title','votre article')} » a été refusée. Raison : {p.get('reason','—')}",
+    ),
     "outbid": (
         lambda p: "You've been outbid",
         lambda p: f"Someone bid {_fmt_money(p.get('new_bid'))} on '{p.get('title','this item')}'. Place a higher bid to stay in the lead.",

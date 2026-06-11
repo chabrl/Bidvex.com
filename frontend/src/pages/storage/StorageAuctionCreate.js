@@ -25,9 +25,13 @@ const TYPES = [
 
 const StorageAuctionCreate = () => {
   const { t, i18n } = useTranslation();
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const navigate = useNavigate();
   const isFr = (i18n.language || '').startsWith('fr');
+  // iter299 P0 — Bill 96 applies to Quebec-based facilities.
+  const isQuebecFacility = ['qc', 'quebec', 'québec'].includes(
+    String(user?.province || '').trim().toLowerCase()
+  );
 
   const [form, setForm] = useState({
     unit_number: '', unit_size: '10x10', unit_type: 'indoor',
@@ -100,6 +104,13 @@ const StorageAuctionCreate = () => {
       toast.error(isFr
         ? 'Veuillez téléverser au moins 1 photo de l\'unité.'
         : 'Please upload at least 1 photo of the unit.');
+      return;
+    }
+    // iter299 P0 — Bill 96: QC facilities must provide a French description.
+    if (isQuebecFacility && !String(form.description_fr || '').trim()) {
+      toast.error(isFr
+        ? 'Une description en français est obligatoire pour les annonces québécoises (Loi 96).'
+        : 'A French description is required for Quebec listings under Bill 96.');
       return;
     }
     setSubmitting(true);
@@ -180,8 +191,23 @@ const StorageAuctionCreate = () => {
                 <Textarea required rows={3} value={form.description_en} onChange={e => set('description_en', e.target.value)} />
               </div>
               <div>
-                <Label>{t('storage.create.descriptionFr')}</Label>
-                <Textarea rows={3} value={form.description_fr} onChange={e => set('description_fr', e.target.value)} />
+                <Label>
+                  {t('storage.create.descriptionFr')}
+                  {isQuebecFacility && <span className="text-red-600"> *</span>}
+                </Label>
+                <Textarea
+                  rows={3}
+                  value={form.description_fr}
+                  onChange={e => set('description_fr', e.target.value)}
+                  data-testid="storage-description-fr-input"
+                />
+                {isQuebecFacility && (
+                  <p className="text-xs text-slate-500 mt-1" data-testid="storage-bill96-helper">
+                    {isFr
+                      ? 'Obligatoire pour les annonces québécoises (Loi 96)'
+                      : 'Required for Quebec listings under Bill 96 / Obligatoire pour les annonces québécoises (Loi 96)'}
+                  </p>
+                )}
               </div>
             </div>
 
