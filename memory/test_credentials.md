@@ -92,8 +92,7 @@ Otherwise the Law-25 consent banner intercepts the Sign-In click.
 - iter189buyer@test.com / TestBuyer123! (phone+email+id verified)
 
 ## ⚠️ Stripe key state on PREVIEW (2026-06-11, iter302)
-- `STRIPE_API_KEY` in /app/backend/.env was TEMPORARILY swapped to the TEST key
-  (value of STRIPE_TEST_SECRET_KEY) so settlement charge flows can be tested
-  without real money movement. The original LIVE key line is backed up at
-  `/tmp/stripe_key_backup.txt` and MUST be restored before any production
-  deploy from this workspace. Production (bidvex.com) carries its own env.
+- `STRIPE_API_KEY` in /app/backend/.env is the user's LIVE key (deliberate config since 2026-04-08; production bidvex.com has its own env).
+- During iter302 it was TEMPORARILY swapped to the TEST key (STRIPE_TEST_SECRET_KEY) to safely E2E-test the buyer settle charge flow, then RESTORED to the live key the same day. Charges made during the swap were Stripe TEST-mode only.
+- The iter302 test buyer's saved card (cus_UgXyebdBBfbh49 / visa 4242) lives on the TEST Stripe account — with the live key active, retrying a settle on seeded data returns a graceful 402 (no real charge possible).
+- If future payment-flow testing is needed in preview, swap to the test key first (backup pattern: copy the STRIPE_API_KEY line aside, replace value with STRIPE_TEST_SECRET_KEY's value, restart backend, restore after).

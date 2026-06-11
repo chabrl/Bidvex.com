@@ -1,5 +1,12 @@
 # BidVex Roadmap
 
+## Iter302 (2026-06-11) — COMPLETE
+- [x] Pre-build legal: bid consent flag + Stripe off_session card saving (verified)
+- [x] Directive 1: Seller Winner & Settlement Panel (replaces Promote on ended+winner)
+- [x] Directive 2: Buyer Settle Payment + pickup code + Stripe Connect onboarding banner + escrow trust line
+- [x] Directive 3: Multi-Lot create page full FR + mobile responsive + 60s per-lot floor (client+server)
+- [x] QA: API-level gates (winner PII seller/admin-only; pickup code winner-only), 12-test iter302 suite, regression sweep green, testing agent 9/9
+
 ## P0 - Critical (All Complete)
 - [x] Vehicle Auction Module (Phases 1-7)
 - [x] Live Stripe Subscription Engine

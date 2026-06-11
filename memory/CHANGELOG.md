@@ -853,3 +853,32 @@ EMERGENT_LLM_KEY=sk-emergent-…         (optional; preview uses it. If missing 
 - Testing agent iteration_247.json: backend 100%; frontend issues (admin deep-link, phone-gated buyer) both FIXED and re-verified via UI smoke (review submit E2E, report-thread E2E, FR storefront, admin oversight)
 - Known env artifacts in full 3300-test legacy run: login rate-limit 429s + event-loop pollution (pre-existing; suites green standalone)
 
+
+## iter302 — Settlement, Payouts & Multi-Lot FR (2026-06-11)
+
+### Pre-build — Legal
+- Verified all 4 bid routes (auctions_bids x2, vehicle_multi_lot, vehicles) record `payment_authorization_consented: true` + `consented_at`
+- Verified all 3 SetupIntent paths (payments.py, vehicle_settlement.py, partner_card.py) use `usage="off_session"` (Stripe off-session card saving)
+
+### Directive 1 — Winner & Settlement Panel (seller view)
+- NEW /app/frontend/src/components/SettlementPanel.jsx — on ended listings with a winner the seller's "Boost Your Listing" promote block is replaced (ListingDetailPage.js ~735) by: winner contact (name/email/phone), hammer + net payout, payment-status badge, T+0/T+24h/T+48h/T+72h automated timeline, "Send Payment Reminder" (24h cooldown, 429 bilingual), "View Invoice" dialog (hammer / 2.5% fee / taxes / total due / net payout)
+- API gates verified: GET /api/settlement/panel/{id} → 403 for non-seller/non-admin (winner PII protected server-side)
+
+### Directive 2 — Buyer Settle Payment + Payouts + Connect
+- NEW SettlePaymentModal.jsx — "Settle Payment" button in My Purchases (BuyerDashboard PurchasesAndReceiptsCard) for pending/failed/overdue items → itemized invoice + saved card → POST /api/settlement/settle (off-session charge) → 8-char pickup code (BVX-XXXXXXXX) shown + persisted as badge; replaced legacy Pay-Now payment-link anchor
+- Escrow trust line (display-only) in purchases panel + modal: "Funds are held securely by BidVex Inc. until pickup is confirmed / Les fonds sont détenus par BidVex Inc. jusqu'à la confirmation de la collecte"
+- dashboard.py buyer won_items_detail now includes pickup_code (winner-only endpoint)
+- NEW StripeConnectBanner.jsx on /seller/dashboard + NEW endpoints POST /api/settlement/connect/onboard (Express account + AccountLink, return → /seller/dashboard?stripe=connected) and GET /api/settlement/connect/status (syncs stripe_connect_payouts_enabled for seller_payouts routing)
+- E2E verified with Stripe TEST key: $512.50 + $256.25 off-session charges succeeded, pickup codes generated, payout queued (payout_pending fallback), buyer receipt + seller statement created
+
+### Directive 3 — Multi-Lot FR + responsive + 60s floor
+- CreateVehicleMultiLotPage.js fully bilingual via L(en,fr) helper; vehicleMultiLotTimingModes.js gained label_fr/short_fr/description_fr + lang-aware helpers (back-compat default 'en')
+- Per-lot duration: visible note "Minimum: 60 seconds / Minimum : 60 secondes", client-side check + model Field(ge=60) server-side (422 below 60)
+- Mobile: single-column confirmed @390px, timing-mode info via bottom Sheet (Radix tooltips don't fire on touch), full-width stacked submit buttons
+
+### Testing & fixes
+- NEW tests/test_iter302_settlement.py — 12/12 (gates, amounts math, cooldown, connect status, pickup-code gate, 60s floor)
+- Regression sweep (iter240→302 + payment suites): 819 passed; fixed 5 stale tests to current product semantics (iter298 deadline 48h→72h, iter300 overdue flow → iter302 consent-gated payment_overdue semantics, iter247/248 support@bidvex.ca→.com, iter211 manual-settle target user now self-seeded); re-seeded p0bugtest@example.com + iter189buyer@test.com on preview
+- Testing agent iteration_248.json: frontend 9/9 directives PASS, no issues
+- Stripe key: preview LIVE key temporarily swapped to TEST for charge E2E, restored same day (see test_credentials.md note)
+- Route fixes: payment reminder action_url /dashboard/buyer → /buyer/dashboard (settlement.py); Connect return URLs → /seller/dashboard
