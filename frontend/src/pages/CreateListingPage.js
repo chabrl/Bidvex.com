@@ -26,6 +26,9 @@ import CategorySelector from '../components/CategorySelector';
 import InfoTip from '../components/InfoTip';
 import { CFIASoilBanner, CFIASoilCheckbox } from '../components/legal/LegalComplianceSections';
 import useGeoLocation from '../hooks/useGeoLocation';
+// iter299 P0 — Bill 96 French-title helpers + shared input field
+import { isQuebecListing, validateFrenchTitle, humanizeQcError } from '../utils/bill96';
+import FrenchTitleField from '../components/FrenchTitleField';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip';
 
 const API = API_BASE;

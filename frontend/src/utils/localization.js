@@ -24,10 +24,15 @@ export function getLocalized(item, field) {
     return localizedValue;
   }
 
-  // Fallback: try the other language, then the base field
+  // iter299 — Fallback order fixed: prefer the BASE field (canonical copy,
+  // usually English) before falling back to the OTHER language. Previously
+  // a listing with only `title` + `title_fr` rendered the French title for
+  // EN users because the other-language key was tried first.
+  if (item[field] && String(item[field]).trim()) {
+    return item[field];
+  }
   const fallbackLang = lang === 'fr' ? 'en' : 'fr';
-  const fallbackKey = `${field}_${fallbackLang}`;
-  return item[fallbackKey] || item[field] || '';
+  return item[`${field}_${fallbackLang}`] || '';
 }
 
 /**

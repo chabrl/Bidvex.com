@@ -1,6 +1,44 @@
 # BidVex Changelog
 
 
+## Jun 11, 2026 — iter299 POST-LAUNCH HOTFIXES (P0 Bill 96 / P1 Last Chance + Emails + Moderation / P2 Analytics) — DONE
+
+### P0 — Bill 96 French Titles (Quebec compliance)
+- `components/FrenchTitleField.jsx` + `utils/bill96.js` (isQuebecListing / validateFrenchTitle / humanizeQcError) wired into CreateListingPage + CreateMultiItemListing (`lots-` testid prefix); vehicle forms use the existing iter285 inline title_fr inputs with QC validation.
+- HOTFIX: CreateListingPage.js was missing the bill96/FrenchTitleField imports → page crashed (`isQuebecListing is not defined`). Imports added; verified field + QC asterisk + helper + relist prefill render.
+- `utils/localization.js` getLocalized fallback order fixed: localized → BASE field → other language (was: localized → other language → base, which showed FR titles to EN users on `title`+`title_fr`-only docs).
+- ListingDetailPage: FR mode H1 = title_fr (primary); EN mode H1 = EN title with FR subtitle (`listing-title-fr-subtitle`); fallback never empty. NOTE: logged-in users with `preferred_language` get that language by design (AuthContext overrides localStorage).
+
+### P1 — Last Chance nudge
+- `services/last_chance.py` (`process_last_chance_nudges`) + APScheduler job `last_chance_nudges` every 10 min — bilingual email + bell notification to watchers/bidders when auction ends within 60 min; `last_chance_sent` flag prevents repeats.
+
+### P1 — Outlook-safe emails (tables only)
+- Converted ALL remaining div-based blocks to `<table role="presentation">` layouts with inline CSS + solid `background-color` (gradients removed): `_email_core._storage_panel`, `email_system` (subscription-active, thread-opened, welcome header/CTA gradients), `email_marketplace` (QR embed, pickup-code EN/FR blocks, buyer pickup-code email, seller pickup-instructions email).
+- Regression guard: `test_email_templates_are_table_only` scans `services/emails/*.py` for `<div` / `display:flex` / `display:grid` / `linear-gradient`.
+
+### P1 — Marketplace moderation (approve/reject)
+- `routes/admin_moderation.py`: `GET /api/admin/moderation/count|pending` (seller enrichment: name/email/province, section marketplace|lots, title_fr), `POST /{id}/approve` (→ active, seller `trusted_seller=true`, bilingual email+notification, cache invalidation, 409 on re-approve), `POST /{id}/reject {reason}` (→ rejected + reason email/notification, 422 empty reason, 404 unknown).
+- `pages/admin/ListingsModeration.js` rewired from legacy `/admin/listings/*` to `/admin/moderation/*`; now shows FR title + seller province per row.
+
+### P2 — Advanced Analytics
+- `routes/admin_analytics.py` `GET /api/admin/analytics/overview`: GMV (all-time/30d), platform revenue from receipts (+2.5% estimate), auctions by section×status, users by role, top-5 sellers by GMV, top-5 most-bid listings, sell-through %, 30-day signups/revenue series. Demo data excluded.
+- NEW `pages/admin/AdvancedAnalytics.js` — Admin → Analytics → "Advanced Analytics" tab (deep-link `?tab=advanced-analytics`): 6 KPI cards + 5 recharts (revenue area, signups bar, section stacked bar, roles pie, avg-hammer bar) + leaderboards.
+- Legacy `GET /api/admin/analytics/advanced` (admin_ops, used by AnalyticsDashboard) now merges `gmv` + `platform_revenue` so production verification has a single URL.
+
+### Notifications bilingual hardening
+- `GET /api/notifications` now guarantees non-empty `title_en/message_en/title_fr/message_fr` per row (legacy-row fallback); `admin_attachment_received` insert now writes full EN/FR copy.
+
+### Ops scripts (run on PRODUCTION after deploy)
+- `backend/scripts/verify_production_iter299.py` — 5 checks (register-no-phone, /admin/analytics/advanced gmv, ending_soon ≤24h, seller dashboard counts, notifications EN+FR) with ✅/❌ + actual values. 5/5 green on preview.
+- `backend/scripts/repair_alex_boulanger_win_email.py` — locate winner (by --email or name regex), dry-run report of won auctions, `--execute` resends `send_auction_won_email` + creates missing `auction_won` notification; idempotent (`win_email_repaired_at`, `--force` to override).
+
+### Tests
+- NEW `tests/test_iter299_postlaunch.py` (15) — emails table-only, Bill 96 validator, last-chance wiring, analytics + moderation APIs.
+- Testing agent `tests/test_iter299_e2e_preview.py` (13 live) — approve/reject E2E with DB verification (2 seed pending listings consumed; 2 left).
+- `tests/test_bid_email_notifications.py` modernized (post-iter298 unified-email architecture; SendGrid-configured skip for log-fallback unit tests; asyncio.run).
+- Suites green: iter29x sweep 121/121; iter298+iter299 combined 48 passed / 1 skipped.
+
+
 ## Jun 10, 2026 — iter298 FINAL PRE-LAUNCH HARDENING (launch gate) — DONE
 
 ### Cleanup

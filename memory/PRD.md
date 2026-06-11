@@ -10124,13 +10124,26 @@ Facility chooses payment method per listing (Stripe / Cash / E-Transfer). Option
 - DEPLOY: user must redeploy preview → production (bidvex.com) — all checks green
 - Known debt: BIDVEX-EMAIL-TABLES (legacy div templates in _email_core/email_marketplace senders)
 
+## iter299 (Jun 11, 2026) — POST-LAUNCH HOTFIXES P0/P1/P2 — DONE ✅ (see CHANGELOG.md)
+- P0 Bill 96: French Title field on ALL 4 creation forms (marketplace + lots via shared `FrenchTitleField`; vehicles via iter285 inline inputs). Required (red asterisk + Loi 96 helper) for QC sellers/listings, optional otherwise. Client-side gate via `utils/bill96.js` + backend `qc_bilingual_validator`. CRITICAL FIX: missing imports in CreateListingPage.js (page crashed with `isQuebecListing is not defined`).
+- P0 FR display: `getLocalized` fallback order fixed (base field BEFORE other language) — EN users no longer see French titles when `title_en` absent. FR mode shows title_fr as primary H1; EN mode shows EN title + FR subtitle (`listing-title-fr-subtitle`). Never-empty guarantee.
+- P1 Last Chance: `services/last_chance.py` + `last_chance_nudges` scheduler job (10-min interval) — emails+notifications to watchers/bidders 1h before close, `last_chance_sent` dedupe flag.
+- P1 Outlook-safe emails: ALL `services/emails/*.py` templates are now strict table layout — zero `<div>`, `display:flex`, `display:grid`, `linear-gradient`. Regression-guarded by `test_email_templates_are_table_only`.
+- P1 Moderation: `routes/admin_moderation.py` (`GET count/pending`, `POST {id}/approve|reject`) — approve → active + seller becomes `trusted_seller` + bilingual email/notification; reject → reason email. Admin UI `ListingsModeration.js` rewired to new API (FR titles + seller province shown).
+- P2 Advanced Analytics: `routes/admin_analytics.py` `GET /api/admin/analytics/overview` (GMV all-time/30d, platform revenue, auctions by section/status, users by role, top sellers, most-bid listings, sell-through rate, 30-day signups+revenue series). NEW Admin tab `AdvancedAnalytics.js` (recharts: area/bar/pie). Legacy `GET /admin/analytics/advanced` (admin_ops) now merges in `gmv` + `platform_revenue`.
+- Notifications: server-side bilingual fallback in `GET /api/notifications` (legacy rows get non-empty EN+FR); `admin_attachment_received` insert now bilingual.
+- Scripts: `backend/scripts/repair_alex_boulanger_win_email.py` (dry-run default, --execute to resend win email + notification, idempotent via `win_email_repaired_at`); `backend/scripts/verify_production_iter299.py` (5 post-deploy production checks, ✅/❌ output — 5/5 green on preview).
+- Tests: `tests/test_iter299_postlaunch.py` (15) + testing-agent `tests/test_iter299_e2e_preview.py` (13). iter29x sweep 121 passed/0 failed. Stale `test_bid_email_notifications.py` assertions updated to post-iter298 architecture. Testing agent iteration_245: backend 12/13 (1 skip), frontend issues found → ALL FIXED + re-verified (create forms, FR subtitle, relist prefill).
+- DEPLOY: user must redeploy preview → production (bidvex.com), then run `verify_production_iter299.py` against prod.
+- Note: 2 seeded `pending_review` listings intentionally left in preview DB for future moderation UI testing.
+
 ## Backlog
-- (P1) Marketplace approve/reject status workflow (architecture decision needed)
-- (P1) Advanced analytics aggregation (top sellers, conversion rate)
 - (P2) Custom date range picker on admin analytics
 - (Enhancement) Dispute resolution & admin offline order management
 - (Enhancement) Scheduler job to auto-capture $500 deposit when fee invoice goes unpaid past deadline
 - (Enhancement) "Recently Sold" rolling ticker beside the Live Auctions pill once you have ~10+ active listings
+- (P3) React "unique key" console warning somewhere under Admin → Users (cosmetic; all direct .map calls in EnhancedUserManager have keys — likely a child component)
+- (Pending user) Alex Boulanger win email: run `python scripts/repair_alex_boulanger_win_email.py --email <his email>` (dry-run) on PRODUCTION, review, then add `--execute`
 
 ## Test credentials
 - Admin: `charbel911@gmail.com` / `Anderosli123!@#` (role=admin)
