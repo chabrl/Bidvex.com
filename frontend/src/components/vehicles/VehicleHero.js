@@ -207,22 +207,9 @@ const VehicleHero = ({ onSearch, searchQuery, setSearchQuery }) => {
         </div>
       </div>
 
-      {/* Wave divider matching homepage style */}
-      <div className="absolute bottom-0 left-0 right-0 pointer-events-none">
-        <svg
-          viewBox="0 0 1440 80"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          className="w-full h-12 sm:h-16"
-          preserveAspectRatio="none"
-          aria-hidden
-        >
-          <path
-            d="M0,80 C240,40 480,0 720,20 C960,40 1200,80 1440,40 L1440,80 Z"
-            className="fill-slate-50 dark:fill-slate-950"
-          />
-        </svg>
-      </div>
+      {/* iter303 Directive 3 — removed slate-filled wave divider that
+          was bleeding white space against the green CTA banner below.
+          Hero now sits flush against the CTA strip (zero gap). */}
     </section>
   );
 };

@@ -1,0 +1,56 @@
+{
+  "summary": "iter303 frontend regression — D1 (Multi-Lot Wizard), D2 (My Listings responsive), D3 (Hero/CTA gap + FR translations). Logged in as charbel911@gmail.com. All visible flows tested in EN+FR. No backend testing per request.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "LotWizard step bar header tab", "issue": "FR label 'Révision et soumission' is truncated to 'Révisic' in the top-right tab pill (step bar header). The full text appears in the step bar itself (count=1) and the page heading, so functionality is unaffected — purely a cosmetic overflow.", "selector": "header pill in lot-wizard-page", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "MyVehicleListingsPage card 'Schedule:' field", "issues": ["Uses the browser's native HTML5 datetime-local picker (mm/dd/yyyy --:-- --) instead of a shadcn calendar component. Consistent with other parts of the app but worth noting."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/test_reports/d3_hero_cta_en.png",
+    "/app/test_reports/d3_fr.png",
+    "/app/test_reports/d2_listings_en.png",
+    "/app/test_reports/d2_fr.png",
+    "/app/test_reports/d1_event_setup.png",
+    "/app/test_reports/d1_wizard_step1.png",
+    "/app/test_reports/d1_validation_step2.png",
+    "/app/test_reports/d1_step2.png",
+    "/app/test_reports/d1_wizard_fr_real.png"
+  ],
+  "action_items": [
+    "(LOW) Consider shortening or wrapping the FR 'Révision et soumission' label in the lot-wizard step bar header pill — currently visually truncates to 'Révisic'.",
+    "(INFO) The remaining wizard flows that could not be automated end-to-end (Bill 96 Quebec FR title required marker on Step 5, photo-step minimum-1-photo enforcement, Save Lot reveals submit-row, edit/delete lot persistence) require file upload and full 6-step traversal — main agent should manually self-verify these or wire a mocked file-upload path for next testing round."
+  ],
+  "critical_code_review_comments": [
+    "Cookie consent banner reappears even after setting localStorage 'bidvex_cookie_consent'={version:1,accepted:true}; the consent state key/format may have drifted. Not blocking but causes flaky automated tests.",
+    "Setting localStorage.i18nextLng before login is overridden after auth (server pref wins). The FR toggle button must be clicked AFTER landing on the protected route — works but worth documenting for QA scripts."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped per request)", "frontend": "~90% (D1 partial — full wizard photo-step+save+edit+delete+Bill96 not auto-tested end-to-end)"},
+  "test_credentials": "Admin charbel911@gmail.com / Anderosli123!@# — logged in successfully, landed on /marketplace, then manual nav to target routes.",
+  "seed_data_creation": "None — relied on existing 3 multi-lot drafts already on admin account.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Tested with REACT_APP_BACKEND_URL=https://prod-verify-2.preview.emergentagent.com. Cookie consent banner uses localStorage key 'bidvex_cookie_consent' BUT still re-appears in many runs — click 'Accept All Cookies' button. Language toggle is a single button in navbar that toggles between EN<->FR; must be clicked after navigating to the target route post-login. For full wizard completion, set up a programmatic file upload (page.set_input_files on the photo-step <input type=file>) to bypass the min-1-photo gate; without it the wizard cannot reach Step 5 (Bill 96) or Save Lot.",
+  "detailed_findings": {
+    "D3_hero_cta_gap_EN": "PASS — Navy hero with stats strip (Active Auctions / Ending in 24h / Verified Dealers / Provinces Live / Bids in 24h) is flush against the green 'Want to sell your vehicle?' CTA banner. No white-bleed gap. Diagonal SVG divider visible between CTA banner and category pills.",
+    "D3_FR_translations": "PASS — CTA heading 'Vous voulez vendre votre véhicule?' (no space before ?), subtitle 'Rejoignez notre réseau de vendeurs vérifiés — Particulier, Concessionnaire ou Commissaire-priseur.', buttons 'Devenir vendeur', 'Mettre en vente', 'Mes annonces', 'Trouver un courtier', 'Devenir courtier →' all confirmed.",
+    "D2_desktop_layout": "PASS — Header 'My Vehicle Listings' + subtitle. Two header buttons (+ Create a Vehicle Listing / + Create Multi-Lot Vehicle Auction). 4 stats cards (Total Listings 3, Active 0, Pending 0, Sold 0). Tabs All(3), Drafts(3), Active(0), Pending(0), Ended(0) with count badges. data-testid=my-listings-grid present with 3 cards rendered in 3-column grid.",
+    "D2_FR_translations": "PASS — 'Mes annonces de véhicules', '+ Créer une annonce de véhicule', '+ Enchère multi-lots', tabs 'Tous/Brouillons/Actives/En attente/Terminées', 'Annonces mensuelles : 2 / 500', 'Concessionnaire autorisé' all confirmed.",
+    "D1_event_level_setup": "PASS — data-testid=create-multi-lot-page renders Event Title, Start Time datetime, Sequential Spotlight (★ Recommended) + Synchronized Wave timing-mode cards, Per-Lot Duration (default 120) with 'Minimum: 60 seconds / Minimum : 60 secondes' note, Description textarea. Lots (0) empty state with 'Add Your First Lot' button. data-testid=submit-row is correctly NOT present (count=0) until first lot saved.",
+    "D1_wizard_step1": "PASS — data-testid=lot-wizard-page, lot-wizard-step-bar, wizard-vin-input, wizard-vin-lookup-btn, wizard-next-btn, wizard-prev-btn, lot-wizard-cancel-btn, vehicle-category-grid all present. 6-step bar shows VIN & Basic Info / Specifications / Condition Report / Photos & Media / Auction Settings / Review & Submit. All 15 vehicle categories rendered (Cars & Sedans through Vehicle Parts & Accessories).",
+    "D1_step_validation": "PASS (partial) — Toast 'Please select a vehicle category' fires on Next without category. Toast 'VIN must be exactly 17 characters' fires on Next without VIN. After filling category=Cars & Sedans, VIN=1HGBH41JXMN109186, Year=2026 (default), Make=Toyota, Model=Camry, Body=sedan, clicking Next advanced to Step 2 (Specifications heading visible). Photo-step minimum-1-photo enforcement NOT auto-verified (would need programmatic file upload).",
+    "D1_cancel": "PASS — Clicking Cancel returns to event-setup view with Lots (0) intact and no submit-row.",
+    "D1_FR_wizard_labels": "PASS — After clicking FR navbar toggle: step bar reads 'NIV et infos de base', 'Spécifications', 'Rapport de condition', 'Photos et médias', 'Paramètres de la vente', 'Révision et soumission'. VIN lookup btn = 'Rechercher le NIV'. Cancel btn = 'Annuler'. Page title = 'Ajouter un lot'. All 15 FR category names render (Voitures et berlines, VUS et multisegments, etc.). NOTE: 'Révision et soumission' overflows the top-right tab pill (visually truncated to 'Révisic') — see ui_bugs.",
+    "D1_not_fully_tested": [
+      "Bill 96 — Quebec FR title required marker (red *) when Province=QC vs (optional) when Province=ON. Step 5 of wizard not reached because photo step gate cannot be cleared without programmatic file upload.",
+      "Save Lot button reveals submit-row with Save as Draft / Schedule (Upcoming) / Go Live Now buttons.",
+      "Edit existing lot pre-fills wizard with prior data and updates without duplicating.",
+      "Delete lot decrements count and hides submit-row when last lot removed."
+    ]
+  }
+}

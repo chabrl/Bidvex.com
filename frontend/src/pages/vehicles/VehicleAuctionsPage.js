@@ -227,23 +227,20 @@ const VehicleAuctionsPage = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 overflow-x-hidden" data-testid="vehicle-auctions-page">
-      {/* HERO */}
+      {/* HERO (navy, full bleed) — iter303 Directive 3: hero sits flush
+          against the CTA strip with zero whitespace below. */}
       <VehicleHero
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         onSearch={handleSearch}
       />
 
-      {/* iter294 P1 — Live multi-lot feed widget. Renders nothing
-          when there are zero live AND zero upcoming events. */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-2 sm:-mt-4">
-        <LiveMultiLotFeedWidget />
-      </div>
-
-      {/* SELLER CTA STRIP */}
-      <div className="bg-gradient-to-r from-emerald-600 to-teal-600 dark:from-emerald-700 dark:to-teal-700 py-4" data-testid="seller-cta-section">
+      {/* SELLER CTA STRIP — iter303 Directive 3: tightened responsive
+          layout. Headline + buttons stack on mobile; buttons render as
+          a 2×2 grid with "Become a broker →" full width at the bottom. */}
+      <div className="bg-gradient-to-r from-emerald-600 to-teal-600 dark:from-emerald-700 dark:to-teal-700 py-4 sm:py-5" data-testid="seller-cta-section">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col lg:flex-row items-center justify-between gap-4">
+          <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
             <div className="flex items-center gap-3 text-white">
               <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
                 <DollarSign className="h-5 w-5" />
@@ -253,26 +250,41 @@ const VehicleAuctionsPage = () => {
                 <p className="text-emerald-100 text-xs sm:text-sm">{t('vehiclePage.sellerCtaBody', 'Join our verified seller network — Private, Dealer, or Auctioneer.')}</p>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2 w-full sm:w-auto justify-center">
-              <button onClick={() => navigate('/vehicle-auctions/seller/register')} className="inline-flex items-center gap-1.5 rounded-lg bg-white text-emerald-700 hover:bg-emerald-50 font-semibold text-xs sm:text-sm px-3 py-2" data-testid="btn-seller-register">
+            {/* Desktop: single row, wraps if needed. Mobile: 2×2 grid +
+                "Become a broker →" full-width below. */}
+            <div className="grid grid-cols-2 lg:flex lg:flex-wrap gap-2 w-full lg:w-auto" data-testid="seller-cta-buttons">
+              <button onClick={() => navigate('/vehicle-auctions/seller/register')} className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-white text-emerald-700 hover:bg-emerald-50 font-semibold text-xs sm:text-sm px-3 py-2 min-h-[40px]" data-testid="btn-seller-register">
                 <User className="h-4 w-4" />{t('vehiclePage.becomeSeller', 'Become a seller')}
               </button>
-              <button onClick={() => navigate('/vehicle-auctions/create')} className="inline-flex items-center gap-1.5 rounded-lg bg-transparent border border-white text-white hover:bg-white/15 font-semibold text-xs sm:text-sm px-3 py-2" data-testid="btn-create-listing">
+              <button onClick={() => navigate('/vehicle-auctions/create')} className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-transparent border border-white text-white hover:bg-white/15 font-semibold text-xs sm:text-sm px-3 py-2 min-h-[40px]" data-testid="btn-create-listing">
                 <PlusCircle className="h-4 w-4" />{t('vehiclePage.listVehicle', 'List a vehicle')}
               </button>
-              <button onClick={() => navigate('/vehicle-auctions/my-listings')} className="inline-flex items-center gap-1.5 rounded-lg bg-transparent border border-white text-white hover:bg-white/15 font-semibold text-xs sm:text-sm px-3 py-2" data-testid="btn-my-listings">
+              <button onClick={() => navigate('/vehicle-auctions/my-listings')} className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-transparent border border-white text-white hover:bg-white/15 font-semibold text-xs sm:text-sm px-3 py-2 min-h-[40px]" data-testid="btn-my-listings">
                 <Building2 className="h-4 w-4" />{t('vehiclePage.myListings', 'My listings')}
               </button>
-              {/* iter217 Phase 5 Hotfix v5b — Broker discovery + apply CTAs */}
-              <button onClick={() => navigate(i18n?.language?.startsWith('fr') ? '/courtiers' : '/brokers')} className="inline-flex items-center gap-1.5 rounded-lg bg-amber-400 text-emerald-900 hover:bg-amber-300 font-semibold text-xs sm:text-sm px-3 py-2" data-testid="btn-find-broker">
+              <button onClick={() => navigate(i18n?.language?.startsWith('fr') ? '/courtiers' : '/brokers')} className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-amber-400 text-emerald-900 hover:bg-amber-300 font-semibold text-xs sm:text-sm px-3 py-2 min-h-[40px]" data-testid="btn-find-broker">
                 🤝 {i18n?.language?.startsWith('fr') ? 'Trouver un courtier' : 'Find a Broker'}
               </button>
-              <button onClick={() => navigate(i18n?.language?.startsWith('fr') ? '/devenir-courtier' : '/become-a-broker')} className="inline-flex items-center gap-1.5 rounded-lg bg-transparent border border-white text-white hover:bg-white/15 font-semibold text-xs sm:text-sm px-3 py-2" data-testid="btn-become-broker">
+              <button onClick={() => navigate(i18n?.language?.startsWith('fr') ? '/devenir-courtier' : '/become-a-broker')} className="col-span-2 lg:col-span-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-transparent border border-white text-white hover:bg-white/15 font-semibold text-xs sm:text-sm px-3 py-2 min-h-[40px]" data-testid="btn-become-broker">
                 {i18n?.language?.startsWith('fr') ? 'Devenir courtier →' : 'Become a broker →'}
               </button>
             </div>
           </div>
         </div>
+      </div>
+
+      {/* iter303 Directive 3 — soft diagonal SVG divider transitioning
+          the green CTA banner into the page background. */}
+      <div className="relative w-full overflow-hidden -mb-px" aria-hidden data-testid="cta-divider">
+        <svg viewBox="0 0 1440 36" preserveAspectRatio="none" className="w-full h-6 sm:h-9 block" xmlns="http://www.w3.org/2000/svg">
+          <path d="M0,0 L1440,0 L1440,12 C1080,36 360,0 0,28 Z" className="fill-emerald-600 dark:fill-emerald-700" />
+        </svg>
+      </div>
+
+      {/* iter294 P1 — Live multi-lot feed widget. Renders nothing
+          when there are zero live AND zero upcoming events. */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-2">
+        <LiveMultiLotFeedWidget />
       </div>
 
       {/* CATEGORY PILLS */}

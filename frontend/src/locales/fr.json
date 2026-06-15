@@ -1726,11 +1726,11 @@
     "retry": "Réessayer"
   },
   "vehiclePage": {
-    "sellerCtaTitle": "Vous voulez vendre votre véhicule ?",
-    "sellerCtaBody": "Rejoignez notre réseau de vendeurs vérifiés — Privé, Concessionnaire ou Encanteur.",
+    "sellerCtaTitle": "Vous voulez vendre votre véhicule?",
+    "sellerCtaBody": "Rejoignez notre réseau de vendeurs vérifiés — Particulier, Concessionnaire ou Commissaire-priseur.",
     "becomeSeller": "Devenir vendeur",
-    "listVehicle": "Inscrire un véhicule",
-    "myListings": "Mes inscriptions",
+    "listVehicle": "Mettre en vente",
+    "myListings": "Mes annonces",
     "loadingResults": "Chargement des enchères…",
     "resultsCount": "{{count}} enchères",
     "resultsCount_one": "{{count}} enchère",
