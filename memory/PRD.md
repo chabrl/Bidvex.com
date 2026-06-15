@@ -1,6 +1,17 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter305 — PRE-LAUNCH HARDENING PASS (Jun 15, 2026) ✅ COMPLETE
+- Duplicate Lot button + banner on multi-lot wizard lot cards (clones everything except VIN/mileage/photos; auto-focus VIN; " — Copy" / " — Copie" title suffix). Bilingual.
+- Production verification (verify_production_iter299.py) PASS 5/5 on preview. Alex Boulanger win-email repair: ZERO won auctions found (nothing to repair).
+- Bundle audit: main.js = 358.9 KB gzipped (under 500 KB target). Admin + MultiLot wizard already lazy-loaded.
+- 5 new route aliases added: /legal/terms, /legal/privacy, /legal/refunds, /legal/prohibited, /broker-directory — all point at existing bilingual pages, no SPA 404s.
+- Mobile 390px sweep on 11 pages: ZERO horizontal overflow on all.
+- Platform audit backend 10/10 + new pytest test_iter305_audit.py. Full regression: 53/53 PASS (iter299+302+304+305 suites).
+- Items deferred to post-deploy (require seeded real listings, NOT bugs): live buyer place-bid e2e, settlement panel on ended listings click-through, admin approve-pending-listing button click.
+
+
+
 ## iter304 — FIVE BACKLOG ITEMS (Jun 15, 2026) ✅ COMPLETE
 - P0 Save Lot Template: backend CRUD (max 20/dealer) + wizard Step5 Save button + Step1 Use Template dropdown + dedicated `/vehicle-auctions/lot-templates` manager page + dashboard link
 - P1 MongoDB indexes added on `vehicle_bids(vehicle_id, created_at)`, `lot_bids(listing_id, created_at)`, `bidding_deposits(auction_id, created_at)`. Verified IXSCAN via explain().

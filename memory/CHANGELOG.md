@@ -1,6 +1,45 @@
 # BidVex Changelog
 
 
+## Jun 15, 2026 — iter305 PRE-LAUNCH HARDENING PASS
+
+### Duplicate Lot
+- `openWizardForDuplicate(idx)` in `CreateVehicleMultiLotPage.js` clones a saved lot into a fresh draft, clears VIN + mileage + pendingPhotos (always unique per vehicle), applies " — Copy"/" — Copie" suffix to title, opens immediately in Step 1 with auto-focused VIN and a blue banner.
+- `data-testid="lot-duplicate-btn-{idx}"` added to each lot card; `data-testid="lot-duplicate-banner"` on the Step 1 banner.
+- Bilingual EN/FR throughout.
+
+### Production Verification & Alex Boulanger Repair
+- `verify_production_iter299.py` against preview env: **5/5 PASS**.
+- `repair_alex_boulanger_win_email.py`: located user (correct email `alexboul1993@gmail.com`, original spec had typo). Dry-run shows ZERO won auctions — nothing to repair.
+
+### Bundle Audit
+- Main bundle: **358.9 KB gzipped** (target ≤ 500 KB ✓).
+- Admin pages + multi-lot wizard already lazy-loaded via React.lazy (no extra code-split work required).
+
+### Static Page Audit — New Route Aliases
+- `/legal/terms` → TermsOfServicePage
+- `/legal/privacy` → PrivacyPolicyPage
+- `/legal/refunds` → RefundPolicyPage
+- `/legal/prohibited` → ProhibitedItemsPage
+- `/broker-directory` → BrokerDirectoryPage
+- (`/legal/cookies` was added in iter304; all aliases point at existing bilingual pages.)
+
+### Mobile Responsiveness Sweep — 390×844 viewport
+- Testing-agent verified ZERO horizontal overflow on 11 pages: /vehicle-auctions, /marketplace, /auth, /how-it-works, /about, /contact, /legal/terms, /legal/privacy, /legal/refunds, /legal/cookies, /legal/prohibited.
+- Multi-lot wizard at 390px: step pills horizontally scrollable, VIN+Lookup stack vertically, FR labels render correctly, all buttons ≥ 44px tap target.
+
+### Platform Audit
+- Backend 10/10 PASS: register-without-phone, all 4 marketplaces browse (200 unauth), admin moderation + analytics endpoints, all `/api/legal/*` public endpoints.
+- New pytest: `tests/test_iter305_audit.py` (10 tests). Full suite (iter299+302+304+305) 53/53 PASS.
+- Items deferred due to empty seed data (NOT bugs): live buyer place-bid, province-gate firing, settlement panel on ended listing, admin approve-pending-listing button click. Once real production listings exist these will be testable.
+
+### Files modified — iter305
+- `frontend/src/pages/vehicles/CreateVehicleMultiLotPage.js` (Duplicate Lot handler + button + banner + auto-focus)
+- `frontend/src/App.js` (5 new route aliases)
+- `backend/tests/test_iter305_audit.py` (new pytest)
+
+
+
 ## Jun 15, 2026 — iter304 FIVE BACKLOG ITEMS (P0/P1/P2)
 
 ### P0 — Save Lot Template
