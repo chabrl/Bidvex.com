@@ -1,6 +1,48 @@
 # BidVex Changelog
 
 
+## Jun 15, 2026 — iter304 FIVE BACKLOG ITEMS (P0/P1/P2)
+
+### P0 — Save Lot Template
+- Backend `routes/lot_templates.py` with CRUD endpoints (`/api/lot-templates`), 20-template-per-dealer cap.
+- Wizard Step 5 adds 'Save as Template / Enregistrer comme modèle' button + SaveTemplateModal (max 60 chars).
+- Wizard Step 1 shows 'Use a Template / Utiliser un modèle' dropdown above category grid (only when ≥1 template exists). Pre-fills Steps 2–5; VIN/Year/Mileage/Photos always unique.
+- New `/vehicle-auctions/lot-templates` page (LotTemplatesManagerPage) with Edit/Delete row actions, count badge X/20.
+- Linked from MyVehicleListingsPage header via 'Lot Templates / Modèles de lots' button.
+- Fully bilingual EN/FR.
+
+### P1 — MongoDB Indexes for Bid History
+- Added compound indexes (background): `vehicle_bids(vehicle_id, created_at -1)`, `lot_bids(listing_id, created_at -1)`, `bidding_deposits(auction_id, created_at -1)`, `lot_templates(dealer_id, created_at -1)`, `email_to_friend_log(sender_id, sent_at -1)`.
+- Verified via `.explain()` — bid history queries now use IXSCAN instead of COLLSCAN.
+
+### P1 — Cookie Consent i18n Integration
+- CookieConsentBanner now uses `useTranslation()` + re-fetches `/api/legal/cookie-policy?lang=` whenever `i18n.language` changes. Banner switches EN↔FR without page reload.
+- Added `/legal/cookies` route alias pointing at PrivacyPolicyPage.
+
+### P1 — Verified Auction Firm Badge
+- Backend `routes/verified_firm.py`: admin grant/revoke + public lookup endpoints.
+- Frontend `VerifiedAuctionFirmBadge.jsx`: brand-blue #2B8FD0 with ShieldCheck icon, bilingual ('Verified Auction Firm' / "Société d'enchères vérifiée"), tooltip on provincial auctioneer regulations.
+- Wired into: TrustIndicators seller row, VehicleListingCard (compact + full variants), VehicleDetailPage seller trust row.
+
+### P2 — Email to Friend for Vehicle Listings
+- Backend `routes/email_to_friend.py` with `POST /api/vehicles/{id}/email-to-friend` — rate limited 5/user/24h via `email_to_friend_log` collection.
+- Outlook-safe HTML email (tables only) in `email_vehicles.py::send_vehicle_email_to_friend()`: subject "{Sender} thought you'd be interested in this vehicle on BidVex" / "{Expéditeur} pense que ce véhicule sur BidVex pourrait vous intéresser", listing thumbnail, current bid, listing CTA.
+- Frontend `EmailToFriendModal.jsx` triggered from 'Email to a Friend / Envoyer à un ami' button in the vehicle detail trust badge row.
+
+### Validation — iter304
+- Backend pytest `test_iter304_lot_templates_and_badges.py`: 7/7 PASS.
+- Testing agent iteration_250: backend 100% (9/9 verified), frontend 90% (one critical infinite useCallback loop in LotTemplatesManagerPage found AND fixed during testing — fix in line 52, removed `L` from useCallback deps).
+- Main agent self-test: full Save-as-Template flow walk-through (Step 1→5 + modal + manager page) confirmed end-to-end in FR.
+- One additional fix: SaveTemplateModal needed to be rendered as a sibling to LotWizard (not inside the non-wizard branch) so the modal mounts when triggered from inside the wizard. Fixed.
+
+### Files added / modified — iter304
+- NEW Backend: `routes/lot_templates.py`, `routes/verified_firm.py`, `routes/email_to_friend.py`, `tests/test_iter304_lot_templates_and_badges.py`, `tests/test_iter304_extra.py`
+- NEW Frontend: `components/VerifiedAuctionFirmBadge.jsx`, `components/EmailToFriendModal.jsx`, `pages/vehicles/LotTemplatesManagerPage.js`
+- MODIFIED Backend: `server.py` (router includes + indexes), `services/emails/email_vehicles.py` (send_vehicle_email_to_friend)
+- MODIFIED Frontend: `components/CookieConsentBanner.js` (i18n integration), `components/vehicles/TrustBadges.js` (badge slot), `components/vehicles/VehicleListingCard.js` (badge), `pages/vehicles/VehicleDetailPage.js` (badge + Email-to-Friend btn), `pages/vehicles/CreateVehicleMultiLotPage.js` (templates integration), `pages/vehicles/MyVehicleListingsPage.js` (Lot Templates link), `App.js` (new routes)
+
+
+
 ## Jun 15, 2026 — iter303 THREE FRONTEND DIRECTIVES (Multi-Lot Wizard + Listings Responsive + Hero/CTA Gap)
 
 ### Directive 1 — Multi-Lot Vehicle Auction: Full 6-Step Wizard Per Lot

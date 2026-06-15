@@ -1,6 +1,17 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter304 — FIVE BACKLOG ITEMS (Jun 15, 2026) ✅ COMPLETE
+- P0 Save Lot Template: backend CRUD (max 20/dealer) + wizard Step5 Save button + Step1 Use Template dropdown + dedicated `/vehicle-auctions/lot-templates` manager page + dashboard link
+- P1 MongoDB indexes added on `vehicle_bids(vehicle_id, created_at)`, `lot_bids(listing_id, created_at)`, `bidding_deposits(auction_id, created_at)`. Verified IXSCAN via explain().
+- P1 Cookie consent i18n: banner now re-fetches localized strings on language toggle without reload; `/legal/cookies` alias route
+- P1 Verified Auction Firm badge: brand-blue #2B8FD0 component wired into TrustIndicators / VehicleListingCard / VehicleDetailPage; admin grant/revoke endpoints + public lookup
+- P2 Email-to-Friend: rate-limited (5/user/24h) endpoint + Outlook-safe template + modal triggered from vehicle detail trust row
+- Bilingual EN/FR throughout
+- Validation: 7/7 pytest pass + testing-agent 100% backend / 90% frontend (one critical infinite-loop bug fixed during testing) + main-agent E2E self-test PASSED
+
+
+
 ## iter303 — THREE FRONTEND DIRECTIVES (Jun 15, 2026) ✅ COMPLETE
 - D1 Multi-Lot Wizard: flat form → 6-step per-lot wizard (event-level + per-lot layers; VehicleCategoryGrid + VIN lookup reused; Bill 96 + min-1-photo enforced; bottom CTAs reveal after first save)
 - D2 My Vehicle Listings: full responsive overhaul (mobile single-col, tablet 2-col 40/60 split, desktop 3-col); horizontally scrollable tabs; FR translations

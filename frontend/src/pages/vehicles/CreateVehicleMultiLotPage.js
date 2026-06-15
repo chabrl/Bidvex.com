@@ -571,29 +571,40 @@ const CreateVehicleMultiLotPage = () => {
 
   if (wizard) {
     return (
-      <LotWizard
-        STEPS={STEPS}
-        wizard={wizard}
-        L={L}
-        fr={fr}
-        i18n={i18n}
-        vinLoading={vinLoading}
-        updateDraft={updateDraft}
-        lookupVin={lookupVin}
-        addPhotos={addPhotos}
-        removePhoto={removePhoto}
-        movePhoto={movePhoto}
-        goNext={goNext}
-        goPrev={goPrev}
-        cancelWizard={cancelWizard}
-        saveLot={saveLot}
-        eventProvince={event.timing_mode}
-        eventDurationSec={Number(event.lot_duration_seconds) || 120}
-        templates={templates}
-        templatesMax={templatesMax}
-        applyTemplate={applyTemplate}
-        onSaveAsTemplate={() => setSaveTemplateModal(true)}
-      />
+      <>
+        <LotWizard
+          STEPS={STEPS}
+          wizard={wizard}
+          L={L}
+          fr={fr}
+          i18n={i18n}
+          vinLoading={vinLoading}
+          updateDraft={updateDraft}
+          lookupVin={lookupVin}
+          addPhotos={addPhotos}
+          removePhoto={removePhoto}
+          movePhoto={movePhoto}
+          goNext={goNext}
+          goPrev={goPrev}
+          cancelWizard={cancelWizard}
+          saveLot={saveLot}
+          eventProvince={event.timing_mode}
+          eventDurationSec={Number(event.lot_duration_seconds) || 120}
+          templates={templates}
+          templatesMax={templatesMax}
+          applyTemplate={applyTemplate}
+          onSaveAsTemplate={() => setSaveTemplateModal(true)}
+        />
+        {/* iter304 — modal must live OUTSIDE the wizard's conditional return
+            so it's still mounted when the wizard is active. */}
+        <SaveTemplateModal
+          open={saveTemplateModal}
+          onClose={() => setSaveTemplateModal(false)}
+          onSave={persistTemplate}
+          saving={savingTemplate}
+          L={L}
+        />
+      </>
     );
   }
 
