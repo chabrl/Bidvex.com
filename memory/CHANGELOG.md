@@ -1,6 +1,50 @@
 # BidVex Changelog
 
 
+## Jun 15, 2026 — iter303 THREE FRONTEND DIRECTIVES (Multi-Lot Wizard + Listings Responsive + Hero/CTA Gap)
+
+### Directive 1 — Multi-Lot Vehicle Auction: Full 6-Step Wizard Per Lot
+- Rewrote `CreateVehicleMultiLotPage.js` from flat form into two-layer wizard:
+  • Layer 1: Event-level setup (Title, Start Time, Timing Mode picker, Per-Lot Duration ≥60s, Description) — always visible at top.
+  • Layer 2: Per-lot 6-step wizard (VIN & Basic Info → Specifications → Condition Report → Photos & Media → Auction Settings → Review & Submit) — opens via "Add Lot" / "Edit Lot".
+- Step 1 reuses `VehicleCategoryGrid` (15-category icon picker) + VIN lookup endpoint identical to single-vehicle wizard.
+- Bill 96 — Title (FR) field shows red asterisk when Province = QC, "(optional)" otherwise.
+- Minimum 1 photo per lot enforced before Save Lot (drag-to-reorder via arrow buttons, 20-photo cap).
+- Lot list shows thumbnail + Edit/Delete per lot.
+- Bottom CTAs (Save as Draft / Schedule (Upcoming) / Go Live Now) ONLY render after ≥1 lot saved.
+- Full FR translation (all 6 step labels, navigation, CTAs, validation toasts).
+
+### Directive 2 — My Vehicle Listings: Full Responsive Layout
+- Rewrote `MyVehicleListingsPage.js` for mobile/tablet/desktop:
+  • Mobile (≤640px): single-column cards, full-width 16:9 thumbnails, stacked header buttons, 2×2 stats grid, horizontally scrollable tab bar (each tab min 80px), VIN tag truncates with tap-to-expand.
+  • Tablet (640–1024px): 2-column card grid (40/60 image+content split), inline header buttons, single-row stats.
+  • Desktop (≥1024px): 3-column card grid, image top, content below.
+- Bilingual EN/FR for status badges (Brouillon/Active/En attente/Vendue/Terminée), tab labels (Tous/Brouillons/Actives/En attente/Terminées), header (Annonces mensuelles : X/500, Concessionnaire autorisé).
+
+### Directive 3 — Vehicle Auctions Homepage: Hero/CTA Gap Fix
+- Removed slate-fill wave SVG from `VehicleHero.js` that was creating the visible white-bleed gap against the green CTA strip.
+- Stats bar (Active Auctions / Ending in 24h / Verified Dealers / Provinces Live / Bids in 24h) is now flush within the navy hero.
+- CTA banner (`VehicleAuctionsPage.js`) restructured: single row on desktop / 2×2 grid on mobile / "Devenir courtier →" full-width row on mobile.
+- Added a clean diagonal SVG divider between CTA banner and category pills (`data-testid="cta-divider"`).
+- FR translations in `locales/fr.json` updated to match exact user spec:
+  • `sellerCtaTitle`: "Vous voulez vendre votre véhicule?" (no space before ?)
+  • `sellerCtaBody`: "Rejoignez notre réseau de vendeurs vérifiés — Particulier, Concessionnaire ou Commissaire-priseur."
+  • `listVehicle`: "Mettre en vente"
+
+### Validation
+- `testing_agent_v3_fork` iteration_249: ~90% pass (one LOW cosmetic issue fixed in same commit).
+- Self-test via Playwright: full wizard flow with photo upload + Bill 96 QC marker + Save Lot revealing submit-row + Edit pre-fill + Delete hide → ALL CONFIRMED in French language mode.
+- iter302 backend regression: 17/17 settlement tests still pass.
+
+### Files modified — iter303
+- `frontend/src/pages/vehicles/CreateVehicleMultiLotPage.js` (full rewrite; 6-step LotWizard component)
+- `frontend/src/pages/vehicles/MyVehicleListingsPage.js` (full responsive rewrite)
+- `frontend/src/pages/vehicles/VehicleAuctionsPage.js` (CTA banner restructure + diagonal divider)
+- `frontend/src/components/vehicles/VehicleHero.js` (removed slate wave SVG)
+- `frontend/src/locales/fr.json` (vehiclePage namespace — exact user wording)
+
+
+
 ## Jun 11, 2026 — iter299 POST-LAUNCH HOTFIXES (P0 Bill 96 / P1 Last Chance + Emails + Moderation / P2 Analytics) — DONE
 
 ### P0 — Bill 96 French Titles (Quebec compliance)

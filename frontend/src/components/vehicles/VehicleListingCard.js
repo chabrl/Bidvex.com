@@ -114,6 +114,13 @@ const VehicleListingCard = ({ vehicle, countdown, onClick, onQuickView, compact 
               {t('vehicleCard.dealerVerified', 'Verified dealer')}
             </span>
           )}
+          {/* iter304 — Verified Auction Firm badge (compact card variant) */}
+          {!!vehicle.seller?.verified_auction_firm && (
+            <span className="absolute top-2 right-2 inline-flex items-center gap-1 rounded-md text-white text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 shadow" style={{ backgroundColor: '#2B8FD0' }} data-testid={`vehicle-card-verified-firm-compact-${vehicle.id}`}>
+              <ShieldCheck className="h-2.5 w-2.5" />
+              {isFr ? "Société d'enchères vérifiée" : 'Verified Auction Firm'}
+            </span>
+          )}
           {isPromoted && (
             <span className="absolute top-2 right-2 inline-flex items-center gap-0.5 rounded-md bg-amber-500 text-white text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 shadow">
               {t('vehicleCard.promoted', 'Featured')}
@@ -250,6 +257,13 @@ const VehicleListingCard = ({ vehicle, countdown, onClick, onQuickView, compact 
             <span className="inline-flex items-center gap-1 rounded-md bg-blue-600 text-white text-[10px] font-bold uppercase tracking-wider px-2 py-1 shadow">
               <BadgeCheck className="h-3 w-3" />
               {t('vehicleCard.dealerVerified', 'Verified dealer')}
+            </span>
+          )}
+          {/* iter304 — Verified Auction Firm badge (full card variant) */}
+          {!!vehicle.seller?.verified_auction_firm && (
+            <span className="inline-flex items-center gap-1 rounded-md text-white text-[10px] font-bold uppercase tracking-wider px-2 py-1 shadow" style={{ backgroundColor: '#2B8FD0' }} data-testid={`vehicle-card-verified-firm-${vehicle.id}`}>
+              <ShieldCheck className="h-3 w-3" />
+              {isFr ? "Société d'enchères vérifiée" : 'Verified Auction Firm'}
             </span>
           )}
           {province && (

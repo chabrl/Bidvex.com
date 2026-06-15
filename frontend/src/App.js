@@ -129,6 +129,7 @@ const VehicleInvoicesPage = lazy(() => import('./pages/vehicles/VehicleInvoicesP
 const SellerFinancialsPage = lazy(() => import('./pages/vehicles/SellerFinancialsPage'));
 // iter293 — Multi-Lot Vehicle Auction (Copart-style sequential events)
 const CreateVehicleMultiLotPage = lazy(() => import('./pages/vehicles/CreateVehicleMultiLotPage'));
+const LotTemplatesManagerPage = lazy(() => import('./pages/vehicles/LotTemplatesManagerPage'));
 const VehicleMultiLotDetailPage = lazy(() => import('./pages/vehicles/VehicleMultiLotDetailPage'));
 
 // Lazy-loaded heavy components
@@ -559,6 +560,9 @@ const App = () => {
           } />
           <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
           <Route path="/privacy" element={<Navigate to="/privacy-policy" replace />} />
+          {/* iter304 — Cookie policy alias per user spec; banner link target */}
+          <Route path="/legal/cookies" element={<PrivacyPolicyPage />} />
+          <Route path="/legal/cookie-policy" element={<Navigate to="/legal/cookies" replace />} />
           <Route path="/terms-of-service" element={<TermsOfServicePage />} />
           <Route path="/terms" element={<Navigate to="/terms-of-service" replace />} />
           <Route path="/refund-policy" element={<RefundPolicyPage />} />
@@ -651,6 +655,14 @@ const App = () => {
             <ProtectedRoute>
               <ErrorBoundary scope="vehicle-my-listings">
                 <MyVehicleListingsPage />
+              </ErrorBoundary>
+            </ProtectedRoute>
+          } />
+          {/* iter304 — Lot Templates manager (dealer tab) */}
+          <Route path="/vehicle-auctions/lot-templates" element={
+            <ProtectedRoute>
+              <ErrorBoundary scope="lot-templates-manager">
+                <LotTemplatesManagerPage />
               </ErrorBoundary>
             </ProtectedRoute>
           } />

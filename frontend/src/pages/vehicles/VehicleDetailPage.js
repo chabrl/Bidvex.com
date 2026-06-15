@@ -46,8 +46,10 @@ import { PricingEstimate } from '../../components/vehicles/PricingBreakdown';
 import UpcomingCountdownBadge from '../../components/UpcomingCountdownBadge';
 import ListingLogisticsDetails from '../../components/ListingLogisticsDetails';
 import MessageSellerModal from '../../components/MessageSellerModal';
-import { MessageSquare, ShieldCheck } from 'lucide-react';
+import { MessageSquare, ShieldCheck, Mail, Share2 } from 'lucide-react';
 import VehicleLegalFooter from '../../components/vehicles/VehicleLegalFooter';
+import VerifiedAuctionFirmBadge from '../../components/VerifiedAuctionFirmBadge';
+import EmailToFriendModal from '../../components/EmailToFriendModal';
 import VehicleBuyerGateModal from '../../components/vehicles/VehicleBuyerGateModal';
 import VehicleProvinceEligibilityDisplay from '../../components/vehicles/VehicleProvinceEligibilityDisplay';
 import VehicleCarfaxWidget from '../../components/vehicles/VehicleCarfaxWidget';
@@ -1045,6 +1047,8 @@ const VehicleDetailPage = () => {
   const [showPromoModal, setShowPromoModal] = useState(false);
   // iter197 — Message Seller modal (winner-only after unlock fee paid)
   const [showMessageModal, setShowMessageModal] = useState(false);
+  // iter304 — Email to Friend share modal
+  const [showEmailToFriend, setShowEmailToFriend] = useState(false);
   // iter201 — Phase 3 / 3A — Province-aware buyer gate
   const [showBuyerGateModal, setShowBuyerGateModal] = useState(false);
   const [buyerGateCleared, setBuyerGateCleared] = useState(false);
@@ -1156,11 +1160,22 @@ const VehicleDetailPage = () => {
             </div>
             
             {/* Trust Badges Header Row */}
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 items-center">
               <TitleStatusBadge status={vehicle.title_status} />
               <RunningStatusBadge isRunning={vehicle.condition_report?.is_running} />
               <VINVerifiedBadge vin={vehicle.vin} vinData={vehicle.vin_data} />
               {!vehicle.reserve_price && <NoReserveBadge />}
+              {/* iter304 — "Email to a Friend" share button */}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setShowEmailToFriend(true)}
+                className="gap-1.5 ml-1"
+                data-testid="vehicle-email-to-friend-btn"
+              >
+                <Mail className="h-4 w-4" />
+                {i18n.language === 'fr' ? 'Envoyer à un ami' : 'Email to a Friend'}
+              </Button>
             </div>
           </div>
           
@@ -1170,6 +1185,8 @@ const VehicleDetailPage = () => {
               <span className="text-sm text-slate-500">Seller:</span>
               <SellerTypeBadge sellerType={seller?.seller_type} size="sm" />
               <VerifiedSellerBadge isVerified={seller?.verification_status === 'approved'} />
+              {/* iter304 — Verified Auction Firm badge in seller trust row */}
+              <VerifiedAuctionFirmBadge isVerified={!!seller?.verified_auction_firm} size="sm" dataTestid="vehicle-detail-verified-firm-badge" />
               <SellerRatingBadge 
                 rating={seller?.average_rating} 
                 reviewCount={seller?.review_count}
@@ -1831,6 +1848,14 @@ const VehicleDetailPage = () => {
       )}
       {/* iter201 — Phase 2 — Bilingual legal footer (CEO Part 4) */}
       <VehicleLegalFooter />
+
+      {/* iter304 — Email to Friend modal */}
+      <EmailToFriendModal
+        open={showEmailToFriend}
+        onClose={() => setShowEmailToFriend(false)}
+        vehicleId={vehicle?.id}
+        listingTitle={`${vehicle?.year || ''} ${vehicle?.make || ''} ${vehicle?.model || ''}`.trim()}
+      />
     </div>
   );
 };

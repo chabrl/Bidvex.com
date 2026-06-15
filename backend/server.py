@@ -1162,6 +1162,19 @@ try:
     from routes.settlement import settlement_router
     api_router.include_router(settlement_router)
 
+    # iter304 — Lot Templates for multi-lot vehicle auction wizard
+    from routes.lot_templates import router as lot_templates_router
+    api_router.include_router(lot_templates_router)
+
+    # iter304 — "Verified Auction Firm" badge admin endpoints
+    from routes.verified_firm import router as verified_firm_router
+    api_router.include_router(verified_firm_router)
+
+    # iter304 — "Email to Friend" share endpoint for vehicle listings
+    from routes.email_to_friend import router as email_to_friend_router
+    api_router.include_router(email_to_friend_router)
+
+
     # iter298 BUG 4 — Buyer receipts + seller statements.
     from routes.receipts import receipts_router
     api_router.include_router(receipts_router)
@@ -1291,7 +1304,15 @@ async def create_critical_indexes(database):
         ("bids", [("user_id", 1)], {"background": True}),
         ("bids", [("listing_id", 1), ("created_at", -1)], {"background": True}),
         ("lot_bids", [("user_id", 1)], {"background": True}),
+        # iter304 P1 — auction_id-style compound indexes for fast bid history
+        ("lot_bids", [("listing_id", 1), ("created_at", -1)], {"background": True}),
         ("vehicle_bids", [("user_id", 1)], {"background": True}),
+        ("vehicle_bids", [("vehicle_id", 1), ("created_at", -1)], {"background": True}),
+        ("bidding_deposits", [("auction_id", 1), ("created_at", -1)], {"background": True}),
+        # iter304 — Lot templates (per-dealer lookup)
+        ("lot_templates", [("dealer_id", 1), ("created_at", -1)], {"background": True}),
+        # iter304 — Email to friend rate limit log
+        ("email_to_friend_log", [("sender_id", 1), ("sent_at", -1)], {"background": True}),
         ("messages", [("conversation_id", 1), ("created_at", -1)], {"background": True}),
         ("messages", [("receiver_id", 1), ("is_read", 1)], {"background": True}),
         ("conversations", [("participants", 1)], {"background": True}),

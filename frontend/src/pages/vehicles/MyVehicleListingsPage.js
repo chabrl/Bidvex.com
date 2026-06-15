@@ -26,6 +26,7 @@ import { Badge } from '../../components/ui/badge';
 import {
   Car, Plus, Clock, CheckCircle, XCircle, AlertTriangle, Eye,
   DollarSign, TrendingUp, Edit, Trash2, MoreVertical, Layers,
+  BookmarkPlus,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -416,6 +417,15 @@ const MyVehicleListingsPage = () => {
                 data-testid="create-multi-lot-btn"
               >
                 <Plus className="h-4 w-4" /> {isFr ? '+ Enchère multi-lots' : '+ Create Multi-Lot Vehicle Auction'}
+              </Button>
+              {/* iter304 — Lot Templates manager link */}
+              <Button
+                onClick={() => navigate('/vehicle-auctions/lot-templates')}
+                variant="ghost"
+                className="gap-2 min-h-[44px] w-full sm:w-auto text-blue-700 hover:bg-blue-50"
+                data-testid="lot-templates-link"
+              >
+                <BookmarkPlus className="h-4 w-4" /> {isFr ? 'Modèles de lots' : 'Lot Templates'}
               </Button>
             </div>
           </div>

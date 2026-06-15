@@ -509,3 +509,112 @@ async def send_seller_license_expired_email(recipient: dict, suspended_count: in
         ),
     )
 
+
+
+
+# ─────────────────────────────────────────────────────────────
+# iter304 — "Email to a Friend" share email (Outlook-safe tables)
+# ─────────────────────────────────────────────────────────────
+async def send_vehicle_email_to_friend(
+    recipient_email: str,
+    sender_first_name: str,
+    listing: dict,
+    message: str = "",
+    lang: str = "en",
+) -> bool:
+    """Bilingual share email — Outlook-safe (tables only, no flex/grid)."""
+    if not SENDGRID_AVAILABLE:
+        logger.warning("send_vehicle_email_to_friend skipped — SendGrid disabled")
+        return False
+    is_fr = (lang or "en").startswith("fr")
+    listing_id = listing.get("id") or ""
+    title = listing.get("title") or f"{listing.get('year','')} {listing.get('make','')} {listing.get('model','')}".strip()
+    title_fr = listing.get("title_fr") or title
+    display_title = title_fr if is_fr else title
+    photo_url = ""
+    media = listing.get("media") or []
+    if media and isinstance(media, list):
+        first = media[0]
+        if isinstance(first, dict):
+            photo_url = first.get("url") or ""
+    if not photo_url:
+        photos = listing.get("images") or []
+        if photos and isinstance(photos, list):
+            photo_url = (photos[0] if isinstance(photos[0], str) else photos[0].get("url", ""))
+    current_bid = listing.get("current_bid") or listing.get("starting_price") or 0
+    listing_url = f"{FRONTEND_URL}/vehicle-auctions/{listing_id}"
+
+    if is_fr:
+        subject = f"{sender_first_name} pense que ce véhicule sur BidVex pourrait vous intéresser"
+        intro = f"<strong>{sender_first_name}</strong> vous a envoyé ce véhicule à découvrir sur BidVex&nbsp;:"
+        bid_label = "Enchère actuelle"
+        cta = "Voir l'annonce sur BidVex"
+        footer = "Cette annonce est régie par les enchères BidVex Vehicle. Aucune obligation pour vous."
+        msg_label = "Message :"
+    else:
+        subject = f"{sender_first_name} thought you'd be interested in this vehicle on BidVex"
+        intro = f"<strong>{sender_first_name}</strong> sent you this vehicle on BidVex:"
+        bid_label = "Current bid"
+        cta = "View Listing on BidVex"
+        footer = "This listing runs on BidVex Vehicle Auctions — no obligation to bid."
+        msg_label = "Message:"
+
+    photo_block = (
+        f'<tr><td style="padding:0 0 18px 0;"><img src="{photo_url}" alt="" width="560" '
+        f'style="display:block;max-width:100%;height:auto;border-radius:8px;border:0;"/></td></tr>'
+    ) if photo_url else ""
+
+    msg_block = (
+        f'<tr><td style="padding:8px 0 16px 0;"><table role="presentation" width="100%" '
+        f'style="background-color:#f1f5f9;border-left:4px solid #0ea5e9;border-radius:6px;">'
+        f'<tr><td style="padding:12px 16px;font-family:Arial,sans-serif;font-size:14px;color:#334155;">'
+        f'<strong style="color:#0f172a;">{msg_label}</strong><br/>'
+        f'<span style="white-space:pre-wrap;">{message}</span>'
+        f'</td></tr></table></td></tr>'
+    ) if message else ""
+
+    html = f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8"/><title>{subject}</title></head>
+<body style="margin:0;padding:0;background-color:#f8fafc;font-family:Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f8fafc;padding:20px 0;">
+  <tr><td align="center">
+    <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0"
+      style="background-color:#ffffff;border-radius:8px;overflow:hidden;border:1px solid #e2e8f0;">
+      <tr><td style="padding:24px 28px 8px 28px;font-family:Arial,sans-serif;color:#0f172a;font-size:15px;line-height:22px;">
+        {intro}
+      </td></tr>
+      <tr><td style="padding:8px 28px 0 28px;font-family:Arial,sans-serif;color:#0f172a;font-size:18px;font-weight:bold;">
+        {display_title}
+      </td></tr>
+      <tr><td style="padding:6px 28px 16px 28px;font-family:Arial,sans-serif;color:#475569;font-size:14px;">
+        {bid_label}: <strong style="color:#0ea5e9;">${current_bid:,.0f} CAD</strong>
+      </td></tr>
+      <tr><td style="padding:0 28px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+          {photo_block}
+          {msg_block}
+          <tr><td align="center" style="padding:14px 0 24px 0;">
+            <a href="{listing_url}" style="display:inline-block;padding:12px 28px;background-color:#0ea5e9;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;font-family:Arial,sans-serif;font-size:14px;">{cta}</a>
+          </td></tr>
+        </table>
+      </td></tr>
+      <tr><td style="padding:14px 28px 22px 28px;border-top:1px solid #e2e8f0;font-family:Arial,sans-serif;font-size:12px;color:#94a3b8;text-align:center;">
+        {footer}
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>"""
+
+    res = await send_unified_email(
+        "new_feature",
+        user={"email": recipient_email, "first_name": ""},
+        data={
+            "html_full_override": html,
+            "subject_override": subject,
+        },
+        is_marketing=False,
+        categories=["share-to-friend", "vehicles"],
+    )
+    return bool(res and res.get("success"))
+

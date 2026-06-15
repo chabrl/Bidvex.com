@@ -1,5 +1,13 @@
 # BidVex — Auction Marketplace PRD
 
+
+## iter303 — THREE FRONTEND DIRECTIVES (Jun 15, 2026) ✅ COMPLETE
+- D1 Multi-Lot Wizard: flat form → 6-step per-lot wizard (event-level + per-lot layers; VehicleCategoryGrid + VIN lookup reused; Bill 96 + min-1-photo enforced; bottom CTAs reveal after first save)
+- D2 My Vehicle Listings: full responsive overhaul (mobile single-col, tablet 2-col 40/60 split, desktop 3-col); horizontally scrollable tabs; FR translations
+- D3 Vehicle Auctions homepage: removed wave SVG bleed; hero flush against green CTA banner; CTA buttons 2×2 mobile / single-row desktop; diagonal divider into category pills; FR translations updated to exact user spec ("Vous voulez vendre votre véhicule?", "Mettre en vente", "Particulier, Concessionnaire ou Commissaire-priseur")
+- Validation: testing-agent iteration_249 ~90% pass + agent self-test of full wizard E2E in FR with photo upload + Bill 96 + edit/delete; iter302 regression intact
+
+
 ## iter296 — P0 EMERGENCY: Auction Lifecycle, Bilingual Notifications, Dashboard Counters (Jun 10, 2026) 🚨🔧
 
 User reported 5 production bugs via bidvex.com screenshots. All 5 root-caused and fixed in a single focused pass.

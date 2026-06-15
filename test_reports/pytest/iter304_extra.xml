@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="2" failures="0" skipped="0" tests="2" time="0.104" timestamp="2026-06-15T22:30:31.127333+00:00" hostname="agent-env-c75ae3b4-0836-48ac-857c-c6a46c32e016"><testcase classname="backend.tests.test_iter304_extra" name="test_lot_templates_max_20_enforcement" time="0.001"><error message="failed on setup with &quot;requests.exceptions.MissingSchema: Invalid URL '/api/auth/login': No scheme supplied. Perhaps you meant https:///api/auth/login?&quot;">backend/tests/test_iter304_extra.py:20: in admin_token
+    r = requests.post(
+backend/tests/conftest.py:69: in _cached_requests_post
+    resp = _orig_requests_post(url, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/api.py:115: in post
+    return request("post", url, data=data, json=json, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/api.py:59: in request
+    return session.request(method=method, url=url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:578: in request
+    prep = self.prepare_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:487: in prepare_request
+    p.prepare(
+/root/.venv/lib/python3.11/site-packages/requests/models.py:369: in prepare
+    self.prepare_url(url, params)
+/root/.venv/lib/python3.11/site-packages/requests/models.py:440: in prepare_url
+    raise MissingSchema(
+E   requests.exceptions.MissingSchema: Invalid URL '/api/auth/login': No scheme supplied. Perhaps you meant https:///api/auth/login?</error></testcase><testcase classname="backend.tests.test_iter304_extra" name="test_email_to_friend_invalid_email_format" time="0.000"><error message="failed on setup with &quot;requests.exceptions.MissingSchema: Invalid URL '/api/auth/login': No scheme supplied. Perhaps you meant https:///api/auth/login?&quot;">backend/tests/test_iter304_extra.py:20: in admin_token
+    r = requests.post(
+backend/tests/conftest.py:69: in _cached_requests_post
+    resp = _orig_requests_post(url, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/api.py:115: in post
+    return request("post", url, data=data, json=json, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/api.py:59: in request
+    return session.request(method=method, url=url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:578: in request
+    prep = self.prepare_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:487: in prepare_request
+    p.prepare(
+/root/.venv/lib/python3.11/site-packages/requests/models.py:369: in prepare
+    self.prepare_url(url, params)
+/root/.venv/lib/python3.11/site-packages/requests/models.py:440: in prepare_url
+    raise MissingSchema(
+E   requests.exceptions.MissingSchema: Invalid URL '/api/auth/login': No scheme supplied. Perhaps you meant https:///api/auth/login?</error></testcase></testsuite></testsuites>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Shield, Settings, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from './ui/button';
 import { Switch } from './ui/switch';
@@ -6,6 +7,7 @@ import { useCookieConsent, DEFAULT_CONSENT } from '../hooks/useCookieConsent';
 import API_BASE from '../config';
 
 const CookieConsentBanner = () => {
+  const { i18n } = useTranslation();
   const { hasConsented, acceptAll, refuseAll, saveCustom } = useCookieConsent();
   const [visible, setVisible] = useState(false);
   const [showCustomize, setShowCustomize] = useState(false);
@@ -33,15 +35,17 @@ const CookieConsentBanner = () => {
     }
   }, [hasConsented, acceptAll]);
 
-  // Fetch localized strings from the API
+  // iter304 — Re-fetch localized strings whenever the active i18n language changes,
+  // so the banner re-renders in FR when the user toggles language WITHOUT
+  // requiring a page reload.
   useEffect(() => {
     if (!visible) return;
-    const lang = (navigator.language || 'en').startsWith('fr') ? 'fr' : 'en';
+    const lang = (i18n.language || 'en').toLowerCase().startsWith('fr') ? 'fr' : 'en';
     fetch(`${API_BASE}/legal/cookie-policy?lang=${lang}`)
       .then((r) => r.json())
       .then((d) => setStrings(d.consent))
       .catch(() => {});
-  }, [visible]);
+  }, [visible, i18n.language]);
 
   if (!visible || hasConsented) return null;
 

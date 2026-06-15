@@ -12,6 +12,7 @@ import {
   Building2, User, Gavel, FileCheck, Car, Award,
   BadgeCheck, Clock, TrendingUp, Eye, Lock, Info
 } from 'lucide-react';
+import VerifiedAuctionFirmBadge from '../VerifiedAuctionFirmBadge';
 
 // Seller Type Badge
 export const SellerTypeBadge = ({ sellerType, size = 'default' }) => {
@@ -378,6 +379,8 @@ export const TrustIndicators = ({
           isVerified={seller?.verification_status === 'approved'} 
           verificationDetails={seller}
         />
+        {/* iter304 — Verified Auction Firm badge (admin-granted, brand blue) */}
+        <VerifiedAuctionFirmBadge isVerified={!!seller?.verified_auction_firm} size="sm" />
         <SellerRatingBadge 
           rating={seller?.average_rating} 
           reviewCount={seller?.review_count}

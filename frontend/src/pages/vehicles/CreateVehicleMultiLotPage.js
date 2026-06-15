@@ -58,6 +58,7 @@ import {
   Upload, ImageIcon, X, ArrowLeft, ArrowRight, Info, Search, Plus,
   Edit3, Trash2, FileText, Camera, DollarSign, Settings2, Gauge,
   Fuel, Palette, Shield, AlertTriangle, ChevronLeft, ChevronRight,
+  BookmarkPlus, FolderOpen,
 } from 'lucide-react';
 import { TIMING_MODES, getTimingModeLabel, getTimingModeDescription } from '../../lib/vehicleMultiLotTimingModes';
 
@@ -175,6 +176,105 @@ const CreateVehicleMultiLotPage = () => {
   const [loading, setLoading] = useState(false);
   const [infoSheet, setInfoSheet] = useState(null);
   const [vinLoading, setVinLoading] = useState(null); // lot id currently looking up
+
+  // iter304 — Lot Templates (per-dealer presets that pre-fill Steps 2–5)
+  const [templates, setTemplates] = useState([]);
+  const [templatesMax, setTemplatesMax] = useState(20);
+  const [saveTemplateModal, setSaveTemplateModal] = useState(false);
+  const [savingTemplate, setSavingTemplate] = useState(false);
+
+  const fetchTemplates = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      const r = await axios.get(`${API}/lot-templates`, { headers: { Authorization: `Bearer ${token}` } });
+      setTemplates(r.data?.items || []);
+      setTemplatesMax(r.data?.max || 20);
+    } catch (_e) {
+      // silent — dealer might not have permission or none exist
+    }
+  };
+  useEffect(() => { fetchTemplates(); }, []);
+
+  // Apply a template's fields onto the current wizard draft (Steps 2–5)
+  const applyTemplate = (tplId) => {
+    if (!tplId) return;
+    const tpl = templates.find((t) => t.id === tplId);
+    if (!tpl) return;
+    const f = tpl.fields || {};
+    setWizard((w) => w ? ({
+      ...w,
+      draft: {
+        ...w.draft,
+        // Step 1 — Make/Model/BodyType
+        make: f.make || w.draft.make,
+        model: f.model || w.draft.model,
+        body_type: f.body_type || w.draft.body_type,
+        // Step 2 — Specs
+        engine_size: f.engine_size || w.draft.engine_size,
+        transmission: f.transmission || w.draft.transmission,
+        drivetrain: f.drivetrain || w.draft.drivetrain,
+        fuel_type: f.fuel_type || w.draft.fuel_type,
+        exterior_color: f.exterior_color || w.draft.exterior_color,
+        interior_color: f.interior_color || w.draft.interior_color,
+        doors: f.doors || w.draft.doors,
+        seats: f.seats || w.draft.seats,
+        // Step 3 — Condition
+        title_status: f.title_status || w.draft.title_status,
+        condition_rating: f.condition_rating || w.draft.condition_rating,
+        // Step 5 — Auction settings
+        starting_price: f.starting_price ?? w.draft.starting_price,
+        reserve_price: f.reserve_price ?? w.draft.reserve_price,
+        bid_increment: f.bid_increment ?? w.draft.bid_increment,
+        location_city: f.location_city || w.draft.location_city,
+        location_province: f.location_province || w.draft.location_province,
+        _applied_template_id: tplId,
+      },
+    }) : w);
+    toast.success(L(`Template "${tpl.name}" applied`, `Modèle « ${tpl.name} » appliqué`));
+  };
+
+  // Persist current draft as a new template (called from wizard Step 5)
+  const persistTemplate = async (name) => {
+    if (!wizard) return;
+    const trimmed = (name || '').trim();
+    if (!trimmed) { toast.error(L('Template name is required', 'Nom de modèle requis')); return; }
+    if (trimmed.length > 60) { toast.error(L('Max 60 characters', 'Max 60 caractères')); return; }
+    if (templates.length >= templatesMax) {
+      toast.error(L(`Maximum ${templatesMax} templates reached`, `Maximum ${templatesMax} modèles atteint`));
+      return;
+    }
+    setSavingTemplate(true);
+    try {
+      const token = localStorage.getItem('token');
+      const d = wizard.draft;
+      const payload = {
+        name: trimmed,
+        fields: {
+          make: d.make, model: d.model, body_type: d.body_type,
+          engine_size: d.engine_size, transmission: d.transmission,
+          drivetrain: d.drivetrain, fuel_type: d.fuel_type,
+          exterior_color: d.exterior_color, interior_color: d.interior_color,
+          doors: String(d.doors || ''), seats: String(d.seats || ''),
+          starting_price: Number(d.starting_price) || 0,
+          reserve_price: d.reserve_price ? Number(d.reserve_price) : null,
+          bid_increment: Number(d.bid_increment) || 100,
+          location_city: d.location_city, location_province: d.location_province,
+          title_status: d.title_status, condition_rating: d.condition_rating,
+        },
+      };
+      await axios.post(`${API}/lot-templates`, payload, { headers: { Authorization: `Bearer ${token}` } });
+      await fetchTemplates();
+      toast.success(L(`Template "${trimmed}" saved`, `Modèle « ${trimmed} » enregistré`));
+      setSaveTemplateModal(false);
+    } catch (err) {
+      const detail = err?.response?.data?.detail;
+      const msg = (typeof detail === 'object' ? (fr ? detail.message_fr : detail.message_en) : detail) || L('Failed to save template', 'Échec de la sauvegarde');
+      toast.error(msg);
+    } finally {
+      setSavingTemplate(false);
+    }
+  };
 
   const [event, setEvent] = useState(() => ({
     title: '',
@@ -489,6 +589,10 @@ const CreateVehicleMultiLotPage = () => {
         saveLot={saveLot}
         eventProvince={event.timing_mode}
         eventDurationSec={Number(event.lot_duration_seconds) || 120}
+        templates={templates}
+        templatesMax={templatesMax}
+        applyTemplate={applyTemplate}
+        onSaveAsTemplate={() => setSaveTemplateModal(true)}
       />
     );
   }
@@ -790,6 +894,15 @@ const CreateVehicleMultiLotPage = () => {
           </SheetHeader>
         </SheetContent>
       </Sheet>
+
+      {/* iter304 — Save Lot Template modal */}
+      <SaveTemplateModal
+        open={saveTemplateModal}
+        onClose={() => setSaveTemplateModal(false)}
+        onSave={persistTemplate}
+        saving={savingTemplate}
+        L={L}
+      />
     </div>
   );
 };
@@ -800,6 +913,7 @@ const LotWizard = ({
   STEPS, wizard, L, fr, i18n, vinLoading,
   updateDraft, lookupVin, addPhotos, removePhoto, movePhoto,
   goNext, goPrev, cancelWizard, saveLot, eventDurationSec,
+  templates = [], templatesMax = 20, applyTemplate, onSaveAsTemplate,
 }) => {
   const d = wizard.draft;
   const stepIdx = wizard.currentStep;
@@ -815,9 +929,6 @@ const LotWizard = ({
             <h1 className="text-base sm:text-xl font-bold flex items-center gap-2 min-w-0">
               <Layers className="h-5 w-5 text-blue-600 flex-shrink-0" />
               <span className="truncate">{wizard.lotIndex === 'new' ? L('Add Lot', 'Ajouter un lot') : L('Edit Lot', 'Modifier le lot')}</span>
-              <Badge variant="outline" className="text-[10px] flex-shrink-0">
-                {fr ? STEPS[stepIdx].frTitle : STEPS[stepIdx].enTitle}
-              </Badge>
             </h1>
             <Button variant="ghost" size="sm" onClick={cancelWizard} className="text-slate-600 hover:text-red-600 min-h-[40px]" data-testid="lot-wizard-cancel-btn">
               <X className="h-4 w-4 mr-1" /> {L('Cancel', 'Annuler')}
@@ -863,6 +974,38 @@ const LotWizard = ({
             {/* === Step 1: VIN & Basic === */}
             {stepIdx === 0 && (
               <div className="space-y-6">
+                {/* iter304 — Use a Template dropdown (only shows when dealer has saved templates) */}
+                {templates.length > 0 && (
+                  <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3" data-testid="template-picker-block">
+                    <Label className="flex items-center gap-1.5 text-sm font-semibold text-blue-900 dark:text-blue-100">
+                      <FolderOpen className="h-4 w-4" /> {L('Use a Template', 'Utiliser un modèle')}
+                    </Label>
+                    <p className="text-xs text-blue-700 dark:text-blue-300 mt-0.5 mb-2">
+                      {L(
+                        'Pre-fill Steps 2–5 from a saved template. You can still edit any field.',
+                        'Pré-remplir les étapes 2 à 5 depuis un modèle enregistré. Vous pouvez modifier les champs.',
+                      )}
+                    </p>
+                    <Select
+                      value={wizard.draft._applied_template_id || ''}
+                      onValueChange={(v) => { if (v === '__none__') { updateDraft({ _applied_template_id: '' }); return; } applyTemplate(v); }}
+                    >
+                      <SelectTrigger data-testid="template-picker-select" className="bg-white dark:bg-slate-900">
+                        <SelectValue placeholder={L('No template (start blank)', 'Aucun modèle (formulaire vierge)')} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">{L('No template', 'Aucun modèle')}</SelectItem>
+                        {templates.map((tpl) => (
+                          <SelectItem key={tpl.id} value={tpl.id} data-testid={`template-option-${tpl.id}`}>
+                            {tpl.name}
+                            {tpl.fields?.make && ` · ${tpl.fields.make}${tpl.fields.model ? ` ${tpl.fields.model}` : ''}`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
                 <div>
                   <Label className="text-base font-semibold">{L('Vehicle Category', 'Catégorie de véhicule')} *</Label>
                   <p className="text-xs sm:text-sm text-slate-500 mb-2">
@@ -1178,6 +1321,27 @@ const LotWizard = ({
                   <Label>{L('Description', 'Description')}</Label>
                   <Textarea data-testid="wizard-description-input" value={d.description} onChange={(e) => updateDraft({ description: e.target.value })} rows={3} placeholder={L('Condition notes, options, equipment, defects…', "Notes sur l'état, options, équipements, défauts…")} />
                 </div>
+
+                {/* iter304 — Save as Template */}
+                <div className="border-t pt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={onSaveAsTemplate}
+                    className="w-full sm:w-auto min-h-[44px] border-blue-300 text-blue-700 hover:bg-blue-50"
+                    data-testid="save-as-template-btn"
+                    disabled={templates.length >= templatesMax}
+                  >
+                    <BookmarkPlus className="h-4 w-4 mr-1" /> {L('Save as Template', 'Enregistrer comme modèle')}
+                    <span className="ml-2 text-[10px] text-slate-500">({templates.length}/{templatesMax})</span>
+                  </Button>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    {L(
+                      'Save Make/Model/Specs/Pricing/Location as a reusable template for future lots. VIN, year, mileage and photos are always unique per vehicle.',
+                      "Enregistrez Marque/Modèle/Spécifications/Prix/Lieu comme modèle réutilisable. NIV, année, kilométrage et photos restent uniques par véhicule.",
+                    )}
+                  </p>
+                </div>
               </div>
             )}
 
@@ -1297,3 +1461,53 @@ const validateAll = (d, L) => {
 };
 
 export default CreateVehicleMultiLotPage;
+
+// ===================== SaveTemplateModal (iter304) =====================
+const SaveTemplateModal = ({ open, onClose, onSave, saving, L }) => {
+  const [name, setName] = useState('');
+  useEffect(() => { if (!open) setName(''); }, [open]);
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[9999] bg-black/60 flex items-center justify-center p-4" data-testid="save-template-modal">
+      <div className="bg-white dark:bg-slate-900 rounded-lg shadow-2xl w-full max-w-md p-5">
+        <div className="flex items-center gap-2 mb-1">
+          <BookmarkPlus className="h-5 w-5 text-blue-600" />
+          <h3 className="text-lg font-semibold">{L('Save Lot Template', 'Enregistrer un modèle de lot')}</h3>
+        </div>
+        <p className="text-xs text-slate-500 mb-4">
+          {L(
+            'Templates speed up creating similar lots later. Maximum 60 characters.',
+            'Les modèles accélèrent la création de lots similaires. Maximum 60 caractères.',
+          )}
+        </p>
+        <Label htmlFor="tpl-name" className="text-xs">{L('Template name', 'Nom du modèle')}</Label>
+        <Input
+          id="tpl-name"
+          data-testid="save-template-name-input"
+          autoFocus
+          maxLength={60}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder={L('e.g. Ford F-350 Work Truck', 'ex. Ford F-350 utilitaire')}
+          disabled={saving}
+        />
+        <p className="text-[10px] text-slate-400 mt-1 text-right">{name.length}/60</p>
+        <div className="flex justify-end gap-2 mt-4">
+          <Button variant="ghost" onClick={onClose} disabled={saving} data-testid="save-template-cancel-btn">
+            <X className="h-4 w-4 mr-1" /> {L('Cancel', 'Annuler')}
+          </Button>
+          <Button
+            onClick={() => onSave(name)}
+            disabled={saving || !name.trim()}
+            className="bg-blue-600 hover:bg-blue-700"
+            data-testid="save-template-confirm-btn"
+          >
+            {saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
+            {L('Save Template', 'Enregistrer le modèle')}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
