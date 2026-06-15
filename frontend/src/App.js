@@ -552,6 +552,8 @@ const App = () => {
           } />
           <Route path="/brokers" element={<BrokerDirectoryPage />} />
           <Route path="/courtiers" element={<BrokerDirectoryPage />} />
+          {/* iter305 — Static-pages audit: canonical /broker-directory alias */}
+          <Route path="/broker-directory" element={<BrokerDirectoryPage />} />
           <Route path="/brokers/:broker_id/request" element={
             <ProtectedRoute><BrokerBindingRequestPage /></ProtectedRoute>
           } />
@@ -563,6 +565,11 @@ const App = () => {
           {/* iter304 — Cookie policy alias per user spec; banner link target */}
           <Route path="/legal/cookies" element={<PrivacyPolicyPage />} />
           <Route path="/legal/cookie-policy" element={<Navigate to="/legal/cookies" replace />} />
+          {/* iter305 — Static-pages audit: canonical /legal/* aliases */}
+          <Route path="/legal/privacy" element={<PrivacyPolicyPage />} />
+          <Route path="/legal/terms" element={<TermsOfServicePage />} />
+          <Route path="/legal/refunds" element={<RefundPolicyPage />} />
+          <Route path="/legal/prohibited" element={<ProhibitedItemsPage />} />
           <Route path="/terms-of-service" element={<TermsOfServicePage />} />
           <Route path="/terms" element={<Navigate to="/terms-of-service" replace />} />
           <Route path="/refund-policy" element={<RefundPolicyPage />} />

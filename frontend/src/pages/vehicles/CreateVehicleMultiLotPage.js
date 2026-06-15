@@ -58,7 +58,7 @@ import {
   Upload, ImageIcon, X, ArrowLeft, ArrowRight, Info, Search, Plus,
   Edit3, Trash2, FileText, Camera, DollarSign, Settings2, Gauge,
   Fuel, Palette, Shield, AlertTriangle, ChevronLeft, ChevronRight,
-  BookmarkPlus, FolderOpen,
+  BookmarkPlus, FolderOpen, Copy,
 } from 'lucide-react';
 import { TIMING_MODES, getTimingModeLabel, getTimingModeDescription } from '../../lib/vehicleMultiLotTimingModes';
 
@@ -304,6 +304,35 @@ const CreateVehicleMultiLotPage = () => {
   // ---------- Wizard helpers ----------
   const openWizardForNew = () => setWizard({ lotIndex: 'new', currentStep: 0, draft: emptyLot() });
   const openWizardForEdit = (idx) => setWizard({ lotIndex: idx, currentStep: 0, draft: { ...lots[idx] } });
+  // iter305 — Duplicate Lot: clone a saved lot into a new draft. VIN, Mileage,
+  // and Photos are intentionally CLEARED — those are always unique per vehicle.
+  // Opens immediately in Step 1 with a banner prompting the user to fill the
+  // new VIN + upload photos.
+  const openWizardForDuplicate = (idx) => {
+    const src = lots[idx];
+    if (!src) return;
+    const cloneTitle = (src.title || '').trim();
+    const cloneTitleFr = (src.title_fr || '').trim();
+    setWizard({
+      lotIndex: 'new',
+      currentStep: 0,
+      _duplicate: true, // banner flag
+      draft: {
+        ...src,
+        // Fresh id so React keys stay unique
+        id: `lot-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        // CLEARED — always unique per vehicle
+        vin: '',
+        mileage: 0,
+        pendingPhotos: [],
+        // Mark the duplicated title (EN + FR)
+        title: cloneTitle ? `${cloneTitle} — Copy` : '',
+        title_fr: cloneTitleFr ? `${cloneTitleFr} — Copie` : (cloneTitle ? `${cloneTitle} — Copie` : ''),
+        // Reset any applied template flag so the user sees the duplicate-banner
+        _applied_template_id: '',
+      },
+    });
+  };
   const cancelWizard = () => setWizard(null);
 
   const updateDraft = (patch) => setWizard((w) => (w ? { ...w, draft: { ...w.draft, ...patch } } : w));
@@ -848,6 +877,9 @@ const CreateVehicleMultiLotPage = () => {
                     <Button size="sm" variant="outline" onClick={() => openWizardForEdit(idx)} className="flex-1 sm:flex-none min-h-[40px]" data-testid={`lot-edit-btn-${idx}`}>
                       <Edit3 className="h-3.5 w-3.5 mr-1" /> {L('Edit', 'Modifier')}
                     </Button>
+                    <Button size="sm" variant="outline" onClick={() => openWizardForDuplicate(idx)} className="flex-1 sm:flex-none min-h-[40px] border-blue-300 text-blue-700 hover:bg-blue-50" data-testid={`lot-duplicate-btn-${idx}`}>
+                      <Copy className="h-3.5 w-3.5 mr-1" /> {L('Duplicate Lot', 'Dupliquer le lot')}
+                    </Button>
                     <Button size="sm" variant="ghost" onClick={() => removeLot(idx)} className="flex-1 sm:flex-none min-h-[40px] text-red-600 hover:bg-red-50" data-testid={`lot-delete-btn-${idx}`}>
                       <Trash2 className="h-3.5 w-3.5 mr-1" /> {L('Delete', 'Supprimer')}
                     </Button>
@@ -985,6 +1017,21 @@ const LotWizard = ({
             {/* === Step 1: VIN & Basic === */}
             {stepIdx === 0 && (
               <div className="space-y-6">
+                {/* iter305 — Duplicate Lot banner: only renders when this draft
+                    was opened via the "Duplicate Lot" action. Reminds the user
+                    that VIN, Mileage and Photos must still be entered. */}
+                {wizard._duplicate && (
+                  <div className="bg-blue-50 dark:bg-blue-950 border-l-4 border-blue-500 rounded-r-lg p-3 flex items-start gap-2" data-testid="lot-duplicate-banner">
+                    <Copy className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <p className="text-sm text-blue-800 dark:text-blue-200">
+                      {L(
+                        'Lot duplicated — enter the new VIN and add photos to complete this lot.',
+                        'Lot dupliqué — entrez le nouveau NIV et ajoutez des photos pour compléter ce lot.',
+                      )}
+                    </p>
+                  </div>
+                )}
+
                 {/* iter304 — Use a Template dropdown (only shows when dealer has saved templates) */}
                 {templates.length > 0 && (
                   <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3" data-testid="template-picker-block">
@@ -1038,6 +1085,7 @@ const LotWizard = ({
                   <div className="flex flex-col sm:flex-row gap-2">
                     <Input
                       data-testid="wizard-vin-input"
+                      autoFocus={!!wizard._duplicate}
                       value={d.vin}
                       maxLength={17}
                       onChange={(e) => updateDraft({ vin: e.target.value.toUpperCase() })}
