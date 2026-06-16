@@ -58,9 +58,10 @@ import {
   Upload, ImageIcon, X, ArrowLeft, ArrowRight, Info, Search, Plus,
   Edit3, Trash2, FileText, Camera, DollarSign, Settings2, Gauge,
   Fuel, Palette, Shield, AlertTriangle, ChevronLeft, ChevronRight,
-  BookmarkPlus, FolderOpen, Copy,
+  BookmarkPlus, FolderOpen, Copy, FileSpreadsheet,
 } from 'lucide-react';
 import { TIMING_MODES, getTimingModeLabel, getTimingModeDescription } from '../../lib/vehicleMultiLotTimingModes';
+import BulkImportLotsCSV from '../../components/vehicles/BulkImportLotsCSV';
 
 const API = API_BASE;
 
@@ -182,6 +183,11 @@ const CreateVehicleMultiLotPage = () => {
   const [templatesMax, setTemplatesMax] = useState(20);
   const [saveTemplateModal, setSaveTemplateModal] = useState(false);
   const [savingTemplate, setSavingTemplate] = useState(false);
+
+  // iter306 — CSV bulk import
+  const [csvImportOpen, setCsvImportOpen] = useState(false);
+  const [draftEventId, setDraftEventId] = useState(null);
+  const [creatingDraftEvent, setCreatingDraftEvent] = useState(false);
 
   const fetchTemplates = async () => {
     try {
@@ -598,6 +604,47 @@ const CreateVehicleMultiLotPage = () => {
 
   // ===================== RENDER =====================
 
+  // iter306 — Create a stub event (if not yet saved) and open CSV import modal
+  const openCsvImport = async () => {
+    if (!event.title.trim()) {
+      toast.error(L('Set the event title first', "Définissez d'abord le titre de l'événement"));
+      return;
+    }
+    if (draftEventId) {
+      setCsvImportOpen(true);
+      return;
+    }
+    setCreatingDraftEvent(true);
+    try {
+      const token = localStorage.getItem('token');
+      const startISO = new Date(event.start_time).toISOString();
+      const r = await axios.post(`${API}/vehicle-multi-lot-auctions`, {
+        title: event.title,
+        description: event.description || '',
+        timing_mode: event.timing_mode,
+        start_time: startISO,
+        lot_duration_seconds: Math.max(MIN_LOT_DURATION_SECONDS, Number(event.lot_duration_seconds) || 120),
+        stagger_offset_seconds: Number(event.stagger_offset_seconds) || 60,
+        submission_intent: 'draft',
+        lots: [], // start empty — CSV import will append
+      }, { headers: { Authorization: `Bearer ${token}` } });
+      setDraftEventId(r.data.id);
+      setCsvImportOpen(true);
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || L('Could not start CSV import', "Impossible de démarrer l'import CSV"));
+    } finally {
+      setCreatingDraftEvent(false);
+    }
+  };
+
+  // After successful import, navigate to the created event so dealer can add photos
+  const handleImported = (data) => {
+    const eventId = data?.event_id || draftEventId;
+    if (eventId) {
+      navigate(`/vehicle-multi-lot/${eventId}`);
+    }
+  };
+
   if (wizard) {
     return (
       <>
@@ -825,20 +872,50 @@ const CreateVehicleMultiLotPage = () => {
             <Car className="h-5 w-5" />
             Lots ({lots.length})
           </h2>
-          <Button onClick={openWizardForNew} className="min-h-[44px]" data-testid="add-lot-btn">
-            <Plus className="h-4 w-4 mr-1" /> {lots.length === 0 ? L('Add Your First Lot', 'Ajouter le premier lot') : L('Add Another Lot', 'Ajouter un autre lot')}
-          </Button>
+          <div className="flex gap-2 flex-wrap">
+            {/* iter306 — Import from CSV */}
+            <Button
+              variant="outline"
+              onClick={openCsvImport}
+              disabled={creatingDraftEvent}
+              className="min-h-[44px] border-blue-300 text-blue-700 hover:bg-blue-50"
+              data-testid="open-bulk-import-btn"
+            >
+              {creatingDraftEvent ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <FileSpreadsheet className="h-4 w-4 mr-1" />}
+              {L('Import Lots from CSV', 'Importer des lots depuis un CSV')}
+            </Button>
+            <Button onClick={openWizardForNew} className="min-h-[44px]" data-testid="add-lot-btn">
+              <Plus className="h-4 w-4 mr-1" /> {lots.length === 0 ? L('Add Your First Lot', 'Ajouter le premier lot') : L('Add Another Lot', 'Ajouter un autre lot')}
+            </Button>
+          </div>
         </div>
 
         {lots.length === 0 ? (
-          <div className="text-center py-10 px-4 border-2 border-dashed border-slate-200 rounded-lg" data-testid="lots-empty-state">
-            <Layers className="h-10 w-10 text-slate-300 mx-auto mb-3" />
-            <p className="text-sm text-slate-600 mb-1 font-medium">
-              {L('No lots yet — add your first one to get started.', "Aucun lot pour l'instant — ajoutez votre premier lot.")}
-            </p>
-            <p className="text-xs text-slate-500">
-              {L('Each lot runs through a 6-step wizard with VIN auto-fill.', 'Chaque lot passe par un assistant en 6 étapes avec auto-remplissage NIV.')}
-            </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" data-testid="lots-empty-state">
+            {/* Card 1 — Add First Lot manually */}
+            <button
+              type="button"
+              onClick={openWizardForNew}
+              className="text-center py-8 px-4 border-2 border-dashed border-indigo-300 hover:border-indigo-500 hover:bg-indigo-50 rounded-lg transition-colors"
+              data-testid="empty-add-first-lot-cta"
+            >
+              <Plus className="h-10 w-10 text-indigo-400 mx-auto mb-3" />
+              <p className="text-sm font-semibold text-indigo-900 mb-1">{L('Add Your First Lot', 'Ajouter votre premier lot')}</p>
+              <p className="text-xs text-slate-500">{L('Walk through the 6-step wizard for one lot at a time.', "Suivez l'assistant en 6 étapes, un lot à la fois.")}</p>
+            </button>
+
+            {/* Card 2 — Import from CSV (iter306) */}
+            <button
+              type="button"
+              onClick={openCsvImport}
+              disabled={creatingDraftEvent}
+              className="text-center py-8 px-4 border-2 border-dashed border-blue-300 hover:border-blue-500 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-60"
+              data-testid="empty-csv-import-cta"
+            >
+              <FileSpreadsheet className="h-10 w-10 text-blue-400 mx-auto mb-3" />
+              <p className="text-sm font-semibold text-blue-900 mb-1">{L('Import Lots from CSV', 'Importer des lots depuis un CSV')}</p>
+              <p className="text-xs text-slate-500">{L('Bulk-add up to 50 lots at once from a spreadsheet.', "Importez jusqu'à 50 lots à la fois depuis une feuille de calcul.")}</p>
+            </button>
           </div>
         ) : (
           <div className="space-y-3">
@@ -945,6 +1022,16 @@ const CreateVehicleMultiLotPage = () => {
         onSave={persistTemplate}
         saving={savingTemplate}
         L={L}
+      />
+
+      {/* iter306 — Bulk Import Lots from CSV */}
+      <BulkImportLotsCSV
+        open={csvImportOpen}
+        onClose={() => setCsvImportOpen(false)}
+        eventId={draftEventId}
+        fr={fr}
+        L={L}
+        onImported={handleImported}
       />
     </div>
   );

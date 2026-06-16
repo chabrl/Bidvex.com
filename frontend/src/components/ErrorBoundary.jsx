@@ -29,6 +29,31 @@ class ErrorBoundaryBase extends React.Component {
   componentDidCatch(error, errorInfo) {
     // eslint-disable-next-line no-console
     console.error(`[ErrorBoundary:${this.props.scope || 'unknown'}]`, error, errorInfo);
+    // iter306 — Best-effort log to backend so production crashes surface in
+    // the Admin Error Logs tab. Never throw from within the catch.
+    try {
+      const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null;
+      const url = typeof window !== 'undefined' ? window.location.href : '';
+      const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+      const apiBase = (typeof process !== 'undefined' && process.env && process.env.REACT_APP_BACKEND_URL) || '';
+      if (apiBase && typeof fetch !== 'undefined') {
+        fetch(`${apiBase}/api/errors/frontend`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            error_message: String(error?.message || error || 'unknown').slice(0, 2000),
+            component_stack: String(errorInfo?.componentStack || '').slice(0, 10000),
+            url,
+            user_agent: ua.slice(0, 500),
+            scope: String(this.props.scope || '').slice(0, 100),
+          }),
+          // Keep silent — we don't want to await this in render
+        }).catch(() => {});
+      }
+    } catch (_e) { /* silent */ }
   }
 
   handleRetry = () => {

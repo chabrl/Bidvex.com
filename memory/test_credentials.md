@@ -10,6 +10,30 @@
 - Note (iter212, 2026-05-14): Auto-flagged `is_storage_facility=True` + `account_type=storage_facility` because they own the legacy "Bidvex Inc." storage facility. The `role=admin` override keeps the navbar/route restrictions disabled for them.
 - Note (iter226, 2026-02-24): Confirmed permanent sole admin for the platform.
 
+## 🌱 iter306 — Production Demo Seed Users (Jun 15, 2026)
+Seeded via `python /app/backend/scripts/seed_production_demo.py --execute` (idempotent — safe to re-run).
+
+### Test Buyer
+- Email: testbuyer@bidvex.com
+- Password: TestBuyer2026!
+- Role: user (individual buyer)
+- Province: QC
+
+### Test Seller (trusted)
+- Email: testseller@bidvex.com
+- Password: TestSeller2026!
+- Role: user (trusted_seller=True)
+- Province: QC
+
+### Test Vehicle Dealer
+- Email: testdealer@bidvex.com
+- Password: TestDealer2026!
+- Role: user (is_vehicle_dealer=True, vehicle_dealer_verified=True, seller_type=dealer)
+- Province: QC
+- Preferred language: FR
+
+
+
 ## Test buyer (for vehicle-settlement dispute tests)
 - Email: p0bugtest@example.com
 - Password: TestBuyer123!

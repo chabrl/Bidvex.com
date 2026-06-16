@@ -145,7 +145,11 @@ class MultiLotAuctionCreate(BaseModel):
     # iter302 Directive 3 — 60s hard minimum per lot (server-side enforcement).
     lot_duration_seconds: int = Field(120, ge=60, le=3600)
     stagger_offset_seconds: int = Field(60, ge=30, le=600)
-    lots: List[MultiLotItemCreate] = Field(..., min_length=1, max_length=200)
+    # iter306 — Allow zero lots when submission_intent='draft' (CSV bulk import
+    # flow: dealer first creates the event stub, then appends lots via the
+    # bulk-import endpoint). live/schedule still require ≥1 lot — enforced
+    # below in the model_validator.
+    lots: List[MultiLotItemCreate] = Field(default_factory=list, max_length=200)
     submission_intent: Optional[str] = "live"   # draft / schedule / live
 
     @field_validator("submission_intent")
@@ -155,6 +159,12 @@ class MultiLotAuctionCreate(BaseModel):
         if v not in ("draft", "schedule", "live"):
             raise ValueError("submission_intent must be one of draft / schedule / live")
         return v
+
+    @model_validator(mode="after")
+    def _live_or_schedule_requires_lots(self):
+        if self.submission_intent in ("live", "schedule") and len(self.lots) < 1:
+            raise ValueError("At least 1 lot is required to schedule or go live.")
+        return self
 
 
 class MultiLotBidCreate(BaseModel):

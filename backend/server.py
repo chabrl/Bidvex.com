@@ -600,6 +600,53 @@ async def _bilingual_rate_limit_handler(request: Request, exc: RateLimitExceeded
 
 app.add_exception_handler(RateLimitExceeded, _bilingual_rate_limit_handler)
 
+
+# ─── iter306 — Global Backend Exception Handler ───
+# Captures all unhandled exceptions and writes them to the `backend_errors`
+# collection so production issues surface in the admin Error Logs tab.
+# Returns a generic 500 with a bilingual error envelope; never leaks stack traces.
+@app.exception_handler(Exception)
+async def _global_exception_handler(request: Request, exc: Exception):
+    """Log + return generic 500 for any unhandled exception."""
+    from fastapi.responses import JSONResponse
+    import traceback as _tb
+    try:
+        user_id = None
+        auth = request.headers.get("authorization") or ""
+        if auth.lower().startswith("bearer "):
+            try:
+                import base64, json as _json
+                token = auth.split(" ", 1)[1]
+                payload_b64 = token.split(".")[1] + "=="
+                payload = _json.loads(base64.urlsafe_b64decode(payload_b64))
+                user_id = payload.get("sub") or payload.get("user_id")
+            except Exception:
+                pass
+        await db.backend_errors.insert_one({
+            "id": str(uuid.uuid4()),
+            "endpoint": str(request.url.path),
+            "method": request.method,
+            "error_type": type(exc).__name__,
+            "error_message": str(exc)[:2000],
+            "stack_trace": "".join(_tb.format_exception(type(exc), exc, exc.__traceback__))[:5000],
+            "user_id": user_id,
+            "ip": request.client.host if request.client else "",
+            "timestamp": datetime.now(timezone.utc),
+        })
+    except Exception as log_err:
+        logger.error(f"[global-exception-handler] Failed to log exception: {log_err}")
+    logger.error(f"[unhandled] {request.method} {request.url.path} -> {type(exc).__name__}: {exc}")
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": {
+                "code": "internal_server_error",
+                "message_en": "An unexpected error occurred. Our team has been notified.",
+                "message_fr": "Une erreur inattendue est survenue. Notre équipe a été notifiée.",
+            }
+        },
+    )
+
 # ─── WebSocket Managers ───
 from ws_managers import ConnectionManager, MessageConnectionManager, MarketplaceConnectionManager
 
@@ -1173,6 +1220,14 @@ try:
     # iter304 — "Email to Friend" share endpoint for vehicle listings
     from routes.email_to_friend import router as email_to_friend_router
     api_router.include_router(email_to_friend_router)
+
+    # iter306 — CSV bulk import of lots into a multi-lot vehicle auction event
+    from routes.multi_lot_bulk_import import router as multi_lot_bulk_import_router
+    api_router.include_router(multi_lot_bulk_import_router)
+
+    # iter306 — Error logging (frontend + backend) and admin Error Logs tab
+    from routes.error_logs import router as error_logs_router
+    api_router.include_router(error_logs_router)
 
 
     # iter298 BUG 4 — Buyer receipts + seller statements.

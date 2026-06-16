@@ -28,6 +28,7 @@ import ScrollToTop from './components/ScrollToTop';
 import FbPixelTracker from './components/FbPixelTracker';
 import MarketingPixelLoader from './components/MarketingPixelLoader';
 import CookieConsentBanner from './components/CookieConsentBanner';
+import PushPermissionPrompt from './components/PushPermissionPrompt';
 import MessageNotificationListener from './components/MessageNotificationListener';
 
 import { registerServiceWorker } from './utils/pushNotifications';
@@ -130,6 +131,7 @@ const SellerFinancialsPage = lazy(() => import('./pages/vehicles/SellerFinancial
 // iter293 — Multi-Lot Vehicle Auction (Copart-style sequential events)
 const CreateVehicleMultiLotPage = lazy(() => import('./pages/vehicles/CreateVehicleMultiLotPage'));
 const LotTemplatesManagerPage = lazy(() => import('./pages/vehicles/LotTemplatesManagerPage'));
+const AdminErrorLogsPage = lazy(() => import('./pages/admin/AdminErrorLogsPage'));
 const VehicleMultiLotDetailPage = lazy(() => import('./pages/vehicles/VehicleMultiLotDetailPage'));
 
 // Lazy-loaded heavy components
@@ -410,6 +412,8 @@ const App = () => {
             <CampaignAttributionTracker />
             <FbPixelTracker />
             <CookieConsentBanner />
+            {/* iter306 — non-blocking first-login push permission prompt */}
+            <PushPermissionPrompt />
             <MaintenanceGuard>
         <div className="App min-h-screen bg-gradient-to-br from-blue-50 via-white to-teal-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
           {/* iter214 P3 — Sticky site-wide dealer-fee banner (above the navbar) */}
@@ -670,6 +674,14 @@ const App = () => {
             <ProtectedRoute>
               <ErrorBoundary scope="lot-templates-manager">
                 <LotTemplatesManagerPage />
+              </ErrorBoundary>
+            </ProtectedRoute>
+          } />
+          {/* iter306 — Admin Error Logs (frontend + backend) */}
+          <Route path="/admin/error-logs" element={
+            <ProtectedRoute>
+              <ErrorBoundary scope="admin-error-logs">
+                <AdminErrorLogsPage />
               </ErrorBoundary>
             </ProtectedRoute>
           } />
