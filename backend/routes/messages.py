@@ -341,6 +341,17 @@ async def send_message(request: Request, msg: MessageCreate, current_user: User 
         except Exception as exc:
             logger.warning(f"[iter301] new-message bell notification failed: {exc}")
 
+        # iter306 — Web Push
+        try:
+            from services.push_dispatcher import dispatch_push
+            await dispatch_push(
+                db, user_id=msg.receiver_id, kind="new_message",
+                sender_name=current_user.name, preview=msg.content[:80],
+                url=f"/messages?c={conversation_id}",
+            )
+        except Exception:
+            pass
+
     return message
 
 

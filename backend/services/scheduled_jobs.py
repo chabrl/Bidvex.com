@@ -302,6 +302,21 @@ async def process_overdue_auction_payments(db):
                           "penalty_amount": penalty_amount},
                 )
 
+                # iter306 — Web Push
+                try:
+                    from services.push_dispatcher import dispatch_push
+                    _cat = (listing.get("category") or "").lower()
+                    _is_vehicle = any(v in _cat for v in ("vehicle", "car", "auto"))
+                    await dispatch_push(
+                        db, user_id=winner_id, kind="payment_due",
+                        title_item=listing.get("title", "your item"),
+                        amount=hammer_price, listing_id=listing_id,
+                        is_vehicle=_is_vehicle,
+                        url=f"/checkout/{listing_id}",
+                    )
+                except Exception:
+                    pass
+
                 winner = await db.users.find_one({"id": winner_id}, {"_id": 0, "email": 1, "name": 1})
                 if winner and winner.get("email"):
                     from services.emails.email_system import send_payment_overdue_email

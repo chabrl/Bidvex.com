@@ -803,6 +803,38 @@ scheduler.add_job(
     lambda: safe_run("watchlist_expiry_alerts", run_watchlist_expiry_alerts()),
     trigger=IntervalTrigger(minutes=2), id='watchlist_expiry_alerts', replace_existing=True)
 
+
+# iter306 — 1-hour pre-end nudge (push notification only — emails handled elsewhere)
+async def run_watchlist_1h_nudge():
+    try:
+        now = datetime.now(timezone.utc)
+        # 60-65 minute window so each item is only nudged once per scheduler tick (runs every 5 min)
+        in_60_min = now + timedelta(minutes=60)
+        in_65_min = now + timedelta(minutes=65)
+        expiring = await db.listings.find(
+            {"status": "active", "auction_end_date": {"$gte": in_60_min.isoformat(), "$lt": in_65_min.isoformat()}},
+            {"_id": 0, "id": 1, "title": 1, "category": 1}
+        ).to_list(100)
+        from services.push_dispatcher import dispatch_push
+        for listing in expiring:
+            lid = listing["id"]
+            cat = (listing.get("category") or "").lower()
+            is_vehicle = any(v in cat for v in ("vehicle", "car", "auto"))
+            watchers = await db.watchlist.find({"listing_id": lid}, {"_id": 0, "user_id": 1}).to_list(200)
+            for w in watchers:
+                await dispatch_push(
+                    db, user_id=w["user_id"], kind="ending_soon_1h",
+                    title_item=listing.get("title", "Item"),
+                    listing_id=lid, is_vehicle=is_vehicle,
+                )
+    except Exception as e:
+        logger.warning(f"Watchlist 1h nudge failed: {e}")
+
+
+scheduler.add_job(
+    lambda: safe_run("watchlist_1h_nudge", run_watchlist_1h_nudge()),
+    trigger=IntervalTrigger(minutes=5), id='watchlist_1h_nudge', replace_existing=True)
+
 # iter241 Mission 1 — Sweep expired listing promotions every hour.
 async def run_promotion_expiry_sweep():
     try:

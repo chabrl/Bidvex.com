@@ -122,8 +122,8 @@ const AdminErrorLogsPage = () => {
     }
   }, [days, endpointFilter]);
 
-  useEffect(() => { fetchFrontend(); }, [fetchFrontend]);
-  useEffect(() => { fetchBackend(); }, [fetchBackend]);
+  useEffect(() => { fetchFrontend(); }, [fetchFrontend]); // eslint-disable-line
+  useEffect(() => { fetchBackend(); }, [fetchBackend]); // eslint-disable-line
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950" data-testid="admin-error-logs-page">

@@ -288,7 +288,20 @@ async def process_ended_auctions():
                         data={"listing_id": listing_id, "amount": _final,
                               "action_url": f"/listings/{listing_id}"},
                     )
-                    
+
+                    # iter306 — Web Push notification
+                    try:
+                        from services.push_dispatcher import dispatch_push
+                        _cat = (listing.get("category") or "").lower()
+                        _is_vehicle = any(v in _cat for v in ("vehicle", "car", "auto"))
+                        await dispatch_push(
+                            db, user_id=winner_id, kind="auction_won",
+                            title_item=_title_item, amount=_final,
+                            listing_id=listing_id, is_vehicle=_is_vehicle,
+                        )
+                    except Exception:
+                        pass
+
                     # Persist to Winner's Circle (30-day retention)
                     try:
                         from routes.user_insights import persist_auction_winner

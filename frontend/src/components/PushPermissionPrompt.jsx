@@ -28,13 +28,13 @@ const PushPermissionPrompt = () => {
     if (!token || !user) return;
     // Respect prior decision
     let prior = null;
-    try { prior = localStorage.getItem(STORAGE_KEY); } catch {}
+    try { prior = localStorage.getItem(STORAGE_KEY); } catch (_e) { /* ignore */ }
     if (prior) return;
     // Skip if browser doesn't support push
     if (typeof Notification === 'undefined' || !('serviceWorker' in navigator)) return;
     // Skip if already granted (user enabled via toggle) or already denied
     if (Notification.permission !== 'default') {
-      try { localStorage.setItem(STORAGE_KEY, Notification.permission); } catch {}
+      try { localStorage.setItem(STORAGE_KEY, Notification.permission); } catch (_e) { /* ignore */ }
       return;
     }
     // Non-blocking — wait 6 sec after login so we don't interrupt onboarding
@@ -43,7 +43,7 @@ const PushPermissionPrompt = () => {
   }, [token, user]);
 
   const decide = async (answer) => {
-    try { localStorage.setItem(STORAGE_KEY, answer); } catch {}
+    try { localStorage.setItem(STORAGE_KEY, answer); } catch (_e) { /* ignore */ }
     if (answer === 'accept') {
       setBusy(true);
       try {

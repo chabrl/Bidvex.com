@@ -393,18 +393,15 @@ async def place_bid(request: Request, bid_data: BidCreate, current_user: User = 
 
         # Send push notification
         try:
-            from routes.push_notifications import send_push_to_user
+            from services.push_dispatcher import dispatch_push
             cat = (listing.get("category") or "").lower()
             is_vehicle = any(v in cat for v in ("vehicle", "car", "auto"))
-            push_url = f"/vehicle-auctions/{bid_data.listing_id}" if is_vehicle else f"/listing/{bid_data.listing_id}"
-            await send_push_to_user(_db, previous_highest_bidder, {
-                "title": "You've been outbid!",
-                "body": f"Someone bid ${bid_data.amount:,.2f} on '{listing.get('title', 'Item')}'. Tap to counter-bid.",
-                "type": "outbid",
-                "url": push_url,
-                "listing_id": bid_data.listing_id,
-                "category": listing.get("category", ""),
-            })
+            await dispatch_push(
+                _db, user_id=previous_highest_bidder, kind="outbid",
+                title_item=listing.get("title", "Item"),
+                amount=bid_data.amount, listing_id=bid_data.listing_id,
+                is_vehicle=is_vehicle,
+            )
         except Exception as push_err:
             logger.warning(f"Push outbid notification failed: {push_err}")
 

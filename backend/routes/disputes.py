@@ -283,6 +283,19 @@ async def _notify_resolution(db, dispute, outcome: str, note: str):
                 db, user_id=party_id, kind="dispute_resolved",
                 params={"title": dispute["listing_title"], "outcome": outcome},
                 data={"dispute_id": dispute["id"], "listing_id": dispute["listing_id"]})
+
+            # iter306 — Web Push
+            try:
+                from services.push_dispatcher import dispatch_push
+                await dispatch_push(
+                    db, user_id=party_id, kind="dispute_resolved",
+                    title_item=dispute["listing_title"], outcome=outcome,
+                    listing_id=dispute["listing_id"],
+                    url=f"/disputes/{dispute['id']}",
+                )
+            except Exception:
+                pass
+
             party = await db.users.find_one({"id": party_id}, {"_id": 0, "email": 1, "name": 1})
             if party and party.get("email"):
                 await send_dispute_resolved_email(

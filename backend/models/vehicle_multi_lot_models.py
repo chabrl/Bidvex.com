@@ -57,7 +57,7 @@ Constraints honoured:
 - Deposits per lot = max($200, 10%) — same as single-vehicle auctions.
 - Soft-close 2-minute snipe extension applies independently to each lot.
 """
-from pydantic import BaseModel, Field, field_validator, ConfigDict
+from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 from typing import Optional, List, Dict, Any, Literal
 from datetime import datetime, timezone
 from enum import Enum
