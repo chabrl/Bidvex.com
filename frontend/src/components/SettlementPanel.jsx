@@ -13,14 +13,14 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import {
   Trophy, Mail, Phone, BellRing, FileText, CheckCircle2, Clock,
-  Loader2, CircleDollarSign, PackageCheck,
+  Loader2, CircleDollarSign, PackageCheck, Send, ShieldAlert,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Separator } from './ui/separator';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from './ui/dialog';
 import { useAuth } from '../contexts/AuthContext';
 import { formatCurrency } from '../utils/currencyFormatter';
@@ -36,12 +36,17 @@ const STATUS_BADGES = {
 
 const SettlementPanel = ({ listingId }) => {
   const { i18n } = useTranslation();
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const fr = (i18n.language || 'en').startsWith('fr');
+  const isAdmin = ['admin', 'super_admin'].includes(user?.role);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [invoiceOpen, setInvoiceOpen] = useState(false);
+  const [resendOpen, setResendOpen] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendCount, setResendCount] = useState(null);
+  const MAX_RESENDS = 3;
 
   const fetchPanel = useCallback(async () => {
     if (!token || !listingId) { setLoading(false); return; }
@@ -50,6 +55,8 @@ const SettlementPanel = ({ listingId }) => {
         headers: { Authorization: `Bearer ${token}` },
       });
       setData(r.data);
+      setResendCount(typeof r.data?.winner_notification_resend_count === 'number'
+        ? r.data.winner_notification_resend_count : null);
     } catch {
       setData(null); // not seller / no winner — self-hide
     } finally {
@@ -73,6 +80,30 @@ const SettlementPanel = ({ listingId }) => {
       toast.error(msg || (fr ? "Échec de l'envoi du rappel" : 'Failed to send the reminder'));
     } finally {
       setSending(false);
+    }
+  };
+
+  // iter307 — Admin only: re-send winner email + push (max 3 per listing)
+  const resendWinnerNotification = async () => {
+    setResending(true);
+    try {
+      const r = await axios.post(
+        `${API_BASE}/settlement/panel/${listingId}/resend-winner-notification`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      const remaining = r.data?.remaining ?? '?';
+      toast.success(fr
+        ? `Notification renvoyée au gagnant (${remaining} restant${remaining === 1 ? '' : 's'})`
+        : `Winner notification re-sent (${remaining} remaining)`);
+      setResendCount(r.data?.resend_count ?? null);
+      setResendOpen(false);
+    } catch (e) {
+      const d = e?.response?.data?.detail;
+      const msg = (typeof d === 'object' && d) ? (fr ? d.message_fr : d.message_en) : d;
+      toast.error(msg || (fr ? 'Échec du renvoi' : 'Re-send failed'));
+    } finally {
+      setResending(false);
     }
   };
 
@@ -221,6 +252,76 @@ const SettlementPanel = ({ listingId }) => {
               : `Reminder sent ${Math.round(data.reminder_sent_hours_ago)}h ago — one manual reminder per 24h.`}
           </p>
         )}
+
+        {/* iter307 — Admin only: Re-send Winner Notification (email + push) */}
+        {isAdmin && data.winner?.email && (
+          <div className="pt-2 border-t border-dashed border-amber-200 dark:border-amber-900/40" data-testid="admin-resend-block">
+            <div className="flex items-start gap-2 mb-2">
+              <ShieldAlert className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+              <p className="text-xs text-amber-700 dark:text-amber-300">
+                {fr ? 'Outils administrateur' : 'Admin tools'}
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full border-amber-300 text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/40"
+              onClick={() => setResendOpen(true)}
+              disabled={typeof resendCount === 'number' && resendCount >= MAX_RESENDS}
+              data-testid="admin-resend-winner-btn"
+              title={typeof resendCount === 'number' && resendCount >= MAX_RESENDS
+                ? (fr ? `Limite atteinte (${MAX_RESENDS})` : `Max re-sends reached (${MAX_RESENDS})`)
+                : undefined}
+            >
+              <Send className="h-3.5 w-3.5 mr-1.5" />
+              {fr ? 'Renvoyer la notification au gagnant' : 'Re-send Winner Notification'}
+              {typeof resendCount === 'number' && (
+                <span className="ml-1.5 text-xs opacity-70">
+                  ({resendCount}/{MAX_RESENDS})
+                </span>
+              )}
+            </Button>
+          </div>
+        )}
+
+        {/* Admin re-send confirmation dialog */}
+        <Dialog open={resendOpen} onOpenChange={setResendOpen}>
+          <DialogContent className="sm:max-w-md" data-testid="admin-resend-confirm-dialog">
+            <DialogHeader>
+              <DialogTitle>
+                {fr ? 'Confirmer le renvoi' : 'Confirm Re-send'}
+              </DialogTitle>
+              <DialogDescription>
+                {fr
+                  ? `Renvoyer le courriel et la notification push à ${data.winner?.name || data.winner?.email} ?`
+                  : `Re-send win email + push to ${data.winner?.name || data.winner?.email}?`}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="text-sm text-muted-foreground">
+              {fr
+                ? `Cette action ne peut être annulée. Limite: ${MAX_RESENDS} renvois par annonce.`
+                : `This action cannot be undone. Limit: ${MAX_RESENDS} re-sends per listing.`}
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setResendOpen(false)}
+                data-testid="admin-resend-cancel-btn"
+              >
+                {fr ? 'Annuler' : 'Cancel'}
+              </Button>
+              <Button
+                onClick={resendWinnerNotification}
+                disabled={resending}
+                className="bg-amber-500 hover:bg-amber-600 text-white"
+                data-testid="admin-resend-confirm-btn"
+              >
+                {resending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                {fr ? 'Confirmer le renvoi' : 'Confirm Re-send'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Invoice dialog */}
         <Dialog open={invoiceOpen} onOpenChange={setInvoiceOpen}>

@@ -211,8 +211,8 @@ def meta_item_to_google_xml(item: Dict[str, Any]) -> str:
         "<g:shipping>"
         f"<g:country>{_g(country)}</g:country>"
         f"{f'<g:region>{_g(region_iso)}</g:region>' if region_iso else ''}"
-        "<g:service>Buyer Arranges Pickup</g:service>"
-        "<g:price>0.00 CAD</g:price>"
+        "<g:service>Buyer Arranges Transport</g:service>"
+        "<g:price>0 CAD</g:price>"
         "</g:shipping>"
     )
     if postal:

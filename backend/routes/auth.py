@@ -524,7 +524,14 @@ async def register(user_data: UserCreate, request: Request, background_tasks: Ba
             logger.warning(f"[iter274 coupon-redemption] non-fatal: {_coupon_exc}")
 
     # ── Affiliate Referral Tracking ──
+    # iter307 — Fall back to the `bidvex_ref` cookie set by /r/{code}
+    # landing if the registration body didn't carry an explicit `ref_code`.
     ref_code = user_data.ref_code
+    if not ref_code:
+        try:
+            ref_code = request.cookies.get("bidvex_ref")
+        except Exception:
+            ref_code = None
     if ref_code:
         referrer = await db.users.find_one({"affiliate_code": ref_code}, {"_id": 0, "id": 1, "email": 1, "name": 1})
         if referrer and referrer["id"] != user_id:

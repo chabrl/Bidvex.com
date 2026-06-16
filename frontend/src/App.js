@@ -36,6 +36,8 @@ import './App.css';
 
 // ─── Lazy-loaded pages (route-level code splitting) ───────────────
 const HomePage = lazy(() => import('./pages/HomePage'));
+// iter307 — public /r/{code} referral landing page
+const ReferralLanding = lazy(() => import('./pages/ReferralLanding'));
 const MarketplacePage = lazy(() => import('./pages/MarketplacePage'));
 const ListingDetailPage = lazy(() => import('./pages/ListingDetailPage'));
 const AuthPage = lazy(() => import('./pages/AuthPage'));
@@ -425,6 +427,8 @@ const App = () => {
           <Suspense fallback={<PageLoader />}>
           <Routes>
           <Route path="/" element={<ErrorBoundary scope="home"><HomePage /></ErrorBoundary>} />
+          {/* iter307 — Public referral landing: drops bidvex_ref cookie and redirects to / */}
+          <Route path="/r/:code" element={<ReferralLanding />} />
           <Route path="/marketplace" element={<ErrorBoundary scope="marketplace"><MarketplacePage /></ErrorBoundary>} />
           <Route path="/items" element={<ErrorBoundary scope="items"><ItemsMarketplacePage /></ErrorBoundary>} />
           <Route path="/lots" element={<ErrorBoundary scope="lots"><LotsMarketplacePage /></ErrorBoundary>} />

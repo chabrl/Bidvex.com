@@ -145,6 +145,9 @@ async def get_settlement_panel(listing_id: str, current_user: User = Depends(get
         "reminder_available": reminder_hours_ago is None or reminder_hours_ago >= 24,
         "buyer_receipt_id": doc.get("buyer_receipt_id"),
         "seller_statement_id": doc.get("seller_statement_id"),
+        # iter307 — admin re-send counter (exposed so the UI can disable the
+        # button once the per-listing limit is reached).
+        "winner_notification_resend_count": int(doc.get("winner_notification_resend_count") or 0),
     }
 
 
@@ -222,6 +225,118 @@ async def send_manual_payment_reminder(listing_id: str, current_user: User = Dep
 # ────────────────────────────────────────────────────────────────────
 # DIRECTIVE 2 — buyer Settle Payment flow
 # ────────────────────────────────────────────────────────────────────
+
+# ────────────────────────────────────────────────────────────────────
+# iter307 — Admin "Re-send Winner Notification" (email + push)
+# ────────────────────────────────────────────────────────────────────
+
+@settlement_router.post("/panel/{listing_id}/resend-winner-notification")
+async def resend_winner_notification(listing_id: str, current_user: User = Depends(get_current_user)):
+    """Admin-only re-send of the winner email + push.
+
+    Rate-limited to MAX 3 re-sends per listing (tracked on the listing
+    document as `winner_notification_resend_count`). Logged to
+    `admin_action_logs`.
+    """
+    is_admin = getattr(current_user, "role", None) in ("admin", "super_admin")
+    if not is_admin:
+        raise HTTPException(status_code=403, detail="Admin only")
+
+    db = get_db()
+    doc, coll, section = await _find_listing(db, listing_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Listing not found")
+
+    winner_id = _winner_id(doc)
+    if not winner_id:
+        raise HTTPException(status_code=400, detail={
+            "code": "no_winner", "message_en": "This listing has no winner",
+            "message_fr": "Cette annonce n'a aucun gagnant",
+        })
+
+    resend_count = int(doc.get("winner_notification_resend_count") or 0)
+    MAX_RESENDS = 3
+    if resend_count >= MAX_RESENDS:
+        raise HTTPException(status_code=429, detail={
+            "code": "max_resends_reached",
+            "message_en": f"Maximum re-sends reached ({MAX_RESENDS}). Contact the buyer directly.",
+            "message_fr": f"Limite atteinte ({MAX_RESENDS} renvois). Contactez l'acheteur directement.",
+        })
+
+    winner = await db.users.find_one(
+        {"id": winner_id},
+        {"_id": 0, "email": 1, "name": 1, "preferred_language": 1, "province": 1},
+    )
+    if not winner or not winner.get("email"):
+        raise HTTPException(status_code=400, detail="Winner has no email on file")
+
+    amounts = _amounts(doc)
+    # Vehicle vs marketplace: vehicles use the EXISTING T+0 won email template.
+    is_vehicle = (section == "vehicles") or bool(doc.get("is_vehicle"))
+    try:
+        from services.emails.email_marketplace import send_auction_won_email
+        await send_auction_won_email(
+            to_email=winner["email"],
+            to_name=winner.get("name", "Winner"),
+            auction_id=listing_id,
+            item_name=doc.get("title", "Item"),
+            hammer_price=amounts["hammer_price"],
+            platform_fee=amounts["platform_fee"],
+            seller_name=doc.get("seller_name", "Seller"),
+            is_vehicle=is_vehicle,
+            buyer_province=(winner.get("province") or "QC"),
+            payment_deadline=doc.get("payment_deadline") or "",
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.error(f"[iter307] resend winner email failed for {listing_id}: {e}")
+        raise HTTPException(status_code=502, detail="Failed to re-send the winner email")
+
+    # Push (best-effort — never block the response)
+    try:
+        from services.push_dispatcher import dispatch_push
+        await dispatch_push(
+            db, user_id=winner_id, kind="auction_won",
+            title_item=doc.get("title", "Item"), amount=amounts["hammer_price"],
+            listing_id=listing_id, is_vehicle=is_vehicle,
+        )
+    except Exception:  # noqa: BLE001
+        pass
+
+    new_count = resend_count + 1
+    now_iso = _now().isoformat()
+    await db[coll].update_one(
+        {"id": listing_id},
+        {"$set": {
+            "winner_notification_resend_count": new_count,
+            "winner_notification_resend_at": now_iso,
+        }},
+    )
+
+    # Admin action log (single collection used across the platform).
+    try:
+        await db.admin_action_logs.insert_one({
+            "ts": now_iso,
+            "admin_id": current_user.id,
+            "admin_email": getattr(current_user, "email", "") or "",
+            "admin_name": getattr(current_user, "name", "") or "",
+            "action": "resend_winner_notification",
+            "listing_id": listing_id,
+            "listing_title": doc.get("title", "Item"),
+            "buyer_id": winner_id,
+            "buyer_email": winner["email"],
+            "resend_count": new_count,
+        })
+    except Exception:  # noqa: BLE001
+        pass
+
+    return {
+        "success": True,
+        "resend_count": new_count,
+        "max_resends": MAX_RESENDS,
+        "remaining": max(0, MAX_RESENDS - new_count),
+        "sent_at": now_iso,
+    }
+
 
 @settlement_router.get("/settle-context/{listing_id}")
 async def get_settle_context(listing_id: str, current_user: User = Depends(get_current_user)):
@@ -342,6 +457,14 @@ async def settle_payment(listing_id: str, current_user: User = Depends(get_curre
     result = await finalize_auction_payment(
         db, listing=doc, collection=coll, settlement=settlement, section=section,
     )
+
+    # iter307 — Referral commission trigger ($10 CAD platform credit
+    # on the buyer's FIRST paid auction). Idempotent + best-effort.
+    try:
+        from routes.affiliate import award_referral_credit_if_first_purchase
+        await award_referral_credit_if_first_purchase(db, current_user.id)
+    except Exception as _ref_exc:  # noqa: BLE001
+        logger.warning(f"[iter307] referral credit hook failed for {listing_id}: {_ref_exc}")
 
     fresh, _c, _s = await _find_listing(db, listing_id)
     return {

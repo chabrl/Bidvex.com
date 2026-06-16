@@ -211,7 +211,27 @@ _CSV_COLUMNS: List[str] = [
     # Center "Invalid sales price" validation failures.
     "custom_label_0", "custom_label_1",
     "custom_label_2", "custom_label_3",
+    # iter307 — Shipping column (Meta CSV format: country:region:service:price)
+    "shipping",
 ]
+
+
+def _shipping_to_csv(value: Any) -> str:
+    """Meta CSV shipping serialization: `country:region:service:price`.
+
+    Accepts a list of dicts (as emitted by `map_listing_to_meta_item`)
+    and returns the first entry encoded as Meta expects.
+    """
+    if isinstance(value, list) and value:
+        s = value[0]
+        if isinstance(s, dict):
+            return ":".join([
+                str(s.get("country") or "CA"),
+                "",  # region intentionally empty — country-level shipping
+                str(s.get("service") or "Buyer Arranges Transport"),
+                str(s.get("price") or "0 CAD"),
+            ])
+    return "CA::Buyer Arranges Transport:0 CAD"
 
 
 def _items_to_csv(items: List[Dict[str, Any]]) -> str:
@@ -243,6 +263,10 @@ def _items_to_csv(items: List[Dict[str, Any]]) -> str:
             v = item.get(col, "")
             if v is None:
                 v = ""
+            # iter307 — `shipping` is a list of dicts; serialize to Meta's
+            # `country:region:service:price` colon-delimited form.
+            if col == "shipping":
+                v = _shipping_to_csv(v)
             row.append(str(v))
         writer.writerow(row)
     return buf.getvalue()

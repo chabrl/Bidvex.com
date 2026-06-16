@@ -835,6 +835,22 @@ scheduler.add_job(
     lambda: safe_run("watchlist_1h_nudge", run_watchlist_1h_nudge()),
     trigger=IntervalTrigger(minutes=5), id='watchlist_1h_nudge', replace_existing=True)
 
+
+# iter307 — Bill 96 auto-suspend sweep (every 30 min)
+async def run_bill96_autosuspend():
+    try:
+        from routes.admin_compliance import bill96_autosuspend_sweep
+        count = await bill96_autosuspend_sweep(db)
+        if count:
+            logger.info(f"[iter307] Bill 96 auto-suspended {count} QC listing(s) past 48h notice")
+    except Exception as e:
+        logger.warning(f"Bill 96 sweep failed: {e}")
+
+
+scheduler.add_job(
+    lambda: safe_run("bill96_autosuspend", run_bill96_autosuspend()),
+    trigger=IntervalTrigger(minutes=30), id='bill96_autosuspend', replace_existing=True)
+
 # iter241 Mission 1 — Sweep expired listing promotions every hour.
 async def run_promotion_expiry_sweep():
     try:
@@ -1240,6 +1256,17 @@ try:
     # iter302 — Winner & Settlement panel + buyer Settle Payment flow.
     from routes.settlement import settlement_router
     api_router.include_router(settlement_router)
+
+    # iter307 — Admin Compliance Dashboard (5 sections)
+    from routes.admin_compliance import compliance_router
+    api_router.include_router(compliance_router)
+
+    # iter307 — Affiliate / Referral program
+    from routes.affiliate import affiliate_router, referral_redirect_router
+    api_router.include_router(affiliate_router)
+    # Public landing /r/{code} must be at the app root, not behind /api,
+    # since the link is the user-facing URL bidvex.com/r/CODE.
+    app.include_router(referral_redirect_router)
 
     # iter304 — Lot Templates for multi-lot vehicle auction wizard
     from routes.lot_templates import router as lot_templates_router

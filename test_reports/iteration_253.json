@@ -1,0 +1,43 @@
+{
+  "summary": "iter307 E2E tested on https://prod-verify-2.preview.emergentagent.com. Backend pytest: 20/20 PASS for test_iter307_features.py + 7 pass / 1 skip / 1 FAIL for supplementary test_iter307_supplement.py. Frontend: Referral landing /r/{code}, Admin Compliance dashboard (5 sections + bilingual EN/FR), JSON-LD on listing detail, and Affiliate dashboard all working. Only 2 issues: (1) sitemap.xml does NOT include any dynamic /listing/{id} URLs (only static routes), (2) cannot verify Settlement Re-send Winner UI because the seeded `ended-001` listing is missing in preview DB.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/sitemap.xml", "issue": "Dynamic listing URLs are NOT included. Sitemap only emits static routes (/, /marketplace, /items, /lots, /vehicle-auctions, etc.). Active listing (id 8531001b-...) exists via /api/listings but is absent from sitemap. iter307 requirement explicitly said 'dynamic, includes active listings'."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Admin Re-send Winner Notification", "issue": "Could not verify the SettlementPanel admin-resend-block UI end-to-end because seed listing `ended-001` returns 404 ('Listing not found') and no other ended listing with a winner exists in the preview DB. Only 1 active listing exists in preview. Re-seed `seed_production_demo.py` on preview or seed a fresh ended+winner listing for QA.", "affected_selectors": ["[data-testid='settlement-panel']","[data-testid='admin-resend-block']","[data-testid='admin-resend-winner-btn']","[data-testid='admin-resend-confirm-dialog']"]},
+      {"flow": "Affiliate dashboard route", "issue": "Review request specified path `/dashboard/affiliate` but the actual React route is `/affiliate` (App.js line 500). /dashboard/affiliate returns 404. Once on /affiliate, the page renders correctly with data-testid='affiliate-dashboard' and the referral link uses canonical /r/{code} format (https://bidvex.com/r/BVX8940074DXKTU). However the visible commission copy still reads '10% of BidVex platform fees on every sale from a referred user' — the requested '$10 CAD flat' wording was not found anywhere on the page.", "affected_selectors": ["[data-testid='affiliate-dashboard']"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter307_features.py",
+    "/app/backend/tests/test_iter307_supplement.py",
+    "/app/test_reports/pytest/iter307_results.xml",
+    "/app/test_reports/pytest/iter307_supplement.xml"
+  ],
+  "action_items": [
+    "Fix sitemap.xml to dynamically include active listing URLs (current implementation only emits static URLs).",
+    "Seed an ended listing with a winner in the preview DB so the Re-send Winner UI can be E2E-verified. Either re-run seed_production_demo.py on the preview environment, or use an alternative seed.",
+    "Confirm whether the affiliate dashboard route is /affiliate or /dashboard/affiliate; align the test expectations (and add a redirect if both should work).",
+    "Update the affiliate dashboard copy to reflect the new '$10 CAD flat' commission per the iter307 P2 spec — currently it still shows '10% of BidVex platform fees'."
+  ],
+  "critical_code_review_comments": [
+    "Sitemap dynamic-listing generation is broken — verify the code path that should query active listings (and ensure `is_active`/`status=active` filter actually returns rows before XML serialization).",
+    "Affiliate landing/cookie path uses the frontend SPA (/r/:code in App.js -> ReferralLanding.jsx) — verified end-to-end: cookie set with 30d expiry + localStorage + redirect to /."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter307_supplement.py (NEW — supplementary endpoint tests)"
+  ],
+  "success_rate": {"backend": "96% (27/28 effective; 1 supplement failure for sitemap dynamic URLs)", "frontend": "85% (Referral landing, JSON-LD, Compliance EN+FR, Affiliate dashboard ✅; Re-send Winner UI not verifiable due to seed gap; $10 CAD copy missing)"},
+  "test_credentials": "Used charbel911@gmail.com / Anderosli123!@# (admin) per /app/memory/test_credentials.md. No new accounts created.",
+  "seed_data_creation": "None. Recommend main agent re-run /app/backend/scripts/seed_production_demo.py on the preview DB so ended-001 (and other QA fixtures) exist.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "iter307 backend largely green. The remaining failures are (a) sitemap is missing dynamic listing URLs and (b) preview DB has no ended-with-winner listing so the Re-send Winner UI flow cannot be exercised. Affiliate dashboard route is `/affiliate` (NOT /dashboard/affiliate). JSON-LD Product schema confirmed working on /listing/{id}. Compliance Dashboard EN+FR strings verified. Use `_admin_token()` helper pattern in /app/backend/tests/test_iter307_features.py for any new backend tests.",
+  "rca of the issue": "Sitemap: the generator function likely returns only the static URL list and never appends per-listing URLs from the DB (verify in /app/backend/routes/seo.py or wherever /sitemap.xml is served). Reproduce: curl https://prod-verify-2.preview.emergentagent.com/sitemap.xml | grep '/listing' → no matches, while curl /api/listings?status=active returns 1 row. Fix: ensure the listing query inside the sitemap handler iterates active listings and emits <url><loc>{base}/listing/{id}</loc></url>; verify the handler isn't short-circuiting on env or DB filter."
+}

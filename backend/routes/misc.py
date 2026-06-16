@@ -90,32 +90,75 @@ async def get_public_stats():
 
 @misc_router.get("/affiliate/stats")
 async def get_affiliate_stats(current_user: User = Depends(get_current_user)):
+    """Affiliate dashboard data.
+
+    iter307 — also pulls `platform_credits` entries with `source="referral"`
+    (the new commission ledger from the iter307 referral engine) so the
+    dashboard surfaces both legacy `affiliate_earnings` and the new credits.
+    The referral link now uses the canonical bidvex.com/r/{code} format that
+    matches the /r/{code} landing route.
+    """
     db = get_db()
     referrals = await db.affiliate_referrals.find({"affiliate_id": current_user.id}, {"_id": 0}).to_list(1000)
     # Fallback to legacy referrals collection
     if not referrals:
         referrals = await db.referrals.find({"affiliate_id": current_user.id}, {"_id": 0}).to_list(1000)
-    
+
+    # iter307 — Also surface users attributed via the new `referred_by_code`
+    # field (set at /api/auth/register from the bidvex_ref cookie).
+    if current_user.affiliate_code:
+        async for u in db.users.find(
+            {"referred_by_code": current_user.affiliate_code},
+            {"_id": 0, "id": 1, "email": 1, "name": 1, "created_at": 1, "first_paid_at": 1},
+        ):
+            # Dedupe against affiliate_referrals collection
+            if not any(r.get("referred_user_id") == u["id"] for r in referrals):
+                referrals.append({
+                    "id": u["id"],
+                    "referred_user_id": u["id"],
+                    "referred_email": u.get("email"),
+                    "referred_name": u.get("name"),
+                    "created_at": u.get("created_at"),
+                    "status": "converted" if u.get("first_paid_at") else "pending",
+                })
+
     total_referrals = len(referrals)
     active_referrals = len([r for r in referrals if r.get("status") in ("active", "converted")])
-    
+
     earnings = await db.affiliate_earnings.find({"affiliate_id": current_user.id}, {"_id": 0}).to_list(1000)
+    # iter307 — Also pull platform_credits entries from the new commission engine
+    async for c in db.platform_credits.find(
+        {"user_id": current_user.id, "source": "referral"},
+        {"_id": 0, "id": 1, "amount": 1, "currency": 1, "status": 1, "created_at": 1},
+    ):
+        earnings.append({
+            "id": c.get("id"),
+            "commission_amount": float(c.get("amount") or 0),
+            "currency": c.get("currency", "CAD"),
+            "status": c.get("status", "pending"),
+            "created_at": c.get("created_at"),
+        })
+
     total_earnings = sum(e.get("commission_amount", 0) for e in earnings)
     pending_earnings = sum(e.get("commission_amount", 0) for e in earnings if e.get("status") == "pending")
     paid_earnings = sum(e.get("commission_amount", 0) for e in earnings if e.get("status") in ("paid", "transferred"))
-    
-    frontend_url = os.environ.get('FRONTEND_URL', os.environ.get('REACT_APP_BACKEND_URL', 'http://localhost:3000'))
-    
+
+    # iter307 — Use the canonical /r/{code} landing URL (matches the
+    # `referral_redirect_router` route mounted at app root). Falls back to
+    # bidvex.com when PUBLIC_HOST isn't set.
+    public_host = os.environ.get("PUBLIC_HOST", "https://bidvex.com").rstrip("/")
+    code = current_user.affiliate_code or ""
+
     return {
-        "affiliate_code": current_user.affiliate_code,
-        "referral_link": f"{frontend_url}/?ref={current_user.affiliate_code}",
+        "affiliate_code": code,
+        "referral_link": f"{public_host}/r/{code}" if code else "",
         "total_referrals": total_referrals,
         "active_referrals": active_referrals,
         "total_earnings": total_earnings,
         "pending_earnings": pending_earnings,
         "paid_earnings": paid_earnings,
-        "commission_rate": "10%",
-        "commission_description": "10% of BidVex platform fees",
+        "commission_rate": "$10 CAD flat",  # iter307 — flat credit on first paid auction
+        "commission_description": "$10 CAD platform credit when a referred user completes their first paid auction",
         "payout_delay_days": 7,
         "earnings_history": earnings,
         "referrals": referrals

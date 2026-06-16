@@ -249,12 +249,25 @@ def _has_any_image(images: Optional[List[Any]], lots: Optional[List[Dict]]) -> b
 
 # ── Province → ISO 3166-2:CA subdivision code (uppercase) ────────────
 def _iso_region_code(province: Optional[str]) -> Optional[str]:
+    """Returns the bare 2-letter province code (e.g. "QC"). Used as the
+    Meta seed/feed `region` field has historically accepted this. For the
+    feed published to Google Merchant Center, callers should prefix with
+    "CA-" via `_iso_3166_2_region`."""
     if not province:
         return None
     normalized = _normalize_region(province)  # "qc", "on", etc.
     if not normalized or len(normalized) != 2:
         return None
     return normalized.upper()
+
+
+def _iso_3166_2_region(province: Optional[str]) -> Optional[str]:
+    """ISO 3166-2 subdivision code, e.g. "CA-QC" — required by Google
+    Merchant Center and the Meta Commerce Catalog spec (iter307)."""
+    code = _iso_region_code(province)
+    if not code:
+        return None
+    return f"CA-{code}"
 
 
 # ── Coarse geocode fallback for major Canadian cities ────────────────
@@ -536,6 +549,11 @@ def map_listing_to_meta_item(
         or listing.get("location_province")
         or listing.get("facility_province")
     )
+    # iter307 — Google Merchant + Meta now require ISO 3166-2 subdivision
+    # (e.g. "CA-QC"). `region_iso` is the legacy bare code; `region_iso_3166_2`
+    # is the new format. Some legacy callers may still expect the bare form,
+    # but every external feed (Google Merchant + Meta) gets the prefixed form.
+    region_iso_3166_2 = f"CA-{region_iso}" if region_iso else None
     if not city or not region_iso:
         exclusion_counter["no_location"] += 1
         return None
@@ -577,15 +595,25 @@ def map_listing_to_meta_item(
         "brand":           _brand(listing),
         # Location
         "city":            city,
-        "region":          region_iso,
+        # iter307 — ISO 3166-2 (e.g. "CA-QC"). Google Merchant Center
+        # was rejecting the bare 2-letter form with "Invalid region".
+        "region":          region_iso_3166_2,
         "country":         "CA",
         "postal_code":     _normalize_postal(listing.get("postal_code")),
         "neighborhood":    city[:200],
+        # iter307 — Shipping block (Meta+Google both require this on every
+        # product). BidVex is buyer-arranges-transport for all sections,
+        # so the block is constant.
+        "shipping": [{
+            "country": "CA",
+            "price":   "0 CAD",
+            "service": "Buyer Arranges Transport",
+        }],
         # Optional / recommended
         "google_product_category": _google_product_category(listing.get("category")),
         "custom_label_0":  listing_type,
         "custom_label_1":  listing.get("seller_account_type") or "individual",
-        "custom_label_2":  region_iso,
+        "custom_label_2":  region_iso_3166_2 or region_iso,
         "custom_label_3":  "auction_ending_soon" if _auction_ends_within_24h(listing) else "auction_active",
     }
 
@@ -701,15 +729,22 @@ def build_seed_items(needed: int) -> List[Dict[str, Any]]:
             "brand":           "BidVex Marketplace",
             # Location
             "city":            tpl["city"],
-            "region":          tpl["region"],
+            # iter307 — ISO 3166-2 (e.g. "CA-QC")
+            "region":          f"CA-{tpl['region']}",
             "country":         "CA",
             "postal_code":     tpl["postal_code"],
             "neighborhood":    tpl["city"],
+            # iter307 — Shipping block required by Meta+Google
+            "shipping": [{
+                "country": "CA",
+                "price":   "0 CAD",
+                "service": "Buyer Arranges Transport",
+            }],
             # Optional / recommended
             "google_product_category": "632",
             "custom_label_0":  "lots",
             "custom_label_1":  "individual",
-            "custom_label_2":  tpl["region"],
+            "custom_label_2":  f"CA-{tpl['region']}",
             "custom_label_3":  "test_seed",
             "latitude":        tpl["latitude"],
             "longitude":       tpl["longitude"],
