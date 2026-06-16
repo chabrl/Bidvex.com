@@ -1,6 +1,25 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter306 — FINAL PRE-LAUNCH FEATURES (Jun 16, 2026) ✅ COMPLETE
+- **Bulk Import Lots from CSV** — `POST /api/vehicle-multi-lot-auctions/{event_id}/bulk-import` accepts up to 50 lots per request. Frontend modal `BulkImportLotsCSV.jsx` uses PapaParse client-side, drag-and-drop, downloadable bilingual CSV template, inline preview-and-edit table with green/yellow/red row status, parallel VIN auto-fill via `Promise.all` against `/api/vehicles/decode-vin/{VIN}`, and a "Save event title first" guard. QC rows missing `title_fr` return a per-row Bill 96 error in the import response (`errors[].message_en` / `message_fr`).
+- **Production Demo Seed Script** — `backend/scripts/seed_production_demo.py` (idempotent). Seeds 3 test users (buyer/seller/dealer), 2 ended marketplace listings (paid + payment_pending), 1 ended lots auction, 1 ended storage auction, 1 active + 1 upcoming vehicle listing, 1 completed multi-lot event w/ 3 lots. Dry-run by default; `--execute` writes; re-runs are no-ops via `seed_demo_id` deterministic hash.
+- **Post-Launch Error Tracking** — `components/ErrorBoundary.jsx` wraps every major route; on render-time crash it POSTs the error to `/api/errors/frontend` (bilingual fallback UI). Backend global exception handler logs to `db.backend_errors`. New admin page `/admin/error-logs` (lazy-loaded) — `AdminErrorLogsPage.js` — surfaces both Frontend (15) and Backend (9) tabs with date/user/endpoint filters + expand-row.
+- **Web Push Notifications (VAPID, pywebpush)** — Centralized `services/push_dispatcher.py` with `dispatch_push(db, user_id, kind, **kw)` for the 6 launch-blocking event kinds: `outbid`, `auction_won`, `ending_soon_1h`, `payment_due`, `dispute_resolved`, `new_message`. Wired into 6 trigger sites:
+  - `routes/auctions_bids.py` — outbid
+  - `routes/auctions.py` — auction_won (winner notification path)
+  - `services/scheduled_jobs.py` — payment_due (winner_payment_due flow)
+  - `routes/disputes.py` — dispute_resolved (admin resolve)
+  - `routes/messages.py` — new_message (offline recipient)
+  - `server.py` — new `watchlist_1h_nudge` scheduler job (5-min interval, 60-65min window)
+  - Frontend: `PushPermissionPrompt.jsx` — non-blocking toast 6s after login (FR/EN), respects prior decision via localStorage, dev override `?force_push_prompt=1` for QA/headless testing.
+- **Empty draft multi-lot events allowed** — `MultiLotAuctionCreate.lots` was previously required ≥1 lot; now `default_factory=list` (max 200) AND a `@model_validator(mode="after")` re-enforces ≥1 lot for `submission_intent in ("live","schedule")`. Draft path skips the check so the CSV import flow can append lots into an empty event stub.
+- **Test coverage** — `test_iter306_bulk_import_and_errors.py` (8 backend integration tests) + `test_iter306_push_dispatcher.py` (15 unit tests for payload shape EN/FR + graceful failure modes). Testing-agent E2E `test_iter306_e2e_public.py` (11 tests) added by testing-agent — all 34 pass against preview backend.
+- **Frontend regression**: 0 compile errors. AdminErrorLogsPage uses bare `// eslint-disable-line` for CRA-compatible useEffect deps annotation.
+- **Final regression**: iter299 + iter304 + iter305 + iter306 = **54 passed, 3 skipped, 0 failures**.
+
+
+
 ## iter305 — PRE-LAUNCH HARDENING PASS (Jun 15, 2026) ✅ COMPLETE
 - Duplicate Lot button + banner on multi-lot wizard lot cards (clones everything except VIN/mileage/photos; auto-focus VIN; " — Copy" / " — Copie" title suffix). Bilingual.
 - Production verification (verify_production_iter299.py) PASS 5/5 on preview. Alex Boulanger win-email repair: ZERO won auctions found (nothing to repair).

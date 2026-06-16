@@ -26,6 +26,13 @@ const PushPermissionPrompt = () => {
 
   useEffect(() => {
     if (!token || !user) return;
+    // iter306 — dev/QA override: `?force_push_prompt=1` always shows the prompt.
+    const params = (typeof window !== 'undefined' && window.location && window.location.search) ? new URLSearchParams(window.location.search) : null;
+    const forceShow = !!(params && params.get('force_push_prompt') === '1');
+    if (forceShow) {
+      const tf = setTimeout(() => setVisible(true), 200);
+      return () => clearTimeout(tf);
+    }
     // Respect prior decision
     let prior = null;
     try { prior = localStorage.getItem(STORAGE_KEY); } catch (_e) { /* ignore */ }

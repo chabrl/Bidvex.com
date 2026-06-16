@@ -617,7 +617,16 @@ const CreateVehicleMultiLotPage = () => {
     setCreatingDraftEvent(true);
     try {
       const token = localStorage.getItem('token');
-      const startISO = new Date(event.start_time).toISOString();
+      // event.start_time can be either "YYYY-MM-DDTHH:MM" (datetime-local input)
+      // OR an ISO string. Coerce safely to ISO; if invalid, default to +1h.
+      let startISO;
+      try {
+        const d = new Date(event.start_time);
+        if (Number.isNaN(d.getTime())) throw new Error('invalid date');
+        startISO = d.toISOString();
+      } catch (_e) {
+        startISO = new Date(Date.now() + 3600_000).toISOString();
+      }
       const r = await axios.post(`${API}/vehicle-multi-lot-auctions`, {
         title: event.title,
         description: event.description || '',
@@ -631,7 +640,13 @@ const CreateVehicleMultiLotPage = () => {
       setDraftEventId(r.data.id);
       setCsvImportOpen(true);
     } catch (err) {
-      toast.error(err?.response?.data?.detail || L('Could not start CSV import', "Impossible de démarrer l'import CSV"));
+      // eslint-disable-next-line no-console
+      console.error('[openCsvImport] failed:', err?.response?.status, err?.response?.data, err);
+      const detail = err?.response?.data?.detail;
+      const msg = (typeof detail === 'string' ? detail
+        : typeof detail === 'object' ? JSON.stringify(detail).slice(0, 200)
+        : L('Could not start CSV import', "Impossible de démarrer l'import CSV"));
+      toast.error(msg);
     } finally {
       setCreatingDraftEvent(false);
     }
