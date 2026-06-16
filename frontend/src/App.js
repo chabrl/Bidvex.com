@@ -506,6 +506,8 @@ const App = () => {
               </BlockForStorageFacility>
             </ProtectedRoute>
           } />
+          {/* iter307 — spec-aligned alias */}
+          <Route path="/dashboard/affiliate" element={<Navigate to="/affiliate" replace />} />
           <Route path="/messages" element={
             <ProtectedRoute><MessagesPage /></ProtectedRoute>
           } />

@@ -176,8 +176,8 @@ const AffiliateDashboard = () => {
             </CardTitle>
             <CardDescription>
               {isFrench
-                ? 'Partagez ce lien — vous gagnez 10% des frais BidVex sur chaque vente d\'un utilisateur référé.'
-                : 'Share this link — you earn 10% of BidVex platform fees on every sale from a referred user.'}
+                ? "Partagez ce lien — vous gagnez 10 $ CAD en crédit plateforme lorsqu'un utilisateur référé complète son premier achat payé."
+                : "Share this link — you earn $10 CAD platform credit when a referred user completes their first paid auction."}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -283,7 +283,7 @@ const AffiliateDashboard = () => {
                 </div>
                 <h3 className="font-semibold mb-1">{isFrench ? '3. Vous êtes payé' : '3. Get Paid'}</h3>
                 <p className="text-sm text-muted-foreground">
-                  {isFrench ? '10% des frais BidVex, versé dans 7 jours.' : '10% of BidVex platform fees, paid out in 7 days.'}
+                  {isFrench ? '10 $ CAD en crédit plateforme — versé dans 7 jours.' : '$10 CAD flat platform credit — paid out in 7 days.'}
                 </p>
               </div>
             </div>

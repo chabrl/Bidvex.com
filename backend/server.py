@@ -851,6 +851,38 @@ scheduler.add_job(
     lambda: safe_run("bill96_autosuspend", run_bill96_autosuspend()),
     trigger=IntervalTrigger(minutes=30), id='bill96_autosuspend', replace_existing=True)
 
+
+# iter307 — Nightly sitemap + robots regeneration (2am ET = 06:00 UTC)
+async def run_sitemap_regen():
+    try:
+        from services.sitemap_regen import regenerate_sitemap_and_robots
+        counts = await regenerate_sitemap_and_robots(db)
+        logger.info(f"[iter307] Sitemap regenerated: {counts}")
+    except Exception as e:
+        logger.warning(f"Sitemap regen failed: {e}")
+
+
+scheduler.add_job(
+    lambda: safe_run("sitemap_regen", run_sitemap_regen()),
+    trigger=CronTrigger(hour=6, minute=0, timezone="UTC"),
+    id='sitemap_regen', replace_existing=True,
+)
+
+
+# iter307 — Run once at startup so a freshly-deployed environment has a
+# valid sitemap before the first cron tick fires.
+async def _initial_sitemap_regen():
+    try:
+        from services.sitemap_regen import regenerate_sitemap_and_robots
+        await regenerate_sitemap_and_robots(db)
+    except Exception as e:
+        logger.warning(f"[iter307] startup sitemap regen failed: {e}")
+
+
+@app.on_event("startup")
+async def _iter307_startup_sitemap():
+    await _initial_sitemap_regen()
+
 # iter241 Mission 1 — Sweep expired listing promotions every hour.
 async def run_promotion_expiry_sweep():
     try:

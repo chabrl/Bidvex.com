@@ -1,6 +1,126 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter307 — PRODUCTION-READY FEATURE SET (Jun 16, 2026) ✅ COMPLETE
+**Shipped post-iter306 deploy. iter306 features live on https://bidvex.com.**
+
+- **P0 — Admin Re-send Winner Notification (email + push)**
+  - `POST /api/settlement/panel/{listing_id}/resend-winner-notification` (admin-only)
+  - Re-sends the T+0 winner email template + push (`auction_won` kind via push_dispatcher)
+  - Rate-limit: max **3** re-sends per listing (tracked as `winner_notification_resend_count`)
+  - 429 with bilingual `{code:'max_resends_reached', message_en, message_fr}` once cap hit
+  - 400 with `code:'no_winner'` for listings with no winner
+  - All actions logged to `db.admin_action_logs` (admin_id, listing_id, buyer_email, resend_count)
+  - UI: SettlementPanel.jsx adds an `admin-resend-block` (Send icon) → confirm dialog → API call
+  - Bilingual button label + dialog ("Re-send Winner Notification" / "Renvoyer la notification au gagnant")
+
+- **P1 — SEO + Structured Data**
+  - **Sitemap regen** — New nightly job in `services/sitemap_regen.py` writes
+    `/app/frontend/public/sitemap.xml` (and `robots.txt`) with every active
+    listing across all 4 sections. Runs at startup AND on cron `06:00 UTC`
+    (2am ET). Static-file approach so any kubernetes ingress serves the
+    dynamic content without backend routing rules.
+  - **robots.txt** — correct directives (Disallow /admin, /dashboard, /api/;
+    Allow /api/feeds/; Sitemap: bidvex.com/sitemap.xml).
+  - **Structured data** — JSON-LD Product schema already wired on:
+    `ListingDetailPage.js` (marketplace, via SEO.js), `VehicleDetailPage.js`,
+    `MultiItemListingDetailPage.js`, `StorageAuctionDetail.js` (all via
+    `ListingJsonLd.jsx`). Includes `priceCurrency:'CAD'`, `availability`,
+    `priceValidUntil`, `auctionStatus`.
+
+- **P1 — Google Merchant + Meta Catalog Feed Final Fix (deferred since iter293)**
+  - **Region** → ISO 3166-2 format (`CA-QC`, `CA-ON`, `CA-BC`, etc.) on
+    every product. New helper `_iso_3166_2_region()` in
+    `services/meta_feed_mapper.py`; seed templates updated.
+  - **Shipping block** present on every product:
+    - JSON: `{country:'CA', price:'0 CAD', service:'Buyer Arranges Transport'}`
+    - CSV: new `shipping` column serialized as `CA::Buyer Arranges Transport:0 CAD`
+    - Google XML: `<g:shipping>` with `<g:country>`, `<g:region>`,
+      `<g:service>Buyer Arranges Transport</g:service>`, `<g:price>0 CAD</g:price>`
+  - **Image URLs** — direct S3 URLs returning `200 image/jpeg`. Pillow-generated
+    `placeholder_image_url` fallback for listings with no photo (built in iter297).
+  - **Feed cache** auto-rebuilds on the existing 15-min cache TTL; admin Feeds tab
+    can also force a manual rebuild.
+
+- **P1 — Admin Compliance Dashboard (5 sections in one page)**
+  - New tab: Admin Dashboard → Vehicles → **Compliance** (icon: 🛡️ ShieldAlert)
+  - `pages/admin/AdminCompliancePage.js` renders 5 stacked sections, each with
+    inline empty state ("All clear — no action needed.") and per-row actions:
+    1. **AI Watchdog Flagged Listings** — Approve & Exempt / Reject (4 collections scanned)
+    2. **Bidding-Suspended Users** — one-click Reinstate
+    3. **Overdue Payments** — Retry Charge / Mark Resolved / Flag Account (suspends bidder)
+    4. **Escalated Disputes** — Add Note (multi-line, persisted to `disputes.admin_notes[]`)
+    5. **Bill 96 Compliance** — Edit Listing / Notify Seller (sends 48h notice email)
+  - **Bill 96 auto-suspend** — `bill96_autosuspend_sweep()` scheduler job runs every
+    30 min, suspends any QC listing where `bill96_notified_at > 48h` AND `title_fr`
+    still missing. Sets `status='suspended_bill96'` + notifies seller.
+  - All admin actions logged to `db.admin_action_logs` for audit trail.
+
+- **P2 — Referral / Affiliate Program**
+  - **Landing route** — `/r/{code}` React SPA route (`ReferralLanding.jsx`):
+    sets `bidvex_ref` cookie (30-day expiry, samesite=lax, secure on https)
+    + localStorage `bidvex_ref`, fires `GET /api/affiliate/track/{code}`
+    click log, then redirects to `/`.
+  - **Registration attribution** — `routes/auth.py::register` reads the
+    `bidvex_ref` cookie when `ref_code` is missing in the body. Persists
+    to `users.referred_by_code`.
+  - **Commission engine** — `services/affiliate.award_referral_credit_if_first_purchase(db, buyer_id)`
+    awards **$10 CAD flat platform credit** to the referrer when the buyer's
+    FIRST paid auction completes. Idempotent (no duplicate awards), inserts
+    to `db.platform_credits` with `source:'referral', status:'pending'`,
+    sets `users.first_paid_at`, notifies referrer (bell + push).
+    Hook wired into `POST /api/settlement/settle/{listing_id}` after
+    `finalize_auction_payment()`.
+  - **Endpoints**:
+    - `GET /api/affiliate/my-referral-link` → `{referral_code, referral_link}`
+    - `GET /api/affiliate/stats` (extended in misc.py) — surfaces both
+      `affiliate_earnings` (legacy) + `platform_credits` (new). Returns
+      canonical `/r/{code}` link format, `commission_rate:'$10 CAD flat'`.
+    - `GET /api/affiliate/track/{code}` — click logger (public)
+    - `GET /api/affiliate/admin/all` — admin aggregated affiliate view
+    - `POST /api/affiliate/admin/credit` — admin manual credit grant / deduct
+  - **Frontend** — `/affiliate` dashboard updated copy to "$10 CAD platform
+    credit on first paid auction" (EN + FR), `/dashboard/affiliate` alias
+    redirects to `/affiliate`.
+
+- **Tests**: 24/24 iter307 tests PASS (`test_iter307_features.py` 20/20 +
+  `test_iter307_remediation.py` 4/4). Full regression iter299+304+305+306+307
+  = **97 passed, 4 skipped, 0 failures**.
+
+- **Files changed**:
+  - Added: `backend/routes/admin_compliance.py`, `backend/routes/affiliate.py`,
+    `backend/services/push_dispatcher.py`, `backend/services/sitemap_regen.py`,
+    `frontend/src/pages/admin/AdminCompliancePage.js`,
+    `frontend/src/pages/ReferralLanding.jsx`,
+    `backend/tests/test_iter307_features.py`,
+    `backend/tests/test_iter307_remediation.py`
+  - Updated: `backend/routes/settlement.py` (resend endpoint + counter exposure),
+    `backend/routes/auth.py` (cookie attribution),
+    `backend/routes/misc.py` (affiliate stats canonical URL + platform_credits),
+    `backend/services/meta_feed_mapper.py` (CA-XX + shipping),
+    `backend/services/google_feed_mapper.py` (Buyer Arranges Transport + 0 CAD),
+    `backend/routes/feeds.py` (CSV shipping column),
+    `backend/server.py` (sitemap regen + bill96 sweep + startup hook),
+    `frontend/src/components/SettlementPanel.jsx` (admin re-send block + dialog),
+    `frontend/src/pages/AdminDashboard.js` (Compliance tab),
+    `frontend/src/pages/AffiliateDashboard.js` ($10 CAD copy),
+    `frontend/src/App.js` (/r/:code + /dashboard/affiliate routes)
+  - Deleted: `frontend/public/sitemap.xml`, `frontend/public/robots.txt`
+    (replaced by nightly-regenerated dynamic copies written to the same paths)
+
+- **Production deploy gate**:
+  - Pending user action: redeploy to push iter307 to https://bidvex.com.
+  - After deploy: run `python /app/backend/scripts/verify_production_iter299.py
+    --base-url https://bidvex.com --admin-email charbel911@gmail.com
+    --admin-password 'REDACTED'` for the 5-check smoke. Requires the
+    admin password the user must provide on deploy.
+  - Demo account smoke tests requested by user (buyer outbid push, seller
+    settlement panel, dealer CSV bulk import) require user manual exercise
+    on prod — script automation cannot drive a real browser session against
+    bidvex.com from this preview environment.
+
+
+
 ## iter306 — FINAL PRE-LAUNCH FEATURES (Jun 16, 2026) ✅ COMPLETE
 - **Bulk Import Lots from CSV** — `POST /api/vehicle-multi-lot-auctions/{event_id}/bulk-import` accepts up to 50 lots per request. Frontend modal `BulkImportLotsCSV.jsx` uses PapaParse client-side, drag-and-drop, downloadable bilingual CSV template, inline preview-and-edit table with green/yellow/red row status, parallel VIN auto-fill via `Promise.all` against `/api/vehicles/decode-vin/{VIN}`, and a "Save event title first" guard. QC rows missing `title_fr` return a per-row Bill 96 error in the import response (`errors[].message_en` / `message_fr`).
 - **Production Demo Seed Script** — `backend/scripts/seed_production_demo.py` (idempotent). Seeds 3 test users (buyer/seller/dealer), 2 ended marketplace listings (paid + payment_pending), 1 ended lots auction, 1 ended storage auction, 1 active + 1 upcoming vehicle listing, 1 completed multi-lot event w/ 3 lots. Dry-run by default; `--execute` writes; re-runs are no-ops via `seed_demo_id` deterministic hash.

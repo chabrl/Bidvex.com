@@ -1,15 +1,8 @@
 User-agent: *
 Allow: /
-Disallow: /api/
 Disallow: /admin
-Disallow: /admin/*
-Disallow: /settings
-Disallow: /messages
-Disallow: /checkout/*
-Disallow: /create-listing
-Disallow: /create-multi-item-listing
-Disallow: /verify-phone
-Disallow: /payment/*
+Disallow: /dashboard
+Disallow: /api/
+Allow: /api/feeds/
 
 Sitemap: https://bidvex.com/sitemap.xml
-Sitemap: https://bidvex.com/api/feeds/meta-catalog.json
