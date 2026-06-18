@@ -215,6 +215,82 @@ def test_webhook_signature_verification_is_enforced():
     assert 'Missing stripe-signature header' in src
 
 
+# ─── iter308 — Verification approve/reject push+email side effects ───
+# Source-level assertions: these are the "iter308 added" rows in the
+# admin panel audit log. A future revert of any of these branches would
+# break the closed-loop notification guarantee and these tests will catch
+# it before deploy.
+
+
+def test_broker_approve_reject_send_push_and_email():
+    src = Path("/app/backend/routes/brokers.py").read_text()
+    # Bilingual email + push must both be dispatched from the broker
+    # verify endpoint (iter308 added the push half).
+    assert 'send_email' in src, "broker route must call send_email on decide"
+    assert 'dispatch_push' in src, "broker route must call dispatch_push on decide (iter308)"
+    # iter308 marker strings — keep the branch tagged
+    assert '[iter308] broker email failed' in src
+    assert '[iter308] broker push failed' in src
+
+
+def test_partner_decision_dispatches_push():
+    src = Path("/app/backend/services/verification_service.py").read_text()
+    assert 'from services.push_dispatcher import dispatch_push' in src
+    assert 'partner decision push failed' in src or '[iter308] partner' in src
+
+
+def test_dealer_license_decision_dispatches_push():
+    src = Path("/app/backend/services/verification_service.py").read_text()
+    # Same module exposes notify_dealer_license_decision; ensure push branch is wired
+    assert 'dealer license decision push failed' in src or '[iter308] dealer' in src
+
+
+def test_storage_facility_verify_dispatches_push_and_logs_admin_action():
+    src = Path("/app/backend/routes/storage_auctions.py").read_text()
+    assert 'dispatch_push' in src, "storage facility verify must dispatch push (iter308)"
+    assert 'admin_logs' in src, "storage facility verify must write to admin_logs"
+    assert '[iter308] storage facility push failed' in src
+
+
+def test_storage_facility_reject_branch_present():
+    """Admin reject endpoint exists and writes a rejection reason
+    (iter308 — verification status: rejected, with reason)."""
+    src = Path("/app/backend/routes/storage_auctions.py").read_text()
+    # The reject route was iter308-added — confirm structure
+    assert 'storage_facility_rejected' in src or '"status": "rejected"' in src
+    assert 'rejection_reason' in src or 'reject' in src.lower()
+
+
+# ─── iter308 — Webhook annual fee branch full side-effect inventory ──
+
+
+def test_webhook_annual_fee_unsets_suspended_and_sets_renewal():
+    """Audit log says: webhook sets vehicle_dealer_suspended:false +
+    annual_fee_renewal_at one year out. Confirm both."""
+    src = Path("/app/backend/routes/webhooks.py").read_text()
+    assert '"vehicle_dealer_suspended": False' in src
+    assert '"annual_fee_renewal_at"' in src
+    assert 'timedelta(days=365)' in src
+    # Per-collection unblock loop covers all 3 collections
+    for coll in ('listings', 'vehicle_listings', 'multi_lot_auctions'):
+        assert coll in src, f"webhook unblock loop must touch {coll}"
+
+
+# ─── iter308 — Admin tier override endpoint exists with audit log ────
+
+
+def test_change_tier_endpoint_writes_admin_log():
+    src = Path("/app/backend/routes/admin_user_actions.py").read_text()
+    # change-tier must persist to MongoDB AND write to the audit log
+    assert '"/{user_id}/change-tier"' in src
+    assert 'action="change_tier"' in src, \
+        "change-tier endpoint must record an admin audit action"
+    assert 'admin_actions' in src or 'admin_logs' in src, \
+        "change-tier endpoint must log to admin_actions/admin_logs collection"
+
+
+
+
 # ─── Footer link assertion ───────────────────────────────────────────
 
 

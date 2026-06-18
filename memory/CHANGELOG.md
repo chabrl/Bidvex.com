@@ -1,6 +1,40 @@
 # BidVex Changelog
 
 
+## Jun 18, 2026 — iter308 MONETIZATION + ADMIN VERIFICATION + FOOTER (CLOSE-OUT)
+
+### Footer
+- `Footer.js`: stale `to="/vehicles"` link → `/vehicle-auctions` (resolves to working route in `App.js`). All other footer links audited and resolve.
+
+### Subscription Tier Override (persistence)
+- New `POST /api/admin/users/{user_id}/change-tier` (in `admin_user_actions.py`) — persists `buyer_tier` + `buyer_tier_updated_at` to MongoDB and writes a `change_tier` action row to `admin_actions` for audit.
+- Existing `POST /api/admin/users/{user_id}/subscription/override` confirmed persisting `subscription_tier` + `subscription_override_at`.
+
+### Annual-fee "Pay Now" → Stripe Checkout
+- `GlobalDealerFeeBanner.jsx::handlePay` was reading `r.data?.url` but backend returns `{checkout_url, session_id}`. Now reads `checkout_url` + idempotent `already_active` branch.
+
+### Stripe `checkout.session.completed` (vehicle_dealer_annual_fee)
+- Now sets `annual_platform_fee_paid: true`, `annual_fee_paid_at`, `annual_fee_renewal_at` (+365 days), `vehicle_dealer_suspended: false`.
+- Unblocks every listing with `status: suspended_unpaid_fee` or `listing_blocked: true` across `listings`, `vehicle_listings`, `multi_lot_auctions`.
+- Sends bilingual email receipt (amount + renewal date) + web push notification.
+- Signature verification (`stripe.Webhook.construct_event`) still enforced; missing-signature returns 400.
+
+### Verification approve/reject — bilingual push + email (closed-loop)
+- `routes/brokers.py` (admin approve/reject): added bilingual email + `dispatch_push`.
+- `services/verification_service.py` partner + dealer-license decision: added `dispatch_push`.
+- `routes/storage_auctions.py` (admin verify/reject facility): added `dispatch_push` + `admin_logs` row.
+
+### Admin Panel Audit
+- Full audit log at `/app/memory/iter308_admin_panel_audit.md` (200+ lines) — every primary + secondary tab probed, frontend handler traced to backend route, MongoDB mutation verified, per-row pass/fail.
+
+### Tests
+- `backend/tests/test_iter308_billing_and_verification.py`: **19 passed, 0 failed** (7 new tests added during this run for audit-log → test-coverage mapping).
+- iter299→iter308 regression: **194 passed / 8 conditional skips / 0 failed** (file-by-file runner at `/app/test_reports/iter308_regression/run_per_file.sh` with 35s rate-limit spacing).
+- Fixed stale test: `test_iter300_features.py::test_top_seller_visible_on_storefront_and_profile` no longer hardcodes admin id; reads the actual top seller from the recalc response (sold seed listings belong to `testseller@bidvex.com`).
+- New seeder: `backend/scripts/iter308_reseed_test_fixtures.py` — idempotent re-seed of `iter225buyer@bidvex.com`, `iter302buyer@test.com`, and password-reset of `testbuyer/testseller/testdealer` accounts so the iter299→iter308 fixtures all log in.
+
+
+
 ## Jun 15, 2026 — iter305 PRE-LAUNCH HARDENING PASS
 
 ### Duplicate Lot

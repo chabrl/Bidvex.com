@@ -120,3 +120,20 @@ Otherwise the Law-25 consent banner intercepts the Sign-In click.
 - During iter302 it was TEMPORARILY swapped to the TEST key (STRIPE_TEST_SECRET_KEY) to safely E2E-test the buyer settle charge flow, then RESTORED to the live key the same day. Charges made during the swap were Stripe TEST-mode only.
 - The iter302 test buyer's saved card (cus_UgXyebdBBfbh49 / visa 4242) lives on the TEST Stripe account — with the live key active, retrying a settle on seeded data returns a graceful 402 (no real charge possible).
 - If future payment-flow testing is needed in preview, swap to the test key first (backup pattern: copy the STRIPE_API_KEY line aside, replace value with STRIPE_TEST_SECRET_KEY's value, restart backend, restore after).
+
+## 🌱 iter308 — Re-seed script (Jun 18, 2026)
+If any of the canonical fixture accounts below fail to log in on a fresh
+preview DB, run:
+```
+python /app/backend/scripts/iter308_reseed_test_fixtures.py
+```
+This is idempotent — it creates missing accounts and password-resets
+existing ones so the iter299→iter308 regression suite can run cleanly.
+
+Accounts seeded / reset:
+- `iter225buyer@bidvex.com` / `TestBuyer225!`
+- `iter302buyer@test.com` / `TestBuyer123!`
+- `testbuyer@bidvex.com` / `TestBuyer2026!`
+- `testseller@bidvex.com` / `TestSeller2026!`
+- `testdealer@bidvex.com` / `TestDealer2026!`
+

@@ -111,7 +111,16 @@ def test_top_seller_recalc_and_flag(admin_token):
 
 
 def test_top_seller_visible_on_storefront_and_profile(admin_token):
-    top_id = ADMIN_ID  # admin owns the sold seed listings → top seller
+    # iter308: recalc top-sellers first, then read the actual top id from the
+    # response (in this DB the seeded sold listings belong to testseller@bidvex.com,
+    # not admin). The test asserts the public surfacing path, not which user
+    # happens to be #1.
+    rc = requests.post(f"{BASE}/api/admin/analytics/top-sellers/recalculate",
+                       headers={"Authorization": f"Bearer {admin_token}"}, timeout=60)
+    assert rc.status_code == 200, rc.text[:300]
+    top_list = rc.json().get("top", [])
+    assert top_list, "no top sellers — seed sold listings first via seed_production_demo.py"
+    top_id = top_list[0]["seller_id"]
     r = requests.get(f"{BASE}/api/storefronts/{top_id}", timeout=30)
     assert r.status_code == 200
     assert r.json()["seller"]["is_top_seller"] is True

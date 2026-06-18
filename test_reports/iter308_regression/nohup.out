@@ -1,0 +1,33 @@
+═══ backend/tests/test_iter299_e2e_preview.py ═══
+═══ backend/tests/test_iter299_postlaunch.py ═══
+═══ backend/tests/test_iter300_features.py ═══
+═══ backend/tests/test_iter301_features.py ═══
+═══ backend/tests/test_iter301_review_request.py ═══
+═══ backend/tests/test_iter302_settlement.py ═══
+═══ backend/tests/test_iter304_extra.py ═══
+═══ backend/tests/test_iter304_lot_templates_and_badges.py ═══
+═══ backend/tests/test_iter305_audit.py ═══
+═══ backend/tests/test_iter306_bulk_import_and_errors.py ═══
+═══ backend/tests/test_iter306_e2e_public.py ═══
+═══ backend/tests/test_iter306_push_dispatcher.py ═══
+═══ backend/tests/test_iter307_features.py ═══
+═══ backend/tests/test_iter307_remediation.py ═══
+═══ backend/tests/test_iter307_supplement.py ═══
+═══ backend/tests/test_iter308_billing_and_verification.py ═══
+═══════════ SUMMARY ═══════════
+backend/tests/test_iter299_e2e_preview.py :: ========================= 9 passed, 4 skipped in 7.48s =========================
+backend/tests/test_iter299_postlaunch.py :: ============================== 15 passed in 1.28s ==============================
+backend/tests/test_iter300_features.py :: ======================== 11 passed, 1 warning in 20.05s ========================
+backend/tests/test_iter301_features.py :: ============================= 19 passed in 13.51s ==============================
+backend/tests/test_iter301_review_request.py :: ============================= 15 passed in 20.67s ==============================
+backend/tests/test_iter302_settlement.py :: ============================== 12 passed in 6.19s ==============================
+backend/tests/test_iter304_extra.py :: ============================== 2 passed in 10.32s ==============================
+backend/tests/test_iter304_lot_templates_and_badges.py :: ============================== 7 passed in 3.31s ===============================
+backend/tests/test_iter305_audit.py :: ========================= 7 passed, 3 skipped in 3.55s =========================
+backend/tests/test_iter306_bulk_import_and_errors.py :: ============================== 8 passed in 2.29s ===============================
+backend/tests/test_iter306_e2e_public.py :: ============================== 11 passed in 4.14s ==============================
+backend/tests/test_iter306_push_dispatcher.py :: ============================== 15 passed in 0.04s ==============================
+backend/tests/test_iter307_features.py :: ======================== 20 passed, 1 warning in 3.78s =========================
+backend/tests/test_iter307_remediation.py :: ============================== 4 passed in 1.06s ===============================
+backend/tests/test_iter307_supplement.py :: ========================= 8 passed, 1 skipped in 1.62s =========================
+backend/tests/test_iter308_billing_and_verification.py :: ======================== 12 passed, 1 warning in 18.30s ========================
