@@ -91,7 +91,20 @@ const GlobalDealerFeeBanner = () => {
       const r = await axios.post(`${API_BASE}/dealer-subscription/create-checkout-session`, {}, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (r.data?.url) window.location.assign(r.data.url);
+      // iter308 bug fix — backend returns {checkout_url, session_id}, NOT {url}.
+      // Previous read of `r.data?.url` always resolved to undefined and the
+      // banner did nothing. Also handle the `already_active` idempotent path.
+      if (r.data?.already_active) {
+        await fetchStatus();
+        return;
+      }
+      const target = r.data?.checkout_url || r.data?.url;
+      if (target) {
+        window.location.assign(target);
+      } else {
+        // eslint-disable-next-line no-console
+        console.error('[dealer-fee-banner] no checkout URL in response:', r.data);
+      }
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('[dealer-fee-banner] checkout failed:', err);

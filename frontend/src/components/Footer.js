@@ -202,7 +202,7 @@ const Footer = () => {
               <li><Link to={language === 'fr' ? '/courtiers' : '/brokers'} className="hover:text-white transition-colors text-sm" data-testid="footer-broker-directory">
                 {language === 'fr' ? 'Répertoire des courtiers' : 'Broker Directory'}
               </Link></li>
-              <li><Link to="/vehicles" className="hover:text-white transition-colors text-sm" data-testid="footer-vehicles-link">
+              <li><Link to="/vehicle-auctions" className="hover:text-white transition-colors text-sm" data-testid="footer-vehicles-link">
                 {language === 'fr' ? 'Encans de véhicules' : 'Vehicle Auctions'}
               </Link></li>
               <li><Link to="/storage-auctions" className="hover:text-white transition-colors text-sm" data-testid="footer-storage-link">

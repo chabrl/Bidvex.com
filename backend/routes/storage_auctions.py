@@ -1539,6 +1539,33 @@ async def admin_verify_facility(
         background_tasks.add_task(send_storage_facility_approved_email, fac)
     except Exception as e:
         logger.error(f"[STORAGE] approve email failed: {e}")
+
+    # iter308 — Web push notification + admin audit log
+    if owner_id:
+        try:
+            from services.push_dispatcher import dispatch_push
+            owner = await db.users.find_one({"id": owner_id}, {"_id": 0, "preferred_language": 1})
+            fr = ((owner or {}).get("preferred_language") or "").startswith("fr")
+            preview = ("Votre installation a été vérifiée — vous pouvez maintenant lister des encans."
+                       if fr else "Your facility has been verified — you can now list storage auctions.")
+            await dispatch_push(
+                db, user_id=owner_id, kind="new_message",
+                sender_name="BidVex", preview=preview, url="/dashboard",
+            )
+        except Exception as e:
+            logger.warning(f"[iter308] storage facility push failed: {e}")
+    try:
+        await db.admin_logs.insert_one({
+            "id": __import__("uuid").uuid4().hex,
+            "action": "storage_facility_verified",
+            "admin_id": current_user.id, "admin_email": current_user.email,
+            "target_user_id": owner_id,
+            "details": {"facility_id": facility_id, "business_name": fac.get("business_name")},
+            "timestamp": _now().isoformat(),
+        })
+    except Exception:
+        pass
+
     return {"success": True, "facility_id": facility_id, "status": "verified"}
 
 
@@ -2134,6 +2161,51 @@ async def admin_reject_facility(
             "rejection_reason": reason,
         }},
     )
+
+    # iter308 — Email + push + admin audit
+    owner_id = fac.get("owner_user_id") or fac.get("user_id")
+    if owner_id:
+        owner = await db.users.find_one({"id": owner_id}, {"_id": 0, "email": 1, "name": 1, "preferred_language": 1})
+        if owner and owner.get("email"):
+            try:
+                subject = "Your facility verification was not approved / Vérification non approuvée"
+                body = (
+                    f"<p>Hello {owner.get('name','')},</p>"
+                    f"<p>Your storage facility application was not approved.</p>"
+                    f"<p><b>Reason:</b> {reason}</p>"
+                    f"<p>To appeal or resubmit: <a href=\"mailto:support@bidvex.com\">support@bidvex.com</a></p>"
+                    f"<hr><p>Bonjour {owner.get('name','')},</p>"
+                    f"<p>Votre demande d'installation de stockage n'a pas été approuvée.</p>"
+                    f"<p><b>Raison :</b> {reason}</p>"
+                    f"<p>Pour faire appel : <a href=\"mailto:support@bidvex.com\">support@bidvex.com</a></p>"
+                )
+                from services.emails._email_core import send_email
+                background_tasks.add_task(send_email, owner["email"], subject, body)
+            except Exception as e:
+                logger.warning(f"[iter308] facility reject email failed: {e}")
+        try:
+            from services.push_dispatcher import dispatch_push
+            fr = ((owner or {}).get("preferred_language") or "").startswith("fr")
+            preview = (f"Votre vérification d'installation n'a pas été approuvée. Raison : {reason[:80]}"
+                       if fr else f"Your facility verification was not approved. Reason: {reason[:80]}")
+            await dispatch_push(
+                db, user_id=owner_id, kind="new_message",
+                sender_name="BidVex", preview=preview, url="/dashboard",
+            )
+        except Exception as e:
+            logger.warning(f"[iter308] facility reject push failed: {e}")
+    try:
+        await db.admin_logs.insert_one({
+            "id": __import__("uuid").uuid4().hex,
+            "action": "storage_facility_rejected",
+            "admin_id": current_user.id, "admin_email": current_user.email,
+            "target_user_id": owner_id,
+            "details": {"facility_id": facility_id, "reason": reason},
+            "timestamp": _now().isoformat(),
+        })
+    except Exception:
+        pass
+
     return {"success": True, "facility_id": facility_id, "status": "rejected"}
 
 

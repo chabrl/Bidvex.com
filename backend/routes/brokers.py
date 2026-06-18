@@ -1667,6 +1667,9 @@ async def admin_list_brokers(
 @brokers_router.patch("/admin/brokers/{broker_id}/approve")
 async def admin_approve_broker(broker_id: str, current_user: User = Depends(require_admin)):
     db = get_db()
+    broker_doc = await db.brokers.find_one({"id": broker_id}, {"_id": 0})
+    if not broker_doc:
+        raise HTTPException(status_code=404, detail={"error": "broker_not_found"})
     res = await db.brokers.update_one(
         {"id": broker_id},
         {"$set": {
@@ -1678,12 +1681,17 @@ async def admin_approve_broker(broker_id: str, current_user: User = Depends(requ
     )
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail={"error": "broker_not_found"})
+    # iter308 — full notification loop (admin audit + email + push)
+    await _notify_broker_decision(db, broker_doc, decision="approve", current_user=current_user)
     return {"success": True}
 
 
 @brokers_router.patch("/admin/brokers/{broker_id}/reject")
 async def admin_reject_broker(broker_id: str, reason: str = Body("", embed=True), current_user: User = Depends(require_admin)):
     db = get_db()
+    broker_doc = await db.brokers.find_one({"id": broker_id}, {"_id": 0})
+    if not broker_doc:
+        raise HTTPException(status_code=404, detail={"error": "broker_not_found"})
     res = await db.brokers.update_one(
         {"id": broker_id},
         {"$set": {
@@ -1695,7 +1703,87 @@ async def admin_reject_broker(broker_id: str, reason: str = Body("", embed=True)
     )
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail={"error": "broker_not_found"})
+    await _notify_broker_decision(db, broker_doc, decision="reject", current_user=current_user, rejection_reason=reason)
     return {"success": True}
+
+
+async def _notify_broker_decision(db, broker_doc, *, decision, current_user, rejection_reason: str = ""):
+    """iter308 — Centralized broker verify/reject notifier.
+
+    Records admin audit log + sends bilingual email + push to the broker's
+    underlying user. All best-effort; never raises.
+    """
+    import logging as _logging
+    _log = _logging.getLogger(__name__)
+    user_id = broker_doc.get("user_id")
+    try:
+        await db.admin_logs.insert_one({
+            "id": __import__("uuid").uuid4().hex,
+            "action": f"broker_{decision}d",
+            "admin_id": current_user.id,
+            "admin_email": current_user.email,
+            "target_user_id": user_id,
+            "details": {"broker_id": broker_doc.get("id"),
+                         "business_name": broker_doc.get("legal_business_name") or broker_doc.get("business_name"),
+                         "reason": rejection_reason} if decision == "reject" else
+                        {"broker_id": broker_doc.get("id"),
+                         "business_name": broker_doc.get("legal_business_name") or broker_doc.get("business_name")},
+            "timestamp": _utcnow().isoformat() if hasattr(_utcnow(), "isoformat") else str(_utcnow()),
+        })
+    except Exception as e:
+        _log.warning(f"[iter308] broker admin_logs insert failed: {e}")
+    if not user_id:
+        return
+    user = await db.users.find_one({"id": user_id}, {"_id": 0, "email": 1, "name": 1, "preferred_language": 1})
+    if not user:
+        return
+    # Email
+    try:
+        fr = (user.get("preferred_language") or "").startswith("fr")
+        if decision == "approve":
+            subject = "Your broker account has been verified / Votre compte courtier a été vérifié"
+            body = (
+                f"<p>Hello {user.get('name','')},</p>"
+                f"<p>Your broker application has been approved. You can now post broker listings "
+                f"and accept bids on behalf of clients.</p>"
+                f"<p><a href=\"https://bidvex.com/broker/dashboard\">Open your broker dashboard</a></p>"
+                f"<hr><p>Bonjour {user.get('name','')},</p>"
+                f"<p>Votre demande de courtier a été approuvée. Vous pouvez maintenant publier des "
+                f"annonces de courtier et accepter des offres pour le compte de clients.</p>"
+                f"<p><a href=\"https://bidvex.com/broker/dashboard\">Ouvrir le tableau de bord courtier</a></p>"
+            )
+        else:
+            subject = "Your verification was not approved / Votre vérification n'a pas été approuvée"
+            body = (
+                f"<p>Hello {user.get('name','')},</p>"
+                f"<p>Your broker application was not approved.</p>"
+                f"<p><b>Reason:</b> {rejection_reason or 'Please contact support'}</p>"
+                f"<p>To appeal or resubmit: <a href=\"mailto:support@bidvex.com\">support@bidvex.com</a></p>"
+                f"<hr><p>Bonjour {user.get('name','')},</p>"
+                f"<p>Votre demande de courtier n'a pas été approuvée.</p>"
+                f"<p><b>Raison :</b> {rejection_reason or 'Veuillez contacter le support'}</p>"
+                f"<p>Pour faire appel ou soumettre à nouveau : <a href=\"mailto:support@bidvex.com\">support@bidvex.com</a></p>"
+            )
+        from services.emails._email_core import send_email
+        await send_email(to_email=user["email"], subject=subject, html_content=body)
+    except Exception as e:
+        _log.warning(f"[iter308] broker email failed: {e}")
+    # Push
+    try:
+        from services.push_dispatcher import dispatch_push
+        fr = (user.get("preferred_language") or "").startswith("fr")
+        if decision == "approve":
+            preview = ("Votre compte courtier a été vérifié — vous pouvez maintenant lister."
+                       if fr else "Your broker account has been verified — you can now list.")
+        else:
+            preview = (f"Votre vérification n'a pas été approuvée. {rejection_reason or 'Voir email'}"
+                       if fr else f"Your verification was not approved. {rejection_reason or 'See email'}")
+        await dispatch_push(
+            db, user_id=user_id, kind="new_message",
+            sender_name="BidVex", preview=preview, url="/broker/dashboard",
+        )
+    except Exception as e:
+        _log.warning(f"[iter308] broker push failed: {e}")
 
 
 @brokers_router.patch("/admin/brokers/{broker_id}/suspend")

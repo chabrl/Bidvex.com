@@ -170,22 +170,96 @@ async def handle_stripe_webhook(request: Request):
                 pass  # handled by subscription events above
             elif session_type == "vehicle_dealer_annual_fee":
                 # iter211 P3 — Activate dealer subscription after checkout success
+                # iter308 — Full revenue loop closure:
+                #   1. dealer_subscription_active = true (existing)
+                #   2. annual_platform_fee_paid = true (new — surfaced to UI)
+                #   3. Unblock any listings suspended due to non-payment
+                #   4. Email receipt with amount + renewal date
+                #   5. Web push notification confirming activation
                 from datetime import timedelta
                 user_id_dealer = _meta_all.get("user_id")
                 if user_id_dealer:
                     now = datetime.now(timezone.utc)
+                    renewal = now + timedelta(days=365)
+                    paid_iso = now.isoformat()
                     await db.users.update_one(
                         {"id": user_id_dealer},
                         {"$set": {
                             "dealer_subscription_active": True,
                             "dealer_subscription_status": "active",
-                            "dealer_subscription_start": now.isoformat(),
-                            "dealer_subscription_renewal": (now + timedelta(days=365)).isoformat(),
+                            "dealer_subscription_start": paid_iso,
+                            "dealer_subscription_renewal": renewal.isoformat(),
                             "dealer_stripe_subscription_id": data.get("subscription"),
                             "dealer_stripe_customer_id": data.get("customer"),
+                            # iter308 — fields the orange banner watches
+                            "annual_platform_fee_paid": True,
+                            "annual_fee_paid_at": paid_iso,
+                            "annual_fee_renewal_at": renewal.isoformat(),
+                            "vehicle_dealer_suspended": False,  # ungate listings
+                        }, "$unset": {
+                            "vehicle_dealer_suspended_reason": "",
                         }},
                     )
                     logger.info(f"[DealerAnnualFee] Activated dealer subscription for user={user_id_dealer}")
+
+                    # iter308 — Unblock any listings previously blocked due to non-payment
+                    try:
+                        unblock_filter = {
+                            "seller_id": user_id_dealer,
+                            "$or": [
+                                {"status": "suspended_unpaid_fee"},
+                                {"listing_blocked": True},
+                            ],
+                        }
+                        unblock_update = {"$set": {
+                            "status": "active",
+                            "listing_blocked": False,
+                            "unblocked_at": paid_iso,
+                            "unblocked_reason": "annual_fee_paid",
+                        }}
+                        total_unblocked = 0
+                        for coll_name in ("listings", "vehicle_listings", "multi_lot_auctions"):
+                            r = await db[coll_name].update_many(unblock_filter, unblock_update)
+                            total_unblocked += r.modified_count
+                        if total_unblocked:
+                            logger.info(f"[iter308] Unblocked {total_unblocked} listings for dealer={user_id_dealer}")
+                    except Exception as e:
+                        logger.warning(f"[iter308] listing unblock failed for {user_id_dealer}: {e}")
+
+                    # iter308 — Email receipt + push notification (best-effort)
+                    user_doc = await db.users.find_one(
+                        {"id": user_id_dealer},
+                        {"_id": 0, "email": 1, "name": 1, "preferred_language": 1},
+                    ) or {}
+                    if user_doc.get("email"):
+                        try:
+                            fr = (user_doc.get("preferred_language") or "").startswith("fr")
+                            renewal_date = renewal.strftime("%Y-%m-%d")
+                            subject = ("Reçu de paiement — Frais annuels BidVex / Payment Receipt — BidVex Annual Fee")
+                            body = (
+                                f"<p>Hello {user_doc.get('name','')},</p>"
+                                f"<p>Your <b>$100 CAD</b> annual platform fee has been received. "
+                                f"Your account is now active until <b>{renewal_date}</b>.</p>"
+                                f"<p>Receipt ID: {data.get('id', '')[:24]}</p>"
+                                f"<p>You can now publish unlimited vehicle listings.</p>"
+                                f"<hr><p>Bonjour {user_doc.get('name','')},</p>"
+                                f"<p>Vos frais annuels de plateforme de <b>100 $ CAD</b> ont été reçus. "
+                                f"Votre compte est maintenant actif jusqu'au <b>{renewal_date}</b>.</p>"
+                                f"<p>Vous pouvez maintenant publier des annonces de véhicules illimitées.</p>"
+                            )
+                            from services.emails._email_core import send_email
+                            await send_email(to_email=user_doc["email"], subject=subject, html_content=body)
+                        except Exception as e:
+                            logger.warning(f"[iter308] dealer fee receipt email failed: {e}")
+                        try:
+                            from services.push_dispatcher import dispatch_push
+                            await dispatch_push(
+                                db, user_id=user_id_dealer, kind="payment_due",
+                                title_item="BidVex Annual Fee", amount=100.0,
+                                url="/seller-dashboard",
+                            )
+                        except Exception:
+                            pass
             elif session_type == "listing_promotion":
                 await _handle_listing_promotion_paid(db, data)
             elif session_type == "payment_request":

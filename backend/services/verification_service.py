@@ -246,6 +246,24 @@ async def notify_partner_decision(db, *, user: dict, decision: str,
             extra={"reason": rejection_reason},
         )
     result["seller_notif"] = True
+
+    # iter308 — Web Push notification (best-effort)
+    try:
+        from services.push_dispatcher import dispatch_push
+        fr = (user.get("preferred_language") or "").startswith("fr")
+        if decision == "approve":
+            preview = ("Votre statut de partenaire a été vérifié — vous pouvez maintenant lister."
+                       if fr else "Your partner status has been verified — you can now start listing.")
+        else:
+            preview = (f"Votre soumission n'a pas été approuvée. Raison : {rejection_reason or 'voir email'}."
+                       if fr else f"Your submission was not approved. Reason: {rejection_reason or 'see email'}.")
+        await dispatch_push(
+            db, user_id=user["id"], kind="new_message",
+            sender_name="BidVex", preview=preview, url="/dashboard",
+        )
+    except Exception as exc:
+        logger.warning(f"[iter308] partner decision push failed: {exc}")
+
     return result
 
 
@@ -317,4 +335,22 @@ async def notify_dealer_license_decision(db, *, user: dict, license_doc: dict,
             extra={"license_id": license_doc.get("id"), "reason": rejection_reason},
         )
     result["seller_notif"] = True
+
+    # iter308 — Web Push notification (best-effort)
+    try:
+        from services.push_dispatcher import dispatch_push
+        fr = (user.get("preferred_language") or "").startswith("fr")
+        if decision == "approve":
+            preview = ("Votre permis a été vérifié — vous pouvez maintenant lister des véhicules."
+                       if fr else "Your dealer licence has been verified — you can now list vehicles.")
+        else:
+            preview = (f"Votre permis n'a pas été approuvé. Raison : {rejection_reason or 'voir email'}."
+                       if fr else f"Your licence was not approved. Reason: {rejection_reason or 'see email'}.")
+        await dispatch_push(
+            db, user_id=user["id"], kind="new_message",
+            sender_name="BidVex", preview=preview, url="/seller-dashboard",
+        )
+    except Exception as exc:
+        logger.warning(f"[iter308] dealer license decision push failed: {exc}")
+
     return result
