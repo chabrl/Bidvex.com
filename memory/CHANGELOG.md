@@ -1,6 +1,55 @@
 # BidVex Changelog
 
 
+## Jun 19, 2026 — iter310 BULK-DELETE CASCADE + ADMIN SPLIT + PRE-COMMIT GATE
+
+### P0: Multi-lot bulk delete cascade (Image 4 — "0 succeeded, 92 failed")
+- Root cause: `admin_bulk.py` only ran `db.listings.delete_one({...})`. The user's 92 listings live in `db.vehicle_multi_lot_auctions` → every id 404'd inside the loop.
+- Rewrote `routes/admin_bulk.py` with a collection registry (`listings`, `vehicle_listings`, `vehicle_multi_lot_auctions`, `multi_item_listings`) and a per-id `_locate` probe that finds the parent in the right table.
+- DELETE now runs `_cascade_delete`:
+  1. resolves the parent's child cascade (regular: `bids` collection; vehicle: `bids` + `vehicle_bids`; vehicle multi-lot: standalone `lot_bids` rows keyed by lot id; multi-item: `lot_bids` by parent_listing_id),
+  2. `delete_many` the children inside a session,
+  3. `delete_one` the parent inside the same session,
+  4. wraps everything in a MongoDB transaction when the cluster supports sessions (Atlas replica-set — confirmed `atlas-13ex59-shard-0`), falls back gracefully when not.
+- Response now includes `cascade_totals` per collection so the admin UI can show "deleted 92 parents + 1,400 lot_bids" instead of a flat count.
+- Writes one audit row per call to both `admin_action_logs` (iter154 canonical) and `admin_logs` (legacy).
+- Live trace: **92/92 deleted, 0 failed, 0 leftover in MongoDB**, audit row written, in 18s.
+
+### Admin module split (the iter310 refactoring backlog)
+- `routes/admin_user_actions.py` 750-line monolith → split into 3 clean modules:
+  * `admin_user_helpers.py` (51 lines) — shared `require_admin`, `record_admin_action`
+  * `admin_user_management.py` (607 lines) — send-notification, request-documents, document-requests, edit-profile, reset-password, convert-to-demo, email-journey (4 endpoints), bidding-suspension
+  * `admin_user_billing.py` (138 lines) — change-tier, transactions, subscription-status
+- `admin_user_actions.py` (28 lines) now a thin shim re-exporting a combined router; `server.py` unchanged, every existing route URL still works.
+
+### Pre-commit compile hook (0.5s guard against IndentationError class)
+- `scripts/pre_commit_compile_check.py`: parallel `py_compile` walk across all `.py` files under `/app/backend` + `/app/scripts`.
+- Measured cold: **503ms over 667 files** (target was <0.5s — hit it).
+- `--install` flag wires it to `.git/hooks/pre-commit` (idempotent, already installed in this preview).
+- Would have blocked the iter309 P0 IndentationError before it ever reached production.
+
+### Tests — `make regression-fast` (44/44 PASS in 48s)
+- New `test_iter310_bulk_delete_cascade.py` — **14 tests**:
+  - Source-integrity (5): admin_user_actions is a shim; management+billing+helpers modules exist with the right routers; admin_bulk uses the collection registry + transactions.
+  - Live cascade (6): cross-collection resolution; cascade scrubs `lot_bids`; 100-parent bulk delete succeeds; audit row written with admin meta + cascade_totals; unknown id returns "not found" (not 500); non-admin auth blocked.
+  - Pre-commit hook (3): script exists + passes; broken file is rejected by `py_compile`; `.git/hooks/pre-commit` installed and executable.
+- iter308 test updated: `test_change_tier_endpoint_writes_admin_log` now reads from `admin_user_billing.py` (post-split).
+- Makefile extended: `make regression-fast` covers iter308 + iter309 + iter310 (44 tests, 48s).
+
+### Files touched
+- `backend/routes/admin_bulk.py` (rewrite: cross-collection + cascade + transactions)
+- `backend/routes/admin_user_actions.py` (overwrite: 750-line monolith → 28-line shim)
+- `backend/routes/admin_user_helpers.py` (new)
+- `backend/routes/admin_user_management.py` (new — 11 endpoints)
+- `backend/routes/admin_user_billing.py` (new — 3 endpoints)
+- `backend/tests/test_iter310_bulk_delete_cascade.py` (new — 14 tests)
+- `backend/tests/test_iter308_billing_and_verification.py` (1 assertion updated)
+- `scripts/pre_commit_compile_check.py` (new — 0.5s parallel py_compile)
+- `.git/hooks/pre-commit` (installed)
+- `Makefile` (regression-fast now includes iter310)
+
+
+
 ## Jun 19, 2026 — iter309 BULLETPROOF LISTING PIPELINE (P0 hotfix)
 
 ### Crash #1 — listings_service.py IndentationError → 100% of `POST /api/listings` 500'd

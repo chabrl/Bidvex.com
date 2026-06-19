@@ -283,13 +283,17 @@ def test_webhook_annual_fee_unsets_suspended_and_sets_renewal():
 
 
 def test_change_tier_endpoint_writes_admin_log():
-    src = Path("/app/backend/routes/admin_user_actions.py").read_text()
+    # iter310: change-tier was moved out of admin_user_actions.py (now a
+    # shim) and into the dedicated admin_user_billing.py module.
+    src = Path("/app/backend/routes/admin_user_billing.py").read_text()
     # change-tier must persist to MongoDB AND write to the audit log
     assert '"/{user_id}/change-tier"' in src
     assert 'action="change_tier"' in src, \
         "change-tier endpoint must record an admin audit action"
-    assert 'admin_actions' in src or 'admin_logs' in src, \
-        "change-tier endpoint must log to admin_actions/admin_logs collection"
+    # The audit row is written via the shared `record_admin_action` helper
+    # which inserts into `db.admin_actions`. Verify the helper is wired in.
+    assert 'record_admin_action' in src, \
+        "change-tier must call record_admin_action (writes to admin_actions)"
 
 
 
