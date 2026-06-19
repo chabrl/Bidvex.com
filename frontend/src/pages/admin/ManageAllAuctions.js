@@ -21,8 +21,7 @@ const ManageAllAuctions = () => {
   const navigate = useNavigate();
   const { token } = useAuth();
   const headers = { Authorization: `Bearer ${token}` };
-  const [singleListings, setSingleListings] = useState([]);
-  const [multiListings, setMultiListings] = useState([]);
+  const [allListings, setAllListings] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -33,21 +32,46 @@ const ManageAllAuctions = () => {
   const [editModal, setEditModal] = useState({ open: false, listing: null, form: {} });
   // FEATURE PATCH v9 / Feature 1 — Edit auction end time
   const [endTimeModal, setEndTimeModal] = useState({ open: false, listing: null, newEndTime: '', reason: '', history: [] });
+  // iter311 — performance + capacity telemetry from the unified endpoint
+  const [perfMeta, setPerfMeta] = useState({ total: 0, server_ms: 0, by_section: {} });
 
   useEffect(() => {
     fetchAllListings();
   }, []);
 
+  // iter311 — Unified server-aggregated fetch.
+  // Replaces the old fan-out of 2-4 client-side round-trips with ONE
+  // call to /api/admin/listings/all-collections, which merges + sorts +
+  // counts across `listings`, `vehicle_listings`,
+  // `vehicle_multi_lot_auctions`, and `multi_item_listings` server-side.
+  // Each row arrives normalized with a `_section` tag we map to the
+  // existing `type` prop so the rest of the JSX is untouched.
   const fetchAllListings = async () => {
+    setLoading(true);
     try {
-      const [singleRes, multiRes] = await Promise.all([
-        axios.get(`${API}/admin/listings/all`, { headers }),
-        axios.get(`${API}/admin/multi-item-listings/all`, { headers })
-      ]);
-      const singleData = singleRes.data;
-      setSingleListings(Array.isArray(singleData) ? singleData : singleData.listings || []);
-      const multiData = multiRes.data;
-      setMultiListings(Array.isArray(multiData) ? multiData : multiData.listings || []);
+      const res = await axios.get(
+        `${API}/admin/listings/all-collections?limit=500&sort=created_at_desc`,
+        { headers },
+      );
+      const { rows = [], total = 0, by_section = {}, perf_ms = 0 } = res.data || {};
+      // Map _section → type so existing filters / actions keep working.
+      //   _section ∈ {marketplace, vehicle, vehicle_multi, lots}
+      //   type     ∈ {single, multi}
+      const decorated = rows.map(r => ({
+        ...r,
+        // Each row needs a `type` (the existing All/Single/Multi filter
+        // hinges on this). Single-vehicle counts as single; multi-lot
+        // events and multi-item parents count as multi.
+        type: (r._section === 'marketplace' || r._section === 'vehicle')
+          ? 'single' : 'multi',
+      }));
+      setAllListings(decorated);
+      setPerfMeta({ total, server_ms: perf_ms, by_section });
+      if (total > rows.length) {
+        toast.info(
+          `Showing ${rows.length} of ${total} listings — refine the filter to narrow down.`,
+        );
+      }
     } catch (error) {
       console.error('Failed to load listings:', error);
       toast.error('Failed to load auctions');
@@ -308,11 +332,12 @@ const ManageAllAuctions = () => {
     toast.success(`Exported ${filteredListings.length} auction(s) to CSV`);
   };
 
-  // Combine and filter listings
-  const combinedListings = [
-    ...singleListings.map(l => ({ ...l, type: 'single' })),
-    ...multiListings.map(l => ({ ...l, type: 'multi' }))
-  ];
+  // iter311 — combined view is now just the single state array. The
+  // server already normalized + sorted + tagged each row with `_section`,
+  // and `fetchAllListings` mapped that to a `type` field. Type / status /
+  // search filters still run client-side over the already-paged window
+  // so admins can flip filters without round-tripping.
+  const combinedListings = allListings;
 
   const filteredListings = combinedListings.filter(listing => {
     // Type filter
@@ -374,13 +399,13 @@ const ManageAllAuctions = () => {
         </Card>
         <Card>
           <CardContent className="p-6">
-            <p className="text-2xl font-bold text-blue-600">{singleListings.length}</p>
+            <p className="text-2xl font-bold text-blue-600">{combinedListings.filter(l => l.type === 'single').length}</p>
             <p className="text-sm text-muted-foreground">Single Items</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-6">
-            <p className="text-2xl font-bold text-purple-600">{multiListings.length}</p>
+            <p className="text-2xl font-bold text-purple-600">{combinedListings.filter(l => l.type === 'multi').length}</p>
             <p className="text-sm text-muted-foreground">Multi-Item</p>
           </CardContent>
         </Card>

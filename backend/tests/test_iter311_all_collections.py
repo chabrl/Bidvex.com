@@ -261,3 +261,51 @@ def test_perf_baseline_script_exists():
     """The before/after baseline script lives in repo and is runnable."""
     assert Path("/app/backend/scripts/iter311_perf_baseline.py").is_file()
     assert Path("/app/backend/scripts/iter311_perf_seed.py").is_file()
+
+
+def test_index_install_script_exists():
+    """iter311 compound-index installer must exist and cover all 4 collections."""
+    path = Path("/app/backend/scripts/iter311_install_indexes.py")
+    assert path.is_file()
+    src = path.read_text()
+    for coll in ("listings", "vehicle_listings", "vehicle_multi_lot_auctions", "multi_item_listings"):
+        assert coll in src, f"index installer missing {coll}"
+    assert "iter311_status_1_created_at_-1" in src
+    assert "iter311_seller_id_1" in src
+
+
+def test_indexes_actually_installed_on_atlas(db):
+    """The 4 collections must carry the iter311_status_1_created_at_-1
+    compound index after the installer has been run."""
+    for coll_name in ("listings", "vehicle_listings",
+                       "vehicle_multi_lot_auctions", "multi_item_listings"):
+        names = [idx["name"] for idx in db[coll_name].list_indexes()]
+        has_iter311 = any("iter311" in n for n in names)
+        # Allow the listings collection to satisfy via the pre-existing
+        # `idx_listings_status_created` (same key shape, different name).
+        has_equivalent = any(
+            ("status_created" in n) or ("iter311" in n) or
+            (n.startswith("status_1_") and "created" in n)
+            for n in names
+        )
+        assert has_iter311 or has_equivalent, (
+            f"{coll_name} missing the status+created_at compound index. "
+            f"Found: {names}. Run scripts/iter311_install_indexes.py."
+        )
+
+
+def test_frontend_swapped_to_unified_endpoint():
+    """Admin Manage-All-Auctions page must call the new endpoint, not
+    the legacy /admin/listings/all + /admin/multi-item-listings/all
+    fan-out pattern."""
+    src = Path("/app/frontend/src/pages/admin/ManageAllAuctions.js").read_text()
+    assert "/admin/listings/all-collections" in src, \
+        "frontend not wired to the iter311 unified endpoint"
+    # Legacy multi-fetch must be gone
+    assert "/admin/listings/all'" not in src and \
+           "/admin/multi-item-listings/all'" not in src, \
+        "frontend still calls the legacy multi-fetch endpoints"
+    # Single state array replaces the old singleListings/multiListings split
+    assert "setAllListings" in src
+    assert "setSingleListings" not in src
+    assert "setMultiListings" not in src

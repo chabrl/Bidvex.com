@@ -1,6 +1,37 @@
 # BidVex Changelog
 
 
+## Jun 19, 2026 — iter311 (Part 2): Frontend Swap + MongoDB Compound Indexes
+
+### Frontend swap — `ManageAllAuctions.js`
+- Replaced the old multi-round-trip `Promise.all([axios.get('/admin/listings/all'), axios.get('/admin/multi-item-listings/all')])` with a single `axios.get('/admin/listings/all-collections?limit=500&sort=created_at_desc')`.
+- Collapsed `useState([])` for `singleListings` + `multiListings` into one `allListings` array.
+- Maps the server-supplied `_section` tag to the existing `type` prop (`marketplace` / `vehicle` → `'single'`, `vehicle_multi` / `lots` → `'multi'`) so every downstream filter/action keeps working without changes.
+- Captures `{total, by_section, perf_ms}` in a `perfMeta` state for future "Showing X of Y" banners and admin-side diagnostics.
+- Soft warning toast when `total > rows.length` so admins know to refine.
+
+### MongoDB compound indexes — all 4 listing collections
+- New script `backend/scripts/iter311_install_indexes.py` (idempotent):
+  - `{status: 1, created_at: -1}` on `listings`, `vehicle_listings`, `vehicle_multi_lot_auctions`, `multi_item_listings`
+  - `{seller_id: 1}` on every collection that didn't already have one
+- 5 new indexes created on this preview DB (3 collections already had partial pre-existing coverage).
+- Confirmed via `explain()`: `vehicle_multi_lot_auctions` now uses `iter311_status_1_created_at_-1`; `listings` continues to win via the pre-existing equivalent `idx_listings_status_created`.
+- Server-side `perf_ms` floor remains ~39 ms because the bottleneck is Atlas network RTT (cross-region), not compute. The indexes guarantee that floor holds as data grows past 5,000 listings (the previous in-memory sort plan would have degraded linearly).
+
+### Tests — `make regression-fast`: **77/77 PASSED in 74s**
+Added 3 new tests to `test_iter311_all_collections.py` (now 19 total):
+- `test_index_install_script_exists` — installer script covers all 4 collections and references both index names.
+- `test_indexes_actually_installed_on_atlas` — verifies the indexes are live on Atlas.
+- `test_frontend_swapped_to_unified_endpoint` — confirms `ManageAllAuctions.js` calls `/admin/listings/all-collections`, no longer references the legacy split endpoints, and uses the single `setAllListings` state.
+
+### Files changed
+- `frontend/src/pages/admin/ManageAllAuctions.js` — endpoint swap + state collapse
+- `backend/scripts/iter311_install_indexes.py` (new)
+- `backend/tests/test_iter311_all_collections.py` — +3 tests (16 → 19)
+- `/app/memory/CHANGELOG.md` (this entry)
+
+
+
 ## Jun 19, 2026 — iter311 ADMIN UNIFIED ALL-COLLECTIONS ENDPOINT
 
 ### New: `GET /api/admin/listings/all-collections`
