@@ -328,22 +328,3 @@ def parse_listing_dates(listing: Dict):
     for lot in listing.get("lots", []):
         if isinstance(lot.get("lot_end_time"), str):
             lot["lot_end_time"] = datetime.fromisoformat(lot["lot_end_time"])
-      if listing_dict.get(key):
-            val = listing_dict[key]
-            if hasattr(val, 'isoformat'):
-                listing_dict[key] = val.isoformat()
-    for lot in listing_dict.get("lots", []):
-        if lot.get("lot_end_time") and hasattr(lot["lot_end_time"], 'isoformat'):
-            lot["lot_end_time"] = lot["lot_end_time"].isoformat()
-
-
-# ─── Read Helpers ─────────────────────────────────────────────────────
-
-def parse_listing_dates(listing: Dict):
-    """Convert ISO string dates back to datetime objects (in-place)."""
-    for key in ("created_at", "auction_end_date", "auction_start_date"):
-        if isinstance(listing.get(key), str):
-            listing[key] = datetime.fromisoformat(listing[key])
-    for lot in listing.get("lots", []):
-        if isinstance(lot.get("lot_end_time"), str):
-            lot["lot_end_time"] = datetime.fromisoformat(lot["lot_end_time"])

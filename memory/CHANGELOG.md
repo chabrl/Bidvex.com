@@ -1,6 +1,43 @@
 # BidVex Changelog
 
 
+## Jun 19, 2026 — iter309 BULLETPROOF LISTING PIPELINE (P0 hotfix)
+
+### Crash #1 — listings_service.py IndentationError → 100% of `POST /api/listings` 500'd
+- Orphan code block (duplicate of `serialise_datetimes` body) had been pasted into the middle of `parse_listing_dates` with mismatched indentation, referencing a non-existent `listing_dict` variable. The module raised `IndentationError` on import → every request to `POST /api/listings` 500'd → the generic `{code: "internal_server_error"…}` popup the user reported.
+- Removed orphan lines 331–349 in `services/listings_service.py`.
+
+### Crash #2 — Vehicle dealer Stripe Checkout `InvalidRequestError`
+- `dealer_subscription_routes.create_checkout_session` was sending BOTH `discounts=[{"coupon": "LAUNCH50"}]` AND `allow_promotion_codes=False`. Stripe rejects the combo unconditionally.
+- Removed `allow_promotion_codes` kwarg; the LAUNCH50 coupon is always applied via `discounts=`.
+
+### iter309 — Bilingual 400 validation envelope
+- New `RequestValidationError` handler in `server.py` converts FastAPI's 422 → 400 with `{detail: {code: "validation_error", message_en, message_fr, fields:[…]}}`.
+- Each field error carries EN + FR translation (`"Missing field: Category" / "Champ manquant : Catégorie"`) using a curated `_FIELD_LABELS_BILINGUAL` lookup covering title/description/category/condition/starting_price/location/city/region/auction_end_date/duration_days/images/payment_method/lots/vin/make/model/year/mileage. Unknown fields fall back to a prettified name in both columns.
+- Frontend now receives a 400 with an inline-field error array instead of the generic 500 popup.
+
+### iter309 — 90-second CI guard
+- New `pytest.ini` + `Makefile` at /app root.
+- `make regression-fast` runs the iter308 + iter309 suites — **30/30 PASSED in 22 seconds** (target was 90s).
+- Bot suites are tagged with `pytestmark = pytest.mark.monetization` for the marker-based gate.
+
+### iter309 — Test suite (11 tests, all PASS)
+- `test_iter309_bulletproof_listing.py`:
+  - Source integrity: `listings_service` imports cleanly; no orphan `listing_dict` references; `allow_promotion_codes` kwarg is forbidden in dealer Checkout; bilingual validator handler is wired into `server.py`.
+  - Live API: empty `POST /api/listings` body returns 400 + bilingual `fields[]`; well-formed body never 500s; `POST /api/vehicles`, `POST /api/vehicle-multi-lot-auctions`, `POST /api/storage-facilities/auctions`, `POST /api/dealer-subscription/create-checkout-session` all never 500.
+  - MongoDB persistence proof for the seeded admin happy-path.
+
+### Files touched
+- `backend/services/listings_service.py` — removed orphan block (lines 331–349)
+- `backend/routes/dealer_subscription_routes.py` — removed `allow_promotion_codes=False`
+- `backend/server.py` — added `_bilingual_validation_handler` + `_FIELD_LABELS_BILINGUAL`
+- `backend/tests/test_iter308_billing_and_verification.py` — added `pytest.mark.monetization`
+- `backend/tests/test_iter309_bulletproof_listing.py` — new (11 tests)
+- `pytest.ini` — new (registered `monetization` marker, ignored orphan `e2e_qa_test.py`)
+- `Makefile` — new (`regression-fast`, `regression-full` targets)
+
+
+
 ## Jun 18, 2026 — iter308 MONETIZATION + ADMIN VERIFICATION + FOOTER (CLOSE-OUT)
 
 ### Footer

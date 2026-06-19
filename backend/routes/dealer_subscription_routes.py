@@ -99,6 +99,10 @@ async def create_dealer_checkout_session(current_user: User = Depends(get_curren
         mode="subscription",
         customer_email=current_user.email,
         line_items=[{"price": settings["price_id"], "quantity": 1}],
+        # iter309: Stripe rejects checkout sessions that send both
+        # `discounts` and `allow_promotion_codes` (any value, including
+        # False). We always apply the LAUNCH50 coupon → omit
+        # allow_promotion_codes entirely.
         discounts=[{"coupon": COUPON_ID}],
         success_url=f"{frontend_url}/seller-dashboard?dealer_fee=success",
         cancel_url=f"{frontend_url}/seller-dashboard?dealer_fee=cancelled",
@@ -112,7 +116,6 @@ async def create_dealer_checkout_session(current_user: User = Depends(get_curren
                 "type": "vehicle_dealer_annual_fee",
             }
         },
-        allow_promotion_codes=False,
     )
     return {"checkout_url": session.url, "session_id": session.id}
 

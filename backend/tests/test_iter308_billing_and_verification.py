@@ -18,7 +18,10 @@ import os
 import re
 from pathlib import Path
 
+import pytest
 import requests
+
+pytestmark = pytest.mark.monetization
 
 BASE = os.environ.get("REACT_APP_BACKEND_URL", "http://localhost:8001").rstrip("/")
 API = f"{BASE}/api"

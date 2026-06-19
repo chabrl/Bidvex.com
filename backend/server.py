@@ -601,6 +601,99 @@ async def _bilingual_rate_limit_handler(request: Request, exc: RateLimitExceeded
 app.add_exception_handler(RateLimitExceeded, _bilingual_rate_limit_handler)
 
 
+# ─── iter309 — Bilingual validation error handler ──────────────────
+# Converts FastAPI's default 422 validation envelope into a clean 400
+# with EN/FR field-by-field error messages. This is what the frontend
+# binds to inline form errors (instead of the generic 500 popup).
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse as _JSONResponse
+
+
+# Reusable field-name → bilingual label lookup. Listing routes were the
+# P0 hot path for iter309; add entries as new forms emerge.
+_FIELD_LABELS_BILINGUAL = {
+    "title": ("Title", "Titre"),
+    "title_fr": ("French title", "Titre en français"),
+    "description": ("Description", "Description"),
+    "description_fr": ("French description", "Description en français"),
+    "category": ("Category", "Catégorie"),
+    "condition": ("Condition", "État"),
+    "starting_price": ("Starting price", "Prix de départ"),
+    "starting_bid": ("Starting bid", "Mise de départ"),
+    "buy_now_price": ("Buy-now price", "Prix achat immédiat"),
+    "reserve_price": ("Reserve price", "Prix de réserve"),
+    "location": ("Location", "Emplacement"),
+    "city": ("City", "Ville"),
+    "region": ("Province / Region", "Province / Région"),
+    "country": ("Country", "Pays"),
+    "auction_end_date": ("Auction end date", "Date de fin de l'enchère"),
+    "auction_start_date": ("Auction start date", "Date de début de l'enchère"),
+    "duration_days": ("Duration (days)", "Durée (jours)"),
+    "images": ("Photos", "Photos"),
+    "payment_method": ("Payment method", "Méthode de paiement"),
+    "lots": ("Lots", "Lots"),
+    "vin": ("VIN", "NIV"),
+    "make": ("Make", "Marque"),
+    "model": ("Model", "Modèle"),
+    "year": ("Year", "Année"),
+    "mileage": ("Mileage", "Kilométrage"),
+}
+
+
+def _label_for(field_name: str) -> tuple[str, str]:
+    label = _FIELD_LABELS_BILINGUAL.get(field_name)
+    if label:
+        return label
+    # Fallback: prettify the field name itself in both languages
+    pretty = field_name.replace("_", " ").strip().capitalize()
+    return (pretty, pretty)
+
+
+@app.exception_handler(RequestValidationError)
+async def _bilingual_validation_handler(request: Request, exc: RequestValidationError):
+    """Convert Pydantic validation errors → 400 with bilingual messages."""
+    fields = []
+    for err in exc.errors():
+        loc = [str(p) for p in err.get("loc", []) if str(p) != "body"]
+        field_name = loc[-1] if loc else "body"
+        en_label, fr_label = _label_for(field_name)
+        etype = err.get("type", "")
+        if etype == "missing" or etype.endswith("_required"):
+            msg_en = f"Missing field: {en_label}"
+            msg_fr = f"Champ manquant : {fr_label}"
+        elif etype.startswith("string_too_short"):
+            msg_en = f"{en_label} is too short"
+            msg_fr = f"{fr_label} est trop court"
+        elif etype.startswith("greater_than") or etype.startswith("less_than"):
+            msg_en = f"{en_label} value out of range"
+            msg_fr = f"Valeur de « {fr_label} » hors limites"
+        elif etype.startswith("type_error") or etype.startswith("value_error"):
+            msg_en = f"{en_label} format is invalid"
+            msg_fr = f"Format de « {fr_label} » invalide"
+        else:
+            base = err.get("msg") or "Invalid value"
+            msg_en = f"{en_label}: {base}"
+            msg_fr = f"{fr_label} : valeur invalide"
+        fields.append({
+            "field": ".".join(loc) if loc else "body",
+            "message_en": msg_en,
+            "message_fr": msg_fr,
+            "code": etype or "invalid",
+        })
+    return _JSONResponse(
+        status_code=400,
+        content={
+            "detail": {
+                "code": "validation_error",
+                "message_en": "Some required fields are missing or invalid.",
+                "message_fr": "Certains champs requis sont manquants ou invalides.",
+                "fields": fields,
+            }
+        },
+    )
+
+
+
 # ─── iter306 — Global Backend Exception Handler ───
 # Captures all unhandled exceptions and writes them to the `backend_errors`
 # collection so production issues surface in the admin Error Logs tab.
