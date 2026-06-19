@@ -312,14 +312,25 @@ const CreateListingPage = () => {
       return;
     }
 
-    // iter299 P0 — Bill 96 client-side gate. Never let a Quebec seller hit
-    // the API and bounce off a raw qc_french_title_required JSON error.
-    const bill96Error = validateFrenchTitle({ isQuebec, titleFr: formData.title_fr });
-    if (bill96Error) {
-      setFrTitleError(isFr ? bill96Error.fr : bill96Error.en);
-      toast.error(isFr ? bill96Error.fr : bill96Error.en);
-      document.getElementById('title-fr')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      return;
+    // iter310 — Bill 96 compliance is now zero-friction: when the listing
+    // is in Quebec and the French copy is missing, the backend auto-
+    // translates it via Gemini 2.5 Flash before persisting. The UI shows a
+    // soft "Translating…" loading toast (NEVER a hard-block popup) while
+    // the request is in flight. The 422 hard-gate is the absolute floor —
+    // it only fires for truly empty submissions or when both EN + FR are
+    // missing.
+    const needsBill96Translation = isQuebec && (
+      (String(formData.title || '').trim() && !String(formData.title_fr || '').trim()) ||
+      (String(formData.description || '').trim() && !String(formData.description_fr || '').trim())
+    );
+    let bill96ToastId = null;
+    if (needsBill96Translation) {
+      bill96ToastId = toast.loading(
+        isFr
+          ? 'Traduction et mise en conformité avec la Loi 96…'
+          : 'Translating and formatting listing for Bill 96 compliance…',
+        { duration: 30000, id: 'bill96-translating' }
+      );
     }
 
     setLoading(true);
@@ -420,6 +431,12 @@ const CreateListingPage = () => {
       toast.error('Failed to create listing');
     } finally {
       setLoading(false);
+      // iter310 — Dismiss the Bill 96 "Translating…" loading toast.
+      // Sonner uses string ids; passing the id dismisses the in-flight toast
+      // regardless of whether the submit succeeded or failed.
+      if (bill96ToastId) {
+        toast.dismiss('bill96-translating');
+      }
     }
   };
 

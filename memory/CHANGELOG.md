@@ -1,6 +1,58 @@
 # BidVex Changelog
 
 
+## Jun 19, 2026 — iter310 DIRECTIVE 2: Bill 96 AI Auto-Translation Pipeline
+
+### P0 (Image 5): Quebec listings hard-blocked with HTTP 422 `qc_french_description_required`
+- The `assert_qc_bilingual_titles` validator was raising a 422 popup for QC listings missing French copy → seller's submit died with a generic JSON error.
+- Fixed by adding an inline auto-translation step that runs BEFORE the hard validator. The 422 is now the absolute floor (truly empty submissions only); every realistic submission sails through to 201 Created with auto-filled French copy.
+
+### Backend — new `services/bill96_autofill.py`
+- `autofill_qc_french_copy(listing_data, *, region_override=None, city_override=None)` — checks if the listing is in Quebec, finds blank `title_fr`/`description_fr` paired with non-blank EN, calls `translation_service.translate_text` (Gemini 2.5 Flash via Emergent LLM key), mutates the payload in place.
+- Returns `{applied, fields, skipped}` so callers can surface a translation badge.
+- Works with both Pydantic models and plain dict payloads.
+- Skips gracefully on: not_quebec / already_filled / translator_unavailable / no_source.
+
+### Backend — wired into all 4 listing entry points
+- `routes/listings.py` (single listing) — autofill runs BEFORE the validator and BEFORE the admin bypass, so admin listings also get the FR copy.
+- `routes/listings.py` (multi-item parent listing).
+- `routes/vehicles.py` — uses `region_override=` because vehicle payloads name the field `province`.
+- `routes/storage_auctions.py` — calls `translate_text` directly since storage auctions only have `description_en`/`description_fr` (no title field).
+
+### Frontend — soft "Translating…" toast, no more hard-block popup
+- `CreateListingPage.js`: removed the `validateFrenchTitle` hard-block from `handleSubmit`. When the listing is QC + missing FR copy, shows `toast.loading("Translating and formatting listing for Bill 96 compliance… / Traduction et mise en conformité avec la Loi 96…")` (sticky `id='bill96-translating'`, auto-dismissed on response). Submit goes through to 201 Created.
+- `CreateMultiItemListing.js`: same pattern (`id='bill96-translating-multi'`).
+- `humanizeQcError` still in place as the final safety net for truly empty submissions.
+
+### Live E2E trace (admin, QC region, EN-only payload)
+```
+POST /api/listings  →  HTTP 200 in 13.5s
+  response.title         : Antique Brass Lamp - iter310 trace
+  response.title_fr      : Lampe antique en laiton - iter310 trace
+  response.description_fr: Lampe en laiton restaurée à la main, entièrement fonctionnelle.
+  Mongo.title_fr         : Lampe antique en laiton - iter310 trace
+  Mongo.description_fr   : Lampe en laiton restaurée à la main, entièrement fonctionnelle.
+```
+Both the API response AND MongoDB carry the auto-translated French copy.
+
+### Tests — `make regression-fast`: **58/58 PASSED in 50s**
+- `test_iter310_bill96_compliance.py` — **14 tests** (one live LLM round-trip skipped when `EMERGENT_LLM_KEY` is unset):
+  - Source-integrity (6): autofill module exists; all 4 listing routes call it; order is autofill → validator; frontend toasts EN+FR strings present; legacy hard-block removed.
+  - Unit (7): skip non-QC; no-op when already filled; fills missing FR via Gemini; detects QC by city alone; `region_override` works for vehicle payloads; translator failure surfaces `translator_unavailable`; accepts dict payloads.
+  - Live (1): real Gemini 2.5 Flash round-trip via the Emergent proxy — gated by `EMERGENT_LLM_KEY`.
+
+### Files touched
+- `backend/services/bill96_autofill.py` (new — autofill helper)
+- `backend/routes/listings.py` (autofill in single + multi-item flows; admin no longer bypasses autofill)
+- `backend/routes/vehicles.py` (autofill with region_override)
+- `backend/routes/storage_auctions.py` (inline translation for description_en/_fr)
+- `frontend/src/pages/CreateListingPage.js` (soft toast replaces hard-block)
+- `frontend/src/pages/CreateMultiItemListing.js` (soft toast replaces hard-block at Step 1)
+- `backend/tests/test_iter310_bill96_compliance.py` (new — 14 tests)
+- `Makefile` — `regression-fast` now covers all 4 iter308+309+310 suites (58 tests, 50s).
+
+
+
 ## Jun 19, 2026 — iter310 BULK-DELETE CASCADE + ADMIN SPLIT + PRE-COMMIT GATE
 
 ### P0: Multi-lot bulk delete cascade (Image 4 — "0 succeeded, 92 failed")

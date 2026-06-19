@@ -13,6 +13,7 @@ regression-fast:
 	pytest backend/tests/test_iter308_billing_and_verification.py \
 	       backend/tests/test_iter309_bulletproof_listing.py \
 	       backend/tests/test_iter310_bulk_delete_cascade.py \
+	       backend/tests/test_iter310_bill96_compliance.py \
 	       -v --tb=short
 
 # Full iter299→iter309 regression (~17 min, per-file with 35s rate-limit spacing).

@@ -239,8 +239,13 @@ async def create_listing(
     _is_demo_creator = bool(user_demo_row and user_demo_row.get("is_demo_account"))
 
     # iter217 — Quebec Bill 96 compliance — French title required for QC listings
-    # Phase 6.0 hotfix — admins bypass (master role override).
+    # Phase 6.0 hotfix — admins bypass the hard validator (master role override).
+    # iter310 — Auto-translate missing French copy via Gemini 2.5 Flash before
+    # the hard-gate runs. Runs for EVERYONE (incl. admins) so the resulting
+    # MongoDB row always has clean bilingual copy.
     _is_admin_role = (getattr(current_user, "role", "") or "").lower() in ("admin", "superadmin")
+    from services.bill96_autofill import autofill_qc_french_copy
+    _bill96_autofill_result = await autofill_qc_french_copy(listing_data)
     if not _is_admin_role:
         from services.qc_bilingual_validator import assert_qc_bilingual_titles
         assert_qc_bilingual_titles(
@@ -1124,6 +1129,9 @@ async def create_multi_item_listing(
     _is_demo_creator_multi = bool(user_demo_row and user_demo_row.get("is_demo_account"))
 
     # iter217 — Quebec Bill 96 compliance — French title required for QC listings
+    # iter310 — Auto-translate missing French copy before the hard-gate runs.
+    from services.bill96_autofill import autofill_qc_french_copy
+    _bill96_autofill_result_multi = await autofill_qc_french_copy(listing_data)
     from services.qc_bilingual_validator import assert_qc_bilingual_titles
     assert_qc_bilingual_titles(
         title=getattr(listing_data, "title", None),

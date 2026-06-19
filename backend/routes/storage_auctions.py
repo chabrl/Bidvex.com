@@ -1030,6 +1030,20 @@ async def create_storage_auction(
     # iter217 — Quebec Bill 96 compliance — French description required for QC facilities.
     # Storage auctions have description_en/description_fr (no title field), so we
     # validate the description side only.
+    # iter310 — Auto-translate the English description to French before the
+    # hard-gate. The payload field name is `description_en` (not `description`),
+    # so we route through the autofill helper with a small mapping shim.
+    if _is_quebec_listing_storage := (str(facility.get("province") or "").strip().upper() in ("QC", "QUEBEC")):
+        if payload.description_en and not (payload.description_fr or "").strip():
+            try:
+                from services.translation_service import translate_text
+                translated = await translate_text(
+                    payload.description_en, source_lang="en", target_lang="fr"
+                )
+                if translated and translated.strip():
+                    payload.description_fr = translated.strip()
+            except Exception:  # pragma: no cover — best-effort autofill
+                pass
     from services.qc_bilingual_validator import assert_qc_bilingual_titles
     assert_qc_bilingual_titles(
         title=payload.description_en or "",

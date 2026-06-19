@@ -684,13 +684,20 @@ async def create_vehicle_listing(
         )
 
     # iter217 — Quebec Bill 96 compliance — French title required for QC listings
+    # iter310 — Auto-translate missing French copy before the hard-gate runs.
+    # Vehicle payload uses `province` (not `region`); pass it as an override.
+    from services.bill96_autofill import autofill_qc_french_copy
+    _vehicle_region = getattr(listing_data, "province", None) or getattr(listing_data, "region", None)
+    _bill96_autofill_result_vehicle = await autofill_qc_french_copy(
+        listing_data, region_override=_vehicle_region,
+    )
     from services.qc_bilingual_validator import assert_qc_bilingual_titles
     assert_qc_bilingual_titles(
         title=getattr(listing_data, "title", None),
         title_fr=getattr(listing_data, "title_fr", None),
         description=getattr(listing_data, "description", None),
         description_fr=getattr(listing_data, "description_fr", None),
-        region=getattr(listing_data, "province", None) or getattr(listing_data, "region", None),
+        region=_vehicle_region,
         city=getattr(listing_data, "city", None),
         content_language=getattr(listing_data, "content_language", None),
     )

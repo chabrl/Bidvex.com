@@ -457,13 +457,10 @@ const CreateMultiItemListing = () => {
         return false;
       }
       // iter299 P0 — Bill 96: Quebec lots auctions require a French title.
-      const bill96Error = validateFrenchTitle({ isQuebec, titleFr: formData.title_fr });
-      if (bill96Error) {
-        const msg = (i18n.language || 'en').startsWith('fr') ? bill96Error.fr : bill96Error.en;
-        setFrTitleError(msg);
-        toast.error(msg);
-        return false;
-      }
+      // iter310 — Soft-gate only: when the title is missing in French, we no
+      // longer block the user at Step 1; the backend will auto-translate via
+      // Gemini 2.5 Flash before persisting. Clear any stale error.
+      setFrTitleError('');
       return true;
     }
     
@@ -575,6 +572,25 @@ const CreateMultiItemListing = () => {
     }
 
     setLoading(true);
+
+    // iter310 — Bill 96 zero-friction translation: when the QC listing
+    // lacks French copy, show a soft "Translating…" toast while the
+    // backend auto-fills via Gemini 2.5 Flash. Never a hard-block popup.
+    const isFr2 = (i18n.language || 'en').startsWith('fr');
+    const needsBill96Translation = isQuebec && (
+      (String(formData.title || '').trim() && !String(formData.title_fr || '').trim()) ||
+      (String(formData.description || '').trim() && !String(formData.description_fr || '').trim())
+    );
+    let bill96ToastId = null;
+    if (needsBill96Translation) {
+      bill96ToastId = toast.loading(
+        isFr2
+          ? 'Traduction et mise en conformité avec la Loi 96…'
+          : 'Translating and formatting listing for Bill 96 compliance…',
+        { duration: 30000, id: 'bill96-translating-multi' }
+      );
+    }
+
     const lotsData = lots.map(lot => ({
       ...lot,
       starting_price: parseFloat(lot.starting_price),
@@ -669,6 +685,10 @@ const CreateMultiItemListing = () => {
       }
     } finally {
       setLoading(false);
+      // iter310 — Dismiss the Bill 96 "Translating…" loading toast.
+      if (bill96ToastId) {
+        toast.dismiss('bill96-translating-multi');
+      }
     }
   };
 
