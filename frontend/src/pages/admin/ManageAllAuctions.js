@@ -303,33 +303,59 @@ const ManageAllAuctions = () => {
     }
   };
 
-  const exportToCsv = () => {
-    if (filteredListings.length === 0) {
+  // iter312 — server-streamed CSV export. Hits
+  // GET /api/admin/listings/export which re-uses the same $unionWith
+  // aggregation as the list view (minus pagination + facet) and streams
+  // the response. Honours the admin's current filter state — type /
+  // status / search are mapped 1:1 to the backend's section / status /
+  // q params so what the admin SEES is what the admin EXPORTS, even
+  // when the visible window is paginated at 500.
+  const [exportPending, setExportPending] = useState(false);
+  const exportToCsv = async () => {
+    if (perfMeta.total === 0) {
       toast.error('Nothing to export with current filters');
       return;
     }
-    const rows = [
-      ['ID', 'Type', 'Title', 'Category', 'Seller ID', 'Status', 'Current Price', 'Bid Count', 'Created'],
-      ...filteredListings.map(l => [
-        l.id || '',
-        l.type || '',
-        `"${(l.title || '').replace(/"/g, '""')}"`,
-        l.category || '',
-        l.seller_id || '',
-        l.status || '',
-        l.current_price ?? l.starting_price ?? '',
-        l.bid_count ?? '',
-        l.created_at ? new Date(l.created_at).toISOString() : '',
-      ].join(',')),
-    ].join('\n');
-    const blob = new Blob([rows], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `bidvex-auctions-${new Date().toISOString().slice(0,10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success(`Exported ${filteredListings.length} auction(s) to CSV`);
+    setExportPending(true);
+    try {
+      // Map the client filter state → server params.
+      // typeFilter: 'all' | 'single' | 'multi'  →  section: undefined | 'marketplace,vehicle' | 'vehicle_multi,lots'
+      const params = new URLSearchParams();
+      if (typeFilter === 'single') params.set('section', 'marketplace,vehicle');
+      else if (typeFilter === 'multi') params.set('section', 'vehicle_multi,lots');
+      if (statusFilter && statusFilter !== 'all') params.set('status', statusFilter);
+      const q = (searchQuery || '').trim();
+      if (q) params.set('q', q);
+      params.set('hard_cap', '50000');
+
+      const res = await axios.get(
+        `${API}/admin/listings/export?${params.toString()}`,
+        { headers, responseType: 'blob' },
+      );
+
+      // Pull filename from Content-Disposition if present, else build one.
+      const cd = res.headers['content-disposition'] || '';
+      let filename = `bidvex-listings-${new Date().toISOString().slice(0, 10)}.csv`;
+      const m = /filename="?([^"]+)"?/.exec(cd);
+      if (m) filename = m[1];
+
+      const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      // Count rows in the downloaded blob (subtract 1 for header line)
+      const text = await blob.text();
+      const rowCount = Math.max(0, (text.split('\n').length - 1) - 1);
+      toast.success(`Exported ${rowCount} auction(s) to ${filename}`);
+    } catch (err) {
+      console.error('CSV export failed:', err);
+      toast.error('Export failed — see console');
+    } finally {
+      setExportPending(false);
+    }
   };
 
   // iter311 — combined view is now just the single state array. The
@@ -377,9 +403,17 @@ const ManageAllAuctions = () => {
           </h2>
           <p className="text-muted-foreground">Unified view of all single and multi-item listings</p>
         </div>
-        <Button variant="outline" onClick={exportToCsv} disabled={filteredListings.length === 0}
-          data-testid="export-auctions-csv">
-          <Download className="h-4 w-4 mr-2" /> Export CSV ({filteredListings.length})
+        <Button
+          variant="outline"
+          onClick={exportToCsv}
+          disabled={perfMeta.total === 0 || exportPending}
+          data-testid="export-auctions-csv"
+          title="Streams the full filtered result set from the server — not capped at the 500-row view."
+        >
+          <Download className="h-4 w-4 mr-2" />
+          {exportPending
+            ? 'Exporting…'
+            : `Export CSV (${perfMeta.total || filteredListings.length})`}
         </Button>
       </div>
 

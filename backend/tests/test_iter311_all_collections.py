@@ -220,8 +220,29 @@ def test_sort_created_at_desc_is_default(admin_headers):
     rows = r.json()["rows"]
     if len(rows) < 2:
         pytest.skip("need at least 2 rows to verify sort")
-    timestamps = [row.get("created_at") for row in rows if row.get("created_at")]
-    assert timestamps == sorted(timestamps, reverse=True), \
+    # Parse timestamps via datetime so we compare values (not BSON
+    # mixed-type strings). Some legacy `listings` rows have `created_at`
+    # stored as a tz-naive string while iter311/iter312-seeded rows have
+    # tz-aware datetimes — Python string sort would interleave them
+    # incorrectly. We coerce both to UTC `datetime` for the compare.
+    from datetime import datetime, timezone
+
+    def _to_utc(s):
+        if not s:
+            return None
+        try:
+            dt = datetime.fromisoformat(s)
+        except Exception:
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+
+    parsed = [_to_utc(row.get("created_at")) for row in rows]
+    parsed = [d for d in parsed if d is not None]
+    if len(parsed) < 2:
+        pytest.skip("not enough parseable timestamps to verify sort")
+    assert parsed == sorted(parsed, reverse=True), \
         "default sort is not created_at_desc"
 
 

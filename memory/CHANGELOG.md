@@ -1,6 +1,59 @@
 # BidVex Changelog
 
 
+## Jun 19, 2026 — iter312 ADMIN CSV EXPORT + AGGREGATION TYPE-SAFETY
+
+### New: `GET /api/admin/listings/export`
+Server-streamed CSV export across all 4 listing collections. Re-uses the iter311 `$unionWith` aggregation pipeline (minus pagination + facet) and streams row-by-row via FastAPI `StreamingResponse` so memory pressure stays flat regardless of export size.
+
+- **Filters**: same params as the list view — `q`, `status`, `section` (csv), `seller_id`, `sort`, plus `hard_cap` (default 50,000 / max 200,000).
+- **Headers**: `Content-Type: text/csv; charset=utf-8`, `Content-Disposition: attachment; filename="bidvex-listings-YYYYMMDD-HHmmss.csv"`, custom `X-BidVex-Export: listings-all-collections` for monitoring.
+- **CSV quality**: UTF-8 BOM (Excel autodetects), RFC-4180 quoting (commas / quotes / newlines safely escaped), 13 canonical columns matching the list-view shape: `Listing ID, Section, Title, Status, Seller ID, Seller Email, Created At, Auction End, Featured, Current Bid, Lot Count, City, Region`.
+
+### Bug fix: type-safe sorting on the unified endpoint
+Discovered while writing iter312 tests: legacy rows in `listings` historically stored `created_at` as an ISO string (tz-naive), while iter311/iter312 inserts use BSON dates. MongoDB's `$sort` sorts strings AFTER dates in mixed-type comparisons, so `?sort=created_at_desc` interleaved the legacy strings ahead of the newer dates.
+
+**Fix**: every per-collection `$project` in the aggregation pipeline now wraps `created_at` and `auction_end_date` in `$convert: {input: ..., to: "date", onError: None, onNull: None}`. All rows now sort consistently regardless of how the source data was stored.
+
+### Frontend — Export CSV button rewired
+- `ManageAllAuctions.js::exportToCsv` now calls `/admin/listings/export` with `responseType: 'blob'` and the current admin filter state mapped 1:1 to the backend's params (`typeFilter='single'` → `section=marketplace,vehicle`, etc.).
+- Replaces the legacy client-side CSV builder that only saw the paginated 500-row window — admins can now export every matching row, even with 5,000+ in scope.
+- Button label shows the server-side `perfMeta.total` count, not the client-paginated subset.
+- Pending state (`exportPending`) + "Exporting…" label during the request.
+- Filename pulled from the server's `Content-Disposition` header so all downloads carry the canonical timestamped name.
+
+### Live trace
+Full export against 658 rows across 4 collections (post iter311 perf-seed):
+```
+HTTP 200 in 295 ms
+  Content-Disposition : attachment; filename="bidvex-listings-20260619-183817.csv"
+  size                : 137.4 KB
+  rows (excl. header) : 658
+  filtered (marketplace + active): 212 ms, 190 rows
+```
+
+### Tests — `make regression-fast`: **85/85 PASSED in 55s** (3 conditional skips)
+- New `test_iter312_csv_export.py` — **10 passing, 1 conditional skip**:
+  - Source-integrity: endpoint exists, StreamingResponse + `_build_match_pipeline` shared with list view, frontend wired correctly, legacy client-side CSV builder gone.
+  - Live: canonical header row + BOM, admin-only (403 for non-admin), section filter row count matches list endpoint's `by_section.marketplace`, status / q filters propagate, RFC-4180 quoting survives a synthetic row with `"`, `,`, embedded text, invalid section yields header-only CSV, `hard_cap` validates via iter309 bilingual 400 handler, 5k-row export completes in <10s.
+- iter311 `test_sort_created_at_desc_is_default` updated to parse timestamps via `datetime.fromisoformat` (testing resilience for legacy data shapes).
+
+### Files changed
+- `backend/routes/admin_listings_aggregated.py` — new `_build_match_pipeline` shared helper, new `_CSV_COLUMNS` / `_csv_quote` / `admin_listings_export_csv`, all per-collection $project now `$convert`s `created_at` + `auction_end_date` to BSON dates.
+- `frontend/src/pages/admin/ManageAllAuctions.js` — `exportToCsv` rewired; button shows server-side total + pending state.
+- `backend/tests/test_iter312_csv_export.py` (new — 11 tests)
+- `backend/tests/test_iter311_all_collections.py` — sort test parses timestamps before comparing
+- `Makefile` — `regression-fast` now covers iter308 + iter309 + iter310 (×2) + iter311 + iter312 (85 tests, 55 s)
+- `/app/memory/CHANGELOG.md` (this entry)
+
+### Production deployment note for the user
+The export + the aggregation type-safety fix are **live in preview only**. To push to https://bidvex.com:
+1. Redeploy preview → production.
+2. The `$convert` type-safety fix is the most important reason to redeploy — without it, production admins will see `?sort=created_at_desc` ordering quirks on the new list endpoint.
+3. (Already covered in iter311) Run `python /app/backend/scripts/iter311_install_indexes.py` against the production Atlas cluster (idempotent, `background=True`).
+
+
+
 ## Jun 19, 2026 — iter311 (Part 2): Frontend Swap + MongoDB Compound Indexes
 
 ### Frontend swap — `ManageAllAuctions.js`

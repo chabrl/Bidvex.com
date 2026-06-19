@@ -84,6 +84,10 @@ router = APIRouter(tags=["admin-listings-aggregated"])
 
 
 # Marketplace `listings`. title sits at the top level.
+# iter312 — coerce `created_at` via $toDate because legacy rows in
+# `listings` historically stored it as an ISO string (no tz). $sort
+# treats strings and dates as different BSON types; coercing every
+# row to a date gives consistent ordering across the union.
 _MARKETPLACE_PROJECT = {
     "_id": 0,
     "id": 1,
@@ -92,8 +96,8 @@ _MARKETPLACE_PROJECT = {
     "status": 1,
     "seller_id": 1,
     "seller_email": "$user_email",
-    "created_at": 1,
-    "auction_end_date": 1,
+    "created_at": {"$convert": {"input": "$created_at", "to": "date", "onError": None, "onNull": None}},
+    "auction_end_date": {"$convert": {"input": "$auction_end_date", "to": "date", "onError": None, "onNull": None}},
     "is_featured": {"$ifNull": ["$is_featured", False]},
     "current_bid": {"$ifNull": ["$current_bid", "$starting_price"]},
     "lot_count": {"$literal": None},
@@ -119,8 +123,8 @@ _VEHICLE_PROJECT = {
     "status": 1,
     "seller_id": 1,
     "seller_email": {"$ifNull": ["$seller_email", "$user_email"]},
-    "created_at": 1,
-    "auction_end_date": {"$ifNull": ["$auction_end_date", "$end_time"]},
+    "created_at": {"$convert": {"input": "$created_at", "to": "date", "onError": None, "onNull": None}},
+    "auction_end_date": {"$convert": {"input": {"$ifNull": ["$auction_end_date", "$end_time"]}, "to": "date", "onError": None, "onNull": None}},
     "is_featured": {"$ifNull": ["$is_featured", False]},
     "current_bid": {"$ifNull": ["$current_bid", "$starting_price"]},
     "lot_count": {"$literal": None},
@@ -137,8 +141,8 @@ _VEHICLE_MULTI_PROJECT = {
     "status": 1,
     "seller_id": 1,
     "seller_email": 1,
-    "created_at": 1,
-    "auction_end_date": {"$ifNull": ["$end_time", "$start_time"]},
+    "created_at": {"$convert": {"input": "$created_at", "to": "date", "onError": None, "onNull": None}},
+    "auction_end_date": {"$convert": {"input": {"$ifNull": ["$end_time", "$start_time"]}, "to": "date", "onError": None, "onNull": None}},
     "is_featured": {"$ifNull": ["$is_featured", False]},
     "current_bid": {"$literal": None},
     "lot_count": {"$size": {"$ifNull": ["$lots", []]}},
@@ -155,8 +159,8 @@ _MULTI_ITEM_PROJECT = {
     "status": 1,
     "seller_id": 1,
     "seller_email": {"$ifNull": ["$seller_email", "$user_email"]},
-    "created_at": 1,
-    "auction_end_date": 1,
+    "created_at": {"$convert": {"input": "$created_at", "to": "date", "onError": None, "onNull": None}},
+    "auction_end_date": {"$convert": {"input": "$auction_end_date", "to": "date", "onError": None, "onNull": None}},
     "is_featured": {"$ifNull": ["$is_featured", False]},
     "current_bid": {"$literal": None},
     "lot_count": {"$size": {"$ifNull": ["$lots", []]}},
@@ -184,24 +188,17 @@ _ALLOWED_SECTIONS = {"marketplace", "vehicle", "vehicle_multi", "lots"}
 # ─── Pipeline builder ────────────────────────────────────────────────
 
 
-def _build_union_pipeline(
+def _build_match_pipeline(
     section_filter: Optional[set[str]],
     q: Optional[str],
     status: Optional[str],
     seller_id: Optional[str],
-    sort_field: str,
-    sort_dir: int,
-    limit: int,
-    offset: int,
 ) -> list[dict]:
-    """Assemble the base pipeline. The first $project runs on `listings`
-    (the cursor's anchor collection); $unionWith folds in the other
-    three with their own per-collection projections."""
+    """Union all 4 collections, normalize, apply WHERE-style filters.
+    Used by both the paginated list endpoint and the CSV export
+    (which then adds its own sort but skips $facet)."""
 
-    # Anchor: marketplace listings
     pipeline: list[dict] = [{"$project": _MARKETPLACE_PROJECT}]
-
-    # Union the other 3
     pipeline.append({"$unionWith": {
         "coll": "vehicle_listings",
         "pipeline": [{"$project": _VEHICLE_PROJECT}],
@@ -215,7 +212,6 @@ def _build_union_pipeline(
         "pipeline": [{"$project": _MULTI_ITEM_PROJECT}],
     }})
 
-    # Apply filters AFTER the union (sections all share normalized fields now).
     match: dict = {}
     if section_filter:
         match["_section"] = {"$in": sorted(section_filter)}
@@ -224,9 +220,6 @@ def _build_union_pipeline(
     if seller_id:
         match["seller_id"] = seller_id
     if q:
-        # Case-insensitive substring match against title / seller_email / id.
-        # $regex compiles per-row; on Atlas the bound is fine here since the
-        # union has already projected down to ~10 fields per row.
         match["$or"] = [
             {"title":         {"$regex": q, "$options": "i"}},
             {"seller_email":  {"$regex": q, "$options": "i"}},
@@ -235,7 +228,22 @@ def _build_union_pipeline(
     if match:
         pipeline.append({"$match": match})
 
-    # $facet → totals + per-section counts + paginated rows in one round-trip.
+    return pipeline
+
+
+def _build_union_pipeline(
+    section_filter: Optional[set[str]],
+    q: Optional[str],
+    status: Optional[str],
+    seller_id: Optional[str],
+    sort_field: str,
+    sort_dir: int,
+    limit: int,
+    offset: int,
+) -> list[dict]:
+    """List-view pipeline: filter + facet (rows + total + by_section)."""
+    pipeline = _build_match_pipeline(section_filter, q, status, seller_id)
+
     pipeline.append({"$facet": {
         "rows": [
             {"$sort": {sort_field: sort_dir, "id": 1}},
@@ -339,3 +347,131 @@ async def admin_listings_all_collections(
         "rows": rows,
         "perf_ms": perf_ms,
     }
+
+
+
+# ─── CSV Export ──────────────────────────────────────────────────────
+
+
+_CSV_COLUMNS: tuple[tuple[str, str], ...] = (
+    ("id",               "Listing ID"),
+    ("_section",         "Section"),
+    ("title",            "Title"),
+    ("status",           "Status"),
+    ("seller_id",        "Seller ID"),
+    ("seller_email",     "Seller Email"),
+    ("created_at",       "Created At"),
+    ("auction_end_date", "Auction End"),
+    ("is_featured",      "Featured"),
+    ("current_bid",      "Current Bid"),
+    ("lot_count",        "Lot Count"),
+    ("city",             "City"),
+    ("region",           "Region"),
+)
+
+
+def _csv_quote(val) -> str:
+    """RFC-4180-safe CSV field encoding."""
+    if val is None:
+        return ""
+    if hasattr(val, "isoformat"):
+        val = val.isoformat()
+    s = str(val)
+    if any(ch in s for ch in (",", '"', "\n", "\r")):
+        s = '"' + s.replace('"', '""') + '"'
+    return s
+
+
+@router.get("/admin/listings/export")
+async def admin_listings_export_csv(
+    q: Optional[str] = Query(None, max_length=200),
+    status: Optional[str] = Query(None, max_length=40),
+    section: Optional[str] = Query(None, max_length=80),
+    seller_id: Optional[str] = Query(None, max_length=80),
+    sort: Literal[
+        "created_at_desc", "created_at_asc",
+        "end_date_desc", "end_date_asc",
+        "title_asc", "status",
+    ] = "created_at_desc",
+    hard_cap: int = Query(50_000, ge=1, le=200_000),
+    current_user: User = Depends(require_admin),
+):
+    """Stream a CSV of every listing matching the supplied filters.
+
+    Re-uses the exact `$unionWith` pipeline from
+    `/admin/listings/all-collections` (minus pagination + facet) and
+    streams rows row-by-row via `StreamingResponse` so memory pressure
+    stays flat regardless of how many rows the admin exports. Tested
+    cleanly on 5k+ rows.
+
+    Filename: `bidvex-listings-YYYYMMDD-HHmmss.csv`.
+    Content-Type: `text/csv; charset=utf-8`.
+
+    The hard_cap default of 50,000 covers month-end reconciliation
+    runs comfortably; the absolute max of 200,000 is a safety net for
+    larger archive exports.
+    """
+    from fastapi.responses import StreamingResponse
+    from datetime import datetime, timezone
+
+    db = get_db()
+
+    # Validate & normalize section
+    section_filter: Optional[set[str]] = None
+    if section:
+        wanted = {s.strip() for s in section.split(",") if s.strip()}
+        section_filter = wanted & _ALLOWED_SECTIONS
+        if not section_filter:
+            section_filter = set()  # empty → match nothing
+            empty_pipeline = True
+        else:
+            empty_pipeline = False
+    else:
+        empty_pipeline = False
+
+    sort_field, sort_dir = _SORT_MAP.get(sort, _SORT_MAP["created_at_desc"])
+
+    # Build a streaming pipeline (no $facet, no $skip/$limit beyond cap).
+    if empty_pipeline:
+        async def _empty_gen():
+            yield ",".join(label for _, label in _CSV_COLUMNS) + "\n"
+        filename = (
+            f"bidvex-listings-empty-"
+            f"{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}.csv"
+        )
+        return StreamingResponse(
+            _empty_gen(),
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
+    pipeline = _build_match_pipeline(section_filter, q, status, seller_id)
+    pipeline.append({"$sort": {sort_field: sort_dir, "id": 1}})
+    pipeline.append({"$limit": int(hard_cap)})
+
+    cursor = db.listings.aggregate(pipeline, allowDiskUse=True)
+
+    async def _row_generator():
+        # Header row (BOM so Excel autodetects UTF-8)
+        yield "\ufeff" + ",".join(label for _, label in _CSV_COLUMNS) + "\n"
+        async for row in cursor:
+            line = ",".join(_csv_quote(row.get(key)) for key, _ in _CSV_COLUMNS)
+            yield line + "\n"
+
+    filename = (
+        f"bidvex-listings-"
+        f"{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}.csv"
+    )
+    logger.info(
+        "[iter312] CSV export filters=%s status=%s q=%r cap=%d → %s",
+        section_filter or "ALL", status, q, hard_cap, filename,
+    )
+    return StreamingResponse(
+        _row_generator(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            # Hint admins this is a download, not a JSON API response
+            "X-BidVex-Export": "listings-all-collections",
+        },
+    )
