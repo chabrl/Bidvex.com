@@ -1335,6 +1335,11 @@ try:
     from routes.admin_user_actions import router as admin_user_actions_router
     api_router.include_router(admin_user_actions_router)
 
+    # iter311 — Unified server-aggregated admin listing view across the
+    # 4 listing collections (replaces 4 client-side fetches with 1).
+    from routes.admin_listings_aggregated import router as admin_listings_aggregated_router
+    api_router.include_router(admin_listings_aggregated_router)
+
     # iter214 P1 — Individual-seller pickup-code system
     from routes.transaction_pickup_code import router as pickup_code_router
     api_router.include_router(pickup_code_router)

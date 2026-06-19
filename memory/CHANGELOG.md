@@ -1,6 +1,55 @@
 # BidVex Changelog
 
 
+## Jun 19, 2026 — iter311 ADMIN UNIFIED ALL-COLLECTIONS ENDPOINT
+
+### New: `GET /api/admin/listings/all-collections`
+Single server-aggregated endpoint that merges all 4 admin listing
+collections (`listings`, `vehicle_listings`,
+`vehicle_multi_lot_auctions`, `multi_item_listings`) into a normalized
+paginated payload. Replaces the old client-side multi-fetch pattern
+in Admin → Manage All Auctions.
+
+#### Aggregation strategy
+- Anchor collection: `listings`, then `$unionWith` for the other 3.
+- Per-collection `$project` normalizes to a common shape: `{id, _section, title, status, seller_id, seller_email, created_at, auction_end_date, is_featured, current_bid, lot_count, city, region}`.
+- Filters (`q`, `status`, `section`, `seller_id`) apply AFTER the union so they hit every section consistently.
+- `$facet` returns `{rows, total, by_section}` in a single round-trip.
+- Section tags: `marketplace` | `vehicle` | `vehicle_multi` | `lots`.
+- Sort options: `created_at_desc` (default) | `created_at_asc` | `end_date_desc` | `end_date_asc` | `title_asc` | `status`.
+- Pagination: `limit` (1-500, default 50) + `offset`.
+- Section param accepts comma-separated values (`?section=vehicle,vehicle_multi`).
+
+#### Performance baseline (752 docs across 4 collections, Atlas free tier)
+
+| Metric        | OLD (multi-fetch) | NEW (1 endpoint) | Δ           |
+| ------------- | ----------------- | ---------------- | ----------- |
+| p50 latency   | 882 ms            | **178 ms**       | **4.96×**   |
+| min latency   | 833 ms            | 173 ms           |             |
+| payload p50   | 685 KB            | **19 KB**        | **-97.2 %** |
+| MongoDB time  | n/a               | 39 ms            |             |
+
+The 70 % speedup target from my iter310 close-out suggestion is exceeded — measured **80 % p50 latency reduction + 97 % payload drop**. Free MongoDB tier, no indexes added (room for further wins).
+
+### Files added
+- `backend/routes/admin_listings_aggregated.py` (new — endpoint + pipeline builder)
+- `backend/scripts/iter311_perf_seed.py` (new — synthetic data seeder, idempotent, tagged `_seed_tag="iter311-perf-seed"`)
+- `backend/scripts/iter311_perf_baseline.py` (new — before/after timing script)
+- `backend/tests/test_iter311_all_collections.py` (new — **16 tests**)
+
+### Files modified
+- `backend/server.py` — registered the new router under api_router
+- `Makefile` — `regression-fast` now covers iter308 + iter309 + iter310 (×2) + iter311
+
+### Tests — `make regression-fast`: **74/74 PASSED in 60s**
+- iter308: 19/19 — billing + verification
+- iter309: 11/11 — bulletproof listing
+- iter310 cascade: 14/14
+- iter310 bill96: 14/14 (incl. live LLM round-trip)
+- iter311 all-collections: 16/16 (auth, shape, filters, pagination, sort, perf bound, source-integrity)
+
+
+
 ## Jun 19, 2026 — iter310 DIRECTIVE 2: Bill 96 AI Auto-Translation Pipeline
 
 ### P0 (Image 5): Quebec listings hard-blocked with HTTP 422 `qc_french_description_required`
