@@ -1,6 +1,76 @@
 # BidVex Changelog
 
 
+## Jun 19, 2026 — iter312 P0 FINANCIAL LEAK FIX: Multi-Quantity Hammer Multiplier
+
+### The bug (Image 1f5000.jpg — Settle Payment modal)
+Listing with Quantity=2, $1.10 hammer price → modal showed:
+- Hammer Price: $1.10 (per unit, WRONG)
+- Platform Fee 2.5%: $0.03
+- Total Due: $1.13
+
+Buyer was undercharged by ~50% on every multi-quantity win, and the platform was earning fee on the per-unit price instead of the total goods value. Sellers also got short net payouts.
+
+### Root cause
+`routes/settlement.py::_amounts()` (and the ledger writer `services/payment_collection.py::finalize_auction_payment`) both read the listing's `final_price` directly and computed all downstream amounts off that single-unit number. The `quantity` field on every `ListingCreate` (default 1) was completely ignored by the settlement engine.
+
+### Fix
+**1. `routes/settlement.py::_amounts()`** — now resolves `quantity = max(1, listing.quantity_won or listing.quantity or 1)` and computes:
+```
+final_hammer_base = unit_hammer_price × quantity_won
+platform_fee = final_hammer_base × 0.025
+total_due    = final_hammer_base + platform_fee + taxes
+net_payout   = final_hammer_base − platform_fee
+```
+Response also exposes `unit_hammer_price` + `quantity` so the Settle Payment modal can render "$1.10 × 2 = $2.20" without a second call.
+
+**2. `services/payment_collection.py::finalize_auction_payment()`** — defense-in-depth: when no explicit `hammer_override` is passed, derives the gross from `listing.quantity` directly so transactions / invoices / payouts all record the multiplied total even if a caller forgets to multiply.
+
+### Live trace (the exact P0 listing from Image 1f5000.jpg)
+```
+GET /api/settlement/panel/3330370f-428c-4b90-b957-0a859ecf3fcc
+  HTTP 200
+  unit_hammer_price  : $1.10
+  quantity           : 2
+  hammer_price       : $2.20   ← buyer-owed goods total (was $1.10)
+  platform_fee (2.5%): $0.06   ← (was $0.03 — half what platform was owed)
+  taxes              : $0.00
+  total_due          : $2.26   ← (was $1.13 — buyer was underpaying by ~50%)
+  net_payout         : $2.14   ← (was $1.07 — seller was underpaid by ~50%)
+```
+
+### Quantity edge cases handled
+| Input              | Result                                  |
+| ------------------ | --------------------------------------- |
+| `quantity=2`       | × 2 (the fix)                            |
+| `quantity=1`       | × 1 (no-op, identical to pre-iter312)    |
+| `quantity` missing | × 1 (safe default)                       |
+| `quantity=0`       | × 1 (CLAMPED — never zero-out a charge)  |
+| `quantity=-3`      | × 1 (CLAMPED)                            |
+| `quantity="abc"`   | × 1 (CLAMPED, no crash)                  |
+| `quantity_won=3, quantity=5` | × 3 (`quantity_won` wins) |
+
+### Tests — `make regression-fast`: **101/101 PASSED in 67s**
+New `test_iter312_multi_quantity_billing.py` — **13 tests**:
+- Unit tests for `_amounts()` covering the P0 repro, qty=1 backwards-compat, missing/zero/negative/non-numeric quantity, large quantity scaling, `quantity_won` precedence, taxes after multiplication.
+- Live HTTP tests: seller `settlement/panel` returns multiplied figures; winning buyer's `settle-context` modal returns multiplied figures; query-string coercion attempts to fake `quantity=1` are blocked (server always reads from the listing).
+- Defense-in-depth: `finalize_auction_payment` records the multiplied hammer in transactions + receipts even when no override is passed.
+- Source-integrity: iter312 marker comments + key signatures (`_quantity(doc)`, `unit_hammer * quantity`) present in both modified files.
+
+### Files changed
+- `backend/routes/settlement.py` — new `_quantity()` helper + iter312-rewritten `_amounts()` with multiplier and response keys.
+- `backend/services/payment_collection.py` — `finalize_auction_payment` now multiplies by `listing.quantity` when no override is passed.
+- `backend/tests/test_iter312_multi_quantity_billing.py` (new — 13 tests)
+- `Makefile` — `regression-fast` now covers iter308 + 309 + 310×2 + 311 + 312×2 (101 tests, 67s).
+
+### Pre-commit compile gate
+`scripts/pre_commit_compile_check.py` validates all touched routes in **513ms over 675 files** — well under the 0.5s target.
+
+### Production deployment note
+The fix is **live in preview only**. This is a P0 financial leak — production https://bidvex.com is still undercharging buyers and underpaying sellers on every multi-quantity win until you redeploy. The change is purely additive (response gains `unit_hammer_price` + `quantity` keys; existing keys keep their semantics for qty=1 listings), so the redeploy is risk-free.
+
+
+
 ## Jun 19, 2026 — iter312 ADMIN CSV EXPORT + AGGREGATION TYPE-SAFETY
 
 ### New: `GET /api/admin/listings/export`

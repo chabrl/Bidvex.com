@@ -73,17 +73,58 @@ def _hammer(doc: Dict) -> float:
                  or doc.get("current_bid") or doc.get("winning_bid") or 0)
 
 
+def _quantity(doc: Dict) -> int:
+    """Resolve the quantity actually settled. Per iter312, bids are
+    placed at the per-unit price but the buyer owes hammer × quantity.
+
+    Priority:
+      1. `quantity_won` if the seller / system set it explicitly
+         (partial-quantity wins, batched lots).
+      2. `quantity` on the listing (top-level field, default 1).
+
+    Anything <= 0 or non-int is clamped to 1 — never accidentally
+    zero-out a charge.
+    """
+    raw = doc.get("quantity_won") or doc.get("quantity") or 1
+    try:
+        q = int(raw)
+    except (TypeError, ValueError):
+        q = 1
+    return max(1, q)
+
+
 def _amounts(doc: Dict) -> Dict[str, float]:
-    hammer = _hammer(doc)
-    platform_fee = round(hammer * PLATFORM_FEE_RATE, 2)
+    """iter312 — Multi-quantity hammer multiplier fix.
+
+    Pre-iter312 the settlement engine computed fees off the per-unit
+    hammer price, silently undercharging buyers of multi-quantity
+    listings (e.g. Quantity=2, $1.10 → buyer was charged $1.13 instead
+    of $2.20 base + fees). Platform broker fee + taxes now derive from
+    the multiplied `final_hammer_base = unit_hammer × quantity_won`,
+    preserving platform revenue per Directive 1.
+
+    Response keeps the legacy keys (`hammer_price`, `platform_fee`,
+    `taxes`, `total_due`, `net_payout`) so the frontend Settle Payment
+    modal doesn't need to change shape, and adds `quantity` +
+    `unit_hammer_price` so the UI can render "$1.10 × 2 = $2.20".
+    """
+    unit_hammer = _hammer(doc)
+    quantity = _quantity(doc)
+    final_hammer_base = round(unit_hammer * quantity, 2)
+    platform_fee = round(final_hammer_base * PLATFORM_FEE_RATE, 2)
     taxes = float(doc.get("buyer_taxes") or 0)
-    total = round(hammer + platform_fee + taxes, 2)
+    total = round(final_hammer_base + platform_fee + taxes, 2)
     return {
-        "hammer_price": round(hammer, 2),
+        # `hammer_price` ALWAYS means "what the buyer owes for the
+        # goods" — for multi-quantity wins that's unit × quantity.
+        "hammer_price": final_hammer_base,
+        # Per-unit and quantity exposed so the UI can render the math.
+        "unit_hammer_price": round(unit_hammer, 2),
+        "quantity": quantity,
         "platform_fee": platform_fee,
         "taxes": round(taxes, 2),
         "total_due": total,
-        "net_payout": round(hammer - platform_fee, 2),
+        "net_payout": round(final_hammer_base - platform_fee, 2),
     }
 
 

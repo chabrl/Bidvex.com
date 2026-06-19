@@ -273,7 +273,16 @@ async def finalize_auction_payment(
     winner_override: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Interpret a settle_auction result and drive the payment lifecycle.
-    Never raises — auction close must not block on payment bookkeeping."""
+    Never raises — auction close must not block on payment bookkeeping.
+
+    iter312 — `hammer_override` is the BUYER-OWED gross hammer (already
+    multiplied by quantity if applicable). When NOT provided, this
+    function multiplies the listing's per-unit final price by
+    `listing.quantity` (default 1) so transactions / invoices / payouts
+    all record the multiplied total. This closes a P0 financial leak
+    where multi-quantity listings were undercharged by the per-unit
+    factor.
+    """
     out: Dict[str, Any] = {"payment_status": None}
     try:
         listing_id = listing.get("id")
@@ -283,12 +292,21 @@ async def finalize_auction_payment(
             or listing.get("winning_bidder_id") or listing.get("highest_bidder_id")
         )
         seller_id = listing.get("seller_id") or listing.get("facility_owner_id")
-        hammer = float(
-            hammer_override
-            if hammer_override is not None
-            else (listing.get("final_price") or listing.get("current_price")
-                  or listing.get("current_bid") or 0)
-        )
+        # iter312 — quantity multiplier (see docstring). Clamp to >=1
+        # because zero/null silently zero-outs the entire transaction.
+        try:
+            quantity_raw = listing.get("quantity_won") or listing.get("quantity") or 1
+            quantity = max(1, int(quantity_raw))
+        except (TypeError, ValueError):
+            quantity = 1
+        if hammer_override is not None:
+            hammer = float(hammer_override)
+        else:
+            unit = float(
+                listing.get("final_price") or listing.get("current_price")
+                or listing.get("current_bid") or 0
+            )
+            hammer = round(unit * quantity, 2)
         if not winner_id or hammer <= 0:
             return out
 
