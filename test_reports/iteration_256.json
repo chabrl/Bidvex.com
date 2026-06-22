@@ -1,0 +1,44 @@
+{
+  "summary": "iter312 regression: backend rock-solid, frontend Edit hydration BROKEN. (1) All 12 iter312 backend pytest cases pass (6 ai_review_dataloss + 6 draft_expiry). (2) `make regression-fast` = 147 passed / 3 skipped / 0 failed (122s). (3) D1 root-cause fix verified live: locked-* stub doc persists every seller field (location/city/region/country/postal_code/province/title/title_fr/condition/currency/buy_now_price) and admin approve preserves them byte-identical. (4) D2 backend PUT-edit-while-pending works; resubmit-for-review returns 200 with valid rescan outcome. (5) D3 draft-expiry sweep handles all age bands, all 5 collections, idempotency, scheduler job registration. (6) Frontend Seller Dashboard correctly renders the new Edit/Resubmit/Delete data-testids for a pending listing — the old 🔒 locked banner is GONE (locked_banner_count=0). (7) Edit button navigates to /edit-listing/{id} successfully. ❌ CRITICAL: form hydration FAILS — GET /api/listings/locked-* returns 500 because the Pydantic `Listing` response model requires `current_price` and `auction_end_date`, but the locked-* stub doc has neither. Title input renders empty. Console shows 500 and the seller sees a blank Create-Listing form instead of their pre-filled data — defeating the whole D2 edit-mode UX promise.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/listings/{id}", "issue": "Returns 500 for locked-* docs because Listing response model requires current_price + auction_end_date, but request_manual_vehicle_review stub omits both. Breaks frontend Edit hydration. Pydantic error: 'current_price Field required' + 'auction_end_date Field required' for Listing model.", "priority": "CRITICAL"}
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "CreateListingPage edit mode", "issue": "data-testid mismatch — review request expected 'listing-title-input' but actual rendered testid is 'title-input'. Either update the spec or rename the testid for consistency.", "selector": "input[data-testid='title-input']", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "Seller Dashboard → click Edit on pending listing → hydrate CreateListingPage", "issue": "Hydration fetch (axios.get /api/listings/{locked_id}) returns HTTP 500 due to backend Pydantic validation error, so formData stays at defaults. Title/category/location/city fields all render EMPTY when they should be pre-filled. Seller cannot self-correct flagged listings — they would have to re-type the entire form. This negates the entire D2 'Universal Drafts / edit-pending' feature.", "affected_selectors": ["[data-testid='title-input']", "[data-testid='edit-pending-listing-{id}']"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter312_ai_review_dataloss.py",
+    "/app/backend/tests/test_iter312_draft_expiry.py",
+    "/app/test_reports/pytest/iter312.xml"
+  ],
+  "action_items": [
+    "FIX BACKEND (CRITICAL): Make GET /api/listings/{id} tolerate locked-* / pending_admin_review docs. Options: (a) drop the response_model on the public detail endpoint and return the raw dict (minus _id); (b) make current_price + auction_end_date Optional in the Listing pydantic model; (c) coerce defaults (current_price = starting_price or 0; auction_end_date = stub far-future ISO timestamp) before returning. Option (b) is the safest one-line fix and matches the rest of the model's Optional pattern.",
+    "ADD a regression test: GET /api/listings/{locked_id} must return 200 with the seller's title/location/city for a pending_admin_review doc. (Currently no test covers this — that's why the backend pytest suite is 100% green while the live UX is broken.)",
+    "ALIGN testid naming: review request specified 'listing-title-input' but CreateListingPage uses 'title-input'. Update one or the other so future tests don't drift.",
+    "AFTER backend fix: re-validate the full seller→edit→resubmit loop end-to-end on the live UI."
+  ],
+  "critical_code_review_comments": [
+    "BUG: request_manual_vehicle_review stub in routes/admin_ai_review.py creates a `listings` doc without current_price/auction_end_date, but those are required by the Listing response_model used by GET /api/listings/{id}. The 'fix' for D1 (persisting location/city/etc) exposed this latent contract mismatch.",
+    "OK: test_iter312_ai_review_dataloss.py asserts via direct MongoDB query — it bypasses the broken GET endpoint, which is why backend tests pass while the UX is broken. Consider adding an HTTP-level GET assertion to the same test module.",
+    "OK: SellerDashboard.js lines 885-940 correctly conditionally renders Edit/Resubmit/Delete for pending statuses; the old locked banner branch is gone.",
+    "OK: CreateListingPage.js lines 85-123 useEffect for edit-mode hydration is correctly written — it just can't succeed because the upstream endpoint 500s.",
+    "OK: services/draft_expiry.py + services/scheduler.py registration is clean (DRAFT_COLLECTIONS frozen at 5; idempotency via draft_expiry_warning_sent_at; soft-archive via status='draft_expired')."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (159/162 incl. iter312 12/12 and regression-fast 147/150)", "frontend": "60% (buttons render, route navigates, hydration broken)"},
+  "test_credentials": "Seller testseller@bidvex.com / TestSeller2026! (works). Admin charbel911@gmail.com / Anderosli123!@# (works).",
+  "seed_data_creation": "Inserted listings doc id='locked-iter312-fe-54f33827' for testseller (cleaned up after test). All pytest tests insert+teardown their own data.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "After main agent fixes the Listing pydantic model (make current_price + auction_end_date Optional, OR drop the response_model on GET /api/listings/{id}, OR add defaults in request_manual_vehicle_review stub), re-run: (a) `make regression-fast` (should stay 147/3/0), (b) insert a fresh locked-* listing for testseller, log in via UI, navigate to /seller/dashboard, click the Edit testid, assert title-input.value contains the pre-set title. The bug is server-side only — the frontend hydration code is correct.",
+  "rca of the issue": "RCA — D2 Edit hydration broken: GET /api/listings/{id} declares response_model=Listing in routes/listings.py (or wherever the endpoint lives). The Listing pydantic model has `current_price: float` and `auction_end_date: datetime` as REQUIRED fields. The locked-* stub created by routes/admin_ai_review.py::request_manual_vehicle_review omits both (it only stores starting_price + buy_now_price). When the frontend's edit-mode useEffect calls axios.get(`${API}/listings/${editListingId}`), FastAPI tries to serialize the doc through Listing(**doc), Pydantic validation fails with 'Field required' errors for both fields, and FastAPI converts that to a generic 500 internal_server_error. Repro: `curl -s $BASE/api/listings/locked-<any_id>` → 500. Mitigation (one-line fix): change the Listing model to `current_price: Optional[float] = None` and `auction_end_date: Optional[datetime] = None`. Alternative: drop response_model and return raw dict (already excluding _id). Either approach lets the seller's pre-filled data flow into the Edit form."
+}

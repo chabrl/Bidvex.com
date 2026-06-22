@@ -930,6 +930,24 @@ def init_scheduler(database):
         replace_existing=True,
     )
 
+    # iter312 D3 — Daily draft-expiry sweep
+    async def draft_expiry_sweep_job():
+        if db_instance is None:
+            return
+        from services.draft_expiry import run_draft_expiry_sweep
+        return await safe_db_operation(
+            "draft_expiry_sweep",
+            lambda: run_draft_expiry_sweep(db_instance),
+        )
+
+    scheduler.add_job(
+        _tracked("draft_expiry_sweep", draft_expiry_sweep_job),
+        IntervalTrigger(hours=24),
+        id="draft_expiry_sweep",
+        name="iter312 — Draft Expiry Sweep (warn at d23, archive at d30)",
+        replace_existing=True,
+    )
+
     # Job 13: Flip `upcoming` auctions whose start_time has passed → `active` (iter178, FIX 4)
     async def activate_upcoming_auctions_job():
         if db_instance is None:

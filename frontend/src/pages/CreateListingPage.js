@@ -1,7 +1,7 @@
 import API_BASE from '../config';
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 import { extractErrorMessage } from '../utils/errorHandler';
@@ -78,6 +78,49 @@ const CreateListingPage = () => {
     auction_end_date: '',
     currency: 'CAD',
   });
+
+  // iter312 D2 — Edit mode: when the route param `:listingId` is present,
+  // hydrate formData from the existing listing so the seller can correct
+  // a flagged listing without re-typing everything. URL: /edit-listing/:id
+  const { listingId: editListingId } = useParams();
+  const [editMode, setEditMode] = useState(false);
+  useEffect(() => {
+    if (!editListingId) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await axios.get(`${API}/listings/${editListingId}`);
+        const l = r.data || {};
+        if (cancelled) return;
+        setEditMode(true);
+        setFormData((prev) => ({
+          ...prev,
+          // Copy every overlapping field; leave others at their defaults.
+          title:            l.title || '',
+          title_fr:         l.title_fr || '',
+          title_en:         l.title_en || '',
+          description:      l.description || '',
+          description_fr:   l.description_fr || '',
+          description_en:   l.description_en || '',
+          category:         l.category || '',
+          condition:        l.condition || 'good',
+          starting_price:   l.starting_price ?? '',
+          buy_now_price:    l.buy_now_price ?? '',
+          images:           Array.isArray(l.images) ? l.images : [],
+          country:          l.country || 'CA',
+          region:           l.region || '',
+          city:             l.city || '',
+          postal_code:      l.postal_code || '',
+          location:         l.location || '',
+          currency:         l.currency || 'CAD',
+          id:               l.id,
+        }));
+      } catch (err) {
+        toast.error(extractErrorMessage(err) || 'Failed to load listing for editing');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [editListingId]);
 
   // Buyer's Premium — default to org setting
   const [buyersPremiumPercent, setBuyersPremiumPercent] = useState('');
@@ -271,7 +314,26 @@ const CreateListingPage = () => {
 
   const submitListingPayload = async (payload) => {
     try {
-      const response = await axios.post(`${API}/listings`, payload);
+      // iter312 D2 — Edit mode submits PUT against the existing listing
+      // (preserves seller data) and then resubmits the listing for AI re-scan.
+      // Normal (non-edit) flow remains POST to /listings.
+      let response;
+      if (editMode && editListingId) {
+        response = await axios.put(`${API}/listings/${editListingId}`, payload);
+        // After saving the edits, kick the re-scan + status flip.
+        try {
+          await axios.post(`${API}/listings/${editListingId}/resubmit-for-review`);
+        } catch {
+          // Non-fatal — the edit itself succeeded. The seller can use the
+          // "Resubmit" button on the dashboard if the re-scan didn't run.
+        }
+        toast.success((i18n.language || 'en').startsWith('fr')
+          ? 'Annonce mise à jour et resoumise.'
+          : 'Listing updated and resubmitted for review.');
+        navigate('/seller/dashboard');
+        return response.data;
+      }
+      response = await axios.post(`${API}/listings`, payload);
       toast.success('Listing created successfully!');
       navigate(`/listing/${response.data.id}`);
       return response.data;
@@ -486,18 +548,44 @@ const CreateListingPage = () => {
   // user clicks the new "Request Manual Review" button inside the vehicle-block
   // modal. The listing has NOT been created yet at this point, so we send the
   // form snapshot + detected signals so an admin can override the block.
+  //
+  // iter312 D1 ROOT-CAUSE FIX:
+  //   Previously this payload only sent {title, description, category,
+  //   detected_signals, images, starting_price, listing_id}. The backend
+  //   then created a stub listing with HARDCODED empty strings for
+  //   location/city/region/country (because they weren't on the payload).
+  //   That data was lost permanently when admin approved.
+  //
+  //   We now send EVERY form field the wizard has captured at the moment
+  //   the AI block fires so the locked- stub mirrors the seller's draft
+  //   exactly, and admin approve = pure status flip with no data loss.
   const handleRequestManualVehicleReview = async () => {
     if (vehicleComplianceReviewRequested || vehicleComplianceReviewSubmitting) return;
     setVehicleComplianceReviewSubmitting(true);
     try {
       await axios.post(`${API}/listings/request-manual-vehicle-review`, {
         title:            formData.title || '',
+        title_en:         formData.title_en || '',
+        title_fr:         formData.title_fr || '',
         description:      formData.description || '',
+        description_en:   formData.description_en || '',
+        description_fr:   formData.description_fr || '',
         category:         formData.category || '',
+        condition:        formData.condition || 'good',
+        currency:         formData.currency || 'CAD',
+        starting_price:   parseFloat(formData.starting_price) || 0,
+        buy_now_price:    formData.buy_now_price ? parseFloat(formData.buy_now_price) : null,
+        // iter312 D1 — Send the seller's actual location so it's preserved.
+        location:         formData.location || '',
+        city:             formData.city || '',
+        region:           formData.region || '',
+        country:          formData.country || '',
+        postal_code:      formData.postal_code || '',
+        province:         formData.province || '',
+        auction_end_date: formData.auction_end_date || null,
         detected_signals: vehicleComplianceSignals,
         images:           Array.isArray(formData.images) ? formData.images : [],
         images_count:     Array.isArray(formData.images) ? formData.images.length : 0,
-        starting_price:   parseFloat(formData.starting_price) || 0,
         listing_id:       formData.id || null,
       });
       setVehicleComplianceReviewRequested(true);

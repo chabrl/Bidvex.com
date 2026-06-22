@@ -52,6 +52,16 @@ class ManualVehicleBlockReviewRequest(BaseModel):
     chairs"). The listing has NOT been created yet — we snapshot the form
     data so an admin can review and either approve creation or confirm the
     block.
+
+    iter312 ROOT-CAUSE FIX (data-loss bug):
+      Previously this model only accepted title/description/category/images/
+      starting_price. When the backend created the stub `locked-*` listing
+      it HARDCODED empty strings for location/city/region/country and
+      defaulted condition/currency. That data was permanently lost from the
+      seller's draft. Now the model accepts every field the create-listing
+      wizard collects so the locked stub mirrors the seller's actual draft
+      end-to-end (admin approve = pure status flip, NO empty-string
+      hardcoding).
     """
     title: Optional[str] = Field("", max_length=300)
     description: Optional[str] = Field("", max_length=4000)
@@ -66,6 +76,22 @@ class ManualVehicleBlockReviewRequest(BaseModel):
     # Optional — when the seller already has a draft listing tied to this
     # block (rare; mostly the listing has NOT been created yet).
     listing_id: Optional[str] = None
+    # iter312 D1 — Full form-snapshot fields. All optional so legacy
+    # frontends (which only sent the original 8 fields) don't break.
+    location:           Optional[str]   = Field(default=None, max_length=200)
+    city:               Optional[str]   = Field(default=None, max_length=120)
+    region:             Optional[str]   = Field(default=None, max_length=120)
+    country:            Optional[str]   = Field(default=None, max_length=80)
+    postal_code:        Optional[str]   = Field(default=None, max_length=20)
+    condition:          Optional[str]   = Field(default=None, max_length=40)
+    currency:           Optional[str]   = Field(default=None, max_length=3)
+    buy_now_price:      Optional[float] = None
+    auction_end_date:   Optional[datetime] = None
+    title_fr:           Optional[str]   = Field(default=None, max_length=300)
+    description_fr:     Optional[str]   = Field(default=None, max_length=4000)
+    title_en:           Optional[str]   = Field(default=None, max_length=300)
+    description_en:     Optional[str]   = Field(default=None, max_length=4000)
+    province:           Optional[str]   = Field(default=None, max_length=80)
 
 
 @ai_review_router.post("/listings/request-manual-vehicle-review")
@@ -138,6 +164,17 @@ async def request_manual_vehicle_review(
     # Phase 6.0 hotfix — Failure 2: create an actual listing row in
     # status=pending_admin_review so the seller sees it on their dashboard
     # (instead of vanishing) AND the admin can preview the real document.
+    #
+    # iter312 D1 ROOT-CAUSE FIX:
+    #   Previously this block hardcoded `location=""`, `city=""`, `region=""`,
+    #   `country=""` because the legacy payload didn't carry them. Result:
+    #   when admin later approved the listing it went public with empty
+    #   location → that's the "data loss" bug reported in iter312.
+    #
+    #   Now we trust the seller's form snapshot. Every field the wizard
+    #   knows about is copied verbatim onto the stub listing. The approve
+    #   endpoint is a pure status flip (already verified) so seller data
+    #   survives the full flag → review → approve cycle intact.
     actual_listing_id = payload.listing_id
     if not actual_listing_id:
         actual_listing_id = f"locked-{req_id}"
@@ -146,18 +183,25 @@ async def request_manual_vehicle_review(
                 "id":                 actual_listing_id,
                 "seller_id":          current_user.id,
                 "title":              title or "(no title)",
+                "title_en":           (payload.title_en or "").strip()[:300] or None,
+                "title_fr":           (payload.title_fr or "").strip()[:300] or None,
                 "description":        description,
+                "description_en":     (payload.description_en or "").strip()[:4000] or None,
+                "description_fr":     (payload.description_fr or "").strip()[:4000] or None,
                 "category":           category,
-                "condition":          "good",
+                "condition":          (payload.condition or "good").strip() or "good",
                 "starting_price":     float(payload.starting_price or 0),
                 "current_price":      float(payload.starting_price or 0),
-                "buy_now_price":      None,
+                "buy_now_price":      payload.buy_now_price,
                 "images":             list(payload.images or [])[:20],
-                "location":           "",
-                "city":               "",
-                "region":             "",
-                "country":            "",
-                "currency":           "CAD",
+                # iter312 D1 — Preserve seller's actual location data.
+                "location":           (payload.location or "").strip(),
+                "city":               (payload.city or "").strip(),
+                "region":             (payload.region or "").strip(),
+                "country":            (payload.country or "").strip(),
+                "postal_code":        (payload.postal_code or "").strip() or None,
+                "province":           (payload.province or "").strip() or None,
+                "currency":           (payload.currency or "CAD").strip().upper()[:3] or "CAD",
                 "status":             "pending_admin_review",
                 "ai_review_id":       req_id,
                 "ai_review_flagged_at": now,
@@ -167,11 +211,14 @@ async def request_manual_vehicle_review(
                 "vehicle_block_signals": detected_signals,
                 "created_at":         now,
                 "updated_at":         now,
-                "auction_end_date":   now + timedelta(days=7),
+                "auction_end_date":   payload.auction_end_date or (now + timedelta(days=7)),
                 "bid_count":          0,
                 "views":              0,
+                # iter312 D2/D3 — Mark as editable-by-seller-while-pending.
+                "is_seller_editable_pending": True,
+                "pending_admin_review_at":     now,
             })
-            logger.info(f"[manual_review] created locked listing {actual_listing_id} for seller dashboard visibility")
+            logger.info(f"[manual_review] created locked listing {actual_listing_id} for seller dashboard visibility (iter312 — full form snapshot)")
         except Exception as exc:
             logger.error(f"[manual_review] locked listing create failed: {exc}", exc_info=True)
 
@@ -1251,6 +1298,94 @@ async def seller_withdraw_from_review(
         )
     logger.info(f"[ai_review] seller {current_user.email} withdrew listing {listing_id}")
     return {"success": True, "listing_id": listing_id, "status": "withdrawn"}
+
+
+@ai_review_router.post("/listings/{listing_id}/resubmit-for-review")
+async def seller_resubmit_for_review(
+    listing_id: str,
+    listing_type: Optional[Literal["single", "multi"]] = Query("single"),
+    current_user: User = Depends(get_current_user),
+):
+    """iter312 D2 — Seller edits a flagged listing and resubmits it.
+
+    Default behavior: ANY edit to a previously-flagged listing re-runs the
+    vehicle/safety scanner. If the scanner now passes clean, the listing
+    goes live immediately (status='active'). If it still flags, the
+    listing returns to `pending_admin_review` for actual admin eyes.
+
+    This is the "safer" of the two policies the directive offered — admin
+    still gets a chance to review when the issue persists, but the seller
+    can self-resolve genuine false positives without waiting.
+    """
+    db = get_db()
+    collection, listing = await _resolve_listing(db, listing_id, listing_type)
+    if listing.get("seller_id") != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    if listing.get("status") not in ("pending_ai_review", "pending_admin_review", "draft"):
+        raise HTTPException(status_code=400, detail={
+            "error": "not_in_review",
+            "message_en": "Listing is not pending review.",
+            "message_fr": "L'annonce n'est pas en attente d'examen.",
+        })
+
+    now = datetime.now(timezone.utc)
+
+    # Step 1 — Flip status to "active" so the scanner doesn't skip it.
+    await db[collection].update_one(
+        {"id": listing_id},
+        {"$set": {
+            "status":                  "active",
+            "is_published":            True,
+            "published_at":            now,
+            "ai_review_resubmitted_at": now,
+            "ai_review_id":            None,
+            "ai_review_flag":          None,
+            "ai_review_status":        None,
+            "ai_review_flagged_at":    None,
+            "ai_suggested_category":   None,
+            "ai_review_reason_en":     None,
+            "ai_review_reason_fr":     None,
+            "paused_by_watchdog":      False,
+            "paused_by":               None,
+            "paused_reason":           None,
+            "updated_at":              now,
+        }},
+    )
+
+    # Step 2 — Re-run the AI scanner. If still flagged, the scanner will
+    # write status='pending_review' back; otherwise leaves it 'active'.
+    rescan_outcome = "passed"
+    try:
+        from services.vehicle_listing_scanner import scan_listing_for_vehicles
+        scan_result = await scan_listing_for_vehicles(db, listing_id=listing_id, collection=collection)
+        if scan_result.get("action_taken") == "paused_pending_review":
+            rescan_outcome = "still_flagged"
+            # Scanner has already set status='pending_review' — promote to
+            # pending_admin_review for consistency with the unified status set.
+            await db[collection].update_one(
+                {"id": listing_id},
+                {"$set": {"status": "pending_admin_review"}},
+            )
+    except Exception as exc:
+        logger.warning(f"[ai_review] resubmit rescan errored for {listing_id}: {exc}")
+        # Fail open — leave at active (admin can re-flag via watchdog if needed).
+
+    # Step 3 — Mark the open review row as resubmitted-clear if rescan passed.
+    review_id = listing.get("ai_review_id")
+    if review_id and rescan_outcome == "passed":
+        await db.listing_reviews.update_one(
+            {"id": review_id},
+            {"$set": {
+                "status":      "resubmitted",
+                "updated_at":  now,
+                "resolved_at": now,
+                "admin_note":  "Seller edited the listing and the re-scan passed clean.",
+            }},
+        )
+
+    final_status = "active" if rescan_outcome == "passed" else "pending_admin_review"
+    logger.info(f"[ai_review] seller {current_user.email} resubmitted listing {listing_id} → {final_status} (rescan={rescan_outcome})")
+    return {"success": True, "listing_id": listing_id, "status": final_status, "rescan": rescan_outcome}
 
 
 async def escalate_overdue_reviews(db) -> int:

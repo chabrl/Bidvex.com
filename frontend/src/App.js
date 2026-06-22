@@ -488,6 +488,13 @@ const App = () => {
               </BlockForStorageFacility>
             </ProtectedRoute>
           } />
+          {/* iter312 D2 — Seller-side edit for pending_admin_review (and active/draft) listings.
+              CreateListingPage hydrates from /api/listings/:id when listingId param present. */}
+          <Route path="/edit-listing/:listingId" element={
+            <ProtectedRoute>
+              <CreateListingPage />
+            </ProtectedRoute>
+          } />
           <Route path="/payment/success" element={
             <ProtectedRoute><PaymentSuccessPage /></ProtectedRoute>
           } />

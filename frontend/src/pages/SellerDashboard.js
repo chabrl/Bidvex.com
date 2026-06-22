@@ -883,16 +883,60 @@ const SellerDashboard = () => {
                         </span>
                       </div>
                       <div className="flex flex-col lg:flex-row gap-2">
-                        {/* Phase 6.0 hotfix — fully locked card while under admin review: no view, edit, or delete affordances. */}
+                        {/* iter312 D2 — Pending listings remain fully editable.
+                            Previously this branch displayed a "🔒 Listing locked
+                            while under review" message and HID the Edit/Delete
+                            buttons. That directly violated the Directive 2 spec
+                            (seller must be able to self-correct flagged
+                            listings). We now show Edit + Resubmit + Delete just
+                            like a normal Draft, but with an amber Under-Review
+                            banner above (rendered by PendingAiReviewBanner). */}
                         {(listing.status === 'pending_admin_review' || listing.status === 'pending_ai_review') ? (
-                          <div
-                            className="w-full text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2"
-                            data-testid={`locked-card-notice-${listing.id}`}
-                          >
-                            🔒 {(i18n.language || 'en').startsWith('fr')
-                                ? 'Annonce verrouillée pendant la révision — aucune modification possible.'
-                                : 'Listing locked while under review — no edits, deletions or public view.'}
-                          </div>
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => navigate(`/edit-listing/${listing.id}`)}
+                              data-testid={`edit-pending-listing-${listing.id}`}
+                              className="w-full lg:w-auto bg-amber-50 border-amber-300 text-amber-800 hover:bg-amber-100"
+                            >
+                              {(i18n.language || 'en').startsWith('fr') ? 'Modifier' : 'Edit'}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={async () => {
+                                try {
+                                  await axios.post(
+                                    `${API}/listings/${listing.id}/resubmit-for-review`,
+                                    {},
+                                    { params: { listing_type: isMultiItem ? 'multi' : 'single' } }
+                                  );
+                                  toast.success(
+                                    (i18n.language || 'en').startsWith('fr')
+                                      ? 'Annonce resoumise pour examen.'
+                                      : 'Listing resubmitted for review.'
+                                  );
+                                  fetchDashboard();
+                                } catch (e) {
+                                  toast.error((e?.response?.data?.detail || e?.message || 'Resubmit failed'));
+                                }
+                              }}
+                              data-testid={`resubmit-pending-listing-${listing.id}`}
+                              className="w-full lg:w-auto"
+                            >
+                              {(i18n.language || 'en').startsWith('fr') ? 'Resoumettre' : 'Resubmit'}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleDeleteListing(listing.id, isMultiItem)}
+                              data-testid={`delete-pending-listing-${listing.id}`}
+                              className="w-full lg:w-auto text-red-700 border-red-200 hover:bg-red-50"
+                            >
+                              {(i18n.language || 'en').startsWith('fr') ? 'Supprimer' : 'Delete'}
+                            </Button>
+                          </>
                         ) : (
                           <>
                             <Button
