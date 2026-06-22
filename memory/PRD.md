@@ -10328,3 +10328,60 @@ Facility chooses payment method per listing (Stripe / Cash / E-Transfer). Option
 - P2 Perf: 27 new Mongo indexes, total_count+page pagination metadata, limit caps (≤100), 60s analytics cache, bundle 358.5KB gz.
 - QA: 53 pytest green (iter300+301+messaging suites); testing agent iteration_247.json backend 100%, both frontend flags fixed + re-verified E2E. Legacy full-suite 429/event-loop artifacts documented (pre-existing).
 - NOT YET DEPLOYED to production (bidvex.com) — user to deploy.
+
+
+
+## iter309 (Feb 22, 2026) — 4-Directive Sprint — DONE ✅
+**Tested 26/26 backend + frontend EN/FR live verified by testing agent (report: iteration_254.json). 0 critical, 0 minor regressions.**
+
+- **D1 — Multi-Lot Category Restructure** (auction → lot level)
+  - `Lot.category: Optional[str]` added to `backend/models/auction_models.py`
+  - `MultiItemListing.categories: List[str]` aggregate (source of truth for tag rendering + faceted filter)
+  - `MultiItemListingCreate.category` is now optional (lots carry their own); backend derives the primary category from lot frequency
+  - `POST /api/multi-item-listings` aggregates `lots[].category` → `listing.categories[]` and backfills missing lot categories from the auction-level default
+  - Public marketplace category filter now matches `category | categories | lots.category` (any-of)
+  - Frontend `CreateMultiItemListing.js`: per-lot category picker with `data-testid="lot-{N}-category-select"`; auction-level field re-labeled "Default Category (optional)"
+  - Migration scripts:
+    - `backend/scripts/iter309_d1_dryrun_multilot_categories.py` (counts what will change before write)
+    - `backend/scripts/iter309_d1_backfill_multilot_categories.py` (idempotent backfill — preview dry-run = 0 docs affected, clean DB)
+
+- **D2 — AI Review Pause/Approve Workflow**
+  - `pending_admin_review` + `pending_ai_review` listings are already hidden from public marketplace (filter `status: "active"` only)
+  - `admin_approve_listing_review` uses **pure `$set` semantics** on an allow-list of fields (no payload reconstruction → seller content preserved on approve) — verified via integration tests + testing agent code review
+  - Bilingual seller-dashboard badge surfaced via existing `_PENDING_STATUSES` infra in `routes/facility_dashboard.py`
+
+- **D3 — Partner Trial Coupon (4th option) + External Campaign Wizard Audit**
+  - `TRIAL_DURATIONS["partner"] = 30` in `routes/trial_coupons.py`
+  - `ActivateTrialBody` + `BulkCouponsBody` + `CampaignCreate.trial_partner_type` patterns now accept `^(dealer|broker|storage|partner)$`
+  - Redeeming a partner coupon sets `user.trial_active = True`, `user.account_tier = "partner"`, `user.partner_type = "partner"`, `user.partner_trial_active = True`, `user.partner_trial_expires_at` (30 days)
+  - Featured-listing quota map gains `partner: 5`
+  - Frontend wizard (`AdminExternalCampaigns.jsx`): 4th `<option value="partner">Partner Account (30-day trial)</option>` in `data-testid="coupon-partner-type-select"`
+  - Wizard audited end-to-end (testing agent ran the 4 steps, valid + invalid `trial_partner_type` payloads handled with 200/422 as expected)
+
+- **D4 — Global Unsubscribe Link Standardization** (CAN-SPAM / CASL)
+  - Canonical URL format across ALL marketing/campaign emails: `https://bidvex.com/unsubscribe?token=<signed>&lang=<en|fr>`
+  - `build_unsubscribe_urls()` no longer emits the `/desabonnement` divergence — both EN and FR resolve to `/unsubscribe?...&lang=...`
+  - **Unified token decoder** `_decode_any_unsubscribe_token()` accepts BOTH platform `itsdangerous` tokens AND external campaign JWT tokens — single canonical URL works across the whole stack
+  - New endpoints:
+    - `GET /api/unsubscribe/auto-verify?token=...` — verifies any token, returns masked email + already-unsubscribed status + source
+    - `POST /api/unsubscribe/auto-confirm { token }` — flips `users.email_unsubscribed=True` (canonical) + `marketing_unsubscribed=True` (legacy compat), upserts platform `email_suppressions` row + external `external_email_suppressions` row, increments campaign `analytics.unsubscribed`, pushes to SendGrid global suppressions (best-effort)
+  - `services/external_email.py` — `send_external_campaign_email` injects the canonical frontend URL into emails (no longer `/api/external/unsubscribe?token=...`)
+  - Legacy `/api/external/unsubscribe?token=...` route remains live and mirrors the same DB writes for already-delivered emails (backward-compat — keeps existing inboxes' links working)
+  - Frontend `UnsubscribePage.js` switched to the `/auto-verify` + `/auto-confirm` endpoints; reads `lang` from query string
+
+- **Test coverage**
+  - `backend/tests/test_iter309_directives.py` — 14 unit + integration tests (model + Pydantic + DB backfill + decoder + flag-flip), all PASS
+  - `backend/tests/test_iter309_e2e_http.py` — 13 HTTP e2e tests (12 PASS, 1 SKIP for env-gated seller payment), authored by testing agent
+  - Both files added to `make regression-fast` (Makefile updated)
+  - `make regression-fast` summary: **98+12 = 110 passed, 3+1 skipped, 0 failures** in ~70s
+
+- **Files touched**
+  - Backend: `routes/unsubscribe.py`, `routes/external_campaigns.py`, `routes/trial_coupons.py`, `routes/listings.py`, `models/auction_models.py`, `services/external_email.py`
+  - Frontend: `pages/UnsubscribePage.js`, `pages/admin/AdminExternalCampaigns.jsx`, `pages/CreateMultiItemListing.js`
+  - Scripts: `backend/scripts/iter309_d1_dryrun_multilot_categories.py`, `backend/scripts/iter309_d1_backfill_multilot_categories.py`
+  - Tests: `backend/tests/test_iter309_directives.py`, `backend/tests/test_iter309_e2e_http.py` (testing agent)
+  - Build: `Makefile`
+
+- **Production deploy reminder** — Run the D1 backfill script on production AFTER deploy (`python backend/scripts/iter309_d1_backfill_multilot_categories.py --dry-run` first to confirm production impact, then re-run without `--dry-run` to execute).
+
+- **NOT YET DEPLOYED** to production (bidvex.com) — user to deploy.
