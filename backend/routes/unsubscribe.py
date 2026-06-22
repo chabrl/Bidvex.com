@@ -16,7 +16,7 @@ SendGrid Dashboard Settings (manual, one-time):
      Toggle Signed Event Webhook → ON (SENDGRID_EVENT_WEBHOOK_VERIFICATION_KEY stored in .env)
 """
 from datetime import datetime, timezone
-from typing import Dict
+from typing import Dict, Optional
 import logging
 import os
 import uuid
@@ -121,6 +121,9 @@ async def verify_unsubscribe_token(token: str = ""):
 
 class ConfirmRequest(BaseModel):
     token: str
+    # iter310 — optional bilingual hint for the Unsubscribe Audit Trail. Falls
+    # back to `en` (or whatever the JWT payload carries for external tokens).
+    lang: Optional[str] = None
 
 
 @unsubscribe_router.post("/confirm")
@@ -398,6 +401,29 @@ async def auto_confirm_unsubscribe(payload: ConfirmRequest, request: Request):
             },
             upsert=True,
         )
+
+    # iter310 — Unsubscribe Audit Trail. Write one row per *successful*
+    # unsubscribe attempt so admins can audit deliverability spikes per
+    # campaign / source / token-type. Even already-unsubscribed re-clicks
+    # are logged (as `repeat_click`) so we can see suppression-list drift.
+    user_doc = await db.users.find_one({"email": email}, {"_id": 0, "id": 1})
+    audit_row = {
+        "id":              str(uuid.uuid4()),
+        "user_id":         (user_doc or {}).get("id"),
+        "email":           email,
+        "campaign_id":     campaign_id,
+        "source":          "platform" if source == "platform" else "external_campaign",
+        "unsubscribed_at": now,
+        "token_type":      "itsdangerous" if source == "platform" else "jwt",
+        "lang":            ((payload.lang if hasattr(payload, "lang") and payload.lang else None) or "en").lower(),
+        "event":           "repeat_click" if already else "unsubscribed",
+        "ip":              (request.client.host if request.client else None),
+        "user_agent":      (request.headers.get("user-agent") if hasattr(request, "headers") else None),
+    }
+    try:
+        await db.unsubscribe_events.insert_one(audit_row)
+    except Exception as audit_err:
+        logger.warning(f"[UNSUBSCRIBE audit] insert failed (non-fatal): {audit_err}")
 
     # Platform suppression list (fast lookup for send-time guard).
     await db.email_suppressions.update_one(

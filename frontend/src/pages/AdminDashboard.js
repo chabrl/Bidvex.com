@@ -32,6 +32,7 @@ import AffiliateManager from './admin/AffiliateManager';
 import AdminAffiliatePayouts from './admin/AdminAffiliatePayouts';
 // iter271 — External email campaigns (acquisition marketing)
 import AdminExternalCampaigns from './admin/AdminExternalCampaigns';
+import AdminUnsubscribeAudit from './admin/AdminUnsubscribeAudit';
 import ReportManager from './admin/ReportManager';
 import AnalyticsDashboard from './admin/AnalyticsDashboard';
 // iter299 P2 — Advanced Analytics (GMV, revenue, usage charts)
@@ -151,6 +152,8 @@ const SECONDARY_TABS = {
     { id: 'email-marketing', label: 'Email Marketing', icon: '📤', lucideIcon: Send },
     // iter271 — External acquisition campaigns
     { id: 'external-campaigns', label: 'External Campaigns', icon: '📬', lucideIcon: Send },
+    // iter310 — Unsubscribe deliverability monitor
+    { id: 'unsubscribe-audit', label: 'Unsubscribe Audit', icon: '📉', lucideIcon: Send },
     { id: 'marketing-integrations', label: 'Marketing Integrations', icon: '📣', lucideIcon: Send },
     { id: 'trust-safety', label: 'Trust & Safety', icon: '🛡️', lucideIcon: Shield },
     { id: 'escrow-manager', label: 'Escrow & Penalties', icon: '🔒', lucideIcon: Lock },
@@ -547,6 +550,8 @@ const AdminDashboard = () => {
           case 'email-marketing': return <EmailMarketingManager />;
           // iter271 — External acquisition campaigns
           case 'external-campaigns': return <AdminExternalCampaigns />;
+          // iter310 — Unsubscribe Audit Trail
+          case 'unsubscribe-audit': return <AdminUnsubscribeAudit />;
           case 'marketing-integrations': return <AdminMarketingIntegrations />;
           case 'trust-safety': return <TrustSafetyDashboard />;
           case 'escrow-manager': return <AdminEscrowManager />;
@@ -826,6 +831,7 @@ const AdminDashboard = () => {
               return (
                 <button
                   key={tab.id}
+                  data-testid={`admin-tab-${tab.id}`}
                   onClick={() => setSecondaryTab(tab.id)}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-full font-medium transition-all whitespace-nowrap ${
                     isActive 
@@ -993,8 +999,8 @@ const AdminDashboard = () => {
               {liveAuditLog.length === 0 ? (
                 <p className="text-sm text-gray-400 text-center py-4">No changes yet</p>
               ) : (
-                liveAuditLog.map((log) => (
-                  <div key={log.id} className="bg-gray-50 rounded-lg p-2 text-xs">
+                liveAuditLog.map((log, idx) => (
+                  <div key={log.id || `${log.timestamp || idx}-${log.setting || ''}`} className="bg-gray-50 rounded-lg p-2 text-xs">
                     <div className="flex items-center justify-between">
                       <span className="font-medium">{log.setting}</span>
                       <span className={log.newValue ? 'text-green-600' : 'text-red-600'}>

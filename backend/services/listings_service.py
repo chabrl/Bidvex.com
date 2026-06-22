@@ -230,9 +230,26 @@ async def resolve_listing_status(db, current_user: User, settings: Dict) -> str:
 
 async def resolve_multi_item_status(db, current_user: User, listing_data, settings: Dict) -> str:
     """Determine listing status — iter299 P1: moderation always on for
-    non-trusted sellers (mirrors resolve_listing_status)."""
+    non-trusted sellers (mirrors resolve_listing_status).
+
+    iter310 — Pre-existing NameError fix: `_is_trusted_marketplace_seller`
+    was referenced but never defined. Inlined the same heuristic used by
+    resolve_listing_status (admin OR completed-listing count ≥ 1 → trusted).
+    """
     status = "active"
-    if not await _is_trusted_marketplace_seller(db, current_user):
+    is_trusted = (
+        current_user.role == "admin"
+        or (
+            (await db.listings.count_documents({
+                "seller_id": current_user.id, "status": "completed",
+            }))
+            + (await db.multi_item_listings.count_documents({
+                "seller_id": current_user.id, "status": "completed",
+            }))
+            >= 1
+        )
+    )
+    if not is_trusted and settings.get("require_approval_new_sellers", False):
         status = "pending_review"
         logger.info(f"[MODERATION] Non-trusted seller {current_user.email} multi-item → PENDING_REVIEW")
     if listing_data.auction_start_date:

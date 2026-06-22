@@ -1086,6 +1086,26 @@ async def public_unsubscribe(token: str = Query(...)):
                  "$set": {"analytics.last_updated_at": _now_iso()}},
             )
 
+        # iter310 — Unsubscribe Audit Trail. Legacy /api/external/unsubscribe
+        # path mirrors the canonical /api/unsubscribe/auto-confirm writer.
+        try:
+            user_doc = await db.users.find_one({"email": email}, {"_id": 0, "id": 1})
+            await db.unsubscribe_events.insert_one({
+                "id":              str(uuid.uuid4()),
+                "user_id":         (user_doc or {}).get("id"),
+                "email":           email,
+                "campaign_id":     campaign_id,
+                "source":          "external_campaign",
+                "unsubscribed_at": now,
+                "token_type":      "jwt",
+                "lang":            lang or "en",
+                "event":           "unsubscribed",
+                "ip":              None,
+                "user_agent":      None,
+            })
+        except Exception as audit_err:
+            logger.warning(f"[UNSUBSCRIBE audit legacy] insert failed: {audit_err}")
+
     if lang == "fr":
         msg = "Vous avez été désabonné avec succès."
     else:

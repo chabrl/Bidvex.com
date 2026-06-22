@@ -16,6 +16,7 @@ regression-fast:
 	       backend/tests/test_iter309_e2e_http.py \
 	       backend/tests/test_iter310_bulk_delete_cascade.py \
 	       backend/tests/test_iter310_bill96_compliance.py \
+	       backend/tests/test_iter310_followup.py \
 	       backend/tests/test_iter311_all_collections.py \
 	       backend/tests/test_iter312_csv_export.py \
 	       backend/tests/test_iter312_multi_quantity_billing.py \

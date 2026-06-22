@@ -1,0 +1,42 @@
+{
+  "summary": "iter310 follow-up sprint testing (backend + frontend). All 10 iter310-followup pytest cases PASS. The previously-skipped D1 multi-item test (test_iter309_e2e_http::TestD1MultiItemCategories::test_create_multi_item_listing_aggregates_categories) now PASSES against the preview env. Added D4 backward-compat audit-row test (PASS). Frontend had a compile-blocking ESLint error in AdminUnsubscribeAudit.jsx (react-hooks/exhaustive-deps disable comment referencing a rule not loaded in the project's eslint config) — fixed (replaced disable comment with a plain comment). After fix, Admin login → /admin?tab=unsubscribe-audit renders the AdminUnsubscribeAudit panel with all stat cards (Today=2, Last 7=2, Last 30=2, 30-day trend), Filters (Start date, End date, Campaign ID, Source dropdown w/ Any/Platform/External campaign), paginated Audit Trail table, and Prev/Next pagination. Recently Sold ticker gracefully hides on homepage when items.length === 0 (preview DB has no sold listings — expected). make regression-fast: 136 passed, 2 skipped, 0 failures (81s).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter310_followup.py",
+    "/app/backend/tests/test_iter310_d4_audit.py",
+    "/app/test_reports/pytest/iter310_followup.xml"
+  ],
+  "action_items": [
+    "(already fixed by testing agent) The eslint-disable comment for 'react-hooks/exhaustive-deps' in AdminUnsubscribeAudit.jsx referenced a rule not loaded in the project's eslint config, causing a compile-blocking overlay across the whole app. Replaced with a regular comment. Consider installing/enabling eslint-plugin-react-hooks project-wide if you want exhaustive-deps linting to function."
+  ],
+  "critical_code_review_comments": [
+    "OK: routes/admin_unsubscribe_audit.py uses $facet aggregation with index hit, masks email PII (first 3 chars + domain), and joins campaign names in a single batch.",
+    "OK: routes/admin_offline_transactions.py validates listing across all 4 sections, pops mongo _id from insert_one return, writes admin_action_logs, and explicitly sets stripe_payment_intent_id=None.",
+    "OK: routes/public_recently_sold.py response strips _id, has no buyer/seller fields, 60s in-memory cache keyed by limit, sorts by ended_at desc across 4 collections.",
+    "OK: services/deposit_auto_capture.py iter310 invoice-settlement block writes deposit_capture_applied, remaining_balance, payment_overdue via vehicle_invoices.update_one.",
+    "OK: routes/external_campaigns.py legacy public_unsubscribe mirrors the canonical audit-row write with source='external_campaign', token_type='jwt' (D4 backward-compat verified)."
+  ],
+  "updated_files": [
+    "/app/frontend/src/pages/admin/AdminUnsubscribeAudit.jsx (removed unknown eslint-disable directive)",
+    "/app/frontend/src/pages/AdminDashboard.js (added data-testid to MARKETING_TABS buttons for testing — non-functional)",
+    "/app/backend/tests/test_iter310_d4_audit.py (new D4 legacy-URL audit-row regression)"
+  ],
+  "success_rate": {
+    "backend": "100% (10/10 iter310 followup + 1/1 D1 multi-item + 1/1 D4 legacy = 12/12; regression-fast 136/138 with 2 skipped 0 failed)",
+    "frontend": "100% (admin unsub audit panel renders w/ stats/filters/table/pagination, ticker gracefully hidden with empty items)"
+  },
+  "test_credentials": "Admin charbel911@gmail.com / Anderosli123!@# (working)",
+  "seed_data_creation": "Tests create + tear down their own data using TEST_/iter310- prefixes (no pollution).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "iter310 followup is fully green. Recently Sold ticker depends on real sold listings in the DB to render — preview DB currently returns items:[] which is the intended graceful-hide. To force ticker to appear during a future regression, insert a doc into `listings` (or vehicle_listings/multi_item_listings/storage_auctions) with status in ('sold','completed','won','closed'), a numeric price, and a non-empty title. Note in-memory 60s cache: bust with `_CACHE['data']=None` or wait 60s.",
+  "rca of the issue": "RCA — compile-blocking overlay: AdminUnsubscribeAudit.jsx line 92 had `// eslint-disable-next-line react-hooks/exhaustive-deps`. The CRA build's eslint runtime doesn't have eslint-plugin-react-hooks registered, so it treats the unknown rule name as an error and renders the red 'Compiled with problems' overlay across the entire app — login form was visually present but the overlay intercepted any data-testid-based selectors. Reproduction: visit any page, observe overlay. Mitigation applied: replaced the disable comment with a plain comment (preserves intent without referencing an unloaded rule)."
+}
