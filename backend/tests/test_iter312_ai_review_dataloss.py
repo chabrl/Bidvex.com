@@ -335,3 +335,49 @@ def test_request_manual_vehicle_review_no_longer_hardcodes_empties():
     assert "payload.city" in src
     assert "payload.region" in src
     assert "payload.country" in src
+
+
+def test_get_listing_endpoint_serves_locked_stub_200(seller_token, db):
+    """Regression guard (per testing agent feedback): GET /api/listings/{id}
+    MUST return 200 with the full seller form snapshot for a locked-*
+    pending_admin_review stub. The previous iter309 contract had
+    current_price + auction_end_date required on the response model — the
+    stub creator must keep those populated so the Edit-mode hydration
+    on /edit-listing/:id never breaks."""
+    payload = {
+        "title":           "iter312-http-roundtrip",
+        "description":     "fixture",
+        "category":        "Vehicles",
+        "detected_signals": ["title:vehicle"],
+        "starting_price":  77,
+        "location":        "HTTP-ROUNDTRIP-LOC",
+        "city":            "HTTP-CITY",
+        "region":          "QC",
+        "country":         "CA",
+    }
+    r = requests.post(
+        f"{BASE_URL}/api/listings/request-manual-vehicle-review",
+        json=payload,
+        headers=_hdr(seller_token),
+        timeout=15,
+    )
+    assert r.status_code == 200, r.text
+    listing_id = f"locked-{r.json()['listing_review_id']}"
+
+    try:
+        # Anonymous GET (used by frontend edit hydration before token attaches).
+        rg = requests.get(f"{BASE_URL}/api/listings/{listing_id}", timeout=15)
+        assert rg.status_code == 200, f"GET broke contract: {rg.status_code} {rg.text[:300]}"
+        body = rg.json()
+        assert body["title"]          == payload["title"]
+        assert body["location"]       == payload["location"]
+        assert body["city"]           == payload["city"]
+        assert body["region"]         == payload["region"]
+        assert body["country"]        == payload["country"]
+        assert body["current_price"]  == 77.0
+        # auction_end_date is required by the Listing response model.
+        assert body["auction_end_date"] is not None
+    finally:
+        db.listings.delete_many({"id": listing_id})
+        db.listing_reviews.delete_many({"id": listing_id.removeprefix("locked-")})
+        db.manual_review_requests.delete_many({"id": listing_id.removeprefix("locked-")})

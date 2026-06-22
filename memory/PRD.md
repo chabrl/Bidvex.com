@@ -10416,3 +10416,55 @@ Facility chooses payment method per listing (Stripe / Cash / E-Transfer). Option
 
 - **NOT YET DEPLOYED** to production — user to redeploy.
 
+
+
+## iter312 (Feb 22, 2026) — AI Review Data-Loss Root-Cause Fix + Drafts — DONE ✅
+**This bug was *reported as fixed* in iter309 and was NOT actually fixed. iter309's claim about pure $set semantics was true but irrelevant — the data loss happened upstream, not at approve time. Reproduced live before fixing.**
+
+### Step 0 — Live Reproduction (evidence-based RCA)
+Before the fix, calling `POST /api/listings/request-manual-vehicle-review` with a full form payload created a `listings` doc with:
+```
+location='', city='', region='', country='', postal_code (missing)
+```
+…**regardless of what the seller actually entered.** Verified via direct MongoDB query of the resulting `locked-*` row.
+
+**Root cause** (single line, single file):
+- `backend/routes/admin_ai_review.py::request_manual_vehicle_review` lines 156-159 (old) hardcoded `"location": ""`, `"city": ""`, `"region": ""`, `"country": ""` because the legacy `ManualVehicleBlockReviewRequest` payload didn't accept those fields and the frontend never sent them.
+- The approve endpoint was already pure `$set` (iter309's claim was correct) — but the data was never written in the first place.
+
+### Fix applied
+- **Backend**: `ManualVehicleBlockReviewRequest` expanded to accept all listing fields (location, city, region, country, postal_code, condition, currency, buy_now_price, auction_end_date, title_en/fr, description_en/fr, province). Stub creator now uses `payload.location` / `payload.city` / … verbatim — NO hardcoded empties.
+- **Frontend**: `CreateListingPage.handleRequestManualVehicleReview` now sends the FULL `formData` snapshot.
+- Verified live post-fix: every seller field persists end-to-end through flag → pending_admin_review → admin approve.
+
+### D2 — Pending listings appear in Draft section + fully editable
+- Removed the 🔒 "Listing locked while under review" banner that blocked all interaction.
+- Added per-pending-listing **Edit / Resubmit / Delete** buttons (data-testids: `edit-pending-listing-{id}`, `resubmit-pending-listing-{id}`, `delete-pending-listing-{id}`).
+- New route `/edit-listing/:listingId` — `CreateListingPage` hydrates from `GET /api/listings/{id}` and saves edits via `PUT /api/listings/{id}` + auto-triggers `POST /api/listings/{id}/resubmit-for-review`.
+- New endpoint `POST /api/listings/{listing_id}/resubmit-for-review` — re-runs the AI scanner; if it now passes clean → status="active"; if it still flags → status="pending_admin_review". Documented "safer" default: any edit re-runs the scan; admin sees only listings that still fail.
+
+### D3 — Universal Draft Expiry (all 5 collections)
+- New `services/draft_expiry.py::run_draft_expiry_sweep` scans `listings`, `multi_item_listings`, `vehicle_listings`, `vehicle_multi_lot_auctions`, `storage_auctions` daily.
+- Day 23: warning notification (`notifications.kind="draft_expiry_warning"`) + bilingual email queued to `email_outbox`. Idempotent within 24h.
+- Day 30: soft-archive (`status="draft_expired"`, `archived=true`, `draft_expired_at` set) + final notification. **Soft-delete only** — never hard-delete (audit trail preserved).
+- Countdown anchor: `updated_at` (or `created_at` fallback) — any edit resets the clock automatically.
+- Scheduler job `id="draft_expiry_sweep"` registered with 24h interval.
+
+### Tests
+- `backend/tests/test_iter312_ai_review_dataloss.py` — 7 tests (live HTTP + DB roundtrip + source-code invariants) all PASS
+- `backend/tests/test_iter312_draft_expiry.py` — 6 tests (4 sweep behaviors + 5-collection coverage + scheduler registration) all PASS
+- Added to `make regression-fast`: **149 passed / 2 skipped / 0 failed (119s)**
+- Testing agent report `/app/test_reports/iteration_256.json`
+
+### Honest gaps (NOT fully delivered — for next iteration)
+- **D3 "Save as Draft" UI**: Vehicles already had it (iter293/iter306). Marketplace / Lots / Storage create-listing wizards still POST as `active` only. Adding `is_draft=true` to those 3 POST endpoints + a "Save Draft" CTA in each wizard is the remaining D3 surface. The expiry sweep already handles existing/future drafts in those collections — only the *creation* UX is missing.
+- **D4 Unified Drafts Dashboard Tab**: Pending listings render correctly in the existing seller listings list (with Edit/Resubmit/Delete + amber Under-Review badge). A *dedicated* `Drafts` sub-tab grouping draft + draft_expired + pending_admin_review across all 5 types is not yet built — current dashboard shows them inline mixed with active listings.
+
+### Files touched
+- Backend: `routes/admin_ai_review.py` (payload schema + stub creator + new resubmit-for-review endpoint), `services/draft_expiry.py` (new), `services/scheduler.py` (job registration)
+- Frontend: `pages/CreateListingPage.js` (edit-mode hydration + PUT + full form snapshot), `pages/SellerDashboard.js` (Edit/Resubmit/Delete buttons), `App.js` (new /edit-listing/:id route)
+- Tests: `tests/test_iter312_ai_review_dataloss.py` (new), `tests/test_iter312_draft_expiry.py` (new)
+- Build: `Makefile` (regression-fast adds 2 new files)
+
+- **NOT YET DEPLOYED** to production — user to deploy.
+
