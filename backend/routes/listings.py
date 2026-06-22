@@ -726,7 +726,14 @@ async def get_listings(
     # walls were removed for universal dual-visibility per the spec.
     multi_query = {"status": "active"}
     if category:
-        multi_query["category"] = category
+        # iter309 D1 — Multi-lot category filter:
+        # match any auction whose `categories[]` aggregate OR primary
+        # `category` OR a nested lot.category contains the requested value.
+        multi_query["$or"] = [
+            {"category":            category},
+            {"categories":          category},
+            {"lots.category":       category},
+        ]
     if city:
         multi_query["city"] = city
     if region:
@@ -737,7 +744,13 @@ async def get_listings(
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid search query")
         _safe = safe_regex(search)
-        multi_query["$or"] = [{"title": {"$regex": _safe, "$options": "i"}}, {"description": {"$regex": _safe, "$options": "i"}}]
+        search_or = [{"title": {"$regex": _safe, "$options": "i"}}, {"description": {"$regex": _safe, "$options": "i"}}]
+        if category:
+            # Combine category $or + search $or with $and.
+            existing_or = multi_query.pop("$or", [])
+            multi_query["$and"] = [{"$or": existing_or}, {"$or": search_or}]
+        else:
+            multi_query["$or"] = search_or
     # Tax Status filter applies to multi-item too
     if tax_status == "partner":
         multi_query["seller_type"] = "partner"
@@ -1242,11 +1255,37 @@ async def create_multi_item_listing(
         if isinstance(_lot, dict) and _lot.get("images"):
             _lot["images"] = compress_image_list(_lot["images"])
 
+    # iter309 D1 — Aggregate per-lot categories into the parent listing.
+    # Primary `category` field falls back to the most common lot category
+    # (or the seller-supplied auction-level value, or "Other") for legacy
+    # search/sort. `categories` is the distinct set for tag rendering.
+    from collections import Counter as _Counter
+    _lot_cat_counts = _Counter()
+    for _lot in lots_with_end_time:
+        _lc = (_lot.get("category") or "").strip() if isinstance(_lot, dict) else ""
+        if _lc:
+            _lot_cat_counts[_lc] += 1
+    _categories_aggregate = sorted({c for c in _lot_cat_counts}, key=lambda c: -_lot_cat_counts[c])
+    if not _categories_aggregate and listing_data.category:
+        _categories_aggregate = [listing_data.category]
+    _primary_category = (
+        listing_data.category
+        or (_categories_aggregate[0] if _categories_aggregate else "Other")
+    )
+    # Backfill lot.category from the primary when missing — keeps every lot
+    # tagged so faceted filters can rely on lot.category alone.
+    for _lot in lots_with_end_time:
+        if isinstance(_lot, dict) and not (_lot.get("category") or "").strip():
+            _lot["category"] = _primary_category
+    if _primary_category and _primary_category not in _categories_aggregate:
+        _categories_aggregate.insert(0, _primary_category)
+
     listing = MultiItemListing(
         seller_id=current_user.id,
         title=listing_data.title,
         description=listing_data.description,
-        category=listing_data.category,
+        category=_primary_category,
+        categories=_categories_aggregate,
         location=listing_data.location,
         city=listing_data.city,
         region=listing_data.region,

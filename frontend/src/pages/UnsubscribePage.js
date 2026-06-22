@@ -6,12 +6,16 @@ import { Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 
 /**
  * BidVex custom unsubscribe page (bilingual EN/FR).
- * Routes: /unsubscribe?token=...&lang=en
- *         /desabonnement?token=...&lang=fr
  *
- * Endpoints:
- *   GET  {API}/unsubscribe/verify?token=...
- *   POST {API}/unsubscribe/confirm { token }
+ * iter309 D4 — Canonical single route:
+ *   /unsubscribe?token=<signed>&lang=<en|fr>
+ *
+ * Legacy alias (still mounted in App.js for emails already in inboxes):
+ *   /desabonnement?token=...
+ *
+ * Endpoints (unified — handle BOTH platform itsdangerous + external JWT tokens):
+ *   GET  {API}/unsubscribe/auto-verify?token=...
+ *   POST {API}/unsubscribe/auto-confirm { token }
  */
 const UnsubscribePage = () => {
   const [searchParams] = useSearchParams();
@@ -37,7 +41,7 @@ const UnsubscribePage = () => {
     let cancelled = false;
     (async () => {
       try {
-        const r = await axios.get(`${API}/unsubscribe/verify`, { params: { token } });
+        const r = await axios.get(`${API}/unsubscribe/auto-verify`, { params: { token } });
         if (cancelled) return;
         setEmailMasked(r.data?.email_masked || '');
         setState(r.data?.already_unsubscribed ? 'already' : 'confirm');
@@ -53,7 +57,7 @@ const UnsubscribePage = () => {
   const handleConfirm = async () => {
     setSubmitting(true);
     try {
-      const r = await axios.post(`${API}/unsubscribe/confirm`, { token });
+      const r = await axios.post(`${API}/unsubscribe/auto-confirm`, { token });
       setEmailMasked(r.data?.email_masked || emailMasked);
       setState(r.data?.status === 'already_done' ? 'already' : 'success');
     } catch (err) {

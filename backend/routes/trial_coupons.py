@@ -52,10 +52,15 @@ logger = logging.getLogger(__name__)
 
 # Trial duration mirrors `partner_trial._TRIAL_DURATIONS` so the two
 # minting paths converge on the same business rule.
+#
+# iter309 D3 — Added the generic `partner` (30-day) tier so admins can
+# attach a "Partner Account Free Trial" coupon to external campaigns
+# without committing recipients to a specific dealer/broker/storage role.
 TRIAL_DURATIONS = {
     "dealer":  30,
     "broker":  60,
     "storage": 45,
+    "partner": 30,
 }
 
 # Public base URL used to build the redemption signup link. Read from
@@ -133,7 +138,7 @@ def _serialize_coupon(c: Dict[str, Any]) -> Dict[str, Any]:
 
 
 class ActivateTrialBody(BaseModel):
-    partner_type: str = Field(..., pattern="^(dealer|broker|storage)$")
+    partner_type: str = Field(..., pattern="^(dealer|broker|storage|partner)$")
     recipient_email: Optional[EmailStr] = None
     recipient_name: Optional[str] = Field(default=None, max_length=200)
     company_name: Optional[str] = Field(default=None, max_length=200)
@@ -142,7 +147,7 @@ class ActivateTrialBody(BaseModel):
 
 
 class BulkCouponsBody(BaseModel):
-    partner_type: str = Field(..., pattern="^(dealer|broker|storage)$")
+    partner_type: str = Field(..., pattern="^(dealer|broker|storage|partner)$")
     count: int = Field(..., ge=1, le=2000)
     campaign_id: Optional[str] = None
     campaign_slug: Optional[str] = Field(default=None, max_length=120)
@@ -448,6 +453,9 @@ async def redeem_coupon_for_user(
 
     # Provision the partner_trials row so the existing trial machinery
     # (extend / revoke / featured listing quota) keeps working.
+    # iter309 D3 — Added `partner` to the featured-listings table so the
+    # generic Partner Account tier doesn't KeyError on lookup.
+    featured_quota_map = {"dealer": 3, "broker": 99, "storage": 5, "partner": 5}
     trial_doc = {
         "id":                          str(uuid.uuid4()),
         "user_id":                     user_id,
@@ -458,7 +466,7 @@ async def redeem_coupon_for_user(
         "phone":                       phone_hint or "",
         "status":                      "active",
         "trial_expires_at":            trial_expiry.isoformat(),
-        "featured_listings_remaining": {"dealer": 3, "broker": 99, "storage": 5}[partner_type],
+        "featured_listings_remaining": featured_quota_map.get(partner_type, 5),
         "created_at":                  _now_iso(),
         "activated_via_coupon":        code,
         "campaign_id":                 res.get("campaign_id"),
@@ -469,6 +477,13 @@ async def redeem_coupon_for_user(
         "partner_type":                partner_type,
         "partner_trial_active":        True,
         "partner_trial_expires_at":    trial_expiry.isoformat(),
+        # iter309 D3 — Canonical `trial_active` flag + `account_tier` so the
+        # rest of the platform (gated dashboards, partner badges, fee rules)
+        # consistently identifies trial members without inferring from
+        # partner_type alone.
+        "trial_active":                True,
+        "trial_expires_at":            trial_expiry.isoformat(),
+        "account_tier":                "partner",
         # iter274 — Annual-fee gate is short-circuited: partner is
         # treated as paid for the duration of the trial so the dashboard
         # doesn't show the "pay $99 to continue" overlay.

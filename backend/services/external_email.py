@@ -320,8 +320,16 @@ async def send_external_campaign_email(
         }
 
     # Unsubscribe link with per-recipient token.
+    # iter309 D4 — Canonical frontend URL format:
+    #   https://bidvex.com/unsubscribe?token=<jwt>&lang=<en|fr>
+    # The frontend /unsubscribe page calls the unified /api/unsubscribe/auto-*
+    # endpoints which decode both platform itsdangerous AND external JWT tokens.
     unsub_token = make_unsubscribe_token(to_email, campaign_id, language)
-    unsub_url = f"{public_base_url}/api/external/unsubscribe?token={unsub_token}"
+    public_base = (public_base_url or "https://bidvex.com").rstrip("/")
+    lang_tag = (language or "en")[:2].lower()
+    if lang_tag not in ("en", "fr"):
+        lang_tag = "en"
+    unsub_url = f"{public_base}/unsubscribe?token={unsub_token}&lang={lang_tag}"
 
     # Inject the per-recipient unsubscribe URL into the {unsubscribe_url}
     # placeholder. If the admin forgot the placeholder, auto-append the

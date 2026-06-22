@@ -68,6 +68,10 @@ const CreateMultiItemListing = () => {
     lot_number: 1,
     title: '',
     description: '',
+    // iter309 D1 — Multi-Lot Category Restructure. Each lot carries its own
+    // category. Backend aggregates these into the parent listing's
+    // `categories[]` field for tag rendering + filtering.
+    category: '',
     quantity: 1,
     starting_price: '',
     current_price: '',
@@ -220,6 +224,9 @@ const CreateMultiItemListing = () => {
       lot_number: lots.length + 1,
       title: '',
       description: '',
+      // iter309 D1 — Per-lot category (defaults to auction-level category
+      // for backward-compat; seller can change per lot).
+      category: formData.category || '',
       quantity: 1,
       starting_price: '',
       current_price: '',
@@ -249,6 +256,8 @@ const CreateMultiItemListing = () => {
       lot_number: i + 1,
       title: '',
       description: '',
+      // iter309 D1 — Default per-lot category from auction-level (changeable).
+      category: formData.category || '',
       quantity: 1,
       starting_price: '',
       current_price: '',
@@ -304,6 +313,9 @@ const CreateMultiItemListing = () => {
             lot_number: index + 1,
             title: row.title || '',
             description: row.description || '',
+            // iter309 D1 — Per-lot category from CSV column (falls back to
+            // auction-level when missing).
+            category: (row.category || formData.category || '').trim(),
             quantity: parseInt(row.quantity) || 1,
             starting_price: parseFloat(row.starting_bid) || '',
             current_price: parseFloat(row.starting_bid) || '',
@@ -430,6 +442,11 @@ const CreateMultiItemListing = () => {
       errors.quantity = t('createListing.quantityPositive', 'Quantity must be a positive integer');
     }
 
+    // iter309 D1 — Per-lot category is now required.
+    if (!lot.category || !lot.category.toString().trim()) {
+      errors.category = t('createListing.lotCategoryRequired', 'Category is required for each lot');
+    }
+
     // Buy Now price validation: must be at least 20% higher than starting price
     if (lot.buy_now_enabled && lot.buy_now_price && lot.starting_price) {
       const startingPrice = parseFloat(lot.starting_price);
@@ -451,7 +468,9 @@ const CreateMultiItemListing = () => {
 
   const validateStep = (step) => {
     if (step === 1) {
-      if (!formData.title || !formData.description || !formData.category || 
+      // iter309 D1 — Auction-level category is now optional (lots carry it).
+      // Backend will derive the primary category from the lots' aggregate.
+      if (!formData.title || !formData.description || 
           !formData.city || !formData.region || !formData.postal_code || !formData.auction_end_date) {
         toast.error(t('createListing.fillRequired', 'Please fill all required fields'));
         return false;
@@ -761,10 +780,16 @@ const CreateMultiItemListing = () => {
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
+          <Label className="flex items-center gap-1 text-xs text-slate-500">
+            {t('createListing.defaultCategoryOptional', 'Default Category (optional)')}
+            <InfoTip
+              en="Optional starting category applied to new lots. Each lot can override its own category individually (D1 — multi-lot category restructure)."
+              fr="Catégorie par défaut optionnelle appliquée aux nouveaux lots. Chaque lot peut remplacer sa propre catégorie individuellement (D1 — restructure des catégories multi-lots)."
+            />
+          </Label>
           <CategorySelector
             value={formData.category}
             onChange={(val) => setFormData(prev => ({ ...prev, category: val }))}
-            required
             filterVehicles
             userRole={user?.role}
           />
@@ -1296,6 +1321,28 @@ const CreateMultiItemListing = () => {
                       <p className="text-red-500">{validationErrors[actualIndex].description}</p>
                     )}
                   </div>
+                </div>
+
+                {/* iter309 D1 — Per-Lot Category */}
+                <div className="space-y-2" data-testid={`lot-${actualIndex}-category-wrapper`}>
+                  <Label className="flex items-center gap-1">
+                    {t('createListing.lotCategory', 'Lot Category')} *
+                    <InfoTip
+                      en="Categorize THIS lot. Each lot can have its own category — your multi-lot auction will appear in every category at least one of its lots belongs to."
+                      fr="Catégorisez CE lot. Chaque lot peut avoir sa propre catégorie — votre enchère multi-lots apparaîtra dans chaque catégorie d'au moins un de ses lots."
+                    />
+                  </Label>
+                  <CategorySelector
+                    value={lot.category || ''}
+                    onChange={(val) => handleLotChange(actualIndex, 'category', val)}
+                    required
+                    filterVehicles
+                    userRole={user?.role}
+                    data-testid={`lot-${actualIndex}-category-select`}
+                  />
+                  {validationErrors[actualIndex]?.category && (
+                    <p className="text-red-500 text-xs">{validationErrors[actualIndex].category}</p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

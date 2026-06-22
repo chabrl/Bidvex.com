@@ -594,6 +594,7 @@ function CampaignWizard({ campaignId, headers, onClose }) {
                       <option value="dealer">Vehicle Dealer (30-day trial)</option>
                       <option value="broker">Licensed Broker (60-day trial)</option>
                       <option value="storage">Storage Facility (45-day trial)</option>
+                      <option value="partner">Partner Account (30-day trial)</option>
                     </select>
                   </div>
                 </div>

@@ -216,6 +216,15 @@ class Lot(BaseModel):
     lot_number: int
     title: str
     description: str
+    # iter309 D1 — Multi-Lot Category Restructure. Each lot now carries its
+    # own `category` so a single multi-lot auction can mix item types (e.g.
+    # "Tools" lot + "Furniture" lot inside the same event). Auction-level
+    # `category` on MultiItemListing remains as a denormalized "primary
+    # category" for legacy single-category searches; the new
+    # `categories: List[str]` aggregate is the source of truth for
+    # category-tag rendering + faceted filters ("contains at least one lot
+    # in this category").
+    category: Optional[str] = None
     quantity: int
     # FEATURE PATCH v9 / Feature 4 — lot-level "multiply hammer by quantity" opt-in
     multiply_hammer_by_quantity: bool = False
@@ -252,7 +261,12 @@ class Lot(BaseModel):
 class MultiItemListingCreate(BaseModel):
     title: str
     description: str
-    category: str
+    # iter309 D1 — Auction-level category remains as the primary/dominant
+    # category for backward-compat with feeds + sort. Per-lot categories
+    # (Lot.category) are authoritative for tag/filter rendering. When
+    # omitted on creation, the backend computes it from the lots'
+    # categories (most common first).
+    category: Optional[str] = None
     location: str
     city: str
     region: str
@@ -294,7 +308,11 @@ class MultiItemListing(BaseModel):
     seller_id: str
     title: str
     description: str
+    # iter309 D1 — Primary/dominant category for backward-compat. The
+    # `categories: List[str]` aggregate is the source of truth for tag
+    # rendering + faceted filters.
     category: str
+    categories: List[str] = Field(default_factory=list)
     location: str
     city: str
     region: str

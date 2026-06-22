@@ -12,6 +12,7 @@
 regression-fast:
 	pytest backend/tests/test_iter308_billing_and_verification.py \
 	       backend/tests/test_iter309_bulletproof_listing.py \
+	       backend/tests/test_iter309_directives.py \
 	       backend/tests/test_iter310_bulk_delete_cascade.py \
 	       backend/tests/test_iter310_bill96_compliance.py \
 	       backend/tests/test_iter311_all_collections.py \

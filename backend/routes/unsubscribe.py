@@ -85,11 +85,19 @@ def _mask_email(email: str) -> str:
 
 
 def build_unsubscribe_urls(email: str) -> Dict[str, str]:
-    """Helper used by the email-send pipeline to inject EN + FR links."""
+    """Helper used by the email-send pipeline to inject EN + FR links.
+
+    iter309 D4 — Canonical URL format:
+        https://bidvex.com/unsubscribe?token=<signed>&lang=<en|fr>
+    Both EN and FR resolve to the same `/unsubscribe` SPA route; the
+    `lang` query param drives the bilingual rendering. Legacy `/desabonnement`
+    route remains alive via a frontend alias for older campaign emails
+    already in inboxes.
+    """
     token = generate_unsubscribe_token(email)
     return {
         "en": f"{FRONTEND_URL}/unsubscribe?token={token}&lang=en",
-        "fr": f"{FRONTEND_URL}/desabonnement?token={token}&lang=fr",
+        "fr": f"{FRONTEND_URL}/unsubscribe?token={token}&lang=fr",
     }
 
 
@@ -277,10 +285,189 @@ async def confirm_resubscribe(payload: ConfirmRequest, request: Request):
     return {"status": "success", "email_masked": _mask_email(email)}
 
 
+# ── iter309 D4 — Unified auto-verify / auto-confirm ────────────
+# Standardized unsubscribe handler that decodes EITHER:
+#   • platform itsdangerous tokens (issued by build_unsubscribe_urls)
+#   • external campaign JWT tokens (issued by external_email.make_unsubscribe_token)
+# so a single canonical /unsubscribe?token=...&lang=... URL works across
+# every marketing/campaign email type. Sets `email_unsubscribed=true` on
+# the user document + writes to the suppression collections.
+
+def _decode_any_unsubscribe_token(token: str) -> Dict[str, str]:
+    """Try platform itsdangerous decoder first, fall back to external JWT.
+
+    Returns a dict: {email, campaign_id?, source: "platform"|"external"}.
+    Raises HTTPException(400) on any failure.
+    """
+    # 1. Platform itsdangerous attempt.
+    try:
+        email = _decode_unsubscribe_token(token)
+        return {"email": email, "campaign_id": None, "source": "platform"}
+    except HTTPException:
+        pass
+
+    # 2. External JWT attempt.
+    try:
+        from services.external_email import decode_unsubscribe_token as decode_jwt
+        payload = decode_jwt(token)
+        if not isinstance(payload, dict) or payload.get("type") != "external_unsub":
+            raise ValueError("invalid_token_type")
+        email = (payload.get("email") or "").strip().lower()
+        if not email:
+            raise ValueError("no_email_in_token")
+        return {
+            "email":       email,
+            "campaign_id": payload.get("campaign_id"),
+            "source":      "external",
+        }
+    except Exception as exc:
+        logger.warning(f"[UNSUBSCRIBE auto] JWT decode failed: {exc}")
+        raise HTTPException(status_code=400, detail="token_invalid")
+
+
+@unsubscribe_router.get("/auto-verify")
+async def auto_verify_unsubscribe_token(token: str = ""):
+    """Decode any platform / external token + return masked email + status."""
+    if not token:
+        raise HTTPException(status_code=400, detail="token_missing")
+    decoded = _decode_any_unsubscribe_token(token)
+    email = decoded["email"]
+    db = get_db()
+    user = await db.users.find_one(
+        {"email": email},
+        {"_id": 0, "marketing_unsubscribed": 1, "email_unsubscribed": 1},
+    )
+    suppressed_platform = bool(user and (user.get("marketing_unsubscribed") or user.get("email_unsubscribed")))
+    suppressed_external = await db.external_email_suppressions.find_one(
+        {"email": email}, {"_id": 0, "email": 1},
+    )
+    return {
+        "email_masked":         _mask_email(email),
+        "already_unsubscribed": bool(suppressed_platform or suppressed_external),
+        "source":               decoded["source"],
+    }
+
+
+@unsubscribe_router.post("/auto-confirm")
+async def auto_confirm_unsubscribe(payload: ConfirmRequest, request: Request):
+    """Standardize unsubscribe across platform + external campaign tokens.
+
+    iter309 D4:
+      • Sets `email_unsubscribed=true` (canonical) + `marketing_unsubscribed=true`
+        (legacy compat) on the user document (upserts a contact-only row if no
+        user exists).
+      • Writes to `email_suppressions` (platform) + `external_email_suppressions`
+        (campaigns) so every send-time guard agrees.
+      • Increments `analytics.unsubscribed` on the source campaign when the token
+        is an external JWT carrying a `campaign_id`.
+      • Pushes the suppression to the SendGrid global list (best-effort).
+    """
+    decoded = _decode_any_unsubscribe_token(payload.token)
+    email = decoded["email"]
+    campaign_id = decoded.get("campaign_id")
+    source = decoded["source"]
+    db = get_db()
+    now = datetime.now(timezone.utc)
+
+    # Short-circuit if already unsubscribed.
+    user = await db.users.find_one(
+        {"email": email},
+        {"_id": 0, "marketing_unsubscribed": 1, "email_unsubscribed": 1},
+    )
+    already = bool(user and (user.get("marketing_unsubscribed") or user.get("email_unsubscribed")))
+
+    if not already:
+        await db.users.update_one(
+            {"email": email},
+            {
+                "$set": {
+                    "email_unsubscribed":          True,
+                    "email_unsubscribed_at":       now,
+                    "email_unsubscribed_source":   source,
+                    "marketing_unsubscribed":      True,
+                    "marketing_unsubscribed_at":   now,
+                    "marketing_unsubscribed_source": "link",
+                    "marketing_unsubscribed_ip": (request.client.host if request.client else None),
+                },
+                "$setOnInsert": {
+                    "id":               str(uuid.uuid4()),
+                    "email":            email,
+                    "created_at":       now,
+                    "is_contact_only":  True,
+                },
+            },
+            upsert=True,
+        )
+
+    # Platform suppression list (fast lookup for send-time guard).
+    await db.email_suppressions.update_one(
+        {"email": email},
+        {
+            "$set": {
+                "email":           email,
+                "unsubscribed_at": now,
+                "source":          source,
+            }
+        },
+        upsert=True,
+    )
+
+    # External campaign suppression list — keeps external sender in sync.
+    await db.external_email_suppressions.update_one(
+        {"email": email},
+        {
+            "$setOnInsert": {
+                "email":          email,
+                "reason":         "unsubscribe",
+                "campaign_id":    campaign_id,
+                "suppressed_at":  now.isoformat(),
+                "source":         source,
+            }
+        },
+        upsert=True,
+    )
+
+    # Campaign analytics tick (external campaigns).
+    if campaign_id:
+        try:
+            await db.external_email_campaigns.update_one(
+                {"id": campaign_id},
+                {
+                    "$inc": {"analytics.unsubscribed": 1},
+                    "$set": {"analytics.last_updated_at": now.isoformat()},
+                },
+            )
+        except Exception as exc:
+            logger.warning(f"[UNSUBSCRIBE auto] campaign analytics update failed: {exc}")
+
+    # Propagate to SendGrid global suppressions (best effort).
+    if SENDGRID_API_KEY:
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                r = await client.post(
+                    SENDGRID_SUPPRESSIONS_URL,
+                    headers={
+                        "Authorization": f"Bearer {SENDGRID_API_KEY}",
+                        "Content-Type":  "application/json",
+                    },
+                    json={"recipient_emails": [email]},
+                )
+                if r.status_code not in (200, 201):
+                    logger.warning(
+                        f"[UNSUBSCRIBE auto] SendGrid suppression returned "
+                        f"{r.status_code}: {r.text[:200]}"
+                    )
+        except Exception as exc:
+            logger.error(f"[UNSUBSCRIBE auto] SendGrid API call failed: {exc}")
+
+    return {
+        "status":       "already_done" if already else "success",
+        "email_masked": _mask_email(email),
+        "source":       source,
+    }
+
+
 # ── Admin-only debug helper ────────────────────────────────────
-# REMOVE BEFORE PRODUCTION GA (or leave — the `require_admin` gate makes it
-# safe; only super_admin / admin role can hit it). Useful for QA testing the
-# unsubscribe flow end-to-end without going through the email send pipeline.
 @unsubscribe_router.get("/generate-test-link")
 async def generate_test_link(email: str, _: User = Depends(require_admin)):
     """

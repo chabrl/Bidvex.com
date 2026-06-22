@@ -115,9 +115,10 @@ class CampaignCreate(BaseModel):
     # `BVX-TRIAL-*` code minted on send-now and the `{trial_signup_url}`
     # template token in the body resolves to a deep registration link
     # that skips the annual fee gate.
+    # iter309 D3 — Added `partner` (30-day generic Partner Account trial).
     attach_trial_coupon: bool = False
     trial_partner_type: Optional[str] = Field(
-        default=None, pattern="^(dealer|broker|storage)$",
+        default=None, pattern="^(dealer|broker|storage|partner)$",
     )
 
 
@@ -134,7 +135,7 @@ class CampaignUpdate(BaseModel):
     scheduled_at: Optional[datetime] = None
     attach_trial_coupon: Optional[bool] = None
     trial_partner_type: Optional[str] = Field(
-        default=None, pattern="^(dealer|broker|storage)$",
+        default=None, pattern="^(dealer|broker|storage|partner)$",
     )
 
 
@@ -1013,7 +1014,14 @@ async def refresh_all_analytics(current_user: User = Depends(get_current_user)) 
 @public_router.get("/unsubscribe", response_class=HTMLResponse)
 async def public_unsubscribe(token: str = Query(...)):
     """Public endpoint — no auth required. Decodes the JWT, suppresses
-    the email, returns a small bilingual confirmation page."""
+    the email, returns a small bilingual confirmation page.
+
+    iter309 D4 — Backward-compat handler for OLD external campaign emails
+    that still point to /api/external/unsubscribe?token=... New emails ship
+    a canonical https://bidvex.com/unsubscribe?token=...&lang=... URL that
+    hits the unified /api/unsubscribe/auto-* endpoints instead. We mirror
+    the same DB writes here so already-delivered emails keep working.
+    """
     db = get_db()
     try:
         payload = decode_unsubscribe_token(token)
@@ -1031,6 +1039,8 @@ async def public_unsubscribe(token: str = Query(...)):
     campaign_id = payload.get("campaign_id")
     lang = (payload.get("lang") or "en").lower()
     if email:
+        now = datetime.now(timezone.utc)
+        # External suppression row (legacy).
         await db.external_email_suppressions.update_one(
             {"email": email},
             {"$setOnInsert": {
@@ -1038,7 +1048,35 @@ async def public_unsubscribe(token: str = Query(...)):
                 "reason":        "unsubscribe",
                 "campaign_id":   campaign_id,
                 "suppressed_at": _now_iso(),
+                "source":        "external",
             }},
+            upsert=True,
+        )
+        # iter309 D4 — Canonical email_unsubscribed flag + platform suppression
+        # so the unified suppression check used by all sender pipelines agrees.
+        await db.users.update_one(
+            {"email": email},
+            {
+                "$set": {
+                    "email_unsubscribed":          True,
+                    "email_unsubscribed_at":       now,
+                    "email_unsubscribed_source":   "external",
+                    "marketing_unsubscribed":      True,
+                    "marketing_unsubscribed_at":   now,
+                    "marketing_unsubscribed_source": "link",
+                },
+                "$setOnInsert": {
+                    "id":              str(uuid.uuid4()),
+                    "email":           email,
+                    "created_at":      now,
+                    "is_contact_only": True,
+                },
+            },
+            upsert=True,
+        )
+        await db.email_suppressions.update_one(
+            {"email": email},
+            {"$set": {"email": email, "unsubscribed_at": now, "source": "external"}},
             upsert=True,
         )
         if campaign_id:
