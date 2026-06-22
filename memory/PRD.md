@@ -10385,3 +10385,34 @@ Facility chooses payment method per listing (Stripe / Cash / E-Transfer). Option
 - **Production deploy reminder** — Run the D1 backfill script on production AFTER deploy (`python backend/scripts/iter309_d1_backfill_multilot_categories.py --dry-run` first to confirm production impact, then re-run without `--dry-run` to execute).
 
 - **NOT YET DEPLOYED** to production (bidvex.com) — user to deploy.
+
+
+## iter310 (Feb 22, 2026) — Post-D1/D2/D3/D4 Follow-Up — DONE ✅
+**`make regression-fast`: 136 passed, 2 skipped, 0 failures. Testing agent report: `/app/test_reports/iteration_255.json` (14 new tests all green).**
+
+- **D1 backfill** — Preview DB dry-run: 0 multi_item_listings docs to update, no mismatches. Script `backend/scripts/iter309_d1_backfill_multilot_categories.py` ready for production run.
+- **Alex Boulanger win-email repair** — User exists in preview but has no won auctions → no-op on preview. Run on production for actual repair.
+
+- **Unsubscribe Audit Trail**
+  - New `unsubscribe_events` collection written by both `/api/unsubscribe/auto-confirm` (platform) and legacy `/api/external/unsubscribe` (external JWT)
+  - `GET /api/admin/unsubscribe-audit/summary` (today/7/30 + by_day sparkline + by_source) + `GET /api/admin/unsubscribe-audit` (paginated, filterable)
+  - Frontend: new admin sub-tab `Marketing → Unsubscribe Audit`
+
+- **testseller demo bypass** — `is_demo_account=true` + `has_payment_method=true` + `phone_verified=true`. Previously-skipped D1 multi-item e2e test now PASSES. Pre-existing NameError in `listings_service.py::resolve_multi_item_status` fixed.
+
+- **$500 Deposit Auto-Capture** — Existing scheduler (iter175) enhanced: after capture, applies amount against `vehicle_invoices.paid_amount`; if covered → `payment_status="paid"`, if not → `payment_status="payment_overdue"` + `remaining_balance` flagged.
+
+- **Admin Offline Transaction recording** — `POST /api/admin/offline-transactions/record` (cash/etransfer/wire/cheque/other) + list/get endpoints. No Stripe charge, no buyer email; optional seller notification + admin_action_logs row.
+
+- **Recently Sold rolling ticker** — `GET /api/public/recently-sold` (anonymized, 60s cache, all 4 sections). Frontend `<RecentlySoldTicker />` mounted beside Live Auctions pill on homepage hero, bilingual, rotates 4s.
+
+- **React unique-key warning** — Defensive composite key fallback on AdminDashboard liveAuditLog map.
+
+- **Production action items**
+  - Deploy preview to bidvex.com
+  - On prod: `python backend/scripts/iter309_d1_backfill_multilot_categories.py --dry-run` → review → execute
+  - On prod: `python backend/scripts/repair_alex_boulanger_win_email.py --email alexboul1993@gmail.com --execute`
+  - Do NOT run `iter310_mark_testseller_demo.py` on prod (preview-only QA helper)
+
+- **NOT YET DEPLOYED** to production — user to redeploy.
+
