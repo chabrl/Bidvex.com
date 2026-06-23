@@ -1,0 +1,32 @@
+{
+  "summary": "iter313 P2 — Per-Campaign 5% Bounce+Unsubscribe Auto-Pause Guardrail banner E2E verified. All 6 actionable behaviours (BG-1..BG-6) PASS; BG-7 verified via code mapping. Seeded test campaign cleaned up post-run.",
+  "test_steps_executed": [
+    "BG-1 PASS — Admin login (charbel911@gmail.com) with localStorage cookie consent pre-set; landed on /marketplace then navigated to /admin.",
+    "BG-2 PASS — Direct pymongo insert of auto_paused campaign 'iter313-banner-test-1' (ratio 8%, 8/100, status='auto_paused').",
+    "BG-3 PASS — /admin → Settings tab → External Campaigns sub-tab → [data-testid='auto-paused-banner'] rendered. Title text: '1 campaign auto-paused — 5% guardrail breached'. Row [data-testid='auto-paused-row-iter313-banner-test-1'] visible showing 'Ratio 8% (8/100) — paused …'.",
+    "BG-4 PASS — [data-testid='resume-auto-paused-iter313-banner-test-1'] rendered with label 'Resume sending'.",
+    "BG-5 PASS — window.prompt mocked to return 'List cleaned, contact list re-verified' → click resume → POST /api/admin/external-campaigns/iter313-banner-test-1/resume-auto-paused returned 200 with body {resumed: true, campaign_id, status: 'sent'}. Toast 'Campaign resumed' shown (sonner). Banner detached from DOM. DB verified: campaign.status='sent', auto_paused_resumed_at='2026-06-23T04:23:40.773327+00:00'. Audit row in campaign_guardrail_events: event='auto_pause_resumed', reason='List cleaned, contact list re-verified', resumed_by_email='charbel911@gmail.com'.",
+    "BG-6 PASS — Pre-resume, window.prompt mocked to return null → click resume → fetch network hook captured ZERO requests to resume-auto-paused; banner remained visible (banner_still_after_cancel=true).",
+    "BG-7 CODE-VERIFIED — STATUS_BADGES.auto_paused mapping at AdminExternalCampaigns.jsx lines 44-45: {label: 'Auto-Paused', cls: 'bg-rose-100 text-rose-800 border-rose-400'} — rose styling confirmed. Visual badge in the campaigns list row not screenshotted (cleanup ran)."
+  ],
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/test_reports/iter313_seed.py",
+    "/app/test_reports/iter313_verify.py",
+    "/app/test_reports/iter313_banner.png"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "AutoPausedBanner uses native window.prompt() for reason capture — works but is non-styled and non-i18n. For polish, replace with a shadcn Dialog containing a textarea + Confirm/Cancel buttons. Low priority (functionality is correct).",
+    "The 30s polling interval (setInterval) is implemented correctly with cleanup in useEffect — no leak."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "Admin charbel911@gmail.com / Anderosli123!@# (sole admin, working). Cookie consent pre-set via localStorage.bidvex_cookie_consent.",
+  "seed_data_creation": "Inserted external_email_campaigns row id='iter313-banner-test-1' with _iter313_banner_test=True flag; deleted in post-run cleanup along with related campaign_guardrail_events.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "iter313 P2 banner + resume flow is end-to-end verified. Seed script at /app/test_reports/iter313_seed.py is idempotent (delete_many first); cleanup script at /app/test_reports/iter313_verify.py also performs cleanup. Banner sits between page header and the tabs row inside /admin → Settings → External Campaigns sub-tab.",
+  "rca_of_the_issue": "N/A — no failures."
+}

@@ -22,6 +22,8 @@ regression-fast:
 	       backend/tests/test_iter312_multi_quantity_billing.py \
 	       backend/tests/test_iter312_ai_review_dataloss.py \
 	       backend/tests/test_iter312_draft_expiry.py \
+	       backend/tests/test_iter313_universal_drafts.py \
+	       backend/tests/test_iter313_campaign_guardrail.py \
 	       -v --tb=short
 
 # Full iter299→iter309 regression (~17 min, per-file with 35s rate-limit spacing).

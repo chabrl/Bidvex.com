@@ -234,6 +234,29 @@ async def list_campaigns(
     }
 
 
+# iter313 P2 — list of auto-paused campaigns (for admin banner).
+# MUST be defined BEFORE the @router.get("/{campaign_id}") route below;
+# otherwise FastAPI's route matcher catches "auto-paused" as a
+# campaign_id and returns 404.
+@router.get("/auto-paused")
+async def list_auto_paused(
+    current_user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Return all campaigns currently in `auto_paused` state.
+    Used by the admin banner that surfaces guardrail breaches."""
+    _require_admin(current_user)
+    db = get_db()
+    cursor = db.external_email_campaigns.find(
+        {"status": "auto_paused"},
+        {"_id": 0, "id": 1, "name": 1, "subject_en": 1,
+         "auto_paused_at": 1, "auto_paused_reason": 1,
+         "auto_paused_ratio_pct": 1, "auto_paused_negative_count": 1,
+         "auto_paused_attempted_count": 1, "analytics": 1},
+    ).sort("auto_paused_at", -1)
+    items = await cursor.to_list(length=200)
+    return {"items": items, "count": len(items)}
+
+
 @router.get("/{campaign_id}")
 async def get_campaign(campaign_id: str, current_user: User = Depends(get_current_user)) -> Dict[str, Any]:
     _require_admin(current_user)
@@ -841,9 +864,15 @@ async def send_now(
     doc = await db.external_email_campaigns.find_one({"id": campaign_id}, {"_id": 0})
     if not doc:
         raise HTTPException(status_code=404, detail="Campaign not found")
+    if doc.get("status") == "auto_paused":
+        raise HTTPException(
+            status_code=400,
+            detail=("Campaign is auto-paused (5% bounce/unsubscribe guardrail). "
+                    "Use POST /external-campaigns/{id}/resume-auto-paused with "
+                    "{confirm: true} to resume sending."),
+        )
     if doc.get("status") not in ("draft", "scheduled"):
         raise HTTPException(status_code=400, detail="Only draft/scheduled campaigns can be sent")
-
     err = validate_casl(doc.get("subject_en", ""), doc.get("body_html_en", ""))
     if err:
         raise HTTPException(status_code=400, detail=err)
@@ -945,6 +974,70 @@ async def cancel_campaign(
         {"$set": {"status": "draft", "scheduled_at": None, "updated_at": _now_iso()}},
     )
     return {"cancelled": True, "status": "draft"}
+
+
+# iter313 P2 — Per-Campaign 5% Auto-Pause Guardrail.
+#
+# When SendGrid webhooks push the (bounced + unsubscribed + spam_reports)
+# ratio above 5% of attempted sends, the campaign is auto-paused (see
+# routes/sendgrid_webhook.py::_maybe_auto_pause_campaign). The endpoints
+# below let admins (a) see the list of auto-paused campaigns for the
+# admin banner and (b) explicitly confirm resumption.
+
+class ResumeAutoPausedBody(BaseModel):
+    confirm: bool = False
+    acknowledge_risk: Optional[str] = None  # free-text reason field
+
+
+@router.post("/{campaign_id}/resume-auto-paused")
+async def resume_auto_paused(
+    campaign_id: str, body: ResumeAutoPausedBody,
+    current_user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Confirmation-gated resume of an auto-paused campaign. Requires
+    `confirm=true` in the body — this prevents a one-click misfire that
+    would re-burn sender reputation."""
+    _require_admin(current_user)
+    if not body.confirm:
+        raise HTTPException(
+            status_code=400,
+            detail=("Confirmation required. Submit {confirm: true} to "
+                    "acknowledge the bounce/unsubscribe ratio breach and "
+                    "resume sending."),
+        )
+    db = get_db()
+    doc = await db.external_email_campaigns.find_one({"id": campaign_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    if doc.get("status") != "auto_paused":
+        raise HTTPException(
+            status_code=400,
+            detail="Only an auto-paused campaign can be resumed via this endpoint.",
+        )
+    now_iso = _now_iso()
+    await db.external_email_campaigns.update_one(
+        {"id": campaign_id},
+        {"$set": {
+            "status":                 "sent",  # back to terminal sent state
+            "auto_paused_resumed_at": now_iso,
+            "auto_paused_resumed_by": current_user.id,
+            "updated_at":             now_iso,
+        }},
+    )
+    # Audit
+    try:
+        await db.campaign_guardrail_events.insert_one({
+            "id":           str(uuid.uuid4()),
+            "campaign_id":  campaign_id,
+            "event":        "auto_pause_resumed",
+            "resumed_by":   current_user.id,
+            "resumed_by_email": current_user.email,
+            "reason":       body.acknowledge_risk or "",
+            "resumed_at":   now_iso,
+        })
+    except Exception as audit_err:
+        logger.warning(f"[guardrail resume audit] insert failed: {audit_err}")
+    return {"resumed": True, "campaign_id": campaign_id, "status": "sent"}
 
 
 # ─── 2E — Analytics ───────────────────────────────────────────────────

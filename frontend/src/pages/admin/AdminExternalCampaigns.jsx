@@ -29,18 +29,20 @@ import { toast } from 'sonner';
 import {
   Mail, Send, Users, Paperclip, RefreshCw, Trash2,
   CheckCircle2, AlertTriangle, Loader2, Plus, X, Eye, Calendar,
-  Download, Ban,
+  Download, Ban, PauseCircle, PlayCircle,
 } from 'lucide-react';
 
 const API = API_BASE;
 
 const STATUS_BADGES = {
-  draft:      { label: '🟡 Draft',       cls: 'bg-slate-100 text-slate-700 border-slate-300' },
-  scheduled:  { label: '📅 Scheduled',   cls: 'bg-blue-100 text-blue-800 border-blue-300' },
-  sending:    { label: '🔄 Sending…',    cls: 'bg-indigo-100 text-indigo-800 border-indigo-300 animate-pulse' },
-  sent:       { label: '✅ Sent',         cls: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
-  failed:     { label: '❌ Failed',       cls: 'bg-rose-100 text-rose-800 border-rose-300' },
-  paused:     { label: '⏸️ Paused',       cls: 'bg-amber-100 text-amber-800 border-amber-300' },
+  draft:       { label: 'Draft',        cls: 'bg-slate-100 text-slate-700 border-slate-300' },
+  scheduled:   { label: 'Scheduled',    cls: 'bg-blue-100 text-blue-800 border-blue-300' },
+  sending:     { label: 'Sending...',   cls: 'bg-indigo-100 text-indigo-800 border-indigo-300 animate-pulse' },
+  sent:        { label: 'Sent',         cls: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
+  failed:      { label: 'Failed',       cls: 'bg-rose-100 text-rose-800 border-rose-300' },
+  paused:      { label: 'Paused',       cls: 'bg-amber-100 text-amber-800 border-amber-300' },
+  // iter313 P2 — auto-paused by the 5% bounce+unsubscribe guardrail.
+  auto_paused: { label: 'Auto-Paused',  cls: 'bg-rose-100 text-rose-800 border-rose-400' },
 };
 
 const TABS = [
@@ -97,6 +99,10 @@ export default function AdminExternalCampaigns() {
           <Plus className="h-4 w-4 mr-1" /> New Campaign
         </Button>
       </header>
+
+      {/* iter313 P2 — Auto-Pause banner. Sticky-red affordance that
+          stays until each campaign is explicitly resumed. */}
+      <AutoPausedBanner headers={headers} onResumed={fetchCampaigns} />
 
       <div className="flex gap-2 border-b">
         {TABS.map(t => (
@@ -1037,3 +1043,111 @@ function SuppressionList({ headers }) {
     </Card>
   );
 }
+
+
+// ─── iter313 P2 — Auto-Pause Guardrail Banner ───────────────────────────
+//
+// Polls GET /admin/external-campaigns/auto-paused every 30s and renders
+// a sticky red banner for each campaign that breached the 5% guardrail.
+// Each card includes a one-click confirmation-gated Resume action that
+// calls POST /admin/external-campaigns/{id}/resume-auto-paused with
+// {confirm: true}. We never auto-resume.
+function AutoPausedBanner({ headers, onResumed }) {
+  const [items, setItems] = useState([]);
+  const [busy, setBusy] = useState(null);
+
+  const fetchPaused = useCallback(async () => {
+    try {
+      const r = await axios.get(`${API}/admin/external-campaigns/auto-paused`, { headers });
+      setItems(r.data?.items || []);
+    } catch (_e) { /* silent — banner is best-effort */ }
+  }, [headers]);
+
+  useEffect(() => {
+    fetchPaused();
+    const id = setInterval(fetchPaused, 30000);
+    return () => clearInterval(id);
+  }, [fetchPaused]);
+
+  const handleResume = async (campaign) => {
+    const reason = window.prompt(
+      `Resume "${campaign.name || campaign.subject_en || campaign.id}"?\n\n`
+      + `This campaign tripped the 5% bounce/unsubscribe guardrail `
+      + `(${campaign.auto_paused_ratio_pct}%). Please briefly note `
+      + `what you cleaned up (list hygiene, content fix, etc.):`,
+      '',
+    );
+    if (reason === null) return; // user cancelled
+    setBusy(campaign.id);
+    try {
+      await axios.post(
+        `${API}/admin/external-campaigns/${campaign.id}/resume-auto-paused`,
+        { confirm: true, acknowledge_risk: reason || 'No reason provided' },
+        { headers },
+      );
+      toast.success('Campaign resumed');
+      await fetchPaused();
+      if (typeof onResumed === 'function') onResumed();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || 'Failed to resume campaign');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  if (items.length === 0) return null;
+
+  return (
+    <div
+      className="space-y-2 border-l-4 border-rose-600 bg-rose-50 p-4 rounded-r-lg shadow-sm"
+      data-testid="auto-paused-banner"
+    >
+      <div className="flex items-center gap-2 font-semibold text-rose-900">
+        <PauseCircle className="h-5 w-5" />
+        <span data-testid="auto-paused-banner-title">
+          {items.length === 1
+            ? '1 campaign auto-paused — 5% guardrail breached'
+            : `${items.length} campaigns auto-paused — 5% guardrail breached`}
+        </span>
+      </div>
+      <p className="text-xs text-rose-800">
+        Sender reputation protected. Each campaign requires explicit
+        confirmation before sending can resume.
+      </p>
+      <ul className="space-y-2">
+        {items.map((c) => (
+          <li
+            key={c.id}
+            className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 bg-white rounded p-2 border border-rose-200"
+            data-testid={`auto-paused-row-${c.id}`}
+          >
+            <div className="flex-1 min-w-0">
+              <div className="font-medium text-slate-900 truncate">
+                {c.name || c.subject_en || c.id}
+              </div>
+              <div className="text-xs text-slate-600">
+                Ratio <b>{c.auto_paused_ratio_pct}%</b>
+                {' '}({c.auto_paused_negative_count}/{c.auto_paused_attempted_count}){' '}
+                — paused {new Date(c.auto_paused_at).toLocaleString()}
+              </div>
+            </div>
+            <Button
+              size="sm"
+              onClick={() => handleResume(c)}
+              disabled={busy === c.id}
+              className="bg-rose-600 hover:bg-rose-700 text-white"
+              data-testid={`resume-auto-paused-${c.id}`}
+            >
+              {busy === c.id ? (
+                <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Resuming...</>
+              ) : (
+                <><PlayCircle className="h-3.5 w-3.5 mr-1" /> Resume sending</>
+              )}
+            </Button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
