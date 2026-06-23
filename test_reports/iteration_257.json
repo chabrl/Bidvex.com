@@ -1,0 +1,47 @@
+{
+  "summary": "iter313 frontend E2E for Universal Save-as-Draft across 5 wizards + Drafts dashboard sub-tab. Storage flow PASSES end-to-end (save→Drafts tab render→Resume hydrates URL→Delete→Empty state). Marketplace & Lots Save buttons render but the click produced NO /api/drafts/save network request (likely overlay/race or button onClick not firing). Vehicle and Multi-Lot Vehicle Save buttons are NOT RENDERED — pages return 403s for testseller (vehicle wizard is gated behind dealer verification, which testseller does not have). Drafts tab UI, expiry badges, Resume (hydration URL with draft_id), Delete confirm flow, and Empty state all verified.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "CreateListingPage (Marketplace)", "issue": "Save as Draft button is present but clicking it does NOT trigger POST /api/drafts/save (no network request, no toast). Possible causes: cookie-consent overlay intercepting clicks on the wizard page (banner observed at bottom of viewport on /seller/dashboard for the same session), button onClick disabled state, or React not hydrated. Needs main-agent debug.", "selector": "[data-testid='save-as-draft-btn-marketplace']", "priority": "HIGH"},
+      {"component": "CreateMultiItemListing (Lots)", "issue": "Save as Draft button present but click does NOT trigger POST /api/drafts/save. Same symptom as Marketplace.", "selector": "[data-testid='save-as-draft-btn-lots']", "priority": "HIGH"},
+      {"component": "CreateVehicleListingPage (/vehicle-auctions/create)", "issue": "save-as-draft-btn-vehicle is NOT rendered on the page for testseller@bidvex.com. Page navigated but no draft testids found at all and several 403/404 console errors. Vehicle wizard appears gated behind dealer verification — testseller is not a vehicle dealer. Either (a) move SaveAsDraftButton above the dealer-gate so partial drafts are still allowed, or (b) re-test with testdealer@bidvex.com.", "selector": "[data-testid='save-as-draft-btn-vehicle']", "priority": "HIGH"},
+      {"component": "CreateVehicleMultiLotPage (/vehicle-auctions/multi-lot/create)", "issue": "save-as-draft-btn-multi_lot_vehicle is NOT rendered. Same dealer-gate likely applies.", "selector": "[data-testid='save-as-draft-btn-multi_lot_vehicle']", "priority": "HIGH"}
+    ],
+    "integration_issues": [
+      {"flow": "Marketplace + Lots Save-as-Draft → POST /api/drafts/save", "issue": "Click handler does not fire the axios POST. Storage wizard with identical SaveAsDraftButton works correctly (200 + draft_id + toast), so the universal button component itself is healthy — the difference is page-level (overlay / gate / hydration timing).", "affected_selectors": ["[data-testid='save-as-draft-btn-marketplace']", "[data-testid='save-as-draft-btn-lots']"]}
+    ],
+    "design_issues": [
+      {"screen": "/seller/dashboard", "issues": ["Cookie Consent dialog appears anchored over the Drafts tab content even after localStorage consent is set (the banner re-appears on this preview URL). It does not block Drafts tab interactions but is visually distracting."]}
+    ]
+  },
+  "verified_passing": [
+    "FEATURE 3 Storage Save-as-Draft: POST /api/drafts/save returned 200 with draft_id=24d4a911-… expires_in_days=30.",
+    "FEATURE 6 Unified Drafts sub-tab: data-testid='tab-drafts' visible in /seller/dashboard, click activates SellerDrafts which renders data-testid='seller-drafts-tab' with a Storage badge, title, expiry pill, Resume + Delete buttons.",
+    "FEATURE 7 Resume Draft: clicking data-testid='edit-draft-{id}' navigates to /storage-auctions/create?draft_id={id} (correct wizard + correct query param).",
+    "FEATURE 8 Delete Draft: window.confirm accepted → DELETE /api/drafts/{id} → draft removed from list → 'Draft deleted' toast shown.",
+    "FEATURE 9 Empty state: data-testid='seller-drafts-empty' renders 'No saved drafts yet.' after the last draft is deleted."
+  ],
+  "not_tested": [
+    "FEATURE 10 Restore Expired Draft — P1 requires direct DB mutation; not executed in this run (requested as skip-able)."
+  ],
+  "test_report_links": ["/app/test_reports/iteration_257.json"],
+  "action_items": [
+    "Debug why save-as-draft-btn-marketplace and save-as-draft-btn-lots click handlers do not fire POST /api/drafts/save. Check for cookie-consent or other overlay z-index intercepting pointer events on /create-listing and /create-multi-item-listing.",
+    "Confirm whether SaveAsDraftButton should render on /vehicle-auctions/create and /vehicle-auctions/multi-lot/create for non-dealer users. If yes, move the button above the dealer-verification gate. If no, re-test with testdealer@bidvex.com (TestDealer2026!) which has is_vehicle_dealer=True and vehicle_dealer_verified=True.",
+    "Investigate the 403/404 console errors on /vehicle-auctions/create — they confirm the page is partially blocked for the seller role."
+  ],
+  "critical_code_review_comments": [
+    "SellerDrafts.jsx imports from '../../components/ui/{card,button,badge}' — confirmed correct path (file at src/pages/seller/SellerDrafts.jsx, ui at src/components/ui/). Earlier import-path bug fix is verified compiled cleanly.",
+    "SaveAsDraftButton uses JSON.parse(JSON.stringify(formData)) which silently drops File objects — acceptable for draft persistence but consider warning the user that uploaded images are not preserved in drafts.",
+    "SellerDashboard.js is 1100+ lines — should be split into smaller tab components for maintainability (Drafts is already extracted; Listings/Earnings/Analytics could follow)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "skipped (per request)", "frontend": "Storage wizard 100%, Drafts tab UI/Resume/Delete/Empty 100%, Marketplace/Lots save click 0%, Vehicle/Multi-Lot Vehicle button render 0%. Overall ~55% of the 9 in-scope features verified."},
+  "test_credentials": "testseller@bidvex.com / TestSeller2026! — login verified working. For vehicle-wizard retesting use testdealer@bidvex.com / TestDealer2026!.",
+  "seed_data_creation": "Created and then deleted 1 storage draft (id=24d4a911-e001-401a-bb3b-fb21aa9b569c) during the run; DB is clean.",
+  "retest_needed": true,
+  "main_agent_can_self_test": false,
+  "context_for_next_testing_agent": "Storage Save-as-Draft is the reference implementation that works. When debugging Marketplace/Lots, focus on whether the button onClick fires at all (add a console.log) and whether any overlay is intercepting clicks. For Vehicle and Multi-Lot Vehicle, log in as testdealer@bidvex.com (TestDealer2026!) which has verified vehicle dealer status — the testseller account is non-dealer and the vehicle wizards likely gate render behind that.",
+  "rca of the issue": "Storage path proves the universal SaveAsDraftButton component + backend POST /api/drafts/save + Drafts dashboard sub-tab + Resume URL hydration + Delete + Empty state all function correctly. Marketplace/Lots failures are page-level (click never reaches handler). Vehicle/Multi-Lot Vehicle failures are gate-level (button not in DOM because the wizard page is restricted for non-dealer testseller account)."
+}
