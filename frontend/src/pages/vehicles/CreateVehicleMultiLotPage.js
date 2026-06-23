@@ -185,10 +185,14 @@ const CreateVehicleMultiLotPage = () => {
   const [saveTemplateModal, setSaveTemplateModal] = useState(false);
   const [savingTemplate, setSavingTemplate] = useState(false);
 
-  // iter306 — CSV bulk import
+  // iter313 — CSV bulk import
   const [csvImportOpen, setCsvImportOpen] = useState(false);
   const [draftEventId, setDraftEventId] = useState(null);
   const [creatingDraftEvent, setCreatingDraftEvent] = useState(false);
+  // iter313 — Universal draft id tracked OUTSIDE the per-lot wizard state.
+  // (Using wizard.draft.universal_draft_id breaks the null-vs-truthy gate
+  // at line 689; wizard must stay null until the user opens a lot wizard.)
+  const [universalDraftId, setUniversalDraftId] = useState(null);
 
   const fetchTemplates = async () => {
     try {
@@ -214,15 +218,14 @@ const CreateVehicleMultiLotPage = () => {
         const r = await axios.get(`${API}/drafts/${hydratedDraftId}`);
         const p = r.data?.payload || {};
         if (cancelled) return;
-        setWizard((prev) => ({
-          ...prev,
-          ...p,
-          draft: {
-            ...(prev?.draft || {}),
-            ...(p.draft || {}),
-            universal_draft_id: hydratedDraftId,
-          },
-        }));
+        setUniversalDraftId(hydratedDraftId);
+        // Hydrate event-level fields from the draft payload (title,
+        // timing_mode, lot_duration_seconds, etc.). The per-lot wizard
+        // state stays null so the user lands on the event-setup screen.
+        if (p && typeof p === 'object') {
+          setEvent((prev) => ({ ...prev, ...(p.event || p) }));
+          if (Array.isArray(p.lots)) setLots(p.lots);
+        }
       } catch { /* silent */ }
     })();
     return () => { cancelled = true; };
@@ -692,6 +695,12 @@ const CreateVehicleMultiLotPage = () => {
         <LotWizard
           STEPS={STEPS}
           wizard={wizard}
+          setWizard={setWizard}
+          draftEventId={draftEventId}
+          universalDraftId={universalDraftId}
+          setUniversalDraftId={setUniversalDraftId}
+          event={event}
+          lots={lots}
           L={L}
           fr={fr}
           i18n={i18n}
@@ -746,14 +755,9 @@ const CreateVehicleMultiLotPage = () => {
             6-step wizard. */}
         <SaveAsDraftButton
           type="multi_lot_vehicle"
-          formData={{ ...wizard, draftEventId, draft_id: wizard?.draft?.universal_draft_id }}
-          draftId={wizard?.draft?.universal_draft_id || null}
-          onSaved={(id) => {
-            setWizard((prev) => ({
-              ...prev,
-              draft: { ...(prev?.draft || {}), universal_draft_id: id },
-            }));
-          }}
+          formData={{ event, lots, draftEventId, draft_id: universalDraftId }}
+          draftId={universalDraftId}
+          onSaved={(id) => setUniversalDraftId(id)}
         />
       </div>
 
@@ -1097,7 +1101,8 @@ const CreateVehicleMultiLotPage = () => {
 // ===================== Per-Lot Wizard =====================
 
 const LotWizard = ({
-  STEPS, wizard, L, fr, i18n, vinLoading,
+  STEPS, wizard, setWizard, draftEventId, universalDraftId, setUniversalDraftId,
+  event, lots, L, fr, i18n, vinLoading,
   updateDraft, lookupVin, addPhotos, removePhoto, movePhoto,
   goNext, goPrev, cancelWizard, saveLot, eventDurationSec,
   templates = [], templatesMax = 20, applyTemplate, onSaveAsTemplate,
@@ -1121,14 +1126,9 @@ const LotWizard = ({
               {/* iter313 — Universal Save-as-Draft at every step of the per-lot wizard */}
               <SaveAsDraftButton
                 type="multi_lot_vehicle"
-                formData={{ ...wizard, draftEventId, draft_id: wizard?.draft?.universal_draft_id }}
-                draftId={wizard?.draft?.universal_draft_id || null}
-                onSaved={(id) => {
-                  setWizard((prev) => ({
-                    ...prev,
-                    draft: { ...(prev?.draft || {}), universal_draft_id: id },
-                  }));
-                }}
+                formData={{ event, lots, wizard, draftEventId, draft_id: universalDraftId }}
+                draftId={universalDraftId}
+                onSaved={(id) => setUniversalDraftId(id)}
               />
               <Button variant="ghost" size="sm" onClick={cancelWizard} className="text-slate-600 hover:text-red-600 min-h-[40px]" data-testid="lot-wizard-cancel-btn">
                 <X className="h-4 w-4 mr-1" /> {L('Cancel', 'Annuler')}

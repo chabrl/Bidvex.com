@@ -34,7 +34,7 @@ const TYPE_TO_WIZARD = {
   lots:              (id) => `/create-multi-item-listing?draft_id=${id}`,
   storage:           (id) => `/storage-auctions/create?draft_id=${id}`,
   vehicle:           (id) => `/vehicle-auctions/create?draft_id=${id}`,
-  multi_lot_vehicle: (id) => `/vehicle-auctions/multi-lot/create?draft_id=${id}`,
+  multi_lot_vehicle: (id) => `/vehicle-multi-lot/create?draft_id=${id}`,
 };
 
 const SellerDrafts = () => {

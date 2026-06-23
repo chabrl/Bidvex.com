@@ -130,6 +130,50 @@ async def upsert_user(db, doc: dict, dry_run: bool, log) -> Optional[str]:
     return new_id
 
 
+async def upsert_vehicle_seller_profile(db, dealer_id: str, dry_run: bool, log):
+    """iter313 — Ensure testdealer has an approved vehicle_sellers record
+    so the /vehicle-auctions/create dealer-gate lets them in."""
+    existing = await db.vehicle_sellers.find_one({"user_id": dealer_id})
+    if existing:
+        if existing.get("verification_status") != "approved":
+            log(f"  ↻  upgrading vehicle_sellers to approved for dealer (id={existing.get('id')})")
+            if not dry_run:
+                await db.vehicle_sellers.update_one(
+                    {"user_id": dealer_id},
+                    {"$set": {"verification_status": "approved",
+                              "approved_at": datetime.now(timezone.utc),
+                              "updated_at": datetime.now(timezone.utc)}}
+                )
+        else:
+            log(f"  ↩  vehicle_sellers already approved (id={existing.get('id')})")
+        return existing.get("id")
+    sid = str(uuid.uuid4())
+    doc = {
+        "id": sid,
+        "user_id": dealer_id,
+        "seller_type": "dealer",
+        "business_name": "Test Dealer Auto Corp.",
+        "business_address": "123 Test Rd, Montreal QC",
+        "business_phone": "5145550103",
+        "license_number": "OMVIC-TEST-001",
+        "license_province": "QC",
+        "tax_id": "123456789",
+        "description": "Test dealer for E2E (seeded).",
+        "verification_status": "approved",
+        "approved_at": datetime.now(timezone.utc),
+        "created_at": datetime.now(timezone.utc),
+        "updated_at": datetime.now(timezone.utc),
+        "resubmission_count": 0,
+        "max_resubmissions": 3,
+        "rejection_history": [],
+        "_seed_demo_v1": True,
+    }
+    log(f"  + create vehicle_sellers approved record for dealer (id={sid})")
+    if not dry_run:
+        await db.vehicle_sellers.insert_one(doc)
+    return sid
+
+
 async def upsert_marketplace_listing(db, label: str, seller_id: str, winner_id: str, payment_status: str, dry_run: bool, log):
     sid = _seed_demo_id(f"mkt-{label}")
     existing = await db.listings.find_one({"id": sid})
@@ -363,6 +407,7 @@ async def main():
     await upsert_storage_auction(db, "ended-001", seller_id, buyer_id, dry_run, log)
 
     log("\n🚗 Vehicle listings")
+    await upsert_vehicle_seller_profile(db, dealer_id, dry_run, log)
     await upsert_vehicle_listing(db, "live-001", dealer_id, "active", dry_run, log)
     await upsert_vehicle_listing(db, "upcoming-001", dealer_id, "upcoming", dry_run, log)
 
