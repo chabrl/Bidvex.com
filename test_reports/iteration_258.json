@@ -1,0 +1,51 @@
+{
+  "summary": "iter313 P0 — Save as Draft full E2E re-verification across 5 wizards + Drafts dashboard. After portal-mount fix (z-[90] floating button at top-right of viewport), Marketplace, Lots and Storage wizards ALL pass: POST /api/drafts/save fires and returns 200 with draft_id, toast renders. Idempotency confirmed (2 clicks on Marketplace = 1 draft in DB). Drafts dashboard sub-tab renders Storage/Lots/Marketplace type badges + Resume + Delete; Resume hydrates URL with ?draft_id=. Delete loop wipes all drafts and 'No saved drafts yet.' empty state appears. Vehicle (FEATURE 4) and Multi-Lot Vehicle (FEATURE 5) STILL FAIL — different root cause than iter257: /vehicle-auctions/create now hard-redirects testdealer@bidvex.com to /vehicle-auctions/seller/register with toast 'Please register as a vehicle seller first', and /vehicle-auctions/multi-lot/create returns 404 'Page non trouvée'. The dealer-gate is checking a vehicle_sellers collection record (NOT the user-level is_vehicle_dealer flag from the seed), and the multi-lot route appears broken or behind a separate gate.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "CreateVehicleListingPage (/vehicle-auctions/create)", "issue": "testdealer@bidvex.com (seeded with is_vehicle_dealer=True, vehicle_dealer_verified=True) is HARD-REDIRECTED to /vehicle-auctions/seller/register with red toast 'Please register as a vehicle seller first'. The dealer-gate is reading a record from the vehicle_sellers collection (likely vehicle_sellers.verification_status='approved') rather than the user-level flags from /api/auth/me. As a result, the SaveAsDraftButton never enters the DOM and FEATURE 4 cannot be exercised. Either (a) seed a vehicle_sellers approved record for testdealer, or (b) move SaveAsDraftButton above the dealer-gate redirect so partial drafts are allowed pre-onboarding, or (c) fix the gate to honour user.is_vehicle_dealer+vehicle_dealer_verified.", "selector": "[data-testid='save-as-draft-btn-vehicle']", "priority": "HIGH"},
+      {"component": "CreateVehicleMultiLotPage (/vehicle-auctions/multi-lot/create)", "issue": "Route returns 404 'Page non trouvée / Enchère introuvable' for testdealer. URL did NOT redirect to /seller/register — it loaded a generic 404 page (likely a child route inside /vehicle-auctions/:slug catches first and tries to fetch a listing with id='multi-lot'). The route either is not declared in App.js or is shadowed by a dynamic detail route. data-testid='save-as-draft-btn-multi_lot_vehicle' is not in DOM. Verify route registration in /app/frontend/src/App.js and route precedence (static /multi-lot/create must come BEFORE any /vehicle-auctions/:id pattern).", "selector": "[data-testid='save-as-draft-btn-multi_lot_vehicle']", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/seller/dashboard Drafts tab", "issues": ["Cookie Consent dialog reappears on the dashboard despite localStorage.bidvex_cookie_consent being set — banner is non-blocking but visually overlaps drafts list. Same issue noted in iter257."]}
+    ]
+  },
+  "verified_passing": [
+    "FEATURE 1 Marketplace: POST /api/drafts/save returned 200 on click; second click on same session updated the SAME draft (DB shows exactly 1 draft 'TEST_Marketplace_Draft' for marketplace type — idempotency CONFIRMED). Toast 'Draft saved (expires in 30 days).' shown.",
+    "FEATURE 2 Lots: POST /api/drafts/save returned 200 with draft_id. Draft 'TEST_Lots_Event' (type=lots) verified in /api/drafts listing.",
+    "FEATURE 3 Storage: POST /api/drafts/save returned 200. Storage badge + '(untitled draft)' tile visible on Drafts tab.",
+    "FEATURE 6 Unified Drafts sub-tab: data-testid='tab-drafts' clickable, [data-testid='seller-drafts-tab'] renders 3 cards (Storage Auction badge, Lots/Multi-Item badge, Marketplace badge), 30d-left expiry pill, Resume + Delete buttons per row.",
+    "FEATURE 7 Resume Draft: click [data-testid='edit-draft-<id>'] navigates to wizard URL with ?draft_id=<id> (verified for storage route -> /storage-auctions/create?draft_id=...).",
+    "FEATURE 8 Delete Draft: 3 DELETE /api/drafts/<id> requests returned 200, cards removed from list, 'Draft deleted' toast shown.",
+    "FEATURE 9 Empty state: [data-testid='seller-drafts-empty'] 'No saved drafts yet.' renders after last draft deleted.",
+    "Portal mount: SaveAsDraftButton renders via React portal at document.body with position:fixed top-20 right-4 z-[90] — clicks fire through above the TaxInterviewModal overlay (iter257 root cause is FIXED for marketplace and lots)."
+  ],
+  "not_tested": [
+    "FEATURE 4 Vehicle Save as Draft — page redirects testdealer to /vehicle-auctions/seller/register; button never in DOM.",
+    "FEATURE 5 Multi-Lot Vehicle Save as Draft — route returns 404; button never in DOM.",
+    "FEATURE 10 Restore Expired Draft — explicitly skip-able per request; not exercised."
+  ],
+  "test_report_links": ["/app/test_reports/iteration_258.json"],
+  "action_items": [
+    "Vehicle gate: align /vehicle-auctions/create access for testdealer@bidvex.com. Either seed an approved vehicle_sellers collection record for the testdealer user (preferred — matches production gate), OR move SaveAsDraftButton to render BEFORE the redirect so partial drafts are allowed for users who haven't yet completed the vehicle-seller onboarding.",
+    "Fix /vehicle-auctions/multi-lot/create routing — currently returns 404. Verify the route is declared in /app/frontend/src/App.js and that it is registered BEFORE any /vehicle-auctions/:id catch-all dynamic route.",
+    "Once both vehicle pages render the SaveAsDraftButton, re-test FEATURES 4 and 5 to confirm the portal-mounted button also fires POST /api/drafts/save and returns 200 for type='vehicle' and type='multi_lot_vehicle'.",
+    "Cookie Consent: investigate why bidvex_cookie_consent localStorage flag isn't suppressing the banner on /seller/dashboard (banner re-appears in both EN and FR variants)."
+  ],
+  "critical_code_review_comments": [
+    "SaveAsDraftButton portal fix is correct and effective — it correctly escapes TaxInterviewModal's stacking context (z-[70]) by mounting on document.body with z-[90]. Idempotency via draftId prop also works (2 clicks => 1 draft).",
+    "Vehicle dealer-gate logic is inconsistent with the seeded test credentials: /app/memory/test_credentials.md states testdealer has is_vehicle_dealer=True + vehicle_dealer_verified=True, but the gate at /vehicle-auctions/create reads vehicle_sellers collection state. Either the seed script needs to also create the vehicle_sellers record, or the gate needs to honour both signals.",
+    "/vehicle-auctions/multi-lot/create returning a 404 'Page non trouvée' page (and not the SellerRegister redirect) indicates the route is either unregistered or order-shadowed by another dynamic route. This needs immediate router audit.",
+    "SellerDashboard.js still 1100+ lines — extract per-tab components (already noted in iter257).",
+    "Stale-handle issue when iterating delete-draft buttons in a loop: each delete removes the row, so previously-collected handles detach. Tests should re-query after every click (handled in the loop now)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "skipped (per request)", "frontend": "Features 1,2,3,6,7,8,9 = 7/10 verified PASS (~70%). Features 4 and 5 BLOCKED on dealer-gate + 404 routing. Feature 10 not in scope."},
+  "test_credentials": "testseller@bidvex.com / TestSeller2026! (login verified); testdealer@bidvex.com / TestDealer2026! (login verified, but vehicle-create route redirects to /seller/register).",
+  "seed_data_creation": "Created 3 drafts during run (marketplace, lots, storage) and then deleted all 3 via the UI — DB is clean.",
+  "retest_needed": true,
+  "main_agent_can_self_test": false,
+  "context_for_next_testing_agent": "Marketplace/Lots/Storage Save-as-Draft + Drafts dashboard sub-tab + Resume + Delete + Empty state are all confirmed working — the portal-mount z-[90] fix solved the iter257 overlay block. Outstanding work is Vehicle + Multi-Lot Vehicle only. For FEATURE 4, the testdealer account needs either a seeded approved vehicle_sellers record OR the dealer-gate needs to honour the user-level is_vehicle_dealer flag; the SaveAsDraftButton itself is healthy (proved by 3 other wizards). For FEATURE 5, /vehicle-auctions/multi-lot/create is currently 404 — likely a route-registration bug in App.js. After main agent fixes both, only those 2 features need re-running.",
+  "rca of the issue": "iter257 root cause (TaxInterviewModal z-[70] overlay swallowing clicks on /create-listing and /create-multi-item-listing) is RESOLVED by the portal mount + z-[90] fix — marketplace and lots now fire POST /api/drafts/save successfully. Remaining 2 failures are unrelated: (a) testdealer is redirected away from /vehicle-auctions/create because the dealer-gate looks at vehicle_sellers collection state instead of the user-level is_vehicle_dealer/vehicle_dealer_verified flags from /api/auth/me, and (b) /vehicle-auctions/multi-lot/create returns a 404 page entirely (route not registered or shadowed). Idempotency (1 draft per type per session) and the universal SaveAsDraftButton component itself are both confirmed correct."
+}
