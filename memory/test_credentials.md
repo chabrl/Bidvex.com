@@ -31,6 +31,7 @@ Seeded via `python /app/backend/scripts/seed_production_demo.py --execute` (idem
 - Role: user (is_vehicle_dealer=True, vehicle_dealer_verified=True, seller_type=dealer)
 - Province: QC
 - Preferred language: FR
+- **iter313 patch (Jun 22, 2026)**: Now also has an approved `vehicle_sellers` collection record (`business_name='Test Dealer Auto Corp.'`, `verification_status='approved'`) so the dealer-gate on `/vehicle-auctions/create` and `/vehicle-multi-lot/create` passes. Re-seeded by the updated `seed_production_demo.py` script via `upsert_vehicle_seller_profile`.
 
 
 

@@ -1,6 +1,92 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter313 — Universal Save-as-Draft + Per-Campaign Auto-Pause Guardrail (Jun 22, 2026) ✅ COMPLETE
+
+### P0 — Save as Draft works identically across ALL 5 listing types
+Previously broken: clicks on Marketplace/Lots wizards were intercepted by
+the TaxInterviewModal overlay; Vehicle wizards were inaccessible to
+non-dealer test accounts; Multi-Lot Vehicle resume URL was wrong.
+
+- **Backend (NEW)** — `POST/GET/DELETE /api/drafts*` (universal endpoint backed by `seller_drafts` collection):
+  - `POST /api/drafts/save` — upserts a draft for any of 5 types
+    (`marketplace`, `lots`, `storage`, `vehicle`, `multi_lot_vehicle`)
+  - `GET /api/drafts` — lists all drafts for the seller (incl. those in `draft_expired` state)
+  - `GET /api/drafts/{id}` — hydrates a single draft (URL-route-agnostic)
+  - `DELETE /api/drafts/{id}` — removes a draft
+  - `POST /api/drafts/{id}/restore` — restores a `draft_expired` draft within the 60-day window (P1)
+- **Frontend (NEW)** — `SaveAsDraftButton.jsx` is a portal-mounted (`createPortal`) floating action button at `position:fixed top-20 right-4 z-[90]` — escapes all parent stacking contexts and renders ABOVE the TaxInterviewModal (`z-[70]`) and the navbar (`z-[80]`). Universal `data-testid='save-as-draft-btn-{type}'`.
+- **5 wizards updated** to wire the SaveAsDraftButton + `?draft_id=X` hydration:
+  - `CreateListingPage.js` (marketplace)
+  - `CreateMultiItemListing.js` (lots)
+  - `storage/StorageAuctionCreate.js` (storage)
+  - `vehicles/CreateVehicleListingPage.js` (vehicle — also added approved `vehicle_sellers` record for testdealer in seed script)
+  - `vehicles/CreateVehicleMultiLotPage.js` (multi-lot vehicle — `universalDraftId` now tracked OUTSIDE the per-lot wizard state so the wizard stays null until user explicitly opens a lot wizard)
+- **Idempotency**: clicking Save twice produces 1 draft (re-uses the returned `draft_id`).
+- Tests: `backend/tests/test_iter313_universal_drafts.py` (9/9 PASS).
+- E2E: `iteration_259.json` reports 11/11 features PASS (Marketplace, Lots, Storage, Vehicle, Multi-Lot, Drafts dashboard, resume hydration, delete, empty state, idempotency).
+
+### P0 — Unified Drafts Dashboard Sub-Tab
+- New `SellerDrafts.jsx` mounted at `/seller/dashboard → Drafts` tab.
+- Aggregates drafts across all 5 listing types with type badges and expiry pills.
+- Per-row actions: **Resume** (navigates to wizard with `?draft_id=X`), **Delete** (confirm-gated), and **Restore** (for `draft_expired` rows within the 60-day window).
+- Correct URL builders for all 5 types — including the previously broken `/vehicle-multi-lot/create` route mapping.
+
+### P1 — Restore Draft (60-Day Window)
+- `seller_drafts.status='draft_expired'` rows that are within `60d` of `draft_expired_at` are surfaced in the dashboard with a rose "Expired" badge and a `restore_days_left` count.
+- `POST /api/drafts/{id}/restore` flips the row back to `status='draft'` with a fresh 30-day expiry — only within the 60-day grace window.
+
+### P1 — Production Verification Hand-off
+- See `/app/memory/iter313_P1_prod_verification.md` for the user's run-script playbook (iter312 dataloss regression, alex_boulanger win-email repair, iter309 D1 backfill, SendGrid Activity feed check).
+
+### P2 — Per-Campaign 5% Bounce+Unsubscribe Auto-Pause Guardrail
+Protects SendGrid sender reputation per-campaign (complements the existing global 1% guardrail).
+
+- **Backend** — `routes/sendgrid_webhook.py::_maybe_auto_pause_campaign`:
+  - Triggered on every external campaign `bounce`, `dropped`, `blocked`, `unsubscribe`, `group_unsubscribe`, `spamreport` event.
+  - Formula: `(bounced + unsubscribed + spam_reports) / max(delivered + bounced + unsub, recipient_count) > 5.0%`.
+  - Min-sample guard: skip if `attempted < 20` (avoids 100%-on-1-event noise).
+  - CAS-guarded `status` flip (only fires once per campaign — re-trigger is a no-op).
+  - Side-effects: writes `auto_paused_at`, `auto_paused_reason`, `auto_paused_ratio_pct`, `auto_paused_negative_count`, `auto_paused_attempted_count`. Inserts a `campaign_guardrail_events` audit row + in-app notification to each admin + best-effort email alert to `ADMIN_ALERT_EMAIL`.
+- **Backend — endpoints (NEW)** in `routes/external_campaigns.py`:
+  - `GET /admin/external-campaigns/auto-paused` — list of paused campaigns (for admin banner).
+  - `POST /admin/external-campaigns/{id}/resume-auto-paused` — confirmation-gated resume (requires body `{confirm: true}`). Records `auto_paused_resumed_at`, `auto_paused_resumed_by`, and a second audit row in `campaign_guardrail_events`.
+  - `POST /send-now` now refuses to send `auto_paused` campaigns with a clear 400 directing the admin to the resume endpoint.
+- **Frontend** — `AutoPausedBanner` sub-component in `AdminExternalCampaigns.jsx`:
+  - Sticky red banner above the tabs row in `/admin → Settings → External Campaigns`.
+  - Polls `GET /auto-paused` every 30s.
+  - Per-campaign card shows ratio, negative/attempted counts, paused timestamp, and a `data-testid='resume-auto-paused-{id}'` button.
+  - Resume button prompts for a free-text reason (window.prompt) → confirmation-gated POST → toast → banner refresh.
+  - `STATUS_BADGES.auto_paused` rose mapping added for the campaigns list rows.
+- Tests: `backend/tests/test_iter313_campaign_guardrail.py` (9/9 PASS) — below-threshold, above-threshold, combined bounce+unsub, tiny-sample noise guard, send-now block, resume-without-confirm 400, resume-with-confirm 200, auto-paused list endpoint, CAS double-pause idempotency.
+- E2E: `iteration_260.json` reports banner+resume+audit-trail all PASS.
+
+### Files touched (iter313)
+- `backend/routes/drafts.py` (new — universal endpoint)
+- `backend/routes/external_campaigns.py` (auto-paused list + resume-auto-paused endpoint + send-now gate)
+- `backend/routes/sendgrid_webhook.py` (`_maybe_auto_pause_campaign` + send_html_email integration)
+- `backend/scripts/seed_production_demo.py` (upsert_vehicle_seller_profile for testdealer)
+- `backend/tests/test_iter313_universal_drafts.py` (new — 9 tests)
+- `backend/tests/test_iter313_campaign_guardrail.py` (new — 9 tests)
+- `frontend/src/components/SaveAsDraftButton.jsx` (rewritten — portal + fixed positioning)
+- `frontend/src/pages/seller/SellerDrafts.jsx` (new — dashboard sub-tab; correct ../../components/ imports)
+- `frontend/src/pages/SellerDashboard.js` (added `tab-drafts` button)
+- `frontend/src/pages/CreateListingPage.js` (hydration + SaveAsDraftButton)
+- `frontend/src/pages/CreateMultiItemListing.js` (hydration + SaveAsDraftButton)
+- `frontend/src/pages/storage/StorageAuctionCreate.js` (hydration + SaveAsDraftButton)
+- `frontend/src/pages/vehicles/CreateVehicleListingPage.js` (hydration + SaveAsDraftButton)
+- `frontend/src/pages/vehicles/CreateVehicleMultiLotPage.js` (universalDraftId state extracted; hydration; LotWizard prop signature widened)
+- `frontend/src/pages/admin/AdminExternalCampaigns.jsx` (`AutoPausedBanner` + STATUS_BADGES.auto_paused)
+- `Makefile` (regression-fast now includes iter313 suites)
+- `/app/memory/iter313_P1_prod_verification.md` (new — user-run-script playbook)
+
+### Regression status (iter313)
+- `make regression-fast`: **166 passed, 3 skipped, 0 failures** (~138s)
+- Frontend E2E: 11/11 P0 features PASS + 6/6 P2 banner features PASS
+
+---
+
+
 ## iter307 — PRODUCTION-READY FEATURE SET (Jun 16, 2026) ✅ COMPLETE
 **Shipped post-iter306 deploy. iter306 features live on https://bidvex.com.**
 
