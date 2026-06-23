@@ -2,6 +2,7 @@ import API_BASE from '../config';
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams, useParams } from 'react-router-dom';
+import SaveAsDraftButton from '../components/SaveAsDraftButton';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 import { extractErrorMessage } from '../utils/errorHandler';
@@ -83,7 +84,26 @@ const CreateListingPage = () => {
   // hydrate formData from the existing listing so the seller can correct
   // a flagged listing without re-typing everything. URL: /edit-listing/:id
   const { listingId: editListingId } = useParams();
+  const [searchParamsLocal] = useSearchParams();
+  const hydratedDraftId = searchParamsLocal.get('draft_id');
   const [editMode, setEditMode] = useState(false);
+
+  // iter313 — Hydrate from /api/drafts/{id} when ?draft_id=X is in URL.
+  useEffect(() => {
+    if (!hydratedDraftId) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await axios.get(`${API}/drafts/${hydratedDraftId}`);
+        const p = r.data?.payload || {};
+        if (cancelled) return;
+        setFormData((prev) => ({ ...prev, ...p, draft_id: hydratedDraftId }));
+      } catch {
+        toast.error('Failed to load draft');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [hydratedDraftId]);
   useEffect(() => {
     if (!editListingId) return undefined;
     let cancelled = false;
@@ -645,7 +665,16 @@ const CreateListingPage = () => {
       <div className="max-w-3xl mx-auto">
         <Card className="glassmorphism">
           <CardHeader>
-            <CardTitle className="text-2xl font-bold">{t('createListing.createNewListing', 'Create New Listing')}</CardTitle>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <CardTitle className="text-2xl font-bold">{t('createListing.createNewListing', 'Create New Listing')}</CardTitle>
+              {/* iter313 — Universal Save-as-Draft, always visible at every step */}
+              <SaveAsDraftButton
+                type="marketplace"
+                formData={formData}
+                draftId={formData.draft_id || null}
+                onSaved={(id) => setFormData((p) => ({ ...p, draft_id: id }))}
+              />
+            </div>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">

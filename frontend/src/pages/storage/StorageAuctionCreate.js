@@ -1,7 +1,8 @@
 import API_BASE from '../../config';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import SaveAsDraftButton from '../../components/SaveAsDraftButton';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { Card } from '../../components/ui/card';
@@ -61,6 +62,23 @@ const StorageAuctionCreate = () => {
   const [uploadingIdx, setUploadingIdx] = useState(false);
 
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
+
+  // iter313 — Hydrate from /api/drafts/{id} when ?draft_id=X is on URL.
+  const [searchParamsLocal] = useSearchParams();
+  const hydratedDraftId = searchParamsLocal.get('draft_id');
+  useEffect(() => {
+    if (!hydratedDraftId) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await axios.get(`${API}/drafts/${hydratedDraftId}`);
+        const p = r.data?.payload || {};
+        if (cancelled) return;
+        setForm((prev) => ({ ...prev, ...p, draft_id: hydratedDraftId }));
+      } catch { /* silent */ }
+    })();
+    return () => { cancelled = true; };
+  }, [hydratedDraftId]);
 
   const uploadPhotos = async (files) => {
     setUploadingIdx(true);
@@ -148,8 +166,19 @@ const StorageAuctionCreate = () => {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 py-8" data-testid="storage-auction-create">
       <div className="max-w-3xl mx-auto px-4">
-        <h1 className="text-2xl font-bold mb-1">{t('storage.create.createNewAuction')}</h1>
-        <p className="text-sm text-muted-foreground mb-6">{t('storage.create.listANewStorageUnitForAuction')}</p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-3">
+          <div>
+            <h1 className="text-2xl font-bold mb-1">{t('storage.create.createNewAuction')}</h1>
+            <p className="text-sm text-muted-foreground">{t('storage.create.listANewStorageUnitForAuction')}</p>
+          </div>
+          {/* iter313 — Universal Save-as-Draft, visible at every step */}
+          <SaveAsDraftButton
+            type="storage"
+            formData={form}
+            draftId={form.draft_id || null}
+            onSaved={(id) => set('draft_id', id)}
+          />
+        </div>
         <Card className="p-6">
           <form onSubmit={submit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

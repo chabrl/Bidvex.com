@@ -1,6 +1,7 @@
 import API_BASE from '../config';
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import SaveAsDraftButton from '../components/SaveAsDraftButton';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
@@ -83,6 +84,28 @@ const CreateMultiItemListing = () => {
     // iter233 — Display-only "Lot price × Quantity" toggle (per lot).
     price_multiplied_by_quantity: false,
   }]);
+
+  // iter313 — Hydrate from /api/drafts/{id} when ?draft_id=X is on the URL.
+  const [searchParamsLocal] = useSearchParams();
+  const hydratedDraftId = searchParamsLocal.get('draft_id');
+  useEffect(() => {
+    if (!hydratedDraftId) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await axios.get(`${API}/drafts/${hydratedDraftId}`);
+        const p = r.data?.payload || {};
+        if (cancelled) return;
+        setFormData((prev) => ({ ...prev, ...p, draft_id: hydratedDraftId }));
+        if (Array.isArray(p.lots) && p.lots.length > 0) {
+          setLots(p.lots);
+        }
+      } catch {
+        toast.error('Failed to load draft');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [hydratedDraftId]);
 
   // Step 5: Promotion Selection
   const [promotionTier, setPromotionTier] = useState('standard'); // 'standard', 'premium', 'elite'
@@ -2574,12 +2597,23 @@ const CreateMultiItemListing = () => {
       <div className="max-w-6xl mx-auto">
         <Card className="glassmorphism">
           <CardHeader>
-            <CardTitle className="text-3xl font-bold text-center">
-              {t('createListing.title')}
-            </CardTitle>
-            <p className="text-center text-muted-foreground">
-              {t('createListing.subtitle', 'Create a grouped auction with multiple lots')}
-            </p>
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+              <div>
+                <CardTitle className="text-3xl font-bold">
+                  {t('createListing.title')}
+                </CardTitle>
+                <p className="text-muted-foreground">
+                  {t('createListing.subtitle', 'Create a grouped auction with multiple lots')}
+                </p>
+              </div>
+              {/* iter313 — Universal Save-as-Draft visible at every step */}
+              <SaveAsDraftButton
+                type="lots"
+                formData={{ ...formData, lots, draft_id: formData.draft_id }}
+                draftId={formData.draft_id || null}
+                onSaved={(id) => setFormData((p) => ({ ...p, draft_id: id }))}
+              />
+            </div>
           </CardHeader>
           <CardContent>
             <StepIndicator />

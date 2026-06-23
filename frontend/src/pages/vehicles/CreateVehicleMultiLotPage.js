@@ -33,11 +33,12 @@ import API_BASE from '../../config';
  * Fully bilingual EN/FR via inline L(en, fr) helper.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import { toast } from 'sonner';
 import VehicleCategoryGrid from '../../components/vehicles/VehicleCategoryGrid';
+import SaveAsDraftButton from '../../components/SaveAsDraftButton';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Textarea } from '../../components/ui/textarea';
@@ -201,6 +202,31 @@ const CreateVehicleMultiLotPage = () => {
     }
   };
   useEffect(() => { fetchTemplates(); }, []);
+
+  // iter313 — Hydrate from /api/drafts/{id} when ?draft_id=X on URL.
+  const [searchParamsLocal] = useSearchParams();
+  const hydratedDraftId = searchParamsLocal.get('draft_id');
+  useEffect(() => {
+    if (!hydratedDraftId) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await axios.get(`${API}/drafts/${hydratedDraftId}`);
+        const p = r.data?.payload || {};
+        if (cancelled) return;
+        setWizard((prev) => ({
+          ...prev,
+          ...p,
+          draft: {
+            ...(prev?.draft || {}),
+            ...(p.draft || {}),
+            universal_draft_id: hydratedDraftId,
+          },
+        }));
+      } catch { /* silent */ }
+    })();
+    return () => { cancelled = true; };
+  }, [hydratedDraftId]);
 
   // Apply a template's fields onto the current wizard draft (Steps 2–5)
   const applyTemplate = (tplId) => {
@@ -702,17 +728,33 @@ const CreateVehicleMultiLotPage = () => {
   return (
     <div className="max-w-5xl mx-auto p-4 sm:p-6 space-y-6" data-testid="create-multi-lot-page">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
-          <Layers className="h-7 w-7 text-blue-600 flex-shrink-0" />
-          {L('Create Multi-Lot Vehicle Auction', 'Créer une enchère multi-lots de véhicules')}
-        </h1>
-        <p className="text-sm text-gray-600 mt-1">
-          {L(
-            'Run multiple vehicle lots in one auction event — set the event details, then add each lot through the 6-step wizard.',
-            "Organisez plusieurs lots de véhicules dans un même événement — réglez les détails, puis ajoutez chaque lot via l'assistant en 6 étapes.",
-          )}
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
+            <Layers className="h-7 w-7 text-blue-600 flex-shrink-0" />
+            {L('Create Multi-Lot Vehicle Auction', 'Créer une enchère multi-lots de véhicules')}
+          </h1>
+          <p className="text-sm text-gray-600 mt-1">
+            {L(
+              'Run multiple vehicle lots in one auction event — set the event details, then add each lot through the 6-step wizard.',
+              "Organisez plusieurs lots de véhicules dans un même événement — réglez les détails, puis ajoutez chaque lot via l'assistant en 6 étapes.",
+            )}
+          </p>
+        </div>
+        {/* iter313 — Universal Save-as-Draft visible at every step,
+            including event-level setup AND mid-way through any lot's
+            6-step wizard. */}
+        <SaveAsDraftButton
+          type="multi_lot_vehicle"
+          formData={{ ...wizard, draftEventId, draft_id: wizard?.draft?.universal_draft_id }}
+          draftId={wizard?.draft?.universal_draft_id || null}
+          onSaved={(id) => {
+            setWizard((prev) => ({
+              ...prev,
+              draft: { ...(prev?.draft || {}), universal_draft_id: id },
+            }));
+          }}
+        />
       </div>
 
       {/* ========== Event-level setup ========== */}
@@ -1075,9 +1117,23 @@ const LotWizard = ({
               <Layers className="h-5 w-5 text-blue-600 flex-shrink-0" />
               <span className="truncate">{wizard.lotIndex === 'new' ? L('Add Lot', 'Ajouter un lot') : L('Edit Lot', 'Modifier le lot')}</span>
             </h1>
-            <Button variant="ghost" size="sm" onClick={cancelWizard} className="text-slate-600 hover:text-red-600 min-h-[40px]" data-testid="lot-wizard-cancel-btn">
-              <X className="h-4 w-4 mr-1" /> {L('Cancel', 'Annuler')}
-            </Button>
+            <div className="flex items-center gap-2">
+              {/* iter313 — Universal Save-as-Draft at every step of the per-lot wizard */}
+              <SaveAsDraftButton
+                type="multi_lot_vehicle"
+                formData={{ ...wizard, draftEventId, draft_id: wizard?.draft?.universal_draft_id }}
+                draftId={wizard?.draft?.universal_draft_id || null}
+                onSaved={(id) => {
+                  setWizard((prev) => ({
+                    ...prev,
+                    draft: { ...(prev?.draft || {}), universal_draft_id: id },
+                  }));
+                }}
+              />
+              <Button variant="ghost" size="sm" onClick={cancelWizard} className="text-slate-600 hover:text-red-600 min-h-[40px]" data-testid="lot-wizard-cancel-btn">
+                <X className="h-4 w-4 mr-1" /> {L('Cancel', 'Annuler')}
+              </Button>
+            </div>
           </div>
           {/* Step indicators */}
           <div className="flex gap-1 mt-4 overflow-x-auto pb-1 -mx-1 px-1" data-testid="lot-wizard-step-bar">

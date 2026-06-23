@@ -1237,6 +1237,7 @@ try:
         ("routes.admin_unsubscribe_audit", "admin_unsubscribe_audit_router", None, False),
         ("routes.admin_offline_transactions", "admin_offline_tx_router", None, False),
         ("routes.public_recently_sold", "public_recently_sold_router", None, False),
+        ("routes.drafts", "drafts_router", None, False),
         ("routes.admin_bulk", "admin_bulk_router", None, False),
         ("routes.admin_listing_edit", "admin_listing_edit_router", None, False),
         ("routes.admin_end_time", "admin_end_time_router", None, False),

@@ -5,7 +5,7 @@ import API_BASE from '../../config';
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import axios from 'axios';
@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import VehicleCategoryGrid from '../../components/vehicles/VehicleCategoryGrid';
+import SaveAsDraftButton from '../../components/SaveAsDraftButton';
 import ProvinceSellerNotice from '../../components/vehicles/ProvinceSellerNotice';
 import VehicleLegalFooter from '../../components/vehicles/VehicleLegalFooter';
 import VehicleProvinceEligibility from '../../components/vehicles/VehicleProvinceEligibility';
@@ -243,6 +244,23 @@ const CreateVehicleListingPage = () => {
     
     checkSeller();
   }, [token, navigate]);
+
+  // iter313 — Hydrate from /api/drafts/{id} when ?draft_id=X on URL.
+  const [searchParamsLocal] = useSearchParams();
+  const hydratedDraftId = searchParamsLocal.get('draft_id');
+  useEffect(() => {
+    if (!hydratedDraftId) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await axios.get(`${API}/drafts/${hydratedDraftId}`);
+        const p = r.data?.payload || {};
+        if (cancelled) return;
+        setFormData((prev) => ({ ...prev, ...p, draft_id: hydratedDraftId }));
+      } catch { /* silent */ }
+    })();
+    return () => { cancelled = true; };
+  }, [hydratedDraftId]);
 
   // Update form field
   const updateField = (field, value) => {
@@ -1530,12 +1548,23 @@ const CreateVehicleListingPage = () => {
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 border-b">
         <div className="max-w-4xl mx-auto px-4 py-6">
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
-            {t('vehicleListing.title', 'List Your Vehicle')}
-          </h1>
-          <p className="text-slate-500 mt-1">
-            {t('vehicleListing.subtitle', 'Create a professional vehicle auction listing')}
-          </p>
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+                {t('vehicleListing.title', 'List Your Vehicle')}
+              </h1>
+              <p className="text-slate-500 mt-1">
+                {t('vehicleListing.subtitle', 'Create a professional vehicle auction listing')}
+              </p>
+            </div>
+            {/* iter313 — Universal Save-as-Draft visible at every step */}
+            <SaveAsDraftButton
+              type="vehicle"
+              formData={formData}
+              draftId={formData.draft_id || null}
+              onSaved={(id) => setFormData((p) => ({ ...p, draft_id: id }))}
+            />
+          </div>
           
           {/* Progress */}
           <div className="mt-6">

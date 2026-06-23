@@ -153,6 +153,7 @@ async def run_draft_expiry_sweep(db) -> dict:
 
     summary = {"warnings_sent": 0, "drafts_archived": 0, "scanned": 0}
 
+    # 1) Per-type collections (legacy draft rows + future per-type drafts).
     for collection in DRAFT_COLLECTIONS:
         cursor = db[collection].find(
             {"status": "draft"},
@@ -180,6 +181,56 @@ async def run_draft_expiry_sweep(db) -> dict:
                 days_left = max(1, DRAFT_MAX_AGE_DAYS - (now - anchor).days)
                 await _warn_seller(db, doc, days_left)
                 summary["warnings_sent"] += 1
+
+    # 2) iter313 — Universal seller_drafts collection (the new home for
+    # halfway-typed drafts from all 5 listing types).
+    cursor = db.seller_drafts.find(
+        {"status": "draft"},
+        {"_id": 0, "id": 1, "seller_id": 1, "title": 1, "type": 1,
+         "created_at": 1, "updated_at": 1, "draft_expiry_warning_sent_at": 1},
+    )
+    async for doc in cursor:
+        summary["scanned"] += 1
+        anchor = _draft_age_anchor(doc)
+        if not anchor:
+            continue
+        if anchor < expire_cutoff:
+            # Soft-expire — keeps the row reachable for 60-day Restore window.
+            await db.seller_drafts.update_one(
+                {"id": doc["id"]},
+                {"$set": {
+                    "status":             "draft_expired",
+                    "draft_expired_at":   now,
+                }},
+            )
+            summary["drafts_archived"] += 1
+            # Drop the final notification.
+            if doc.get("seller_id"):
+                await db.notifications.insert_one({
+                    "id":         str(uuid.uuid4()),
+                    "user_id":    doc["seller_id"],
+                    "kind":       "draft_expired",
+                    "title_en":   f"Your draft '{(doc.get('title') or '(untitled)')[:80]}' has expired",
+                    "title_fr":   f"Votre brouillon « {(doc.get('title') or '(sans titre)')[:80]} » a expiré",
+                    "body_en":    "It was archived after 30 days. Restore it within 60 days from your Drafts dashboard.",
+                    "body_fr":    "Il a été archivé après 30 jours. Restaurez-le dans les 60 jours depuis votre tableau de bord Brouillons.",
+                    "is_read":    False,
+                    "created_at": now,
+                    "listing_id": doc.get("id"),
+                })
+            continue
+        already_warned = doc.get("draft_expiry_warning_sent_at")
+        recently_warned = (
+            isinstance(already_warned, datetime)
+            and (now - (already_warned if already_warned.tzinfo else already_warned.replace(tzinfo=timezone.utc))) < timedelta(days=1)
+        )
+        if anchor < warn_cutoff and not recently_warned:
+            days_left = max(1, DRAFT_MAX_AGE_DAYS - (now - anchor).days)
+            # Reuse the in-app notification + email queue helpers, but
+            # against the seller_drafts collection.
+            doc["__collection"] = "seller_drafts"
+            await _warn_seller(db, doc, days_left)
+            summary["warnings_sent"] += 1
 
     logger.info(f"[draft_expiry] sweep complete: {summary}")
     return summary
