@@ -28,9 +28,16 @@ BIDVEX_EMAIL_TEMPLATE = """<!DOCTYPE html>
 </head>
 <body style="font-family:Arial,sans-serif;margin:0;padding:0;background:#f4f6fb;">
 <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:32px auto;background:#fff;border:1px solid #e0e0e0;border-radius:12px;overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,0.07);">
+  <!-- iter314 — Canonical BidVex logo row (must appear first) -->
+  <tr>
+    <td style="background-color: #0b1a30; padding: 25px 40px; text-align: left;">
+      <a href="https://bidvex.com" target="_blank" style="text-decoration: none;">
+        <img src="http://cdn.mcauto-images-production.sendgrid.net/4fbf02710175d39f/91d027c2-73da-4510-9bce-ee1ce34f16a7/4500x1080.png" alt="BidVex" border="0" style="display: block; height: 32px; max-height: 32px; width: auto;">
+      </a>
+    </td>
+  </tr>
   <tr>
     <td style="padding:28px 24px;text-align:center;background:linear-gradient(135deg,#00CFFF,#0077FF);">
-      <img src="http://cdn.mcauto-images-production.sendgrid.net/4fbf02710175d39f/31636d5f-c160-446b-b715-bcf542e9607e/4500x1080.png" alt="BidVex" width="130" style="margin:0 auto 14px;display:block;">
       <h2 style="color:#fff;margin:0;font-size:20px;font-weight:700;">{email_headline}</h2>
       <p style="color:rgba(255,255,255,0.85);margin:6px 0 0;font-size:13px;">{email_subheadline}</p>
     </td>

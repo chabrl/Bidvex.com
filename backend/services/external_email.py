@@ -143,6 +143,83 @@ def casl_footer_html(unsubscribe_url: str) -> str:
 """.strip()
 
 
+# iter314 — Mandatory BidVex header for external (admin-authored) campaigns.
+# The send pipeline below wraps the admin's raw HTML body inside this
+# shell server-side, so admins never need to remember to paste a logo
+# block into the campaign editor. Idempotent: if the body already
+# contains the canonical logo URL the wrap is skipped.
+_BIDVEX_LOGO_URL = (
+    "http://cdn.mcauto-images-production.sendgrid.net/"
+    "4fbf02710175d39f/91d027c2-73da-4510-9bce-ee1ce34f16a7/4500x1080.png"
+)
+_BIDVEX_LOGO_ID_TOKEN = "/91d027c2-73da-4510-9bce-ee1ce34f16a7/"
+_BIDVEX_LEGACY_LOGO_TOKEN = "31636d5f-c160-446b-b715-bcf542e9607e"
+
+
+def wrap_external_campaign_body(body_html: str, unsubscribe_url: str) -> str:
+    """iter314 — Wrap admin-authored campaign HTML inside the standard
+    BidVex header (logo) + footer (CASL unsubscribe).
+
+    Behaviour:
+      • If `body_html` already contains the canonical BidVex logo URL
+        OR the legacy logo URL, we skip the header wrap (no duplicates)
+        but still ensure the CASL footer is present.
+      • Otherwise we build a complete Outlook-safe email document with
+        the logo row first, the admin body inside a `<td>` cell, and
+        the CASL footer below.
+    """
+    has_logo = (
+        _BIDVEX_LOGO_ID_TOKEN in (body_html or "")
+        or _BIDVEX_LEGACY_LOGO_TOKEN in (body_html or "")
+    )
+    has_footer = (
+        "{unsubscribe_url}" in (body_html or "")
+        or "unsubscribe" in (body_html or "").lower()
+    )
+
+    if has_logo:
+        # Admin (or a previous wrap pass) already injected the logo.
+        # Just guarantee the CASL footer is present.
+        if has_footer:
+            return body_html or ""
+        return (body_html or "") + "\n" + casl_footer_html(unsubscribe_url)
+
+    footer_block = casl_footer_html(unsubscribe_url) if not has_footer else ""
+
+    return (
+        '<!DOCTYPE html>'
+        '<html><head>'
+        '<meta charset="UTF-8">'
+        '<meta name="viewport" content="width=device-width, initial-scale=1.0">'
+        '</head>'
+        '<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:Arial,sans-serif;">'
+        '<table width="100%" cellpadding="0" cellspacing="0" border="0" '
+        'style="background-color:#f1f5f9;padding:32px 16px;">'
+        '<tr><td align="center">'
+        '<table width="600" cellpadding="0" cellspacing="0" border="0" '
+        'style="background-color:#ffffff;border-radius:12px;overflow:hidden;max-width:600px;">'
+        # iter314 — Canonical BidVex logo row.
+        '<tr>'
+        '<td style="background-color: #0b1a30; padding: 25px 40px; text-align: left;">'
+        '<a href="https://bidvex.com" target="_blank" style="text-decoration: none;">'
+        f'<img src="{_BIDVEX_LOGO_URL}" alt="BidVex" border="0" '
+        'style="display: block; height: 32px; max-height: 32px; width: auto;">'
+        '</a>'
+        '</td>'
+        '</tr>'
+        # Admin-authored body slotted in.
+        '<tr><td style="padding:32px 40px;color:#0f172a;font-size:15px;line-height:1.6;">'
+        f'{body_html or ""}'
+        '</td></tr>'
+        # CASL footer (only if admin omitted it).
+        f'{footer_block}'
+        '</table>'
+        '</td></tr>'
+        '</table>'
+        '</body></html>'
+    )
+
+
 def validate_casl(subject: str, body_html: str) -> Optional[str]:
     """Return an error string if the campaign fails CASL — otherwise None."""
     if not subject or not subject.strip():
@@ -332,12 +409,16 @@ async def send_external_campaign_email(
     unsub_url = f"{public_base}/unsubscribe?token={unsub_token}&lang={lang_tag}"
 
     # Inject the per-recipient unsubscribe URL into the {unsubscribe_url}
-    # placeholder. If the admin forgot the placeholder, auto-append the
-    # CASL footer so we never break compliance.
-    if "{unsubscribe_url}" in body_html:
-        rendered = body_html.replace("{unsubscribe_url}", unsub_url)
-    else:
-        rendered = body_html + "\n" + casl_footer_html(unsub_url)
+    # placeholder. If the admin forgot the placeholder, the wrapper
+    # below will inject a CASL footer automatically.
+    rendered = (body_html or "").replace("{unsubscribe_url}", unsub_url)
+
+    # iter314 — Server-side BidVex header (logo) + CASL footer wrap.
+    # This guarantees every external campaign email carries the canonical
+    # BidVex logo at the top, regardless of what the admin pasted into
+    # the campaign editor. Idempotent: if the admin already included
+    # the canonical logo URL, the wrap step skips the header.
+    rendered = wrap_external_campaign_body(rendered, unsub_url)
 
     rendered = inject_utm_params(rendered, {
         "utm_source":   "email",

@@ -1301,6 +1301,20 @@ async def request_email_change(
             )
             mail.tracking_settings = None
             sg = SendGridAPIClient(api_key)
+            # iter314 — Inject canonical BidVex logo header before send.
+            try:
+                from services.emails._email_core import inject_bidvex_logo_header
+                from sendgrid.helpers.mail import Content
+                _wrapped = inject_bidvex_logo_header(body_fr if lang == "fr" else body_en)
+                mail = Mail(
+                    from_email=(from_email, from_name),
+                    to_emails=new_email,
+                    subject=subject_fr if lang == "fr" else subject_en,
+                    html_content=Content("text/html", _wrapped),
+                )
+                mail.tracking_settings = None
+            except Exception:
+                pass
             sg.send(mail)
             logger.info(f"[EMAIL_CHANGE] Verification link sent to new email '{new_email}' for user {current_user['id']}")
     except Exception as e:

@@ -226,6 +226,12 @@ async def send_html_email(
     from_name = os.environ.get("SENDGRID_FROM_NAME", "BidVex Canada")
 
     from sendgrid.helpers.mail import Content
+    # iter314 — Inject canonical BidVex logo header (idempotent).
+    try:
+        from services.emails._email_core import inject_bidvex_logo_header
+        html_content = inject_bidvex_logo_header(html_content)
+    except Exception:
+        pass  # never let logo injection break a send
     message = Mail(
         from_email=Email(from_email, from_name),
         to_emails=To(to_email, to_name or ""),
@@ -603,7 +609,9 @@ async def send_cross_border_purchase_notice_email(user: dict, auction_id: str, i
 # Uses SendGrid dynamic templates when configured, else inline HTML
 # ═══════════════════════════════════════════════════════════════
 
-LOGO_URL = "http://cdn.mcauto-images-production.sendgrid.net/4fbf02710175d39f/9dc6a7c3-8237-4a66-b82b-0d9abc165b44/4500x1080.png"
+# iter314 — Canonical BidVex logo URL (SendGrid CDN hosted).
+# Per iter314 directive: use this exact URL, do not re-host or substitute.
+LOGO_URL = "http://cdn.mcauto-images-production.sendgrid.net/4fbf02710175d39f/91d027c2-73da-4510-9bce-ee1ce34f16a7/4500x1080.png"
 DASHBOARD_URL = "https://bidvex.com/buyer/dashboard"
 SUPPORT_URL = "https://bidvex.com/policies"
 
@@ -678,6 +686,12 @@ async def _send_p0_email(to_email: str, to_name: str, template_name: str,
         return False
     try:
         from sendgrid.helpers.mail import Mail as SgMail, Email as SgEmail, To as SgTo, Content as SgContent
+        # iter314 — Inject canonical BidVex logo header (idempotent).
+        try:
+            from services.emails._email_core import inject_bidvex_logo_header
+            html_fallback = inject_bidvex_logo_header(html_fallback)
+        except Exception:
+            pass
         msg = SgMail(
             # iter270 — Unified sender; .com only (matches DKIM domain).
             from_email=SgEmail(os.environ.get("SENDGRID_FROM_EMAIL", "noreply@bidvex.com"), "BidVex Canada"),

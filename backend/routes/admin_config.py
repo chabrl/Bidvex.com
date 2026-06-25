@@ -498,6 +498,13 @@ async def send_test_draft_invoice_email(
 
     html_content = build_draft_invoice_html(result)
 
+    # iter314 — Inject canonical BidVex logo header (idempotent).
+    try:
+        from services.emails._email_core import inject_bidvex_logo_header
+        html_content = inject_bidvex_logo_header(html_content)
+    except Exception:
+        pass
+
     sg_key = os.environ.get("SENDGRID_API_KEY")
     if not sg_key:
         raise HTTPException(status_code=503, detail="SENDGRID_API_KEY not configured")

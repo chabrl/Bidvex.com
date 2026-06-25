@@ -127,6 +127,85 @@ def _format_currency_fr(amount) -> str:
     return s.replace(",", " ").replace(".", ",") + " $"
 
 
+# ─── iter314 — Mandatory BidVex Logo Injection ──────────────────────────
+#
+# Every outbound email (transactional, marketing, system, admin-triggered,
+# external campaign, scheduled, manual) MUST display the BidVex logo
+# at the top, immediately after the preheader and before any subject-
+# matter content. We accomplish this with a single idempotent
+# injector applied:
+#
+#   (a) Inside `send_email()` — the canonical dispatcher most paths use.
+#   (b) Inside `send_external_campaign_email()` — for admin-authored
+#       raw HTML (wraps body inside the standard BidVex header + footer).
+#   (c) Inside any remaining direct `sg.send()` call sites (legacy paths
+#       in `email_service.py`, `routes/admin_config.py`, `routes/auth.py`).
+#
+# The canonical logo URL is hosted on SendGrid's CDN and must not be
+# rehosted or substituted (per iter314 directive).
+BIDVEX_LOGO_URL = (
+    "http://cdn.mcauto-images-production.sendgrid.net/"
+    "4fbf02710175d39f/91d027c2-73da-4510-9bce-ee1ce34f16a7/4500x1080.png"
+)
+BIDVEX_LOGO_ID_TOKEN = "/91d027c2-73da-4510-9bce-ee1ce34f16a7/"  # idempotency marker
+BIDVEX_LOGO_BLOCK = (
+    '<tr>'
+    '<td style="background-color: #0b1a30; padding: 25px 40px; text-align: left;">'
+    '<a href="https://bidvex.com" target="_blank" style="text-decoration: none;">'
+    f'<img src="{BIDVEX_LOGO_URL}" alt="BidVex" border="0" '
+    'style="display: block; height: 32px; max-height: 32px; width: auto;">'
+    '</a>'
+    '</td>'
+    '</tr>'
+)
+
+
+def inject_bidvex_logo_header(html: str) -> str:
+    """iter314 — Idempotently prepend the canonical BidVex logo row to
+    the first <table> inside an HTML email body.
+
+    Strategy (in order):
+      1. If the HTML already contains the canonical logo URL anywhere
+         (matched by its unique CDN id-token), return it unchanged.
+         This protects emails that already render through a wrapper
+         that itself contains the logo (e.g. BIDVEX_EMAIL_TEMPLATE in
+         services/email_templates.py).
+      2. If the HTML contains a `<table ...>` open tag, insert
+         BIDVEX_LOGO_BLOCK as the first child <tr>. This is the
+         Outlook-safe path — the logo becomes the first content row of
+         the email's main table.
+      3. Otherwise, wrap the whole HTML in a minimal Outlook-safe
+         <table> with the logo as the first row. This is a defensive
+         fallback for plain-string HTML snippets.
+    """
+    if not html or not isinstance(html, str):
+        return html
+    if BIDVEX_LOGO_ID_TOKEN in html:
+        return html  # logo already present — no duplicates
+    # iter314 — also catch the older (pre-canonical) logo URL token
+    # that may live in legacy template snapshots; we don't *replace*
+    # it here (callers that own those templates have been migrated
+    # to the canonical URL), but we *don't* double-inject either.
+    if "31636d5f-c160-446b-b715-bcf542e9607e" in html:
+        return html
+    import re as _re
+    m = _re.search(r"<table\b[^>]*>", html, flags=_re.IGNORECASE)
+    if m:
+        head = html[: m.end()]
+        tail = html[m.end():]
+        return head + BIDVEX_LOGO_BLOCK + tail
+    # Fallback wrapper.
+    return (
+        '<table width="100%" cellpadding="0" cellspacing="0" border="0" '
+        'style="background-color:#f1f5f9;font-family:Arial,sans-serif;">'
+        f'{BIDVEX_LOGO_BLOCK}'
+        '<tr><td style="padding:24px;background-color:#ffffff;">'
+        + html +
+        '</td></tr>'
+        '</table>'
+    )
+
+
 async def send_email(
     to_email: str,
     subject: str,
@@ -205,6 +284,12 @@ async def send_email(
         }
     
     try:
+        # iter314 — Mandatory BidVex logo on every outbound email.
+        # Idempotent: if the html already contains the canonical logo
+        # URL (because it was rendered through a wrapper that already
+        # includes it), this is a no-op.
+        html_content = inject_bidvex_logo_header(html_content)
+
         # iter270 — Always send from the unified noreply@bidvex.com so
         # the same DKIM key + SPF record + DMARC policy is used on every
         # message. Callers can pass `from_name` to keep their branded
@@ -459,9 +544,11 @@ def _base_template(content: str, title: str = "BidVex Notification",
             <tr>
                 <td align="center">
                     <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
-                        <!-- Header -->
+                        <!-- iter314 — BidVex logo (canonical, must appear first) -->
+                        {BIDVEX_LOGO_BLOCK}
+                        <!-- Section header -->
                         <tr>
-                            <td style="background-color: {header_bg}; padding: 30px; border-radius: 12px 12px 0 0;">
+                            <td style="background-color: {header_bg}; padding: 30px;">
                                 <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: bold;">
                                     {header_text}
                                 </h1>

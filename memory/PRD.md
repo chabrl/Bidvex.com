@@ -1,6 +1,88 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter314 — Mandatory BidVex Logo on Every Outbound Email (Jun 23, 2026) ✅ COMPLETE
+
+### Problem
+Email branding was inconsistent across the platform. Three different
+logo URLs lived in three different template layers
+(`BIDVEX_EMAIL_TEMPLATE` used `/31636d5f-…/`, `email_service.LOGO_URL`
+used `/9dc6a7c3-…/`, and `_email_core._base_template` had **no logo at all**).
+External campaigns built admin-authored HTML through
+`send_external_campaign_email()` which bypassed every shared layer.
+
+### Solution — canonical logo at the dispatcher level
+Logo block injected at the **single canonical send_email() dispatcher**
+so every code path inherits it automatically. The injector is
+**idempotent** (skips when the canonical URL token or the legacy
+URL token is already present) so emails rendered through the
+unified transactional template do not get a duplicate logo header.
+
+#### Inventory (Step 1)
+86 email-send call sites across:
+- `services/emails/email_marketplace.py`, `email_vehicles.py`, `email_disputes.py`, `email_engagement.py`, `broker.py`, `marketing.py`
+- `services/emails/_email_core.py` (`send_email`, `send_unified_email`)
+- `services/email_templates.py` (`build_email_payload` / `BIDVEX_EMAIL_TEMPLATE`)
+- `services/external_email.py` (`send_external_campaign_email`)
+- `services/email_service.py` (`_p0_wrap`, `send_html_email`, `_send_p0_email`)
+- `services/compliance_notifier.py`, `genai_watchdog.py`, `admin_notifications.py`, `geo_notifications.py`, `verification_service.py`, `seller_payouts.py`, `pickup_confirmation.py`, `dealer_grace_period_service.py`, `vehicle_fee_service.py`, `resubmission_service.py`, `email_journey.py`, `scheduler.py`, `scheduled_jobs.py`, `promotion_expiry.py`, `promotion_broadcast.py`, `fraud_detection.py`
+- `routes/admin_oversight.py`, `admin_payment_requests.py`, `admin_promotions.py`, `admin_config.py`, `admin_deposits.py`, `brokers.py`, `partner_trial.py`, `transaction_pickup_code.py`, `reviews.py`, `auth.py`, `chat_history.py`, `external_campaigns.py`, `vehicle_settlement.py`, `webhooks.py`, `public_payments.py`
+
+Of those, 5 bypassed the canonical `send_email()` (direct `sg.send()`):
+1. `services/email_service.py:174` (dynamic templates — uses SG-hosted HTML)
+2. `services/email_service.py:272` (raw HTML fallback) — patched to call `inject_bidvex_logo_header()`
+3. `services/email_service.py:688` (P0 inline fallback) — patched
+4. `services/external_email.py:358,409` (external campaigns) — wrapped via `wrap_external_campaign_body()`
+5. `routes/admin_config.py:517` (test draft invoice) — patched
+6. `routes/auth.py:1304` (email-change confirmation) — patched
+
+#### Implementation (Step 2 + 3)
+- `services/emails/_email_core.py`:
+  - `BIDVEX_LOGO_URL` constant — canonical URL from iter314 directive
+  - `BIDVEX_LOGO_ID_TOKEN` — idempotency marker
+  - `BIDVEX_LOGO_BLOCK` — Outlook-safe `<tr><td><a><img></a></td></tr>` block
+  - `inject_bidvex_logo_header(html)` — idempotent injector (inserts as first child of the outermost `<table>` or falls back to a wrap)
+  - `send_email()` calls `inject_bidvex_logo_header()` on every `html_content` before SG dispatch
+  - `_base_template()` now renders the logo block as its first row
+- `services/email_templates.py`:
+  - `BIDVEX_EMAIL_TEMPLATE` updated to use the canonical URL inside a dark `#0b1a30` header row (matches iter314 directive markup)
+- `services/email_service.py`:
+  - `LOGO_URL` constant updated to canonical URL (fixes `_p0_wrap`)
+  - `send_html_email()` and `_send_p0_email()` inline-fallback now call `inject_bidvex_logo_header()` before `sg.send()`
+- `services/external_email.py`:
+  - **NEW `wrap_external_campaign_body(body_html, unsub_url)`** — server-side wraps admin HTML inside the BidVex header (logo) + CASL footer. Idempotent against the canonical and legacy logo tokens.
+  - `send_external_campaign_email()` now calls `wrap_external_campaign_body()` instead of the older "footer only if missing" path
+- `routes/auth.py` (email-change verify) — wraps body via `inject_bidvex_logo_header()` before its direct `sg.send()`
+- `routes/admin_config.py` (test draft invoice send) — same
+
+#### Verification (Step 4) — REAL RENDERED EVIDENCE
+- 15 pytest assertions in `backend/tests/test_iter314_logo_injection.py` — **15/15 PASS** (constants, idempotency on table-html / plain-string / None, BIDVEX_EMAIL_TEMPLATE, _base_template, _p0_wrap, external campaign wrap with all idempotency edge cases, send_email mocked-SG dispatch)
+- 7 rendered email samples in `backend/tests/iter314_step4_verify.py` — **7/7 categories PASS**:
+  - 1 transactional buyer (auction_won)
+  - 2 transactional seller (statement passthrough)
+  - 3 system/admin alert (compliance via _base_template)
+  - 4 external campaign (admin-authored, wrapped)
+  - 5 manual admin email (auth.py change-email)
+  - 6 auth welcome (registry-mapped)
+  - 7 P0 inline fallback (_p0_wrap)
+- Screenshots saved to `/tmp/iter314_*.png` — logo visible at top, links to https://bidvex.com, Outlook-safe layout, exactly one logo block per email
+
+#### No duplicates guarantee
+The injector checks both the canonical URL id-token AND the legacy URL id-token before injecting. Emails rendered through a wrapper that already contains the logo (e.g. `BIDVEX_EMAIL_TEMPLATE`, `_base_template`, `_p0_wrap`) are detected and the dispatcher does not double-inject.
+
+### Files touched (iter314)
+- `backend/services/emails/_email_core.py` (logo constants, injector, dispatcher hook, _base_template)
+- `backend/services/email_templates.py` (BIDVEX_EMAIL_TEMPLATE canonical URL)
+- `backend/services/email_service.py` (LOGO_URL canonical URL, send_html_email + _send_p0_email injection)
+- `backend/services/external_email.py` (NEW wrap_external_campaign_body, send_external_campaign_email wraps body)
+- `backend/routes/auth.py` (email-change confirmation body wrap)
+- `backend/routes/admin_config.py` (test draft invoice body wrap)
+- `backend/tests/test_iter314_logo_injection.py` (15 unit/integration tests)
+- `backend/tests/iter314_step4_verify.py` (7-category rendered-evidence verification script)
+
+---
+
+
 ## iter313 — Universal Save-as-Draft + Per-Campaign Auto-Pause Guardrail (Jun 22, 2026) ✅ COMPLETE
 
 ### P0 — Save as Draft works identically across ALL 5 listing types
