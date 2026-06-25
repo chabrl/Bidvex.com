@@ -1,6 +1,64 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter315 — Legacy-Logo Patcher + Auto-Pause Dialog Refinement (Jun 25, 2026) ✅ COMPLETE
+
+### A. One-shot legacy-logo patcher tool
+Closes the gap on any in-flight email row (drafts / scheduled / queued)
+that was created BEFORE iter314 and therefore stored HTML referencing
+either the legacy logo URL or no logo at all.
+
+**Tool**: `backend/scripts/iter315_patch_legacy_logo.py`
+
+**Operations**:
+- Scans `email_outbox` (statuses: scheduled, draft, pending_send, pending, queued, sending, retry) — uses `inject_bidvex_logo_header()` to rewrite `html_content` in-place.
+- Scans `external_email_campaigns` (statuses: scheduled, draft, pending_send, pending, queued, sending) — uses `wrap_external_campaign_body()` to wrap each row's `body_html_en` and `body_html_fr` with the canonical BidVex header + CASL footer.
+- **Dry-run by default**, prints affected count + 3 before/after diffs.
+- `--execute` flag required for actual writes; stamps `iter315_patched_at` ISO timestamp.
+- `--only outbox` / `--only campaigns` to scope.
+- `--include-sent` to also touch terminal-state rows (not recommended — those have left the platform).
+- **Idempotent** — a second pass reports 0 affected, since the helpers detect the canonical token and short-circuit.
+
+**Preview dry-run results**:
+- `email_outbox`: 0 affected (all clean — recently drained).
+- `external_email_campaigns`: **61 affected** — all `draft` rows created in iter271/iter309 with short stub HTML and no canonical logo.
+- Live execute on preview: 61 patched, idempotency confirmed (re-run = 0).
+
+**Pre-send guard feasibility assessment**:
+The runtime helpers (`inject_bidvex_logo_header()` in `send_email()` and `wrap_external_campaign_body()` in `send_external_campaign_email()`) ALREADY run on every send — sub-millisecond string ops, no DB writes, zero added latency. This means the canonical logo is guaranteed at SEND time even if the stored DB row carries legacy markup. The iter315 patcher's job is to keep the persisted HTML in sync so previews, audits, and admin-screen renders match what actually goes out. **Verdict**: no new pre-send guard is necessary — iter314 already provides it. The patcher is the one-shot reconciliation tool.
+
+### B. Auto-Pause banner — `window.prompt()` → shadcn Dialog
+`frontend/src/pages/admin/AdminExternalCampaigns.jsx::AutoPausedBanner`
+no longer uses the native browser `window.prompt()` for capturing the
+resume reason. Replaced with a proper shadcn `Dialog` + `Textarea` flow:
+
+- Title: "Resume auto-paused campaign?"
+- Description shows the campaign name + the bounce/unsubscribe ratio.
+- 4-row Textarea with placeholder ("e.g. Removed 1,200 stale addresses…") and a "Risk acknowledgement" label.
+- Buttons: Cancel (returns without action) + Resume sending (POST to `/resume-auto-paused` with `{confirm: true, acknowledge_risk: reasonText}`).
+- All elements carry data-testid attributes (`resume-confirm-dialog`, `resume-reason-textarea`, `resume-confirm-btn`, `resume-cancel-btn`) for E2E coverage.
+- Visual evidence: `/tmp/iter315_dialog.png`.
+
+### Files touched (iter315)
+- `backend/scripts/iter315_patch_legacy_logo.py` (new — one-shot patcher)
+- `backend/tests/test_iter315_legacy_logo_patcher.py` (new — 3/3 PASS)
+- `frontend/src/pages/admin/AdminExternalCampaigns.jsx` (Dialog-based resume flow)
+- `Makefile` (regression-fast now includes iter315 suite)
+
+### Tests / regression
+- iter315 patcher: **3/3 PASS**
+- iter313 + iter314 + iter315 combined: **35/35 PASS**, 14 conditional skips (admin-token tests during rate-limit cooldown — not real failures)
+
+### User action items (cannot be performed by Emergent)
+1. **Deploy iter314+iter315 to production** via the Emergent UI "Deploy" button or "Save to GitHub" feature.
+2. **SendGrid Dynamic Templates** UI edit — log into SendGrid Dashboard → Marketing → Dynamic Templates → update every template's `<img src>` to `http://cdn.mcauto-images-production.sendgrid.net/4fbf02710175d39f/91d027c2-73da-4510-9bce-ee1ce34f16a7/4500x1080.png`.
+3. **Production dry-run** of the iter315 patcher: `python /app/backend/scripts/iter315_patch_legacy_logo.py`. Review the count. Then `--execute`.
+4. **iter313 P1 production scripts** — still pending, see `/app/memory/iter313_P1_prod_verification.md`.
+5. **Live test campaign post-deploy** — send 1 small test campaign to a personal address, then pull the SendGrid Activity feed to visually confirm logo renders for a real external recipient (not just the internal test harness).
+
+---
+
+
 ## iter314 — Mandatory BidVex Logo on Every Outbound Email (Jun 23, 2026) ✅ COMPLETE
 
 ### Problem

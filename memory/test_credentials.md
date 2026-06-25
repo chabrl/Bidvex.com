@@ -18,6 +18,9 @@ Seeded via `python /app/backend/scripts/seed_production_demo.py --execute` (idem
 - Password: TestBuyer2026!
 - Role: user (individual buyer)
 - Province: QC
+- Preferred language: en
+- **iter315 patch (Jun 25, 2026)**: This user was re-seeded after being deleted during a cleanup pass. The bcrypt-hashed password in MongoDB now matches `TestBuyer2026!` exactly.
+- Province: QC
 
 ### Test Seller (trusted)
 - Email: testseller@bidvex.com

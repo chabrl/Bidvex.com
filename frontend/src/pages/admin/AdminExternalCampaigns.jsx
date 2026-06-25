@@ -23,7 +23,7 @@ import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Textarea } from '../../components/ui/textarea';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from '../../components/ui/dialog';
 import { toast } from 'sonner';
 import {
@@ -1055,6 +1055,10 @@ function SuppressionList({ headers }) {
 function AutoPausedBanner({ headers, onResumed }) {
   const [items, setItems] = useState([]);
   const [busy, setBusy] = useState(null);
+  // iter315 — shadcn Dialog (replaces the older window.prompt) for
+  // capturing the "what did you fix?" risk-acknowledgement reason.
+  const [confirmCampaign, setConfirmCampaign] = useState(null);
+  const [reasonText, setReasonText] = useState('');
 
   const fetchPaused = useCallback(async () => {
     try {
@@ -1069,23 +1073,31 @@ function AutoPausedBanner({ headers, onResumed }) {
     return () => clearInterval(id);
   }, [fetchPaused]);
 
-  const handleResume = async (campaign) => {
-    const reason = window.prompt(
-      `Resume "${campaign.name || campaign.subject_en || campaign.id}"?\n\n`
-      + `This campaign tripped the 5% bounce/unsubscribe guardrail `
-      + `(${campaign.auto_paused_ratio_pct}%). Please briefly note `
-      + `what you cleaned up (list hygiene, content fix, etc.):`,
-      '',
-    );
-    if (reason === null) return; // user cancelled
+  const openConfirm = (campaign) => {
+    setConfirmCampaign(campaign);
+    setReasonText('');
+  };
+
+  const closeConfirm = () => {
+    setConfirmCampaign(null);
+    setReasonText('');
+  };
+
+  const handleResumeConfirm = async () => {
+    if (!confirmCampaign) return;
+    const campaign = confirmCampaign;
     setBusy(campaign.id);
     try {
       await axios.post(
         `${API}/admin/external-campaigns/${campaign.id}/resume-auto-paused`,
-        { confirm: true, acknowledge_risk: reason || 'No reason provided' },
+        {
+          confirm: true,
+          acknowledge_risk: reasonText.trim() || 'No reason provided',
+        },
         { headers },
       );
       toast.success('Campaign resumed');
+      closeConfirm();
       await fetchPaused();
       if (typeof onResumed === 'function') onResumed();
     } catch (e) {
@@ -1098,6 +1110,7 @@ function AutoPausedBanner({ headers, onResumed }) {
   if (items.length === 0) return null;
 
   return (
+    <>
     <div
       className="space-y-2 border-l-4 border-rose-600 bg-rose-50 p-4 rounded-r-lg shadow-sm"
       data-testid="auto-paused-banner"
@@ -1133,7 +1146,7 @@ function AutoPausedBanner({ headers, onResumed }) {
             </div>
             <Button
               size="sm"
-              onClick={() => handleResume(c)}
+              onClick={() => openConfirm(c)}
               disabled={busy === c.id}
               className="bg-rose-600 hover:bg-rose-700 text-white"
               data-testid={`resume-auto-paused-${c.id}`}
@@ -1148,6 +1161,67 @@ function AutoPausedBanner({ headers, onResumed }) {
         ))}
       </ul>
     </div>
+
+    {/* iter315 — shadcn Dialog replacing window.prompt for resume reason. */}
+    <Dialog open={!!confirmCampaign} onOpenChange={(o) => { if (!o) closeConfirm(); }}>
+      <DialogContent className="sm:max-w-md" data-testid="resume-confirm-dialog">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-rose-900">
+            <PauseCircle className="h-5 w-5 text-rose-600" />
+            Resume auto-paused campaign?
+          </DialogTitle>
+          <DialogDescription className="text-slate-600 pt-2">
+            <span className="font-semibold text-slate-900">
+              &quot;{confirmCampaign?.name || confirmCampaign?.subject_en || confirmCampaign?.id}&quot;
+            </span>{' '}
+            tripped the 5% bounce/unsubscribe guardrail{' '}
+            (<b className="text-rose-700">{confirmCampaign?.auto_paused_ratio_pct}%</b>{' '}—{' '}
+            {confirmCampaign?.auto_paused_negative_count}/
+            {confirmCampaign?.auto_paused_attempted_count} recipients).
+            <br /><br />
+            Please briefly note what was cleaned up (list hygiene, content fix,
+            sender domain change, etc.) before resuming. This is audit-logged.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="py-2">
+          <label htmlFor="resume-reason" className="text-xs font-medium text-slate-700 mb-1 block">
+            Risk acknowledgement
+          </label>
+          <Textarea
+            id="resume-reason"
+            value={reasonText}
+            onChange={(e) => setReasonText(e.target.value)}
+            placeholder="e.g. Removed 1,200 stale addresses from the import list; re-verified domain in SendGrid; updated subject line to remove triggering keywords."
+            rows={4}
+            data-testid="resume-reason-textarea"
+            className="resize-none"
+          />
+        </div>
+        <DialogFooter className="flex flex-col sm:flex-row gap-2">
+          <Button
+            variant="outline"
+            onClick={closeConfirm}
+            disabled={busy === confirmCampaign?.id}
+            data-testid="resume-cancel-btn"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleResumeConfirm}
+            disabled={busy === confirmCampaign?.id}
+            className="bg-rose-600 hover:bg-rose-700 text-white"
+            data-testid="resume-confirm-btn"
+          >
+            {busy === confirmCampaign?.id ? (
+              <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Resuming...</>
+            ) : (
+              <><PlayCircle className="h-3.5 w-3.5 mr-1" /> Resume sending</>
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
 
