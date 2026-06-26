@@ -78,6 +78,9 @@ import AdminStorageAuctions from './admin/AdminStorageAuctions';
 import AdminFeatureFlags from './admin/AdminFeatureFlags';
 import AdminFacilities from './admin/AdminFacilities';
 import AdminMarketingIntegrations from './admin/AdminMarketingIntegrations';
+// iter316 Phase B — Mission B5: Admin Contractor Management + Commission Rate Editor
+import AdminContractorsPage from './admin/AdminContractorsPage';
+import AdminDialer from './admin/AdminDialer';
 import SchedulerStatusCard from '../components/SchedulerStatusCard';
 import { 
   Users, Package, Gavel, Shield, TrendingUp, Bell, Settings, FileText, 
@@ -92,6 +95,7 @@ const API = API_BASE;
 const PRIMARY_TABS = [
   { id: 'marketplace', label: 'Marketplace', icon: '🛒', lucideIcon: Package },
   { id: 'vehicles', label: 'Vehicles', icon: '🚗', lucideIcon: Car },
+  { id: 'dialer', label: 'Dialer & Contractors', icon: '📞', lucideIcon: Megaphone },
   { id: 'settings', label: 'Settings', icon: '⚙️', lucideIcon: Settings },
   { id: 'banners', label: 'Banners', icon: '🎨', lucideIcon: Image },
   { id: 'analytics', label: 'Analytics', icon: '📊', lucideIcon: TrendingUp },
@@ -136,6 +140,11 @@ const SECONDARY_TABS = {
     { id: 'feature-flags', label: 'Feature Flags', icon: '🚩', lucideIcon: Car },
     { id: 'ai-guard', label: 'AI Guard', icon: '🤖', lucideIcon: Bot },
     { id: 'risk-monitoring', label: 'Risk Monitoring', icon: '🔴', lucideIcon: ShieldAlert },
+  ],
+  // iter316 Phase B — Dialer + Contractor commission management
+  dialer: [
+    { id: 'dialer-ui', label: 'Dialer', icon: '📞', lucideIcon: Megaphone },
+    { id: 'contractors', label: 'Contractor Management', icon: '👤', lucideIcon: Users },
   ],
   settings: [
     { id: 'site-mode', label: 'Site Mode', icon: '🌐', lucideIcon: Globe },
@@ -534,6 +543,12 @@ const AdminDashboard = () => {
           case 'ai-guard': return <AIGuardDashboard />;
           case 'risk-monitoring': return <RiskMonitoringDashboard />;
           default: return <VehicleAdminManager />;
+        }
+      case 'dialer':
+        switch (secondaryTab) {
+          case 'dialer-ui': return <AdminDialer />;
+          case 'contractors': return <AdminContractorsPage />;
+          default: return <AdminDialer />;
         }
       case 'settings':
         switch (secondaryTab) {

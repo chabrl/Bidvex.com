@@ -662,6 +662,25 @@ async def contractor_dashboard(user: User = Depends(require_dialer_access),
 
 # ─── Mission 4 — Admin commission rate CRUD ─────────────────────────────
 
+@router.get("/admin/contractors")
+async def admin_list_contractors(user: User = Depends(require_admin)) -> Dict[str, Any]:
+    """iter316 Mission B5 — Admin: list all dialer contractors with
+    minimal fields for the Contractors admin tab. Earnings + referred
+    accounts can be lazy-loaded per-contractor via the existing
+    /twilio/contractor/dashboard?contractor_id=... endpoint."""
+    db = get_db()
+    rows = await db.users.find(
+        {"role": "dialer_contractor"},
+        {"_id": 0, "id": 1, "email": 1, "name": 1, "first_name": 1, "last_name": 1,
+         "affiliate_code": 1,
+         "stripe_connect_account_id": 1,
+         "stripe_connect_payouts_enabled": 1,
+         "stripe_connect_onboarding_complete": 1,
+         "created_at": 1},
+    ).sort("created_at", -1).to_list(length=500)
+    return {"items": rows, "count": len(rows)}
+
+
 @router.get("/admin/contractors/{contractor_id}/commission-rates")
 async def get_rates(contractor_id: str, user: User = Depends(require_admin)) -> Dict[str, Any]:
     db = get_db()

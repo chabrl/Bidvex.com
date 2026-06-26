@@ -138,6 +138,34 @@ async def _process_one(call_log_id: str, audio_path: str, db, attempt: int) -> N
                 "updated_at":            datetime.now(timezone.utc).isoformat(),
             }},
         )
+        # iter316 Mission B3 — Notify the call's agent (bilingual bell-icon
+        # entry) so they know AI insights won't be available for this call.
+        # Recording + dialer remain fully functional regardless.
+        try:
+            from services.notifications_i18n import create_notification
+            log = await db.call_logs.find_one(
+                {"_id": call_log_id},
+                {"_id": 0, "agent_user_id": 1, "client_name": 1, "client_phone": 1},
+            )
+            if log and log.get("agent_user_id"):
+                client_name = (
+                    (log.get("client_name") or "").strip()
+                    or log.get("client_phone")
+                    or "the client"
+                )
+                await create_notification(
+                    db,
+                    user_id=log["agent_user_id"],
+                    kind="voice_ai_failed",
+                    params={"client_name": client_name},
+                    data={
+                        "call_log_id": call_log_id,
+                        "action_url":  f"/admin/dialer?call={call_log_id}",
+                        "error":       str(e)[:200],
+                    },
+                )
+        except Exception as notif_err:  # noqa: BLE001
+            logger.error(f"[voice_ai] failure-notification insert failed: {notif_err}")
 
 
 # ─── Gemini call ────────────────────────────────────────────────────────

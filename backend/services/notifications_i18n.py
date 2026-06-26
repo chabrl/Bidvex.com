@@ -278,6 +278,14 @@ _TEMPLATES = {
         lambda p: "Acheteur suspendu",
         lambda p: f"Un acheteur a été suspendu après 3 tentatives de paiement échouées sur « {p.get('title','une annonce')} » ({_fmt_money(p.get('amount'))}). Vous pouvez lever la suspension dans Gestion des utilisateurs.",
     ),
+    # iter316 Mission B3 — AI Voice Pipeline failure (so the call's agent
+    # knows insights won't be generated for this recording).
+    "voice_ai_failed": (
+        lambda p: "AI Call Analysis Failed",
+        lambda p: f"AI insights for your call with {p.get('client_name','the client')} could not be generated. The recording is still saved.",
+        lambda p: "Échec de l'analyse IA",
+        lambda p: f"Les analyses IA pour votre appel avec {p.get('client_name','le client')} n'ont pas pu être générées. L'enregistrement est toujours conservé.",
+    ),
 }
 
 

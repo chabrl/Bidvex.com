@@ -135,6 +135,9 @@ const CreateVehicleMultiLotPage = lazy(() => import('./pages/vehicles/CreateVehi
 const LotTemplatesManagerPage = lazy(() => import('./pages/vehicles/LotTemplatesManagerPage'));
 const AdminErrorLogsPage = lazy(() => import('./pages/admin/AdminErrorLogsPage'));
 const VehicleMultiLotDetailPage = lazy(() => import('./pages/vehicles/VehicleMultiLotDetailPage'));
+// iter316 Phase B — Twilio Dialer + AI Voice Intelligence + Contractor surfaces
+const AdminDialer = lazy(() => import('./pages/admin/AdminDialer'));
+const ContractorDashboard = lazy(() => import('./pages/contractor/ContractorDashboard'));
 
 // Lazy-loaded heavy components
 const AIAssistant = lazy(() => import('./components/AIAssistant'));
@@ -543,6 +546,14 @@ const App = () => {
           } />
           <Route path="/admin/tax-dashboard" element={
             <ProtectedRoute><AdminTaxDashboard /></ProtectedRoute>
+          } />
+          {/* iter316 Phase B — Browser-based Twilio dialer + AI insights */}
+          <Route path="/admin/dialer" element={
+            <ProtectedRoute><ErrorBoundary scope="admin-dialer"><AdminDialer /></ErrorBoundary></ProtectedRoute>
+          } />
+          {/* iter316 Phase B — Contractor self-service dashboard */}
+          <Route path="/contractor/dashboard" element={
+            <ProtectedRoute><ErrorBoundary scope="contractor-dashboard"><ContractorDashboard /></ErrorBoundary></ProtectedRoute>
           } />
           {/* iter217 Phase 5 Hotfix v5b — Broker Ecosystem */}
           <Route path="/admin/brokers" element={
