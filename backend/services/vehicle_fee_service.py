@@ -190,6 +190,20 @@ async def handle_vehicle_fee_succeeded(db, payment_intent_id: str):
 
     logger.info(f"[VehicleFee] Fee paid — contact revealed for auction {settlement['auction_id']}")
 
+    # iter316 Mission 4 — Contractor commission accrual hook for the
+    # vehicle 2.5% platform fee. Generic across all account types.
+    try:
+        from services.contractor_commission import maybe_accrue_contractor_commission
+        await maybe_accrue_contractor_commission(
+            db, seller_id=seller_id,
+            listing_id=settlement["auction_id"],
+            platform_fee_amount=float(settlement.get("net_commission_amount") or 0),
+            transaction_id=payment_intent_id,
+            section="vehicle",
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[VehicleFee] contractor commission accrual failed: {e}")
+
     # Send bilingual success email to buyer
     try:
         buyer = await db.users.find_one({"id": settlement["buyer_id"]}, {"_id": 0, "email": 1, "name": 1})

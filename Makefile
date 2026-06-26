@@ -26,6 +26,7 @@ regression-fast:
 	       backend/tests/test_iter313_campaign_guardrail.py \
 	       backend/tests/test_iter314_logo_injection.py \
 	       backend/tests/test_iter315_legacy_logo_patcher.py \
+	       backend/tests/test_iter316_dialer_and_commission.py \
 	       -v --tb=short
 
 # Full iter299→iter309 regression (~17 min, per-file with 35s rate-limit spacing).

@@ -157,6 +157,45 @@ async def lifespan(app):
     except Exception as e:
         logger.warning(f"GenAI Watchdog cron registration failed (non-fatal): {e}")
 
+    # iter316 Mission 4 — Monthly contractor commission payout (1st of each month, 02:00 UTC)
+    try:
+        from apscheduler.triggers.cron import CronTrigger
+        from services.contractor_commission import run_monthly_contractor_payouts
+
+        async def _monthly_contractor_payout_job():
+            try:
+                report = await run_monthly_contractor_payouts(db)
+                logger.info(f"[contractor_payout] monthly run: "
+                            f"paid_count={report.get('paid_count')} "
+                            f"batch_total={report.get('batch_total')} "
+                            f"skipped_no_connect={len(report.get('skipped_no_connect') or [])} "
+                            f"errors={len(report.get('errors') or [])}")
+            except Exception as je:  # noqa: BLE001
+                logger.warning(f"[contractor_payout] monthly job failed: {je}")
+
+        scheduler.add_job(
+            _monthly_contractor_payout_job,
+            CronTrigger(day=1, hour=2, minute=0, timezone="UTC"),
+            id="contractor_commission_monthly_payout",
+            replace_existing=True,
+            misfire_grace_time=86400,
+        )
+        logger.info("iter316 — Monthly contractor commission payout cron registered (1st @ 02:00 UTC)")
+    except Exception as e:
+        logger.warning(f"Contractor payout cron registration failed (non-fatal): {e}")
+
+    # iter316 Mission 1 — Twilio dialer configuration check (non-fatal).
+    try:
+        from services.twilio_service import verify_twilio_config
+        s = verify_twilio_config()
+        if s["configured"]:
+            logger.info("iter316 — Twilio dialer fully configured.")
+        else:
+            logger.warning(f"iter316 — Twilio dialer partial config. Missing: {s['missing']}. "
+                           f"can_mint_tokens={s['can_mint_tokens']}, can_place_calls={s['can_place_calls']}.")
+    except Exception as e:
+        logger.warning(f"Twilio config check failed (non-fatal): {e}")
+
     try:
         from lifecycle import (
             log_db_status, prewarm_caches, init_cloud_storage,
@@ -1238,6 +1277,8 @@ try:
         ("routes.admin_offline_transactions", "admin_offline_tx_router", None, False),
         ("routes.public_recently_sold", "public_recently_sold_router", None, False),
         ("routes.drafts", "drafts_router", None, False),
+        # iter316 — Twilio Dialer + Contractor Commission Engine
+        ("routes.twilio", "router", None, False),
         ("routes.admin_bulk", "admin_bulk_router", None, False),
         ("routes.admin_listing_edit", "admin_listing_edit_router", None, False),
         ("routes.admin_end_time", "admin_end_time_router", None, False),

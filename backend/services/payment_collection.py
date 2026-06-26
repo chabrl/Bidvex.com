@@ -405,6 +405,21 @@ async def finalize_auction_payment(
                     )
             except Exception as e:  # noqa: BLE001
                 logger.warning(f"[payment-collection] notif failed for {listing_id}: {e}")
+
+            # iter316 Mission 4 — Contractor commission accrual hook.
+            # Generic across all listing types: any seller carrying the
+            # permanent referred_by_contractor_id stamp accrues commission
+            # on whatever platform_fee BidVex collected on this txn.
+            try:
+                from services.contractor_commission import maybe_accrue_contractor_commission
+                await maybe_accrue_contractor_commission(
+                    db, seller_id=seller_id, listing_id=listing_id,
+                    platform_fee_amount=platform_fee,
+                    transaction_id=stripe_pi, section=section,
+                )
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"[payment-collection] contractor commission accrual failed: {e}")
+
             return out
 
         # ── NO PAYMENT METHOD → Payment link, 72h deadline (iter302) ──

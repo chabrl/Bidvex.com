@@ -1,6 +1,78 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter316 Phase A — Twilio Dialer + AI Voice Intelligence + Contractor Commission Engine (Jun 26, 2026) ✅ BACKEND COMPLETE
+
+### Sprint structure
+- **Phase A (this iteration):** Full backend + tests
+- **Phase B (next):** Frontend dialer UI + contractor dashboard
+- **Phase C:** Live integration testing after Twilio TwiML App is created post-deploy
+
+### Confirmed reuses (locate-and-confirm step)
+| Reuse | File path | What was reused |
+|---|---|---|
+| Gemini | `services/genai_direct_client.py` (`get_genai_client`, model `gemini-2.5-flash`) | Audio analysis client, no second config |
+| Stripe Connect seller payout (iter302) | `services/seller_payouts.py` (`stripe.Transfer.create` pattern + `stripe_connect_account_id` field on users) | Contractors mapped as standard Connect transfer destinations — no fork |
+| Shared platform-fee capture | `services/payment_collection.py` line 408 (marketplace + lots) and `services/vehicle_fee_service.py::handle_vehicle_fee_succeeded` (vehicle 2.5%) | Single hook in each — generic accrual |
+| Referral code generator (iter307) | `routes/affiliate.py::_ensure_referral_code` | Idempotent `affiliate_code` field |
+| Async task pattern | FastAPI `BackgroundTasks` | AI pipeline fires from webhook, never blocks |
+| Scheduler | `services/scheduler.py` + APScheduler `CronTrigger` | Monthly payout cron registered in `server.py` lifespan |
+
+### Mission 1 — Twilio dialer core
+- `services/twilio_service.py`: token mint, TwiML build, REST call placement, X-Twilio-Signature validation, recording download + Twilio-side delete, E.164 validation, `verify_twilio_config()` startup probe
+- `routes/twilio.py` (mounted at `/api/twilio`): 17 endpoints — `/config`, `/token`, `/call`, `/twiml`, `/call-status-callback`, `/recording-callback`, `/calls`, `/calls/{id}`, `/calls/{id}/recording` (admin only), `/calls/{id}/notes`, `/stats`, `/stats/mine`, contractor endpoints, admin commission-rate endpoints
+- `call_logs` collection with all AI fields pre-allocated
+- Graceful degradation when 3 post-deploy env vars (TWILIO_API_KEY/SECRET/TWIML_APP_SID) are missing — `503` on `/token`, `/config` returns the missing list
+
+### Mission 2 — AI Voice Intelligence
+- `services/voice_ai_pipeline.py` — async post-call processor triggered from `/recording-callback` via `BackgroundTasks`
+- Single Gemini call returns one JSON with: diarized transcript (Agent/Client labels), bilingual EN/FR full transcript, sentiment score [-1, 1] + label, 2-4 sentence summary, 0-8 action items
+- Per-worker `asyncio.Lock()` serialises Gemini calls (rate-limit protection)
+- One retry on failure, then `ai_processing_status="failed"` — never infinite loop
+- NEVER blocks the call_log itself — recording + dialer remain fully functional even when Gemini is down
+- Access rules: agent/contractor sees AI insights for OWN calls; raw MP3 stays admin-only
+
+### Mission 3 — Contractor accounts + permanent referral stamping
+- 3 endpoints: `POST /contractor/create-client-account`, `POST /contractor/create-demo-account`, `POST /contractor/generate-referral-code`
+- **Phase A scope constraint honored:** `account_type` defaults to `vehicle_dealer` when missing/unknown — full cross-type flexibility preserved when explicit (`partner` / `broker` / `liquidator` / `individual_seller`)
+- `referred_by_contractor_id` stamped PERMANENTLY on user doc — no expiry, no transaction cap, survives demo-to-live conversion
+- Audit row in `contractor_account_creations` per creation
+- Referral code generation reuses `routes/affiliate._ensure_referral_code` — idempotent
+
+### Mission 4 — Commission engine + Stripe Connect payout
+- `services/contractor_commission.py`:
+  - `get_contractor_commission_rate(db, contractor_id, account_type)` — per-account-type lookup with fallback to `default_rate`, then `DEFAULT_COMMISSION_RATE = 0.20`
+  - `upsert_contractor_commission_rates(...)` — admin-only writer; rate changes apply FORWARD ONLY (history immutable)
+  - `maybe_accrue_contractor_commission(...)` — idempotent on `(contractor_id, source_listing_id, transaction_id)`. Captures rate AT accrual time
+  - `run_monthly_contractor_payouts(db)` — sums accrued per contractor → Stripe Connect Transfer → marks paid → emails confirmation. **Skips contractors with no `stripe_connect_account_id`** — entries stay accrued
+  - `remove_referral_attribution(...)` — admin override; future accruals stop, history preserved
+  - `contractor_earnings_summary`, `contractor_referred_accounts`, `contractor_commission_history` — dashboard helpers
+- **Scope constraint honored:** contractors are mapped as standard Connect transfer recipients — the seller-specific listing-stamping / regulatory / physical-asset workflows are NOT touched
+- Hooked into BOTH shared fee-capture points (`payment_collection.py` for marketplace+lots, `vehicle_fee_service.py` for vehicle 2.5%) — generic, never duplicates fee logic
+- Monthly cron registered in `server.py` lifespan: `1st of each month @ 02:00 UTC`
+
+### Mission 8 — Role / access matrix
+- `DIALER_ROLES = {admin, super_admin, support, support_team, dialer_contractor}`
+- Server-side enforcement on every endpoint via `require_dialer_access` / `require_admin` / explicit `_is_contractor/_is_admin` checks
+- Cross-contractor isolation: dashboard, my-created-accounts, calls list all server-FORCE-filter to `user.id`
+- Recording download stays ADMIN ONLY — even the call's own agent gets 403
+
+### Test results
+- `tests/test_iter316_dialer_and_commission.py` — **24/24 PASS** covering: E.164 validation, Twilio config probe, AI validator (clamp/trim/defaults), account_type derivation, rate config CRUD, accrual + idempotency + skip cases, rate-change immutability, monthly payout with no-Connect skip, monthly payout success path (stripe.Transfer mocked), admin attribution removal, dashboard isolation
+- Combined iter313+314+315+316: **51 passed, 9 skipped, 0 failures**
+- Live smoke tests (curl): config endpoint OK, /token correctly 503s for missing TWIML_APP_SID, /call validates E.164 with bilingual 400, buyer role 403'd from /twilio/calls
+
+### USER ACTION ITEMS (post-deploy, cannot be done by Emergent)
+1. **Deploy** Phase A backend via Emergent UI
+2. Twilio Console → create TwiML App with Voice Request URL `https://bidvex.com/api/twilio/twiml`, Status Callback `https://bidvex.com/api/twilio/call-status-callback` → copy SID → set `TWILIO_TWIML_APP_SID` env var
+3. Twilio Console → create API Key → set `TWILIO_API_KEY` + `TWILIO_API_SECRET` env vars
+4. Twilio Console → set the purchased number's Voice webhook to the TwiML App from step 2
+5. Confirm `verify_twilio_config()` returns `configured=true` via `GET /api/twilio/config`
+6. Greenlight Phase B (frontend dialer + contractor dashboard)
+
+---
+
+
 ## iter315 — Legacy-Logo Patcher + Auto-Pause Dialog Refinement (Jun 25, 2026) ✅ COMPLETE
 
 ### A. One-shot legacy-logo patcher tool
