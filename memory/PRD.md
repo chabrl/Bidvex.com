@@ -1,6 +1,72 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter316 Phase B — Frontend Dialer + AI Insights + Contractor Dashboard + Admin Commission Editor (Jun 26, 2026) ✅ COMPLETE
+
+### Sprint structure
+- **Phase A:** Backend (Twilio dialer + AI pipeline + commission engine) — done.
+- **Phase B (this iteration):** Frontend dialer UI + contractor dashboard + admin commission editor.
+- **Phase C (next):** Live Twilio call testing post-deploy once 3 env vars are set.
+
+### Mission B1 — Admin Dialer UI ✅
+`frontend/src/pages/admin/AdminDialer.jsx` (new) — three-panel layout
+(Outbound form | Active-call card | Call history).
+- Installed `@twilio/voice-sdk@2.18.3` via yarn.
+- Browser-based `sdk.Device()` initialised with token from `POST /api/twilio/token`; falls back to REST-only call placement when `can_mint_tokens=false`.
+- E.164 phone validation client-side + server-side; bilingual toast.
+- Graceful "Twilio not fully configured" banner listing missing env vars (data-testid=`dialer-config-banner`).
+- Active call card surfaces mute/hangup buttons (only enabled with an active Twilio connection).
+- All interactive elements carry kebab-case `data-testid` attributes.
+
+### Mission B2 — AI Insights Expandable Panel ✅
+Per-row expand in the Call History panel renders the AI Insights sub-component:
+- Sentiment badge (positive/neutral/negative) with Lucide icon mapping.
+- 2-4 sentence summary + action-item checklist (rendered when present).
+- Bilingual EN/FR transcript toggle + diarized Agent/Client turns (scrollable).
+- Auto-polls `/api/twilio/calls` every **15 seconds** while ANY row's `ai_processing_status ∈ {pending, processing}`. Stops polling once all rows are terminal (completed/failed).
+- Raw audio playback button is admin-only (`Lock` notice rendered for everyone else via `data-testid=dialer-recording-locked`).
+
+### Mission B3 — AI Pipeline Failure Notification ✅
+`backend/services/voice_ai_pipeline.py` — when the AI retry path exhausts and lands on `failed`, the pipeline now inserts a bilingual notification (kind `voice_ai_failed`) addressed to the call's agent via the existing `services/notifications_i18n.create_notification()` SoT. Includes deep-link `data.action_url=/admin/dialer?call={id}`. Failure-notification insertion is wrapped in try/except so a notification crash NEVER re-raises into the pipeline (recording + dialer remain fully functional).
+
+### Mission B4 — Contractor Dashboard ✅
+`frontend/src/pages/contractor/ContractorDashboard.jsx` (new) at route `/contractor/dashboard`.
+- Reuses the iter302 Stripe Connect onboarding flow via `POST /api/settlement/connect/onboard`.
+- Server-enforced 403 banner (`data-testid=contractor-dashboard-403`) for users whose role is neither `dialer_contractor` nor `admin`.
+- 60-second auto-refresh poll on `/api/twilio/contractor/dashboard`.
+- Surfaces: Stripe status card, 4-stat earnings grid (accrued/paid/month/referrals), call-stats card (today/month/lifetime/accounts created), referred-accounts table, commission-history table.
+- "Open Dialer" + "Copy referral link" CTAs in header.
+
+### Mission B5 — Admin Commission Rate Editor ✅
+`frontend/src/pages/admin/AdminContractorsPage.jsx` (new).
+- Admin row table — search by email/name/id, expand to see referred-account list with per-account "Remove" attribution action.
+- Per-contractor "Rates" modal shows percentage inputs for each account type (vehicle_dealer, partner, broker, liquidator, individual_seller) + default rate. `pctToDecimal()` helper converts to decimals on save (clamped 0-100%).
+- PATCH to `/api/twilio/admin/contractors/{id}/commission-rates` (admin-only).
+- "Remove Referral Attribution" modal requires a free-text reason; POSTs to `/api/twilio/admin/accounts/{account_id}/remove-referral-attribution`. Stops FUTURE accruals; history immutable.
+
+### Wiring
+- `App.js` — two new routes: `/admin/dialer` and `/contractor/dashboard` (both ProtectedRoute + ErrorBoundary scoped).
+- `AdminDashboard.js` — new primary tab `"Dialer & Contractors"` with sub-tabs `dialer-ui` and `contractors`. Embedded `AdminDialer` + `AdminContractorsPage` render via the existing `renderContent` switch.
+
+### Backend tweak (also part of Phase B)
+`backend/routes/twilio.py` — NEW `GET /api/twilio/admin/contractors` endpoint (admin-only) returns `{items, count}` of all `role=dialer_contractor` users for the Contractors admin tab.
+
+### Test results
+- `backend/tests/test_iter316_phase_b.py` — **5/5 PASS** covering: bilingual `voice_ai_failed` notification insertion on terminal failure, no failure-notification on happy path, missing-agent graceful handling, template registry, new admin/contractors endpoint registered.
+- `backend/tests/test_iter316_dialer_and_commission.py` — 24/24 still PASS (Phase A baseline preserved).
+- `frontend/src/__tests__/iter316_phase_b.test.js` — **32/32 PASS** covering: 3-panel layout testids, Voice SDK dynamic import, token + call + config endpoints, mute/hangup controls, 15-second AI polling constant, transcript lang toggle, diarized testid, admin-only raw audio, 60-second contractor poll, 403 banner, Stripe connect onboarding link, earnings/referred/history cards, modal rate inputs for all 5 account types + default + save+cancel, percent→decimal helper, PATCH endpoint wiring, route registration in App.js, admin tab wiring.
+- Combined regression iter313+314+315+316: **56 passed, 9 skipped, 0 failures**.
+- Testing agent E2E sweep (iteration_317): all `data-testid` flows verified live on https://prod-verify-2.preview.emergentagent.com — admin+testbuyer role gating, config banner with the 3 missing env vars, E.164 validation, embedded admin tab, contractor 403 negative-path. Zero issues found.
+
+### USER ACTION ITEMS (post-deploy, cannot be done by Emergent)
+1. **Deploy iter316 (Phase A + B)** to production via Emergent UI.
+2. Twilio Console → create API Key + TwiML App → set the 3 env vars on prod (`TWILIO_API_KEY`, `TWILIO_API_SECRET`, `TWILIO_TWIML_APP_SID`).
+3. `GET /api/twilio/config` should then return `configured=true` — the dialer-config banner disappears automatically.
+4. Promote at least one user to `role=dialer_contractor` and seed a Stripe Connect account on them so the Contractor Dashboard + admin commission flows can be exercised end-to-end.
+
+---
+
+
 ## iter316 Phase A — Twilio Dialer + AI Voice Intelligence + Contractor Commission Engine (Jun 26, 2026) ✅ BACKEND COMPLETE
 
 ### Sprint structure
