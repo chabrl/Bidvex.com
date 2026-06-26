@@ -29,7 +29,9 @@ import {
   Copy, Check, Eye, EyeOff, Building2, User, Shield, Mail,
   Phone, AlertTriangle, X, Ban, Trash2, MapPin, MoreVertical,
   Key, Edit, Crown, Theater, CreditCard, Receipt, Star,
+  Headphones,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
   DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel,
@@ -39,6 +41,7 @@ const API = API_BASE;
 
 const EnhancedUserManager = () => {
   const { token } = useAuth();
+  const navigate = useNavigate();
   const [users, setUsers] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -176,11 +179,37 @@ const EnhancedUserManager = () => {
   const handleSuspendMessaging = async (userId, isSuspended) => {
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      await axios.put(`${API}/admin/users/${userId}/messaging`, { suspended: !isSuspended }, { headers });
-      toast.success(`Messaging ${!isSuspended ? 'suspended' : 'restored'}`);
+      await axios.put(`${API}/admin/users/${userId}/messaging`, { suspended: !isSuspended }, { headers });      toast.success(`Messaging ${!isSuspended ? 'suspended' : 'restored'}`);
       fetchData();
     } catch (error) {
       toast.error('Failed to update messaging status');
+    }
+  };
+
+  // iter316-C — Promote / Demote dialer contractor role.
+  const handlePromoteToContractor = async (u) => {
+    if (!window.confirm(`Promote ${u.email} to a dialer contractor? They will gain access to the BidVex Dialer and earn referral commissions.`)) return;
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      await axios.post(`${API}/twilio/admin/users/${u.id}/promote-to-contractor`, {}, { headers });
+      toast.success(`${u.email} promoted to contractor`);
+      fetchData();
+    } catch (error) {
+      const d = error?.response?.data?.detail;
+      toast.error((typeof d === 'object' ? d.message_en : d) || 'Failed to promote');
+    }
+  };
+
+  const handleDemoteFromContractor = async (u) => {
+    if (!window.confirm(`Demote ${u.email} from contractor? Commission history will be preserved.`)) return;
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const r = await axios.post(`${API}/twilio/admin/users/${u.id}/demote-from-contractor`, {}, { headers });
+      toast.success(`Demoted — reverted to ${r.data.reverted_to_role}`);
+      fetchData();
+    } catch (error) {
+      const d = error?.response?.data?.detail;
+      toast.error((typeof d === 'object' ? d.message_en : d) || 'Failed to demote');
     }
   };
 
@@ -1055,6 +1084,32 @@ const EnhancedUserManager = () => {
                       <DropdownMenuItem onClick={() => openBuyerReviews(user)} data-testid={`view-buyer-reviews-${user.id}`}>
                         <Star className="h-3.5 w-3.5 mr-2" /> Buyer Reviews
                       </DropdownMenuItem>
+                      {/* iter316-C — Contractor role management */}
+                      <DropdownMenuSeparator />
+                      {user.role === 'dialer_contractor' ? (
+                        <>
+                          <DropdownMenuItem
+                            onClick={() => navigate(`/admin/contractors/${user.id}`)}
+                            data-testid={`view-contractor-profile-${user.id}`}
+                          >
+                            <Eye className="h-3.5 w-3.5 mr-2" /> View Contractor Profile
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleDemoteFromContractor(user)}
+                            className="text-rose-600 focus:text-rose-700"
+                            data-testid={`demote-contractor-${user.id}`}
+                          >
+                            <Trash2 className="h-3.5 w-3.5 mr-2" /> Demote from Contractor
+                          </DropdownMenuItem>
+                        </>
+                      ) : (
+                        <DropdownMenuItem
+                          onClick={() => handlePromoteToContractor(user)}
+                          data-testid={`promote-contractor-${user.id}`}
+                        >
+                          <Headphones className="h-3.5 w-3.5 mr-2" /> Promote to Contractor
+                        </DropdownMenuItem>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>

@@ -142,6 +142,19 @@ class RemoveAttributionBody(BaseModel):
     reason: str = ""
 
 
+class CreateContractorBody(BaseModel):
+    email:               str
+    name:                Optional[str] = ""
+    phone:               Optional[str] = ""
+    province:            Optional[str] = "QC"
+    preferred_language:  Optional[str] = "en"
+    initial_default_rate: Optional[float] = None  # e.g. 0.20 for 20 %
+
+
+class PromoteUserBody(BaseModel):
+    initial_default_rate: Optional[float] = None
+
+
 # ─── Mission 1 — Browser SDK token ──────────────────────────────────────
 
 @router.get("/config")
@@ -380,9 +393,19 @@ def _ownership_filter(user: User) -> Dict[str, Any]:
 @router.get("/calls")
 async def list_calls(user: User = Depends(require_dialer_access),
                      limit: int = Query(50, le=200),
-                     offset: int = Query(0, ge=0)) -> Dict[str, Any]:
+                     offset: int = Query(0, ge=0),
+                     agent_user_id: Optional[str] = Query(
+                         None,
+                         description="Admin-only: filter to a specific agent's calls "
+                                     "(used by the contractor drill-in).",
+                     )) -> Dict[str, Any]:
     db = get_db()
     q = _ownership_filter(user)
+    # iter316-C — admin drill-in: allow filtering by agent_user_id.
+    if agent_user_id:
+        if not _is_admin(user):
+            raise HTTPException(403, "admin only")
+        q = {"agent_user_id": agent_user_id}
     cursor = db.call_logs.find(q, {"transcript_speakers": 0, "transcript_en": 0, "transcript_fr": 0}) \
         .sort("initiated_at", -1).skip(offset).limit(limit)
     items = await cursor.to_list(length=limit)
@@ -717,6 +740,361 @@ async def admin_remove_attribution(account_id: str, body: RemoveAttributionBody,
         db, account_id=account_id, admin_id=user.id,
         reason=body.reason or "manual_admin_override",
     )
+
+
+# ─── iter316-C — Contractor onboarding (create / promote / demote) ──────
+
+async def _generate_password_reset_token(db, user_id: str) -> str:
+    """Reuse the auth-service convention so the generated link works
+    with the existing /reset-password flow."""
+    from datetime import timedelta
+    token = uuid.uuid4().hex
+    await db.password_reset_tokens.insert_one({
+        "id":          str(uuid.uuid4()),
+        "user_id":     user_id,
+        "token":       token,
+        "expires_at":  (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+        "used":        False,
+        "created_at":  datetime.now(timezone.utc).isoformat(),
+        "source":      "contractor_invite",
+    })
+    return token
+
+
+async def _send_contractor_invite_email(user_doc: dict, reset_token: str) -> bool:
+    """Best-effort send of the invite/welcome email. Never raises."""
+    try:
+        from services.email_service import get_email_service
+        from config.email_templates import send_password_reset_email
+        svc = get_email_service()
+        if not svc.is_configured():
+            return False
+        out = await send_password_reset_email(
+            svc, user=user_doc, reset_token=reset_token,
+            language=user_doc.get("preferred_language", "en"),
+        )
+        return bool(out.get("success"))
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"contractor invite email failed: {e}")
+        return False
+
+
+@router.post("/admin/contractors")
+async def admin_create_contractor(body: CreateContractorBody,
+                                   user: User = Depends(require_admin)) -> Dict[str, Any]:
+    """Create a brand-new dialer_contractor user, OR if the email already
+    belongs to an existing user, promote them in-place. Returns the user
+    id + (best-effort) password-reset invite link."""
+    import bcrypt
+    from routes.affiliate import _ensure_referral_code  # idempotent
+    db = get_db()
+    email = (body.email or "").strip().lower()
+    if not email or "@" not in email:
+        raise HTTPException(400, "valid email required")
+
+    existing = await db.users.find_one({"email": email}, {"_id": 0})
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    if existing:
+        if existing.get("role") == "dialer_contractor":
+            raise HTTPException(409, {
+                "error": "already_contractor",
+                "message_en": "This user is already a contractor.",
+                "message_fr": "Cet utilisateur est déjà un contractant.",
+            })
+        # Promote in-place + preserve the previous role for demotion.
+        await db.users.update_one(
+            {"id": existing["id"]},
+            {"$set": {
+                "role":                "dialer_contractor",
+                "previous_role":       existing.get("role") or "user",
+                "promoted_to_contractor_at": now_iso,
+                "promoted_to_contractor_by": user.id,
+                "updated_at":          now_iso,
+            }},
+        )
+        contractor_id = existing["id"]
+        was_promoted = True
+    else:
+        contractor_id = str(uuid.uuid4())
+        placeholder = uuid.uuid4().hex
+        pw_hash = bcrypt.hashpw(placeholder.encode(), bcrypt.gensalt()).decode()
+        doc = {
+            "id":                  contractor_id,
+            "email":                email,
+            "password_hash":        pw_hash,
+            "first_name":           (body.name or "").split(" ")[0][:60] or "Contractor",
+            "last_name":            " ".join((body.name or "").split(" ")[1:])[:80],
+            "name":                 body.name or email.split("@")[0],
+            "phone":                (body.phone or "").strip(),
+            "province":             body.province or "QC",
+            "preferred_language":   body.preferred_language or "en",
+            "role":                 "dialer_contractor",
+            "is_admin":             False,
+            "email_verified":       False,
+            "is_active":            True,
+            "must_reset_password":  True,
+            "created_at":           now_iso,
+            "updated_at":           now_iso,
+            "created_by_admin_id":  user.id,
+            "creation_source":      "admin_new_contractor",
+        }
+        await db.users.insert_one(doc)
+        existing = doc
+        was_promoted = False
+
+    # Ensure the contractor has a referral code (idempotent).
+    await _ensure_referral_code(db, contractor_id)
+
+    # Seed an initial default commission rate if the admin provided one.
+    if body.initial_default_rate is not None:
+        try:
+            await upsert_contractor_commission_rates(
+                db, contractor_id=contractor_id,
+                rates_by_account_type=None,
+                default_rate=float(body.initial_default_rate),
+                updated_by_admin_id=user.id,
+            )
+        except ValueError as e:
+            logger.warning(f"initial rate rejected: {e}")
+
+    # Generate password-reset invite link + best-effort email.
+    reset_token = await _generate_password_reset_token(db, contractor_id)
+    email_sent = await _send_contractor_invite_email(existing, reset_token)
+
+    # Audit.
+    await db.admin_contractor_actions.insert_one({
+        "id":             str(uuid.uuid4()),
+        "action":         "promote" if was_promoted else "create",
+        "admin_id":       user.id,
+        "contractor_id":  contractor_id,
+        "created_at":     now_iso,
+    })
+
+    return {
+        "contractor_id":   contractor_id,
+        "promoted":        was_promoted,
+        "invite_token":    reset_token,
+        "invite_email_sent": email_sent,
+    }
+
+
+@router.post("/admin/users/{user_id}/promote-to-contractor")
+async def admin_promote_user(user_id: str, body: PromoteUserBody,
+                              user: User = Depends(require_admin)) -> Dict[str, Any]:
+    """Promote an existing user (any role) to dialer_contractor."""
+    from routes.affiliate import _ensure_referral_code
+    db = get_db()
+    target = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if not target:
+        raise HTTPException(404, "user not found")
+    if target.get("role") == "dialer_contractor":
+        raise HTTPException(409, {
+            "error": "already_contractor",
+            "message_en": "This user is already a contractor.",
+            "message_fr": "Cet utilisateur est déjà un contractant.",
+        })
+    now_iso = datetime.now(timezone.utc).isoformat()
+    await db.users.update_one(
+        {"id": user_id},
+        {"$set": {
+            "role":                       "dialer_contractor",
+            "previous_role":              target.get("role") or "user",
+            "promoted_to_contractor_at":  now_iso,
+            "promoted_to_contractor_by":  user.id,
+            "updated_at":                 now_iso,
+        }},
+    )
+    await _ensure_referral_code(db, user_id)
+    if body.initial_default_rate is not None:
+        try:
+            await upsert_contractor_commission_rates(
+                db, contractor_id=user_id,
+                rates_by_account_type=None,
+                default_rate=float(body.initial_default_rate),
+                updated_by_admin_id=user.id,
+            )
+        except ValueError:
+            pass
+    await db.admin_contractor_actions.insert_one({
+        "id": str(uuid.uuid4()), "action": "promote",
+        "admin_id": user.id, "contractor_id": user_id,
+        "created_at": now_iso,
+    })
+    return {"contractor_id": user_id, "status": "promoted"}
+
+
+@router.post("/admin/users/{user_id}/demote-from-contractor")
+async def admin_demote_user(user_id: str,
+                             user: User = Depends(require_admin)) -> Dict[str, Any]:
+    """Revoke contractor role. Returns the user to their `previous_role`
+    or to the platform default `individual_seller`. Existing commission
+    history + referral attribution are PRESERVED (immutable ledger)."""
+    db = get_db()
+    target = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if not target:
+        raise HTTPException(404, "user not found")
+    if target.get("role") != "dialer_contractor":
+        raise HTTPException(409, {
+            "error": "not_a_contractor",
+            "message_en": "This user is not currently a contractor.",
+            "message_fr": "Cet utilisateur n'est pas actuellement un contractant.",
+        })
+    revert_to = target.get("previous_role") or "individual_seller"
+    now_iso = datetime.now(timezone.utc).isoformat()
+    await db.users.update_one(
+        {"id": user_id},
+        {"$set": {
+            "role":                          revert_to,
+            "demoted_from_contractor_at":    now_iso,
+            "demoted_from_contractor_by":    user.id,
+            "updated_at":                    now_iso,
+        }},
+    )
+    await db.admin_contractor_actions.insert_one({
+        "id": str(uuid.uuid4()), "action": "demote",
+        "admin_id": user.id, "contractor_id": user_id,
+        "reverted_to_role": revert_to,
+        "created_at": now_iso,
+    })
+    return {"contractor_id": user_id, "status": "demoted", "reverted_to_role": revert_to}
+
+
+@router.get("/admin/contractors/{contractor_id}/profile")
+async def admin_contractor_profile(contractor_id: str,
+                                    user: User = Depends(require_admin)) -> Dict[str, Any]:
+    """Comprehensive drill-in payload for the admin "View Contractor"
+    page: identity + earnings + Stripe status + referred-accounts WITH
+    per-account listing counts + recent calls + aggregate AI metrics.
+
+    All sub-queries are run against the existing collections; no new
+    state is introduced. Each section is independently empty-safe."""
+    db = get_db()
+    target = await db.users.find_one({"id": contractor_id}, {
+        "_id": 0, "id": 1, "email": 1, "name": 1, "first_name": 1,
+        "last_name": 1, "phone": 1, "province": 1, "role": 1,
+        "affiliate_code": 1,
+        "stripe_connect_account_id": 1,
+        "stripe_connect_payouts_enabled": 1,
+        "stripe_connect_onboarding_complete": 1,
+        "previous_role": 1, "created_at": 1, "updated_at": 1,
+    })
+    if not target:
+        raise HTTPException(404, "contractor not found")
+    if target.get("role") != "dialer_contractor":
+        # Allow viewing demoted ex-contractors so admin can still see
+        # their historical activity — but flag it.
+        target["role_warning"] = "user is no longer a contractor"
+
+    # 1. Earnings + history (reuse Phase-A helpers).
+    earnings = await contractor_earnings_summary(db, contractor_id=contractor_id)
+    history = await contractor_commission_history(db, contractor_id=contractor_id, limit=100)
+
+    # 2. Referred accounts with listing counts (vehicle + marketplace).
+    referred = await contractor_referred_accounts(db, contractor_id=contractor_id)
+    enriched_referred: List[Dict[str, Any]] = []
+    for acc in referred:
+        acc_id = acc.get("id")
+        if not acc_id:
+            enriched_referred.append(acc)
+            continue
+        try:
+            vehicle_active = await db.vehicles.count_documents({
+                "seller_id": acc_id, "status": {"$in": ["active", "live"]},
+            })
+        except Exception:
+            vehicle_active = 0
+        try:
+            vehicle_draft = await db.vehicles.count_documents({
+                "seller_id": acc_id, "status": "draft",
+            })
+        except Exception:
+            vehicle_draft = 0
+        try:
+            mp_active = await db.listings.count_documents({
+                "seller_id": acc_id, "status": {"$in": ["active", "live"]},
+            })
+        except Exception:
+            mp_active = 0
+        try:
+            mp_draft = await db.listings.count_documents({
+                "seller_id": acc_id, "status": "draft",
+            })
+        except Exception:
+            mp_draft = 0
+        enriched_referred.append({
+            **acc,
+            "vehicle_active_count":  vehicle_active,
+            "vehicle_draft_count":   vehicle_draft,
+            "marketplace_active":    mp_active,
+            "marketplace_draft":     mp_draft,
+            "total_listings":        vehicle_active + vehicle_draft + mp_active + mp_draft,
+        })
+
+    # 3. Recent calls (all of them — admin override). Compact projection
+    #    suitable for table rendering; per-row drill-in still uses
+    #    GET /twilio/calls/{id}.
+    calls_cursor = db.call_logs.find(
+        {"agent_user_id": contractor_id},
+        {"transcript_speakers": 0, "transcript_en": 0, "transcript_fr": 0},
+    ).sort("initiated_at", -1).limit(100)
+    calls = await calls_cursor.to_list(length=100)
+    call_count_total = await db.call_logs.count_documents({"agent_user_id": contractor_id})
+
+    # 4. Aggregate AI metrics (sentiment buckets + avg score + most
+    #    common action items across the contractor's last 100 calls).
+    sentiment_buckets = {"positive": 0, "neutral": 0, "negative": 0}
+    score_total = 0.0
+    score_n = 0
+    action_items_freq: Dict[str, int] = {}
+    ai_completed = 0
+    ai_failed = 0
+    ai_pending = 0
+    for c in calls:
+        if c.get("ai_processing_status") == "completed":
+            ai_completed += 1
+        elif c.get("ai_processing_status") == "failed":
+            ai_failed += 1
+        elif c.get("ai_processing_status") in ("pending", "processing"):
+            ai_pending += 1
+        lbl = c.get("sentiment_label")
+        if lbl in sentiment_buckets:
+            sentiment_buckets[lbl] += 1
+        sc = c.get("sentiment_score")
+        if isinstance(sc, (int, float)):
+            score_total += float(sc)
+            score_n += 1
+        for it in (c.get("action_items") or []):
+            key = (it or "").strip()[:120]
+            if key:
+                action_items_freq[key] = action_items_freq.get(key, 0) + 1
+    top_action_items = sorted(action_items_freq.items(), key=lambda kv: -kv[1])[:10]
+
+    # 5. Stripe payout status mirror (taken from the contractor's user doc).
+    stripe = {
+        "connected":   bool(target.get("stripe_connect_payouts_enabled")),
+        "onboarded":   bool(target.get("stripe_connect_onboarding_complete")),
+        "account_id":  target.get("stripe_connect_account_id"),
+    }
+
+    return {
+        "contractor":          target,
+        "earnings":            earnings,
+        "stripe":              stripe,
+        "referred_accounts":   enriched_referred,
+        "referred_count":      len(enriched_referred),
+        "recent_calls":        calls,
+        "calls_total":         call_count_total,
+        "ai_summary": {
+            "completed":     ai_completed,
+            "failed":        ai_failed,
+            "pending":       ai_pending,
+            "sentiment":     sentiment_buckets,
+            "avg_sentiment_score": (score_total / score_n) if score_n else None,
+            "top_action_items":    [{"text": k, "count": v} for k, v in top_action_items],
+        },
+        "commission_history":  history,
+    }
 
 
 __all__ = ["router"]

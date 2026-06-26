@@ -138,6 +138,8 @@ const VehicleMultiLotDetailPage = lazy(() => import('./pages/vehicles/VehicleMul
 // iter316 Phase B — Twilio Dialer + AI Voice Intelligence + Contractor surfaces
 const AdminDialer = lazy(() => import('./pages/admin/AdminDialer'));
 const ContractorDashboard = lazy(() => import('./pages/contractor/ContractorDashboard'));
+// iter316-C — Admin Contractor drill-in (View Contractor Profile)
+const AdminContractorProfilePage = lazy(() => import('./pages/admin/AdminContractorProfilePage'));
 
 // Lazy-loaded heavy components
 const AIAssistant = lazy(() => import('./components/AIAssistant'));
@@ -554,6 +556,10 @@ const App = () => {
           {/* iter316 Phase B — Contractor self-service dashboard */}
           <Route path="/contractor/dashboard" element={
             <ProtectedRoute><ErrorBoundary scope="contractor-dashboard"><ContractorDashboard /></ErrorBoundary></ProtectedRoute>
+          } />
+          {/* iter316-C — Admin Contractor drill-in profile */}
+          <Route path="/admin/contractors/:contractorId" element={
+            <ProtectedRoute><ErrorBoundary scope="admin-contractor-profile"><AdminContractorProfilePage /></ErrorBoundary></ProtectedRoute>
           } />
           {/* iter217 Phase 5 Hotfix v5b — Broker Ecosystem */}
           <Route path="/admin/brokers" element={
