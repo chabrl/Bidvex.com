@@ -1,6 +1,43 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter316-C — Admin Contractor Onboarding + Full Oversight (Jun 26, 2026) ✅ COMPLETE
+
+### Sprint structure
+Completes the contractor workflow started in Phase B by adding the missing
+admin-side onboarding flows + a comprehensive oversight drill-in page.
+
+### Backend additions (all under `/api/twilio/admin/`)
+- `POST /api/twilio/admin/contractors` — creates a brand-new `dialer_contractor` user. If the email already exists, the user is promoted in-place. Returns `{contractor_id, promoted, invite_token, invite_email_sent}`. Generates a 7-day password-reset invite token and best-effort emails the contractor; on the frontend the invite link is displayed for the admin to copy. Optional `initial_default_rate` seeds the commission rate at creation time. Bilingual error envelope on duplicate. Audit row inserted into `admin_contractor_actions`.
+- `POST /api/twilio/admin/users/{user_id}/promote-to-contractor` — flips an existing user to `dialer_contractor` and preserves `previous_role` for clean demotion. 409 if already a contractor.
+- `POST /api/twilio/admin/users/{user_id}/demote-from-contractor` — reverts to `previous_role` (or `individual_seller` fallback). Commission ledger + referral attribution are PRESERVED (immutable audit). 409 if not currently a contractor.
+- `GET  /api/twilio/admin/contractors/{contractor_id}/profile` — comprehensive drill-in payload (identity + earnings + Stripe payout state + referred-accounts WITH per-account vehicle/marketplace listing counts + recent 100 calls + aggregate AI sentiment buckets + top action items + commission history). Renders demoted ex-contractors with a `role_warning` flag.
+- `GET  /api/twilio/calls?agent_user_id={id}` — extended with an admin-only `agent_user_id` query filter so the drill-in page can fetch a contractor's full call log.
+
+### Frontend additions
+- **`AdminContractorsPage.jsx` (extended)** — `+ New Contractor` button opens a modal with email + name + phone + province + default-rate fields. On success the modal flips to a success state surfacing the invite link with a copy button. Each contractor row now also has a `View` (drill-in nav) and `Demote` (confirmation dialog) action alongside the existing `Rates` editor.
+- **`AdminContractorProfilePage.jsx` (NEW)** at route `/admin/contractors/:contractorId`. Header (identity + referral code) → snapshot cards (Accrued / Paid / Calls / Referred) → Stripe payout-status card → 4 tabs:
+  1. **Calls** — list with per-row expand for full AI insights (sentiment badge, contractor's own pre/post-call notes, AI summary, action items, EN/FR transcript toggle with diarized turns, admin-only recording playback).
+  2. **AI Report** — pipeline counts (Completed/Pending/Failed), overall sentiment breakdown with positive/neutral/negative percentages + average sentiment score, most-frequent action items list.
+  3. **Referred Clients** — table per referred account with type badge, vehicle active/draft counts, marketplace active/draft counts, demo/live status.
+  4. **Dashboard mirror** — earnings + commission history exactly as the contractor sees it on `/contractor/dashboard`.
+- **`EnhancedUserManager.js` (extended)** — dropdown menu now conditionally renders 3 new items: `View Contractor Profile` + `Demote from Contractor` (when role is dialer_contractor) OR `Promote to Contractor` (when role isn't). Wired with browser-confirm gates + bilingual toast feedback. New `useNavigate()` import deep-links to the drill-in page.
+- **`App.js`** — new lazy-loaded route `/admin/contractors/:contractorId` wrapped in `ProtectedRoute` + `ErrorBoundary`.
+
+### Tests
+- `backend/tests/test_iter316_c_contractor_admin.py` — **8/8 PASS** (create new + promote-existing + promote/demote round-trip + idempotency 409s + admin drill-in calls filter + 3 negative-path role gates).
+- `frontend/src/__tests__/iter316_c_contractor_oversight.test.js` — **26/26 PASS** (5 new-contractor modal + 8 promote/demote menu wiring + 13 drill-in page testids/endpoints/tabs).
+- Combined iter316 backend pytest: **37 passed** (24 phase-A + 5 phase-B + 8 phase-C). Combined frontend wiring: **58 passed** (32 phase-B + 26 phase-C).
+- Testing-agent E2E (iteration_318): 100% — modal open + invite link surface, promote/demote round-trip on User Management with role-aware menu swap, 4-tab profile drill-in with empty-state rendering, role gating (403), EN/FR bilingual rendering. Zero issues.
+
+### USER ACTION ITEMS
+1. **Onboarding next contractor** — Admin → Dialer & Contractors → Contractor Management → "+ New Contractor". Fill in email + name + (optional) phone/province/default-rate → Create → copy the invite link from the success screen → email it to your contractor. They click → set their password → log in → land on `/contractor/dashboard`.
+2. **Promote an existing user** — Admin → Marketplace → User Management → find the user → dropdown → "Promote to Contractor".
+3. **Inspect a contractor's work** — Admin → Dialer & Contractors → Contractor Management → "View" button on the row. (Or directly via User Management → "View Contractor Profile".)
+
+---
+
+
 ## iter316 Phase B — Frontend Dialer + AI Insights + Contractor Dashboard + Admin Commission Editor (Jun 26, 2026) ✅ COMPLETE
 
 ### Sprint structure
