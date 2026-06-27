@@ -23,7 +23,7 @@ from __future__ import annotations
 import logging
 import os
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional
 
 from fastapi import (
@@ -153,6 +153,18 @@ class CreateContractorBody(BaseModel):
 
 class PromoteUserBody(BaseModel):
     initial_default_rate: Optional[float] = None
+
+
+class ContractorPermissionsBody(BaseModel):
+    permissions: List[str]
+
+
+# Whitelist of admin-grantable contractor permissions.
+ALLOWED_CONTRACTOR_PERMISSIONS = {
+    "add_users",            # can manually create a referred client account
+    "manage_subscriptions", # can request subscription changes for their clients
+    "view_referral_emails", # can see referred clients' email addresses
+}
 
 
 # ─── Mission 1 — Browser SDK token ──────────────────────────────────────
@@ -1095,6 +1107,301 @@ async def admin_contractor_profile(contractor_id: str,
         },
         "commission_history":  history,
     }
+
+
+# ─── iter316-D — Performance Leaderboard ────────────────────────────────
+
+@router.get("/admin/contractors/leaderboard")
+async def admin_contractors_leaderboard(
+    user: User = Depends(require_admin),
+    period: str = Query("lifetime", description="lifetime | month | week"),
+) -> Dict[str, Any]:
+    """Rank all dialer_contractors by volume / earnings / conversion."""
+    db = get_db()
+    contractors = await db.users.find(
+        {"role": "dialer_contractor"},
+        {"_id": 0, "id": 1, "email": 1, "name": 1, "first_name": 1, "last_name": 1,
+         "affiliate_code": 1, "stripe_connect_payouts_enabled": 1,
+         "created_at": 1},
+    ).to_list(length=500)
+
+    now = datetime.now(timezone.utc)
+    if period == "month":
+        since = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
+    elif period == "week":
+        since = (now - timedelta(days=7)).isoformat()
+    else:
+        since = None
+
+    rows: List[Dict[str, Any]] = []
+    for c in contractors:
+        cid = c["id"]
+
+        # Earnings (window-aware).
+        if since:
+            agg = db.contractor_commission_ledger.aggregate([
+                {"$match": {"contractor_id": cid, "created_at": {"$gte": since}}},
+                {"$group": {"_id": None, "total": {"$sum": "$commission_amount"}, "n": {"$sum": 1}}},
+            ])
+            agg_rows = [r async for r in agg]
+        else:
+            agg = db.contractor_commission_ledger.aggregate([
+                {"$match": {"contractor_id": cid}},
+                {"$group": {"_id": None, "total": {"$sum": "$commission_amount"}, "n": {"$sum": 1}}},
+            ])
+            agg_rows = [r async for r in agg]
+        earnings = float(agg_rows[0]["total"]) if agg_rows else 0.0
+        n_commissions = int(agg_rows[0]["n"]) if agg_rows else 0
+
+        # Call volume (window-aware).
+        call_q: Dict[str, Any] = {"agent_user_id": cid}
+        if since:
+            call_q["initiated_at"] = {"$gte": since}
+        call_volume = await db.call_logs.count_documents(call_q)
+
+        # Referrals + conversion (lifetime — referral is a one-shot event).
+        referred = await contractor_referred_accounts(db, contractor_id=cid)
+        referred_count = len(referred)
+        referred_ids = [r["id"] for r in referred if r.get("id")]
+        if referred_ids:
+            # Count referred accounts that have at least 1 published listing.
+            converted_count = 0
+            for r_id in referred_ids:
+                has_v = await db.vehicles.count_documents({
+                    "seller_id": r_id, "status": {"$in": ["active", "live", "sold"]},
+                })
+                has_m = 0
+                if not has_v:
+                    has_m = await db.listings.count_documents({
+                        "seller_id": r_id, "status": {"$in": ["active", "live", "sold"]},
+                    })
+                if has_v or has_m:
+                    converted_count += 1
+            conversion_rate = (converted_count / referred_count) if referred_count else 0.0
+        else:
+            converted_count = 0
+            conversion_rate = 0.0
+
+        rows.append({
+            "contractor_id":      cid,
+            "email":               c.get("email"),
+            "name":                c.get("name") or c.get("first_name") or c.get("email"),
+            "stripe_ready":        bool(c.get("stripe_connect_payouts_enabled")),
+            "earnings":            round(earnings, 2),
+            "commissions_count":   n_commissions,
+            "call_volume":         call_volume,
+            "referred_count":      referred_count,
+            "converted_count":     converted_count,
+            "conversion_rate":     round(conversion_rate, 4),
+            "joined_at":           c.get("created_at"),
+        })
+
+    # Default sort: lifetime earnings desc.
+    rows.sort(key=lambda r: (-r["earnings"], -r["call_volume"], -r["referred_count"]))
+    for i, r in enumerate(rows):
+        r["rank"] = i + 1
+    return {"items": rows, "count": len(rows), "period": period}
+
+
+# ─── iter316-D — Banking validation (payout readiness) ──────────────────
+
+@router.get("/contractor/payout-readiness")
+async def contractor_payout_readiness(
+    user: User = Depends(get_current_user),
+    contractor_id: Optional[str] = Query(None),
+) -> Dict[str, Any]:
+    """Returns a clear yes/no contract on whether the contractor is
+    ready to receive an automatic Stripe Connect payout. If `ready` is
+    False, `blocked_reasons` lists every gate that must be cleared."""
+    cid = contractor_id or user.id
+    if cid != user.id and user.role not in ("admin", "super_admin"):
+        raise HTTPException(403, "admin only")
+    db = get_db()
+    target = await db.users.find_one(
+        {"id": cid},
+        {"_id": 0, "stripe_connect_account_id": 1,
+         "stripe_connect_payouts_enabled": 1,
+         "stripe_connect_onboarding_complete": 1,
+         "role": 1},
+    )
+    if not target:
+        raise HTTPException(404, "user not found")
+
+    earnings = await contractor_earnings_summary(db, contractor_id=cid)
+    accrued = float(earnings.get("lifetime_accrued") or 0)
+
+    blocked: List[str] = []
+    if target.get("role") != "dialer_contractor":
+        blocked.append("not_a_contractor")
+    if not target.get("stripe_connect_account_id"):
+        blocked.append("no_stripe_account")
+    if not target.get("stripe_connect_onboarding_complete"):
+        blocked.append("onboarding_incomplete")
+    if not target.get("stripe_connect_payouts_enabled"):
+        blocked.append("payouts_disabled")
+
+    ready = not blocked
+    return {
+        "ready":            ready,
+        "blocked_reasons":  blocked,
+        "accrued_total":    round(accrued, 2),
+        "next_payout_at":   (datetime.now(timezone.utc).replace(day=1) + timedelta(days=32))
+                              .replace(day=1, hour=8, minute=0, second=0, microsecond=0)
+                              .isoformat(),
+        "action_url":       "/api/settlement/connect/onboard",
+        "stripe_account_id": target.get("stripe_connect_account_id"),
+    }
+
+
+# ─── iter316-D — Admin grants contractor permissions ────────────────────
+
+@router.patch("/admin/contractors/{contractor_id}/permissions")
+async def admin_set_contractor_permissions(
+    contractor_id: str, body: ContractorPermissionsBody,
+    user: User = Depends(require_admin),
+) -> Dict[str, Any]:
+    db = get_db()
+    target = await db.users.find_one({"id": contractor_id, "role": "dialer_contractor"})
+    if target is None:
+        raise HTTPException(404, "contractor not found")
+    cleaned = sorted(set(p for p in body.permissions if p in ALLOWED_CONTRACTOR_PERMISSIONS))
+    now_iso = datetime.now(timezone.utc).isoformat()
+    await db.users.update_one(
+        {"id": contractor_id},
+        {"$set": {
+            "contractor_permissions":         cleaned,
+            "contractor_permissions_set_at":  now_iso,
+            "contractor_permissions_set_by":  user.id,
+            "updated_at":                     now_iso,
+        }},
+    )
+    await db.admin_contractor_actions.insert_one({
+        "id":             str(uuid.uuid4()),
+        "action":         "set_permissions",
+        "admin_id":       user.id,
+        "contractor_id":  contractor_id,
+        "permissions":    cleaned,
+        "created_at":     now_iso,
+    })
+    return {"contractor_id": contractor_id, "permissions": cleaned}
+
+
+@router.get("/admin/contractors/{contractor_id}/permissions")
+async def admin_get_contractor_permissions(contractor_id: str,
+                                            user: User = Depends(require_admin)) -> Dict[str, Any]:
+    db = get_db()
+    target = await db.users.find_one({"id": contractor_id, "role": "dialer_contractor"},
+                                       {"_id": 0, "contractor_permissions": 1})
+    if target is None:
+        raise HTTPException(404, "contractor not found")
+    return {
+        "contractor_id":    contractor_id,
+        "permissions":      target.get("contractor_permissions") or [],
+        "allowed_options":  sorted(ALLOWED_CONTRACTOR_PERMISSIONS),
+    }
+
+
+@router.get("/contractor/permissions/me")
+async def contractor_my_permissions(user: User = Depends(get_current_user)) -> Dict[str, Any]:
+    """Contractor reads their own granted permissions (used to gate UI buttons)."""
+    db = get_db()
+    me = await db.users.find_one({"id": user.id}, {"_id": 0, "contractor_permissions": 1, "role": 1})
+    return {
+        "permissions":      (me or {}).get("contractor_permissions") or [],
+        "is_contractor":    (me or {}).get("role") == "dialer_contractor",
+    }
+
+
+class CreateReferredClientBody(BaseModel):
+    email:             str
+    name:              Optional[str] = ""
+    account_type:      Optional[str] = "individual_seller"
+    phone:             Optional[str] = ""
+    province:          Optional[str] = "QC"
+
+
+@router.post("/contractor/clients")
+async def contractor_create_referred_client(
+    body: CreateReferredClientBody,
+    user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Permission-gated: contractor manually creates a referred client.
+    The contractor must have the `add_users` permission OR be admin."""
+    import bcrypt
+    db = get_db()
+
+    # Permission check.
+    if user.role not in ("admin", "super_admin"):
+        if user.role != "dialer_contractor":
+            raise HTTPException(403, "contractor only")
+        me = await db.users.find_one({"id": user.id}, {"_id": 0, "contractor_permissions": 1})
+        if "add_users" not in ((me or {}).get("contractor_permissions") or []):
+            raise HTTPException(403, {
+                "error": "permission_denied",
+                "message_en": "Your account doesn't have the 'add_users' permission. Contact an administrator.",
+                "message_fr": "Votre compte n'a pas la permission 'add_users'. Contactez un administrateur.",
+            })
+
+    email = (body.email or "").strip().lower()
+    if not email or "@" not in email:
+        raise HTTPException(400, "valid email required")
+    existing = await db.users.find_one({"email": email}, {"_id": 0, "id": 1})
+    if existing:
+        raise HTTPException(409, {
+            "error": "email_exists",
+            "message_en": "A user with this email already exists.",
+            "message_fr": "Un utilisateur avec cet email existe déjà.",
+        })
+
+    contractor_id = user.id
+    now_iso = datetime.now(timezone.utc).isoformat()
+    new_id = str(uuid.uuid4())
+    placeholder = uuid.uuid4().hex
+    pw_hash = bcrypt.hashpw(placeholder.encode(), bcrypt.gensalt()).decode()
+
+    doc = {
+        "id":                  new_id,
+        "email":                email,
+        "password_hash":        pw_hash,
+        "first_name":           (body.name or "").split(" ")[0][:60] or email.split("@")[0],
+        "last_name":            " ".join((body.name or "").split(" ")[1:])[:80],
+        "name":                 body.name or email.split("@")[0],
+        "phone":                (body.phone or "").strip(),
+        "province":             body.province or "QC",
+        "account_type":         body.account_type or "individual_seller",
+        "role":                 "user",
+        "is_admin":             False,
+        "email_verified":       False,
+        "is_active":            True,
+        "must_reset_password":  True,
+        "created_at":           now_iso,
+        "updated_at":           now_iso,
+        # Attribution — links the new account back to the contractor so
+        # future commissions accrue automatically via the Phase A hooks.
+        "referred_by_contractor_id":     contractor_id,
+        "referred_via":                  "contractor_panel",
+        "referred_at":                   now_iso,
+    }
+    await db.users.insert_one(doc)
+
+    # Generate password-reset invite link so the contractor can deliver it.
+    reset_token = await _generate_password_reset_token(db, new_id)
+
+    await db.admin_contractor_actions.insert_one({
+        "id":             str(uuid.uuid4()),
+        "action":         "contractor_created_client",
+        "admin_id":       contractor_id,
+        "contractor_id":  contractor_id,
+        "created_user_id": new_id,
+        "created_at":     now_iso,
+    })
+
+    return {
+        "client_id":       new_id,
+        "invite_token":    reset_token,
+        "invite_url":      None,  # frontend prepends origin
+    }
+
 
 
 __all__ = ["router"]

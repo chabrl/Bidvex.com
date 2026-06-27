@@ -80,6 +80,7 @@ import AdminFacilities from './admin/AdminFacilities';
 import AdminMarketingIntegrations from './admin/AdminMarketingIntegrations';
 // iter316 Phase B — Mission B5: Admin Contractor Management + Commission Rate Editor
 import AdminContractorsPage from './admin/AdminContractorsPage';
+import AdminContractorsLeaderboard from './admin/AdminContractorsLeaderboard';
 import AdminDialer from './admin/AdminDialer';
 import SchedulerStatusCard from '../components/SchedulerStatusCard';
 import { 
@@ -145,6 +146,7 @@ const SECONDARY_TABS = {
   dialer: [
     { id: 'dialer-ui', label: 'Dialer', icon: '📞', lucideIcon: Megaphone },
     { id: 'contractors', label: 'Contractor Management', icon: '👤', lucideIcon: Users },
+    { id: 'leaderboard', label: 'Leaderboard', icon: '🏆', lucideIcon: TrendingUp },
   ],
   settings: [
     { id: 'site-mode', label: 'Site Mode', icon: '🌐', lucideIcon: Globe },
@@ -548,6 +550,7 @@ const AdminDashboard = () => {
         switch (secondaryTab) {
           case 'dialer-ui': return <AdminDialer />;
           case 'contractors': return <AdminContractorsPage />;
+          case 'leaderboard': return <AdminContractorsLeaderboard />;
           default: return <AdminDialer />;
         }
       case 'settings':

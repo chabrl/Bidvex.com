@@ -19,6 +19,7 @@ import {
   ArrowLeft, ShieldCheck, PhoneCall, Sparkles, Users, Wallet,
   CheckCircle2, AlertTriangle, Smile, Meh, Frown, Volume2, Loader2,
   ChevronDown, ChevronRight, FileText, ListChecks, Globe, Lock,
+  KeyRound, Save,
 } from 'lucide-react';
 import API_BASE from '../../config';
 import { useAuth } from '../../contexts/AuthContext';
@@ -214,6 +215,10 @@ export default function AdminContractorProfilePage() {
             <Wallet className="h-4 w-4 mr-1" />
             {fr ? 'Tableau de bord' : 'Dashboard'}
           </TabsTrigger>
+          <TabsTrigger value="permissions" data-testid="tab-permissions">
+            <KeyRound className="h-4 w-4 mr-1" />
+            {fr ? 'Permissions' : 'Permissions'}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="calls" className="mt-3">
@@ -230,6 +235,10 @@ export default function AdminContractorProfilePage() {
 
         <TabsContent value="dashboard" className="mt-3">
           <DashboardTab data={data} fr={fr} />
+        </TabsContent>
+
+        <TabsContent value="permissions" className="mt-3">
+          <PermissionsTab contractorId={c.id} token={token} fr={fr} />
         </TabsContent>
       </Tabs>
     </div>
@@ -615,5 +624,124 @@ function Stat({ label, value, testid }) {
       <p className="text-xs text-slate-500">{label}</p>
       <p className="text-lg font-bold">{value}</p>
     </div>
+  );
+}
+
+
+// ─── Permissions Tab (iter316-D) ─────────────────────────────────────
+
+function PermissionsTab({ contractorId, token, fr }) {
+  const [granted, setGranted] = useState([]);
+  const [allowed, setAllowed] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await axios.get(
+        `${API_BASE}/twilio/admin/contractors/${contractorId}/permissions`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      setGranted(r.data.permissions || []);
+      setAllowed(r.data.allowed_options || []);
+    } catch {
+      toast.error(fr ? 'Échec du chargement.' : 'Failed to load permissions.');
+    } finally {
+      setLoading(false);
+    }
+  }, [contractorId, token, fr]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const toggle = (perm) => {
+    setGranted((g) => g.includes(perm) ? g.filter((p) => p !== perm) : [...g, perm]);
+  };
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await axios.patch(
+        `${API_BASE}/twilio/admin/contractors/${contractorId}/permissions`,
+        { permissions: granted },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      toast.success(fr ? 'Permissions enregistrées.' : 'Permissions saved.');
+    } catch {
+      toast.error(fr ? 'Échec.' : 'Save failed.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const LABELS = {
+    add_users:             { en: 'Add Users',             fr: 'Ajouter des utilisateurs',
+      hint_en: 'Contractor can create new client accounts directly from their dashboard.',
+      hint_fr: 'Le contractant peut créer de nouveaux comptes clients depuis son tableau de bord.' },
+    manage_subscriptions:  { en: 'Manage Subscriptions',  fr: 'Gérer les abonnements',
+      hint_en: 'Contractor can view and propose subscription changes for their referred clients.',
+      hint_fr: 'Le contractant peut voir et proposer des modifications d\u2019abonnements pour ses clients.' },
+    view_referral_emails:  { en: 'View Referral Emails',  fr: 'Voir les emails de référence',
+      hint_en: 'Contractor can see the full email address of every referred account.',
+      hint_fr: 'Le contractant peut voir l\u2019email complet de chaque compte référé.' },
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-10" data-testid="permissions-loading">
+        <Loader2 className="h-5 w-5 animate-spin text-indigo-600 mr-2" />
+        <span className="text-sm">{fr ? 'Chargement…' : 'Loading…'}</span>
+      </div>
+    );
+  }
+
+  return (
+    <Card data-testid="permissions-tab">
+      <CardContent className="p-4 space-y-3">
+        <div>
+          <h3 className="font-semibold flex items-center gap-2">
+            <KeyRound className="h-5 w-5 text-indigo-600" />
+            {fr ? 'Permissions accordées' : 'Granted Permissions'}
+          </h3>
+          <p className="text-xs text-slate-500 mt-1">
+            {fr
+              ? 'Choisissez précisément ce que ce contractant peut faire depuis son tableau de bord.'
+              : 'Pick exactly what this contractor can do from their own dashboard.'}
+          </p>
+        </div>
+        <div className="space-y-2">
+          {allowed.map((perm) => {
+            const meta = LABELS[perm] || { en: perm, fr: perm, hint_en: '', hint_fr: '' };
+            const isOn = granted.includes(perm);
+            return (
+              <label
+                key={perm}
+                className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition ${isOn ? 'border-indigo-300 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'}`}
+                data-testid={`permission-row-${perm}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={isOn}
+                  onChange={() => toggle(perm)}
+                  className="mt-1 h-4 w-4"
+                  data-testid={`permission-toggle-${perm}`}
+                />
+                <div className="flex-1">
+                  <p className="font-medium text-sm">{fr ? meta.fr : meta.en}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">{fr ? meta.hint_fr : meta.hint_en}</p>
+                </div>
+                {isOn && <CheckCircle2 className="h-4 w-4 text-emerald-600 mt-0.5" />}
+              </label>
+            );
+          })}
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button onClick={save} disabled={saving} className="bg-indigo-600 hover:bg-indigo-700 text-white" data-testid="permissions-save-btn">
+            {saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
+            {fr ? 'Enregistrer' : 'Save permissions'}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

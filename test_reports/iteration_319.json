@@ -1,0 +1,64 @@
+{
+  "summary": "iter316-D final deploy-gate testing — Leaderboard sub-tab, Banking validation gate, and granular Permissions all verified end-to-end on https://prod-verify-2.preview.emergentagent.com. 49/49 backend pytest + 84/84 frontend node tests + live API smokes + live UI Playwright sweep all GREEN. Ready for deploy.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "tests_executed": {
+    "pytest_iter316_d_leaderboard_banking_perms": "12/12 PASS",
+    "pytest_iter316_c_contractor_admin": "8/8 PASS",
+    "pytest_iter316_phase_b": "5/5 PASS",
+    "pytest_iter316_dialer_and_commission": "24/24 PASS",
+    "node_iter316_phase_b_test_js": "32/32 PASS",
+    "node_iter316_c_contractor_oversight_test_js": "26/26 PASS",
+    "node_iter316_d_leaderboard_banking_perms_test_js": "26/26 PASS",
+    "live_api_smokes": {
+      "GET /api/twilio/admin/contractors/leaderboard?period=lifetime (admin)": "200 — returns {items, count, period}; rows ranked, fields earnings/call_volume/referred_count/conversion_rate/stripe_ready/rank all present",
+      "GET /api/twilio/admin/contractors/leaderboard?period=week (admin)": "200",
+      "GET /api/twilio/admin/contractors/leaderboard (buyer)": "403 (role gating)",
+      "GET /api/twilio/contractor/payout-readiness (admin self)": "200 — {ready:false, blocked_reasons:['not_a_contractor'], accrued_total, next_payout_at, action_url, stripe_account_id}",
+      "GET /api/twilio/contractor/payout-readiness?contractor_id=0442f96d-... (admin override)": "200 — {ready:false, blocked_reasons:['no_stripe_account','onboarding_incomplete','payouts_disabled']}",
+      "GET /api/twilio/contractor/payout-readiness?contractor_id=other (buyer)": "403",
+      "GET /api/twilio/admin/contractors/{id}/permissions": "200 — {permissions, allowed_options:['add_users','manage_subscriptions','view_referral_emails']}",
+      "PATCH /api/twilio/admin/contractors/{id}/permissions (admin) with bogus_perm in payload": "200 — bogus_perm filtered out server-side, only valid perms persisted (whitelist enforced)",
+      "PATCH permissions (buyer)": "403",
+      "POST /api/twilio/contractor/clients (admin bypass)": "200 — returns client_id + invite_token",
+      "POST /api/twilio/contractor/clients (buyer)": "403 — {detail:'contractor only'}",
+      "POST /api/twilio/contractor/clients duplicate email": "409 — {error:'email_exists', message_en, message_fr}"
+    },
+    "live_ui_playwright": {
+      "/admin → Dialer & Contractors → Leaderboard sub-tab": "PASS — all 9 testids verified (admin-leaderboard-page, leaderboard-table, period-lifetime/month/week, sort-earnings/call_volume/referred_count/conversion_rate)",
+      "Period button switching (Total → 7 derniers jours)": "PASS — table re-renders with new period query",
+      "Sort header re-rank (sort-earnings click)": "PASS",
+      "Top performer crown rendering": "PASS — crown emoji visible on rank-1 row (Test Contractor 1)",
+      "leaderboard-view-{id} buttons (2 contractors visible)": "PASS — 2 view buttons rendered",
+      "/admin/contractors/{id} → Permissions tab (5th tab)": "PASS — all 8 testids (tab-permissions, permissions-tab, permission-row-add_users/manage_subscriptions/view_referral_emails, permission-toggle-{three perms}, permissions-save-btn)",
+      "Bilingual FR rendering": "PASS — 'Classement des contractants', 'Permissions accordées', 'Ajouter des utilisateurs', 'Gérer les abonnements', 'Voir les emails de référence' all rendered correctly"
+    }
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter316_d_leaderboard_banking_perms.py",
+    "/app/backend/tests/test_iter316_c_contractor_admin.py",
+    "/app/backend/tests/test_iter316_phase_b.py",
+    "/app/backend/tests/test_iter316_dialer_and_commission.py",
+    "/app/frontend/src/__tests__/iter316_d_leaderboard_banking_perms.test.js",
+    "/app/frontend/src/__tests__/iter316_c_contractor_oversight.test.js",
+    "/app/frontend/src/__tests__/iter316_phase_b.test.js",
+    "/app/test_reports/pytest/iter316_d_all.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Banking validation API contract: payout-readiness returns 'not_a_contractor' blocked_reason for admin self-call — this is the correct signal and prevents the alert from showing on admin's own dashboard. Frontend ContractorDashboard correctly gates the banking-validation-alert behind accrued_total > 0 AND ready=false.",
+    "Permissions whitelist properly enforced server-side: PATCH with ['add_users','manage_subscriptions','bogus_perm','view_referral_emails'] persists only the 3 valid perms — bogus_perm dropped silently.",
+    "Leaderboard endpoint returns ranked rows with composite metrics (earnings, call_volume, referred_count, conversion_rate, stripe_ready). 'stripe_ready: false' for both seeded contractors visually surfaces 'Manquant' badge on Stripe column.",
+    "POST /contractor/clients permission gating logic correct (verified at line 1338 of twilio.py): for a real contractor (role=dialer_contractor) lacking 'add_users', returns 403 with message_en mentioning 'add_users'. Buyer hits earlier role-check and gets generic 'contractor only' 403 — both are acceptable per spec.",
+    "Admin override on payout-readiness (?contractor_id=X) works for admin but rejected with 403 for non-admin trying to view someone else's readiness — proper authorization.",
+    "Bilingual labels render cleanly in FR (Classement des contractants / Permissions accordées). Backend message_fr is present on duplicate-email error and other 4xx responses."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (49/49 pytest + 11/11 live API smokes)", "frontend": "100% (84/84 node + all 17 critical UI testids verified live)"},
+  "test_credentials": "Admin charbel911@gmail.com / Anderosli123!@# and testbuyer@bidvex.com / TestBuyer2026! both confirmed working on preview. Cookie consent banner (Law-25) intercepts first click — must click 'Accept All Cookies' before interacting with admin tabs.",
+  "seed_data_creation": "Created 1 TEST_admin_client_iter316d@bidvex.test via POST /api/twilio/contractor/clients (admin bypass) to verify duplicate-email 409 path. Restored test-contractor-1 (0442f96d-...) permissions to baseline ['add_users','manage_subscriptions'] after revoking-and-restoring during permission tests. No other persistent state changes.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "iter316-D is fully green and deploy-ready. The new endpoints are: GET /api/twilio/admin/contractors/leaderboard (?period=lifetime|month|week), GET /api/twilio/contractor/payout-readiness (?contractor_id=X admin-override), GET+PATCH /api/twilio/admin/contractors/{id}/permissions (whitelist: add_users, manage_subscriptions, view_referral_emails), GET /api/twilio/contractor/permissions/me, POST /api/twilio/contractor/clients (permission-gated by add_users, admin bypass). UI: Admin → Dialer & Contractors now has 2 sub-tabs (Contractor Management + Leaderboard). AdminContractorProfilePage has 5 tabs including new tab-permissions. ContractorDashboard renders banking-validation-alert (rose) when accrued_total>0 && !ready, banking-validation-ok (emerald) when ready, and contractor-permissions-card when permissions.length>0. Test contractor 0442f96d-f54d-41fe-afb1-fe3085c7840d has permissions=['add_users','manage_subscriptions'] post-test (restored from baseline).",
+  "rca of the issue": "No bug found. One investigation note: testbuyer's POST /contractor/clients returns {'detail':'contractor only'} (without message_en/message_fr envelope) because the role-check fires before the permission-check — this is fine since a buyer cannot legally call this endpoint at all. For a real contractor missing add_users, the route at line 1338 of twilio.py correctly returns the bilingual error envelope mentioning 'add_users' (verified in source). The pytest test_buyer_cannot_create_referred_client correctly asserts only 403."
+}
