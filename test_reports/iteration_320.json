@@ -1,0 +1,58 @@
+{
+  "summary": "iter316-E admin self-demotion safeguards + self-recovery — VERIFIED. All 8 review-request assertions PASS. Preview admin charbel911@gmail.com restored (role=admin, is_admin=true) and can access /api/twilio/admin/contractors (200). Both backend safeguards return 409 cannot_demote_admin with bilingual messages. Self-recovery endpoint correctly restores demoted admins, refuses privilege-escalation for users with previous_role!=admin, and 409s for already-admin / not-a-contractor / requires-auth states. Frontend dropdown safeguard in EnhancedUserManager.js correctly renders null (no 'Promote to Contractor' item) for admin/super_admin/is_admin users. Full iter316 regression: 56/56 pytest cases pass in 32.69s.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "verification_evidence": {
+    "admin_restore_verified": "GET /api/auth/me as charbel911@gmail.com → role=admin, is_admin=true, id=8940074d-da97-43ca-9a0b-c59d39411ed6",
+    "admin_endpoint_access": "GET /api/twilio/admin/contractors → 200 (returned items list)",
+    "safeguard_1_admin_create_contractor": "POST /api/twilio/admin/contractors {email: charbel911@gmail.com} → 409 detail.error=cannot_demote_admin, message_en mentions 'administrator', message_fr mentions 'administrateur' — admin role unchanged",
+    "safeguard_2_admin_promote_user": "POST /api/twilio/admin/users/8940074d-.../promote-to-contractor → 409 detail.error=cannot_demote_admin — admin role unchanged",
+    "recovery_happy_path": "Seeded user role=dialer_contractor previous_role=admin → POST /api/twilio/auth/restore-admin-role → 200 status=restored, restored_role=admin. DB now: role=admin, is_admin=true, previous_role removed, promoted_to_contractor_at removed, self_restored_at set. Second call → 409 not_a_contractor. Cleaned up.",
+    "recovery_no_escalation": "Seeded user role=dialer_contractor previous_role=user (NOT admin) → POST /api/twilio/auth/restore-admin-role → 403 detail.error=not_eligible. DB unchanged (role=dialer_contractor, is_admin=false). Cleaned up.",
+    "recovery_409_for_admin": "admin (already admin) → 409 not_a_contractor ✓",
+    "recovery_409_for_buyer": "testbuyer@bidvex.com (role=user, never contractor) → 409 not_a_contractor ✓",
+    "recovery_401_403_unauth": "No bearer token → response in (401, 403) ✓",
+    "frontend_safeguard_dom": "Logged in as admin on https://prod-verify-2.preview.emergentagent.com/admin → User Management tab loaded → DOM count of [data-testid='promote-contractor-8940074d-da97-43ca-9a0b-c59d39411ed6'] = 0 (item not rendered for admin row). Admin row has no 'Promote to Contractor' option per line 1105 in EnhancedUserManager.js.",
+    "admin_panel_ui_smoke": "Admin landed on /admin. Top tabs detected: Marketplace, Vehicles, Dialer, Contractors, Settings, Banners, Analytics, Partners & Finance, Team, User Management, Listings Moderation, Flagged Listings, Disputed Settlements, Manage All Auctions, Deletion Requests. Admin badge visible in header. Stats cards (Total Users=50, Compliance Alerts=2, ALL CLEAR Watchdog) render."
+  },
+  "regression": {
+    "iter316_full_suite": "56/56 PASS (33s)",
+    "files_run": [
+      "test_iter316_dialer_and_commission.py (24)",
+      "test_iter316_phase_b.py (5)",
+      "test_iter316_c_contractor_admin.py (8)",
+      "test_iter316_d_leaderboard_banking_perms.py (12)",
+      "test_iter316_e_admin_safeguards.py (7)"
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter316_e_admin_safeguards.py",
+    "/app/test_reports/pytest/iter320_e_admin_safeguards.xml",
+    "/app/test_reports/pytest/iter320_iter316_full.xml"
+  ],
+  "action_items": [
+    "Production fix path is now armed: user can deploy these backend/frontend changes to bidvex.com and recover their production admin account by logging in (their current creds still work since password unchanged) and POSTing to /api/twilio/auth/restore-admin-role from their session. No additional dev work required."
+  ],
+  "critical_code_review_comments": [
+    "Self-recovery endpoint correctly checks previous_role in {admin, super_admin} BEFORE escalation — no privilege escalation vector found.",
+    "Cleanup is correct: previous_role and promoted_to_contractor_at are $unset (verified via DB doc inspection in pytest).",
+    "Bilingual error messages present in both safeguards (en + fr), good UX.",
+    "Frontend safeguard at EnhancedUserManager.js:1105 covers all three flags (role==='admin' || role==='super_admin' || is_admin) — defensive and correct.",
+    "EnhancedUserManager.js is 2220 lines — exceeds 700-line guideline. Future refactor recommended (not blocking)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "Existing credentials in /app/memory/test_credentials.md used as-is. Restored admin password unchanged (Anderosli123!@#). No file modified.",
+  "seed_data_creation": "Two ephemeral users were DB-seeded inside pytest (iter316e-recover-* and iter316e-noesc-*) and DELETED in the finally block of each test. Verified no residual TEST_* users left in DB.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "iter316-E review-request fully verified end-to-end on PREVIEW (https://prod-verify-2.preview.emergentagent.com). Admin login + admin-panel access confirmed via Playwright. All 8 reviewer assertions pass. Next testing agent: if the user reports any issue on PRODUCTION after they deploy + call /api/twilio/auth/restore-admin-role, replicate by seeding a fresh user with role=dialer_contractor + previous_role=admin and hitting the endpoint.",
+  "rca of the issue": "ROOT CAUSE: admin_create_contractor (twilio.py ~810-845) and admin_promote_user (twilio.py ~895-905) previously had NO check preventing a target user with role=admin from being downgraded to dialer_contractor — so an admin clicking 'Promote to Contractor' on their own row would silently flip their own role to dialer_contractor and lock them out of the admin panel. FIX: (1) Both endpoints now early-return HTTP 409 detail.error=cannot_demote_admin (with bilingual messages) when target user.role in {admin, super_admin} or user.is_admin is true. (2) NEW POST /api/twilio/auth/restore-admin-role (twilio.py ~1428-1490) lets a logged-in user who was previously admin restore themselves IFF role==dialer_contractor AND previous_role in {admin, super_admin}; otherwise returns 403 not_eligible (prevents escalation) or 409 not_a_contractor (idempotent). (3) Frontend EnhancedUserManager.js:1105 renders null for the menu item when row user is admin (defensive UI guard). MITIGATION ON PROD: redeploy, then user calls the new recovery endpoint from their own logged-in session."
+}

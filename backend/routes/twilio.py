@@ -808,6 +808,16 @@ async def admin_create_contractor(body: CreateContractorBody,
     now_iso = datetime.now(timezone.utc).isoformat()
 
     if existing:
+        # iter316-E SAFEGUARD: never let an admin be silently downgraded
+        # into a contractor through this endpoint. Admin accounts must
+        # stay admins — full stop.
+        if (existing.get("role") in {"admin", "super_admin"}
+                or existing.get("is_admin")):
+            raise HTTPException(409, {
+                "error": "cannot_demote_admin",
+                "message_en": "This email belongs to an administrator. Admins cannot be turned into contractors.",
+                "message_fr": "Cet email appartient à un administrateur. Les administrateurs ne peuvent pas devenir contractants.",
+            })
         if existing.get("role") == "dialer_contractor":
             raise HTTPException(409, {
                 "error": "already_contractor",
@@ -900,6 +910,16 @@ async def admin_promote_user(user_id: str, body: PromoteUserBody,
     target = await db.users.find_one({"id": user_id}, {"_id": 0})
     if not target:
         raise HTTPException(404, "user not found")
+    # iter316-E SAFEGUARD: admins cannot be turned into contractors via
+    # this endpoint. This protects the platform from accidental role
+    # self-demotion (a real bug we hit on iter316-D smoke).
+    if (target.get("role") in {"admin", "super_admin"}
+            or target.get("is_admin")):
+        raise HTTPException(409, {
+            "error": "cannot_demote_admin",
+            "message_en": "Administrators cannot be turned into contractors. Demote the user to a regular role first if you really need to.",
+            "message_fr": "Les administrateurs ne peuvent pas devenir contractants. Rétrogradez d'abord l'utilisateur si nécessaire.",
+        })
     if target.get("role") == "dialer_contractor":
         raise HTTPException(409, {
             "error": "already_contractor",
@@ -1402,6 +1422,74 @@ async def contractor_create_referred_client(
         "invite_url":      None,  # frontend prepends origin
     }
 
+
+
+# ─── iter316-E — Admin self-recovery from accidental contractor promotion ──
+
+@router.post("/auth/restore-admin-role")
+async def restore_admin_role(user: User = Depends(get_current_user)) -> Dict[str, Any]:
+    """Emergency one-shot endpoint that lets an authenticated user revert
+    themselves back to admin IF AND ONLY IF:
+      • Their current role is `dialer_contractor`
+      • Their `previous_role` field is `admin` OR `super_admin`
+    This covers the exact mistake of a sole administrator accidentally
+    clicking "Promote to Contractor" on their own user row and locking
+    themselves out of the admin panel. No other condition can trigger
+    this — it cannot escalate a non-admin into an admin."""
+    db = get_db()
+    me = await db.users.find_one(
+        {"id": user.id},
+        {"_id": 0, "id": 1, "email": 1, "role": 1, "previous_role": 1, "is_admin": 1},
+    )
+    if me is None:
+        raise HTTPException(404, "user not found")
+
+    current_role = me.get("role")
+    prev_role = me.get("previous_role")
+
+    if current_role != "dialer_contractor":
+        raise HTTPException(409, {
+            "error": "not_a_contractor",
+            "message_en": "Your current role is not 'dialer_contractor'; nothing to restore.",
+            "message_fr": "Votre rôle actuel n'est pas « dialer_contractor » ; rien à restaurer.",
+        })
+    if prev_role not in {"admin", "super_admin"}:
+        raise HTTPException(403, {
+            "error": "not_eligible",
+            "message_en": "Only users whose previous role was admin/super_admin can self-restore. Contact support.",
+            "message_fr": "Seuls les utilisateurs dont le rôle précédent était admin peuvent se restaurer eux-mêmes. Contactez le support.",
+        })
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    await db.users.update_one(
+        {"id": user.id},
+        {
+            "$set": {
+                "role":              prev_role,
+                "is_admin":          True,
+                "self_restored_at":  now_iso,
+                "updated_at":        now_iso,
+            },
+            "$unset": {
+                "previous_role":               "",
+                "promoted_to_contractor_at":   "",
+                "promoted_to_contractor_by":   "",
+            },
+        },
+    )
+    await db.admin_contractor_actions.insert_one({
+        "id":             str(uuid.uuid4()),
+        "action":         "self_restore_admin",
+        "admin_id":       user.id,
+        "contractor_id":  user.id,
+        "restored_role":  prev_role,
+        "created_at":     now_iso,
+    })
+    return {
+        "user_id":       user.id,
+        "restored_role": prev_role,
+        "status":        "restored",
+    }
 
 
 __all__ = ["router"]

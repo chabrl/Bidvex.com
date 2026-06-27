@@ -1084,7 +1084,7 @@ const EnhancedUserManager = () => {
                       <DropdownMenuItem onClick={() => openBuyerReviews(user)} data-testid={`view-buyer-reviews-${user.id}`}>
                         <Star className="h-3.5 w-3.5 mr-2" /> Buyer Reviews
                       </DropdownMenuItem>
-                      {/* iter316-C — Contractor role management */}
+                      {/* iter316-C — Contractor role management (iter316-E: hide for admins) */}
                       <DropdownMenuSeparator />
                       {user.role === 'dialer_contractor' ? (
                         <>
@@ -1102,6 +1102,11 @@ const EnhancedUserManager = () => {
                             <Trash2 className="h-3.5 w-3.5 mr-2" /> Demote from Contractor
                           </DropdownMenuItem>
                         </>
+                      ) : (user.role === 'admin' || user.role === 'super_admin' || user.is_admin) ? (
+                        // iter316-E SAFEGUARD: never offer "Promote to Contractor"
+                        // for an admin user; mistakes here lock the admin out of
+                        // the panel.
+                        null
                       ) : (
                         <DropdownMenuItem
                           onClick={() => handlePromoteToContractor(user)}
