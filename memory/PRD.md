@@ -1,6 +1,61 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter316-E — Admin Self-Demotion Bug Fix + Safeguards + Self-Recovery (Jun 27, 2026) ✅ COMPLETE — VERIFIED
+
+### The bug
+The platform's sole admin (`charbel911@gmail.com`) accidentally clicked **Promote to Contractor** on their own user row in Admin → Marketplace → User Management. The role flipped from `admin` → `dialer_contractor`, the `is_admin` flag was unchanged but `require_admin` checks the `role` field — so the admin lost access to every admin-only endpoint and panel. Confirmed in preview DB: `previous_role` was correctly preserved as `"admin"`, so the data needed for recovery was intact.
+
+### Three-pronged fix
+
+**1. Immediate preview restore (one-shot DB op)**
+Restored `charbel911@gmail.com` to `role=admin, is_admin=true` in preview MongoDB and verified `/api/auth/me` now returns role=admin. Admin panel access immediately recovered in preview.
+
+**2. Backend safeguards (so this NEVER happens again)**
+- `POST /api/twilio/admin/contractors` (create-or-promote-by-email endpoint) now rejects with **409 `cannot_demote_admin`** + bilingual envelope when the target email belongs to a user whose role is `admin`/`super_admin` or whose `is_admin=true`.
+- `POST /api/twilio/admin/users/{user_id}/promote-to-contractor` adds the same guard.
+- Frontend `EnhancedUserManager.js` no longer renders the "Promote to Contractor" menu item for admin users at all — the conditional returns `null` for `role in {admin, super_admin}` or `is_admin === true`.
+
+**3. NEW self-recovery endpoint (`POST /api/twilio/auth/restore-admin-role`)**
+Lets an authenticated user revert themselves back to admin IF AND ONLY IF:
+- their current role is `dialer_contractor`, AND
+- their `previous_role` field is `admin` OR `super_admin`.
+
+Any other state returns:
+- 409 `not_a_contractor` (current role isn't contractor, nothing to restore)
+- 403 `not_eligible` (previous_role wasn't admin → cannot escalate)
+- 401/403 if unauthenticated
+
+On success: sets role + is_admin=true, deletes the `previous_role`/`promoted_to_contractor_at`/`promoted_to_contractor_by` fields, stamps `self_restored_at`, and writes an `admin_contractor_actions` audit row with action="self_restore_admin".
+
+### Test results
+- **Backend pytest** (`test_iter316_e_admin_safeguards.py`): **7/7 PASS** covering both safeguards + 5 recovery-endpoint scenarios (happy path with full state cleanup, no-escalation refusal, already-admin 409, never-was-contractor 409, missing-auth 401/403).
+- **Combined iter316 regression**: **56/56 PASS** (24 + 5 + 8 + 12 + 7).
+- **Testing-agent E2E** (iteration_320): 100% — preview admin panel access verified, both safeguards confirmed via curl, no-escalation invariant proven via DB-seeded users. **Zero issues.**
+
+### USER ACTION ITEMS — Production recovery (charbel911@gmail.com is still demoted on prod)
+
+Since I can't reach the production database directly, here's the exact recovery sequence:
+
+1. 🚀 **Redeploy from preview** (Emergent UI → Deploy) so the new safeguards + `/api/twilio/auth/restore-admin-role` endpoint are live on https://bidvex.com.
+2. 🔓 **Log in as charbel911@gmail.com on bidvex.com** (you can still log in — it's the admin role that's missing, not your credentials). You may need to log in through the regular sign-in page since the admin panel is blocked.
+3. ✨ **Hit the recovery endpoint once** with your now-active session. From your browser DevTools console while logged in:
+   ```js
+   fetch('/api/twilio/auth/restore-admin-role', {
+     method: 'POST',
+     headers: { Authorization: 'Bearer ' + localStorage.getItem('token') },
+   }).then(r => r.json()).then(console.log);
+   ```
+   Expected response: `{user_id: "...", restored_role: "admin", status: "restored"}`.
+   
+   *(Alternative: use the same curl pattern from any terminal once you have your access token.)*
+4. ✅ Hard-refresh the page (Cmd+Shift+R / Ctrl+Shift+R). The admin panel is back.
+
+After step 4, the safeguards prevent this exact mistake from ever happening again.
+
+---
+
+
 ## iter316-D — Performance Leaderboard + Banking Validation + Granular Permissions (Jun 27, 2026) ✅ COMPLETE — DEPLOY READY
 
 ### Sprint structure
