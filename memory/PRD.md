@@ -1,6 +1,56 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter316-D — Performance Leaderboard + Banking Validation + Granular Permissions (Jun 27, 2026) ✅ COMPLETE — DEPLOY READY
+
+### Sprint structure
+Final deploy-gate batch before the user clicks the Emergent UI Deploy button. Bundles together three independent enhancements that close the contractor lifecycle loop.
+
+### L1 — Performance Leaderboard
+- Backend: `GET /api/twilio/admin/contractors/leaderboard?period={lifetime|month|week}` — returns ranked rows (`rank`, `earnings`, `commissions_count`, `call_volume`, `referred_count`, `converted_count`, `conversion_rate`, `stripe_ready`). Conversion rate = referred accounts that have ≥1 active/live/sold listing / total referred. Default sort: lifetime earnings desc → call volume desc → referrals desc.
+- Frontend: NEW sub-tab `Leaderboard` (🏆) under Admin → Dialer & Contractors at `/app/frontend/src/pages/admin/AdminContractorsLeaderboard.jsx`. Period filter chips, sortable column headers, top-performer crown card, View → drill-in nav.
+
+### L2 — Banking Validation (Stripe Connect gate)
+- Backend: `GET /api/twilio/contractor/payout-readiness` returns `{ready, blocked_reasons, accrued_total, next_payout_at, action_url, stripe_account_id}`. Admin can `?contractor_id={id}` to view any contractor; non-admin querying another contractor → 403.
+- Frontend: Contractor Dashboard now renders:
+  - **Hard-block red alert** (data-testid=banking-validation-alert) when `accrued_total > 0 && ready=false` — lists every blocked reason as a checkable list + "Resolve now" CTA wired to the existing iter302 Stripe Connect onboarding endpoint.
+  - **Green OK banner** (data-testid=banking-validation-ok) when ready=true — surfaces next-payout date.
+- The monthly payout cron (Phase A) was already coded to skip contractors with `stripe_connect_payouts_enabled=false`. The new endpoint surfaces the same readiness signal so contractors fix it BEFORE the cron skips them.
+
+### L3 — Granular Admin Access Management
+- Whitelist of 3 admin-grantable permissions in `routes/twilio.py::ALLOWED_CONTRACTOR_PERMISSIONS`:
+  - `add_users` — contractor can manually create a referred client from their own dashboard.
+  - `manage_subscriptions` — contractor sees a "Manage Subscriptions" CTA (forwards to admin assist for now; full self-service in a later phase).
+  - `view_referral_emails` — placeholder flag for upcoming email-visibility gate.
+- Backend endpoints:
+  - `PATCH /api/twilio/admin/contractors/{id}/permissions` — set permissions array (unknown values filtered out).
+  - `GET   /api/twilio/admin/contractors/{id}/permissions` — read current + allowed_options whitelist.
+  - `GET   /api/twilio/contractor/permissions/me` — contractor reads their own permissions (used to gate UI buttons).
+  - `POST  /api/twilio/contractor/clients` — permission-gated (requires `add_users`); creates a new client account attributed to the contractor + returns a 7-day password-reset invite token + bilingual error envelopes.
+- Frontend additions:
+  - NEW 5th tab "Permissions" (🗝️) inside the admin Contractor drill-in (`AdminContractorProfilePage`) — checkbox grid of allowed permissions with hint text + save button.
+  - Contractor Dashboard renders a "What you can do" indigo card listing granted permissions as badges + permission-gated action buttons. The "Add Client" modal mirrors the admin "+ New Contractor" UX, returns a copy-to-clipboard invite link.
+
+### Bug fix during preflight
+- MongoDB `find_one()` with a tight projection (e.g. `{"_id": 0, "contractor_permissions": 1}`) returns `{}` (a falsy empty dict) when the doc exists but does not yet have the projected field. The two new GET/PATCH permissions endpoints were checking `if not target:` → falsely returning 404 even when the contractor existed. Patched to `if target is None:` (Phase-A & B/C endpoints unaffected).
+
+### Test results
+- **Backend pytest:** 49 / 49 PASS combined iter316 (24 phase-A + 5 phase-B + 8 phase-C + **12 NEW phase-D** in `test_iter316_d_leaderboard_banking_perms.py`).
+- **Frontend wiring:** 84 / 84 PASS combined (32 phase-B + 26 phase-C + **26 NEW phase-D** in `iter316_d_leaderboard_banking_perms.test.js`).
+- **Testing-agent E2E (iteration_319):** 100% — all three sub-features (Leaderboard + Banking + Permissions) verified live on https://prod-verify-2.preview.emergentagent.com via Playwright + live API smokes. **Zero issues. Ready for deploy.**
+
+### USER ACTION ITEMS (Deploy step)
+1. 🚀 Click the Emergent UI **Deploy** button to push iter316 Phase A + B + C + D to production at https://bidvex.com.
+2. 🔑 Configure the 3 Twilio env vars on the production environment via Emergent → Settings → Environment Variables:
+   - `TWILIO_API_KEY`
+   - `TWILIO_API_SECRET`
+   - `TWILIO_TWIML_APP_SID`
+3. ✅ `GET /api/twilio/config` should return `configured: true` — the dialer-config banner auto-disappears.
+4. 🌱 Visit Admin → Dialer & Contractors → "+ New Contractor" to onboard the first contractor; the invite-link is copied automatically.
+
+---
+
+
 ## iter316-C — Admin Contractor Onboarding + Full Oversight (Jun 26, 2026) ✅ COMPLETE
 
 ### Sprint structure
