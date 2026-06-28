@@ -334,6 +334,31 @@ export default function AdminDialer() {
         </Card>
       )}
 
+      {/* iter316-F — AI voice intelligence config warning */}
+      {config?.configured && config?.ai_voice_configured === false && (
+        <Card className="mb-4 border-2 border-amber-300 bg-amber-50" data-testid="dialer-ai-config-banner">
+          <CardContent className="p-3 flex items-start gap-3">
+            <Sparkles className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div className="text-sm">
+              <p className="font-semibold text-amber-900">
+                {fr ? 'Analyse IA des appels désactivée' : 'AI call analysis disabled'}
+              </p>
+              <p className="text-amber-800">
+                {fr
+                  ? 'Les appels seront enregistrés mais aucune analyse de sentiment ou transcription ne sera générée. Configurez la variable d\u2019environnement '
+                  : 'Calls will be recorded but no sentiment / transcript will be generated. Set the env var '}
+                <span className="font-mono text-xs bg-white px-2 py-0.5 rounded border border-amber-200">
+                  {(config?.ai_voice_missing || ['GEMINI_API_KEY']).join(', ')}
+                </span>
+                {fr
+                  ? ' sur la plateforme de déploiement pour activer l\u2019IA.'
+                  : ' on the deployment platform to enable AI insights.'}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* THREE-PANEL LAYOUT */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* LEFT — Outbound form / dial pad */}

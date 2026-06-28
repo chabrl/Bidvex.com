@@ -7,7 +7,7 @@ import {
   Moon, Sun, User, LogOut, LayoutDashboard, 
   MessageCircle, DollarSign, Shield, Lock, Menu, X,
   ShoppingBag, Gavel, ChevronDown, Car, Building2,
-  BarChart3, Plus, Sparkles
+  BarChart3, Plus, Sparkles, PhoneCall, Headphones,
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -346,6 +346,31 @@ const Navbar = () => {
                         <DropdownMenuItem onClick={() => navigate('/admin')} data-testid="admin-dashboard-link" className="cursor-pointer text-primary font-semibold">
                           <Shield className="mr-3 h-4 w-4" />
                           {t('nav.adminPanel')}
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                    {/* iter316-F — Contractor entry points (dashboard + dialer).
+                        Without these, a freshly promoted dialer_contractor lands
+                        on the buyer/seller home and has no way to reach their
+                        own tools. Admins also see these (useful for testing). */}
+                    {(user.role === 'dialer_contractor' || user.role === 'admin' || user.role === 'superadmin') && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => navigate('/contractor/dashboard')}
+                          data-testid="contractor-dashboard-link"
+                          className="cursor-pointer text-indigo-600 font-semibold"
+                        >
+                          <Headphones className="mr-3 h-4 w-4" />
+                          {i18n.language?.startsWith('fr') ? 'Mon tableau de bord (contractant)' : 'My Contractor Dashboard'}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => navigate('/admin/dialer')}
+                          data-testid="dialer-link"
+                          className="cursor-pointer text-indigo-600"
+                        >
+                          <PhoneCall className="mr-3 h-4 w-4" />
+                          {i18n.language?.startsWith('fr') ? 'Composeur BidVex' : 'BidVex Dialer'}
                         </DropdownMenuItem>
                       </>
                     )}

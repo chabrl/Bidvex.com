@@ -1,0 +1,33 @@
+{
+  "summary": "iter316-F: Validated contractor visibility menu links + AI voice config banner wiring. Backend: all 5 NEW iter316-F pytest cases pass (config endpoint returns ai_voice_configured + ai_voice_missing; genai _resolve_api_key fails fast on missing key and returns when set; auth gate intact). Full iter316 backend regression: 52 passed, 9 skipped (rate-limit / preview-only flags), 0 failures after 60s wait-and-retry on 2 admin-login-throttled tests. Frontend: ran iter316_f wiring test = 10/10 PASS. Live UI on preview: admin login lands on /marketplace; user dropdown exposes both new entries with correct testids (contractor-dashboard-link, dialer-link) plus existing Admin Panel; dialer-link routes to /admin/dialer; /api/twilio/config returns ai_voice_configured=true so NEITHER banner renders (legacy dialer-config-banner=0, NEW dialer-ai-config-banner=0). Contractor live-login flow not exercised (no password on existing test-contractor-1 — request explicitly says source-level inspection is acceptable; the wiring test validates the conditional).",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": { "ui_bugs": [], "integration_issues": [], "design_issues": [] },
+  "test_report_links": [
+    "/app/backend/tests/test_iter316_f_contractor_visibility_and_ai.py",
+    "/app/backend/tests/test_iter316_dialer_and_commission.py",
+    "/app/backend/tests/test_iter316_phase_b.py",
+    "/app/backend/tests/test_iter316_c_contractor_admin.py",
+    "/app/backend/tests/test_iter316_d_leaderboard_banking_perms.py",
+    "/app/backend/tests/test_iter316_e_admin_safeguards.py",
+    "/app/frontend/src/__tests__/iter316_f_contractor_visibility_and_ai.test.js",
+    "/app/test_reports/pytest/iter316_full.xml"
+  ],
+  "action_items": [
+    "USER ACTION (production-only, not a code bug): Set GEMINI_API_KEY in the production Emergent deployment env panel — preview has it set so AI banner stays hidden here; production will display the banner until the env var is configured. This unblocks the original voice-tone analysis bug on bidvex.com."
+  ],
+  "critical_code_review_comments": [
+    "twilio.py:172-190 — get_dialer_config correctly reads GEMINI_API_KEY from env (not a hard-coded default) and exposes a structured ai_voice_missing list. Could add a 30s in-memory cache to avoid env lookup on every poll (minor).",
+    "genai_direct_client.py:139-146 — _resolve_api_key fail-fast pattern is clean and the error message explicitly mentions the missing env var (good UX for the voice_ai_pipeline error chain).",
+    "Navbar.js:356-376 — gating on (role==='dialer_contractor' || role==='admin' || role==='superadmin') is correct. Note that user.account_type==='admin' is NOT considered here (the legacy admin-panel gate at L343 does honor it); low risk but for parity could add it.",
+    "AuthPage.js:116-122 — relying on login() returning the freshly-fetched user object instead of stale auth context state avoids a known race; well done. Pre-existing JSX lint errors at L487/535 are unrelated to this iter and were NOT introduced here."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "100%", "frontend": "100%" },
+  "test_credentials": "Admin charbel911@gmail.com / Anderosli123!@# verified working.",
+  "seed_data_creation": "None — used existing iter316 seed; no contractor-login E2E performed (no known password).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "main_agent_can_self_test": false,
+  "context_for_next_testing_agent": "Both new menu items render for admin (live verified via screenshot). The contractor live-login flow needs a freshly-seeded contractor with a known bcrypt-hashed password if it is to be exercised end-to-end (test_iter316_e_admin_safeguards.py shows the seed pattern). The 2 rate-limit failures in test_iter316_e_admin_safeguards.py are intermittent — always wait 70s between bursts. Banner verification was done on preview where GEMINI_API_KEY IS set; to verify the banner-shows path you would need to temporarily unset the env var, restart backend, and re-poll /api/twilio/config — which the pytest unit test_genai_resolve_api_key_fails_fast_when_missing already covers safely.",
+  "rca of the issue": "Original user bug: contractors had no nav path to their tools + AI voice analysis silently failed on prod. RCA confirmed in iter316-F: production deployment was missing GEMINI_API_KEY env var (preview has it, hence preview never reproduced). The fix bundle (a) adds two visible nav entries gated by role, (b) returns AI config readiness in /api/twilio/config, (c) renders a banner BEFORE the call so the admin sees the issue immediately, and (d) makes the underlying _resolve_api_key fail fast with a clear message so any AI failure surfaces in /api/twilio/calls/{id} ai_processing_error instead of a silent empty result. Mitigation step: user must set GEMINI_API_KEY in production env panel."
+}

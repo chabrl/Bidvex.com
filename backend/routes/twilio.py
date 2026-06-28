@@ -174,12 +174,19 @@ async def get_dialer_config(user: User = Depends(require_dialer_access)) -> Dict
     """UI-facing config probe — tells the frontend whether the dialer is
     usable and which env vars are still missing."""
     s = verify_twilio_config()
+    # iter316-F — Surface AI voice analysis readiness so the dialer UI
+    # can warn the admin BEFORE they place calls. The pipeline uses the
+    # direct Gemini API (not Emergent LLM Key — audio analysis isn't
+    # covered by the universal key).
+    gemini_key_set = bool(os.environ.get("GEMINI_API_KEY", "").strip())
     return {
-        "configured":      s["configured"],
-        "can_mint_tokens": s["can_mint_tokens"],
-        "can_place_calls": s["can_place_calls"],
-        "missing":         s["missing"],
+        "configured":          s["configured"],
+        "can_mint_tokens":     s["can_mint_tokens"],
+        "can_place_calls":     s["can_place_calls"],
+        "missing":             s["missing"],
         "twilio_phone_number": TWILIO_PHONE_NUMBER if s["can_place_calls"] else None,
+        "ai_voice_configured": gemini_key_set,
+        "ai_voice_missing":    [] if gemini_key_set else ["GEMINI_API_KEY"],
     }
 
 

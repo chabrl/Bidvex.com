@@ -115,9 +115,13 @@ const AuthPage = () => {
     
     try {
       if (isLogin) {
-        await login(formData.email, formData.password);
+        const loggedInUser = await login(formData.email, formData.password);
         toast.success(t('auth.welcomeMessage'));
-        const from = location.state?.from?.pathname || '/marketplace';
+        // iter316-F — Contractors land directly on their own dashboard
+        // unless they came in with a deep-link redirect (location.state.from).
+        const isContractor = loggedInUser?.role === 'dialer_contractor';
+        const fallback = isContractor ? '/contractor/dashboard' : '/marketplace';
+        const from = location.state?.from?.pathname || fallback;
         navigate(from, { replace: true });
       } else {
         // iter272 — Attach the persisted UTM blob exactly once. Consuming
