@@ -60,8 +60,14 @@ def get_twilio_client():
 
 
 def get_verify_service_sid():
-    """Get Twilio Verify Service SID"""
-    return os.environ.get("TWILIO_VERIFY_SERVICE_SID", "VA67a9820b7bb137d7b70f01dabbc12d15")
+    """Get Twilio Verify Service SID from environment (fail fast if missing)."""
+    sid = os.environ.get("TWILIO_VERIFY_SERVICE_SID")
+    if not sid:
+        raise RuntimeError(
+            "TWILIO_VERIFY_SERVICE_SID env var is not set — "
+            "configure it in the platform Environment Variables panel."
+        )
+    return sid
 
 
 def validate_phone_number(phone: str) -> str:
