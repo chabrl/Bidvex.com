@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import {
   DollarSign, Users, PhoneCall, Link as LinkIcon, Copy, CheckCircle2,
   AlertTriangle, Zap, Loader2, ShieldCheck, UserPlus, X, Save,
+  Mail, TrendingUp, FileSignature,
 } from 'lucide-react';
 import API_BASE from '../../config';
 import { useAuth } from '../../contexts/AuthContext';
@@ -25,6 +26,7 @@ import { Badge } from '../../components/ui/badge';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '../../components/ui/dialog';
+import ContractorAgreementModal from './ContractorAgreementModal';
 
 const POLL_INTERVAL_MS = 60000; // 60s refresh per spec
 
@@ -194,6 +196,36 @@ export default function ContractorDashboard() {
 
   if (!data) return null;
 
+  // ─── iter317 Directive 2 — Agreement gate ──────────────────────────
+  // Contractors who haven't signed the current agreement see ONLY the
+  // modal (no dashboard data leaks through). Admins always pass.
+  const needsAgreement = isContractor && !isAdmin && data.agreement_signed === false;
+  if (needsAgreement) {
+    return (
+      <div className="container mx-auto max-w-5xl py-10 px-4" data-testid="contractor-agreement-gate">
+        <Card className="border-2 border-amber-300 bg-amber-50">
+          <CardContent className="p-6 flex items-start gap-3">
+            <FileSignature className="h-6 w-6 text-amber-700 flex-shrink-0" />
+            <div>
+              <h2 className="font-semibold text-amber-900">
+                {fr ? 'Signature requise' : 'Signature required'}
+              </h2>
+              <p className="text-sm text-amber-800 mt-1">
+                {fr
+                  ? 'Veuillez accepter l\u2019Entente de services du contractant pour accéder à votre tableau de bord.'
+                  : 'Please accept the Contractor Services Agreement to access your dashboard.'}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+        <ContractorAgreementModal
+          open
+          onSigned={() => fetchDashboard()}
+        />
+      </div>
+    );
+  }
+
   const earnings = data.earnings || {};
   const referred = data.referred_accounts || [];
   const history = data.commission_history || [];
@@ -221,6 +253,14 @@ export default function ContractorDashboard() {
           >
             <PhoneCall className="h-4 w-4 mr-2" />
             {fr ? 'Ouvrir le composeur' : 'Open Dialer'}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => navigate('/contractor/emails')}
+            data-testid="goto-email-hub-btn"
+          >
+            <Mail className="h-4 w-4 mr-2" />
+            {fr ? 'Hub Courriels' : 'Email Hub'}
           </Button>
           {(isContractor || isAdmin) && (
             <Button
@@ -430,6 +470,43 @@ export default function ContractorDashboard() {
           testid="stat-referrals"
         />
       </div>
+
+      {/* iter317 Directive 1 — Leaderboard overlay rate visibility */}
+      <Card
+        className={
+          (data.leaderboard_overlay_rate || 0) > 0
+            ? 'border-2 border-emerald-200 bg-emerald-50'
+            : 'border border-slate-200'
+        }
+        data-testid="leaderboard-overlay-card"
+      >
+        <CardContent className="p-4 flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <TrendingUp className="h-6 w-6 text-emerald-600" />
+            <div>
+              <p className="font-semibold text-sm">
+                {fr ? 'Bonification de classement (overlay)' : 'Leaderboard overlay'}
+              </p>
+              <p className="text-xs text-slate-600 mt-0.5">
+                {fr
+                  ? 'Calculé chaque lundi 8 h 00 (EST) en fonction de votre volume de commission sur 7 jours. +1 % pour entrer dans le Top 5, -1 % pour en sortir. Plafond absolu 20 %, plancher effectif 5 %.'
+                  : 'Re-evaluated every Monday 8:00 AM EST from your 7-day commission volume. +1% on entry to the Top 5, -1% when dropping out. Absolute cap 20%, effective floor 5%.'}
+              </p>
+            </div>
+          </div>
+          <div className="text-right">
+            <p className="text-3xl font-bold text-emerald-700" data-testid="overlay-rate-value">
+              {((data.leaderboard_overlay_rate || 0) * 100).toFixed(1)}%
+            </p>
+            {data.leaderboard_overlay_updated_at && (
+              <p className="text-[10px] text-slate-500">
+                {fr ? 'Mis à jour' : 'Updated'}{' '}
+                {new Date(data.leaderboard_overlay_updated_at).toLocaleDateString(fr ? 'fr-CA' : 'en-CA')}
+              </p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Call stats */}
       <Card data-testid="call-stats-card">

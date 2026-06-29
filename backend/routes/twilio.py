@@ -57,6 +57,18 @@ from services.contractor_commission import (
     contractor_referred_accounts,
     contractor_commission_history,
 )
+from services.contractor_email_hub import (
+    CONTRACTOR_SENDER_EMAIL,
+    CONTRACTOR_SENDER_NAME,
+    SUPPORT_PHONE,
+    send_contractor_email,
+    validate_recipient_email,
+)
+from legal.contractor_agreement_v2 import (
+    AGREEMENT_VERSION,
+    AGREEMENT_TEXT_HASH,
+    get_agreement,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -157,6 +169,20 @@ class PromoteUserBody(BaseModel):
 
 class ContractorPermissionsBody(BaseModel):
     permissions: List[str]
+
+
+class SignAgreementBody(BaseModel):
+    agreement_version: str
+    signed_full_name: str
+    text_hash: str
+
+
+class ContractorEmailSendBody(BaseModel):
+    to_email: str
+    subject: str
+    body_html: str
+    client_account_id: Optional[str] = None
+    locale: Optional[str] = "en"
 
 
 # Whitelist of admin-grantable contractor permissions.
@@ -668,7 +694,12 @@ async def contractor_dashboard(user: User = Depends(require_dialer_access),
         {"_id": 0, "id": 1, "email": 1, "name": 1, "first_name": 1, "last_name": 1,
          "affiliate_code": 1, "stripe_connect_account_id": 1,
          "stripe_connect_payouts_enabled": 1,
-         "stripe_connect_onboarding_complete": 1},
+         "stripe_connect_onboarding_complete": 1,
+         "leaderboard_overlay_rate": 1,
+         "leaderboard_overlay_updated_at": 1,
+         "contractor_agreement_signed": 1,
+         "contractor_agreement_version": 1,
+         "contractor_agreement_signed_at": 1},
     )
     if not contractor:
         raise HTTPException(404, "contractor not found")
@@ -699,6 +730,11 @@ async def contractor_dashboard(user: User = Depends(require_dialer_access),
         "referred_accounts": referred,
         "commission_history": history,
         "call_stats":       call_stats,
+        "leaderboard_overlay_rate":  float(contractor.get("leaderboard_overlay_rate") or 0.0),
+        "leaderboard_overlay_updated_at": contractor.get("leaderboard_overlay_updated_at"),
+        "agreement_signed": bool(contractor.get("contractor_agreement_signed")
+                                  and contractor.get("contractor_agreement_version") == AGREEMENT_VERSION),
+        "agreement_version_required": AGREEMENT_VERSION,
     }
 
 
@@ -1149,6 +1185,7 @@ async def admin_contractors_leaderboard(
         {"role": "dialer_contractor"},
         {"_id": 0, "id": 1, "email": 1, "name": 1, "first_name": 1, "last_name": 1,
          "affiliate_code": 1, "stripe_connect_payouts_enabled": 1,
+         "leaderboard_overlay_rate": 1,
          "created_at": 1},
     ).to_list(length=500)
 
@@ -1220,6 +1257,7 @@ async def admin_contractors_leaderboard(
             "referred_count":      referred_count,
             "converted_count":     converted_count,
             "conversion_rate":     round(conversion_rate, 4),
+            "leaderboard_overlay_rate": float(c.get("leaderboard_overlay_rate") or 0.0),
             "joined_at":           c.get("created_at"),
         })
 
@@ -1228,6 +1266,29 @@ async def admin_contractors_leaderboard(
     for i, r in enumerate(rows):
         r["rank"] = i + 1
     return {"items": rows, "count": len(rows), "period": period}
+
+
+@router.post("/admin/leaderboard-overlay/run-now")
+async def admin_run_leaderboard_overlay_now(user: User = Depends(require_admin)) -> Dict[str, Any]:
+    """iter317 Directive 1 — Admin-only manual trigger of the weekly
+    leaderboard overlay cron. Idempotent within the same ISO week (a
+    second run returns the previously persisted batch summary)."""
+    from services.leaderboard_overlay import run_weekly_leaderboard_overlay
+    db = get_db()
+    return await run_weekly_leaderboard_overlay(db)
+
+
+@router.get("/admin/leaderboard-overlay/batches")
+async def admin_list_leaderboard_batches(
+    user: User = Depends(require_admin),
+    limit: int = Query(20, ge=1, le=100),
+) -> Dict[str, Any]:
+    """List the last N leaderboard batches for the admin audit view."""
+    db = get_db()
+    rows = await db.leaderboard_overlay_batches.find(
+        {}, {"_id": 0},
+    ).sort("ran_at", -1).limit(limit).to_list(length=limit)
+    return {"items": rows, "count": len(rows)}
 
 
 # ─── iter316-D — Banking validation (payout readiness) ──────────────────
@@ -1497,6 +1558,320 @@ async def restore_admin_role(user: User = Depends(get_current_user)) -> Dict[str
         "restored_role": prev_role,
         "status":        "restored",
     }
+
+
+# ─── iter317 Directive 2 — Electronic Contractor Agreement ──────────────
+
+def _resolve_account_legal_name(user_doc: Dict[str, Any]) -> str:
+    """Pick the authoritative legal-name field for the exact-match
+    signing check. Priority: legal_name → legal_business_name → name →
+    first+last → email local part."""
+    candidates = [
+        user_doc.get("legal_name"),
+        user_doc.get("legal_business_name"),
+        user_doc.get("name"),
+        f"{user_doc.get('first_name','').strip()} {user_doc.get('last_name','').strip()}".strip(),
+        (user_doc.get("email") or "").split("@", 1)[0],
+    ]
+    for c in candidates:
+        if c and str(c).strip():
+            return str(c).strip()
+    return ""
+
+
+def _norm_name(s: str) -> str:
+    return " ".join((s or "").strip().lower().split())
+
+
+@router.get("/contractor/agreements/current")
+async def get_current_agreement(user: User = Depends(require_dialer_access)) -> Dict[str, Any]:
+    """Returns the active contractor agreement text + version. Used by
+    the frontend modal to render the scroll-to-accept body."""
+    payload = get_agreement()
+    db = get_db()
+    me = await db.users.find_one(
+        {"id": user.id},
+        {"_id": 0, "id": 1, "email": 1, "name": 1, "first_name": 1, "last_name": 1,
+         "legal_name": 1, "legal_business_name": 1, "role": 1},
+    )
+    payload["account_legal_name"] = _resolve_account_legal_name(me or {})
+    return payload
+
+
+@router.get("/contractor/agreements/me")
+async def get_my_agreement_status(user: User = Depends(get_current_user)) -> Dict[str, Any]:
+    """Returns whether THIS user has signed the current contractor
+    agreement version. Safe for any logged-in user — non-contractors get
+    `signed: false, required: false`."""
+    db = get_db()
+    is_contractor_user = _role(user) == "dialer_contractor"
+    is_admin_user = _role(user) in ADMIN_ROLES
+    if not is_contractor_user and not is_admin_user:
+        return {"signed": False, "required": False, "agreement_version": AGREEMENT_VERSION}
+
+    row = await db.contractor_agreements.find_one(
+        {"contractor_id": user.id, "agreement_version": AGREEMENT_VERSION},
+        {"_id": 0},
+        sort=[("signed_at", -1)],
+    )
+    return {
+        "signed":             bool(row),
+        "required":           is_contractor_user,
+        "agreement_version":  AGREEMENT_VERSION,
+        "signed_at":          (row or {}).get("signed_at"),
+        "signed_full_name":   (row or {}).get("signed_full_name"),
+    }
+
+
+@router.post("/contractor/agreements/sign")
+async def sign_agreement(body: SignAgreementBody,
+                          request: Request,
+                          user: User = Depends(require_dialer_access)) -> Dict[str, Any]:
+    """Persist an append-only `contractor_agreements` row. Requires:
+      • Current contractor role (dialer_contractor).
+      • Body's `agreement_version` MUST match the server's active version.
+      • Body's `text_hash` MUST match the server's canonical SHA-256.
+      • `signed_full_name` MUST match the account_legal_name (case-
+        insensitive, whitespace-collapsed). NO partial matches."""
+    if _role(user) != "dialer_contractor":
+        # Admins don't need to sign — gate only applies to contractors.
+        raise HTTPException(409, {
+            "error":      "not_a_contractor",
+            "message_en": "Only contractors need to sign the agreement.",
+            "message_fr": "Seuls les contractants doivent signer l'entente.",
+        })
+
+    db = get_db()
+    if body.agreement_version != AGREEMENT_VERSION:
+        raise HTTPException(400, {
+            "error":      "version_mismatch",
+            "message_en": "This agreement version is no longer current. Please reload.",
+            "message_fr": "Cette version de l'entente n'est plus à jour. Veuillez recharger.",
+            "current_version": AGREEMENT_VERSION,
+        })
+    if body.text_hash != AGREEMENT_TEXT_HASH:
+        raise HTTPException(400, {
+            "error":      "hash_mismatch",
+            "message_en": "Agreement text has been updated since you opened it. Please reload.",
+            "message_fr": "Le texte de l'entente a été mis à jour depuis son ouverture. Veuillez recharger.",
+        })
+
+    me = await db.users.find_one(
+        {"id": user.id},
+        {"_id": 0, "id": 1, "email": 1, "name": 1, "first_name": 1, "last_name": 1,
+         "legal_name": 1, "legal_business_name": 1},
+    )
+    account_legal_name = _resolve_account_legal_name(me or {})
+    signed_full_name = (body.signed_full_name or "").strip()
+
+    if not signed_full_name:
+        raise HTTPException(400, {
+            "error":      "name_required",
+            "message_en": "Type your full legal name to accept.",
+            "message_fr": "Saisissez votre nom légal complet pour accepter.",
+        })
+
+    name_match = (
+        bool(account_legal_name)
+        and _norm_name(signed_full_name) == _norm_name(account_legal_name)
+    )
+    if not name_match:
+        raise HTTPException(400, {
+            "error":      "name_mismatch",
+            "message_en": (
+                "The name you typed does not match the legal name on file"
+                f" ({account_legal_name or 'unset'}). Please type it exactly."
+            ),
+            "message_fr": (
+                "Le nom saisi ne correspond pas au nom légal au dossier"
+                f" ({account_legal_name or 'non défini'}). Veuillez le saisir exactement."
+            ),
+        })
+
+    # Idempotency: if already signed for this version, return the existing row.
+    existing = await db.contractor_agreements.find_one(
+        {"contractor_id": user.id, "agreement_version": AGREEMENT_VERSION},
+        {"_id": 0},
+        sort=[("signed_at", -1)],
+    )
+    if existing:
+        return {**existing, "already_signed": True}
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    client_ip = (
+        request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+        or (request.client.host if request.client else "")
+        or ""
+    )
+    user_agent = request.headers.get("user-agent", "")[:500]
+
+    row = {
+        "id":                              str(uuid.uuid4()),
+        "contractor_id":                   user.id,
+        "contractor_email":                me.get("email") if me else None,
+        "agreement_version":               AGREEMENT_VERSION,
+        "signed_full_name":                signed_full_name,
+        "account_legal_name_at_signing":   account_legal_name,
+        "name_match_confirmed":            True,
+        "ip_address":                      client_ip,
+        "user_agent":                      user_agent,
+        "agreement_text_hash":             AGREEMENT_TEXT_HASH,
+        "signed_at":                       now_iso,
+    }
+    await db.contractor_agreements.insert_one(row)
+    # Convenience marker on the user doc so future reads don't have to
+    # hit the agreements collection on every request (the audit row is
+    # still the source of truth).
+    await db.users.update_one(
+        {"id": user.id},
+        {"$set": {
+            "contractor_agreement_signed":          True,
+            "contractor_agreement_version":         AGREEMENT_VERSION,
+            "contractor_agreement_signed_at":       now_iso,
+        }},
+    )
+    row.pop("_id", None)
+    return {**row, "already_signed": False}
+
+
+def _require_agreement_signed(db_obj, contractor_id: str):
+    """Internal helper — raise 412 if contractor hasn't signed current
+    agreement version. Caller passes the live db handle so we don't
+    re-instantiate."""
+    async def _check():
+        row = await db_obj.contractor_agreements.find_one(
+            {"contractor_id": contractor_id, "agreement_version": AGREEMENT_VERSION},
+            {"_id": 0, "id": 1},
+        )
+        if not row:
+            raise HTTPException(412, {
+                "error":      "agreement_required",
+                "message_en": "Please sign the Contractor Services Agreement to continue.",
+                "message_fr": "Veuillez signer l'Entente de services du contractant pour continuer.",
+                "agreement_version": AGREEMENT_VERSION,
+            })
+    return _check()
+
+
+# ─── iter317 Directive 3 — Contractor Email Hub ─────────────────────────
+
+@router.post("/contractor/emails/send")
+async def contractor_send_email(body: ContractorEmailSendBody,
+                                  request: Request,
+                                  user: User = Depends(require_dialer_access)) -> Dict[str, Any]:
+    """Sends an outbound email via partners@bidvex.ca on behalf of the
+    contractor. Server-side signature injection is non-overridable.
+    Gated by the signed agreement (Directive 2)."""
+    db = get_db()
+
+    # Admins can send too (acting as themselves) — both contractors and
+    # admins flow through Directive 3. Agreement signing is enforced
+    # only for actual contractors.
+    if _role(user) == "dialer_contractor":
+        await _require_agreement_signed(db, user.id)
+
+    if not validate_recipient_email(body.to_email):
+        raise HTTPException(400, {
+            "error":      "invalid_recipient",
+            "message_en": "Enter a valid recipient email address.",
+            "message_fr": "Saisissez une adresse de courriel valide.",
+        })
+    subj = (body.subject or "").strip()
+    if not subj or len(subj) > 300:
+        raise HTTPException(400, {
+            "error":      "invalid_subject",
+            "message_en": "Subject is required (max 300 characters).",
+            "message_fr": "Le sujet est obligatoire (300 caractères max).",
+        })
+    body_html = (body.body_html or "").strip()
+    if not body_html:
+        raise HTTPException(400, {
+            "error":      "empty_body",
+            "message_en": "Email body cannot be empty.",
+            "message_fr": "Le corps du courriel ne peut pas être vide.",
+        })
+    if len(body_html) > 50000:
+        raise HTTPException(400, {
+            "error":      "body_too_long",
+            "message_en": "Email body must be under 50,000 characters.",
+            "message_fr": "Le corps du courriel doit faire moins de 50 000 caractères.",
+        })
+
+    contractor_doc = await db.users.find_one(
+        {"id": user.id},
+        {"_id": 0, "id": 1, "email": 1, "name": 1, "first_name": 1, "last_name": 1,
+         "preferred_language": 1},
+    )
+    if contractor_doc is None:
+        raise HTTPException(404, "contractor not found")
+
+    client_ip = (
+        request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+        or (request.client.host if request.client else "")
+        or ""
+    )
+    user_agent = request.headers.get("user-agent", "")[:500]
+    locale = (body.locale or contractor_doc.get("preferred_language") or "en").lower()
+
+    row = await send_contractor_email(
+        db,
+        contractor=contractor_doc,
+        to_email=body.to_email.strip().lower(),
+        subject=subj,
+        body_html=body_html,
+        locale=locale,
+        client_account_id=body.client_account_id,
+        contractor_ip=client_ip,
+        contractor_user_agent=user_agent,
+    )
+    return row
+
+
+@router.get("/contractor/emails")
+async def contractor_list_emails(user: User = Depends(require_dialer_access),
+                                   limit: int = Query(50, ge=1, le=200),
+                                   contractor_id: Optional[str] = Query(None)) -> Dict[str, Any]:
+    """Sent-list for the contractor's own emails. Admins can pass
+    `contractor_id` to view another contractor's outbox."""
+    db = get_db()
+    if _is_contractor(user) and not _is_admin(user):
+        cid = user.id
+    elif _is_admin(user):
+        cid = contractor_id or user.id
+    else:
+        raise HTTPException(403, "contractor / admin only")
+
+    rows = await db.contractor_emails.find(
+        {"contractor_id": cid}, {"_id": 0},
+    ).sort("sent_at", -1).limit(limit).to_list(length=limit)
+    return {
+        "items":             rows,
+        "count":             len(rows),
+        "sender_email":      CONTRACTOR_SENDER_EMAIL,
+        "sender_name":       CONTRACTOR_SENDER_NAME,
+        "support_phone":     SUPPORT_PHONE,
+    }
+
+
+@router.get("/contractor/emails/recipients")
+async def contractor_email_recipients(user: User = Depends(require_dialer_access),
+                                        limit: int = Query(100, ge=1, le=500)) -> Dict[str, Any]:
+    """Picker source for the email composer: the contractor's referred
+    accounts with an email. Returns clean (id, email, name) tuples."""
+    db = get_db()
+    cid = user.id if not _is_admin(user) else user.id
+    rows = await db.users.find(
+        {"referred_by_contractor_id": cid, "email": {"$exists": True, "$ne": ""}},
+        {"_id": 0, "id": 1, "email": 1, "name": 1, "first_name": 1, "last_name": 1,
+         "business_name": 1},
+    ).sort("created_at", -1).limit(limit).to_list(length=limit)
+    out = []
+    for r in rows:
+        display = (r.get("business_name") or r.get("name")
+                   or f"{r.get('first_name','')} {r.get('last_name','')}".strip()
+                   or r.get("email"))
+        out.append({"id": r["id"], "email": r["email"], "display": display})
+    return {"items": out, "count": len(out)}
 
 
 __all__ = ["router"]

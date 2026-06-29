@@ -184,6 +184,49 @@ async def lifespan(app):
     except Exception as e:
         logger.warning(f"Contractor payout cron registration failed (non-fatal): {e}")
 
+    # iter317 Directive 1 — Weekly leaderboard commission overlay
+    # Mondays @ 08:00 America/Toronto (EST/EDT auto-handled by ZoneInfo).
+    try:
+        from apscheduler.triggers.cron import CronTrigger
+        from services.leaderboard_overlay import (
+            run_weekly_leaderboard_overlay,
+            LEADERBOARD_CRON_TZ,
+            LEADERBOARD_CRON_HOUR,
+            LEADERBOARD_CRON_DAY_OF_WEEK,
+        )
+
+        async def _weekly_leaderboard_job():
+            try:
+                report = await run_weekly_leaderboard_overlay(db)
+                logger.info(
+                    f"[leaderboard_overlay] weekly run: iso_week={report.get('iso_week')} "
+                    f"evaluated={report.get('contractors_evaluated')} "
+                    f"top5={report.get('top_5_ids')} "
+                    f"entered={report.get('entered_top_5')} "
+                    f"dropped={report.get('dropped_top_5')}"
+                )
+            except Exception as je:  # noqa: BLE001
+                logger.warning(f"[leaderboard_overlay] weekly job failed: {je}")
+
+        scheduler.add_job(
+            _weekly_leaderboard_job,
+            CronTrigger(
+                day_of_week=LEADERBOARD_CRON_DAY_OF_WEEK,
+                hour=LEADERBOARD_CRON_HOUR,
+                minute=0,
+                timezone=LEADERBOARD_CRON_TZ,
+            ),
+            id="leaderboard_overlay_weekly",
+            replace_existing=True,
+            misfire_grace_time=21600,  # 6h tolerance for cluster restarts
+        )
+        logger.info(
+            f"iter317 — Weekly leaderboard overlay cron registered "
+            f"(Mon @ 08:00 {LEADERBOARD_CRON_TZ})"
+        )
+    except Exception as e:
+        logger.warning(f"Leaderboard overlay cron registration failed (non-fatal): {e}")
+
     # iter316 Mission 1 — Twilio dialer configuration check (non-fatal).
     try:
         from services.twilio_service import verify_twilio_config
