@@ -1,6 +1,50 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter322 — Password Reset + Admin Verify Bug Fixes + Interactive Chat (Feb 29, 2026) ✅ COMPLETE — VERIFIED
+
+### 3 User-reported bugs fixed
+- **Bug A — Admin-issued password reset created instantly-expired tokens** (`routes/admin_user_management.py:420`). The token row stored `expires_at = datetime.now(timezone.utc).isoformat()` instead of `now + timedelta(hours=1)`. Verify-reset-token then rejected the token immediately. Also added the missing `used: False` field so the unique-index lookup matches the schema. Fix: 1-hour expiry + explicit `used: False`.
+- **Bug B — Password reset email URL hardcoded to `https://bidvex.com`** (`config/email_templates.py:168` + `routes/admin_user_management.py:419`). Breaks preview testing (token lives in preview DB, link points to prod DB). Fix: both call sites now read `os.environ.get('FRONTEND_URL', 'https://bidvex.com')` so each environment uses its own URL. Preview `.env` updated to `FRONTEND_URL=https://prod-verify-2.preview.emergentagent.com`.
+- **Bug C — Admin "Verify" toggle silently no-op'd** (`routes/admin.py:261`). The endpoint read `data.get("verified", False)` but the frontend (`EnhancedUserManager.js:171` `handleAdminVerify`) sends `{admin_verified: !currentStatus}`. Field-name mismatch → toggle never wrote a `True` value. Fix: accept both keys (`admin_verified` preferred, `verified` legacy). Backward compatible.
+
+### Interactive Chat (Live Help-Desk)
+Upgraded `AdminEscalationsConsole` from a passive queue to a real-time 2-way help desk:
+
+- **Backend — `routes/support_escalations.py`**:
+  - **Extended `_EscalationBroker`** with user-targeted pub/sub: `subscribe_user(user_id)` / `unsubscribe_user` / `publish_to_user(user_id, event, data)`. Each user can have multiple open tabs (each gets its own queue). Fan-out is bounded by user — Alice's events never reach Bob.
+  - **New `POST /api/admin/support/escalations/{ticket_id}/reply`** — admin-only. Pydantic-validates `{message: str (1..2500)}`, appends `{role: 'admin', content, ts, admin_id, admin_email}` to the ticket transcript, auto-promotes `status: open → acknowledged`, sets `last_admin_reply_at` + `has_unread_admin_reply = true`, broadcasts `ticket_updated` to all admin tabs + `admin_reply` to the ticket owner's open tabs, and fires a best-effort SendGrid email with the existing default `Reply-To: support@bidvex.com`.
+  - **New `POST /api/support/escalations/{ticket_id}/reply`** — user-only (must be the ticket owner). Appends `{role: 'user', content, ts, user_id}`. 403 if user_id mismatch. 409 if ticket is `resolved` or `dismissed`. Broadcasts `ticket_updated` to admin tabs.
+  - **New `GET /api/support/escalations/user/stream`** — user-side SSE for receiving admin replies in real time. JWT via Authorization header, `session_token` cookie, OR `?token=<jwt>` query param (EventSource can't set headers).
+  - **New `_email_user_admin_reply(ticket, admin_message)`** — bilingual (EN/FR) HTML template echoing the original problem + the admin's reply, with the standard "open BidVex chat to continue" footer.
+
+- **Frontend — `pages/admin/AdminEscalationsConsole.jsx`**:
+  - Added `ROLE_BG.admin = 'bg-rose-50 border-rose-300'` + `🛡 ADMIN` badge label so admin replies stand out from AI / user messages.
+  - **Inline reply composer** at the bottom of the transcript card: `admin-reply-composer` (wrapper) → `admin-reply-textarea` (3-row, 2500-char cap with char counter) → `admin-reply-send-btn` (emerald Send). Reply-To label shows `support@bidvex.com`. Disabled when ticket is `dismissed`.
+  - **`handleSendReply`** POSTs to `/admin/support/escalations/{id}/reply`, replaces local `data.ticket` with the refreshed payload (so the new bubble appears without a refetch), clears the textarea, surfaces a Sonner toast `Reply sent — user notified`, and triggers the parent list refresh.
+  - **`ticket_updated` SSE listener** via a `window.addEventListener('bidvex:ticket-updated', …)` — when a concurrent admin replies on the same ticket, this dialog auto-refetches so multi-admin scenarios stay in sync.
+
+- **Frontend — `components/admin/EscalationAlertProvider.jsx`**:
+  - Added a `ticket_updated` event handler that re-dispatches as `window CustomEvent 'bidvex:ticket-updated'` (carrying the payload) so the dialog above can subscribe without opening a second EventSource.
+
+- **Frontend — `components/AIAssistant.js`**:
+  - **User-side SSE subscriber** opens `EventSource('/api/support/escalations/user/stream?token=<jwt>')` once the user is logged in. Exponential-backoff reconnect (1s → 30s cap).
+  - On `admin_reply` event: appends a NEW assistant bubble formatted as `🛡 **BidVex Support** (Ticket #<shortId>)\n\n<message>`; plays a soft 660Hz chime (WebAudio generated, no asset); fires a Sonner toast `🛡 Support replied`. The user sees the response within ~2s of the admin clicking Send, regardless of which page they're on.
+
+### Tests (62/62 PASS — 100% backend + 100% frontend)
+- `tests/test_iter322_fixes_and_chat.py` — **13/13 unit PASS** (broker user-targeted fan-out — alice's events don't reach bob, multi-tab fan-out, source-audit for all 3 bug fixes, endpoint surface audit, ReplyRequest validation).
+- `tests/test_iter322_integration_http.py` (testing agent) — **15/15 live HTTP PASS** (full bug-fix round-trip including DB inspection, admin reply success + dismissed-409 + non-owner-403 + status auto-promotion, user-stream SSE 200 + ready event, backwards-compat for `verified` legacy key on admin-verify).
+- `tests/test_iter320_escalation.py` + `tests/test_iter321_realtime_alerts.py` + `tests/test_iter321_live_sse.py` — **28/28 regression PASS**.
+- testing_agent_v3_fork iteration_328 — **100% backend + 100% frontend smoke. 0 critical, 0 minor functional bugs.** RCAs confirmed for all 3 bugs. Admin reply E2E verified — new ADMIN bubble lands in transcript, status auto-promotes to acknowledged, toast fires, user stream emits `admin_reply` event with the message.
+
+### Carryover (next session)
+- `bidvex.ca` SendGrid DKIM/SPF (user DNS action).
+- Bulk applicant CSV export (carryover from iter319).
+- Kanban swim-lane ATS view (carryover from iter319).
+- Optional polish: return `{token, reset_url, expires_at}` from `POST /api/admin/users/{id}/reset-password` so the admin UI can copy the link directly (currently returns `{success, email_sent}` only).
+- Optional: override global validation handler for `/api/support/escalate*` to return 422 instead of 400 (functionally equivalent today).
+
+
 ## iter321 — Live Support Escalation Pipeline Fix + Real-Time Admin Alerts (Feb 29, 2026) ✅ COMPLETE — VERIFIED
 
 ### Root cause analysis (user-reported bug from iter320)
