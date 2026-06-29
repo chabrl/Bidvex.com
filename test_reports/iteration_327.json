@@ -1,0 +1,37 @@
+{
+  "summary": "iter321 — Real-time SSE Live Support escalation pipeline fully validated. BACKEND: 9/9 iter321 unit tests PASS (broker fan-out, prompt strict-marker contract, stream auth resolver) + 7/7 NEW iter321 live HTTP/SSE tests PASS (auth 401/403/200, ready event, broker fan-out to 3 concurrent admin SSE subscribers from 1 POST, iter320 regression — POST escalate / admin list / pending count) = 16/16 backend. FRONTEND: All 4 critical iter321 flows PASS — (1) admin-live-support-card renders with count='7', has 'animate-pulse' + red/rose color classes (open_count>0), sound-toggle flips localStorage.bidvex.escalation_alert_sound (null→0); (2) clicking card navigates Admin→Team→Live Support sub-tab; (3) POST /api/support/escalate from logged-in session → live SSE delivers new_ticket event → card count tick from 7→8 within ~2s + Sonner toast 'New Live Support Ticket #4f048450 — TEST_iter321 sse live increment — View' appears top-right; (4) AIAssistant 'Talk to Human' button (ai-assistant-talk-human) opens manual-escalation-modal with problem/details textareas + submit button — submit POSTs to /api/support/escalate, closes modal, appends user bubble '[Human request] TEST_iter321 manual UI escalation' + system bubble '✅ Ticket created: #f8adbecc · An agent will reach out shortly.', and triggers top-right 'Ticket created' toast. iter320 regression CLEAN.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter321_realtime_alerts.py",
+    "/app/backend/tests/test_iter321_live_sse.py",
+    "/app/test_reports/pytest/iter321_unit_retest.xml",
+    "/app/test_reports/pytest/iter321_live_sse.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "support_escalations.py — _EscalationBroker is single-pod safe with proper asyncio.Lock around subscribe/unsubscribe and QueueFull silent-drop for slow consumers. Verified via 3-subscriber fan-out live test.",
+    "SSE endpoint accepts JWT via Authorization header, session_token cookie, OR ?token=<jwt> query (EventSource fallback) — all three paths exercised by tests. 401 missing token, 403 non-admin role enforced server-side BEFORE subscribing to broker.",
+    "POST /api/support/escalate publishes to broker BEFORE the (best-effort) admin email — chime/notification fires within ~50ms even if SendGrid is degraded. Both publish() and _email_admin are individually try/except wrapped so neither can break the 200 response.",
+    "Initial `event: ready` payload includes open_count snapshot — clients can reconcile state across reconnects without polling. Keepalive comments every 25s prevent proxy timeouts.",
+    "WATCHDOG_SYSTEM_INSTRUCTION (services/genai_direct_client.py) iter321 strict marker contract verified: contains anti-pattern 'INCORRECT (NO ticket gets created' section, 'No marker = no ticket' hard line, PART 1 (marker) ordered BEFORE PART 2 (confirmation), 'NOT wrapped in any markdown fences' rule, and distinct post-emit phrase '✅ Ticket already created' / '✅ Demande déjà créée' to prevent pre/post-emit conflation.",
+    "Frontend AIAssistant.js — Talk-to-Human button is correctly gated on logged-in users (visible only in buyer session; manual-escalation-modal works end-to-end including bubble append + toast)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter321_live_sse.py (NEW — 7-test live HTTP/SSE suite covering auth 401/403/200+ready, broker fan-out to 3 concurrent SSE subscribers from 1 POST, iter320 regression)"
+  ],
+  "success_rate": {
+    "backend": "100% (9/9 unit + 7/7 live = 16/16)",
+    "frontend": "100% (Live Support card + sound toggle + card-click navigation + SSE live count increment + Sonner toast + AI Assistant manual escalation modal end-to-end)"
+  },
+  "test_credentials": "Admin charbel911@gmail.com / Anderosli123!@# WORKS. testbuyer@bidvex.com / TestBuyer2026! WORKS (no re-seed needed this run).",
+  "seed_data_creation": "Created 3 TEST_iter321 escalation tickets in support_escalations collection: (1) one via broker fan-out test, (2) one via admin browser session live increment test 'TEST_iter321 sse live increment' #4f048450, (3) one via buyer AIAssistant manual modal 'TEST_iter321 manual UI escalation' #f8adbecc. All status='open'.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "iter321 fully validated. Reusable live SSE suite at /app/backend/tests/test_iter321_live_sse.py — uses ?token=<jwt> query param. SSE event parsing requires waiting for full event block (\\n\\n separator) before JSON.loads. Frontend testids: admin-live-support-card, admin-live-support-count, admin-live-support-sound-toggle, ai-assistant-btn (FAB), ai-assistant-talk-human (header), manual-escalation-modal, manual-escalation-problem, manual-escalation-details, manual-escalation-submit. The AI assistant FAB MUST be clicked first before talk-human is visible. Cookie consent localStorage key 'bidvex_cookie_consent' must be pre-set to avoid overlay intercepts. Login rate-limit is 60s/5 attempts so pace logins. Admin badge count incremented 7→8 LIVE via SSE without page reload — confirms broker.publish() reaches EscalationAlertProvider's EventSource subscriber.",
+  "rca_of_the_issue": "N/A — no bugs found. iter321 fix correctly ports marker handling from AICoreSupportWidget.jsx (deleted iter280) into AIAssistant.js, adds manual-escalation modal as user-controlled fallback, and adds a Live Support pulse card + SSE-driven EscalationAlertProvider (2-tone chime + Notification + tab title flash + Sonner toast) for the admin alert UX."
+}

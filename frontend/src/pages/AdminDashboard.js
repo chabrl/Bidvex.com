@@ -87,6 +87,9 @@ const AdminEscalationsConsoleLazy = (props) => (
     <_AdminEscalationsConsole {...props} />
   </_SuspenseCareers>
 );
+// iter321 — Real-time escalation alerts (SSE + chime + desktop notification + tab flash)
+import { EscalationAlertProvider, useEscalationAlerts } from '../components/admin/EscalationAlertProvider';
+import { LifeBuoy } from 'lucide-react';
 import AdminTaxDashboard from './AdminTaxDashboard';
 import AdminStorageDeposits from './admin/AdminStorageDeposits';
 import AdminStorageAuctions from './admin/AdminStorageAuctions';
@@ -261,6 +264,8 @@ const AdminDashboard = () => {
         'dashboard':          'analytics',
         'reports':            'analytics',
         'system-monitoring':  'analytics',
+        // iter321 — deep-link to Live Support tab
+        'escalations':        'team',
       };
       const inferredPrimary = SECONDARY_TO_PRIMARY[tab];
       if (inferredPrimary) setPrimaryTab(inferredPrimary);
@@ -718,6 +723,10 @@ const AdminDashboard = () => {
                 <p className="text-xs text-amber-600">Revenue</p>
               </div>
             </div>
+            {/* iter321 — Live Support card (always visible, pulses red when open_count > 0) */}
+            <LiveSupportStatCard
+              onOpen={() => { setPrimaryTab('team'); setSecondaryTab('escalations'); }}
+            />
             {pendingDealerLicenses > 0 && (
               <button
                 type="button"
@@ -1134,4 +1143,98 @@ const BannerManager = () => {
   );
 };
 
-export default AdminDashboard;
+
+// ─── iter321 — Live Support stat card (consumes the SSE provider) ──────
+function LiveSupportStatCard({ onOpen }) {
+  const { openCount, connected, enableSound, setEnableSound, acknowledgeAll } = useEscalationAlerts();
+  const hasOpen = openCount > 0;
+  return (
+    <button
+      type="button"
+      onClick={() => { acknowledgeAll(); onOpen?.(); }}
+      className={`flex items-center gap-3 p-3 rounded-lg text-left transition-all ring-2 ${
+        hasOpen
+          ? 'bg-rose-50 hover:bg-rose-100 ring-rose-400 animate-pulse'
+          : 'bg-emerald-50 hover:bg-emerald-100 ring-emerald-300'
+      }`}
+      data-testid="admin-live-support-card"
+      title={hasOpen
+        ? `${openCount} open Live Support ticket${openCount > 1 ? 's' : ''} — click to view`
+        : 'Live Support — all clear'}
+    >
+      <div className="relative">
+        <LifeBuoy className={`h-8 w-8 ${hasOpen ? 'text-rose-600' : 'text-emerald-600'}`} />
+        <span
+          className={`absolute -top-1 -right-1 inline-block w-3 h-3 rounded-full ring-2 ring-white ${
+            connected ? 'bg-emerald-500' : 'bg-slate-400'
+          }`}
+          title={connected ? 'Real-time alerts ON' : 'Reconnecting…'}
+        />
+      </div>
+      <div className="min-w-0">
+        <p
+          className={`text-2xl font-bold leading-tight ${hasOpen ? 'text-rose-700' : 'text-emerald-700'}`}
+          data-testid="admin-live-support-count"
+        >
+          {openCount}
+        </p>
+        <p className={`text-xs font-medium ${hasOpen ? 'text-rose-600' : 'text-emerald-600'}`}>
+          {hasOpen ? 'Open Tickets' : 'Live Support'}
+        </p>
+        <p
+          className="text-[10px] text-slate-500 leading-tight cursor-pointer hover:underline"
+          onClick={(e) => {
+            e.stopPropagation();
+            setEnableSound(!enableSound);
+          }}
+          data-testid="admin-live-support-sound-toggle"
+        >
+          🔔 Sound: {enableSound ? 'ON' : 'OFF'}
+        </p>
+      </div>
+    </button>
+  );
+}
+
+
+// ─── iter321 — Outer wrapper mounts the EscalationAlertProvider so the
+//    SSE connection lives for the entire Admin Dashboard tree and the
+//    LiveSupportStatCard can consume the live open_count. ───────────
+function InnerAdminEscalationListener({ onNavigate }) {
+  // Listen for the global `bidvex:open-escalations` custom event fired by
+  // the toast "View" CTA — admin clicks anywhere in the app and lands on
+  // the Live Support tab.
+  React.useEffect(() => {
+    const handler = () => { onNavigate?.(); };
+    window.addEventListener('bidvex:open-escalations', handler);
+    return () => window.removeEventListener('bidvex:open-escalations', handler);
+  }, [onNavigate]);
+  return null;
+}
+
+
+function AdminDashboardWithAlerts() {
+  // Bridge: the toast "View" CTA wants to navigate to the escalations tab.
+  // Since AdminDashboard owns the primaryTab/secondaryTab state, we route
+  // via window.history + a re-mount trigger.
+  const onNavigate = React.useCallback(() => {
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', 'escalations');
+      window.history.replaceState({}, '', url.toString());
+      // Trigger AdminDashboard's deep-link useEffect re-eval by dispatching
+      // a hashchange — but easier: just full-reload to the escalations tab.
+      window.location.search = '?tab=escalations';
+    } catch { /* noop */ }
+  }, []);
+
+  return (
+    <EscalationAlertProvider>
+      <InnerAdminEscalationListener onNavigate={onNavigate} />
+      <AdminDashboard />
+    </EscalationAlertProvider>
+  );
+}
+
+
+export default AdminDashboardWithAlerts;

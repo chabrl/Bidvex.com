@@ -1,5 +1,6 @@
 """
 iter320 — Live Support Escalation Protocol.
+iter321 — Real-time SSE notifier for admin (+ in-memory pub/sub).
 
 Backed by the canonical AI Core system prompt section 8: the assistant
 runs a 2-question gate, then emits a `[[BIDVEX_ESCALATION]]…[[/BIDVEX_ESCALATION]]`
@@ -18,9 +19,18 @@ GET  /api/admin/support/escalations
 
 PATCH /api/admin/support/escalations/{id}/status
     Admin updates {open|acknowledged|resolved|dismissed}.
+
+GET  /api/admin/support/escalations/stream  (iter321)
+    Admin-only Server-Sent Events stream. Pushes `new_ticket`
+    events whenever a ticket is created, plus periodic `ping`
+    keepalives. The frontend `EscalationAlertProvider` subscribes
+    here to play the 2-tone chime + desktop notification + flash
+    the tab title in real time.
 """
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
 import re
 import uuid
@@ -28,6 +38,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from deps import get_current_user, get_db, User
@@ -56,6 +67,53 @@ def require_admin(user: User = Depends(get_current_user)) -> User:
     if _role(user) not in ADMIN_ROLES:
         raise HTTPException(403, "admin only")
     return user
+
+
+# ─── iter321 — In-memory pub/sub broker for admin SSE ────────────────────
+#
+# Single-pod deployment friendly. Each admin SSE connection registers
+# an asyncio.Queue; whenever a ticket is created we fan-out the event
+# to every queue. This avoids MongoDB change-streams (which require a
+# replica set) and works with the standalone Mongo used in dev.
+#
+# For multi-pod production, swap this for Redis pub/sub — the public
+# `publish()` API stays the same.
+class _EscalationBroker:
+    def __init__(self) -> None:
+        self._subscribers: List[asyncio.Queue] = []
+        self._lock = asyncio.Lock()
+
+    async def subscribe(self) -> asyncio.Queue:
+        q: asyncio.Queue = asyncio.Queue(maxsize=64)
+        async with self._lock:
+            self._subscribers.append(q)
+        return q
+
+    async def unsubscribe(self, q: asyncio.Queue) -> None:
+        async with self._lock:
+            try:
+                self._subscribers.remove(q)
+            except ValueError:
+                pass
+
+    async def publish(self, event: str, data: Dict[str, Any]) -> None:
+        """Fan-out to every subscriber. Never raises — a slow consumer
+        whose queue is full is silently dropped from this event (will
+        get the next one + auto-reconnect on the next ping)."""
+        async with self._lock:
+            subs = list(self._subscribers)
+        for q in subs:
+            try:
+                q.put_nowait({"event": event, "data": data})
+            except asyncio.QueueFull:
+                logger.warning("[escalation broker] dropped event for slow consumer")
+
+    @property
+    def subscriber_count(self) -> int:
+        return len(self._subscribers)
+
+
+broker = _EscalationBroker()
 
 
 # ─── Models ─────────────────────────────────────────────────────────────
@@ -239,6 +297,22 @@ async def create_escalation(
     }
 
     await db.support_escalations.insert_one(row)
+    # iter321 — Broadcast to every admin SSE subscriber FIRST so the
+    # in-app alert (2-tone chime + desktop notification + tab flash)
+    # fires within ~50ms of the ticket landing.
+    try:
+        await broker.publish("new_ticket", {
+            "id":          row["id"],
+            "user_email":  row.get("user_email"),
+            "user_id":     row.get("user_id"),
+            "problem":     row["problem"][:160],
+            "language":    row["language"],
+            "created_at":  row["created_at"],
+            "status":      row["status"],
+        })
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[escalation] broker publish failed: {e}")
+
     # Fire-and-forget email so a SendGrid hiccup never breaks the widget UX.
     try:
         await _email_admin(row)
@@ -325,6 +399,105 @@ async def admin_pending_count(user: User = Depends(require_admin)) -> Dict[str, 
     db = get_db()
     n = await db.support_escalations.count_documents({"status": "open"})
     return {"open_count": int(n)}
+
+
+# ─── iter321 — Real-time SSE stream for admin alerts ────────────────────
+
+async def _resolve_admin_from_query_or_header(
+    request: Request, token_qp: Optional[str],
+) -> User:
+    """EventSource cannot send Authorization headers, so we accept the
+    JWT via either (a) the Authorization header (standard), (b) the
+    session_token cookie (browser SSO), or (c) `?token=<jwt>` query
+    string (EventSource fallback). All three resolve to the same User
+    object. Raises 401/403 with the same envelope as REST endpoints."""
+    import os as _os
+    from jose import jwt as _jwt, JWTError as _JWTError
+    from deps import db as _db, jwt_secret as _jwt_secret
+
+    token: Optional[str] = None
+    if "session_token" in request.cookies:
+        token = request.cookies["session_token"]
+    elif request.headers.get("authorization", "").lower().startswith("bearer "):
+        token = request.headers["authorization"].split(None, 1)[1].strip()
+    elif token_qp:
+        token = token_qp.strip()
+
+    if not token:
+        raise HTTPException(401, "auth required")
+
+    jwt_secret = _jwt_secret
+    try:
+        payload = _jwt.decode(token, jwt_secret, algorithms=["HS256"])
+    except _JWTError:
+        raise HTTPException(401, "invalid token")
+
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(401, "invalid token")
+    user_doc = await _db.users.find_one({"id": user_id}, {"_id": 0, "password": 0})
+    if not user_doc:
+        raise HTTPException(401, "user not found")
+    u = User(**user_doc)
+    if _role(u) not in ADMIN_ROLES:
+        raise HTTPException(403, "admin only")
+    return u
+
+
+@router.get("/admin/support/escalations/realtime/stream")
+async def admin_escalations_stream(
+    request: Request,
+    token: Optional[str] = Query(None),
+) -> StreamingResponse:
+    """Server-Sent Events stream pushing `new_ticket` events to admins
+    in real time. The first event is always `ready` so the client
+    knows the connection is live; thereafter `new_ticket` lands as
+    soon as a ticket is created; `: keepalive` comments fire every
+    25s so proxies don't time out idle connections.
+
+    Token query-param fallback is supported because EventSource cannot
+    set Authorization headers — the frontend can send `?token=<jwt>`.
+    """
+    await _resolve_admin_from_query_or_header(request, token)
+
+    queue = await broker.subscribe()
+
+    async def event_iter():
+        # Initial open-count snapshot so the client can immediately
+        # reconcile state (in case it missed events while disconnected).
+        try:
+            db = get_db()
+            open_count = await db.support_escalations.count_documents({"status": "open"})
+        except Exception:  # noqa: BLE001
+            open_count = 0
+        yield (
+            "event: ready\n"
+            f"data: {json.dumps({'open_count': int(open_count), 'subscribers': broker.subscriber_count})}\n\n"
+        )
+
+        keepalive_seconds = 25
+        try:
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    msg = await asyncio.wait_for(queue.get(), timeout=keepalive_seconds)
+                    yield f"event: {msg['event']}\ndata: {json.dumps(msg['data'])}\n\n"
+                except asyncio.TimeoutError:
+                    # Keepalive comment so proxies don't kill the conn.
+                    yield f": keepalive {_now_iso()}\n\n"
+        finally:
+            await broker.unsubscribe(queue)
+
+    return StreamingResponse(
+        event_iter(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control":     "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+            "Connection":        "keep-alive",
+        },
+    )
 
 
 __all__ = ["router"]

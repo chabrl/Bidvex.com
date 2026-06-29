@@ -2,7 +2,7 @@ import API_BASE from '../config';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { X, MessageCircle, Send, ShieldCheck, CreditCard, Package, HelpCircle, Mail, GripVertical, History, Trash2, ChevronLeft, Square } from 'lucide-react';
+import { X, MessageCircle, Send, ShieldCheck, CreditCard, Package, HelpCircle, Mail, GripVertical, History, Trash2, ChevronLeft, Square, LifeBuoy, Loader2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -67,6 +67,66 @@ const AIAssistant = () => {
   const { token } = useAuth();
   const navigate = useNavigate();
   const backendUrl = API_BASE;
+
+  // iter321 — Manual "Talk to a human" fallback state (must be declared
+  // AFTER `token`/`backendUrl` to avoid temporal-dead-zone errors in the
+  // useCallback closure dependency array).
+  const [manualEscalationOpen, setManualEscalationOpen] = useState(false);
+  const [manualProblem, setManualProblem] = useState('');
+  const [manualDetails, setManualDetails] = useState('');
+  const [manualSubmitting, setManualSubmitting] = useState(false);
+
+  const submitManualEscalation = useCallback(async () => {
+    const problem = manualProblem.trim();
+    const details = manualDetails.trim();
+    if (!problem || !token || manualSubmitting) return;
+    setManualSubmitting(true);
+    const _ESCALATION_RE = /\[\[BIDVEX_ESCALATION\]\]([\s\S]*?)\[\[\/BIDVEX_ESCALATION\]\]/;
+    const _strip = (txt) => (txt || '').replace(_ESCALATION_RE, '').trim();
+    const recent = (messages || []).slice(-12).map((mm) => ({
+      role:    mm.role,
+      content: _strip(mm.content),
+      ts:      mm.ts || new Date().toISOString(),
+    })).filter((mm) => mm.content);
+    const isFr = typeof window !== 'undefined' && (window.localStorage.getItem('i18nextLng') || '').startsWith('fr');
+    try {
+      const r = await fetch(`${backendUrl}/support/escalate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          problem:    problem.slice(0, 1500),
+          details:    details.slice(0, 2500),
+          language:   isFr ? 'fr' : 'en',
+          transcript: recent,
+          session_id: sessionId || null,
+          page_url:   typeof window !== 'undefined' ? window.location.pathname : null,
+        }),
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const json = await r.json();
+      const shortId = String(json.ticket_id || '').slice(0, 8);
+      setMessages((prev) => [
+        ...prev,
+        { role: 'user', content: `[${isFr ? 'Demande humaine' : 'Human request'}] ${problem}`, rich_content: null },
+        {
+          role: 'assistant',
+          content: isFr
+            ? `✅ Demande créée : #${shortId} · Un agent vous contactera sous peu.`
+            : `✅ Ticket created: #${shortId} · An agent will reach out shortly.`,
+          rich_content: null,
+          escalation_ticket_id: json.ticket_id,
+        },
+      ]);
+      setManualEscalationOpen(false);
+      setManualProblem('');
+      setManualDetails('');
+      toast.success(isFr ? 'Ticket créé' : 'Ticket created');
+    } catch (e) {
+      toast.error(isFr ? 'Échec de la création — réessayez ou écrivez à support@bidvex.com' : 'Could not create ticket — retry or email support@bidvex.com');
+    } finally {
+      setManualSubmitting(false);
+    }
+  }, [manualProblem, manualDetails, manualSubmitting, token, messages, sessionId, backendUrl]);
 
   // ── Draggable FAB state ──
   // Position is stored as {x, y} in viewport pixels (from top-left).
@@ -511,11 +571,62 @@ const AIAssistant = () => {
       }
       clearTimeout(stillProcessingTimer);
       setServiceDegraded(false);
-      // Finalize the streaming bubble (drop the streaming flag).
+      // iter321 — Intercept the [[BIDVEX_ESCALATION]]…[[/BIDVEX_ESCALATION]]
+      // marker before finalizing the bubble. Posts to /api/support/escalate,
+      // strips the marker from the visible content, and appends a system
+      // confirmation bubble. Fire-and-forget — UX never blocks on this.
+      const _ESCALATION_RE = /\[\[BIDVEX_ESCALATION\]\]([\s\S]*?)\[\[\/BIDVEX_ESCALATION\]\]/;
+      const _strip = (txt) => (txt || '').replace(_ESCALATION_RE, '').trim();
+      const visibleContent = _strip(assembled);
+      // Finalize the streaming bubble (drop the streaming flag) WITH the
+      // marker stripped from the rendered text.
       setMessages((prev) => prev.map((m) =>
-        m.streamId === ackId ? { ...m, streaming: false, streamId: undefined } : m
+        m.streamId === ackId
+          ? { ...m, content: visibleContent, streaming: false, streamId: undefined }
+          : m
       ));
-      fireResponseNotification(assembled, isFr);
+      // Out-of-band: fire the escalation POST if the marker was present.
+      try {
+        const match = _ESCALATION_RE.exec(assembled);
+        if (match && token) {
+          let payload = null;
+          try { payload = JSON.parse((match[1] || '').trim()); } catch { /* malformed */ }
+          if (payload && payload.problem) {
+            const recent = (messages || []).slice(-12).map((mm) => ({
+              role:    mm.role,
+              content: _strip(mm.content),
+              ts:      mm.ts || new Date().toISOString(),
+            })).filter((mm) => mm.content);
+            fetch(`${backendUrl}/support/escalate`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+              body: JSON.stringify({
+                problem:    String(payload.problem || '').slice(0, 1500),
+                details:    String(payload.details || '').slice(0, 2500),
+                language:   payload.language || (isFr ? 'fr' : 'en'),
+                transcript: recent,
+                session_id: sessionId || null,
+                page_url:   typeof window !== 'undefined' ? window.location.pathname : null,
+              }),
+            }).then((r) => r.ok ? r.json() : null).then((json) => {
+              if (!json || !json.ticket_id) return;
+              const shortId = String(json.ticket_id).slice(0, 8);
+              setMessages((prev) => [
+                ...prev,
+                {
+                  role: 'assistant',
+                  content: isFr
+                    ? `✅ Demande créée : #${shortId} · Un agent vous contactera sous peu.`
+                    : `✅ Ticket created: #${shortId} · An agent will reach out shortly.`,
+                  rich_content: null,
+                  escalation_ticket_id: json.ticket_id,
+                },
+              ]);
+            }).catch(() => { /* silent — user can retry via Talk to a human */ });
+          }
+        }
+      } catch (e) { /* never let the escalation hook break the chat */ }
+      fireResponseNotification(visibleContent, isFr);
     } catch (e) {
       // iter279 — When the user clicks Stop mid-stream the fetch
       // throws AbortError. That's a deliberate cancellation, not a
@@ -780,16 +891,35 @@ const AIAssistant = () => {
                   <p className="text-xs text-white/90">Your Luxury Auction Specialist</p>
                 </div>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsOpen(false)}
-                className="text-white hover:bg-white/20 rounded-full"
-                aria-label="Close"
-                data-testid="ai-assistant-close-btn"
-              >
-                <X className="h-5 w-5" />
-              </Button>
+              <div className="flex items-center gap-1">
+                {/* iter321 — Manual "Talk to a human" fallback (always available
+                    for logged-in users). Bypasses the AI and POSTs directly to
+                    /api/support/escalate so a ticket is guaranteed even if the
+                    AI is misbehaving. */}
+                {token && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setManualEscalationOpen(true)}
+                    className="text-white hover:bg-white/20 rounded-full h-8 w-8"
+                    aria-label="Talk to a human"
+                    title="Talk to a human"
+                    data-testid="ai-assistant-talk-human"
+                  >
+                    <LifeBuoy className="h-4 w-4" />
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsOpen(false)}
+                  className="text-white hover:bg-white/20 rounded-full"
+                  aria-label="Close"
+                  data-testid="ai-assistant-close-btn"
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
             </div>
 
             {/* iter239 Mission 4 — Slide-in history panel. Renders OVER the
@@ -980,6 +1110,86 @@ const AIAssistant = () => {
             </div>
           </div>
         </>
+      )}
+
+      {/* iter321 — Manual "Talk to a human" modal (escalation fallback) */}
+      {manualEscalationOpen && (
+        <div
+          className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+          data-testid="manual-escalation-modal"
+          onClick={(e) => { if (e.target === e.currentTarget) setManualEscalationOpen(false); }}
+        >
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+            <div className="px-5 py-4 bg-gradient-to-r from-rose-600 to-rose-700 text-white flex items-center gap-2">
+              <LifeBuoy className="w-5 h-5" />
+              <div className="leading-tight flex-1">
+                <div className="text-sm font-bold">Talk to a Human</div>
+                <div className="text-[10px] opacity-90">A BidVex agent will reach out shortly.</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setManualEscalationOpen(false)}
+                className="p-1.5 rounded-md hover:bg-white/15"
+                data-testid="manual-escalation-close"
+                aria-label="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-5 space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                  1. What is the problem? *
+                </label>
+                <textarea
+                  rows={3}
+                  value={manualProblem}
+                  onChange={(e) => setManualProblem(e.target.value)}
+                  placeholder="Briefly describe your problem…"
+                  maxLength={1500}
+                  className="mt-1 w-full rounded-md border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  data-testid="manual-escalation-problem"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                  2. Details (order ID, email, listing URL…)
+                </label>
+                <textarea
+                  rows={3}
+                  value={manualDetails}
+                  onChange={(e) => setManualDetails(e.target.value)}
+                  placeholder="Any helpful account context…"
+                  maxLength={2500}
+                  className="mt-1 w-full rounded-md border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  data-testid="manual-escalation-details"
+                />
+              </div>
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setManualEscalationOpen(false)}
+                  data-testid="manual-escalation-cancel"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={submitManualEscalation}
+                  disabled={!manualProblem.trim() || manualSubmitting}
+                  className="bg-rose-600 hover:bg-rose-700 text-white"
+                  data-testid="manual-escalation-submit"
+                >
+                  {manualSubmitting
+                    ? <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    : <LifeBuoy className="w-4 h-4 mr-2" />}
+                  Create Ticket
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

@@ -28,7 +28,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from './ui/button';
-import { Sparkles, X, Send, Loader2, Trash2, Square } from 'lucide-react';
+import { Sparkles, X, Send, Loader2, Trash2, Square, LifeBuoy } from 'lucide-react';
 import API_BASE from '../config';
 
 const STORAGE_PREFIX = 'bidvex.ai_core_chat.v1';
@@ -382,6 +382,78 @@ const AICoreSupportWidget = () => {
     try { window.localStorage.removeItem(storageKey); } catch { /* noop */ }
   };
 
+  // iter321 — Manual escalation fallback. If the AI is misbehaving and
+  // not emitting the [[BIDVEX_ESCALATION]] marker, the user can click
+  // "Talk to a human" to open a 2-question modal that POSTs directly
+  // to /api/support/escalate. Guaranteed-reliable path.
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualProblem, setManualProblem] = useState('');
+  const [manualDetails, setManualDetails] = useState('');
+  const [manualSubmitting, setManualSubmitting] = useState(false);
+
+  const submitManualEscalation = useCallback(async () => {
+    const problem = manualProblem.trim();
+    const details = manualDetails.trim();
+    if (!problem || !token || manualSubmitting) return;
+    setManualSubmitting(true);
+    const recent = (messages || []).slice(-12).map((mm) => ({
+      role:    mm.role,
+      content: _stripEscalationMarker(mm.content),
+      ts:      mm.ts,
+    })).filter((mm) => mm.content);
+    try {
+      const r = await fetch(`${API_BASE}/support/escalate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          problem:    problem.slice(0, 1500),
+          details:    details.slice(0, 2500),
+          language:   (i18n.language || 'en'),
+          transcript: recent,
+          session_id: sessionId,
+          page_url:   typeof window !== 'undefined' ? window.location.pathname : null,
+        }),
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const json = await r.json();
+      const isFr = (i18n.language || 'en').startsWith('fr');
+      setMessages((prev) => [
+        ...prev,
+        { role: 'user', content: `[${isFr ? 'Demande humaine' : 'Human request'}] ${problem}`, ts: new Date().toISOString() },
+        {
+          role:    'system',
+          content: (isFr ? '✅ Demande créée : #' : '✅ Ticket created: #')
+                    + String(json.ticket_id || '').slice(0, 8)
+                    + (isFr ? ' · Un agent vous contactera sous peu.'
+                            : ' · An agent will reach out shortly.'),
+          ts:      new Date().toISOString(),
+          escalation_ticket_id: json.ticket_id,
+        },
+      ]);
+      setManualOpen(false);
+      setManualProblem('');
+      setManualDetails('');
+    } catch (e) {
+      const isFr = (i18n.language || 'en').startsWith('fr');
+      setMessages((prev) => [
+        ...prev,
+        {
+          role:    'system',
+          content: (isFr
+            ? '❌ Échec de la création du ticket. Veuillez réessayer ou écrire à support@bidvex.com.'
+            : '❌ Could not create your ticket. Please retry or email support@bidvex.com.'),
+          ts:      new Date().toISOString(),
+          error:   true,
+        },
+      ]);
+    } finally {
+      setManualSubmitting(false);
+    }
+  }, [manualProblem, manualDetails, manualSubmitting, token, messages, sessionId, i18n.language]);
+
   // No widget for unauthenticated users — guards against bots / leaking
   // platform-internal P0 language to anonymous traffic.
   if (!user) return null;
@@ -435,6 +507,17 @@ const AICoreSupportWidget = () => {
               </div>
             </div>
             <div className="flex items-center gap-1">
+              {/* iter321 — Manual "Talk to a human" fallback (always available) */}
+              <button
+                type="button"
+                onClick={() => setManualOpen(true)}
+                className="p-1.5 rounded-md hover:bg-white/15 transition"
+                aria-label={t('aiCore.talkToHumanLabel', 'Talk to a human')}
+                data-testid="ai-core-talk-human"
+                title={t('aiCore.talkToHumanLabel', 'Talk to a human')}
+              >
+                <LifeBuoy className="w-4 h-4" />
+              </button>
               {messages.length > 0 && (
                 <button
                   type="button"
@@ -570,6 +653,102 @@ const AICoreSupportWidget = () => {
             <p className="text-[9px] text-slate-400 mt-1">
               {t('aiCore.footerHint')}
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* iter321 — Manual "Talk to a human" modal (escalation fallback) */}
+      {manualOpen && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+          data-testid="manual-escalation-modal"
+          onClick={(e) => { if (e.target === e.currentTarget) setManualOpen(false); }}
+        >
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+            <div className="px-5 py-4 bg-gradient-to-r from-rose-600 to-rose-700 text-white flex items-center gap-2">
+              <LifeBuoy className="w-5 h-5" />
+              <div className="leading-tight flex-1">
+                <div className="text-sm font-bold">
+                  {(i18n.language || 'en').startsWith('fr')
+                    ? 'Parler à un humain'
+                    : 'Talk to a Human'}
+                </div>
+                <div className="text-[10px] opacity-90">
+                  {(i18n.language || 'en').startsWith('fr')
+                    ? 'Un agent BidVex vous contactera sous peu.'
+                    : 'A BidVex agent will reach out shortly.'}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setManualOpen(false)}
+                className="p-1.5 rounded-md hover:bg-white/15"
+                data-testid="manual-escalation-close"
+                aria-label="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-5 space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                  {(i18n.language || 'en').startsWith('fr')
+                    ? '1. Quel est le problème ? *'
+                    : '1. What is the problem? *'}
+                </label>
+                <textarea
+                  rows={3}
+                  value={manualProblem}
+                  onChange={(e) => setManualProblem(e.target.value)}
+                  placeholder={(i18n.language || 'en').startsWith('fr')
+                    ? "Décrivez brièvement votre problème…"
+                    : "Briefly describe your problem…"}
+                  maxLength={1500}
+                  className="mt-1 w-full rounded-md border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  data-testid="manual-escalation-problem"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                  {(i18n.language || 'en').startsWith('fr')
+                    ? '2. Détails (ID de commande, courriel, URL d\'annonce…)'
+                    : '2. Details (order ID, email, listing URL…)'}
+                </label>
+                <textarea
+                  rows={3}
+                  value={manualDetails}
+                  onChange={(e) => setManualDetails(e.target.value)}
+                  placeholder={(i18n.language || 'en').startsWith('fr')
+                    ? "Toute information de compte utile…"
+                    : "Any helpful account context…"}
+                  maxLength={2500}
+                  className="mt-1 w-full rounded-md border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  data-testid="manual-escalation-details"
+                />
+              </div>
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setManualOpen(false)}
+                  data-testid="manual-escalation-cancel"
+                >
+                  {(i18n.language || 'en').startsWith('fr') ? 'Annuler' : 'Cancel'}
+                </Button>
+                <Button
+                  type="button"
+                  onClick={submitManualEscalation}
+                  disabled={!manualProblem.trim() || manualSubmitting}
+                  className="bg-rose-600 hover:bg-rose-700 text-white"
+                  data-testid="manual-escalation-submit"
+                >
+                  {manualSubmitting
+                    ? <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    : <LifeBuoy className="w-4 h-4 mr-2" />}
+                  {(i18n.language || 'en').startsWith('fr') ? 'Créer le ticket' : 'Create Ticket'}
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       )}
