@@ -1,6 +1,52 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter317 — Weekly Leaderboard Overlay + Electronic Contractor Agreement + Email Hub (Feb 29, 2026) ✅ COMPLETE — VERIFIED
+
+### Sprint goal (3 directives)
+1. **Weekly Leaderboard Commission Overlay** — Monday 08:00 EST cron, +1%/-1% on Top 5 entry/exit, 5.0% effective-total floor, 20.0% overlay ceiling, full `leaderboard_history` audit trail.
+2. **Electronic Contractor Agreement v2** — Bilingual scroll-to-accept modal gating contractor dashboard until signed; exact `users.legal_name` match required; immutable `contractor_agreements` audit log with IP, user-agent, SHA-256 text hash.
+3. **Contractor Email Hub** — Outbound email composer + Sent log via locked `partners@bidvex.ca` FROM; server-side signature injection with iter314 canonical CDN logo + hardcoded `+1 450 634 3099` support phone; gated by Directive 2.
+
+### Backend implementation
+- `/app/backend/services/leaderboard_overlay.py` — Pure `clamp_leaderboard_overlay()` + `run_weekly_leaderboard_overlay(db)` orchestrator. ISO-week-keyed idempotency. Constants: `LEADERBOARD_TOP_N=5`, `OVERLAY_DELTA=0.01`, `EFFECTIVE_TOTAL_FLOOR=0.05`, `OVERLAY_CEILING=0.20`. APScheduler `CronTrigger(day_of_week='mon', hour=8, timezone='America/Toronto')` — DST-safe.
+- `/app/backend/legal/contractor_agreement_v2.py` — Bilingual EN+FR text (11 numbered clauses). Garble-free French: `indépendante`, `ou`. SHA-256 hash exposed via `compute_text_hash()`.
+- `/app/backend/services/contractor_email_hub.py` — `build_contractor_signature()`, `inject_signature()` (idempotent), `send_contractor_email()` (raw SendGrid dispatcher bypassing the canonical `noreply@bidvex.com` FROM lock).
+- New endpoints (`/api/twilio` prefix):
+  - `GET /admin/leaderboard-overlay/run-now` (admin manual trigger)
+  - `GET /admin/leaderboard-overlay/batches` (audit list)
+  - `GET /contractor/agreements/current` (text + version + hash + account_legal_name)
+  - `GET /contractor/agreements/me` (signed status)
+  - `POST /contractor/agreements/sign` (immutable audit row)
+  - `POST /contractor/emails/send` (gated by agreement)
+  - `GET /contractor/emails` (sent log)
+  - `GET /contractor/emails/recipients` (referred-client picker)
+- Updated `GET /contractor/dashboard` now exposes `leaderboard_overlay_rate`, `leaderboard_overlay_updated_at`, `agreement_signed`, `agreement_version_required`.
+- Updated `GET /admin/contractors/leaderboard` exposes `leaderboard_overlay_rate` per contractor.
+
+### Frontend implementation
+- `/app/frontend/src/pages/contractor/ContractorAgreementModal.jsx` — Scroll-to-accept modal. Bilingual. Account-legal-name pre-display. Exact-match enforced server-side (case-insensitive).
+- `/app/frontend/src/pages/contractor/ContractorEmailHub.jsx` — Composer + Sent log. Locked-sender badge. Referred-client picker + free-text override.
+- `ContractorDashboard.jsx` — New leaderboard-overlay card (emerald when >0%), Email Hub button, agreement gate (returns alternate render path when unsigned).
+- New route `/contractor/emails` in `App.js`.
+
+### SendGrid domain status (flagged for user)
+- `bidvex.com` — Domain authenticated (DKIM/SPF valid) ✅
+- `partners@bidvex.ca` — Verified Single Sender (sends OK) ✅
+- `bidvex.ca` — **NOT domain-authenticated** ⚠️ DKIM/SPF will not align with `bidvex.ca` until added in SendGrid → Settings → Sender Authentication → Authenticate Your Domain (`bidvex.ca`). Until then, deliverability from `partners@bidvex.ca` is sub-optimal vs `noreply@bidvex.com`.
+
+### Tests
+- `/app/backend/tests/test_iter317_leaderboard_overlay.py` — 218 PASS (clamp invariants + idempotency + drop-out flow).
+- `/app/backend/tests/test_iter317_agreement_and_email_hub.py` — 27 PASS (text hashes, French Arabic-free, CDN URL, signature idempotency, validators).
+- `/app/backend/tests/test_iter317_integration_live.py` (created by testing agent) — 16 PASS (live HTTP).
+- testing_agent_v3_fork verdict: **100% backend, 100% frontend, 0 critical, 0 minor regressions**.
+
+### Tasks NOT yet done (next session candidates)
+- `bidvex.ca` domain authentication in SendGrid console (user action — requires DNS access).
+- Seed a dialer_contractor test account in preview so the agreement happy-path can be exercised E2E via browser (admin is exempt from the gate).
+- Re-seed `testbuyer@bidvex.com` / `testdealer@bidvex.com` passwords (drifted on preview env).
+
+
 ## iter316-E — Admin Self-Demotion Bug Fix + Safeguards + Self-Recovery (Jun 27, 2026) ✅ COMPLETE — VERIFIED
 
 ### The bug
