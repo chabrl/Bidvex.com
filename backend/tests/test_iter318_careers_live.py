@@ -83,6 +83,7 @@ def _base_form(email="TEST_marc@example.com"):
         "last_name": "Applicant",
         "email": email,
         "phone": "+15145551234",
+        "country": "Canada",
         "province": "QC",
         "preferred_language": "en",
     }

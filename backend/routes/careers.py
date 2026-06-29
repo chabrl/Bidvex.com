@@ -43,13 +43,14 @@ from pydantic import BaseModel, Field, EmailStr
 from deps import get_current_user, get_db, User
 from services.careers_security import (
     CV_MAX_BYTES, COVER_LETTER_MAX_BYTES, PHOTO_MAX_BYTES, CERTIFICATION_MAX_BYTES,
-    MAX_PHOTOS, MAX_CERTIFICATIONS,
+    MAX_PHOTOS, MAX_CERTIFICATIONS, CAREERS_UPLOAD_ROOT,
     validate_file, save_validated_file, safe_resolve_download, ensure_applicant_dir,
 )
 from services.careers_notifications import (
     send_applicant_confirmation,
     send_admin_new_applicant_notification,
 )
+from services.careers_screening import screen_applicant
 
 logger = logging.getLogger(__name__)
 
@@ -167,7 +168,9 @@ async def submit_application(
     last_name: str = Form(...),
     email: str = Form(...),
     phone: str = Form(...),
+    country: str = Form(...),
     province: str = Form(""),
+    state: str = Form(""),
     preferred_language: str = Form("en"),
     custom_responses: str = Form("{}"),
     cv: Optional[UploadFile] = File(None),
@@ -180,6 +183,11 @@ async def submit_application(
     Validates every field + every file (size, extension, MIME magic
     bytes) before persisting. Files land under
     /uploads/careers/{job_id}/{applicant_id}/ with UUID prefixes.
+
+    iter319 — global onboarding. `country` is the primary required
+    location field. `province` is required ONLY when country=='Canada'
+    and `state` is required ONLY when country=='United States'. For all
+    other countries both secondary fields are optional.
     """
     db = get_db()
     job = await db.job_offers.find_one(
@@ -207,6 +215,26 @@ async def submit_application(
             "error": "missing_name", "field": "name",
             "message_en": "First and last name are required.",
             "message_fr": "Le prénom et le nom sont obligatoires.",
+        })
+    country = (country or "").strip()
+    if not country:
+        raise HTTPException(422, {
+            "error": "missing_country", "field": "country",
+            "message_en": "Country is required.",
+            "message_fr": "Le pays est obligatoire.",
+        })
+    # Conditional secondary location requirement (iter319).
+    if country == "Canada" and not (province or "").strip():
+        raise HTTPException(422, {
+            "error": "missing_province", "field": "province",
+            "message_en": "Province is required for Canadian applicants.",
+            "message_fr": "La province est obligatoire pour les candidats canadiens.",
+        })
+    if country == "United States" and not (state or "").strip():
+        raise HTTPException(422, {
+            "error": "missing_state", "field": "state",
+            "message_en": "State is required for US applicants.",
+            "message_fr": "L'État est obligatoire pour les candidats américains.",
         })
 
     try:
@@ -283,14 +311,16 @@ async def submit_application(
     attachments: Dict[str, Any] = {
         "cv_url": None, "cover_letter_url": None, "photos": [], "certifications": [],
     }
+    cv_absolute_path: Optional[str] = None
 
     if cv and cv.filename:
         content = await cv.read()
         validate_file(kind="cv", filename=cv.filename, content=content, max_bytes=CV_MAX_BYTES)
-        fname, _abs = save_validated_file(
+        fname, abs_path = save_validated_file(
             dest_dir=dest_dir, kind="cv", original_filename=cv.filename, content=content,
         )
         attachments["cv_url"] = fname
+        cv_absolute_path = abs_path
 
     if cover_letter and cover_letter.filename:
         content = await cover_letter.read()
@@ -342,12 +372,15 @@ async def submit_application(
         "last_name":           (last_name or "").strip(),
         "email":               email,
         "phone":               (phone or "").strip(),
+        "country":             country,
         "province":            (province or "").strip(),
+        "state":               (state or "").strip(),
         "preferred_language":  "fr" if (preferred_language or "").lower().startswith("fr") else "en",
         "custom_responses":    custom_responses_obj,
         "attachments":         attachments,
         "status":              "applied",
         "admin_notes":         None,
+        "screening":           {"status": "pending"} if cv_absolute_path else {"status": "skipped", "reason": "no_cv"},
         "applied_at":          _now_iso(),
         "ip_address":          client_ip,
         "user_agent":          user_agent,
@@ -369,6 +402,15 @@ async def submit_application(
         job_title=job_title,
         admin_panel_link=None,
     )
+    # iter319 — auto-screening (best-effort, never breaks the apply call).
+    if cv_absolute_path:
+        from pathlib import Path as _Path
+        background_tasks.add_task(
+            _screen_in_background,
+            applicant_id=applicant_id,
+            job_id=job_id,
+            cv_absolute_path=_Path(cv_absolute_path),
+        )
 
     return {
         "success":      True,
@@ -524,6 +566,7 @@ async def admin_list_applicants(
     search: Optional[str] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
+    country: Optional[str] = Query(None),
     province: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
@@ -534,6 +577,8 @@ async def admin_list_applicants(
         q["job_offer_id"] = job_offer_id
     if status and status in APPLICANT_STATUSES:
         q["status"] = status
+    if country:
+        q["country"] = country
     if province:
         q["province"] = province
     if search:
@@ -610,7 +655,12 @@ async def admin_update_applicant_status(
 
 @router.get("/admin/careers/applicants/{applicant_id}/attachments/{filename}")
 async def admin_download_attachment(applicant_id: str, filename: str,
+                                      inline: int = Query(0, ge=0, le=1),
                                       user: User = Depends(require_admin)):
+    """Download or inline-preview an applicant attachment.
+    ?inline=1 sets Content-Disposition: inline and a proper media-type
+    (application/pdf or image/*) so the browser can render the file in
+    an <iframe>/<embed>. Defaults to attachment download."""
     db = get_db()
     applicant = await db.job_applicants.find_one(
         {"id": applicant_id}, {"_id": 0, "job_offer_id": 1},
@@ -622,11 +672,112 @@ async def admin_download_attachment(applicant_id: str, filename: str,
         applicant_id=applicant_id,
         filename=filename,
     )
+    ext = target.suffix.lower()
+    media_type = {
+        ".pdf":  "application/pdf",
+        ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ".jpg":  "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png":  "image/png",
+    }.get(ext, "application/octet-stream")
+
+    disposition = "inline" if inline else "attachment"
+    headers = {
+        "Content-Disposition": f'{disposition}; filename="{filename}"',
+        # Cross-origin requirement for the browser to render inside an iframe
+        # when this URL is fetched as a Blob.
+        "X-Content-Type-Options": "nosniff",
+    }
     return FileResponse(
         path=str(target),
-        filename=filename,
-        media_type="application/octet-stream",
+        media_type=media_type,
+        headers=headers,
     )
+
+
+# ─── iter319 — Screening + admin summary edit ───────────────────────────
+
+class ApplicantSummaryUpdate(BaseModel):
+    summary: str
+    pin: bool = True
+
+
+async def _screen_in_background(applicant_id: str, job_id: str, cv_absolute_path) -> None:
+    """Background-task wrapper — caches the DB handle from server-side
+    so we don't need to thread it through BackgroundTasks."""
+    try:
+        await screen_applicant(
+            get_db(),
+            applicant_id=applicant_id,
+            job_id=job_id,
+            cv_absolute_path=cv_absolute_path,
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.exception(f"[screening] background failed for {applicant_id}: {e}")
+
+
+@router.post("/admin/careers/applicants/{applicant_id}/screen")
+async def admin_rescreen_applicant(applicant_id: str,
+                                      user: User = Depends(require_admin)) -> Dict[str, Any]:
+    """Manually re-run the screening for an applicant (e.g. after a CV
+    re-upload or a job-description tweak). Idempotent — overwrites
+    the LLM fields but PRESERVES admin-pinned summary if any."""
+    db = get_db()
+    applicant = await db.job_applicants.find_one(
+        {"id": applicant_id},
+        {"_id": 0, "id": 1, "job_offer_id": 1, "attachments": 1},
+    )
+    if not applicant:
+        raise HTTPException(404, "applicant not found")
+    cv_fname = (applicant.get("attachments") or {}).get("cv_url")
+    if not cv_fname:
+        raise HTTPException(422, {
+            "error": "no_cv",
+            "message_en": "Applicant has no CV on file.",
+            "message_fr": "Aucun CV au dossier.",
+        })
+    from pathlib import Path as _Path
+    cv_path = _Path(CAREERS_UPLOAD_ROOT) / applicant["job_offer_id"] / applicant_id / cv_fname
+    out = await screen_applicant(
+        db,
+        applicant_id=applicant_id,
+        job_id=applicant["job_offer_id"],
+        cv_absolute_path=cv_path,
+    )
+    return out
+
+
+@router.patch("/admin/careers/applicants/{applicant_id}/screening/summary")
+async def admin_edit_screening_summary(
+    applicant_id: str,
+    body: ApplicantSummaryUpdate,
+    user: User = Depends(require_admin),
+) -> Dict[str, Any]:
+    """Admin override of the LLM-generated 1-line summary. When pin=True
+    (default) the edited value is preserved across future re-screens.
+    The original LLM output is kept in `screening.llm_summary`."""
+    db = get_db()
+    applicant = await db.job_applicants.find_one(
+        {"id": applicant_id}, {"_id": 0, "screening": 1},
+    )
+    if not applicant:
+        raise HTTPException(404, "applicant not found")
+    summary = (body.summary or "").strip()[:220]
+    if not summary:
+        raise HTTPException(422, {
+            "error": "empty_summary",
+            "message_en": "Summary cannot be empty.",
+            "message_fr": "Le résumé ne peut pas être vide.",
+        })
+    cur = applicant.get("screening") or {}
+    cur["summary"] = summary
+    cur["summary_edited"] = bool(body.pin)
+    cur["summary_edited_at"] = _now_iso()
+    cur["summary_edited_by"] = getattr(user, "email", None)
+    await db.job_applicants.update_one(
+        {"id": applicant_id}, {"$set": {"screening": cur}},
+    )
+    return cur
 
 
 __all__ = ["router"]

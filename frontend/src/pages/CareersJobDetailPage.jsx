@@ -26,10 +26,9 @@ import { Input } from '../components/ui/input';
 import { Textarea } from '../components/ui/textarea';
 import { Label } from '../components/ui/label';
 import { Badge } from '../components/ui/badge';
+import { COUNTRIES, CA_PROVINCES, US_STATES } from '../lib/countries';
 
-const PROVINCES = [
-  'AB', 'BC', 'MB', 'NB', 'NL', 'NS', 'NT', 'NU', 'ON', 'PE', 'QC', 'SK', 'YT',
-];
+const PROVINCES = CA_PROVINCES.map((p) => p.code);
 
 const CV_MAX = 5 * 1024 * 1024;
 const COVER_MAX = 5 * 1024 * 1024;
@@ -55,7 +54,8 @@ export default function CareersJobDetailPage() {
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({
     first_name: '', last_name: '', email: '', phone: '',
-    province: '', preferred_language: 'en',
+    country: '', province: '', state: '',
+    preferred_language: 'en',
   });
   const [customResponses, setCustomResponses] = useState({});
   const [files, setFiles] = useState({
@@ -108,7 +108,13 @@ export default function CareersJobDetailPage() {
     if (!form.last_name.trim())  errs.last_name = 'Required / Obligatoire';
     if (!EMAIL_RE.test(form.email.trim())) errs.email = 'Invalid email / Courriel invalide';
     if (!form.phone.trim()) errs.phone = 'Required / Obligatoire';
-    if (!form.province) errs.province = 'Required / Obligatoire';
+    if (!form.country) errs.country = 'Required / Obligatoire';
+    if (form.country === 'Canada' && !form.province) {
+      errs.province = 'Required / Obligatoire';
+    }
+    if (form.country === 'United States' && !form.state) {
+      errs.state = 'Required / Obligatoire';
+    }
     setFieldErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -357,18 +363,48 @@ export default function CareersJobDetailPage() {
                 {fieldErrors.phone && <p className="text-xs text-rose-600 mt-1">{fieldErrors.phone}</p>}
               </div>
               <div>
-                <Label>Province *</Label>
+                <Label>Country / Pays *</Label>
                 <select
-                  data-testid="input-province"
-                  value={form.province}
-                  onChange={(e) => setForm({ ...form, province: e.target.value })}
-                  className={`mt-1 block w-full rounded border px-3 py-2 text-sm bg-white ${fieldErrors.province ? 'border-rose-400' : 'border-slate-300'}`}
+                  data-testid="input-country"
+                  value={form.country}
+                  onChange={(e) => setForm({ ...form, country: e.target.value, province: '', state: '' })}
+                  className={`mt-1 block w-full rounded border px-3 py-2 text-sm bg-white ${fieldErrors.country ? 'border-rose-400' : 'border-slate-300'}`}
                 >
                   <option value="">— Select / Sélectionnez —</option>
-                  {PROVINCES.map((p) => <option key={p} value={p}>{p}</option>)}
+                  {COUNTRIES.map((c) => <option key={c} value={c}>{c}</option>)}
                 </select>
-                {fieldErrors.province && <p className="text-xs text-rose-600 mt-1">{fieldErrors.province}</p>}
+                {fieldErrors.country && <p className="text-xs text-rose-600 mt-1">{fieldErrors.country}</p>}
               </div>
+              {form.country === 'Canada' && (
+                <div data-testid="province-field-wrapper">
+                  <Label>Province *</Label>
+                  <select
+                    data-testid="input-province"
+                    value={form.province}
+                    onChange={(e) => setForm({ ...form, province: e.target.value })}
+                    className={`mt-1 block w-full rounded border px-3 py-2 text-sm bg-white ${fieldErrors.province ? 'border-rose-400' : 'border-slate-300'}`}
+                  >
+                    <option value="">— Select / Sélectionnez —</option>
+                    {CA_PROVINCES.map((p) => <option key={p.code} value={p.code}>{p.code} — {p.label}</option>)}
+                  </select>
+                  {fieldErrors.province && <p className="text-xs text-rose-600 mt-1">{fieldErrors.province}</p>}
+                </div>
+              )}
+              {form.country === 'United States' && (
+                <div data-testid="state-field-wrapper">
+                  <Label>State *</Label>
+                  <select
+                    data-testid="input-state"
+                    value={form.state}
+                    onChange={(e) => setForm({ ...form, state: e.target.value })}
+                    className={`mt-1 block w-full rounded border px-3 py-2 text-sm bg-white ${fieldErrors.state ? 'border-rose-400' : 'border-slate-300'}`}
+                  >
+                    <option value="">— Select / Sélectionnez —</option>
+                    {US_STATES.map((s) => <option key={s.code} value={s.code}>{s.code} — {s.label}</option>)}
+                  </select>
+                  {fieldErrors.state && <p className="text-xs text-rose-600 mt-1">{fieldErrors.state}</p>}
+                </div>
+              )}
               <div>
                 <Label>Preferred Language / Langue préférée</Label>
                 <div className="mt-2 flex items-center gap-4">
