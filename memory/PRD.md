@@ -1,6 +1,40 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter321 — Live Support Escalation Pipeline Fix + Real-Time Admin Alerts (Feb 29, 2026) ✅ COMPLETE — VERIFIED
+
+### Root cause analysis (user-reported bug from iter320)
+User reported: *"The AI replied normally ('your ticket is open and the agent will contact you shortly...') but no ticket appeared or registered in the admin live support view."* Two stacked root causes:
+
+1. **The escalation marker handler was on the wrong component.** iter320 wired `[[BIDVEX_ESCALATION]]` regex interception into `AICoreSupportWidget.jsx`, but that widget was unmounted in iter280 — the live AI widget on user dashboards is `AIAssistant.js`, which had **zero** marker-handling logic. So even when the AI emitted the marker correctly, nothing in the live widget intercepted it → no POST to `/api/support/escalate` → no ticket created.
+2. **The AI was hallucinating the confirmation prose without emitting the marker.** The iter320 prompt's post-emit "Your ticket is open. An agent will contact you shortly." boilerplate was too close to a natural-sounding user-facing confirmation, so Gemini was speaking it WITHOUT first emitting the marker block. Code-fence wrapping was also ambiguous (the model treated the marker as an illustrative example).
+
+### Pipeline fix
+- **Strengthened the AI Core system prompt** (`services/genai_direct_client.py` — Section 8 rewrite): PART 1 (marker emission) must precede PART 2 (confirmation prose); added explicit **INCORRECT EXAMPLE** anti-pattern showing what NOT to do; added hard-line `"No marker = no ticket"` rule; forbade markdown code-fence wrapping; replaced the post-emit boilerplate with a distinct phrase `"✅ Ticket already created — our team has been notified."` (EN/FR) that cannot be confused with the pre-emit confirmation.
+- **Ported the marker interception to `AIAssistant.js`** (lines 519-575): when a streamed assistant reply contains `[[BIDVEX_ESCALATION]]…[[/BIDVEX_ESCALATION]]`, the widget strips the marker from the rendered bubble, POSTs `{problem, details, language, transcript[≤12], session_id, page_url}` to `/api/support/escalate`, and appends a `✅ Ticket created: #<shortId>` system bubble.
+- **Added a manual "Talk to a Human" fallback button** (`ai-assistant-talk-human`) in the AIAssistant header → opens a 2-textarea modal (Problem + Details) → POSTs directly to `/api/support/escalate`. Bypasses the AI entirely, so a ticket is guaranteed even if the AI is mid-hallucination.
+
+### New UX — Live Support card + real-time alerts
+- **Top admin stat bar Live Support card** (`AdminDashboard.js` — `LiveSupportStatCard` component): always visible alongside Total Users / Listings / Active Auctions / Revenue / Compliance Alerts / Watchdog. Shows `{open_count} Open Tickets` (rose-red + `animate-pulse` ring when > 0) or `0 Live Support` (emerald "all clear"). Connection dot indicator (green = SSE live, gray = reconnecting). Inline `🔔 Sound: ON/OFF` toggle persisted in `localStorage.bidvex.escalation_alert_sound`. Click anywhere on the card → navigates to Admin → Team → Live Support.
+- **SSE pub/sub broker** (`routes/support_escalations.py` — `_EscalationBroker`): single-pod-friendly in-memory `asyncio.Queue`-backed pub/sub. Every `POST /api/support/escalate` calls `broker.publish('new_ticket', {...})` BEFORE the (best-effort) admin email so the in-app chime fires within ~50ms even if SendGrid is degraded.
+- **NEW endpoint `GET /api/admin/support/escalations/realtime/stream`** — Server-Sent Events stream pushing `event: ready` (initial snapshot with `open_count`) + `event: new_ticket` (per ticket) + `: keepalive` comments every 25s. Accepts JWT via Authorization header, `session_token` cookie, OR `?token=<jwt>` query param (EventSource fallback — browsers can't set custom headers on SSE).
+- **`EscalationAlertProvider`** (`components/admin/EscalationAlertProvider.jsx`): wraps the entire Admin Dashboard tree. Opens a single SSE connection with exponential-backoff reconnect (1s → 30s cap). On `new_ticket`: (1) plays a WebAudio-generated 2-tone "ding-ding-DONG-DONG" escalating chime (880Hz x2 → 1320Hz x2, ~700ms), (2) fires a browser desktop `Notification` (permission requested once on mount), (3) starts a tab-title flasher alternating `BidVex` ↔ `🆘 New Ticket — <user_email>` every 1.1s until the admin re-focuses the tab, (4) shows a Sonner warning toast `🆘 New Live Support Ticket #<shortId>` with a "View" CTA. Exposes `useEscalationAlerts()` hook so the LiveSupportStatCard consumes the live `openCount` without polling.
+- **Deep-link**: `/admin?tab=escalations` now opens directly to Live Support (via the `SECONDARY_TO_PRIMARY` map).
+
+### Tests (37/37 PASS — 100% backend + 100% frontend)
+- `tests/test_iter321_realtime_alerts.py` — **9/9 unit PASS** (broker subscribe/publish/unsubscribe + fan-out to 3 subscribers + slow-consumer silent drop + post-unsubscribe no-deliver + prompt strict-marker contract audit + stream auth resolver 401 on missing token).
+- `tests/test_iter321_live_sse.py` (added by testing agent) — **7/7 live HTTP/SSE PASS** (401 no token, 403 non-admin, 200+`ready` event, broker fan-out to 3 concurrent SSE subscribers from 1 POST, iter320 regression — POST escalate / admin list / pending count).
+- `tests/test_iter320_escalation.py` — **12/12 unit PASS** (regression).
+- testing_agent_v3_fork iteration_327: **100% backend, 100% frontend.** Admin badge count incremented 7→8 LIVE via SSE within ~2s without page reload + Sonner toast surfaced + manual escalation modal end-to-end via AIAssistant verified. **0 critical, 0 functional bugs.**
+
+### Tasks NOT yet done (next session)
+- `bidvex.ca` SendGrid DKIM/SPF (user DNS action).
+- Bulk applicant CSV export (carryover from iter319).
+- Kanban swim-lane ATS view (carryover from iter319).
+- Optional: swap in-memory broker for Redis pub/sub when scaling to multi-pod production (public `publish()` API stays the same).
+- Optional: server-side safety net — detect "escalation prose without marker" in the AI's final stream output and auto-inject a synthetic marker from the last 2 user turns (currently mitigated by the prompt strengthening + manual button — measure first before adding more code).
+
+
 ## iter320 — Live Support Escalation Protocol + AI Core System Prompt Refresh (Feb 29, 2026) ✅ COMPLETE — VERIFIED
 
 ### Sprint goal (3 directives)
