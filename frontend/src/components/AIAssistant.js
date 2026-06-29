@@ -128,6 +128,93 @@ const AIAssistant = () => {
     }
   }, [manualProblem, manualDetails, manualSubmitting, token, messages, sessionId, backendUrl]);
 
+  // iter322 — User-side SSE for admin replies on Live Support tickets.
+  // When an admin posts a reply via the AdminEscalationsConsole, this
+  // EventSource receives an `admin_reply` event and injects a `🛡 Support`
+  // bubble into the chat panel (+ a soft chime + optional unread badge bump).
+  useEffect(() => {
+    if (!token) return undefined;
+    let es = null;
+    let closed = false;
+    let backoff = 1000;
+    let reconnectTimer = null;
+
+    const playSoftChime = () => {
+      try {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return;
+        const ctx = new Ctx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = 660;
+        gain.gain.setValueAtTime(0, ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.18, ctx.currentTime + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.5);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.55);
+      } catch { /* silently fail — browsers may block audio without user gesture */ }
+    };
+
+    const open = () => {
+      try {
+        es = new EventSource(`${backendUrl}/support/escalations/user/stream?token=${encodeURIComponent(token)}`);
+        es.addEventListener('ready', () => { backoff = 1000; });
+        es.addEventListener('admin_reply', (ev) => {
+          let d = null;
+          try { d = JSON.parse(ev.data || '{}'); } catch { return; }
+          if (!d?.message) return;
+          const shortId = String(d.ticket_id || '').slice(0, 8);
+          // Append a styled assistant bubble (rendered identically to AI
+          // replies but with the 🛡 Support tag so the user immediately
+          // sees it's a human reply).
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: 'assistant',
+              content: `🛡 **BidVex Support** (Ticket #${shortId})\n\n${d.message}`,
+              rich_content: null,
+              from_admin: true,
+              ticket_id: d.ticket_id,
+            },
+          ]);
+          playSoftChime();
+          try {
+            // If the chat is closed, bump the unread badge so the user sees
+            // they have an unread human reply waiting.
+            if (typeof window !== 'undefined') {
+              const evt = new CustomEvent('bidvex:admin-reply', { detail: d });
+              window.dispatchEvent(evt);
+            }
+          } catch { /* noop */ }
+          toast.success('🛡 Support replied', {
+            description: String(d.message || '').slice(0, 140),
+            duration: 10000,
+          });
+        });
+        es.onerror = () => {
+          if (closed) return;
+          try { es?.close(); } catch { /* noop */ }
+          es = null;
+          if (reconnectTimer) window.clearTimeout(reconnectTimer);
+          const wait = Math.min(backoff, 30000);
+          reconnectTimer = window.setTimeout(() => {
+            backoff = Math.min(backoff * 2, 30000);
+            open();
+          }, wait);
+        };
+      } catch { /* noop */ }
+    };
+
+    open();
+    return () => {
+      closed = true;
+      try { es?.close(); } catch { /* noop */ }
+      if (reconnectTimer) window.clearTimeout(reconnectTimer);
+    };
+  }, [token, backendUrl]);
+
   // ── Draggable FAB state ──
   // Position is stored as {x, y} in viewport pixels (from top-left).
   // Default sits the FAB above the mobile bottom-nav at the right edge.

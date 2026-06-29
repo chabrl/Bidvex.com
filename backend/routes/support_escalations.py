@@ -80,7 +80,14 @@ def require_admin(user: User = Depends(get_current_user)) -> User:
 # `publish()` API stays the same.
 class _EscalationBroker:
     def __init__(self) -> None:
+        # Admin-fanout subscribers — every connected admin tab receives
+        # every new_ticket / ticket_updated event.
         self._subscribers: List[asyncio.Queue] = []
+        # iter322 — User-targeted subscribers. Keyed by user_id so an
+        # admin reply to ticket X owned by user U only reaches U's tabs
+        # (not every random user). Each user can have multiple open
+        # tabs/devices, hence a list per user_id.
+        self._user_subscribers: Dict[str, List[asyncio.Queue]] = {}
         self._lock = asyncio.Lock()
 
     async def subscribe(self) -> asyncio.Queue:
@@ -96,8 +103,26 @@ class _EscalationBroker:
             except ValueError:
                 pass
 
+    async def subscribe_user(self, user_id: str) -> asyncio.Queue:
+        """iter322 — Subscribe a user-side SSE consumer so they receive
+        admin replies to their own tickets in real time."""
+        q: asyncio.Queue = asyncio.Queue(maxsize=64)
+        async with self._lock:
+            self._user_subscribers.setdefault(user_id, []).append(q)
+        return q
+
+    async def unsubscribe_user(self, user_id: str, q: asyncio.Queue) -> None:
+        async with self._lock:
+            lst = self._user_subscribers.get(user_id) or []
+            try:
+                lst.remove(q)
+            except ValueError:
+                pass
+            if not lst:
+                self._user_subscribers.pop(user_id, None)
+
     async def publish(self, event: str, data: Dict[str, Any]) -> None:
-        """Fan-out to every subscriber. Never raises — a slow consumer
+        """Fan-out to every ADMIN subscriber. Never raises — a slow consumer
         whose queue is full is silently dropped from this event (will
         get the next one + auto-reconnect on the next ping)."""
         async with self._lock:
@@ -108,9 +133,23 @@ class _EscalationBroker:
             except asyncio.QueueFull:
                 logger.warning("[escalation broker] dropped event for slow consumer")
 
+    async def publish_to_user(self, user_id: str, event: str, data: Dict[str, Any]) -> None:
+        """iter322 — Fan-out an event to one specific user's open tabs only."""
+        async with self._lock:
+            subs = list(self._user_subscribers.get(user_id, []))
+        for q in subs:
+            try:
+                q.put_nowait({"event": event, "data": data})
+            except asyncio.QueueFull:
+                logger.warning("[escalation broker] dropped user event for slow consumer")
+
     @property
     def subscriber_count(self) -> int:
         return len(self._subscribers)
+
+    @property
+    def user_subscriber_count(self) -> int:
+        return sum(len(v) for v in self._user_subscribers.values())
 
 
 broker = _EscalationBroker()
@@ -498,6 +537,297 @@ async def admin_escalations_stream(
             "Connection":        "keep-alive",
         },
     )
+
+
+# ─── iter322 — Interactive 2-way chat (admin reply + user reply) ─────────
+
+
+class ReplyRequest(BaseModel):
+    """Either an admin replying to a user OR a user adding context to their
+    own ticket. The reply is appended to the ticket's transcript and broadcast
+    via SSE to the other party in real time."""
+    message: str = Field(..., min_length=1, max_length=2500)
+
+
+@router.post("/admin/support/escalations/{ticket_id}/reply")
+async def admin_reply_to_escalation(
+    ticket_id: str,
+    body: ReplyRequest,
+    request: Request,
+    user: User = Depends(require_admin),
+) -> Dict[str, Any]:
+    """Admin posts a reply on a Live Support ticket. Appends to transcript,
+    broadcasts SSE to the user's open tabs + every admin's escalations console
+    (so multi-admin scenarios stay in sync), and fires a best-effort SendGrid
+    email with `Reply-To: support@bidvex.com`. Status is auto-set to
+    `acknowledged` if it was still `open`."""
+    db = get_db()
+    ticket = await db.support_escalations.find_one({"id": ticket_id}, {"_id": 0})
+    if not ticket:
+        raise HTTPException(404, "ticket not found")
+    if ticket.get("status") == "dismissed":
+        raise HTTPException(409, "cannot reply to a dismissed ticket")
+
+    reply_msg = {
+        "role":        "admin",
+        "content":     body.message.strip()[:2500],
+        "ts":          _now_iso(),
+        "admin_id":    user.id,
+        "admin_email": getattr(user, "email", None),
+    }
+    new_status = ticket.get("status") or "open"
+    if new_status == "open":
+        new_status = "acknowledged"
+
+    update = {
+        "$push": {"transcript": reply_msg},
+        "$set": {
+            "status":             new_status,
+            "status_updated_at":  reply_msg["ts"],
+            "last_admin_reply_at": reply_msg["ts"],
+            "has_unread_admin_reply": True,
+        },
+    }
+    await db.support_escalations.update_one({"id": ticket_id}, update)
+    refreshed = await db.support_escalations.find_one({"id": ticket_id}, {"_id": 0})
+
+    # Broadcast to all admin tabs (so concurrent admins see the same convo).
+    try:
+        await broker.publish("ticket_updated", {
+            "id":             ticket_id,
+            "status":         new_status,
+            "last_message":   reply_msg["content"][:160],
+            "last_role":      "admin",
+            "last_ts":        reply_msg["ts"],
+        })
+    except Exception:  # noqa: BLE001
+        pass
+
+    # Notify the user's open tabs (AIAssistant subscribes to this stream).
+    try:
+        target_user_id = ticket.get("user_id")
+        if target_user_id:
+            await broker.publish_to_user(target_user_id, "admin_reply", {
+                "ticket_id":   ticket_id,
+                "message":     reply_msg["content"],
+                "ts":          reply_msg["ts"],
+                "admin_email": "support@bidvex.com",
+                "status":      new_status,
+            })
+    except Exception:  # noqa: BLE001
+        pass
+
+    # Best-effort email — never blocks the API. Uses Reply-To: support@bidvex.com
+    # so the user can hit reply and land back in the support inbox.
+    try:
+        await _email_user_admin_reply(ticket, reply_msg["content"])
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[escalation reply] user email best-effort failed: {e}")
+
+    return {
+        "ok":      True,
+        "ticket":  refreshed,
+        "reply":   reply_msg,
+    }
+
+
+@router.post("/support/escalations/{ticket_id}/reply")
+async def user_reply_to_escalation(
+    ticket_id: str,
+    body: ReplyRequest,
+    request: Request,
+    user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """User adds a follow-up message on their own ticket — appended to the
+    transcript and broadcast to admin tabs as ticket_updated."""
+    db = get_db()
+    ticket = await db.support_escalations.find_one({"id": ticket_id}, {"_id": 0})
+    if not ticket:
+        raise HTTPException(404, "ticket not found")
+    if str(ticket.get("user_id")) != str(getattr(user, "id", "")):
+        raise HTTPException(403, "this ticket does not belong to you")
+    if ticket.get("status") in ("resolved", "dismissed"):
+        raise HTTPException(409, "ticket already closed")
+
+    reply_msg = {
+        "role":    "user",
+        "content": body.message.strip()[:2500],
+        "ts":      _now_iso(),
+        "user_id": user.id,
+    }
+    await db.support_escalations.update_one(
+        {"id": ticket_id},
+        {
+            "$push": {"transcript": reply_msg},
+            "$set":  {"last_user_reply_at": reply_msg["ts"], "has_unread_user_reply": True},
+        },
+    )
+    refreshed = await db.support_escalations.find_one({"id": ticket_id}, {"_id": 0})
+    try:
+        await broker.publish("ticket_updated", {
+            "id":           ticket_id,
+            "status":       refreshed.get("status"),
+            "last_message": reply_msg["content"][:160],
+            "last_role":    "user",
+            "last_ts":      reply_msg["ts"],
+        })
+    except Exception:  # noqa: BLE001
+        pass
+    return {"ok": True, "ticket": refreshed, "reply": reply_msg}
+
+
+async def _resolve_user_from_query_or_header(
+    request: Request, token_qp: Optional[str],
+) -> User:
+    """Same dual-auth pattern as the admin SSE resolver but for normal users.
+    Required because EventSource cannot send Authorization headers."""
+    import os as _os
+    from jose import jwt as _jwt, JWTError as _JWTError
+    from deps import db as _db, jwt_secret as _jwt_secret
+
+    token: Optional[str] = None
+    if "session_token" in request.cookies:
+        token = request.cookies["session_token"]
+    elif request.headers.get("authorization", "").lower().startswith("bearer "):
+        token = request.headers["authorization"].split(None, 1)[1].strip()
+    elif token_qp:
+        token = token_qp.strip()
+    if not token:
+        raise HTTPException(401, "auth required")
+    try:
+        payload = _jwt.decode(token, _jwt_secret, algorithms=["HS256"])
+    except _JWTError:
+        raise HTTPException(401, "invalid token")
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(401, "invalid token")
+    user_doc = await _db.users.find_one({"id": user_id}, {"_id": 0, "password": 0})
+    if not user_doc:
+        raise HTTPException(401, "user not found")
+    return User(**user_doc)
+
+
+@router.get("/support/escalations/user/stream")
+async def user_escalations_stream(
+    request: Request,
+    token: Optional[str] = Query(None),
+) -> StreamingResponse:
+    """User-side SSE stream — pushes `admin_reply` events whenever an
+    admin replies to one of THIS user's tickets. Used by AIAssistant
+    to surface inline support replies as new chat bubbles."""
+    user = await _resolve_user_from_query_or_header(request, token)
+    queue = await broker.subscribe_user(user.id)
+
+    async def event_iter():
+        # Initial ready snapshot — also reports how many open tickets
+        # this user has so the client can render a "1 ticket in progress"
+        # pill if needed.
+        try:
+            db = get_db()
+            open_count = await db.support_escalations.count_documents(
+                {"user_id": user.id, "status": {"$in": ["open", "acknowledged"]}}
+            )
+        except Exception:  # noqa: BLE001
+            open_count = 0
+        yield (
+            "event: ready\n"
+            f"data: {json.dumps({'open_count': int(open_count)})}\n\n"
+        )
+        try:
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    msg = await asyncio.wait_for(queue.get(), timeout=25)
+                    yield f"event: {msg['event']}\ndata: {json.dumps(msg['data'])}\n\n"
+                except asyncio.TimeoutError:
+                    yield f": keepalive {_now_iso()}\n\n"
+        finally:
+            await broker.unsubscribe_user(user.id, queue)
+
+    return StreamingResponse(
+        event_iter(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control":     "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+            "Connection":        "keep-alive",
+        },
+    )
+
+
+# ─── iter322 — Best-effort email when admin replies in-app ────────────────
+
+
+async def _email_user_admin_reply(ticket: Dict[str, Any], admin_message: str) -> None:
+    """Fire a 'we replied' email to the ticket's owner with Reply-To set to
+    support@bidvex.com so a forward-email chain doesn't break the loop."""
+    try:
+        from services.email_service import get_email_service
+        email_service = get_email_service()
+        if not email_service.is_configured():
+            return
+        recipient = ticket.get("user_email")
+        if not recipient:
+            return
+        ticket_id_short = (ticket.get("id") or "")[:8]
+        problem_preview = (ticket.get("problem") or "")[:200]
+        admin_preview = (admin_message or "")[:1500]
+        is_fr = (ticket.get("language") or "en").startswith("fr")
+        if is_fr:
+            subject = f"BidVex Support — Réponse sur votre demande #{ticket_id_short}"
+            html = f"""<!DOCTYPE html><html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:40px 0;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;">
+  <tr><td style="background:#1e3a8a;padding:24px 32px;text-align:center;">
+    <h1 style="color:#ffffff;margin:0;font-size:24px;">BidVex Support</h1>
+  </td></tr>
+  <tr><td style="padding:32px;">
+    <h2 style="color:#1e3a8a;margin:0 0 16px;">Réponse sur votre demande #{ticket_id_short}</h2>
+    <p style="color:#374151;font-size:14px;line-height:1.6;background:#f9fafb;padding:10px 14px;border-left:3px solid #d1d5db;border-radius:0 6px 6px 0;">
+      <strong>Votre problème :</strong> {problem_preview}
+    </p>
+    <p style="color:#374151;font-size:16px;line-height:1.6;"><strong>Notre réponse :</strong></p>
+    <p style="color:#374151;font-size:15px;line-height:1.7;background:#fff7ed;padding:14px 18px;border-left:3px solid #f59e0b;border-radius:0 6px 6px 0;white-space:pre-wrap;">{admin_preview}</p>
+    <p style="color:#6b7280;font-size:13px;line-height:1.5;">Pour répondre, ouvrez l'application BidVex et continuez la conversation dans votre fenêtre de chat — ou répondez à ce courriel.</p>
+  </td></tr>
+  <tr><td style="background:#f9fafb;padding:16px 32px;text-align:center;">
+    <p style="color:#9ca3af;font-size:12px;margin:0;">&copy; BidVex — support@bidvex.com</p>
+  </td></tr>
+</table></td></tr></table></body></html>"""
+        else:
+            subject = f"BidVex Support — Reply on your ticket #{ticket_id_short}"
+            html = f"""<!DOCTYPE html><html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:40px 0;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;">
+  <tr><td style="background:#1e3a8a;padding:24px 32px;text-align:center;">
+    <h1 style="color:#ffffff;margin:0;font-size:24px;">BidVex Support</h1>
+  </td></tr>
+  <tr><td style="padding:32px;">
+    <h2 style="color:#1e3a8a;margin:0 0 16px;">Reply on your ticket #{ticket_id_short}</h2>
+    <p style="color:#374151;font-size:14px;line-height:1.6;background:#f9fafb;padding:10px 14px;border-left:3px solid #d1d5db;border-radius:0 6px 6px 0;">
+      <strong>Your problem:</strong> {problem_preview}
+    </p>
+    <p style="color:#374151;font-size:16px;line-height:1.6;"><strong>Our reply:</strong></p>
+    <p style="color:#374151;font-size:15px;line-height:1.7;background:#fff7ed;padding:14px 18px;border-left:3px solid #f59e0b;border-radius:0 6px 6px 0;white-space:pre-wrap;">{admin_preview}</p>
+    <p style="color:#6b7280;font-size:13px;line-height:1.5;">To respond, open BidVex and continue the conversation in your chat panel — or simply reply to this email.</p>
+  </td></tr>
+  <tr><td style="background:#f9fafb;padding:16px 32px;text-align:center;">
+    <p style="color:#9ca3af;font-size:12px;margin:0;">&copy; BidVex — support@bidvex.com</p>
+  </td></tr>
+</table></td></tr></table></body></html>"""
+        # Send via the existing send_raw_html method. The underlying
+        # email_service already sets `Reply-To: support@bidvex.com` by
+        # default (see email_service.py lines 135 + 241).
+        await email_service.send_raw_html(
+            to=recipient, subject=subject, html_content=html, disable_tracking=True,
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[escalation reply email] failed: {e}")
 
 
 __all__ = ["router"]

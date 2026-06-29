@@ -18,7 +18,7 @@ import axios from 'axios';
 import { toast } from 'sonner';
 import {
   LifeBuoy, Search, Loader2, Save, Filter, Clock, User as UserIcon,
-  MessageSquare, AlertTriangle, CheckCircle2,
+  MessageSquare, AlertTriangle, CheckCircle2, Send,
 } from 'lucide-react';
 
 import API_BASE from '../../config';
@@ -44,6 +44,13 @@ const ROLE_BG = {
   user:      'bg-sky-50 border-sky-200',
   assistant: 'bg-slate-50 border-slate-200',
   system:    'bg-amber-50 border-amber-200',
+  admin:     'bg-rose-50 border-rose-300',
+};
+const ROLE_LABEL = {
+  user:      'USER',
+  assistant: 'AI',
+  system:    'SYSTEM',
+  admin:     '🛡 ADMIN',
 };
 
 function authHeaders(token) {
@@ -215,6 +222,21 @@ function EscalationDetailDialog({ token, ticketId, open, onClose, onUpdated }) {
   const [status, setStatus] = useState('');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  // iter322 — Inline admin reply composer state.
+  const [replyDraft, setReplyDraft] = useState('');
+  const [sendingReply, setSendingReply] = useState(false);
+
+  // Refetch the ticket (called after each admin reply / user reply / status change).
+  const refetch = useCallback(async () => {
+    try {
+      const r = await axios.get(`${API_BASE}/admin/support/escalations/${ticketId}`, {
+        headers: authHeaders(token),
+      });
+      setData(r.data);
+      setStatus(r.data?.status || 'open');
+      if (!notes) setNotes(r.data?.admin_notes || '');
+    } catch { /* noop */ }
+  }, [ticketId, token, notes]);
 
   useEffect(() => {
     let cancelled = false;
@@ -235,6 +257,22 @@ function EscalationDetailDialog({ token, ticketId, open, onClose, onUpdated }) {
     return () => { cancelled = true; };
   }, [ticketId, token]);
 
+  // iter322 — Subscribe to ticket_updated SSE so concurrent admins see
+  // the same conversation in real time. Uses the existing admin
+  // realtime/stream endpoint already mounted by EscalationAlertProvider
+  // — we just listen via window-events so we don't double-open the SSE
+  // connection.
+  useEffect(() => {
+    const handler = (ev) => {
+      try {
+        const d = ev.detail || {};
+        if (d.id === ticketId) refetch();
+      } catch { /* noop */ }
+    };
+    window.addEventListener('bidvex:ticket-updated', handler);
+    return () => window.removeEventListener('bidvex:ticket-updated', handler);
+  }, [ticketId, refetch]);
+
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -251,6 +289,37 @@ function EscalationDetailDialog({ token, ticketId, open, onClose, onUpdated }) {
       toast.error(detail?.message_en || 'Save failed');
     } finally {
       setSaving(false);
+    }
+  };
+
+  // iter322 — Live help-desk: admin posts a reply, the user receives it
+  // instantly via SSE + email. The transcript card refreshes from the
+  // server response so the new admin bubble lands without a full page reload.
+  const handleSendReply = async () => {
+    const msg = replyDraft.trim();
+    if (!msg || sendingReply) return;
+    setSendingReply(true);
+    try {
+      const r = await axios.post(
+        `${API_BASE}/admin/support/escalations/${ticketId}/reply`,
+        { message: msg },
+        { headers: authHeaders(token) },
+      );
+      setReplyDraft('');
+      if (r.data?.ticket) {
+        setData(r.data.ticket);
+        setStatus(r.data.ticket.status || status);
+      } else {
+        await refetch();
+      }
+      toast.success('Reply sent — user notified');
+      onUpdated?.();
+    } catch (e) {
+      const detail = e?.response?.data?.detail;
+      const msg = (typeof detail === 'object' ? detail?.message_en : detail) || 'Reply failed';
+      toast.error(msg);
+    } finally {
+      setSendingReply(false);
     }
   };
 
@@ -334,7 +403,7 @@ function EscalationDetailDialog({ token, ticketId, open, onClose, onUpdated }) {
                     >
                       <div className="flex items-center gap-2 mb-1">
                         <Badge variant="outline" className="text-[10px] uppercase">
-                          {m.role || 'msg'}
+                          {ROLE_LABEL[m.role] || m.role || 'msg'}
                         </Badge>
                         {m.ts && <span className="text-[10px] text-slate-400">{m.ts}</span>}
                       </div>
@@ -342,6 +411,35 @@ function EscalationDetailDialog({ token, ticketId, open, onClose, onUpdated }) {
                     </li>
                   ))}
                 </ul>
+                {/* iter322 — Inline admin reply composer (live help-desk) */}
+                <div className="mt-4 pt-4 border-t border-slate-200 space-y-2" data-testid="admin-reply-composer">
+                  <Label className="text-xs font-semibold flex items-center gap-2 text-rose-700">
+                    <MessageSquare className="h-3.5 w-3.5" /> Reply to user (sends in-app + email)
+                  </Label>
+                  <Textarea
+                    rows={3}
+                    value={replyDraft}
+                    onChange={(e) => setReplyDraft(e.target.value)}
+                    placeholder="Type your reply — the user receives it instantly in their chat widget…"
+                    maxLength={2500}
+                    className="text-sm"
+                    data-testid="admin-reply-textarea"
+                  />
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] text-slate-400">
+                      Reply-To: <strong>support@bidvex.com</strong> · {replyDraft.length}/2500
+                    </span>
+                    <Button
+                      onClick={handleSendReply}
+                      disabled={sendingReply || !replyDraft.trim() || data.status === 'dismissed'}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                      data-testid="admin-reply-send-btn"
+                    >
+                      {sendingReply ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
+                      Send reply
+                    </Button>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 

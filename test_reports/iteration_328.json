@@ -1,0 +1,27 @@
+{
+  "summary": "iter322 verification — 3 bug fixes (admin password reset 60-min expiry, FRONTEND_URL env var, admin-verify admin_verified key) + interactive chat (admin reply, user reply, user-side SSE) all PASS. 28/28 backend tests green + UI smoke verified the full admin reply flow end-to-end on the preview URL.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter322_fixes_and_chat.py",
+    "/app/backend/tests/test_iter322_integration_http.py",
+    "/app/test_reports/pytest/iter322_combined.xml",
+    "/app/test_reports/pytest/iter322_integration.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Reply endpoint returns 400 (not 422) for empty/oversized message — likely a global validation_exception_handler in server.py converts Pydantic 422→400. Functionally identical (both are validation errors), but Pydantic's native 422 is more idiomatic. Low priority.",
+    "/api/admin/users/{id}/reset-password response body is {success, email_sent} only — does NOT echo the token or reset URL. Callers who need to surface the token (e.g., support page widget) cannot. Consider returning {token, expires_at, reset_url} for the admin-flow.",
+    "admin_user_management.py line 426 still has hardcoded `https://bidvex.com` as the FRONTEND_URL fallback. While the env var IS read now (fixing the bug), the fallback should match the per-env default or be a noop (empty). Low risk in current deployment since FRONTEND_URL is always set."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter322_integration_http.py (NEW — 15 HTTP integration tests)"
+  ],
+  "success_rate": {"backend": "100% (28/28)", "frontend": "100% (smoke flow)"},
+  "test_credentials": "Admin charbel911@gmail.com / Anderosli123!@#; Buyer testbuyer@bidvex.com / TestBuyer2026! — both work on preview URL",
+  "seed_data_creation": "Created 3 TEST_ escalation tickets during integration testing (auto-aged in DB). One TEST_iter322_admin_reply_v2 transcript bubble persisted as expected.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "iter322 is fully verified. Bug A (reset token DB row shows expires_at = created_at + 1h, used=False, valid via /api/auth/verify-reset-token/{token}). Bug C verified on real users: PUT /api/admin/users/{id}/admin-verify with {admin_verified:true} OR {verified:true} both flip admin_verified+admin_verified_by+admin_verified_at. Chat feature verified: admin reply POST 200 → transcript bubble with role='admin', bg-rose-50, 🛡 ADMIN badge, status auto-promoted to acknowledged, toast 'Reply sent — user notified'. User stream (?token=<jwt>) emits `event: ready` within 5s. Admin stream same. 404 for unknown ticket. 403 for non-owner user reply. 400 (not 422) for empty/too-long reply — global exception handler converts. Note: backend uses DB_NAME=bazario_db (not bidvex_db).",
+  "rca_of_the_issue": "All 3 bug fixes RCAs confirmed: (A) line 420 of admin_user_management.py was `datetime.now(...).isoformat()` with no `+ timedelta(hours=1)` → token expired at creation → verify-reset-token rejected; fix adds 1h. (B) email_templates.password_reset_email built reset_url with `https://bidvex.com` hardcoded → broke on preview; fix uses os.environ.get('FRONTEND_URL'). (C) admin.py admin-verify endpoint read payload['verified'] but EnhancedUserManager sends {admin_verified: true}; fix reads either key (`admin_verified` preferred, `verified` legacy)."
+}

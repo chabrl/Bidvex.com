@@ -257,8 +257,15 @@ async def toggle_admin_verified(
     """Toggle admin verification badge for a user"""
     admin = await require_admin(credentials)
     db = get_db()
-    
-    verified = data.get("verified", False)
+
+    # iter322 fix — the frontend (`EnhancedUserManager.js`) sends `{admin_verified: bool}`
+    # but this endpoint was reading `data.get("verified")`. Field-name mismatch meant
+    # `verified` was always False (the fallback), so clicking the Verify toggle
+    # silently no-op'd. Accept either key for forward + backwards compatibility.
+    if "admin_verified" in data:
+        verified = bool(data.get("admin_verified", False))
+    else:
+        verified = bool(data.get("verified", False))
     
     result = await db.users.update_one(
         {"id": user_id},

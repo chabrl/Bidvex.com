@@ -165,7 +165,12 @@ class EmailDataBuilder:
     def password_reset_email(
         user: Dict[str, Any], reset_token: str, expires_in_hours: int = 1
     ) -> Dict[str, Any]:
-        reset_url = f"https://bidvex.com/reset-password?token={reset_token}"
+        # iter322 fix — was hardcoded to https://bidvex.com which broke preview
+        # environments (token lives in preview DB but link sent to prod). Use the
+        # FRONTEND_URL env var so the link points wherever this backend lives.
+        import os as _os
+        frontend_url = _os.environ.get("FRONTEND_URL", "https://bidvex.com").rstrip("/")
+        reset_url = f"{frontend_url}/reset-password?token={reset_token}"
         expiry_message = (
             f"{expires_in_hours} hour"
             if expires_in_hours == 1

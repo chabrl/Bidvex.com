@@ -24,8 +24,9 @@ Routes (all mounted at `/api/admin/users/{user_id}/...`):
 from __future__ import annotations
 
 import logging
+import os
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -408,15 +409,22 @@ async def admin_reset_password(
         try:
             import secrets
             token = secrets.token_urlsafe(32)
+            # iter322 fix — was `datetime.now(timezone.utc).isoformat()` which created
+            # tokens that were already expired at creation time. The verify endpoint
+            # then rejected them with "Invalid or already used token" because the
+            # status check ran AFTER the existence check.
             await db.password_reset_tokens.insert_one({
                 "id": str(uuid.uuid4()),
                 "user_id": user_id,
                 "token": token,
-                "expires_at": datetime.now(timezone.utc).isoformat(),
+                "expires_at": (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat(),
+                "used": False,
+                "created_at": datetime.now(timezone.utc).isoformat(),
                 "issued_by_admin": current_user.id,
             })
             from services.emails._email_core import send_email
-            url = f"https://www.bidvex.com/reset-password?token={token}"
+            frontend_url = os.environ.get("FRONTEND_URL", "https://bidvex.com").rstrip("/")
+            url = f"{frontend_url}/reset-password?token={token}"
             html = f"""
             <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;background:#f8fafc;border-radius:12px;">
               <div style="padding:20px;background:white;border-radius:8px;">

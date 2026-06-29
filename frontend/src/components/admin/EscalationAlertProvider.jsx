@@ -250,6 +250,17 @@ export function EscalationAlertProvider({ children }) {
         });
       });
 
+      // iter322 — Fan-out ticket_updated SSE events to the open
+      // detail dialog (and any other listener via window events).
+      es.addEventListener('ticket_updated', (ev) => {
+        let data = null;
+        try { data = JSON.parse(ev.data || '{}'); } catch { return; }
+        if (!data?.id) return;
+        try {
+          window.dispatchEvent(new CustomEvent('bidvex:ticket-updated', { detail: data }));
+        } catch { /* noop */ }
+      });
+
       es.onerror = () => {
         setConnected(false);
         try { es.close(); } catch { /* noop */ }
