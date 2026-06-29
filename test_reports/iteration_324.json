@@ -1,0 +1,43 @@
+{
+  "summary": "iter318 SPRINT validated end-to-end — both parts PASS. PART 1 (Email Hub sender swap): GET /api/twilio/contractor/emails returns sender_email='info@bidvex.com', sender_name='BidVex Canada', support_phone='+1 450 634 3099'. partners@bidvex.ca preserved in all 8 non-Email-Hub services (partners.py, listings_service.py, resubmission_service.py, dealer_grace_period_service.py, admin_oversight.py, admin_promotions.py, _email_core.py, genai_direct_client.py). PART 2 (Careers): All 15 unit tests in test_iter318_careers.py PASS. New live HTTP suite test_iter318_careers_live.py — 17/17 PASS covering public list, detail, 404, apply success path, all 5 validation errors (invalid_email/cv_required/invalid_file_type/file_too_large/missing_custom_field), admin auth gating, CRUD lifecycle, draft delete, 409 has_applicants on job-with-applicants, status update PATCH (valid + invalid), and path-traversal blocked on attachments. Regression: All 245 iter317 tests still PASS. Frontend: /careers renders hero (EN+FR), 2 active job cards (Liquidator Sales + Independent Vehicle Appraiser), and 'Careers' footer link. /careers/:job_id renders multi-step form with all Step 1 testids (input-first-name, input-last-name, input-email, input-phone, input-province, radio-lang-en, radio-lang-fr, step-back-btn, step-next-btn). Step 2 (Questions) appears with custom_text_field 'Years of auction experience' after valid Step 1 advance. /admin/careers renders admin-careers-console with tab-jobs + tab-applicants; applicants tab lists seeded Marc Tremblay (shortlisted) + filters work.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/careers and /careers/:job_id", "issues": ["Cookie consent banner overlays bottom of viewport on every page. Use force=True for clicks near footer. Not iter318-specific."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter318_careers.py",
+    "/app/backend/tests/test_iter318_careers_live.py",
+    "/app/test_reports/pytest/iter318_careers.xml",
+    "/app/test_reports/pytest/iter318_live.xml",
+    "/app/test_reports/pytest/iter317_regression.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Apply endpoint validates custom_responses BEFORE file checks (CV/MIME/size). When testing in isolation, custom_responses must already be a JSON-valid string containing all required custom_text_fields/custom_date_fields. This is correct fail-fast behaviour but worth documenting in the API spec.",
+    "Apply form expects 'preferred_language' (not 'preferred_lang') and 'custom_responses' as a JSON string field (Form(...)) — frontend builder must JSON.stringify the per-label responses object.",
+    "DELETE /api/admin/careers/jobs/{id} only succeeds on draft jobs with 0 applicants. Activate→Archive→Delete flow is NOT supported (archived jobs can't be deleted — returns 409 not_draft). Spec said 'DELETE on draft with 0 applicants succeeds' which matches.",
+    "Activation requires description_en AND description_fr to be non-empty; returns 422 incomplete_job otherwise. Spec-compliant; UI should surface this missing-fields envelope clearly.",
+    "Path-traversal endpoint correctly blocks 'foo/../bar', '..hidden', URL-encoded variants — returns 403 path_traversal_blocked or 404 for unknown filenames inside the applicant dir.",
+    "CONTRACTOR_SENDER_EMAIL/NAME hardcoded constants in contractor_email_hub.py — good (immutable per Email Hub spec). The one 'partners@bidvex.ca' string remaining in that file is a CHANGELOG COMMENT only; not a sender value."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter318_careers_live.py (new — 17-test live HTTP integration suite for PART 1 + PART 2)"
+  ],
+  "success_rate": {
+    "backend": "100% (15/15 unit iter318 + 17/17 live HTTP iter318 + 245/245 iter317 regression = 277/277)",
+    "frontend": "100% (public /careers, /careers/:job_id multi-step form, /admin/careers Jobs+Applicants tabs all render with documented data-testids; Marc Tremblay shortlisted applicant visible)"
+  },
+  "test_credentials": "Admin charbel911@gmail.com / Anderosli123!@# WORKS. Used for all admin endpoint + admin frontend validation.",
+  "seed_data_creation": "Created 1 successful live applicant via POST /api/careers/jobs/{JOB_ID}/apply during test_apply_success_path (TEST_live_success@example.com, status=applied). Also created+deleted TEST_Job_Live (draft) and created+activated+archived TEST_Job_Activate during admin CRUD lifecycle tests. These do not impact future runs.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "iter318 fully validated. Live test suite at /app/backend/tests/test_iter318_careers_live.py is REUSABLE for regression — it asserts PART 1 sender values + all PART 2 paths. Note: validation order in POST /apply is name→email→phone→custom_responses(JSON parse)→required custom_text_fields→required custom_date_fields→required files→file MIME/size. Tests targeting file errors must include custom_responses JSON with all required labels. Seeded JOB_ID f867ae4d-31ed-43c4-b7fc-f82613d8ff6e now has 2 applicants (was 1 before). Cookie consent banner overlays bottom of viewport sitewide — use force=True for clicks near footer. Footer 'Careers' link visible under CORPORATE column. Admin sidebar Team→Careers sub-tab loads AdminCareersConsole at /admin/careers (separate route, also accessible directly).",
+  "rca_of_the_issue": "N/A — no bugs found. Initial live-test failures (5/17) were test-suite authoring issues (wrong form field name 'preferred_lang' vs 'preferred_language', flat 'custom_text_<label>' field vs JSON-encoded 'custom_responses' field, archived-job delete vs draft-job delete) — all corrected and re-run = 17/17 PASS."
+}

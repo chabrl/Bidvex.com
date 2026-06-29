@@ -1547,6 +1547,14 @@ try:
     from routes.sitemap import sitemap_router
     app.include_router(sitemap_router, tags=["SEO"])
 
+    # iter318 BidVex Careers module — public + admin job/applicant API
+    try:
+        from routes.careers import router as careers_router
+        api_router.include_router(careers_router)
+        logger.info("iter318 — Careers module mounted under /api/careers and /api/admin/careers")
+    except Exception as ce:  # noqa: BLE001
+        logger.warning(f"Careers router registration failed (non-fatal): {ce}")
+
 except ImportError:
     pass
 

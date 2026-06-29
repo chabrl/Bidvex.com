@@ -1759,7 +1759,7 @@ def _require_agreement_signed(db_obj, contractor_id: str):
 async def contractor_send_email(body: ContractorEmailSendBody,
                                   request: Request,
                                   user: User = Depends(require_dialer_access)) -> Dict[str, Any]:
-    """Sends an outbound email via partners@bidvex.ca on behalf of the
+    """Sends an outbound email via info@bidvex.com on behalf of the
     contractor. Server-side signature injection is non-overridable.
     Gated by the signed agreement (Directive 2)."""
     db = get_db()

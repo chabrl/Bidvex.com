@@ -180,8 +180,10 @@ class TestRecipientValidator:
 # ─── Directive 3 — Sender enforcement is a constant, not a parameter ────
 
 class TestSenderHardLock:
-    def test_sender_is_partners_bidvex_ca(self):
-        assert CONTRACTOR_SENDER_EMAIL == "partners@bidvex.ca"
+    def test_sender_is_info_bidvex_com(self):
+        # iter318 sender update — Email Hub now uses info@bidvex.com so
+        # outbound benefits from the domain-authenticated bidvex.com DKIM.
+        assert CONTRACTOR_SENDER_EMAIL == "info@bidvex.com"
 
     def test_support_phone_is_hardcoded_exactly(self):
         assert SUPPORT_PHONE == "+1 450 634 3099"

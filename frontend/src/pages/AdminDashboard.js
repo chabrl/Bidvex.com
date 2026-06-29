@@ -72,6 +72,14 @@ import SystemMonitoringDashboard from './admin/SystemMonitoringDashboard';
 import PlatformCleanupManager from './admin/PlatformCleanupManager';
 import CommunityModerationManager from './admin/CommunityModerationManager';
 import TeamManager from '../components/admin/TeamManager';
+// iter318 — Admin Careers console (lazy)
+import { lazy as _lazyCareers, Suspense as _SuspenseCareers } from 'react';
+const _AdminCareersConsole = _lazyCareers(() => import('./admin/AdminCareersConsole'));
+const AdminCareersConsoleLazy = (props) => (
+  <_SuspenseCareers fallback={<div className="p-8 text-center text-slate-500">Loading…</div>}>
+    <_AdminCareersConsole {...props} />
+  </_SuspenseCareers>
+);
 import AdminTaxDashboard from './AdminTaxDashboard';
 import AdminStorageDeposits from './admin/AdminStorageDeposits';
 import AdminStorageAuctions from './admin/AdminStorageAuctions';
@@ -87,7 +95,7 @@ import {
   Users, Package, Gavel, Shield, TrendingUp, Bell, Settings, FileText, 
   MessageSquare, DollarSign, Search, Image, CreditCard, Megaphone, 
   Activity, AlertTriangle, ChevronRight, Power, Zap, Eye, History,
-  ToggleLeft, ToggleRight, Clock, Mail, Sliders, Car, Send, Bot, Ticket, BarChart3, Globe, Building2, BarChart2, ShieldAlert, ShieldCheck, Lock, Inbox
+  ToggleLeft, ToggleRight, Clock, Mail, Sliders, Car, Send, Bot, Ticket, BarChart3, Globe, Building2, BarChart2, ShieldAlert, ShieldCheck, Lock, Inbox, Briefcase
 } from 'lucide-react';
 
 const API = API_BASE;
@@ -191,6 +199,7 @@ const SECONDARY_TABS = {
   ],
   team: [
     { id: 'team-members', label: 'Team Members & Invites', icon: '👥', lucideIcon: Users },
+    { id: 'careers', label: 'Careers', icon: '💼', lucideIcon: Briefcase },
   ],
   logs: [
     { id: 'action-history', label: 'Action History', icon: '📜', lucideIcon: History },
@@ -600,6 +609,9 @@ const AdminDashboard = () => {
           default: return <FinanceDashboard />;
         }
       case 'team':
+        if (secondaryTab === 'careers') {
+          return <AdminCareersConsoleLazy />;
+        }
         return <TeamManager />;
       case 'logs':
         return (

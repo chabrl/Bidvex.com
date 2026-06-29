@@ -1,9 +1,9 @@
 """
-iter317 Directive 3 — Contractor Email Hub.
+iter317 Directive 3 — Contractor Email Hub (iter318 sender update).
 
 Server-side outbound email pipeline for contractors. Enforces:
-  • Sender FROM = partners@bidvex.ca  (hardcoded, never overridable)
-  • Reply-To = partners@bidvex.ca
+  • Sender FROM = info@bidvex.com    (hardcoded, never overridable)
+  • Reply-To    = support@bidvex.com  (hardcoded, never overridable)
   • Mandatory BidVex signature block appended on every send
   • Canonical CDN logo URL (iter314 token) — NEVER the bidvex.com/assets path
   • Hardcoded support number +1 450 634 3099 — NOT a dynamic variable
@@ -25,11 +25,20 @@ from typing import Any, Dict, List, Optional
 logger = logging.getLogger(__name__)
 
 
-# ─── Hard-locked sender identity (Directive 3) ──────────────────────────
+# ─── Hard-locked sender identity (Email Hub only) ───────────────────────
+# iter318 — sender swapped from partners@bidvex.ca to info@bidvex.com so
+# Email Hub messages benefit from the already-domain-authenticated
+# bidvex.com DKIM/SPF setup. Reply-To pinned to support@bidvex.com
+# per spec (NOT the contractor's email).
 
-CONTRACTOR_SENDER_EMAIL = "partners@bidvex.ca"
-CONTRACTOR_SENDER_NAME = "BidVex Partners"
-CONTRACTOR_REPLY_TO = "partners@bidvex.ca"
+CONTRACTOR_SENDER_EMAIL = "info@bidvex.com"
+CONTRACTOR_SENDER_NAME = "BidVex Canada"
+CONTRACTOR_REPLY_TO = "support@bidvex.com"
+
+# Aliases for new spec naming (so downstream callers can use either).
+EMAIL_HUB_FROM_EMAIL = CONTRACTOR_SENDER_EMAIL
+EMAIL_HUB_FROM_NAME = CONTRACTOR_SENDER_NAME
+EMAIL_HUB_REPLY_TO = CONTRACTOR_REPLY_TO
 
 # Canonical CDN logo URL from iter314 — DO NOT swap to bidvex.com/assets.
 BIDVEX_CDN_LOGO_URL = (
@@ -63,7 +72,7 @@ def build_contractor_signature(
     Locked attributes:
       • Logo = BIDVEX_CDN_LOGO_URL  (CDN, NOT bidvex.com/assets)
       • Support phone = SUPPORT_PHONE  (hardcoded, NOT a variable)
-      • Sender = partners@bidvex.ca
+      • Sender / displayed email = info@bidvex.com (Email Hub spec)
 
     The block carries a hidden idempotency token so re-injection is a no-op.
     """
@@ -92,8 +101,8 @@ def build_contractor_signature(
         <div style="font-weight:700;font-size:15px;">{contractor_name}</div>
         <div style="color:#475569;">{title_line}</div>
         <div style="margin-top:6px;">
-          <a href="mailto:{contractor_email}"
-             style="color:#0b1a30;text-decoration:none;">{contractor_email}</a>
+          <a href="mailto:{CONTRACTOR_SENDER_EMAIL}"
+             style="color:#0b1a30;text-decoration:none;">{CONTRACTOR_SENDER_EMAIL}</a>
         </div>
         <div>
           {support_label}:
@@ -167,8 +176,8 @@ async def send_contractor_email(
             to_email=to_email,
             subject=subject,
             html_content=final_html,
-            reply_to=contractor.get("email") or CONTRACTOR_REPLY_TO,
-            reply_to_name=contractor.get("name") or CONTRACTOR_SENDER_NAME,
+            reply_to=CONTRACTOR_REPLY_TO,
+            reply_to_name=CONTRACTOR_SENDER_NAME,
         )
     except Exception as exc:  # noqa: BLE001
         sent_status = "failed"
@@ -198,7 +207,7 @@ async def send_contractor_email(
 
 
 # ─── SendGrid raw dispatcher (BYPASSES canonical send_email so we keep
-#     the partners@bidvex.ca FROM intact) ─────────────────────────────
+#     the info@bidvex.com Email Hub FROM intact) ─────────────────────────
 
 async def _sendgrid_dispatch(
     *,
@@ -209,8 +218,8 @@ async def _sendgrid_dispatch(
     reply_to_name: Optional[str],
 ) -> Optional[str]:
     """Direct SendGrid call. We can't go through services.emails._email_core
-    because that path forces FROM=noreply@bidvex.com. Contractor emails
-    MUST visibly originate from partners@bidvex.ca per Directive 3."""
+    because that path forces FROM=noreply@bidvex.com. Email Hub messages
+    MUST visibly originate from info@bidvex.com per Email Hub spec."""
     api_key = os.environ.get("SENDGRID_API_KEY")
     if not api_key:
         logger.info(f"[contractor-email] DRY-RUN to={to_email} subj={subject!r}")
@@ -263,6 +272,10 @@ def validate_recipient_email(email: str) -> bool:
 __all__ = [
     "CONTRACTOR_SENDER_EMAIL",
     "CONTRACTOR_SENDER_NAME",
+    "CONTRACTOR_REPLY_TO",
+    "EMAIL_HUB_FROM_EMAIL",
+    "EMAIL_HUB_FROM_NAME",
+    "EMAIL_HUB_REPLY_TO",
     "BIDVEX_CDN_LOGO_URL",
     "SUPPORT_PHONE",
     "SIGNATURE_TOKEN",

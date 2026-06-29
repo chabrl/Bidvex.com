@@ -140,6 +140,10 @@ const AdminDialer = lazy(() => import('./pages/admin/AdminDialer'));
 const ContractorDashboard = lazy(() => import('./pages/contractor/ContractorDashboard'));
 // iter317 Directive 3 — Contractor Email Hub
 const ContractorEmailHub = lazy(() => import('./pages/contractor/ContractorEmailHub'));
+// iter318 — BidVex Careers
+const CareersPage = lazy(() => import('./pages/CareersPage'));
+const CareersJobDetailPage = lazy(() => import('./pages/CareersJobDetailPage'));
+const AdminCareersConsole = lazy(() => import('./pages/admin/AdminCareersConsole'));
 // iter316-C — Admin Contractor drill-in (View Contractor Profile)
 const AdminContractorProfilePage = lazy(() => import('./pages/admin/AdminContractorProfilePage'));
 
@@ -562,6 +566,13 @@ const App = () => {
           {/* iter317 Directive 3 — Contractor Email Hub */}
           <Route path="/contractor/emails" element={
             <ProtectedRoute><ErrorBoundary scope="contractor-email-hub"><ContractorEmailHub /></ErrorBoundary></ProtectedRoute>
+          } />
+          {/* iter318 — BidVex Careers (public) */}
+          <Route path="/careers" element={<ErrorBoundary scope="careers"><CareersPage /></ErrorBoundary>} />
+          <Route path="/careers/:job_id" element={<ErrorBoundary scope="careers-detail"><CareersJobDetailPage /></ErrorBoundary>} />
+          {/* iter318 — Admin Careers console */}
+          <Route path="/admin/careers" element={
+            <ProtectedRoute><ErrorBoundary scope="admin-careers"><AdminCareersConsole /></ErrorBoundary></ProtectedRoute>
           } />
           {/* iter316-C — Admin Contractor drill-in profile */}
           <Route path="/admin/contractors/:contractorId" element={

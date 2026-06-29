@@ -160,6 +160,7 @@ const Footer = () => {
                 {language === 'fr' ? 'Nous joindre' : 'Contact Us'}
               </Link></li>
               <li>{renderLink('about', language === 'fr' ? 'À propos' : 'About Us', '/about')}</li>
+              <li>{renderLink('careers', language === 'fr' ? 'Carrières' : 'Careers', '/careers')}</li>
               <li>{renderLink('community', language === 'fr' ? 'Communauté' : 'Community', '/community')}</li>
               <li><a href="mailto:support@bidvex.com" className="hover:text-white transition-colors text-sm">
                 {language === 'fr' ? 'Presse' : 'Press'}
