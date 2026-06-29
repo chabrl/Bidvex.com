@@ -1,6 +1,58 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter318 — Email Hub Sender Fix + BidVex Careers Module (Feb 29, 2026) ✅ COMPLETE — VERIFIED
+
+### Sprint goal (2 isolated parts, zero regressions)
+1. **Email Hub sender swap** — Change Contractor Email Hub FROM from `partners@bidvex.ca` to `info@bidvex.com` (BidVex Canada). Reply-To pinned to `support@bidvex.com`. Signature email text updated. Strictly scoped — `partners@bidvex.ca` preserved in 8 unrelated services.
+2. **BidVex Careers module** — Brand-new isolated module with public listing/detail/apply + admin Jobs CRUD + Applicants ATS + secure file uploads.
+
+### PART 1 — Email Hub sender swap
+Files touched (Email Hub ONLY):
+- `/app/backend/services/contractor_email_hub.py` — `CONTRACTOR_SENDER_EMAIL="info@bidvex.com"`, `CONTRACTOR_SENDER_NAME="BidVex Canada"`, `CONTRACTOR_REPLY_TO="support@bidvex.com"`. Signature now renders `info@bidvex.com` (was contractor's own email). Reply-To pinned (no longer falls back to contractor.email).
+- `/app/frontend/src/pages/contractor/ContractorEmailHub.jsx` — UI labels updated.
+- Route docstring in `/app/backend/routes/twilio.py` — updated comment only.
+
+`partners@bidvex.ca` PRESERVED in: `partners.py`, `listings_service.py`, `resubmission_service.py`, `dealer_grace_period_service.py`, `admin_oversight.py`, `admin_promotions.py`, `_email_core.py` (B2B_PARTNER_REPLY_TO), `genai_direct_client.py`.
+
+### PART 2 — Careers module
+**Backend (new files):**
+- `/app/backend/routes/careers.py` — 11 endpoints (3 public, 8 admin). Mounted at `/api/careers` + `/api/admin/careers`.
+- `/app/backend/services/careers_security.py` — `validate_file()` with python-magic byte detection. `safe_resolve_download()` with path-traversal protection. UUID-prefixed filenames.
+- `/app/backend/services/careers_notifications.py` — `send_applicant_confirmation()` + `send_admin_new_applicant_notification()` via `send_email()` (noreply@bidvex.com, NOT Email Hub).
+
+**Collections:**
+- `job_offers` — id, title, title_fr, department, location, status (draft|active|archived), description_en/fr, commission_range, required_inputs (requires_cv/cover_letter/photos/certifications + custom_text_fields + custom_date_fields), created_by, created_at, updated_at.
+- `job_applicants` — id, job_offer_id, first_name, last_name, email, phone, province, preferred_language, custom_responses (dict), attachments (cv_url/cover_letter_url/photos[]/certifications[]), status (applied|reviewing|shortlisted|rejected), admin_notes, applied_at, ip_address, user_agent.
+
+**File upload security:**
+- python-magic detects MIME by magic bytes (libmagic1 + python-magic 0.4.27 added to requirements.txt).
+- ALLOWED_MIME_TYPES enforces per-kind allowlists (cv/cover_letter: PDF + DOCX; photos: JPEG/PNG; certifications: PDF only).
+- Per-file size caps: CV/cover_letter 5 MB, photos 3 MB each (max 5), certifications 5 MB each (max 3).
+- UUID-prefixed filenames + `safe_resolve_download()` rejects any path containing `/`, `\\`, or starting with `..`.
+
+**Frontend (new files):**
+- `/app/frontend/src/pages/CareersPage.jsx` — Public listing with bilingual hero + dynamic job grid + empty state.
+- `/app/frontend/src/pages/CareersJobDetailPage.jsx` — Bilingual description side-by-side + adaptive 3-step multi-step form (Step 2 hidden when no custom fields, Step 3 hidden when no required files). Client-side size/type validation before upload.
+- `/app/frontend/src/pages/admin/AdminCareersConsole.jsx` — Two sub-tabs (Jobs + Applicants ATS) with create/edit dialog, status badges, secure file downloads via Blob.
+
+**Wiring:**
+- `/app/frontend/src/App.js` — routes `/careers`, `/careers/:job_id`, `/admin/careers`.
+- `/app/frontend/src/pages/AdminDashboard.js` — Team tab gains a `careers` sub-tab.
+- `/app/frontend/src/components/Footer.js` — "Careers / Carrières" link added.
+
+### Tests (260 total backend, 100% PASS)
+- `/app/backend/tests/test_iter318_careers.py` — 15 unit tests (MIME validators, path traversal, oversize, empty, certification PDF-only, applicant status flow).
+- `/app/backend/tests/test_iter318_careers_live.py` — 17 live HTTP tests (added by testing agent).
+- iter317 regression — 245/245 PASS unchanged.
+- Frontend E2E — public list, detail, multi-step form, success state, admin Jobs+Applicants ATS all verified by testing_agent.
+
+### Tasks NOT yet done (next session candidates)
+- `bidvex.ca` domain authentication in SendGrid console (carry-over from iter317 — user DNS action required).
+- Optional: bulk applicant export (CSV download).
+- Optional: per-job applicant pipeline view (Kanban) as ATS evolution.
+
+
 ## iter317 — Weekly Leaderboard Overlay + Electronic Contractor Agreement + Email Hub (Feb 29, 2026) ✅ COMPLETE — VERIFIED
 
 ### Sprint goal (3 directives)
