@@ -367,7 +367,12 @@ export default function CareersJobDetailPage() {
                 <select
                   data-testid="input-country"
                   value={form.country}
-                  onChange={(e) => setForm({ ...form, country: e.target.value, province: '', state: '' })}
+                  onChange={(e) => {
+                    setForm({ ...form, country: e.target.value, province: '', state: '' });
+                    if (fieldErrors.country) {
+                      setFieldErrors({ ...fieldErrors, country: undefined });
+                    }
+                  }}
                   className={`mt-1 block w-full rounded border px-3 py-2 text-sm bg-white ${fieldErrors.country ? 'border-rose-400' : 'border-slate-300'}`}
                 >
                   <option value="">— Select / Sélectionnez —</option>

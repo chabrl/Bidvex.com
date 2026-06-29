@@ -1,6 +1,34 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter319 — Global Onboarding + Claude Auto-Screening + In-Admin PDF Preview (Feb 29, 2026) ✅ COMPLETE — VERIFIED
+
+### Sprint goal (3 features)
+1. **Global Onboarding** — `province` replaced by primary `country` field. Conditional secondary (province for CA, state for US). Admin filter by Country.
+2. **Claude Auto-Screening** — every applicant with a CV gets a 1-line summary + Yes/Maybe/No tag from Claude via Emergent LLM key. Admin-editable + pinable. Manual re-screen endpoint.
+3. **In-Admin PDF Preview** — Applicant Detail dialog is now a 2-col layout: AI screening + applicant data on the left, inline PDF iframe on the right.
+
+### Backend
+- `services/careers_screening.py` (NEW) — `extract_text_from_file` (pypdf + python-docx), `_call_claude` via `emergentintegrations.LlmChat.with_model('anthropic', 'claude-sonnet-4-6')`, `_parse_screening_json` (handles markdown fences + wrapping prose), `screen_applicant` orchestrator that preserves admin-pinned summary across re-screens.
+- `routes/careers.py` — `submit_application` now takes `country` + optional `province`/`state` with conditional 422 validation; queues `_screen_in_background` BackgroundTask on successful apply. New endpoints: `POST /admin/careers/applicants/{id}/screen` (manual re-screen) + `PATCH /admin/careers/applicants/{id}/screening/summary` (admin edit + pin). `GET .../attachments/{filename}?inline=1` now switches Content-Type by extension (`application/pdf` for .pdf) + Content-Disposition: inline. Admin applicant list gains `country` query param.
+- Tests: `/app/backend/tests/test_iter319_screening_and_global.py` (15 PASS) + `/app/backend/tests/test_iter319_live.py` (12 live PASS, ~2 Claude credits per full run).
+
+### Frontend
+- `lib/countries.js` (NEW) — COUNTRIES (48 incl. priority Canada+US), CA_PROVINCES (13 with codes+labels), US_STATES (51 incl. DC).
+- `CareersJobDetailPage.jsx` — Step 1 form replaces Province dropdown with Country dropdown + conditional `input-province` (Canada) / `input-state` (US) / both hidden (everywhere else). Country error clears on selection.
+- `AdminCareersConsole.jsx` — 5-column filter row with `filter-country` dropdown. Applicants table gains `Country / Region` + `AI` columns. New `RecommendationBadge` (emerald/amber/rose for Yes/Maybe/No). ApplicantDetailDialog refactored to 2-col layout (5/12 + 7/12): LEFT is `ai-screening-panel` (recommendation + summary with edit/save/pin + key signals + re-screen button) + applicant data + status. RIGHT is `cv-preview-pane` with a Blob-URL-loaded `<iframe data-testid="cv-iframe">` showing the PDF inline. DOCX gets a graceful placeholder ("Download to read"). No-CV shows an empty placeholder.
+
+### Tests (292 backend total, 100% PASS — zero regressions)
+- 245 iter317 + 15 iter318 unit + 17 iter318 live + 15 iter319 unit + 12 iter319 live
+- testing_agent_v3_fork verdict: **100% backend, 100% frontend, 0 critical, 0 bugs**.
+
+### Tasks NOT yet done (next session candidates)
+- `bidvex.ca` SendGrid domain auth (carryover, low priority since Email Hub moved to bidvex.com).
+- Bulk applicant CSV export.
+- Kanban swim-lane ATS view.
+- Job-specific Claude prompt overrides (per-job tuning of the screening rubric).
+
+
 ## iter318 — Email Hub Sender Fix + BidVex Careers Module (Feb 29, 2026) ✅ COMPLETE — VERIFIED
 
 ### Sprint goal (2 isolated parts, zero regressions)
