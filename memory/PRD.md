@@ -1,6 +1,48 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter320 — Live Support Escalation Protocol + AI Core System Prompt Refresh (Feb 29, 2026) ✅ COMPLETE — VERIFIED
+
+### Sprint goal (3 directives)
+1. **Live Support Escalation Protocol** — When the AI Core cannot resolve OR the user explicitly asks for a human, the AI runs a 2-question gate (Q1: "What is the problem?" / Q2: "Provide account details") then emits a `[[BIDVEX_ESCALATION]]{json}[[/BIDVEX_ESCALATION]]` marker. The widget intercepts the marker, strips it from the visible bubble, and POSTs a Context Packet (problem + details + last 12 transcript messages + session_id + page_url) to a new escalation endpoint.
+2. **AI Core Intent Router** — System prompt refactored to cleanly route every conversation through three paths: **Buying** / **Selling** / **Global Contracting**.
+3. **Unified Tech Stack knowledge injection** — Prompt section 6 ("BidVex Platform Matrix") now explicitly teaches the AI: `info@bidvex.com` (transactional) vs `support@bidvex.com` (escalation reply-to), the gamified commission engine (5%-20% with weekly Top-5 overlay), the Claude `claude-sonnet-4-6` ATS auto-screening pipeline, Stripe Connect flows, and the 14.975% Quebec tax logic.
+
+### Backend
+- `routes/support_escalations.py` (NEW, mounted at `/api`):
+  - `POST /support/escalate` (JWT) — persists row into `support_escalations`; defence-in-depth strips any embedded `[[BIDVEX_ESCALATION]]` from transcript content; fire-and-forget admin email with rendered Context Packet HTML; returns `{ticket_id, status:'open', message_en, message_fr}`. Caps: problem ≤1500 chars, details ≤2500 chars, transcript ≤20 messages, per-message content ≤2000 chars.
+  - `GET /admin/support/escalations` — list with `status` + `search` filters + paging envelope.
+  - `GET /admin/support/escalations/{id}` — drill-in detail (admin only).
+  - `PATCH /admin/support/escalations/{id}/status` — `{open|acknowledged|resolved|dismissed}` + `admin_notes`.
+  - `GET /admin/support/escalations/pending/count` — cheap badge counter.
+- `services/genai_direct_client.py` — `WATCHDOG_SYSTEM_INSTRUCTION` gains 3 NEW sections: `# 6. BidVex Platform Matrix`, `# 7. Intent Router` (Buying/Selling/Global Contracting), `# 8. Live Support Escalation Protocol` (2-question gate + marker contract + bilingual EN/FR Q1/Q2 wording + "NEVER skip the 2-question gate" hard rule).
+- New collection: `support_escalations` — `{id, user_id, user_email, user_role, session_id, page_url, language, problem, details, transcript[], status, admin_notes, created_at, status_updated_at, status_updated_by, ip_address, user_agent}`.
+- `server.py` — escalation router mounted (`/api/support/escalate` + `/api/admin/support/escalations*`).
+- File-upload fallback: `services/careers_security.py` now falls back to `filetype` when `libmagic` is missing (production redeploy resilience).
+
+### Frontend
+- `components/AICoreSupportWidget.jsx` — On stream finalization, the widget runs `_maybeEmitEscalation(finalContent)` which (a) regex-extracts the JSON inside `[[BIDVEX_ESCALATION]]…[[/BIDVEX_ESCALATION]]`, (b) POSTs `{problem, details, language, transcript[last 12 with markers stripped], session_id, page_url}` to `/api/support/escalate`, (c) appends a bilingual system bubble `✅ Ticket created: #<shortId> · An agent will reach out shortly.` / `✅ Demande créée : #<shortId> · Un agent vous contactera sous peu.`, (d) `_stripEscalationMarker()` removes the marker from the visible bubble.
+- `pages/admin/AdminEscalationsConsole.jsx` (NEW) — Lists tickets with `filter-status` (open/acknowledged/resolved/dismissed) + `filter-search`. Pending-count badge in header (auto-fetched from `/pending/count`). Drill-in dialog (`escalation-detail-dialog`) renders Header card + Problem (Q1) card + Details (Q2) card + Transcript card with role-coded bubbles (USER blue / ASSISTANT gray / SYSTEM yellow) + Status select + Admin notes textarea + Save button. Transcript bubbles use `[overflow-wrap:anywhere]` so pathologically long single-token messages wrap gracefully without breaking layout.
+- `pages/AdminDashboard.js` — New 3rd sub-tab under Team primary tab: `Live Support` 🆘 → `AdminEscalationsConsoleLazy`.
+
+### Tests (302 backend total — 100% PASS)
+- `tests/test_iter320_escalation.py` — **12/12 unit PASS** (system prompt audit + marker regex round-trip + Context Packet HTML escaping + marker stripping + Pydantic validation + status allowlist).
+- `tests/test_iter320_live.py` (added by testing agent) — **23/23 live HTTP PASS** (auth/RBAC, 12-message round-trip with marker stripping + 1990-char cap, admin list filters, pending count badge, status transition open→acknowledged→resolved with admin_notes persistence).
+- testing_agent_v3_fork (iteration_326): **100% backend, 100% frontend, 0 critical, 0 functional bugs** — 12 transcript bubbles render cleanly in drill-in dialog, marker stripped from rendered bubbles (DOM-confirmed), no console errors, no layout breaks.
+
+### Critical Production Notes
+- **Preview vs Production**: The user has deployed to live production. Any future bug report MUST be qualified with "Preview or Production?" before debugging.
+- **Sole admin (permanent)**: `charbel911@gmail.com` — all escalation emails route here.
+- **testbuyer/testseller/testdealer accounts get wiped periodically** — re-seed via `python /app/backend/scripts/seed_production_demo.py --execute` (idempotent).
+
+### Tasks NOT yet done (next session candidates)
+- `bidvex.ca` SendGrid domain authentication (carryover — user DNS action).
+- Bulk applicant CSV export (carryover from iter319).
+- Kanban swim-lane ATS view (carryover from iter319).
+- (Optional polish) Add `overflow-y: auto; max-height: 60vh` to AdminEscalationsConsole transcript-card if transcripts of 20 msgs near 2000-char cap become common in production.
+- (Optional polish) Override global validation handler to return 422 instead of 400 for POST `/api/support/escalate` if strict spec compliance is desired (functionally equivalent today — both return structured `{code, message_en, message_fr, fields[]}` envelope).
+
+
 ## iter319 — Global Onboarding + Claude Auto-Screening + In-Admin PDF Preview (Feb 29, 2026) ✅ COMPLETE — VERIFIED
 
 ### Sprint goal (3 features)

@@ -338,7 +338,7 @@ function EscalationDetailDialog({ token, ticketId, open, onClose, onUpdated }) {
                         </Badge>
                         {m.ts && <span className="text-[10px] text-slate-400">{m.ts}</span>}
                       </div>
-                      <p className="whitespace-pre-wrap">{m.content}</p>
+                      <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{m.content}</p>
                     </li>
                   ))}
                 </ul>
