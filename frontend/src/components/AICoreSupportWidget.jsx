@@ -145,13 +145,20 @@ const AICoreSupportWidget = () => {
   // `error=true` we set `partial=true` so the UI shows "(partial)" in
   // the timestamp row — matches the "displays the partially
   // accumulated text without throwing" robustness contract.
+  // iter320 — On non-error finalization, scan the final content for a
+  // BIDVEX_ESCALATION marker and, if found, fire the escalation API
+  // + strip the marker from the visible bubble.
   const _finalizeActiveStream = ({ error = false, partial = false } = {}) => {
+    let finalContent = null;
     setMessages((prev) => {
       const next = [...prev];
       for (let i = next.length - 1; i >= 0; i -= 1) {
         if (next[i].streaming) {
+          finalContent = next[i].content;
+          const visible = error ? next[i].content : _stripEscalationMarker(next[i].content);
           next[i] = {
             ...next[i],
+            content: visible,
             streaming: false,
             partial,
             error: error || next[i].error,
@@ -161,7 +168,72 @@ const AICoreSupportWidget = () => {
       }
       return prev;
     });
+    if (!error && finalContent && ESCALATION_RE.test(finalContent)) {
+      // Fire-and-forget; failures are silent (banner only on success).
+      _maybeEmitEscalation(finalContent);
+    }
   };
+
+  // iter320 — Detect [[BIDVEX_ESCALATION]]…[[/BIDVEX_ESCALATION]] markers
+  // emitted by the AI Core per the Live Support Escalation Protocol.
+  // When found, POST the payload + the recent transcript to the
+  // /api/support/escalate endpoint and surface a banner to the user.
+  const ESCALATION_RE = /\[\[BIDVEX_ESCALATION\]\]([\s\S]*?)\[\[\/BIDVEX_ESCALATION\]\]/;
+
+  const _stripEscalationMarker = (text) => (text || '').replace(ESCALATION_RE, '').trim();
+
+  const _maybeEmitEscalation = useCallback(async (finalText) => {
+    if (!finalText || !token) return false;
+    const m = ESCALATION_RE.exec(finalText);
+    if (!m) return false;
+    let payload;
+    try {
+      payload = JSON.parse((m[1] || '').trim());
+    } catch {
+      return false;
+    }
+    if (!payload?.problem) return false;
+    const recent = (messages || []).slice(-12).map((mm) => ({
+      role:    mm.role,
+      content: _stripEscalationMarker(mm.content),
+      ts:      mm.ts,
+    })).filter((mm) => mm.content);
+    try {
+      const r = await fetch(`${API_BASE}/support/escalate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          problem:    String(payload.problem || '').slice(0, 1500),
+          details:    String(payload.details || '').slice(0, 2500),
+          language:   payload.language || i18n.language || 'en',
+          transcript: recent,
+          session_id: sessionId,
+          page_url:   typeof window !== 'undefined' ? window.location.pathname : null,
+        }),
+      });
+      if (!r.ok) return false;
+      const json = await r.json();
+      const isFr = (i18n.language || 'en').startsWith('fr');
+      setMessages((prev) => [
+        ...prev,
+        {
+          role:    'system',
+          content: (isFr ? '✅ Demande créée : #' : '✅ Ticket created: #')
+                    + String(json.ticket_id || '').slice(0, 8)
+                    + (isFr ? ' · Un agent vous contactera sous peu.'
+                            : ' · An agent will reach out shortly.'),
+          ts:      new Date().toISOString(),
+          escalation_ticket_id: json.ticket_id,
+        },
+      ]);
+      return true;
+    } catch {
+      return false;
+    }
+  }, [token, messages, sessionId, i18n.language]);
 
   // iter278 — User can interrupt mid-stream via the Stop button. The
   // partially streamed text remains on screen as a finalized bubble.

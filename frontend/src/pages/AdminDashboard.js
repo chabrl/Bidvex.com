@@ -80,6 +80,13 @@ const AdminCareersConsoleLazy = (props) => (
     <_AdminCareersConsole {...props} />
   </_SuspenseCareers>
 );
+// iter320 — Admin Escalations console (lazy)
+const _AdminEscalationsConsole = _lazyCareers(() => import('./admin/AdminEscalationsConsole'));
+const AdminEscalationsConsoleLazy = (props) => (
+  <_SuspenseCareers fallback={<div className="p-8 text-center text-slate-500">Loading…</div>}>
+    <_AdminEscalationsConsole {...props} />
+  </_SuspenseCareers>
+);
 import AdminTaxDashboard from './AdminTaxDashboard';
 import AdminStorageDeposits from './admin/AdminStorageDeposits';
 import AdminStorageAuctions from './admin/AdminStorageAuctions';
@@ -200,6 +207,7 @@ const SECONDARY_TABS = {
   team: [
     { id: 'team-members', label: 'Team Members & Invites', icon: '👥', lucideIcon: Users },
     { id: 'careers', label: 'Careers', icon: '💼', lucideIcon: Briefcase },
+    { id: 'escalations', label: 'Live Support', icon: '🆘', lucideIcon: Briefcase },
   ],
   logs: [
     { id: 'action-history', label: 'Action History', icon: '📜', lucideIcon: History },
@@ -611,6 +619,9 @@ const AdminDashboard = () => {
       case 'team':
         if (secondaryTab === 'careers') {
           return <AdminCareersConsoleLazy />;
+        }
+        if (secondaryTab === 'escalations') {
+          return <AdminEscalationsConsoleLazy />;
         }
         return <TeamManager />;
       case 'logs':

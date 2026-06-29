@@ -1555,6 +1555,14 @@ try:
     except Exception as ce:  # noqa: BLE001
         logger.warning(f"Careers router registration failed (non-fatal): {ce}")
 
+    # iter320 — Live Support Escalation Protocol (AI Core handoff to admin)
+    try:
+        from routes.support_escalations import router as escalations_router
+        api_router.include_router(escalations_router)
+        logger.info("iter320 — Support escalation routes mounted at /api/support/escalate + /api/admin/support/escalations")
+    except Exception as ce:  # noqa: BLE001
+        logger.warning(f"Support escalation router registration failed (non-fatal): {ce}")
+
 except ImportError:
     pass
 

@@ -84,15 +84,37 @@ def _assert_uuid_like(seg: str) -> None:
 # ─── MIME validator ─────────────────────────────────────────────────────
 
 def detect_mime(buf: bytes) -> str:
-    """Detect MIME via libmagic. Raises HTTPException(500) if python-magic
-    isn't available — better to fail loud than to allow uploads through
-    an extension-only check."""
+    """Detect MIME via libmagic (primary) with a pure-Python `filetype`
+    fallback (secondary) so production builds without libmagic still
+    work. Raises HTTPException(500) only if BOTH detectors are missing —
+    better to fail loud than to allow uploads through extension only."""
+    # Primary — python-magic / libmagic
     try:
         import magic
+        try:
+            return magic.from_buffer(buf[:4096], mime=True)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"libmagic detect failed, falling back to filetype: {e}")
     except Exception as e:  # noqa: BLE001
-        logger.exception(f"python-magic missing: {e}")
-        raise HTTPException(500, "magic library unavailable on server")
-    return magic.from_buffer(buf[:2048], mime=True)
+        logger.warning(f"python-magic unavailable, falling back to filetype: {e}")
+
+    # Secondary — pure-Python filetype (no native libs needed)
+    try:
+        import filetype  # type: ignore
+        kind = filetype.guess(buf[:4096])
+        if kind is not None:
+            return kind.mime
+        # Best-effort text detection — every PDF starts with %PDF; DOCX
+        # is a ZIP (filetype returns 'application/zip').
+        if buf.startswith(b"%PDF"):
+            return "application/pdf"
+        if buf.startswith(b"PK"):
+            return "application/zip"
+        # Unknown → text/plain so the allowlist check rejects safely.
+        return "text/plain"
+    except Exception as e:  # noqa: BLE001
+        logger.exception(f"both python-magic AND filetype missing: {e}")
+        raise HTTPException(500, "MIME detector unavailable on server")
 
 
 def validate_file(*, kind: str, filename: str, content: bytes,
