@@ -1,6 +1,50 @@
 # BidVex Changelog
 
 
+## Jun 30, 2026 — iter329 ✅ Pricing Correction + Commission Audit + CI Stripe-Sync Guard
+
+### 1. Subscription Pricing — 50% Promotional Discount Structure
+- **Premium**: live $180/yr ($15/mo) — original $360/yr ($30/mo), **50% promo applied** in code via `original_price_yearly` / `price_yearly` split.
+- **VIP Elite**: live $300/yr ($25/mo) — original $600/yr ($50/mo), **50% promo applied**.
+- **Partner**: $100/yr (no promo).
+- **Partner Pro**: $240/yr (no promo).
+- Code: `services/subscription_pricing.py::DEFAULT_PLANS` updated. MongoDB `subscription_plans` rows updated.
+- `/api/subscription-plans` now correctly returns `original_price_yearly: 360` (Premium) and `600` (VIP), so frontend UI can render the strikethrough/promo badge.
+- `pricing_config.SUBSCRIPTION_TIERS` and `subscription_service.SUBSCRIPTION_PRICES` mirrors continue to show only the **live** $180/$300 values (Stripe Price mirror).
+
+### 2. Commission & Platform Fees Audit (all green vs. directive)
+
+| Spec | Code Value | Status |
+|---|---|---|
+| Vehicle platform fee 2.5% | `PLATFORM_FEE_VEHICLE = 0.025` | ✅ |
+| Partner Program Fee 3.0% | `PLATFORM_FEE_GENERAL = 0.03`, `SELLER_COMMISSION_RATES["partner_pro"] = 0.03` | ✅ |
+| Storage Facility 5% commission (paid by facility, buyer pays $0 BidVex fee) | iter211 `fee_calculator.calculate_fee()` — `seller_commission=5%`, `buyer_premium=0` | ✅ |
+| Broker structure: $500 buyer deposit hold + broker-defined commission | `broker_deposit_service.py`, `BUYER_BROKER_SECURITY_DEPOSIT_DOLLARS=500` | ✅ |
+| Contractor baseline 5% + ±1% Mon Top-5 overlay, clamped [5%, 20%] | `DEFAULT_COMMISSION_RATE=0.05`, `COMMISSION_EFFECTIVE_FLOOR/CEILING=0.05/0.20`, `services.leaderboard_overlay` Monday cron | ✅ |
+
+No fee/commission code changes were required — all 5 specs already matched the iter325/iter328 baseline state.
+
+### 3. CI Stripe-Sync Drift Guard (new)
+- **File:** `backend/scripts/verify_stripe_sync.py` (with `scripts/__init__.py`).
+- Compares `STRIPE_PRICE_IDS` references in code against live Stripe Price `unit_amount` via the Stripe API.
+- Exits 0 on full sync, exits 1 on any drift → fails the CI build.
+- Tested in preview: with the placeholder `sk_test_****gent` API key, the guard correctly reports drift and exits 1. With a real `STRIPE_API_KEY` set in CI, it verifies each tier and prints a clean pass/fail line.
+- **CI integration:** Add this BEFORE `supervisorctl restart backend` in the deploy script:
+  ```bash
+  python /app/backend/scripts/verify_stripe_sync.py || exit 1
+  ```
+
+### Test Results
+- `pytest tests/test_iter316_dialer_and_commission.py tests/test_iter317_leaderboard_overlay.py tests/test_iter323_contractor_sprint.py tests/test_iter324_ivr_proxy_hotfix.py tests/test_fee_schedule_audit_106.py tests/test_iter211_storage_fee_corrections.py` → **314/314 PASS** (including all iter211 storage fee corrections).
+- Zero lint errors.
+
+### Files changed
+- `backend/services/subscription_pricing.py` — DEFAULT_PLANS Premium/VIP price tiers updated to live $180/$300 with 50% promo originals $360/$600.
+- `backend/scripts/verify_stripe_sync.py` — NEW.
+- `backend/scripts/__init__.py` — NEW (package marker).
+- MongoDB `subscription_plans` — Premium + VIP rows updated to match.
+
+
 ## Jun 30, 2026 — iter328 ⏪ ROLLBACK to iter325 State + Stripe-Sync Lock
 
 ### Why

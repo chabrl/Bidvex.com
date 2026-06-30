@@ -141,10 +141,10 @@ DEFAULT_PLANS = {
     "premium": {
         "plan_id": "premium",
         "name": "Premium",
-        "price_monthly": 29.99,
-        "price_yearly": 299.99,
-        "original_price_monthly": 59.99,  # For promotional display (shows as "was $59.99")
-        "original_price_yearly": 599.99,
+        "price_monthly": 15.00,
+        "price_yearly": 180.00,
+        "original_price_monthly": 30.00,   # 50% promotional discount: $30 → $15
+        "original_price_yearly": 360.00,   # 50% promotional discount: $360 → $180
         "features": [
             "Unlimited listings",
             "Reduced buyer premium (3.5%)",
@@ -161,10 +161,10 @@ DEFAULT_PLANS = {
     "vip": {
         "plan_id": "vip",
         "name": "VIP",
-        "price_monthly": 99.99,
-        "price_yearly": 999.99,
-        "original_price_monthly": 199.99,  # For promotional display
-        "original_price_yearly": 1999.99,
+        "price_monthly": 25.00,
+        "price_yearly": 300.00,
+        "original_price_monthly": 50.00,   # 50% promotional discount: $50 → $25
+        "original_price_yearly": 600.00,   # 50% promotional discount: $600 → $300
         "features": [
             "All Premium benefits",
             "Lowest buyer premium (3%)",

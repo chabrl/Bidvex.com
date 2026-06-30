@@ -1,6 +1,32 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter329 — Pricing Correction (50% Promo) + Commission Audit + CI Sync Guard (Jun 30, 2026) ✅ COMPLETE
+
+### Pricing 50% Promotional Structure
+- **Premium**: live $180/yr ($15/mo) ← original $360/yr ($30/mo) — 50% promo.
+- **VIP**: live $300/yr ($25/mo) ← original $600/yr ($50/mo) — 50% promo.
+- Encoded in `DEFAULT_PLANS` via `price_yearly` (live) and `original_price_yearly` (pre-discount) fields, enabling frontend strikethrough UI.
+- MongoDB rows updated; `/api/subscription-plans` returns the promo structure correctly.
+
+### Audit of fee constants vs. directive
+- ✅ Vehicle platform fee 2.5% (`PLATFORM_FEE_VEHICLE`).
+- ✅ Partner Program 3% (`PLATFORM_FEE_GENERAL` / `SELLER_COMMISSION_RATES["partner_pro"]`).
+- ✅ Storage 5% commission (facility pays, buyer pays $0 — iter211 contract).
+- ✅ Broker structure ($500 deposit hold + broker-defined commission).
+- ✅ Contractor 5% baseline + ±1% Monday Top-5 overlay clamped [5%, 20%].
+
+### CI Stripe-Sync Drift Guard
+- New script `backend/scripts/verify_stripe_sync.py`.
+- Fails the deploy if code mirrors drift from live Stripe Price objects.
+- Integrate into CI: `python /app/backend/scripts/verify_stripe_sync.py || exit 1`.
+
+### Tests
+- **314/314 PASS** (incl. iter211 storage fee corrections, iter316/317 commission, iter324 IVR proxy).
+- Zero lint errors.
+
+
+
 ## iter328 — ROLLBACK to iter325 State + Stripe-Sync Lock (Jun 30, 2026) ✅ COMPLETE
 
 ### Rolled back (iter326 + iter327)
