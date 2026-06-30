@@ -141,3 +141,12 @@ Accounts seeded / reset:
 - `testseller@bidvex.com` / `TestSeller2026!`
 - `testdealer@bidvex.com` / `TestDealer2026!`
 
+
+## 🆕 iter323 — Active Contractor (created 2026-06-30, dialer_contractor role)
+- Email: `charbellicha1992@gmail.com`
+- Password: `TestContractor2026!`
+- Role: `dialer_contractor`
+- **Extension: 1220** (first one ever issued — never reused)
+- Personal phone (for IVR forwarding): `+15145559876` (test value; replace in prod)
+- Used by the iter323 backend HTTP tests + frontend dashboard smoke.
+

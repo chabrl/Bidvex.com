@@ -1,6 +1,60 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter323 — Contractor Dashboard Sprint (5 Directives) (Feb 29, 2026) ✅ COMPLETE — VERIFIED
+
+### D1 — Add-a-Client account-type cleanup
+- `services/contractor_commission.py` — `ACCOUNT_TYPES` keeps `liquidator` + `broker` (commission engine pays them, brokers are platform-wide via `/backend/models/broker_models.py`). NEW `CONTRACTOR_CREATABLE_ACCOUNT_TYPES = (individual_seller, business, partner, vehicle_dealer, storage_facility)`.
+- `routes/twilio.py` — `POST /api/twilio/contractor/create-client-account` now rejects non-creatable types with bilingual 422 envelope.
+- `pages/contractor/ContractorDashboard.jsx` — dropdown trimmed to exactly 5 options (EN: Individual / Business / Partner / Vehicle Dealer / Storage Facility; FR: Particulier / Entreprise / Partenaire / Marchand de véhicules / Centre d'entreposage). **Liquidator/Broker remain platform-wide via their dedicated flows.**
+
+### D2 — Contractor email routing
+- `services/contractor_email_hub.py`:
+  - `CONTRACTOR_SENDER_EMAIL` restored to `partners@bidvex.ca`, `CONTRACTOR_SENDER_NAME = "BidVex Partners"`.
+  - NEW `build_contractor_reply_to(contractor_id)` → `partners+c{contractor_id}@reply.bidvex.ca` (sanitised tag).
+  - `build_contractor_signature(..., contractor_extension=int)` now injects bilingual extension line: EN `Direct ext.` / FR `Poste direct` → `tel:+14506343099;ext=1220` link.
+- NEW `POST /api/sendgrid/inbound-parse` (in `routes/contractor_ivr_inbound.py`) — multipart webhook from SendGrid Inbound Parse → parses `+c{id}` tag → persists `contractor_emails` row with `direction=inbound` → fires bilingual notification "New reply from <client>".
+
+### D3 — Inbound IVR + sequential extension assignment
+- NEW `services/contractor_extensions.py`:
+  - `EXTENSION_START = 1220`; `assign_extension()` uses `findAndModify` atomic counter (`system_counters.contractor_extension`) + unique sparse index on `users.extension_number`. **Idempotent. Never reused.**
+  - `backfill_extensions()` one-shot helper for existing contractors.
+- `routes/twilio.py` — `admin_create_contractor` + `promote_to_contractor` both call `assign_extension()` (idempotent).
+- NEW `routes/contractor_ivr_inbound.py`:
+  - `POST /api/twilio/ivr/incoming` — bilingual language picker → extension Gather.
+  - `POST /api/twilio/ivr/route` — looks up extension owner; `<Dial callerId="+14506343099">` bridges to contractor's `personal_phone_number` with `<Number url=".../whisper">` for the announcement.
+  - `POST /api/twilio/ivr/whisper` — TwiML `<Say>` on the contractor's leg: "Incoming BidVex call to your extension from <client_number>. Connecting now." (EN/FR).
+  - `POST /api/twilio/ivr/status` — Twilio dial status callback → updates `inbound_extension_calls` row with outcome/duration.
+  - Fallback paths: invalid ext → "extension no longer active"; `0` → support; no `personal_phone_number` → "extension cannot be reached".
+- NEW collection `inbound_extension_calls` — per-call log per contractor.
+- NEW endpoints `GET /api/twilio/contractor/profile/me`, `PATCH /api/twilio/contractor/profile/me` (E.164 validation), `GET /api/twilio/contractor/extension/me`, `GET /api/twilio/contractor/inbound-calls`.
+
+### D4 — Contractor Leaderboard visibility
+- NEW `GET /api/twilio/contractor/leaderboard` — returns `[{rank, display_name, profile_photo_url, extension_number, weekly_volume_score, leaderboard_overlay_rate, trend ▲/▼/—, is_self}]`. **Documented as the one intentional data-isolation exception** (full visibility = competitive game mechanic per contract). Dollar earnings NEVER exposed.
+- Frontend `ContractorIter323Panel` `LeaderboardCard` — caller's row gets `amber-ring + YOU badge`, trend arrows, footer disclaimer "Dollar earnings stay private".
+
+### D5 — Profile photo upload
+- NEW `POST /api/twilio/contractor/profile/photo` — multipart, MIME-validated `{jpeg, png, webp}`, ≤5 MB. Reuses `services/s3_service._upload_bytes_sync` (existing image pipeline). Persists `profile_photo_url` + `profile_photo_uploaded_at`.
+- Frontend `ProfileEditorCard` — avatar (initials placeholder if no photo) + Upload Profile Photo button + Personal Phone (E.164) editor with Save.
+
+### Tests (49/49 PASS — 100% backend + frontend smoke)
+- `tests/test_iter323_contractor_sprint.py` — **27/27 unit PASS** (account-type set audit, email constants, reply-to tagger, signature extension injection, extension assignment race-safe sequence, IVR tag regex, leaderboard trend marker, E.164 validator, profile photo constraints, router surface).
+- `tests/test_iter323_http_integration.py` (added by testing agent) — **22/22 live HTTP PASS** (account-type 422 envelope, IVR all 6 code paths, leaderboard caller=self/admin, profile photo MIME/size rejection, SendGrid inbound parse positive + negative paths, signature contains `ext.`).
+- testing_agent_v3_fork iteration_329: **100% backend, 100% frontend dashboard smoke** (extension card shows 1220 prominently, Add-a-Client modal lists exactly the 5 allowed options, leaderboard self-row highlighted, inbound calls log renders the IVR test entries). **0 critical, 0 minor bugs.**
+
+### 📋 Pending — USER ACTION REQUIRED (DNS + SendGrid Dashboard)
+See **`/app/memory/ITER323_DNS_SETUP.md`** for the one-page setup checklist. Summary:
+1. SendGrid Domain Authentication for `bidvex.ca` (3 CNAME records).
+2. MX record on `reply.bidvex.ca` → `mx.sendgrid.net` (priority 10).
+3. SendGrid Inbound Parse webhook → `https://bidvex.com/api/sendgrid/inbound-parse` for host `reply.bidvex.ca`.
+4. Twilio Console: set Voice webhook on `+1 450 634 3099` to `https://bidvex.com/api/twilio/ivr/incoming` (POST).
+
+Until those DNS steps are done, the **From=partners@bidvex.ca** outbound side will still SEND (we never block on auth verification at code level) but deliverability will be poor; replies to `partners+c…@reply.bidvex.ca` will bounce. Code-side everything is wired and verified.
+
+### Backfill commands run on PREVIEW
+- `services.contractor_extensions.backfill_extensions(db)` — assigned ext 1220 to the existing contractor `charbellicha1992@gmail.com`.
+
+
 ## iter322 — Password Reset + Admin Verify Bug Fixes + Interactive Chat (Feb 29, 2026) ✅ COMPLETE — VERIFIED
 
 ### 3 User-reported bugs fixed
