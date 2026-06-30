@@ -141,6 +141,53 @@ Reconciled the two-config conflict between `services/pricing_config.py` and `ser
 - Google Maps B2B sourcing; boutique business sub-profiles.
 
 
+## iter331 — UI/UX & Admin Infrastructure Sprint (Jun 30, 2026) ✅ COMPLETE — VERIFIED 9/9 backend, 100% frontend
+
+### Scope (4 P0 deliverables, all shipped)
+
+1. **PromoBanner Conversion Optimization (`/app/frontend/src/components/PromoBanner.js`)**
+   - Detects auth state. Unauthenticated visitors on `/pricing` see a single high-contrast CTA pill **"Sign up to claim your 30-day free trial"** → `/auth?redirect=/pricing` (testid `promo-banner-signup-cta`).
+   - Authenticated visitors continue to see the original promo pill grid.
+   - Bilingual EN/FR.
+
+2. **Contractor Dashboard Responsive Refactor (`/app/frontend/src/pages/contractor/ContractorDashboard.jsx`)**
+   - Header switches between stacked (mobile) / inline (lg+) layouts.
+   - Action buttons grouped into a responsive `grid-cols-2 sm:flex` cluster.
+   - Banking validation alert, Stripe status, Leaderboard overlay, Permissions card and StatCards all now wrap cleanly Mobile 375 / Tablet 768 / Desktop 1440 with NO horizontal overflow.
+   - New `goto-contractor-aid-btn` in the header navigates to `/contractor/aid`.
+
+3. **Contractor Aid Hub + BitVex Gemini AI (`/contractor/aid`)**
+   - Frontend: `/app/frontend/src/pages/contractor/ContractorAidHub.jsx` — 6 static workflow sections (commission, IVR, email hub, add-client, stripe, escalation) + live AI chat panel with auto-scroll, typing indicator, and Markdown rendering.
+   - Backend: `/app/backend/routes/contractor_aid.py`
+     - `GET /api/contractor/aid/info` → 6 structured sections + support email + model name.
+     - `POST /api/contractor/aid/chat` → Gemini 3 Flash Preview reply (Emergent universal key, `emergentintegrations.LlmChat`).
+     - Multi-turn persistence in `contractor_aid_chats` collection keyed on `(user_id, session_id)`, capped at last 40 turns.
+   - System prompt locks the AI to BidVex contractor operational rules (commission ceiling, IVR ext, Stripe Connect, escalation channel). Verified: asking "max effective commission" returns "20.0%".
+
+4. **Press / Blog Admin Panel + DB-driven /blogs (full CRUD)**
+   - Backend: `/app/backend/routes/blogs.py`
+     - Public: `GET /api/blogs/articles`, `GET /api/blogs/articles/{slug}`.
+     - Admin: `GET/POST/PATCH/DELETE /api/admin/blogs/articles`, `POST .../publish`, `POST .../unpublish`, `POST .../cover-upload` (multipart → S3 via existing pipeline).
+   - Seed: `/app/backend/services/blogs_seed.py` idempotently inserts the 6 original articles (commission engine, broker onboarding, storage liquidations, vehicle hammer settlement, contractor commission/leaderboard, watchdog fraud engine) on every boot.
+   - Frontend:
+     - Rewrote `/app/frontend/src/pages/BlogsPage.js` to fetch `/api/blogs/articles` (renders empty state gracefully).
+     - New `/app/frontend/src/pages/BlogArticlePage.js` at `/blogs/:slug` with Markdown body renderer.
+     - New `/app/frontend/src/pages/admin/AdminBlogsConsole.jsx` mounted at **Admin → Team → Press / Blog** sub-tab; bilingual title/excerpt/body, slug auto-generation, S3 cover upload, publish/unpublish toggle, hard delete.
+
+### Tests
+- `/app/backend/tests/test_iter331_blogs_and_aid.py` — 9/9 passing on preview (covers CRUD round-trip, 403 enforcement, cover-upload, AI chat reply).
+- Frontend E2E (testing agent) — all PromoBanner / Dashboard / Aid Hub / Admin Blogs / Public Blogs acceptance criteria PASS at Mobile 375 / Tablet 768 / Desktop 1440.
+
+### Minor follow-ups (non-blocking)
+- `testbuyer@bidvex.com` / `TestBuyer2026!` returned 401 on preview during this run — bcrypt drift. Re-seed script `/app/backend/scripts/iter308_reseed_test_fixtures.py` should be re-run if needed. iter331 testing instead used a fresh `iter331_nonadmin@test.com` for 403 checks.
+- Cookie consent now uses v2 key (`bidvex_cookie_consent_v2`); automation harnesses must seed both v1 and v2 keys.
+
+### Files added/changed (iter331)
+**Added:** `backend/routes/blogs.py`, `backend/routes/contractor_aid.py`, `backend/services/blogs_seed.py`, `backend/tests/test_iter331_blogs_and_aid.py`, `frontend/src/pages/contractor/ContractorAidHub.jsx`, `frontend/src/pages/BlogArticlePage.js`, `frontend/src/pages/admin/AdminBlogsConsole.jsx`.
+**Modified:** `backend/server.py` (mount new routers + schedule seed), `frontend/src/components/PromoBanner.js`, `frontend/src/pages/contractor/ContractorDashboard.jsx`, `frontend/src/pages/BlogsPage.js` (full rewrite to DB-driven), `frontend/src/App.js` (routes `/contractor/aid` + `/blogs/:slug`), `frontend/src/pages/AdminDashboard.js` (Press/Blog sub-tab).
+
+
+
 
 ## iter324 — CRITICAL HOTFIX: Twilio IVR Production Drop (Jun 30, 2026) ✅ COMPLETE — VERIFIED
 

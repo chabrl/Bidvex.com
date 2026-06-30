@@ -150,3 +150,24 @@ Accounts seeded / reset:
 - Personal phone (for IVR forwarding): `+15145559876` (test value; replace in prod)
 - Used by the iter323 backend HTTP tests + frontend dashboard smoke.
 
+
+## 🆕 iter331 — Non-admin test user (registered by testing agent 2026-06-30)
+- Email: `iter331_nonadmin@test.com`
+- Password: `NonAdmin2026!`
+- Role: `user` (regular, no admin)
+- Notes: Created via `/api/auth/register` during iter331 testing to verify 403 on admin-only endpoints (Blogs CRUD + Contractor Aid). Use this when testbuyer@bidvex.com login returns 401 on preview.
+
+## ⚠️ Cookie consent — TWO keys (v1 + v2) — refreshed iter331
+Automation runners must set BOTH localStorage keys before any UI interaction
+(the v2 key is the currently honored one; v1 is legacy/fallback):
+```js
+const consent = JSON.stringify({
+  version: 2, accepted: true, necessary: true,
+  analytics: true, marketing: true, preferences: true,
+  timestamp: Date.now(),
+});
+localStorage.setItem('bidvex_cookie_consent', consent);
+localStorage.setItem('bidvex_cookie_consent_v2', consent);
+```
+Otherwise the Law-25 consent banner intercepts pointer events on Send buttons,
+blog tile anchors, and pricing CTAs.
