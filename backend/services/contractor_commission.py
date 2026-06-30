@@ -37,7 +37,15 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-DEFAULT_COMMISSION_RATE = 0.20  # 20% — fallback if admin hasn't set a rate
+DEFAULT_COMMISSION_RATE = 0.05  # iter325 — 5% structural baseline (was 20%).
+# Section 6 of the BidVex Enterprise Manual locks the contractor commission
+# floor at 5% effective. The +1%/-1% weekly leaderboard overlay (iter317
+# services.leaderboard_overlay) is applied on top of this baseline by
+# get_contractor_commission_rate(), capped at 20% effective.
+
+# Section 6 — Effective-rate clamp (5% floor, 20% ceiling, per spec).
+COMMISSION_EFFECTIVE_FLOOR = 0.05
+COMMISSION_EFFECTIVE_CEILING = 0.20
 
 # Full set of account types tracked by the COMMISSION ENGINE.
 # Brokers + liquidators are platform-wide account types (see /backend/models/broker_models.py),
@@ -71,18 +79,49 @@ CONTRACTOR_CREATABLE_ACCOUNT_TYPES = (
 # ─── Commission rate config ─────────────────────────────────────────────
 
 async def get_contractor_commission_rate(db, contractor_id: str, account_type: str) -> float:
-    """Look up the per-account-type rate for this contractor. Falls back
-    to default_rate, then DEFAULT_COMMISSION_RATE."""
+    """Resolve the effective commission rate at accrual time.
+
+    iter325 — Section 6 of the BidVex Enterprise Manual locks the math as:
+        effective = clamp(base + leaderboard_overlay, 5% floor, 20% ceiling)
+
+    `base` resolves from (in priority order):
+      1. contractor_commission_rates.rates_by_account_type[account_type]
+      2. contractor_commission_rates.default_rate
+      3. DEFAULT_COMMISSION_RATE (5% structural baseline)
+
+    `leaderboard_overlay` is the per-contractor `leaderboard_overlay_rate`
+    field on `users` maintained by the Monday 08:00 EST cron in
+    services.leaderboard_overlay (+1% per week in Top 5, -1% on drop-out).
+
+    Historical accruals are immutable because the resolved effective rate
+    is stamped into `contractor_commission_ledger.commission_rate_applied`
+    at accrual time (see maybe_accrue_contractor_commission).
+    """
     cfg = await db.contractor_commission_rates.find_one(
         {"contractor_id": contractor_id}, {"_id": 0},
     )
-    if not cfg:
-        return DEFAULT_COMMISSION_RATE
-    rates = cfg.get("rates_by_account_type") or {}
-    rate = rates.get(account_type)
-    if rate is not None:
-        return float(rate)
-    return float(cfg.get("default_rate") or DEFAULT_COMMISSION_RATE)
+    base_rate = DEFAULT_COMMISSION_RATE
+    if cfg:
+        rates = cfg.get("rates_by_account_type") or {}
+        override = rates.get(account_type)
+        if override is not None:
+            base_rate = float(override)
+        elif cfg.get("default_rate") is not None:
+            base_rate = float(cfg["default_rate"])
+
+    # iter325 — pull leaderboard overlay from the users collection.
+    user = await db.users.find_one(
+        {"id": contractor_id}, {"_id": 0, "leaderboard_overlay_rate": 1},
+    )
+    overlay = 0.0
+    if user:
+        try:
+            overlay = float(user.get("leaderboard_overlay_rate") or 0.0)
+        except (TypeError, ValueError):
+            overlay = 0.0
+
+    effective = base_rate + overlay
+    return max(COMMISSION_EFFECTIVE_FLOOR, min(COMMISSION_EFFECTIVE_CEILING, effective))
 
 
 async def upsert_contractor_commission_rates(

@@ -28,6 +28,7 @@ const tocEN = [
   { id: 'buyer-broker-deposit', label: '19. Buyer-Broker Security Deposit' },
   { id: 'hammer-direct', label: '20. Vehicle Hammer Price — Direct Settlement' },
   { id: 'title-transfer', label: '21. Broker Title Transfer Obligation' },
+  { id: 'contractor-rules', label: '22. Contractor Commission, Conduct & Weekly Leaderboard' },
 ];
 
 const tocFR = [
@@ -54,6 +55,8 @@ const tocFR = [
   { id: 'no-refund', label: '18. Politique de non-remboursement' },
   { id: 'buyer-broker-deposit', label: '19. Caution de sécurité acheteur-courtier' },
   { id: 'hammer-direct', label: '20. Prix marteau du véhicule — Règlement direct' },
+  { id: 'title-transfer', label: '21. Obligation de transfert de propriété du courtier' },
+  { id: 'contractor-rules', label: '22. Contractant — Commission, conduite et tableau hebdomadaire' },
 ];
 
 const Badge = ({ n }) => (
@@ -326,6 +329,47 @@ const TermsOfServicePage = () => {
               <p className="mt-2">Failure to log a title transfer within 14 days may result in account suspension pending review. Once logged, the reference number appears permanently on the buyer's transaction history as proof that the title transfer was filed with the appropriate provincial registry.</p>
             </BlueBox>
 
+            <SH id="contractor-rules" n="22">Contractor Commission, Conduct &amp; Weekly Leaderboard</SH>
+            <h3 className="text-base font-semibold mt-4">22.1 Eligibility &amp; Scope</h3>
+            <p>A "Contractor" is a sales representative (role <code>dialer_contractor</code>) onboarded by BidVex to acquire and service new client accounts. Contractors are independent contractors, not employees, and are bound by these Terms in addition to any separate written Contractor Agreement they have signed.</p>
+
+            <h3 className="text-base font-semibold mt-4">22.2 Baseline Commission Rate</h3>
+            <BlueBox>
+              <p>The structural baseline commission for verified contractor acquisitions is <strong>five percent (5%)</strong> of every successful platform-fee collection attributed to the contractor via the permanent <code>referred_by_contractor_id</code> stamp.</p>
+              <p className="mt-2">The 5% baseline is the floor — it cannot be reduced below this value through leaderboard movements, account inactivity, or platform discretion.</p>
+            </BlueBox>
+
+            <h3 className="text-base font-semibold mt-4">22.3 Weekly Leaderboard Performance Ladder</h3>
+            <p>Every Monday at 08:00 America/Toronto time, BidVex runs an automated leaderboard evaluation:</p>
+            <ol className="list-decimal pl-5 space-y-2 mt-3 text-sm">
+              <li>The top five (5) contractors by 7-day commission volume earn an additional <strong>+1% overlay</strong>, cumulative week-over-week, capped so the effective commission rate never exceeds <strong>twenty percent (20%)</strong>.</li>
+              <li>Contractors who drop out of the Top 5 in any given week receive an automatic <strong>−1% deduction</strong> to their overlay, never reducing the effective rate below the 5% baseline floor.</li>
+              <li>Each weekly evaluation is idempotent per ISO calendar week; re-running the cron the same week is a no-op.</li>
+              <li>A complete audit row is written to <code>users.leaderboard_history</code> on every evaluation, even when the delta is zero.</li>
+            </ol>
+
+            <h3 className="text-base font-semibold mt-4">22.4 Effective Rate Formula</h3>
+            <BlueBox>
+              <p><code>effective_rate = clamp(baseline + leaderboard_overlay, 5%, 20%)</code></p>
+              <p className="mt-2">The effective rate is stamped into <code>contractor_commission_ledger.commission_rate_applied</code> at the moment of each accrual. Historical ledger entries are immutable; rate changes apply forward only.</p>
+            </BlueBox>
+
+            <h3 className="text-base font-semibold mt-4">22.5 Payouts</h3>
+            <p>Contractor commissions are aggregated and paid out monthly via Stripe Connect Transfers. A Stripe-Connect-onboarded contractor with payouts enabled receives the cumulative balance as a single transfer; contractors who have not completed Connect onboarding remain in <em>accrued</em> status until they do.</p>
+
+            <h3 className="text-base font-semibold mt-4">22.6 Conduct &amp; Brand Representation</h3>
+            <p>Contractors are public-facing representatives of BidVex Inc. and must comply with all of the following at all times:</p>
+            <ul className="list-disc pl-5 space-y-1 mt-2 text-sm">
+              <li>Use only the BidVex-issued partner email signature, extension number, and <em>partners@bidvex.ca</em> sender identity for outbound contact.</li>
+              <li>Never promise pricing, discounts, or commercial terms beyond what is published on the official BidVex pricing page.</li>
+              <li>Never disparage competitors or other platforms in client communications.</li>
+              <li>Escalate any technical, billing, regulatory, or legal inquiry to <a href="mailto:support@bidvex.com" className="text-blue-600 underline">support@bidvex.com</a>; do not attempt to interpret platform rules, tax law, or compliance obligations on behalf of BidVex.</li>
+              <li>Submit to BidVex's discretionary review of inbound IVR call recordings, outbound email logs, and Add-a-Client account creations for quality assurance and fraud prevention.</li>
+            </ul>
+
+            <h3 className="text-base font-semibold mt-4">22.7 Termination &amp; Removal of Referral Attribution</h3>
+            <p>BidVex reserves the right to (a) suspend or terminate any contractor account for violation of these Terms or the separate Contractor Agreement, and (b) remove the <code>referred_by_contractor_id</code> stamp from any client account via administrative override with documented cause, in which case all previously accrued and paid commissions remain immutable but no further commissions accrue from that account.</p>
+
             <p className="text-xs text-slate-400 mt-10">&copy; 2026 BidVex Inc. All rights reserved.</p>
           </>) : (<>
 
@@ -501,6 +545,47 @@ const TermsOfServicePage = () => {
               <p>Les courtiers licenciés sont tenus de consigner le numéro de référence du transfert de propriété provincial dans leur tableau de bord BidVex dans un délai de <strong>quatorze (14) jours</strong> suivant la confirmation de la remise du véhicule. Cette obligation existe pour protéger les acheteurs et pour maintenir la conformité de BidVex avec les exigences d'audit réglementaire de la SAAQ, de ServiceOntario, d'AMVIC et de la VSA.</p>
               <p className="mt-2">Le non-respect de ce délai de 14 jours peut entraîner la suspension du compte en attendant un examen. Une fois consigné, le numéro de référence apparaît de manière permanente dans l'historique des transactions de l'acheteur comme preuve que le transfert de propriété a été déposé auprès du registre provincial approprié.</p>
             </BlueBox>
+
+            <SH id="contractor-rules" n="22">Contractant — Commission, conduite et tableau hebdomadaire</SH>
+            <h3 className="text-base font-semibold mt-4">22.1 Admissibilité et portée</h3>
+            <p>Un « Contractant » est un représentant commercial (rôle <code>dialer_contractor</code>) intégré par BidVex pour acquérir et servir de nouveaux comptes clients. Les contractants sont des travailleurs indépendants et non des salariés, et sont liés par les présentes Conditions en plus de toute Entente de contractant signée séparément.</p>
+
+            <h3 className="text-base font-semibold mt-4">22.2 Taux de commission de base</h3>
+            <BlueBox>
+              <p>Le taux de commission structurel de base pour les acquisitions vérifiées par un contractant est de <strong>cinq pour cent (5 %)</strong> de chaque perception de frais de plateforme réussie attribuée au contractant via la marque permanente <code>referred_by_contractor_id</code>.</p>
+              <p className="mt-2">Le seuil minimal de 5 % est un plancher absolu — il ne peut être réduit en dessous de cette valeur par les mouvements du classement, l'inactivité du compte ou la discrétion de la plateforme.</p>
+            </BlueBox>
+
+            <h3 className="text-base font-semibold mt-4">22.3 Échelle de performance hebdomadaire</h3>
+            <p>Chaque lundi à 08 h 00 (heure de Toronto), BidVex exécute une évaluation automatisée du classement :</p>
+            <ol className="list-decimal pl-5 space-y-2 mt-3 text-sm">
+              <li>Les cinq (5) meilleurs contractants par volume de commissions sur 7 jours obtiennent une <strong>surcouche supplémentaire de +1 %</strong>, cumulative semaine après semaine, plafonnée afin que le taux de commission effectif ne dépasse jamais <strong>vingt pour cent (20 %)</strong>.</li>
+              <li>Les contractants qui sortent du Top 5 au cours d'une semaine donnée reçoivent une <strong>déduction automatique de −1 %</strong> de leur surcouche, sans jamais ramener le taux effectif en dessous du plancher de 5 %.</li>
+              <li>Chaque évaluation hebdomadaire est idempotente par semaine ISO; relancer le cron la même semaine n'a aucun effet.</li>
+              <li>Une ligne d'audit complète est inscrite dans <code>users.leaderboard_history</code> à chaque évaluation, même lorsque la variation est nulle.</li>
+            </ol>
+
+            <h3 className="text-base font-semibold mt-4">22.4 Formule du taux effectif</h3>
+            <BlueBox>
+              <p><code>taux_effectif = clamp(base + surcouche_classement, 5 %, 20 %)</code></p>
+              <p className="mt-2">Le taux effectif est consigné dans <code>contractor_commission_ledger.commission_rate_applied</code> au moment de chaque accrual. Les écritures historiques du grand livre sont immuables; les changements de taux ne s'appliquent que prospectivement.</p>
+            </BlueBox>
+
+            <h3 className="text-base font-semibold mt-4">22.5 Versements</h3>
+            <p>Les commissions des contractants sont agrégées et versées mensuellement via Stripe Connect Transfers. Un contractant ayant complété l'intégration Stripe Connect avec les versements activés reçoit le solde cumulé en un seul transfert; les contractants n'ayant pas complété Connect restent au statut <em>accrued</em> jusqu'à ce qu'ils le fassent.</p>
+
+            <h3 className="text-base font-semibold mt-4">22.6 Conduite et représentation de la marque</h3>
+            <p>Les contractants sont des représentants publics de BidVex Inc. et doivent se conformer en tout temps à ce qui suit :</p>
+            <ul className="list-disc pl-5 space-y-1 mt-2 text-sm">
+              <li>Utiliser uniquement la signature de courriel partenaire émise par BidVex, le numéro de poste et l'identité d'expéditeur <em>partners@bidvex.ca</em> pour les communications sortantes.</li>
+              <li>Ne jamais promettre des prix, des rabais ou des conditions commerciales au-delà de ce qui est publié sur la page de tarification officielle de BidVex.</li>
+              <li>Ne jamais dénigrer les concurrents ou d'autres plateformes dans les communications avec les clients.</li>
+              <li>Faire remonter toute demande technique, de facturation, réglementaire ou juridique à <a href="mailto:support@bidvex.com" className="text-blue-600 underline">support@bidvex.com</a>; ne jamais tenter d'interpréter les règles de la plateforme, le droit fiscal ou les obligations de conformité au nom de BidVex.</li>
+              <li>Se soumettre à l'examen discrétionnaire de BidVex des enregistrements d'appels IVR entrants, des journaux de courriels sortants et des créations de comptes Add-a-Client pour assurance qualité et prévention de la fraude.</li>
+            </ul>
+
+            <h3 className="text-base font-semibold mt-4">22.7 Résiliation et retrait de l'attribution de référence</h3>
+            <p>BidVex se réserve le droit (a) de suspendre ou de résilier tout compte de contractant en cas de violation des présentes Conditions ou de l'Entente de contractant séparée, et (b) de retirer la marque <code>referred_by_contractor_id</code> de tout compte client par dérogation administrative avec cause documentée, auquel cas toutes les commissions précédemment accrues et payées demeurent immuables mais aucune autre commission ne s'accumulera à partir de ce compte.</p>
 
             <p className="text-xs text-slate-400 mt-10">&copy; 2026 BidVex Inc. Tous droits réservés.</p>
           </>)}

@@ -162,9 +162,9 @@ const Footer = () => {
               <li>{renderLink('about', language === 'fr' ? 'À propos' : 'About Us', '/about')}</li>
               <li>{renderLink('careers', language === 'fr' ? 'Carrières' : 'Careers', '/careers')}</li>
               <li>{renderLink('community', language === 'fr' ? 'Communauté' : 'Community', '/community')}</li>
-              <li><a href="mailto:support@bidvex.com" className="hover:text-white transition-colors text-sm">
+              <li><Link to="/blogs" className="hover:text-white transition-colors text-sm" data-testid="footer-press-blogs-link">
                 {language === 'fr' ? 'Presse' : 'Press'}
-              </a></li>
+              </Link></li>
             </ul>
           </div>
 

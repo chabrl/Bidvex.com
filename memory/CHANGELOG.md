@@ -1,6 +1,29 @@
 # BidVex Changelog
 
 
+## iter325 — Footer Blogs Page + Section 6 Contractor Commission Spec (Jun 30, 2026) ✅ COMPLETE — VERIFIED
+
+### Shipped
+- **Footer Press link** — repointed from `mailto:support@bidvex.com` to `<Link to="/blogs">` with `data-testid="footer-press-blogs-link"`.
+- **New `/blogs` SEO landing page** — bilingual EN/FR, 6 initial articles, react-helmet canonical + meta tags, lazy-loaded route in `App.js`.
+- **Contractor commission baseline locked at 5%** — `services/contractor_commission.py::DEFAULT_COMMISSION_RATE = 0.05` (was 0.20). New `COMMISSION_EFFECTIVE_FLOOR = 0.05` and `COMMISSION_EFFECTIVE_CEILING = 0.20`.
+- **Leaderboard overlay finally wired into accruals** — `get_contractor_commission_rate()` now reads `users.leaderboard_overlay_rate` and applies `clamp(base + overlay, 5%, 20%)`. Previously the iter317 overlay was computed but never applied to actual commissions; iter325 closes that gap.
+- **Terms of Service §22 added** — bilingual contractor commission, conduct & weekly leaderboard rules (EN + FR).
+- **Enterprise Operations Manual** — `/app/memory/BIDVEX_ENTERPRISE_MANUAL.md` — single source of truth for fees, taxes, commission ladder, and PLANNED-vs-DEPLOYED status of each feature.
+
+### Test impact
+- `tests/test_iter316_dialer_and_commission.py` — 3 tests updated to reflect 5% baseline + [5%, 20%] clamp; new `test_commission_rate_clamps_to_section6_band` added.
+- Final suite count: **243/243 PASS** (iter316 + iter317 combined).
+
+### Items deliberately left as PLANNED — NOT DEPLOYED
+- 50% partner platform-fee discount
+- 1-month free trial for partners / dealers / storage
+- First-listing-free flag
+- Multi-platform ad pipeline (Meta / Google / TikTok)
+- Google Maps B2B sourcing
+- Boutique business sub-profiles
+
+
 ## Jun 30, 2026 — iter324 🚨 CRITICAL HOTFIX: Twilio IVR Calls Dropping on Production
 
 ### The bug

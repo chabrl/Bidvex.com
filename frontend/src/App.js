@@ -71,6 +71,7 @@ const BrokerBindingRequestPage = lazy(() => import('./pages/BrokerBindingRequest
 const BrokerDashboardPage = lazy(() => import('./pages/BrokerDashboardPage'));
 const WatchlistPage = lazy(() => import('./pages/WatchlistPage'));
 const HowItWorksPage = lazy(() => import('./pages/HowItWorksPage'));
+const BlogsPage = lazy(() => import('./pages/BlogsPage'));
 const SellerProfilePage = lazy(() => import('./pages/SellerProfilePage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'));
@@ -458,6 +459,7 @@ const App = () => {
             <PhoneVerificationRoute><PhoneVerificationPage /></PhoneVerificationRoute>
           } />
           <Route path="/how-it-works" element={<HowItWorksPage />} />
+          <Route path="/blogs" element={<ErrorBoundary scope="blogs"><BlogsPage /></ErrorBoundary>} />
           {/* iter261 — Public payment page (no auth) for admin-issued payment requests. */}
           <Route path="/pay/:payment_request_id" element={<PaymentPage />} />
           <Route path="/pay/:payment_request_id/success" element={<PayRequestSuccessPage />} />

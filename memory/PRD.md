@@ -1,6 +1,35 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter325 — Section 6 Contractor Commission + /blogs SEO Page + Manual (Jun 30, 2026) ✅ COMPLETE
+
+### Shipped
+- Footer "Press" link → `/blogs` (was `mailto:support@bidvex.com`).
+- New bilingual `/blogs` SEO landing page with 6 articles.
+- Contractor commission baseline lowered to **5%** (was 20%); effective rate clamped to **[5%, 20%]**.
+- Leaderboard overlay (iter317) finally **applied to ledger accruals** — closing the long-standing gap.
+- Terms of Service §22 (EN + FR) — contractor commission, conduct & leaderboard rules.
+- Enterprise Operations Manual at `/app/memory/BIDVEX_ENTERPRISE_MANUAL.md` — single source of truth, with explicit **PLANNED vs DEPLOYED** tags.
+
+### Section 6 commission ladder (locked)
+- Baseline: **5.0%** floor.
+- Top 5 weekly: **+1.0% overlay** per consecutive week.
+- Drop-out: **-1.0% overlay** per week out of Top 5 (floor 5%).
+- Hard ceiling: **20.0% effective**.
+- Monday 08:00 America/Toronto idempotent cron (iter317).
+- `effective_rate = clamp(base + overlay, 5%, 20%)` stamped into ledger at accrual time.
+
+### Tests
+- iter316 + iter317 = **243/243 PASS**.
+- 3 iter316 tests updated to reflect the new 5% baseline; 1 new clamp-band test added.
+
+### Documented gaps (planned, NOT deployed)
+- Partner 50% platform-fee discount, 1-month trial, first-listing-free flag.
+- Multi-platform ad pipeline (Meta / Google / TikTok).
+- Google Maps B2B sourcing; boutique business sub-profiles.
+
+
+
 ## iter324 — CRITICAL HOTFIX: Twilio IVR Production Drop (Jun 30, 2026) ✅ COMPLETE — VERIFIED
 
 ### Symptom

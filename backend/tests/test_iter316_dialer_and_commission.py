@@ -203,16 +203,38 @@ def test_commission_rate_per_account_type_overrides_default():
     async def body(db):
         cid = f"test-cid-{uuid.uuid4().hex[:8]}"
         try:
+            # iter325 — Section 6 caps effective rate at 20% and floors at 5%.
+            # Admin-set rates within the band pass through; rates outside
+            # the band are clamped.
             await upsert_contractor_commission_rates(
                 db, contractor_id=cid,
-                rates_by_account_type={"vehicle_dealer": 0.25, "broker": 0.30},
-                default_rate=0.15,
+                rates_by_account_type={"vehicle_dealer": 0.18, "broker": 0.20},
+                default_rate=0.10,
                 updated_by_admin_id="admin-test",
             )
-            assert await get_contractor_commission_rate(db, cid, "vehicle_dealer") == 0.25
-            assert await get_contractor_commission_rate(db, cid, "broker") == 0.30
+            assert await get_contractor_commission_rate(db, cid, "vehicle_dealer") == 0.18
+            assert await get_contractor_commission_rate(db, cid, "broker") == 0.20
             # account type not set explicitly → default_rate
-            assert await get_contractor_commission_rate(db, cid, "partner") == 0.15
+            assert await get_contractor_commission_rate(db, cid, "partner") == 0.10
+        finally:
+            await db.contractor_commission_rates.delete_many({"contractor_id": cid})
+    _with_loop(body)
+
+
+def test_commission_rate_clamps_to_section6_band():
+    """iter325 — out-of-band admin rates clamp to [5%, 20%] effective."""
+    async def body(db):
+        cid = f"test-cid-{uuid.uuid4().hex[:8]}"
+        try:
+            await upsert_contractor_commission_rates(
+                db, contractor_id=cid,
+                rates_by_account_type={"vehicle_dealer": 0.30, "broker": 0.02},
+                updated_by_admin_id="admin-test",
+            )
+            # 0.30 clamps DOWN to 0.20 (ceiling)
+            assert await get_contractor_commission_rate(db, cid, "vehicle_dealer") == 0.20
+            # 0.02 clamps UP to 0.05 (floor)
+            assert await get_contractor_commission_rate(db, cid, "broker") == 0.05
         finally:
             await db.contractor_commission_rates.delete_many({"contractor_id": cid})
     _with_loop(body)
@@ -246,7 +268,7 @@ def test_accrual_creates_ledger_entry_with_captured_rate():
                                                        account_type="vehicle_dealer"))
             await upsert_contractor_commission_rates(
                 db, contractor_id=cid,
-                rates_by_account_type={"vehicle_dealer": 0.22},
+                rates_by_account_type={"vehicle_dealer": 0.18},
                 updated_by_admin_id="admin-test",
             )
             entry = await maybe_accrue_contractor_commission(
@@ -255,8 +277,8 @@ def test_accrual_creates_ledger_entry_with_captured_rate():
                 section="vehicle",
             )
             assert entry is not None
-            assert entry["commission_rate_applied"] == 0.22
-            assert entry["commission_amount"] == 22.00
+            assert entry["commission_rate_applied"] == 0.18
+            assert entry["commission_amount"] == 18.00
             assert entry["account_type"] == "vehicle_dealer"
             assert entry["status"] == "accrued"
         finally:
@@ -415,7 +437,7 @@ def test_monthly_payout_sums_accrued_and_marks_paid_on_success(monkeypatch):
             assert report["paid_count"] >= 1
             paid_for_us = [p for p in report["paid"] if p["contractor_id"] == cid]
             assert len(paid_for_us) == 1
-            assert paid_for_us[0]["amount"] == 60.0  # 20% × ($100 + $200) at default rate
+            assert paid_for_us[0]["amount"] == 15.0  # iter325 — 5% × ($100 + $200) at default rate
             assert paid_for_us[0]["entries"] == 2
 
             # Ledger rows now marked paid + batch id stamped.
