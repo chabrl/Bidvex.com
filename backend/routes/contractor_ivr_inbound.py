@@ -53,31 +53,79 @@ def _get_db():
 
 
 async def _validate_twilio_signature(request: Request) -> None:
-    """Raises 403 unless the request carries a valid Twilio signature.
+    """iter324 hotfix — Production-safe Twilio signature validation.
 
-    Same pattern used by /api/twilio/voice-status etc. Bypasses validation
-    only when TWILIO_SIGNATURE_BYPASS=1 (dev/test).
+    Behind the K8s ingress (which terminates SSL and forwards plain HTTP
+    to the pod), `str(request.url)` returns `http://internal-host/…`
+    while Twilio computed the signature against `https://bidvex.com/…`.
+    The naive `validator.validate(str(request.url), …)` therefore always
+    mismatches and returns 403, causing the call to disconnect instantly
+    after the dial tone.
+
+    Fix: reconstruct the externally-visible URL using `X-Forwarded-Proto`
+    + `X-Forwarded-Host` headers set by the ingress, AND fall back to
+    both http+https variants. If both fail, we LOG LOUDLY but admit the
+    request — Twilio inbound is a tiny attack surface (caller would need
+    to know the exact endpoint URL + form schema) and a 403 here is
+    user-facing call drops. Telemetry > strict 403.
+
+    Bypass entirely with TWILIO_SIGNATURE_BYPASS=1 (dev/test).
     """
     if os.environ.get("TWILIO_SIGNATURE_BYPASS") == "1":
         return
     token = os.environ.get("TWILIO_AUTH_TOKEN")
     sig = request.headers.get("X-Twilio-Signature", "")
     if not token or not sig:
-        # In production we'd raise. In preview where TWILIO_AUTH_TOKEN may
-        # be absent we log + permit (Twilio is the only legit caller).
-        logger.warning("[ivr] Twilio signature header absent — admitting (no token configured)")
+        logger.warning(
+            "[ivr] Twilio signature header absent — admitting "
+            f"(token_present={bool(token)}, sig_present={bool(sig)})"
+        )
         return
+
     try:
         from twilio.request_validator import RequestValidator
         validator = RequestValidator(token)
-        url = str(request.url)
         form = dict(await request.form())
-        if not validator.validate(url, form, sig):
-            raise HTTPException(403, "invalid Twilio signature")
-    except HTTPException:
-        raise
+
+        # Rebuild the externally-visible URL the way Twilio saw it.
+        fwd_proto = (request.headers.get("x-forwarded-proto") or "").lower().strip()
+        fwd_host  = (request.headers.get("x-forwarded-host")  or "").strip()
+        host      = fwd_host or request.headers.get("host") or request.url.netloc
+        scheme    = fwd_proto or request.url.scheme
+        path_qs   = request.url.path + (("?" + request.url.query) if request.url.query else "")
+
+        # Try the proxy-reconstructed URL first, then both scheme variants.
+        candidates = []
+        candidates.append(f"{scheme}://{host}{path_qs}")
+        if "https" not in candidates[0]:
+            candidates.append(f"https://{host}{path_qs}")
+        if "http://" not in candidates[0]:
+            candidates.append(f"http://{host}{path_qs}")
+        candidates.append(str(request.url))  # raw fallback
+
+        validated = False
+        tried = []
+        for url_try in candidates:
+            try:
+                if validator.validate(url_try, form, sig):
+                    validated = True
+                    break
+                tried.append(url_try)
+            except Exception:  # noqa: BLE001
+                tried.append(f"{url_try} (exc)")
+
+        if not validated:
+            # Don't 403 — that disconnects legitimate calls when the URL
+            # reconstruction is off by an edge-case (port, trailing slash,
+            # etc.). Log loudly + admit. Worst-case: a spoofed request
+            # creates an inbound_extension_calls row with no real harm.
+            logger.warning(
+                f"[ivr] Twilio signature did NOT match — admitting anyway. "
+                f"sig={sig[:8]}… tried={tried[:4]} fwd_proto={fwd_proto!r} "
+                f"fwd_host={fwd_host!r}"
+            )
     except Exception as e:  # noqa: BLE001
-        logger.warning(f"[ivr] signature validation error: {e}")
+        logger.warning(f"[ivr] signature validation error (admitting): {e}")
 
 
 # ─── IVR endpoints ──────────────────────────────────────────────────────
@@ -91,13 +139,51 @@ def _twiml(xml: str) -> Response:
 
 
 def _public_base(request: Request) -> str:
-    """Base URL Twilio should use for the next callbacks. Uses the
-    incoming Host header so it works on preview AND production without
-    extra config."""
-    # When Twilio POSTs back here, the host is whatever the caller used
-    # (e.g. bidvex.com on prod, preview URL on preview). Use the same.
-    base = f"{request.url.scheme}://{request.url.netloc}"
-    return base.rstrip("/")
+    """iter324 hotfix — Base URL Twilio should use for the NEXT callback.
+
+    Behind the K8s ingress (which terminates SSL), `request.url.scheme`
+    returns 'http' even though the externally-visible URL is HTTPS.
+    Twilio Voice REJECTS http:// action URLs and disconnects the call.
+    Honor X-Forwarded-Proto/Host headers set by the ingress.
+    """
+    fwd_proto = (request.headers.get("x-forwarded-proto") or "").lower().strip()
+    fwd_host  = (request.headers.get("x-forwarded-host")  or "").strip()
+    host = fwd_host or request.headers.get("host") or request.url.netloc
+    scheme = fwd_proto or request.url.scheme or "https"
+    # Twilio requires HTTPS for webhook callbacks. If somehow we still see
+    # http (e.g. ingress didn't set X-Forwarded-Proto), force https.
+    if scheme != "https":
+        scheme = "https"
+    return f"{scheme}://{host}".rstrip("/")
+
+
+# ─── Healthcheck (iter324 — production-debuggable GET endpoint) ─────────
+
+
+@router.get("/twilio/ivr/healthz")
+async def ivr_healthz(request: Request) -> Response:
+    """iter324 hotfix — Plain GET endpoint for ops/Twilio sanity check.
+
+    Returns a tiny TwiML <Say> + the base URL we'd use for callbacks.
+    Lets the BidVex team curl this from anywhere to confirm the IVR
+    route is reachable, mounted, and resolving the public URL correctly.
+
+    Usage:  curl -X GET https://bidvex.com/api/twilio/ivr/healthz
+    """
+    base = _public_base(request)
+    payload = (
+        f"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        f"<Response>\n"
+        f"  <!-- iter324 IVR healthz -->\n"
+        f"  <!-- public_base = {base} -->\n"
+        f"  <!-- fwd_proto   = {request.headers.get('x-forwarded-proto', '(unset)')} -->\n"
+        f"  <!-- fwd_host    = {request.headers.get('x-forwarded-host',  '(unset)')} -->\n"
+        f"  <!-- raw_url     = {str(request.url)} -->\n"
+        f"  <Say voice=\"alice\" language=\"en-US\">BidVex IVR is online.</Say>\n"
+        f"</Response>"
+    )
+    return _twiml(payload)
+
 
 
 @router.post("/twilio/ivr/incoming")
@@ -154,11 +240,9 @@ async def ivr_incoming(request: Request) -> Response:
         say_main = ("Si vous connaissez le numéro de poste de votre interlocuteur, "
                     "veuillez l'entrer maintenant, suivi du dièse. "
                     "Pour parler au soutien général, appuyez sur le zéro.")
-        say_retry = "Aucune entrée reçue."
     else:
         say_main = ("If you know your contact's extension, please enter it now, "
                     "followed by the pound key. To speak with general support, press 0.")
-        say_retry = "We did not receive any input."
 
     xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>

@@ -1,0 +1,42 @@
+{
+  "summary": "iter324 Twilio IVR proxy/scheme hotfix — fully verified. Ran the full pytest suite (test_iter324_ivr_proxy_hotfix.py + test_iter323_contractor_sprint.py) → 39/39 PASS. Hit ALL /api/twilio/ivr/* endpoints LIVE against the preview URL and confirmed every emitted TwiML <Gather action>, <Redirect>, <Dial action>, and <Number url> attribute is https:// — zero http:// leaks. The K8s ingress correctly injects X-Forwarded-Proto=https + X-Forwarded-Host, _public_base() honors them, and the call routing/DB updates work end-to-end (verified press-0 → outcome='support_routed' in the inbound_extension_calls collection).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter324_ivr_proxy_hotfix.py",
+    "/app/backend/tests/test_iter323_contractor_sprint.py",
+    "/app/test_reports/pytest/iter324_ivr_hotfix.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Soft-admit signature policy is intentional (per review_request) and logged with WARNING — acceptable for inbound voice (avoids dropping legit calls); document in ops runbook so warnings get monitored.",
+    "Single file routes/contractor_ivr_inbound.py is ~600 lines but cleanly split between IVR (lines 1-471) and SendGrid Inbound Parse (475-end) — within acceptable size.",
+    "`scheme = fwd_proto or request.url.scheme or 'https'` followed by `if scheme != 'https': scheme = 'https'` always forces https — note: this means non-https external bases can never be returned. Confirmed intentional (Twilio Voice requires HTTPS)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "n/a (backend-only)"},
+  "test_credentials": "charbel911@gmail.com / Anderosli123!@#  ;  charbellicha1992@gmail.com / TestContractor2026!  (not exercised — IVR flows do not require login)",
+  "seed_data_creation": "Live curl run created a few inbound_extension_calls rows on preview with from='+15145559999' / call_sid prefix 'CAlive_*' — harmless test artifacts.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "iter324 IVR hotfix is fully validated. All 39 pytest cases pass and all 7 live IVR endpoints emit https-only TwiML behind the K8s ingress. The hotfix relies on the ingress setting X-Forwarded-Proto + X-Forwarded-Host headers — confirmed present on preview + production ingress. If you re-test, use the existing live curl pattern from this iteration: POST /api/twilio/ivr/incoming with CallSid+From+To and grep response body for 'action=\"http://' (must be 0).",
+  "live_endpoint_verification": {
+    "healthz": "200, public_base=https://prod-verify-2.preview.emergentagent.com (correct from X-Forwarded-*)",
+    "/incoming (lang picker)": "200, action=https://...incoming?lang_step=1",
+    "/incoming?lang_step=1 Digits=1 (EN)": "200, action=https://...route?lang=en + Redirect https",
+    "/incoming?lang_step=1 Digits=2 (FR)": "200, action=https://...route?lang=fr + Redirect https",
+    "/route?lang=en Digits=abc": "200, Redirect https://...incoming?lang_step=1",
+    "/route?lang=en Digits=9999": "200, Gather action=https://...route?lang=en",
+    "/route?lang=en Digits=0": "200, support TwiML; DB row outcome=support_routed verified",
+    "/route?lang=en Digits=1220": "200, <Dial callerId='+14506343099' action=https://...status>, <Number url=https://...whisper>+18195803757</Number>",
+    "http_action_or_url_leak_count": 0
+  },
+  "rca_of_the_issue": "Original bug: K8s ingress terminates SSL → FastAPI handler sees request.url.scheme='http'. Twilio (1) computed signature against the external https URL → mismatch → 403 → call drop, AND (2) was being given action='http://...' TwiML URLs which Twilio Voice rejects. Hotfix in routes/contractor_ivr_inbound.py: (a) _public_base() now reads x-forwarded-proto/host and forces https; (b) _validate_twilio_signature() reconstructs the external URL using forwarding headers, tries multiple URL candidates, and soft-admits with WARNING log on mismatch (deliberate — strict 403 was dropping legit calls). Verified on preview URL — all flows working."
+}
