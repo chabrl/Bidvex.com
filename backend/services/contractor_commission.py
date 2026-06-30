@@ -39,12 +39,32 @@ def _now_iso() -> str:
 
 DEFAULT_COMMISSION_RATE = 0.20  # 20% — fallback if admin hasn't set a rate
 
+# Full set of account types tracked by the COMMISSION ENGINE.
+# Brokers + liquidators are platform-wide account types (see /backend/models/broker_models.py),
+# registered through dedicated flows. The contractor's "Add a Client" shortcut
+# (iter323 — see CONTRACTOR_CREATABLE_ACCOUNT_TYPES below) intentionally omits
+# them, but the engine MUST still pay commission on them.
 ACCOUNT_TYPES = (
     "individual_seller",
     "liquidator",
     "partner",
     "broker",
     "vehicle_dealer",
+    "storage_facility",  # iter323 — match StorageFooterBanner.js + DEMO_ACCOUNT_TYPES
+    "business",          # iter323 — generic business client (not vehicle/storage specific)
+)
+
+# iter323 — Subset that contractors are allowed to create via the
+# "Add a Client" dropdown in their dashboard. Brokers + liquidators are
+# excluded here because they have dedicated registration flows
+# (broker license verification, OPC permits, etc.) and cannot be quickly
+# spawned from the contractor dialer shortcut.
+CONTRACTOR_CREATABLE_ACCOUNT_TYPES = (
+    "individual_seller",   # "Individual"   / "Particulier"
+    "business",            # "Business"     / "Entreprise"
+    "partner",             # "Partner"      / "Partenaire"
+    "vehicle_dealer",      # "Vehicle Dealer" / "Marchand de véhicules"
+    "storage_facility",    # "Storage Facility" / "Centre d'entreposage"
 )
 
 

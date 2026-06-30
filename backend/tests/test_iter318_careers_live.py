@@ -39,8 +39,10 @@ def test_part1_contractor_email_sender(admin_headers):
     r = requests.get(f"{BASE_URL}/api/twilio/contractor/emails", headers=admin_headers, timeout=20)
     assert r.status_code == 200, r.text
     d = r.json()
-    assert d.get("sender_email") == "info@bidvex.com"
-    assert d.get("sender_name") == "BidVex Canada"
+    # iter323 — sender restored to partners@bidvex.ca; reply-to uses
+    # the new SendGrid Inbound Parse subdomain reply.bidvex.ca.
+    assert d.get("sender_email") == "partners@bidvex.ca"
+    assert d.get("sender_name") == "BidVex Partners"
     assert d.get("support_phone") == "+1 450 634 3099"
 
 

@@ -26,19 +26,55 @@ logger = logging.getLogger(__name__)
 
 
 # ─── Hard-locked sender identity (Email Hub only) ───────────────────────
-# iter318 — sender swapped from partners@bidvex.ca to info@bidvex.com so
-# Email Hub messages benefit from the already-domain-authenticated
-# bidvex.com DKIM/SPF setup. Reply-To pinned to support@bidvex.com
-# per spec (NOT the contractor's email).
+# iter323 — sender restored to partners@bidvex.ca (per the original
+# directive in iter317), now that SendGrid sender authentication is in
+# place for the `reply.bidvex.ca` subdomain. Per-contractor Reply-To
+# addresses use the `partners+c{contractor_id}@reply.bidvex.ca` tag so
+# replies routed through SendGrid Inbound Parse can be attributed back
+# to the originating contractor.
+#
+# DNS setup required (one-time, on bidvex.ca DNS at the customer's
+# registrar — documented in the iter323 setup checklist):
+#   • CNAMEs for SendGrid Domain Authentication on `bidvex.ca`
+#   • CNAME records on `reply.bidvex.ca` for the Inbound Parse domain
+#   • MX record on `reply.bidvex.ca` → mx.sendgrid.net (priority 10)
+#   • Inbound Parse webhook URL: POST /api/sendgrid/inbound-parse
 
-CONTRACTOR_SENDER_EMAIL = "info@bidvex.com"
-CONTRACTOR_SENDER_NAME = "BidVex Canada"
-CONTRACTOR_REPLY_TO = "support@bidvex.com"
+CONTRACTOR_SENDER_EMAIL = "partners@bidvex.ca"
+CONTRACTOR_SENDER_NAME = "BidVex Partners"
+
+# Per-contractor reply-to subdomain. The {contractor_id} suffix is the
+# SendGrid Inbound Parse "plus addressing" mechanism — every reply lands
+# in our Inbound Parse webhook with the recipient tag intact, so we know
+# which contractor to attribute the reply to.
+CONTRACTOR_REPLY_TO_DOMAIN = "reply.bidvex.ca"
+CONTRACTOR_REPLY_TO_BASE = "partners"  # i.e. partners+c{id}@reply.bidvex.ca
+
+# Legacy alias kept for any code path that imports this constant; new
+# code should call `build_contractor_reply_to(contractor_id)` instead.
+CONTRACTOR_REPLY_TO = f"{CONTRACTOR_REPLY_TO_BASE}@{CONTRACTOR_REPLY_TO_DOMAIN}"
 
 # Aliases for new spec naming (so downstream callers can use either).
 EMAIL_HUB_FROM_EMAIL = CONTRACTOR_SENDER_EMAIL
 EMAIL_HUB_FROM_NAME = CONTRACTOR_SENDER_NAME
 EMAIL_HUB_REPLY_TO = CONTRACTOR_REPLY_TO
+
+
+def build_contractor_reply_to(contractor_id: Optional[str]) -> str:
+    """Returns the per-contractor tagged reply-to address.
+
+    Example: contractor_id="b3a9..." → "partners+cb3a9...@reply.bidvex.ca"
+
+    The leading `c` prefix on the contractor_id portion lets the inbound
+    parser distinguish contractor-tag replies from any future tag schemes
+    that may be added (e.g. campaign-tagged replies could use `+m<id>`).
+    """
+    if not contractor_id:
+        return CONTRACTOR_REPLY_TO
+    safe_id = re.sub(r"[^a-zA-Z0-9-]", "", str(contractor_id))[:64]
+    if not safe_id:
+        return CONTRACTOR_REPLY_TO
+    return f"{CONTRACTOR_REPLY_TO_BASE}+c{safe_id}@{CONTRACTOR_REPLY_TO_DOMAIN}"
 
 # Canonical CDN logo URL from iter314 — DO NOT swap to bidvex.com/assets.
 BIDVEX_CDN_LOGO_URL = (
@@ -64,6 +100,7 @@ def build_contractor_signature(
     *,
     contractor_name: str,
     contractor_email: str,
+    contractor_extension: Optional[int] = None,
     contractor_title: Optional[str] = None,
     locale: str = "en",
 ) -> str:
@@ -72,7 +109,8 @@ def build_contractor_signature(
     Locked attributes:
       • Logo = BIDVEX_CDN_LOGO_URL  (CDN, NOT bidvex.com/assets)
       • Support phone = SUPPORT_PHONE  (hardcoded, NOT a variable)
-      • Sender / displayed email = info@bidvex.com (Email Hub spec)
+      • Sender / displayed email = partners@bidvex.ca (Email Hub spec, iter323)
+      • Direct extension = contractor_extension if set (iter323)
 
     The block carries a hidden idempotency token so re-injection is a no-op.
     """
@@ -81,6 +119,18 @@ def build_contractor_signature(
     support_label = "Soutien" if fr else "Support"
     rights = ("© BidVex Inc. Tous droits réservés."
               if fr else "© BidVex Inc. All rights reserved.")
+
+    # iter323 — extension line, server-injected, NOT contractor-overridable.
+    ext_html = ""
+    if contractor_extension:
+        ext_label = "Poste direct" if fr else "Direct ext."
+        ext_html = f"""
+        <div style="margin-top:2px;">
+          {ext_label}:
+          <a href="tel:{SUPPORT_PHONE_TEL};ext={int(contractor_extension)}"
+             style="color:#0b1a30;text-decoration:none;font-weight:600;"
+            >{SUPPORT_PHONE} ext. {int(contractor_extension)}</a>
+        </div>"""
 
     return f"""
 <!-- {SIGNATURE_TOKEN} -->
@@ -109,6 +159,7 @@ def build_contractor_signature(
           <a href="tel:{SUPPORT_PHONE_TEL}"
              style="color:#0b1a30;text-decoration:none;font-weight:600;">{SUPPORT_PHONE}</a>
         </div>
+        {ext_html}
         <div style="margin-top:6px;">
           <a href="https://bidvex.com"
              style="color:#0b1a30;text-decoration:none;">bidvex.com</a>
@@ -163,9 +214,14 @@ async def send_contractor_email(
             or f"{contractor.get('first_name','')} {contractor.get('last_name','')}".strip()
             or contractor.get("email", "BidVex Partner"),
         contractor_email=contractor.get("email") or CONTRACTOR_SENDER_EMAIL,
+        contractor_extension=contractor.get("extension_number"),
         locale=locale,
     )
     final_html = inject_signature(body_html or "", sig)
+
+    # iter323 — per-contractor tagged Reply-To so SendGrid Inbound Parse
+    # can attribute incoming replies back to this contractor.
+    contractor_reply_to = build_contractor_reply_to(contractor.get("id"))
 
     sent_status = "sent"
     sg_message_id: Optional[str] = None
@@ -176,8 +232,8 @@ async def send_contractor_email(
             to_email=to_email,
             subject=subject,
             html_content=final_html,
-            reply_to=CONTRACTOR_REPLY_TO,
-            reply_to_name=CONTRACTOR_SENDER_NAME,
+            reply_to=contractor_reply_to,
+            reply_to_name=contractor.get("name") or CONTRACTOR_SENDER_NAME,
         )
     except Exception as exc:  # noqa: BLE001
         sent_status = "failed"
@@ -189,6 +245,7 @@ async def send_contractor_email(
         "contractor_id":     contractor.get("id"),
         "from_email":        CONTRACTOR_SENDER_EMAIL,
         "from_name":         CONTRACTOR_SENDER_NAME,
+        "reply_to":          contractor_reply_to,
         "to_email":          to_email,
         "client_account_id": client_account_id,
         "subject":           subject,
@@ -200,6 +257,9 @@ async def send_contractor_email(
         "ip_address":        contractor_ip,
         "user_agent":        contractor_user_agent,
         "sent_at":           _now_iso(),
+        # iter323 — direction discriminator so Inbound Parse replies
+        # can be UNIONed in the "Sent" thread view alongside outbounds.
+        "direction":         "outbound",
     }
     await db.contractor_emails.insert_one(row)
     row.pop("_id", None)
@@ -273,13 +333,17 @@ __all__ = [
     "CONTRACTOR_SENDER_EMAIL",
     "CONTRACTOR_SENDER_NAME",
     "CONTRACTOR_REPLY_TO",
+    "CONTRACTOR_REPLY_TO_DOMAIN",
+    "CONTRACTOR_REPLY_TO_BASE",
     "EMAIL_HUB_FROM_EMAIL",
     "EMAIL_HUB_FROM_NAME",
     "EMAIL_HUB_REPLY_TO",
     "BIDVEX_CDN_LOGO_URL",
     "SUPPORT_PHONE",
+    "SUPPORT_PHONE_TEL",
     "SIGNATURE_TOKEN",
     "build_contractor_signature",
+    "build_contractor_reply_to",
     "inject_signature",
     "send_contractor_email",
     "validate_recipient_email",

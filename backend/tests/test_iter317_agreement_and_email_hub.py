@@ -181,9 +181,11 @@ class TestRecipientValidator:
 
 class TestSenderHardLock:
     def test_sender_is_info_bidvex_com(self):
-        # iter318 sender update — Email Hub now uses info@bidvex.com so
-        # outbound benefits from the domain-authenticated bidvex.com DKIM.
-        assert CONTRACTOR_SENDER_EMAIL == "info@bidvex.com"
+        # iter323 sender restored to partners@bidvex.ca (per the original
+        # iter317 spec) now that SendGrid is authenticated for
+        # `reply.bidvex.ca`. Old iter318 assertion (info@bidvex.com)
+        # superseded; see /app/memory/CHANGELOG.md.
+        assert CONTRACTOR_SENDER_EMAIL == "partners@bidvex.ca"
 
     def test_support_phone_is_hardcoded_exactly(self):
         assert SUPPORT_PHONE == "+1 450 634 3099"

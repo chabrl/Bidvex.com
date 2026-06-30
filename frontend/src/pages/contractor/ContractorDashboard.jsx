@@ -27,6 +27,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '../../components/ui/dialog';
 import ContractorAgreementModal from './ContractorAgreementModal';
+import ContractorIter323Panel from './ContractorIter323Panel';
 
 const POLL_INTERVAL_MS = 60000; // 60s refresh per spec
 
@@ -508,6 +509,9 @@ export default function ContractorDashboard() {
         </CardContent>
       </Card>
 
+      {/* iter323 — Extension card + profile editor + leaderboard + inbound calls log */}
+      <ContractorIter323Panel token={token} fr={fr} />
+
       {/* Call stats */}
       <Card data-testid="call-stats-card">
         <CardContent className="p-4">
@@ -757,11 +761,15 @@ function AddClientDialog({ token, fr, onClose, onCreated }) {
                 className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm"
                 data-testid="add-client-type"
               >
-                <option value="individual_seller">{fr ? 'Vendeur individuel' : 'Individual Seller'}</option>
-                <option value="vehicle_dealer">{fr ? 'Concessionnaire' : 'Vehicle Dealer'}</option>
+                {/* iter323 Directive 1 — exactly 5 types creatable via the
+                    contractor shortcut. Liquidator + Broker were removed
+                    (they remain valid platform-wide via their dedicated
+                    registration flows; see /backend/models/broker_models.py). */}
+                <option value="individual_seller">{fr ? 'Particulier' : 'Individual'}</option>
+                <option value="business">{fr ? 'Entreprise' : 'Business'}</option>
                 <option value="partner">{fr ? 'Partenaire' : 'Partner'}</option>
-                <option value="broker">{fr ? 'Courtier' : 'Broker'}</option>
-                <option value="liquidator">{fr ? 'Liquidateur' : 'Liquidator'}</option>
+                <option value="vehicle_dealer">{fr ? 'Marchand de véhicules' : 'Vehicle Dealer'}</option>
+                <option value="storage_facility">{fr ? 'Centre d\'entreposage' : 'Storage Facility'}</option>
               </select>
             </div>
           </div>

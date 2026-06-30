@@ -169,7 +169,7 @@ class TestDirective3EmailHub:
         # Expect metadata
         assert isinstance(data, dict)
         meta = data.get("meta") or data
-        assert meta.get("sender_email") == "info@bidvex.com" or data.get("sender_email") == "info@bidvex.com"
+        assert meta.get("sender_email") == "partners@bidvex.ca" or data.get("sender_email") == "partners@bidvex.ca"
         # Support phone
         sp = meta.get("support_phone") or data.get("support_phone")
         assert sp == "+1 450 634 3099"

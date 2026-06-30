@@ -570,10 +570,27 @@ async def _create_or_reject_account(
             "message_fr": f"Un compte avec l'email {email} existe déjà.",
         })
 
-    # Phase A scope — default cleanly to vehicle_dealer, allow override.
+    # iter323 — Contractor "Add a Client" shortcut is restricted to a 5-type
+    # subset; brokers + liquidators must use their dedicated registration
+    # flows. Reject unknown types with a bilingual 422 envelope so the UI
+    # can render a clean error message.
+    from services.contractor_commission import CONTRACTOR_CREATABLE_ACCOUNT_TYPES
     account_type = body.account_type
-    if account_type not in ACCOUNT_TYPES:
-        account_type = "vehicle_dealer"
+    if account_type not in CONTRACTOR_CREATABLE_ACCOUNT_TYPES:
+        raise HTTPException(422, {
+            "error": "invalid_account_type",
+            "allowed": list(CONTRACTOR_CREATABLE_ACCOUNT_TYPES),
+            "message_en": (
+                f"Account type '{account_type}' is not creatable via the contractor "
+                f"Add-a-Client shortcut. Allowed: "
+                + ", ".join(CONTRACTOR_CREATABLE_ACCOUNT_TYPES) + "."
+            ),
+            "message_fr": (
+                f"Le type de compte « {account_type} » n'est pas autorisé via le "
+                f"raccourci Ajouter un client. Types autorisés : "
+                + ", ".join(CONTRACTOR_CREATABLE_ACCOUNT_TYPES) + "."
+            ),
+        })
 
     user_id = str(uuid.uuid4())
     now_iso = datetime.now(timezone.utc).isoformat()
@@ -599,11 +616,16 @@ async def _create_or_reject_account(
         "created_at":          now_iso,
         "updated_at":          now_iso,
         # Type-specific flags — cleanly defaulted, preserving flexibility.
+        # iter323 — added is_business + is_storage_facility flags so the
+        # platform's existing per-type UX flows can pick up these new
+        # contractor-spawned accounts.
         "account_type":               account_type,
         "is_vehicle_dealer":          account_type == "vehicle_dealer",
         "is_partner":                 account_type == "partner",
         "is_broker":                  account_type == "broker",
         "is_liquidator":              account_type == "liquidator",
+        "is_business":                account_type == "business",
+        "is_storage_facility":        account_type == "storage_facility",
         # Contractor attribution — PERMANENT (Mission 3C).
         "referred_by_contractor_id":  contractor_id,
         "created_by_contractor_id":   contractor_id,
@@ -911,6 +933,16 @@ async def admin_create_contractor(body: CreateContractorBody,
     # Ensure the contractor has a referral code (idempotent).
     await _ensure_referral_code(db, contractor_id)
 
+    # iter323 — Assign sequential 4-digit extension (idempotent — if the
+    # user already had one from a previous promotion cycle, it's
+    # preserved; never-reuse policy enforced server-side).
+    try:
+        from services.contractor_extensions import assign_extension
+        assigned_ext = await assign_extension(db, contractor_id)
+        logger.info(f"[iter323] contractor {contractor_id} → extension {assigned_ext}")
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[iter323] extension assignment failed for {contractor_id}: {e}")
+
     # Seed an initial default commission rate if the admin provided one.
     if body.initial_default_rate is not None:
         try:
@@ -981,6 +1013,12 @@ async def admin_promote_user(user_id: str, body: PromoteUserBody,
         }},
     )
     await _ensure_referral_code(db, user_id)
+    # iter323 — Sequential extension assignment (idempotent).
+    try:
+        from services.contractor_extensions import assign_extension
+        await assign_extension(db, user_id)
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[iter323] extension assign failed: {e}")
     if body.initial_default_rate is not None:
         try:
             await upsert_contractor_commission_rates(
