@@ -189,6 +189,22 @@ Reconciled the two-config conflict between `services/pricing_config.py` and `ser
 
 
 
+## iter331 — Naming consistency hotfix (Jun 30, 2026, post-completion)
+- Final sweep removed all 8 remaining `BitVex` references in iter331 surfaces (`routes/contractor_aid.py`, `ContractorAidHub.jsx`, `PRD.md`) so the platform name is uniformly `BidVex` end-to-end (system prompt, page titles, chat header, typing indicator, escalation copy, source comments).
+- Live verification (Gemini chat post-rename): `model: gemini-3-flash-preview` → reply opens with **"I am the BidVex AI Contractor Aid, your assistant for navigating the BidVex platform…"** + correctly cites 20.0% max rate. No `BitVex` strings remain in any iter331 file.
+- testbuyer@bidvex.com / TestBuyer2026! re-seeded via `scripts/iter308_reseed_test_fixtures.py` and login verified (returns valid `access_token`).
+- pytest `tests/test_iter331_blogs_and_aid.py` → **9/9 PASS** post-rename.
+- Deployment readiness check via `deployment_agent` → **PASS** (no hardcoded secrets, env-var hygiene OK, CORS dynamic, frontend uses `REACT_APP_BACKEND_URL`).
+
+## Backlog (post-iter331 sign-off, Jun 30 2026)
+- **P1 — Proactive Contractor Nudges** (held per user request): inject context-aware nudges into the BidVex AI Aid chat panel on load (e.g. "Your overlay just bumped to +2% this week", "Your IVR extension hasn't been answered in 7 days") tied to leaderboard/IVR/Stripe state.
+- **P1 — Multi-platform ad pipeline** (Meta / Google / TikTok creative + audience sync).
+- **P2 — Google Maps B2B sourcing** for boutique business sub-profiles.
+- **P2 — Promotional landing pages** tied to `/auth?promo=` deep links.
+
+
+
+
 ## iter324 — CRITICAL HOTFIX: Twilio IVR Production Drop (Jun 30, 2026) ✅ COMPLETE — VERIFIED
 
 ### Symptom
