@@ -404,16 +404,34 @@ async def create_subscription(
                 pass
 
     try:
-        subscription = stripe.Subscription.create(
-            customer=customer_id,
-            items=[{"price": stripe_price_id}],
-            default_payment_method=default_pm,
-            metadata={
+        # iter330 — Apply 1-month free trial if eligible (lifetime once-per-user).
+        from services.trial_promo import (
+            is_trial_eligible as _trial_eligible,
+            mark_trial_redeemed as _trial_redeem,
+            TRIAL_DAYS as _TRIAL_DAYS,
+        )
+        sub_create_kwargs = {
+            "customer": customer_id,
+            "items": [{"price": stripe_price_id}],
+            "default_payment_method": default_pm,
+            "metadata": {
                 "user_id": current_user.id,
                 "plan_id": plan_id,
-                "billing_period": "yearly"
-            }
-        )
+                "billing_period": "yearly",
+            },
+        }
+        applied_trial = False
+        if await _trial_eligible(get_db(), current_user.id, tier=plan_id):
+            sub_create_kwargs["trial_period_days"] = _TRIAL_DAYS
+            sub_create_kwargs["metadata"]["bidvex_trial_iter330"] = "true"
+            applied_trial = True
+
+        subscription = stripe.Subscription.create(**sub_create_kwargs)
+
+        if applied_trial:
+            # Stamp the redemption AFTER Stripe accepts the trial — failure path
+            # below cleans up by NOT marking it redeemed.
+            await _trial_redeem(get_db(), current_user.id, plan_id)
 
         sub_data = dict(subscription)
         # For yearly plans, period end = billing_cycle_anchor + 1 year

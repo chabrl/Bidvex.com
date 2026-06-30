@@ -16,6 +16,7 @@ import {
   Settings, PiggyBank, CreditCard, Calendar,
 } from 'lucide-react';
 import { formatCurrency } from '../utils/currencyFormatter';
+import PromoBanner from '../components/PromoBanner';
 
 const API = API_BASE;
 
@@ -164,6 +165,10 @@ const SubscriptionPricingPage = () => {
 
       {/* ── 3-Column Pricing Grid ── */}
       <section className="max-w-[1100px] mx-auto px-4 pb-12 sm:pb-16">
+        {/* iter330 — Summer 2026 promo banner (50% off, 30-day trial, first-listing-free) */}
+        <div className="mb-8">
+          <PromoBanner token={localStorage.getItem('token')} />
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {plans.map((plan) => {
             const tier = TIERS[plan.plan_id] || TIERS.free;

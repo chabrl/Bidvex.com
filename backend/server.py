@@ -1567,8 +1567,10 @@ try:
     try:
         from routes.contractor_profile_ext import router as contractor_profile_ext_router
         from routes.contractor_ivr_inbound import router as contractor_ivr_inbound_router
+        from routes.promo import router as promo_router  # iter330 — Summer 2026 promo API
         api_router.include_router(contractor_profile_ext_router)
         api_router.include_router(contractor_ivr_inbound_router)
+        api_router.include_router(promo_router)
         logger.info("iter323 — Contractor profile/leaderboard + IVR + SendGrid inbound parse mounted")
     except Exception as ce:  # noqa: BLE001
         logger.warning(f"iter323 router registration failed (non-fatal): {ce}")

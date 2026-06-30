@@ -1,6 +1,70 @@
 # BidVex Changelog
 
 
+## Jun 30, 2026 — iter330 ✅ Consolidated Promo Sprint (Trial + First-Listing-Free + 50% Discount UI + DB Sync Guard)
+
+### 1. CI Code↔DB Subscription Plan Drift Guard (closes the triangle)
+- **File:** `backend/scripts/verify_db_subscription_sync.py`.
+- Compares each row in MongoDB `subscription_plans` against `services.subscription_pricing.DEFAULT_PLANS` (9 canonical fields).
+- Exits 0 on full sync, exits 1 on drift. `--fix` flag auto-syncs DB rows from code.
+- Combined with `verify_stripe_sync.py` (iter329), the full **Stripe ↔ Code ↔ DB triangle** is now drift-detectable on every deploy.
+- CI integration:
+  ```bash
+  python /app/backend/scripts/verify_stripe_sync.py || exit 1
+  python /app/backend/scripts/verify_db_subscription_sync.py || exit 1
+  ```
+
+### 2. Trial + First-Listing-Free promo service
+- **New service:** `backend/services/trial_promo.py` — `is_trial_eligible`, `mark_trial_redeemed`, `is_first_listing_free_eligible`, `try_consume_first_listing_free`, `get_promo_state`.
+- **New user fields:** `users.trial_redeemed_at`, `users.trial_redeemed_tier`, `users.first_listing_free_used`, `users.first_listing_free_consumed_at`.
+- **Trial eligible tiers:** premium, vip, partner, partner_pro, vehicle_dealer, storage_facility. Free/basic excluded.
+- **Idempotency:** Both flags use atomic `update_one` with conditional matchers — concurrent calls result in exactly one "consume success".
+- **Bug-guard:** Explicit `if user is None` check (rather than `if not user`) so that `find_one`-returns-empty-dict (because of strict projection) doesn't get treated as user-not-found.
+
+### 3. Promo API endpoints
+- `GET  /api/promo/state` — current user's trial + first-listing-free state.
+- `POST /api/promo/trial/activate` — body `{"tier": "..."}` — mark trial as redeemed, returns 409 if already used.
+- `POST /api/promo/first-listing-free/consume` — idempotent waiver consumption (`{"consumed": true|false}`).
+- File: `backend/routes/promo.py`. Registered in `server.py` under `api_router`.
+
+### 4. 1-Month Free Trial wired into Stripe subscription create
+- **Premium/VIP/Partner Pro path** (`routes/subscriptions.py::create_subscription`): consults `is_trial_eligible(user, tier)` before `stripe.Subscription.create()` — passes `trial_period_days=30` when eligible. Calls `mark_trial_redeemed()` AFTER Stripe accepts.
+- **Vehicle Dealer path** (`services/dealer_subscription_service.py::create_dealer_subscription`): same gate, wrapped in try/except so trial gate failure never blocks subscription creation.
+- Stripe metadata: `bidvex_trial_iter330: "true"` for ledger traceability.
+
+### 5. 50% Partner Discount — PARTNER50 Stripe Coupon helper
+- **File:** `backend/services/partner_coupon.py`.
+- Idempotent `ensure_partner50_coupon(db)` creates the Stripe Coupon (50% off, duration=once) on first call, caches the ID in `db.stripe_settings` (id="partner_subscription").
+- `should_apply_partner_coupon(db, user_id)` — net-new gate (user has no existing partner subscription, hasn't already redeemed).
+- `mark_partner_coupon_applied(db, user_id)` — stamps `partner_coupon_redeemed_at` to prevent re-use.
+- Returns None gracefully on Stripe API failure (preview env) — never blocks subscription creation.
+
+### 6. PromoBanner React component (the "50% off" UI)
+- **File:** `frontend/src/components/PromoBanner.js`.
+- Reads `/api/subscription-plans` and `/api/promo/state` (if authenticated).
+- Renders up to 3 pills: best % off (Premium 50% / VIP 50%), trial offer, first-listing-free.
+- Bilingual EN/FR, mobile-responsive, gracefully hides when no promo applies.
+- Wired into `SubscriptionPricingPage.js` above the 3-column pricing grid.
+- Screenshot-verified live on `/pricing` — "Save 50% — Summer 2026" + "$180/yr (was $360.00)" pill rendered perfectly.
+
+### Tests
+- **New `tests/test_iter330_trial_promo.py`** — 14 cases covering eligibility, redemption, idempotency, missing-user, empty-projection bug regression, full state composition.
+- Combined regression: **328 / 328 PASS** (`iter316` + `iter317` + `iter323` + `iter324` + `iter211` + `test_fee_schedule_audit_106` + `iter330`).
+- Zero lint errors.
+
+### Files changed
+- NEW `backend/scripts/verify_db_subscription_sync.py`
+- NEW `backend/services/trial_promo.py`
+- NEW `backend/services/partner_coupon.py`
+- NEW `backend/routes/promo.py`
+- NEW `frontend/src/components/PromoBanner.js`
+- NEW `backend/tests/test_iter330_trial_promo.py`
+- `backend/server.py` — registered `promo_router`
+- `backend/routes/subscriptions.py` — trial gate in `create_subscription`
+- `backend/services/dealer_subscription_service.py` — trial gate in `create_dealer_subscription`
+- `frontend/src/pages/SubscriptionPricingPage.js` — wired `<PromoBanner />`
+
+
 ## Jun 30, 2026 — iter329 ✅ Pricing Correction + Commission Audit + CI Stripe-Sync Guard
 
 ### 1. Subscription Pricing — 50% Promotional Discount Structure

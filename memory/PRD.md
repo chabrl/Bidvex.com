@@ -1,6 +1,25 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter330 — Promo Sprint: Trial + First-Listing-Free + 50% UI + DB Sync Guard (Jun 30, 2026) ✅ COMPLETE
+
+### Shipped
+1. **CI Code↔DB drift guard** — `verify_db_subscription_sync.py`. Closes the Stripe↔Code↔DB triangle.
+2. **Trial promo service** — `services/trial_promo.py` with full eligibility/idempotency/empty-projection bug guard.
+3. **Promo API** — 3 endpoints: `GET /api/promo/state`, `POST /api/promo/trial/activate`, `POST /api/promo/first-listing-free/consume`.
+4. **30-day Stripe trial wired** into both `routes/subscriptions.py::create_subscription` and `services/dealer_subscription_service.py::create_dealer_subscription` (auth-gated, lifetime once-per-user).
+5. **PARTNER50 coupon helper** — `services/partner_coupon.py`. Idempotent Stripe Coupon creation (50% off, once), gated for net-new Partner-tier subscribers.
+6. **PromoBanner React component** rendering on `/pricing` above the pricing grid — bilingual, mobile-responsive, screenshot-verified live.
+
+### Tests
+- 14 new `test_iter330_trial_promo.py` cases — all pass.
+- **328/328 PASS** combined regression. Zero lint errors.
+
+### Architecture lessons captured
+- `find_one` with strict projection can return `{}` (empty dict) when none of the projected fields exist on the doc. **Always check `if user is None`** not `if not user`. Test guard added.
+
+
+
 ## iter329 — Pricing Correction (50% Promo) + Commission Audit + CI Sync Guard (Jun 30, 2026) ✅ COMPLETE
 
 ### Pricing 50% Promotional Structure

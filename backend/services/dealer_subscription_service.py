@@ -162,6 +162,20 @@ async def create_dealer_subscription(
         "expand": ["latest_invoice.payment_intent"],
         "metadata": {"bidvex_user_id": user_id, "kind": "vehicle_dealer_annual"},
     }
+    # iter330 — Apply 1-month free trial if eligible (lifetime once-per-user).
+    applied_trial = False
+    try:
+        from services.trial_promo import (
+            is_trial_eligible as _trial_eligible,
+            TRIAL_DAYS as _TRIAL_DAYS,
+        )
+        if await _trial_eligible(db, user_id, tier="vehicle_dealer"):
+            sub_kwargs["trial_period_days"] = _TRIAL_DAYS
+            sub_kwargs["metadata"]["bidvex_trial_iter330"] = "true"
+            applied_trial = True
+    except Exception as trial_exc:
+        logger.warning(f"[iter330] trial gate skipped (non-fatal): {trial_exc}")
+
     # Should the launch coupon apply? Admin can override per-call (apply_launch_discount=True)
     if apply_launch_discount is None:
         apply_launch_discount = is_within_launch_window(settings)
@@ -169,6 +183,14 @@ async def create_dealer_subscription(
         sub_kwargs["discounts"] = [{"coupon": settings["stripe_coupon_id"]}]
 
     sub = stripe.Subscription.create(**sub_kwargs)
+
+    # iter330 — Stamp the trial redemption AFTER Stripe accepts the subscription.
+    if applied_trial:
+        try:
+            from services.trial_promo import mark_trial_redeemed as _trial_redeem
+            await _trial_redeem(db, user_id, "vehicle_dealer")
+        except Exception as redeem_exc:
+            logger.warning(f"[iter330] trial redeem mark failed: {redeem_exc}")
 
     # Persist subscription metadata on the user
     update = {
