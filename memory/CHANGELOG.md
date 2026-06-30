@@ -1,6 +1,41 @@
 # BidVex Changelog
 
 
+## Jun 30, 2026 — iter326 ✅ Pricing-Config Consolidation Sprint (Single Source of Truth)
+
+### The conflict (closed)
+Before iter326, BidVex had **two pricing config files disagreeing on every tier**:
+
+| Tier | Old `pricing_config.SUBSCRIPTION_TIERS` | Old `subscription_pricing.DEFAULT_PLANS` |
+|---|---|---|
+| Premium | $180/yr | $29.99/mo OR $299.99/yr |
+| VIP | $300/yr | $99.99/mo OR $999.99/yr |
+| Partner Pro | $240/yr | $100/yr |
+| Partner | $100/yr | *(missing)* |
+
+This was a billing bug waiting to happen — different parts of the codebase resolved the price differently depending on which module they imported.
+
+### The fix
+- **Canonical source:** `services/subscription_pricing.py::DEFAULT_PLANS` (monthly + yearly schema).
+- Added **`partner`** tier to `DEFAULT_PLANS` ($100/yr annual-only).
+- Replaced `services/pricing_config.py::SUBSCRIPTION_TIERS` with a **derived view** built by `_build_subscription_tiers()` at module load. Preserves the legacy `{amount_cents, currency, interval, label}` shape so existing callers (`routes/payments_promotions.py::/pricing-config`, tests, frontend) keep working unchanged. Additionally exposes `monthly_amount_cents` and `monthly_label` for new callers.
+- Resolved tier prices: Premium **$299.99/yr** (was $180), VIP **$999.99/yr** (was $300), Partner Pro **$100/yr** (was $240), Partner $100/yr (unchanged).
+
+### Files changed
+- `backend/services/subscription_pricing.py` — added `partner` tier to `DEFAULT_PLANS`.
+- `backend/services/pricing_config.py` — replaced static `SUBSCRIPTION_TIERS` dict with derived `_build_subscription_tiers()` reading from canonical source.
+- `backend/tests/test_fee_schedule_audit_106.py` — updated Premium/VIP test values and GST/QST calculations to match canonical $299.99 / $999.99; added Partner Pro consolidation test and monthly_amount_cents assertions.
+- `memory/BIDVEX_ENTERPRISE_MANUAL.md` — updated pricing tables to reflect canonical values; removed the "pricing source conflict" warning.
+
+### Verification
+- `python -m pytest tests/test_fee_schedule_audit_106.py tests/test_iter316_dialer_and_commission.py tests/test_iter317_leaderboard_overlay.py` → **243 passed, 0 failed**.
+- Live preview `GET /api/pricing-config` returns canonical values end-to-end ($29.99/mo & $299.99/yr Premium; $99.99/mo & $999.99/yr VIP).
+- Public endpoint shape unchanged for backwards compat; new `monthly_amount_cents` / `monthly_label` fields added.
+
+### Going forward
+**To change a subscription price:** edit `DEFAULT_PLANS` in `services/subscription_pricing.py`. The legacy `SUBSCRIPTION_TIERS` view rebuilds automatically. Do NOT add hardcoded prices to `pricing_config.py`.
+
+
 ## iter325 — Footer Blogs Page + Section 6 Contractor Commission Spec (Jun 30, 2026) ✅ COMPLETE — VERIFIED
 
 ### Shipped

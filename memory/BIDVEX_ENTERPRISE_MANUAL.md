@@ -56,22 +56,26 @@ Vehicle dealers and brokers must complete the **broker gate**:
 
 ## Section 2 — Account Hierarchies, Subscriptions, & Fee Matrices
 
-> ⚠️ **Pricing source conflict in code (iter325 finding):** there are two pricing config files —
-> `services/pricing_config.py` and `services/subscription_pricing.py` — that disagree on
-> per-tier prices. The table below uses **`services/pricing_config.py`** as the canonical
-> source (it is the structural pricing engine; `subscription_pricing.py` is the admin-editable
-> overlay with DB persistence). A consolidation PR is recommended (see iter325 backlog).
+> ✅ **iter326 — Pricing-Config Consolidation (Jun 30, 2026):**
+> The two-config conflict is now resolved. `services/subscription_pricing.py::DEFAULT_PLANS`
+> is the **single canonical source** for all subscription SKU prices (monthly + yearly).
+> The legacy `services/pricing_config.py::SUBSCRIPTION_TIERS` dict is now a **derived view**
+> built at module load via `_build_subscription_tiers()`, preserving its
+> `{amount_cents, currency, interval, label}` shape so existing callers and tests
+> keep working unchanged. To change a subscription price, edit `DEFAULT_PLANS`.
 
-### Canonical price matrix (from `services/pricing_config.py`)
+### Canonical price matrix (from `services/subscription_pricing.py::DEFAULT_PLANS` — iter326 consolidation)
 
-| Tier | Annual price (CAD) | Buyer Premium | Seller Commission | Monthly listings |
-|---|---|---|---|---|
-| **Free / Standard** | $0 | 5.0% | 4.0% | 5 |
-| **Partner** | $100 / yr | 5.0% (no discount) | 4.0% (no discount) | unlimited |
-| **Premium** | $180 / yr | 3.5% | 2.5% | unlimited |
-| **Partner Pro** | $240 / yr | 3.75% | 3.0% | unlimited |
-| **VIP Elite** | $300 / yr | 3.0% | 2.0% | unlimited |
-| **Vehicle Dealer** | $200 / yr → **$100 / yr with `LAUNCH50`** | 3.0% (vehicle-category platform fee 2.5%) | n/a (hammer paid direct) | unlimited |
+| Tier | Monthly (CAD) | Annual (CAD) | Buyer Premium | Seller Commission | Monthly listings |
+|---|---|---|---|---|---|
+| **Free / Standard** | — | $0 | 5.0% | 4.0% | 5 |
+| **Partner** | — (annual only) | $100 | 5.0% (no discount) | 4.0% (no discount) | unlimited |
+| **Premium** | **$29.99** | **$299.99** | 3.5% | 2.5% | unlimited |
+| **Partner Pro** | — (annual only) | $100 | 3.75% | 3.0% | unlimited |
+| **VIP Elite** | **$99.99** | **$999.99** | 3.0% | 2.0% | unlimited |
+| **Vehicle Dealer** | — | $200 → **$100 with `LAUNCH50`** | 3.0% (vehicle-category platform fee 2.5%) | n/a (hammer paid direct) | unlimited |
+
+**Public endpoint:** `GET /api/pricing-config` returns the live canonical dict — both annual and monthly equivalents (in cents and human-readable labels). Frontend consumers read from this endpoint; never hardcode prices.
 
 ### 2.1 Premium Partners Tier
 - Annual subscription: **$100 / yr** (`SUBSCRIPTION_TIERS["partner"]`).
@@ -85,7 +89,7 @@ Vehicle dealers and brokers must complete the **broker gate**:
 - Buyer premium: **5.0%**; seller commission: **4.0%**.
 
 ### 2.3 Individual VIP Users (Premium Layer)
-- Annual: **$300 / yr** (per `pricing_config.SUBSCRIPTION_TIERS["vip"]`).
+- Monthly: **$99.99/mo** OR Annual: **$999.99/yr** (per `subscription_pricing.DEFAULT_PLANS["vip"]`).
 - Buyer premium: **3.0%** (lowest); seller commission: **2.0%** (lowest).
 - Unlimited listings.
 - 🟡 **PLANNED — NOT DEPLOYED:** "Priority placement metrics" — no boosting field on listings collection ties VIP tier to placement rank. Featured listing slots are sold separately as paid promotions (Section 2 Promotion Tiers below).
@@ -324,14 +328,14 @@ Updated in iter325:
 
 ### 9.1 User-Tier Master Pricing Matrix
 
-| Tier | Annual | Buyer Premium | Seller Commission | Listings | Source |
-|---|---|---|---|---|---|
-| Standard | $0 | 5.0% | 4.0% | 5/mo | `pricing_config.py` |
-| Partner | $100 | 5.0% | 4.0% | unlimited | `pricing_config.py` |
-| Premium | $180 | 3.5% | 2.5% | unlimited | `pricing_config.py` |
-| Partner Pro | $240 | 3.75% | 3.0% | unlimited | `pricing_config.py` |
-| VIP Elite | $300 | 3.0% | 2.0% | unlimited | `pricing_config.py` |
-| Vehicle Dealer | $200 (→$100 w/ LAUNCH50) | 3.0% / 2.5% platform fee on vehicles | direct settlement | unlimited | `dealer_subscription_service.py` |
+| Tier | Monthly | Annual | Buyer Premium | Seller Commission | Listings | Canonical source |
+|---|---|---|---|---|---|---|
+| Standard | — | $0 | 5.0% | 4.0% | 5/mo | `DEFAULT_PLANS["free"]` |
+| Partner | — | $100 | 5.0% | 4.0% | unlimited | `DEFAULT_PLANS["partner"]` |
+| Premium | **$29.99** | **$299.99** | 3.5% | 2.5% | unlimited | `DEFAULT_PLANS["premium"]` |
+| Partner Pro | — | $100 | 3.75% | 3.0% | unlimited | `DEFAULT_PLANS["partner_pro"]` |
+| VIP Elite | **$99.99** | **$999.99** | 3.0% | 2.0% | unlimited | `DEFAULT_PLANS["vip"]` |
+| Vehicle Dealer | — | $200 (→$100 w/ LAUNCH50) | 3.0% / 2.5% platform fee | direct settlement | unlimited | `dealer_subscription_service.py` |
 
 ### 9.2 Contractor Commission Ladder Chart (text-rendered)
 

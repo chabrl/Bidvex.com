@@ -1,6 +1,30 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter326 — Pricing-Config Consolidation (Jun 30, 2026) ✅ COMPLETE
+
+### Closed
+Reconciled the two-config conflict between `services/pricing_config.py` and `services/subscription_pricing.py`. `DEFAULT_PLANS` in `subscription_pricing.py` is now the **single canonical source** for all subscription SKU pricing.
+
+### Canonical subscription prices (locked)
+| Tier | Monthly | Annual |
+|---|---|---|
+| Free | — | $0 |
+| Partner | — | $100/yr |
+| Premium | **$29.99** | **$299.99/yr** |
+| Partner Pro | — | $100/yr |
+| VIP | **$99.99** | **$999.99/yr** |
+
+### Architecture
+- Canonical: `services/subscription_pricing.py::DEFAULT_PLANS`
+- Legacy view: `services/pricing_config.py::SUBSCRIPTION_TIERS` now built dynamically via `_build_subscription_tiers()` — preserves the `{amount_cents, currency, interval, label}` shape for existing callers and adds `monthly_amount_cents` / `monthly_label`.
+- Public endpoint `GET /api/pricing-config` returns canonical values to the frontend.
+
+### Tests
+- `tests/test_fee_schedule_audit_106.py` updated for new canonical values + new clamps; **243/243 PASS** including iter316/iter317 regression.
+
+
+
 ## iter325 — Section 6 Contractor Commission + /blogs SEO Page + Manual (Jun 30, 2026) ✅ COMPLETE
 
 ### Shipped

@@ -105,7 +105,8 @@ class TestPartnerTier:
     """§7.2 - Partner Annual Fee and Commission Structure"""
     
     def test_partner_annual_fee_100_cad(self):
-        """Partner annual fee = $100 CAD (10000 cents)"""
+        """Partner annual fee = $100 CAD (10000 cents). iter326 — value now derived from
+        canonical services.subscription_pricing.DEFAULT_PLANS["partner"]."""
         assert SUBSCRIPTION_TIERS["partner"]["amount_cents"] == 10000
         assert SUBSCRIPTION_TIERS["partner"]["currency"] == "cad"
         assert SUBSCRIPTION_TIERS["partner"]["interval"] == "year"
@@ -329,46 +330,59 @@ class TestEmailCreditPricing:
 class TestSubscriptionPricing:
     """FIX: Subscription checkout GST/QST line items"""
     
-    def test_premium_subscription_180_cad(self):
-        """Premium subscription = $180 CAD (18000 cents)"""
-        assert SUBSCRIPTION_TIERS["premium"]["amount_cents"] == 18000
-        print("✓ Premium subscription = $180 CAD")
+    def test_premium_subscription_299_99_cad(self):
+        """Premium subscription = $299.99 CAD/yr (29999 cents). iter326 — value derived
+        from canonical services.subscription_pricing.DEFAULT_PLANS["premium"]."""
+        assert SUBSCRIPTION_TIERS["premium"]["amount_cents"] == 29999
+        # Also surfaces monthly equivalent ($29.99/mo).
+        assert SUBSCRIPTION_TIERS["premium"]["monthly_amount_cents"] == 2999
+        print("✓ Premium subscription = $299.99 CAD/yr ($29.99/mo)")
     
-    def test_vip_subscription_300_cad(self):
-        """VIP subscription = $300 CAD (30000 cents)"""
-        assert SUBSCRIPTION_TIERS["vip"]["amount_cents"] == 30000
-        print("✓ VIP subscription = $300 CAD")
+    def test_vip_subscription_999_99_cad(self):
+        """VIP subscription = $999.99 CAD/yr (99999 cents). iter326 — value derived
+        from canonical services.subscription_pricing.DEFAULT_PLANS["vip"]."""
+        assert SUBSCRIPTION_TIERS["vip"]["amount_cents"] == 99999
+        # Also surfaces monthly equivalent ($99.99/mo).
+        assert SUBSCRIPTION_TIERS["vip"]["monthly_amount_cents"] == 9999
+        print("✓ VIP subscription = $999.99 CAD/yr ($99.99/mo)")
     
     def test_partner_subscription_100_cad(self):
-        """Partner subscription = $100 CAD (10000 cents)"""
+        """Partner subscription = $100 CAD/yr (10000 cents). Annual-only, no monthly."""
         assert SUBSCRIPTION_TIERS["partner"]["amount_cents"] == 10000
-        print("✓ Partner subscription = $100 CAD")
+        assert SUBSCRIPTION_TIERS["partner"]["monthly_amount_cents"] is None
+        print("✓ Partner subscription = $100 CAD/yr (annual-only)")
+    
+    def test_partner_pro_subscription_100_cad(self):
+        """iter326 — Partner Pro consolidated to $100 CAD/yr (was conflicting $240
+        in pricing_config.py vs $100 in subscription_pricing.py)."""
+        assert SUBSCRIPTION_TIERS["partner_pro"]["amount_cents"] == 10000
+        print("✓ Partner Pro subscription = $100 CAD/yr (post-iter326 consolidation)")
     
     def test_premium_subscription_gst_qst_calculation(self):
-        """Premium $180: GST=$9.00, QST=$17.96, Total=$206.96"""
-        base = Decimal("180.00")
-        gst = (base * Decimal("0.05")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-        qst = (base * Decimal("0.09975")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-        total = base + gst + qst
-        
-        assert gst == Decimal("9.00"), f"Expected GST $9.00, got ${gst}"
-        assert qst == Decimal("17.96"), f"Expected QST $17.96, got ${qst}"
-        assert total == Decimal("206.96"), f"Expected total $206.96, got ${total}"
-        
-        print(f"✓ Premium $180: GST=${gst}, QST=${qst}, Total=${total}")
-    
-    def test_vip_subscription_gst_qst_calculation(self):
-        """VIP $300: GST=$15.00, QST=$29.93, Total=$344.93"""
-        base = Decimal("300.00")
+        """iter326 — Premium $299.99: GST=$15.00, QST=$29.92, Total=$344.91"""
+        base = Decimal("299.99")
         gst = (base * Decimal("0.05")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
         qst = (base * Decimal("0.09975")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
         total = base + gst + qst
         
         assert gst == Decimal("15.00"), f"Expected GST $15.00, got ${gst}"
-        assert qst == Decimal("29.93"), f"Expected QST $29.93, got ${qst}"
-        assert total == Decimal("344.93"), f"Expected total $344.93, got ${total}"
+        assert qst == Decimal("29.92"), f"Expected QST $29.92, got ${qst}"
+        assert total == Decimal("344.91"), f"Expected total $344.91, got ${total}"
         
-        print(f"✓ VIP $300: GST=${gst}, QST=${qst}, Total=${total}")
+        print(f"✓ Premium $299.99: GST=${gst}, QST=${qst}, Total=${total}")
+    
+    def test_vip_subscription_gst_qst_calculation(self):
+        """iter326 — VIP $999.99: GST=$50.00, QST=$99.75, Total=$1149.74"""
+        base = Decimal("999.99")
+        gst = (base * Decimal("0.05")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        qst = (base * Decimal("0.09975")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        total = base + gst + qst
+        
+        assert gst == Decimal("50.00"), f"Expected GST $50.00, got ${gst}"
+        assert qst == Decimal("99.75"), f"Expected QST $99.75, got ${qst}"
+        assert total == Decimal("1149.74"), f"Expected total $1149.74, got ${total}"
+        
+        print(f"✓ VIP $999.99: GST=${gst}, QST=${qst}, Total=${total}")
     
     def test_partner_subscription_gst_qst_calculation(self):
         """Partner $100: GST=$5.00, QST=$9.98, Total=$114.98"""

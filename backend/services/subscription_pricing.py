@@ -210,6 +210,28 @@ DEFAULT_PLANS = {
         "has_analytics_export": True,
         "support_level": "priority_chat_email",
         "is_active": True
+    },
+    # iter326 — Partner tier added to canonical DEFAULT_PLANS as the legacy
+    # pricing_config.SUBSCRIPTION_TIERS["partner"] is now derived from here.
+    # Annual-only billing — no monthly equivalent.
+    "partner": {
+        "plan_id": "partner",
+        "name": "Partner",
+        "price_monthly": 0.0,
+        "price_yearly": 100.00,
+        "original_price_monthly": 0.0,
+        "original_price_yearly": 100.00,
+        "features": [
+            "Standard marketplace access",
+            "Unlimited listings",
+            "Standard buyer premium (5%)",
+            "Standard seller commission (4%)",
+            "Annual billing only"
+        ],
+        "buyer_premium_discount": 0.0,
+        "seller_commission_discount": 0.0,
+        "monthly_listing_limit": -1,
+        "is_active": True
     }
 }
 
