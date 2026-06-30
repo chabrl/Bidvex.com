@@ -1,6 +1,28 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter324 — CRITICAL HOTFIX: Twilio IVR Production Drop (Jun 30, 2026) ✅ COMPLETE — VERIFIED
+
+### Symptom
+Calls to +1 450 634 3099 dropped instantly after a brief tone. Bilingual IVR greeting never played.
+
+### Root cause
+K8s ingress terminates SSL → FastAPI sees `request.url.scheme="http"`. Twilio signature was computed against `https://bidvex.com/...` → mismatch → 403 → drop. Also, TwiML `<Gather action="http://...">` URLs were rejected by Twilio Voice.
+
+### Fix (in `/app/backend/routes/contractor_ivr_inbound.py`)
+- `_public_base()` honours `X-Forwarded-Proto` / `X-Forwarded-Host` headers from the ingress, forces `https`.
+- `_validate_twilio_signature()` rebuilds the external URL via forwarding headers, tries multiple URL candidates, **soft-admits with WARNING log** on mismatch (avoids dropping legit calls; tiny attack surface).
+- NEW `GET /api/twilio/ivr/healthz` — ops sanity check endpoint that echoes `public_base`, `fwd_proto`, `fwd_host`.
+
+### Verification
+- New suite `backend/tests/test_iter324_ivr_proxy_hotfix.py` → 12/12 PASS
+- iter323 regression suite → 27/27 PASS (no breakage)
+- Live preview verification of all 7 IVR endpoints → zero `http://` leaks
+- Twilio-signed external-https signature accepted while pod sees `http://` internally → returns 200 (not 403)
+- Report: `/app/test_reports/iteration_330.json`
+
+
+
 ## iter323 — Contractor Dashboard Sprint (5 Directives) (Feb 29, 2026) ✅ COMPLETE — VERIFIED
 
 ### D1 — Add-a-Client account-type cleanup

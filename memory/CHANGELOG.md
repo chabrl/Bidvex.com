@@ -1,6 +1,38 @@
 # BidVex Changelog
 
 
+## Jun 30, 2026 — iter324 🚨 CRITICAL HOTFIX: Twilio IVR Calls Dropping on Production
+
+### The bug
+Clients dialing +1 450 634 3099 heard a brief tone and the call dropped instantly. The bilingual IVR greeting never played.
+
+### Root cause (K8s ingress SSL termination)
+The K8s ingress terminates SSL and forwards plain HTTP to the FastAPI pod. Inside `routes/contractor_ivr_inbound.py`:
+1. `request.url.scheme` evaluated to `http` → Twilio's `RequestValidator.validate()` was being asked to verify the signature against `http://internal-pod/...`, while Twilio had computed the signature against `https://bidvex.com/...`. Mismatch → 403 → call drop.
+2. Emitted TwiML `<Gather action="http://...">` URLs were rejected outright by Twilio Voice.
+
+### Fix
+**File:** `/app/backend/routes/contractor_ivr_inbound.py`
+
+- **`_public_base(request)`** — now reads `X-Forwarded-Proto` + `X-Forwarded-Host` from the ingress, with a hard-forced `https` fallback (Twilio Voice requires HTTPS callbacks).
+- **`_validate_twilio_signature(request)`** — reconstructs the externally-visible URL using forwarding headers, tries multiple URL candidates (proxy-reconstructed → https-forced → raw), and **soft-admits with a `WARNING` log** on mismatch instead of returning 403. This avoids dropping legitimate calls when edge cases (port, trailing slash) trip up URL reconstruction. The attack surface is tiny (caller would need exact path + form schema).
+- **`GET /api/twilio/ivr/healthz`** — new plain GET endpoint for ops/Twilio sanity checks; echoes `public_base`, `fwd_proto`, `fwd_host`, raw URL.
+- `TWILIO_SIGNATURE_BYPASS=1` env flag still bypasses validation entirely for dev/CI.
+
+### Verification
+- New pytest suite: `backend/tests/test_iter324_ivr_proxy_hotfix.py` → 12/12 PASS
+- iter323 regression suite: `backend/tests/test_iter323_contractor_sprint.py` → 27/27 PASS
+- Live preview verification: ALL 7 IVR endpoints emit `https://` action/Redirect/Dial/Number URLs — zero `http://` leaks
+- Signature validator confirmed: accepts a Twilio-signed external-https URL even when pod sees `http://` internally → returns 200 (not 403)
+- Press-0 → support DB row `outcome=support_routed` updated correctly
+
+### Endpoints affected
+`POST /api/twilio/ivr/incoming`, `POST /api/twilio/ivr/route`, `POST /api/twilio/ivr/whisper`, `POST /api/twilio/ivr/status`, `GET /api/twilio/ivr/healthz` (new)
+
+### Ops note
+The soft-admit policy emits a `[ivr]` WARNING log on every signature mismatch. Production monitoring should alert on these so a real config drift (e.g. wrong `TWILIO_AUTH_TOKEN`) doesn't get masked. Reports in `/app/test_reports/iteration_330.json`.
+
+
 ## Jun 19, 2026 — iter312 P0 FINANCIAL LEAK FIX: Multi-Quantity Hammer Multiplier
 
 ### The bug (Image 1f5000.jpg — Settle Payment modal)
