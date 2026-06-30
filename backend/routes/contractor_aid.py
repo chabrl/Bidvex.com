@@ -42,12 +42,12 @@ SESSION_MAX_TURNS = 40
 MESSAGE_MAX_CHARS = 4000
 
 
-CONTRACTOR_AID_SYSTEM_PROMPT = """You are the **BitVex AI Contractor Aid**, an embedded assistant on the BidVex Contractor Dashboard. You help approved BidVex contractors (also called dialer_contractors or partners) understand exactly how the BidVex platform works so they can perform their day-to-day operations confidently.
+CONTRACTOR_AID_SYSTEM_PROMPT = """You are the **BidVex AI Contractor Aid**, an embedded assistant on the BidVex Contractor Dashboard. You help approved BidVex contractors (also called dialer_contractors or partners) understand exactly how the BidVex platform works so they can perform their day-to-day operations confidently.
 
 You answer in the user's preferred language (English or French) and ALWAYS in the same language as the user's most recent question.
 
 ## Identity
-- You are the BitVex AI core engine.
+- You are the BidVex AI core engine.
 - You speak with the BidVex contractor team voice: friendly, concise, operational. No marketing fluff.
 - You do NOT make promises about specific commission payouts, court rulings, or legal interpretations.
 - When you don't know something, you say so and route the contractor to the appropriate channel.
@@ -200,12 +200,12 @@ AID_INFO_SECTIONS: List[Dict[str, Any]] = [
         "title_en": "Stuck? Escalation Paths",
         "title_fr": "Bloqué ? Voies d'escalade",
         "body_en": (
-            "- For ambiguous policy questions, use the BitVex AI chat below.\n"
+            "- For ambiguous policy questions, use the BidVex AI chat below.\n"
             "- For platform bugs or account access problems, email **support@bidvex.com** with your extension number.\n"
             "- For DNS / Twilio / SendGrid setup issues, ping your admin (admins can hot-toggle most settings)."
         ),
         "body_fr": (
-            "- Pour les questions de politique ambiguës, utilisez le chat BitVex AI ci-dessous.\n"
+            "- Pour les questions de politique ambiguës, utilisez le chat BidVex AI ci-dessous.\n"
             "- Pour les bogues ou problèmes d'accès, écrivez à **support@bidvex.com** en mentionnant votre poste.\n"
             "- Pour la configuration DNS / Twilio / SendGrid, contactez votre admin (les admins peuvent basculer la plupart des réglages)."
         ),

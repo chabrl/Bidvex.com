@@ -5,7 +5,7 @@
  * served at /contractor/aid. Combines:
  *   - 6 static workflow sections (commission, IVR, email, add-client,
  *     stripe, escalation) rendered from /api/contractor/aid/info.
- *   - A live BitVex AI chat (Gemini 3 Flash) powered by
+ *   - A live BidVex AI chat (Gemini 3 Flash) powered by
  *     /api/contractor/aid/chat for interactive Q&A.
  *
  * Fully bilingual EN/FR. Server-enforced role gate (dialer_contractor +
@@ -257,7 +257,7 @@ export default function ContractorAidHub() {
             data-testid="aid-page-title"
           >
             <LifeBuoy className="h-6 w-6 sm:h-7 sm:w-7 text-amber-600 flex-shrink-0" />
-            {fr ? 'Aide Contractant — BitVex AI' : 'Contractor Aid — BitVex AI'}
+            {fr ? 'Aide Contractant — BidVex AI' : 'Contractor Aid — BidVex AI'}
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
             {fr
@@ -292,7 +292,7 @@ export default function ContractorAidHub() {
               >
                 <Sparkles className="h-5 w-5" />
                 <h2 className="font-bold text-base sm:text-lg flex-1 min-w-0">
-                  {fr ? 'BitVex AI — Assistant en direct' : 'BitVex AI — Live Assistant'}
+                  {fr ? 'BidVex AI — Assistant en direct' : 'BidVex AI — Live Assistant'}
                 </h2>
                 <span className="text-[10px] px-2 py-0.5 bg-white/20 rounded-full font-mono whitespace-nowrap">
                   {info?.model || 'gemini'}
@@ -356,7 +356,7 @@ export default function ContractorAidHub() {
                     </div>
                     <div className="bg-white border border-slate-200 rounded-2xl px-3 py-2 text-sm flex items-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      <span className="text-slate-500">{fr ? 'BitVex réfléchit…' : 'BitVex is thinking…'}</span>
+                      <span className="text-slate-500">{fr ? 'BidVex réfléchit…' : 'BidVex is thinking…'}</span>
                     </div>
                   </div>
                 )}

@@ -156,7 +156,7 @@ Reconciled the two-config conflict between `services/pricing_config.py` and `ser
    - Banking validation alert, Stripe status, Leaderboard overlay, Permissions card and StatCards all now wrap cleanly Mobile 375 / Tablet 768 / Desktop 1440 with NO horizontal overflow.
    - New `goto-contractor-aid-btn` in the header navigates to `/contractor/aid`.
 
-3. **Contractor Aid Hub + BitVex Gemini AI (`/contractor/aid`)**
+3. **Contractor Aid Hub + BidVex Gemini AI (`/contractor/aid`)**
    - Frontend: `/app/frontend/src/pages/contractor/ContractorAidHub.jsx` — 6 static workflow sections (commission, IVR, email hub, add-client, stripe, escalation) + live AI chat panel with auto-scroll, typing indicator, and Markdown rendering.
    - Backend: `/app/backend/routes/contractor_aid.py`
      - `GET /api/contractor/aid/info` → 6 structured sections + support email + model name.
