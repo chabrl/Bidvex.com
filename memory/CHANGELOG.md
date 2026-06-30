@@ -1,6 +1,47 @@
 # BidVex Changelog
 
 
+## Jun 30, 2026 — iter327 ✅ Public Top Contractor Leaderboard + Pricing-Endpoint Reconciliation
+
+### Top Contractor Leaderboard Widget
+- New public unauthenticated endpoint: **`GET /api/contractor/leaderboard/public`** (`routes/contractor_profile_ext.py::public_leaderboard_router`).
+- Returns Top N (default 10, max 50) contractors with **strictly anonymized fields only**: `rank`, `masked_id` (`Partner #12**`), `extension_prefix` (`12**`), `overlay_rate_pct`, `effective_rate_pct` (clamped to Section 6 band 5–20%), `weeks_in_top_5`, `badge_label` (Rookie/Rising/Pro/Elite/Legendary, bilingual EN/FR), `trend` (▲/▼/—).
+- Privacy contract: **NO names, emails, photos, real extensions, dollar earnings, or user IDs** appear in the response. The full extension is masked to the 2-digit prefix + `**`; user IDs and email addresses are never selected from the DB. Whitelist contract is locked by 14 pytest cases in `tests/test_iter327_public_leaderboard.py`.
+- New React component **`frontend/src/components/TopContractorLeaderboard.js`** placed below the article grid on `/blogs`. Bilingual rendering, mobile-responsive layout, gold/silver/bronze ring on ranks 1-3, badge gradient styling, graceful "no data" hiding.
+- Wired into `/blogs` via `BlogsPage.js`; verified rendering live on preview at `https://prod-verify-2.preview.emergentagent.com/blogs`.
+- SEO value: surfaces social proof + competitive pressure under the article grid, drives "BidVex partner leaderboard" organic queries.
+
+### Pricing Endpoint Reconciliation (audit follow-up)
+Audit discovered that `/api/subscription-plans` and `/api/payments/subscriptions/tiers` were still serving STALE data ($180/$300/$240) because:
+- `subscription_plans` MongoDB collection was seeded once with old values and never updated when `DEFAULT_PLANS` changed.
+- `services/subscription_service.py::get_all_tiers()` had hardcoded literals.
+- Three endpoints were diverging despite iter326's "single source of truth" claim.
+
+**Fixed:**
+1. `services/subscription_pricing.py::initialize_plans()` — added an **iter327 reconciliation loop** that updates each plan's price/feature fields from `DEFAULT_PLANS` whenever they drift, EXCEPT where the admin changelog shows an explicit override (so admin edits are respected).
+2. `services/subscription_service.py` — `SUBSCRIPTION_PRICES` and `get_all_tiers()` now derive their numbers from canonical `DEFAULT_PLANS` instead of hardcoded literals.
+3. Verified end-to-end: all 3 endpoints (`/api/pricing-config`, `/api/subscription-plans`, `/api/payments/subscriptions/tiers`) now consistently serve Premium **$29.99/mo or $299.99/yr** and VIP **$99.99/mo or $999.99/yr**.
+
+### Frontend audit summary
+- `pages/SubscriptionPricingPage.js` — already API-driven via `/api/subscription-plans`. Now serves canonical values automatically.
+- `components/SubscriptionPlans.js` — already API-driven via `/api/payments/subscriptions/tiers`. Now serves canonical values automatically.
+- No further frontend price hardcoding found in transactional flows.
+
+### Tests
+- New `tests/test_iter327_public_leaderboard.py` → **14/14 PASS** (smoke, privacy contract, Section 6 math, query params, French badges).
+- Full pricing + commission regression: `tests/test_iter316_dialer_and_commission.py` + `tests/test_iter317_leaderboard_overlay.py` + `tests/test_iter323_contractor_sprint.py` + `tests/test_iter324_ivr_proxy_hotfix.py` + `tests/test_fee_schedule_audit_106.py` + `tests/test_iter327_public_leaderboard.py` → **296/296 PASS**.
+- Zero lint errors (Python + JavaScript).
+
+### Files changed
+- `backend/routes/contractor_profile_ext.py` — new `public_leaderboard_router` with `_mask_extension`, `_badge_label_for_overlay`, `get_public_contractor_leaderboard`.
+- `backend/server.py` — registered `public_leaderboard_router` on `api_router`.
+- `backend/services/subscription_pricing.py` — added reconciliation loop in `initialize_plans()` + bust in-memory cache after reconcile.
+- `backend/services/subscription_service.py` — derived `SUBSCRIPTION_PRICES` and `get_all_tiers()` from canonical `DEFAULT_PLANS`.
+- `frontend/src/components/TopContractorLeaderboard.js` — new public widget.
+- `frontend/src/pages/BlogsPage.js` — imported + placed the widget below the article grid.
+- `backend/tests/test_iter327_public_leaderboard.py` — 14-case privacy + math test suite.
+
+
 ## Jun 30, 2026 — iter326 ✅ Pricing-Config Consolidation Sprint (Single Source of Truth)
 
 ### The conflict (closed)

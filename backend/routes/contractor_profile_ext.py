@@ -379,3 +379,145 @@ async def get_contractor_leaderboard(caller: User = Depends(_require_contractor)
 
 
 __all__ = ["router"]
+
+
+# ─────────────────────────────────────────────────────────────────────
+# iter327 — Public anonymized leaderboard for /blogs SEO page
+# ─────────────────────────────────────────────────────────────────────
+
+from fastapi import APIRouter as _APIRouter  # noqa: E402
+
+public_leaderboard_router = _APIRouter()
+
+
+def _mask_extension(ext: Optional[str]) -> str:
+    """Mask a 4-digit extension as 'XXNN' → 'XX**'. Returns the 2-digit prefix
+    + two stars so curious visitors can't social-engineer the full extension.
+
+        '1220' → '12**'
+        '1199' → '11**'
+        None / non-string → 'XX**'
+    """
+    if not isinstance(ext, str) or len(ext) < 2:
+        return "XX**"
+    return f"{ext[:2]}**"
+
+
+def _badge_label_for_overlay(overlay_rate: float, lang: str = "en") -> str:
+    """Tier badge based on overlay magnitude — purely cosmetic for the public widget."""
+    pct = max(0.0, overlay_rate * 100)
+    if lang == "fr":
+        if pct >= 12.0:
+            return "Légendaire"
+        if pct >= 8.0:
+            return "Élite"
+        if pct >= 4.0:
+            return "Pro"
+        if pct > 0.0:
+            return "Montant"
+        return "Recrue"
+    if pct >= 12.0:
+        return "Legendary"
+    if pct >= 8.0:
+        return "Elite"
+    if pct >= 4.0:
+        return "Pro"
+    if pct > 0.0:
+        return "Rising"
+    return "Rookie"
+
+
+@public_leaderboard_router.get("/contractor/leaderboard/public")
+async def get_public_contractor_leaderboard(limit: int = 10, lang: str = "en") -> Dict[str, Any]:
+    """Public, unauthenticated, anonymized leaderboard for the /blogs SEO landing page.
+
+    Returns the Top N (default 10) contractors with personal identifiers removed.
+    Each row exposes ONLY:
+        - rank (1-based)
+        - masked_id (e.g. "Partner #12**")
+        - extension_prefix (e.g. "12**")
+        - overlay_rate_pct (the +overlay % on top of the 5% baseline)
+        - weeks_in_top_5 (count of consecutive history rows where rank was ≤ 5)
+        - badge_label (Rookie / Rising / Pro / Elite / Legendary)
+        - trend ('▲' / '▼' / '—')
+
+    Names, emails, photos, real extension numbers, dollar earnings, and user IDs
+    are NEVER exposed by this endpoint. This is the public-facing version of
+    the auth-gated `/twilio/contractor/leaderboard` endpoint.
+    """
+    db = _get_db()
+    limit = max(1, min(50, int(limit)))
+    lang_norm = (lang or "en").lower()
+    if lang_norm not in ("en", "fr"):
+        lang_norm = "en"
+
+    cursor = db.users.find(
+        {"role": "dialer_contractor", "is_active": {"$ne": False}},
+        {"_id": 0, "extension_number": 1, "leaderboard_overlay_rate": 1,
+         "leaderboard_history": 1, "weekly_volume_score": 1},
+    )
+    contractors: List[Dict[str, Any]] = []
+    async for c in cursor:
+        contractors.append(c)
+
+    def _score(c: Dict[str, Any]) -> float:
+        v = c.get("weekly_volume_score")
+        try:
+            return float(v) if v is not None else 0.0
+        except (TypeError, ValueError):
+            return 0.0
+
+    contractors.sort(key=_score, reverse=True)
+    contractors = contractors[:limit]
+
+    rows: List[Dict[str, Any]] = []
+    for idx, c in enumerate(contractors):
+        history = c.get("leaderboard_history") or []
+        prev_rank = None
+        if isinstance(history, list) and len(history) >= 2:
+            try:
+                prev_rank = int(history[-2].get("rank")) if history[-2].get("rank") is not None else None
+            except (TypeError, ValueError):
+                prev_rank = None
+
+        # weeks_in_top_5 = count from the tail of history while rank stays ≤ 5
+        weeks_in_top_5 = 0
+        if isinstance(history, list):
+            for h in reversed(history):
+                try:
+                    r = int(h.get("rank"))
+                    if r > 0 and r <= 5:
+                        weeks_in_top_5 += 1
+                    else:
+                        break
+                except (TypeError, ValueError):
+                    break
+
+        now_rank = idx + 1
+        overlay = float(c.get("leaderboard_overlay_rate") or 0.0)
+        ext_prefix = _mask_extension(c.get("extension_number"))
+
+        rows.append({
+            "rank":             now_rank,
+            "masked_id":        f"Partner #{ext_prefix}",
+            "extension_prefix": ext_prefix,
+            "overlay_rate_pct": round(overlay * 100, 2),
+            "effective_rate_pct": round(min(20.0, max(5.0, 5.0 + overlay * 100)), 2),
+            "weeks_in_top_5":   weeks_in_top_5,
+            "badge_label":      _badge_label_for_overlay(overlay, lang=lang_norm),
+            "trend":            _trend_marker(now_rank, prev_rank),
+        })
+
+    return {
+        "rows":         rows,
+        "total":        len(rows),
+        "limit":        limit,
+        "lang":         lang_norm,
+        "generated_at": _now_iso(),
+        "baseline_pct": 5.0,
+        "ceiling_pct":  20.0,
+        "privacy_note": "Anonymized public view — no names, emails, photos, real extensions, or dollar earnings exposed.",
+    }
+
+
+__all__.append("public_leaderboard_router")

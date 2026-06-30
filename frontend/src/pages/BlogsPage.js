@@ -10,6 +10,7 @@ import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useTranslation } from 'react-i18next';
 import { Newspaper, ArrowRight, BookOpen, Gavel, ShieldCheck, Truck, Warehouse, Sparkles } from 'lucide-react';
+import TopContractorLeaderboard from '../components/TopContractorLeaderboard';
 
 const ARTICLES = [
   {
@@ -164,6 +165,9 @@ export default function BlogsPage() {
             );
           })}
         </div>
+
+        {/* Top Contractor Leaderboard (iter327) — public anonymized social proof */}
+        <TopContractorLeaderboard />
 
         {/* CTA */}
         <div className="mt-16 rounded-2xl p-8 md:p-12 text-center" style={{ background: '#0B2545', color: 'white' }} data-testid="blogs-cta-card">

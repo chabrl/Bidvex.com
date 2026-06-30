@@ -1,6 +1,22 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter327 — Public Top Contractor Leaderboard + 3-Endpoint Pricing Reconciliation (Jun 30, 2026) ✅ COMPLETE
+
+### Shipped
+1. **`GET /api/contractor/leaderboard/public`** — unauthenticated, anonymized public leaderboard for the `/blogs` SEO page. Returns Top N (default 10) contractors with only: rank, `masked_id` (`Partner #12**`), `extension_prefix`, overlay %, effective % (Section 6 clamp 5–20%), weeks in Top 5, bilingual badge, trend. Privacy contract locked by 14 pytest cases.
+2. **`<TopContractorLeaderboard />` React widget** — bilingual EN/FR, mobile-responsive, placed below the article grid on `/blogs`.
+3. **Pricing endpoint reconciliation** — `/api/subscription-plans` and `/api/payments/subscriptions/tiers` were silently serving stale $180/$300/$240. Added reconciliation in `subscription_pricing.initialize_plans()` (respects admin changelog overrides) + derived `subscription_service.SUBSCRIPTION_PRICES` and `get_all_tiers()` from canonical `DEFAULT_PLANS`. All 3 endpoints now consistent.
+
+### Tests
+- New `test_iter327_public_leaderboard.py` → 14/14 PASS.
+- Combined regression → 296/296 PASS.
+
+### Frontend audit conclusion
+- `SubscriptionPricingPage.js` and `SubscriptionPlans.js` already consume the APIs — they now serve canonical values automatically. No transactional hardcoding found.
+
+
+
 ## iter326 — Pricing-Config Consolidation (Jun 30, 2026) ✅ COMPLETE
 
 ### Closed
