@@ -72,6 +72,7 @@ const BrokerDashboardPage = lazy(() => import('./pages/BrokerDashboardPage'));
 const WatchlistPage = lazy(() => import('./pages/WatchlistPage'));
 const HowItWorksPage = lazy(() => import('./pages/HowItWorksPage'));
 const BlogsPage = lazy(() => import('./pages/BlogsPage'));
+const BlogArticlePage = lazy(() => import('./pages/BlogArticlePage'));
 const SellerProfilePage = lazy(() => import('./pages/SellerProfilePage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'));
@@ -141,6 +142,8 @@ const AdminDialer = lazy(() => import('./pages/admin/AdminDialer'));
 const ContractorDashboard = lazy(() => import('./pages/contractor/ContractorDashboard'));
 // iter317 Directive 3 — Contractor Email Hub
 const ContractorEmailHub = lazy(() => import('./pages/contractor/ContractorEmailHub'));
+// iter331 — Contractor Aid Hub + BitVex AI
+const ContractorAidHub = lazy(() => import('./pages/contractor/ContractorAidHub'));
 // iter318 — BidVex Careers
 const CareersPage = lazy(() => import('./pages/CareersPage'));
 const CareersJobDetailPage = lazy(() => import('./pages/CareersJobDetailPage'));
@@ -460,6 +463,7 @@ const App = () => {
           } />
           <Route path="/how-it-works" element={<HowItWorksPage />} />
           <Route path="/blogs" element={<ErrorBoundary scope="blogs"><BlogsPage /></ErrorBoundary>} />
+          <Route path="/blogs/:slug" element={<ErrorBoundary scope="blog-article"><BlogArticlePage /></ErrorBoundary>} />
           {/* iter261 — Public payment page (no auth) for admin-issued payment requests. */}
           <Route path="/pay/:payment_request_id" element={<PaymentPage />} />
           <Route path="/pay/:payment_request_id/success" element={<PayRequestSuccessPage />} />
@@ -568,6 +572,10 @@ const App = () => {
           {/* iter317 Directive 3 — Contractor Email Hub */}
           <Route path="/contractor/emails" element={
             <ProtectedRoute><ErrorBoundary scope="contractor-email-hub"><ContractorEmailHub /></ErrorBoundary></ProtectedRoute>
+          } />
+          {/* iter331 — Contractor Aid Hub + BitVex AI */}
+          <Route path="/contractor/aid" element={
+            <ProtectedRoute><ErrorBoundary scope="contractor-aid"><ContractorAidHub /></ErrorBoundary></ProtectedRoute>
           } />
           {/* iter318 — BidVex Careers (public) */}
           <Route path="/careers" element={<ErrorBoundary scope="careers"><CareersPage /></ErrorBoundary>} />

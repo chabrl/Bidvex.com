@@ -1,0 +1,39 @@
+{
+  "summary": "iter331 — Backend 9/9 PASS (pytest test_iter331_blogs_and_aid.py) and Frontend ALL CHECKS PASS on preview URL. Verified: (1) PromoBanner shows anonymous CTA -> /auth?redirect=/pricing for unauth visitors AND hides it for the authenticated admin (pill grid path); (2) /contractor/dashboard renders with NO horizontal overflow at 375x812, 768x1024, 1440x900, all 4 StatCards (stat-accrued/paid/month/referrals) present at each breakpoint, goto-contractor-aid-btn visible + navigates to /contractor/aid; (3) /contractor/aid renders aid-page-title + 6 sections (commission/ivr/email/add_client/stripe/escalation) + aid-chat-panel, and a live Gemini-3-Flash chat ('What is the maximum effective commission rate?') correctly replied with '20.0%' + Top-5 / Monday overlay explanation; (4) Admin Blogs Console at /admin?tab=press-blogs loads admin-blogs-console with >=6 rows in admin-blogs-table; (5) Public /blogs renders blogs-page + blogs-grid with 6 tiles, tile click navigates to /blogs/:slug and blog-article-page + article-title + article-body all render. Backend: 6 articles seeded, admin CRUD round-trip (create draft -> not public -> patch -> publish -> public -> unpublish -> not public -> delete -> 404) works; non-admin token blocked with 403 on POST /api/admin/blogs/articles; cover-upload returns cover_url on success (S3 configured); /api/contractor/aid/info returns 6 sections + support_email + model='gemini-3-flash-preview' for admin and 403 for a non-contractor regular user; /api/contractor/aid/chat returns reply + session_id and model identifier 'gemini-3-flash-preview' with the expected 20% answer.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/auth/login (testbuyer@bidvex.com)", "issue": "Seeded buyer credentials in /app/memory/test_credentials.md (testbuyer / TestBuyer2026! and iter189buyer / TestBuyer123!) both return 401 on preview env — appears bcrypt hash drifted again. Worked around by registering iter331_nonadmin@test.com / NonAdmin2026! via /api/auth/register to exercise the non-admin 403 paths."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "global", "issues": ["Cookie Consent modal intercepts pointer events on top of page CTAs (Send button on /contractor/aid, blog tile anchors on /blogs, Pricing CTAs). Setting bidvex_cookie_consent v1 in localStorage was NOT enough — the live key is bidvex_cookie_consent_v2. Real users dismiss the banner before clicking, but automated agents and any future Playwright/SDET runs must either click 'Accept All Cookies' first or pre-seed both bidvex_cookie_consent AND bidvex_cookie_consent_v2 keys. Functionally non-blocking, but slows test harnesses."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter331_blogs_and_aid.py",
+    "/app/test_reports/pytest/iter331_results.xml"
+  ],
+  "action_items": [
+    "(low) Re-seed testbuyer@bidvex.com / TestBuyer2026! bcrypt hash on preview env — current creds in /app/memory/test_credentials.md no longer match (returns 401). All other admin/contractor flows unaffected.",
+    "(low) Consider auto-accepting cookie consent for first-party origins to ease automated QA, or honor older bidvex_cookie_consent key for backward-compat."
+  ],
+  "critical_code_review_comments": [
+    "PromoBanner anonymous branch correctly emits data-testid='promo-banner-signup-cta' and href='/auth?redirect=/pricing' — exact match to spec.",
+    "Contractor Aid Hub is well-scoped: /api/contractor/aid/info gates non-contractor/non-admin with 403 cleanly; chat returns model identifier (helpful for client telemetry).",
+    "Admin Blogs CRUD: publish/unpublish are idempotent endpoints (POST), and public list correctly hides drafts + unpublished. Slug-based GET returns 404 after DELETE — clean lifecycle.",
+    "Cover-upload route returns 200 + cover_url on preview (S3 credentials are configured)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter331_blogs_and_aid.py (new)"
+  ],
+  "success_rate": {"backend": "100% (9/9)", "frontend": "100% on all P0 acceptance checks"},
+  "test_credentials": "Admin: charbel911@gmail.com / Anderosli123!@# (worked). Non-admin used for 403 checks: iter331_nonadmin@test.com / NonAdmin2026! (registered fresh because seeded testbuyer/iter189buyer logins both 401 on preview).",
+  "seed_data_creation": "Registered iter331_nonadmin@test.com via /api/auth/register for the 403-check tests. Admin CRUD round-trip creates a TEST_iter331 article per run and deletes it at the end — no orphaned rows.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All iter331 acceptance criteria verified PASS on preview URL https://prod-verify-2.preview.emergentagent.com. To re-run frontend tests, pre-set BOTH localStorage keys 'bidvex_cookie_consent' AND 'bidvex_cookie_consent_v2' to JSON.stringify({version:2,accepted:true,necessary:true,analytics:true,marketing:true,preferences:true,timestamp:Date.now()}) before navigating, otherwise the consent banner intercepts clicks on the Send button (aid chat) and the blog tile anchors. Backend regression: pytest /app/backend/tests/test_iter331_blogs_and_aid.py -v (9 tests, ~10s, depends on Gemini API for the chat assertion — uses ~1 Emergent credit per run)."
+}

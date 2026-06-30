@@ -87,6 +87,13 @@ const AdminEscalationsConsoleLazy = (props) => (
     <_AdminEscalationsConsole {...props} />
   </_SuspenseCareers>
 );
+// iter331 — Admin Blogs / Press console (lazy)
+const _AdminBlogsConsole = _lazyCareers(() => import('./admin/AdminBlogsConsole'));
+const AdminBlogsConsoleLazy = (props) => (
+  <_SuspenseCareers fallback={<div className="p-8 text-center text-slate-500">Loading…</div>}>
+    <_AdminBlogsConsole {...props} />
+  </_SuspenseCareers>
+);
 // iter321 — Real-time escalation alerts (SSE + chime + desktop notification + tab flash)
 import { EscalationAlertProvider, useEscalationAlerts } from '../components/admin/EscalationAlertProvider';
 import { LifeBuoy } from 'lucide-react';
@@ -211,6 +218,7 @@ const SECONDARY_TABS = {
     { id: 'team-members', label: 'Team Members & Invites', icon: '👥', lucideIcon: Users },
     { id: 'careers', label: 'Careers', icon: '💼', lucideIcon: Briefcase },
     { id: 'escalations', label: 'Live Support', icon: '🆘', lucideIcon: Briefcase },
+    { id: 'press-blogs', label: 'Press / Blog', icon: '📰', lucideIcon: FileText },
   ],
   logs: [
     { id: 'action-history', label: 'Action History', icon: '📜', lucideIcon: History },
@@ -627,6 +635,9 @@ const AdminDashboard = () => {
         }
         if (secondaryTab === 'escalations') {
           return <AdminEscalationsConsoleLazy />;
+        }
+        if (secondaryTab === 'press-blogs') {
+          return <AdminBlogsConsoleLazy />;
         }
         return <TeamManager />;
       case 'logs':

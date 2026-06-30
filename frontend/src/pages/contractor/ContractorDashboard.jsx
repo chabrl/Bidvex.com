@@ -15,7 +15,7 @@ import { toast } from 'sonner';
 import {
   DollarSign, Users, PhoneCall, Link as LinkIcon, Copy, CheckCircle2,
   AlertTriangle, Zap, Loader2, ShieldCheck, UserPlus, X, Save,
-  Mail, TrendingUp, FileSignature,
+  Mail, TrendingUp, FileSignature, LifeBuoy,
 } from 'lucide-react';
 import API_BASE from '../../config';
 import { useAuth } from '../../contexts/AuthContext';
@@ -39,12 +39,12 @@ function formatMoney(amount, currency = 'CAD') {
 function StatCard({ label, value, icon: Icon, color = 'indigo', testid }) {
   return (
     <Card data-testid={testid}>
-      <CardContent className="p-4">
-        <div className="flex items-center justify-between">
-          <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
-          <Icon className={`h-4 w-4 text-${color}-600`} />
+      <CardContent className="p-3 sm:p-4">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[10px] sm:text-xs uppercase tracking-wide text-slate-500 leading-tight">{label}</p>
+          <Icon className={`h-4 w-4 text-${color}-600 flex-shrink-0`} />
         </div>
-        <p className="text-2xl font-bold mt-1">{value}</p>
+        <p className="text-lg sm:text-2xl font-bold mt-1 break-words">{value}</p>
       </CardContent>
     </Card>
   );
@@ -233,30 +233,42 @@ export default function ContractorDashboard() {
   const callStats = data.call_stats || {};
 
   return (
-    <div className="container mx-auto max-w-7xl py-6 px-4 space-y-4" data-testid="contractor-dashboard-page">
-      <header className="flex items-start justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2" data-testid="contractor-dashboard-title">
-            <ShieldCheck className="h-7 w-7 text-indigo-600" />
-            {fr ? 'Tableau de bord du contractant' : 'Contractor Dashboard'}
+    <div className="container mx-auto max-w-7xl py-4 sm:py-6 px-3 sm:px-4 space-y-3 sm:space-y-4" data-testid="contractor-dashboard-page">
+      <header className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold flex items-center gap-2 break-words" data-testid="contractor-dashboard-title">
+            <ShieldCheck className="h-6 w-6 sm:h-7 sm:w-7 text-indigo-600 flex-shrink-0" />
+            <span className="break-words">{fr ? 'Tableau de bord du contractant' : 'Contractor Dashboard'}</span>
           </h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">
             {fr
               ? 'Gérez vos comptes recommandés, suivez vos gains et accédez au composeur BidVex.'
               : 'Manage your referred accounts, track commissions, and access the BidVex Dialer.'}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full lg:w-auto">
           <Button
             variant="outline"
+            size="sm"
+            onClick={() => navigate('/contractor/aid')}
+            className="bg-amber-50 border-amber-300 text-amber-900 hover:bg-amber-100 col-span-2 sm:col-auto"
+            data-testid="goto-contractor-aid-btn"
+          >
+            <LifeBuoy className="h-4 w-4 mr-2" />
+            {fr ? 'Aide Contractant' : 'Contractor Aid'}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => navigate('/admin/dialer')}
             data-testid="goto-dialer-btn"
           >
             <PhoneCall className="h-4 w-4 mr-2" />
-            {fr ? 'Ouvrir le composeur' : 'Open Dialer'}
+            {fr ? 'Composeur' : 'Dialer'}
           </Button>
           <Button
             variant="outline"
+            size="sm"
             onClick={() => navigate('/contractor/emails')}
             data-testid="goto-email-hub-btn"
           >
@@ -265,7 +277,8 @@ export default function ContractorDashboard() {
           </Button>
           {(isContractor || isAdmin) && (
             <Button
-              className="bg-indigo-600 hover:bg-indigo-700 text-white"
+              size="sm"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white col-span-2 sm:col-auto"
               onClick={copyReferral}
               data-testid="copy-referral-link-btn"
             >
@@ -283,10 +296,10 @@ export default function ContractorDashboard() {
           className="border-2 border-rose-400 bg-rose-50 animate-pulse-slow"
           data-testid="banking-validation-alert"
         >
-          <CardContent className="p-4 flex items-start gap-3">
+          <CardContent className="p-4 flex flex-col md:flex-row items-start md:items-center gap-3">
             <AlertTriangle className="h-6 w-6 text-rose-600 flex-shrink-0" />
-            <div className="flex-1">
-              <p className="font-bold text-rose-900">
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-rose-900 break-words">
                 {fr
                   ? `Action requise : ${formatMoney(payoutReadiness.accrued_total)} en attente`
                   : `Action required: ${formatMoney(payoutReadiness.accrued_total)} pending payout`}
@@ -312,7 +325,7 @@ export default function ContractorDashboard() {
             <Button
               onClick={startStripeOnboarding}
               disabled={onboardingBusy}
-              className="bg-rose-600 hover:bg-rose-700 text-white"
+              className="bg-rose-600 hover:bg-rose-700 text-white w-full md:w-auto"
               data-testid="banking-validation-resolve-btn"
             >
               {onboardingBusy ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Zap className="h-4 w-4 mr-1" />}
@@ -348,15 +361,15 @@ export default function ContractorDashboard() {
           : 'border-2 border-amber-300 bg-amber-50'}
         data-testid="stripe-status-card"
       >
-        <CardContent className="p-4 flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-center gap-3">
+        <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-start sm:items-center gap-3 min-w-0">
             {data.stripe_connected ? (
-              <CheckCircle2 className="h-6 w-6 text-emerald-600" />
+              <CheckCircle2 className="h-6 w-6 text-emerald-600 flex-shrink-0" />
             ) : (
-              <Zap className="h-6 w-6 text-amber-600" />
+              <Zap className="h-6 w-6 text-amber-600 flex-shrink-0" />
             )}
-            <div>
-              <p className="font-semibold text-sm">
+            <div className="min-w-0">
+              <p className="font-semibold text-sm break-words">
                 {data.stripe_connected
                   ? (fr ? 'Versements Stripe actifs' : 'Stripe payouts active')
                   : (fr ? 'Connectez Stripe pour recevoir vos versements' : 'Connect Stripe to receive payouts')}
@@ -376,7 +389,7 @@ export default function ContractorDashboard() {
             <Button
               onClick={startStripeOnboarding}
               disabled={onboardingBusy}
-              className="bg-amber-600 hover:bg-amber-700 text-white"
+              className="bg-amber-600 hover:bg-amber-700 text-white w-full sm:w-auto"
               data-testid="stripe-connect-btn"
             >
               {onboardingBusy ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Zap className="h-4 w-4 mr-2" />}
@@ -390,8 +403,8 @@ export default function ContractorDashboard() {
       {permissions.length > 0 && (
         <Card className="border-indigo-200 bg-indigo-50" data-testid="contractor-permissions-card">
           <CardContent className="p-4">
-            <div className="flex items-start justify-between flex-wrap gap-3">
-              <div>
+            <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
+              <div className="min-w-0">
                 <h3 className="font-semibold flex items-center gap-2">
                   <ShieldCheck className="h-5 w-5 text-indigo-600" />
                   {fr ? 'Ce que vous pouvez faire' : 'What you can do'}
@@ -414,9 +427,10 @@ export default function ContractorDashboard() {
                   ))}
                 </div>
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-wrap gap-2 w-full lg:w-auto">
                 {permissions.includes('add_users') && (
                   <Button
+                    size="sm"
                     onClick={() => setAddClientOpen(true)}
                     className="bg-indigo-600 hover:bg-indigo-700 text-white"
                     data-testid="contractor-add-client-btn"
@@ -427,6 +441,7 @@ export default function ContractorDashboard() {
                 )}
                 {permissions.includes('manage_subscriptions') && (
                   <Button
+                    size="sm"
                     variant="outline"
                     onClick={() => toast.info(
                       fr
@@ -445,7 +460,7 @@ export default function ContractorDashboard() {
       )}
 
       {/* Earnings stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3" data-testid="earnings-grid">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3" data-testid="earnings-grid">
         <StatCard
           label={fr ? 'Accumulé (non versé)' : 'Accrued (unpaid)'}
           value={formatMoney(earnings.lifetime_accrued)}
@@ -481,22 +496,22 @@ export default function ContractorDashboard() {
         }
         data-testid="leaderboard-overlay-card"
       >
-        <CardContent className="p-4 flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-center gap-3">
-            <TrendingUp className="h-6 w-6 text-emerald-600" />
-            <div>
+        <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-start gap-3 min-w-0">
+            <TrendingUp className="h-6 w-6 text-emerald-600 flex-shrink-0 mt-0.5" />
+            <div className="min-w-0">
               <p className="font-semibold text-sm">
                 {fr ? 'Bonification de classement (overlay)' : 'Leaderboard overlay'}
               </p>
-              <p className="text-xs text-slate-600 mt-0.5">
+              <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">
                 {fr
                   ? 'Calculé chaque lundi 8 h 00 (EST) en fonction de votre volume de commission sur 7 jours. +1 % pour entrer dans le Top 5, -1 % pour en sortir. Plafond absolu 20 %, plancher effectif 5 %.'
                   : 'Re-evaluated every Monday 8:00 AM EST from your 7-day commission volume. +1% on entry to the Top 5, -1% when dropping out. Absolute cap 20%, effective floor 5%.'}
               </p>
             </div>
           </div>
-          <div className="text-right">
-            <p className="text-3xl font-bold text-emerald-700" data-testid="overlay-rate-value">
+          <div className="text-left sm:text-right flex-shrink-0">
+            <p className="text-2xl sm:text-3xl font-bold text-emerald-700" data-testid="overlay-rate-value">
               {((data.leaderboard_overlay_rate || 0) * 100).toFixed(1)}%
             </p>
             {data.leaderboard_overlay_updated_at && (

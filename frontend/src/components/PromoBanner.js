@@ -10,8 +10,9 @@
  */
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Sparkles, BadgePercent, Clock, Gift } from 'lucide-react';
+import { Sparkles, BadgePercent, Clock, Gift, ArrowRight, Rocket } from 'lucide-react';
 import API_BASE from '../config';
 
 const API = API_BASE;
@@ -106,6 +107,58 @@ export default function PromoBanner({ token = null }) {
   }
 
   if (pills.length === 0) return null;
+
+  // iter331 — Conversion CTA for anonymous visitors on /pricing.
+  // When the visitor is NOT authenticated, surface a single high-contrast
+  // CTA pill pointing at /auth?redirect=/pricing instead of the static
+  // pill grid. The deepest discount % is reused as the visual hook.
+  const isAnonymous = !token;
+  if (isAnonymous) {
+    const ctaLabel = fr
+      ? 'Inscrivez-vous pour réclamer votre essai gratuit de 30 jours'
+      : 'Sign up to claim your 30-day free trial';
+    const ctaSubtitle = bestDiscount
+      ? (fr
+          ? `Première annonce offerte + ${bestDiscount.pct} % de rabais sur ${bestDiscount.name}.`
+          : `Plus your first listing free + ${bestDiscount.pct}% off ${bestDiscount.name}.`)
+      : (fr
+          ? 'Première annonce offerte. Annulez avant la fin pour zéro frais.'
+          : 'Plus your first listing on us. Cancel before the end for zero charge.');
+
+    return (
+      <div
+        className="rounded-2xl p-6 md:p-8 text-white"
+        style={{ background: 'linear-gradient(135deg, #0B2545 0%, #2186C6 100%)' }}
+        data-testid="promo-banner"
+      >
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
+          <div className="flex items-start gap-3">
+            <Sparkles className="w-8 h-8 text-cyan-300 flex-shrink-0 mt-1" />
+            <div>
+              <h2
+                className="text-xl sm:text-2xl font-bold leading-tight"
+                data-testid="promo-banner-title"
+              >
+                {ctaLabel}
+              </h2>
+              <p className="text-sm text-cyan-100 mt-2 max-w-xl" data-testid="promo-banner-subtitle">
+                {ctaSubtitle}
+              </p>
+            </div>
+          </div>
+          <Link
+            to="/auth?redirect=/pricing"
+            data-testid="promo-banner-signup-cta"
+            className="inline-flex items-center gap-2 px-5 py-3 bg-cyan-400 text-slate-900 font-semibold rounded-xl hover:bg-cyan-300 transition-colors shadow-lg whitespace-nowrap"
+          >
+            <Rocket className="w-4 h-4" />
+            {fr ? "S'inscrire" : 'Sign up free'}
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

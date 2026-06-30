@@ -1575,6 +1575,25 @@ try:
     except Exception as ce:  # noqa: BLE001
         logger.warning(f"iter323 router registration failed (non-fatal): {ce}")
 
+    # iter331 — Press/Blogs CRUD + Contractor Aid AI hub (Gemini)
+    try:
+        from routes.blogs import router as blogs_router
+        from routes.contractor_aid import router as contractor_aid_router
+        api_router.include_router(blogs_router)
+        api_router.include_router(contractor_aid_router)
+        logger.info("iter331 — Blogs CRUD + Contractor Aid AI mounted")
+
+        # Idempotent seed of the 6 default press articles (only inserts
+        # rows whose slug is missing). Safe to re-run on every boot.
+        try:
+            from services.blogs_seed import seed_press_articles
+            import asyncio as _asyncio
+            _asyncio.create_task(seed_press_articles(db))
+        except Exception as se:  # noqa: BLE001
+            logger.warning(f"iter331 — press_articles seed scheduling failed: {se}")
+    except Exception as ce:  # noqa: BLE001
+        logger.warning(f"iter331 router registration failed (non-fatal): {ce}")
+
 except ImportError:
     pass
 
