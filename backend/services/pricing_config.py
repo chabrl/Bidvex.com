@@ -41,62 +41,20 @@ SELLER_COMMISSION_RATES = {
 
 # ============= SUBSCRIPTION PRICING =============
 #
-# iter326 — Pricing-Config Consolidation Sprint.
+# iter328 — Stripe-Sync Lock.
 #
-# SINGLE SOURCE OF TRUTH for subscription SKU prices is now
-# `services.subscription_pricing.DEFAULT_PLANS` (monthly + yearly schema).
-# This module's SUBSCRIPTION_TIERS dict is a *derived view* in the
-# legacy {amount_cents, currency, interval, label} shape, so existing
-# callers (routes/payments_promotions.py, tests, frontend) keep working
-# while billing math flows through one place.
-#
-# Adding/changing a subscription price: edit DEFAULT_PLANS in
-# services/subscription_pricing.py. Do NOT edit SUBSCRIPTION_TIERS here.
+# These values MIRROR the live BidVex Stripe Product/Price objects.
+# DO NOT EDIT in code without first updating the corresponding
+# Stripe Price in the BidVex Stripe account, then mirroring here.
+# Subscription pricing is Stripe-driven going forward; no code-side overrides.
 
-def _build_subscription_tiers():
-    """Derive the legacy SUBSCRIPTION_TIERS dict from DEFAULT_PLANS.
-
-    Output shape (unchanged for backwards compatibility):
-        {
-          "<plan_id>": {
-            "amount_cents": int,    # yearly price in cents
-            "currency":     "cad",
-            "interval":     "year",
-            "label":        "$xxx.xx CAD/year",
-            # iter326 — additionally exposes monthly equivalents:
-            "monthly_amount_cents": int | None,
-            "monthly_label":        str | None,
-          }
-        }
-    """
-    from services.subscription_pricing import DEFAULT_PLANS  # local import — avoids cycle
-    tiers = {
-        "free": {
-            "amount_cents": 0,
-            "currency": "cad",
-            "interval": "year",
-            "label": "Free",
-            "monthly_amount_cents": 0,
-            "monthly_label": "Free",
-        }
-    }
-    for plan_id, plan in DEFAULT_PLANS.items():
-        if plan_id == "free":
-            continue
-        yearly = float(plan.get("price_yearly") or 0.0)
-        monthly = float(plan.get("price_monthly") or 0.0)
-        tiers[plan_id] = {
-            "amount_cents": int(round(yearly * 100)),
-            "currency": "cad",
-            "interval": "year",
-            "label": f"${yearly:.2f} CAD/year",
-            "monthly_amount_cents": int(round(monthly * 100)) if monthly > 0 else None,
-            "monthly_label": f"${monthly:.2f} CAD/month" if monthly > 0 else None,
-        }
-    return tiers
-
-
-SUBSCRIPTION_TIERS = _build_subscription_tiers()
+SUBSCRIPTION_TIERS = {
+    "free":        {"amount_cents": 0,     "currency": "cad", "interval": "year", "label": "Free"},
+    "partner":     {"amount_cents": 10000, "currency": "cad", "interval": "year", "label": "$100.00 CAD/year"},
+    "premium":     {"amount_cents": 18000, "currency": "cad", "interval": "year", "label": "$180.00 CAD/year"},
+    "partner_pro": {"amount_cents": 24000, "currency": "cad", "interval": "year", "label": "$240.00 CAD/year"},
+    "vip":         {"amount_cents": 30000, "currency": "cad", "interval": "year", "label": "$300.00 CAD/year"},
+}
 
 # ============= LISTING PROMOTIONS =============
 

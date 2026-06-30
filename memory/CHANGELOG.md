@@ -1,6 +1,52 @@
 # BidVex Changelog
 
 
+## Jun 30, 2026 — iter328 ⏪ ROLLBACK to iter325 State + Stripe-Sync Lock
+
+### Why
+Critical product directive: revert iter326 (pricing consolidation) and iter327 (public leaderboard) back to yesterday's iter325 baseline. Subscription pricing must be Stripe-driven going forward; no code-side overrides.
+
+### What was rolled back
+1. **`services/pricing_config.py::SUBSCRIPTION_TIERS`** — derived view replaced with the original static dict ($100/$180/$240/$300, free $0).
+2. **`services/subscription_service.py`** — `SUBSCRIPTION_PRICES` and `get_all_tiers()` reverted to hardcoded literals ($180/$300/$240).
+3. **`services/subscription_pricing.py`** —
+   - `DEFAULT_PLANS["partner_pro"]` price_yearly reverted to $240 (was $100).
+   - `DEFAULT_PLANS["partner"]` entry **removed** (added in iter326 only).
+   - `initialize_plans()` reconciliation loop removed; original migration-only behavior restored.
+4. **MongoDB `subscription_plans` collection** — reset: `partner` row deleted, `partner_pro` row updated back to `price_yearly: 240.00`. Premium/VIP rows unchanged (already at iter325 values).
+5. **`routes/contractor_profile_ext.py`** — `public_leaderboard_router`, `get_public_contractor_leaderboard()`, `_mask_extension()`, `_badge_label_for_overlay()` all deleted. Only the auth-gated `/twilio/contractor/leaderboard` remains.
+6. **`server.py`** — `public_leaderboard_router` registration removed.
+7. **`pages/BlogsPage.js`** — `<TopContractorLeaderboard />` import + usage removed; `/blogs` SEO page kept fully active for admin blog publishing.
+8. **`components/TopContractorLeaderboard.js`** — DELETED.
+9. **`tests/test_iter327_public_leaderboard.py`** — DELETED.
+10. **`tests/test_fee_schedule_audit_106.py`** — Premium/VIP/Partner Pro test values reverted (Premium $180, VIP $300; GST/QST recalcs for original amounts).
+
+### What was kept (iter325 state — explicitly preserved per user directive)
+- ✅ Contractor commission **5% baseline + Top-5 leaderboard ±1% Monday overlay**, clamped to [5%, 20%] effective.
+- ✅ Leaderboard overlay **applied to ledger accruals** via `get_contractor_commission_rate()`.
+- ✅ Terms of Service §22 (contractor commission rules, bilingual).
+- ✅ `/blogs` SEO page itself (article grid, hero, press email, react-helmet meta).
+- ✅ Footer "Press" link → `/blogs`.
+- ✅ Auth-gated `/twilio/contractor/leaderboard` endpoint + `<ContractorIter323Panel>` widget rendering it inside `/contractor/dashboard`.
+
+### Stripe-Sync Lock Policy (going forward)
+Both `SUBSCRIPTION_TIERS` (pricing_config.py) and `SUBSCRIPTION_PRICES` (subscription_service.py) now carry an inline comment:
+> "These values MIRROR live BidVex Stripe Product/Price objects. DO NOT EDIT in code without first updating the corresponding Stripe Price."
+
+Future pricing changes flow: **Update Stripe Price → mirror value in code → deploy**. No automatic reconciliation; no DB auto-sync.
+
+### Verification
+- All 3 public endpoints back to yesterday's state:
+  - `/api/pricing-config` → $100/$180/$240/$300 static.
+  - `/api/payments/subscriptions/tiers` → $180/$300/$240 static.
+  - `/api/subscription-plans` → $0/$299.99/$999.99/$240 (DB-driven; same as pre-iter326).
+- `/api/contractor/leaderboard/public` → HTTP 404 (endpoint deleted).
+- `/api/twilio/contractor/leaderboard` → HTTP 401 (auth-gated, still wired).
+- `/blogs` page renders correctly with no leaderboard widget (screenshot-verified).
+- `python -m pytest tests/test_iter316_dialer_and_commission.py tests/test_iter317_leaderboard_overlay.py tests/test_iter323_contractor_sprint.py tests/test_iter324_ivr_proxy_hotfix.py tests/test_fee_schedule_audit_106.py` → **282 passed, 0 failed**.
+- Zero lint errors.
+
+
 ## Jun 30, 2026 — iter327 ✅ Public Top Contractor Leaderboard + Pricing-Endpoint Reconciliation
 
 ### Top Contractor Leaderboard Widget

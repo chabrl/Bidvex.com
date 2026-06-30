@@ -1,6 +1,33 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter328 — ROLLBACK to iter325 State + Stripe-Sync Lock (Jun 30, 2026) ✅ COMPLETE
+
+### Rolled back (iter326 + iter327)
+- `pricing_config.SUBSCRIPTION_TIERS` → static $100/$180/$240/$300.
+- `subscription_service.SUBSCRIPTION_PRICES` + `get_all_tiers()` → static hardcoded values.
+- `subscription_pricing.DEFAULT_PLANS` → removed `partner` tier; `partner_pro` price_yearly reverted to $240.
+- `subscription_pricing.initialize_plans()` → reconciliation loop removed; original migration-only behavior.
+- MongoDB `subscription_plans` collection — `partner` row deleted, `partner_pro` reset to $240.
+- Public anonymized leaderboard endpoint `/api/contractor/leaderboard/public` DELETED.
+- `<TopContractorLeaderboard />` widget DELETED.
+- `test_iter327_public_leaderboard.py` DELETED.
+- `test_fee_schedule_audit_106.py` reverted to pre-iter326 expectations.
+
+### Kept (iter325 baseline preserved)
+- Contractor commission **5% baseline + ±1% Monday Top-5 overlay**, clamped [5%, 20%].
+- Terms §22 (contractor rules, bilingual).
+- `/blogs` SEO page (article grid + hero) — fully active for admin blogging.
+- Auth-gated contractor leaderboard inside `/contractor/dashboard` (iter323).
+
+### Stripe-Sync Lock
+Subscription pricing now MIRRORS live Stripe Price objects. Code values are display-only mirrors; Stripe is the billing source of truth. Inline comments in both pricing files document this policy. No auto-reconciliation.
+
+### Tests
+- **282/282 PASS** (iter316 + iter317 + iter323 + iter324 + fee schedule). Zero lint errors.
+
+
+
 ## iter327 — Public Top Contractor Leaderboard + 3-Endpoint Pricing Reconciliation (Jun 30, 2026) ✅ COMPLETE
 
 ### Shipped

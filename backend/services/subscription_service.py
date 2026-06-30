@@ -2,9 +2,15 @@
 BidVex Subscription Service
 Handles subscription tier management, Stripe price mappings, and tier-based fee calculations
 
-iter327 — Canonical prices are sourced from services.subscription_pricing.DEFAULT_PLANS.
-This module's helpers (get_all_tiers, SUBSCRIPTION_PRICES) derive their numbers from
-that single source of truth. Stripe Price IDs remain mapped here.
+iter328 — Stripe-Sync Lock.
+These values MIRROR live BidVex Stripe Product/Price objects. Do not edit in code
+without first updating the corresponding Stripe Price object. Subscription pricing
+is Stripe-driven going forward; no code-side overrides.
+
+Stripe Price IDs:
+- Free: price_1T5V79Bd6Wtvh7hsnp69zu1F
+- Premium ($180.00 CAD/year): price_1T5V5xBd6Wtvh7hscWcNnk34
+- VIP ($300.00 CAD/year): price_1T5V2bBd6Wtvh7hsqLLmAZSH
 """
 
 import os
@@ -12,8 +18,6 @@ import logging
 from typing import Dict, Any, Optional
 from datetime import datetime, timezone
 from enum import Enum
-
-from services.subscription_pricing import DEFAULT_PLANS as _CANONICAL_PLANS
 
 logger = logging.getLogger(__name__)
 
@@ -45,26 +49,16 @@ PRICE_ID_TO_TIER = {
     "price_1T5V2bBd6Wtvh7hsqLLmAZSH": "vip",
 }
 
-# Subscription prices (for display) — iter327 derived from canonical DEFAULT_PLANS.
-def _build_subscription_prices() -> Dict[str, Dict[str, Any]]:
-    out: Dict[str, Dict[str, Any]] = {
-        "free":  {"amount": 0, "currency": "CAD", "interval": "year", "display": "Free"},
-        "basic": {"amount": 0, "currency": "CAD", "interval": "year", "display": "Free"},
-    }
-    for plan_id, plan in _CANONICAL_PLANS.items():
-        if plan_id == "free":
-            continue
-        yearly = float(plan.get("price_yearly") or 0.0)
-        out[plan_id] = {
-            "amount": int(round(yearly * 100)),
-            "currency": "CAD",
-            "interval": "year",
-            "display": f"${yearly:.2f} CAD/year + taxes",
-        }
-    return out
-
-
-SUBSCRIPTION_PRICES = _build_subscription_prices()
+# Subscription prices (for display) — iter328 Stripe-Sync Lock.
+# These mirror live Stripe Price objects; edit Stripe first, then mirror here.
+SUBSCRIPTION_PRICES = {
+    "free": {"amount": 0, "currency": "CAD", "interval": "year", "display": "Free"},
+    "basic": {"amount": 0, "currency": "CAD", "interval": "year", "display": "Free"},
+    "partner": {"amount": 10000, "currency": "CAD", "interval": "year", "display": "$100.00 CAD/year + taxes"},
+    "premium": {"amount": 18000, "currency": "CAD", "interval": "year", "display": "$180.00 CAD/year + taxes"},
+    "partner_pro": {"amount": 24000, "currency": "CAD", "interval": "year", "display": "$240.00 CAD/year + taxes"},
+    "vip": {"amount": 30000, "currency": "CAD", "interval": "year", "display": "$300.00 CAD/year + taxes"},
+}
 
 # Fee rates by tier (synchronized with tax_engine.py)
 BUYER_PREMIUM_RATES = {
@@ -226,31 +220,44 @@ def get_tier_benefits(tier: str) -> Dict[str, Any]:
 def get_all_tiers() -> Dict[str, Any]:
     """Get all subscription tiers with their details.
 
-    iter327 — Price numbers are derived from canonical DEFAULT_PLANS so that the
-    /api/payments/subscriptions/tiers endpoint matches /api/subscription-plans
-    and /api/pricing-config. Stripe Price IDs and tier benefits remain mapped here.
+    iter328 Stripe-Sync Lock — values mirror live Stripe Price objects.
+    Edit Stripe first, then mirror here. No code-side overrides.
     """
     _ensure_partner_pro_stripe_price()
-
-    def _tier_row(plan_id: str, display_name: str):
-        price_cents = SUBSCRIPTION_PRICES.get(plan_id, {}).get("amount", 0)
-        yearly = price_cents / 100.0
-        # Spread TIER_BENEFITS FIRST so canonical price fields win on conflict.
-        return {
-            **TIER_BENEFITS.get(plan_id, TIER_BENEFITS["free"]),
-            "id": plan_id,
-            "name": display_name,
-            "price": price_cents,
-            "price_display": f"${yearly:.2f} CAD/year + taxes" if price_cents > 0 else "Free",
-            "stripe_price_id": STRIPE_PRICE_IDS.get(plan_id, ""),
-        }
-
     return {
         "tiers": [
-            _tier_row("free", "Free"),
-            _tier_row("premium", "Premium"),
-            _tier_row("partner_pro", "Partner Pro"),
-            _tier_row("vip", "VIP Elite"),
+            {
+                "id": "free",
+                "name": "Free",
+                "price": 0,
+                "price_display": "Free",
+                "stripe_price_id": STRIPE_PRICE_IDS["free"],
+                **TIER_BENEFITS["free"]
+            },
+            {
+                "id": "premium",
+                "name": "Premium",
+                "price": 18000,
+                "price_display": "$180 CAD/year + taxes",
+                "stripe_price_id": STRIPE_PRICE_IDS["premium"],
+                **TIER_BENEFITS["premium"]
+            },
+            {
+                "id": "partner_pro",
+                "name": "Partner Pro",
+                "price": 24000,
+                "price_display": "$240 CAD/year + taxes",
+                "stripe_price_id": STRIPE_PRICE_IDS.get("partner_pro", ""),
+                **TIER_BENEFITS["partner_pro"]
+            },
+            {
+                "id": "vip",
+                "name": "VIP Elite",
+                "price": 30000,
+                "price_display": "$300 CAD/year + taxes",
+                "stripe_price_id": STRIPE_PRICE_IDS["vip"],
+                **TIER_BENEFITS["vip"]
+            }
         ],
         "fee_comparison": {
             "columns": ["Tier", "Buyer Premium", "Seller Commission", "Savings per $1,000"],

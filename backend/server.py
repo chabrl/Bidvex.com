@@ -1566,10 +1566,8 @@ try:
     # iter323 — Contractor profile (extension + photo), leaderboard, IVR + SendGrid inbound parse
     try:
         from routes.contractor_profile_ext import router as contractor_profile_ext_router
-        from routes.contractor_profile_ext import public_leaderboard_router as contractor_public_leaderboard_router
         from routes.contractor_ivr_inbound import router as contractor_ivr_inbound_router
         api_router.include_router(contractor_profile_ext_router)
-        api_router.include_router(contractor_public_leaderboard_router)
         api_router.include_router(contractor_ivr_inbound_router)
         logger.info("iter323 — Contractor profile/leaderboard + IVR + SendGrid inbound parse mounted")
     except Exception as ce:  # noqa: BLE001

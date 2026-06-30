@@ -56,26 +56,37 @@ Vehicle dealers and brokers must complete the **broker gate**:
 
 ## Section 2 — Account Hierarchies, Subscriptions, & Fee Matrices
 
-> ✅ **iter326 — Pricing-Config Consolidation (Jun 30, 2026):**
-> The two-config conflict is now resolved. `services/subscription_pricing.py::DEFAULT_PLANS`
-> is the **single canonical source** for all subscription SKU prices (monthly + yearly).
-> The legacy `services/pricing_config.py::SUBSCRIPTION_TIERS` dict is now a **derived view**
-> built at module load via `_build_subscription_tiers()`, preserving its
-> `{amount_cents, currency, interval, label}` shape so existing callers and tests
-> keep working unchanged. To change a subscription price, edit `DEFAULT_PLANS`.
+> ✅ **iter328 — Stripe-Sync Lock (Jun 30, 2026):** iter326 / iter327 consolidation rolled
+> back. Subscription pricing is now Stripe-driven; in-code values (`SUBSCRIPTION_TIERS`,
+> `SUBSCRIPTION_PRICES`) MIRROR live Stripe Price objects. Edit Stripe first, then mirror
+> in code. No auto-reconciliation between MongoDB and code. The public anonymized
+> `/api/contractor/leaderboard/public` endpoint and the `/blogs` widget have been
+> deleted; the contractor leaderboard is now visible ONLY inside the authenticated
+> `/contractor/dashboard` (via the iter323 `<ContractorIter323Panel>` component).
 
-### Canonical price matrix (from `services/subscription_pricing.py::DEFAULT_PLANS` — iter326 consolidation)
+### Canonical price matrix (yesterday's state, pre-iter326)
 
-| Tier | Monthly (CAD) | Annual (CAD) | Buyer Premium | Seller Commission | Monthly listings |
-|---|---|---|---|---|---|
-| **Free / Standard** | — | $0 | 5.0% | 4.0% | 5 |
-| **Partner** | — (annual only) | $100 | 5.0% (no discount) | 4.0% (no discount) | unlimited |
-| **Premium** | **$29.99** | **$299.99** | 3.5% | 2.5% | unlimited |
-| **Partner Pro** | — (annual only) | $100 | 3.75% | 3.0% | unlimited |
-| **VIP Elite** | **$99.99** | **$999.99** | 3.0% | 2.0% | unlimited |
-| **Vehicle Dealer** | — | $200 → **$100 with `LAUNCH50`** | 3.0% (vehicle-category platform fee 2.5%) | n/a (hammer paid direct) | unlimited |
+| Tier | Yearly (CAD) | Buyer Premium | Seller Commission | Monthly listings |
+|---|---|---|---|---|
+| **Free / Standard** | $0 | 5.0% | 4.0% | 5 |
+| **Partner** | $100 | 5.0% (no discount) | 4.0% (no discount) | unlimited |
+| **Premium** | $180 (display) — Stripe Price `price_1T5V5xBd6Wtvh7hscWcNnk34` is canonical | 3.5% | 2.5% | unlimited |
+| **Partner Pro** | $240 | 3.75% | 3.0% | unlimited |
+| **VIP Elite** | $300 (display) — Stripe Price `price_1T5V2bBd6Wtvh7hsqLLmAZSH` is canonical | 3.0% | 2.0% | unlimited |
+| **Vehicle Dealer** | $200 → **$100 with `LAUNCH50`** | 3.0% (vehicle-category platform fee 2.5%) | n/a (hammer paid direct) | unlimited |
 
-**Public endpoint:** `GET /api/pricing-config` returns the live canonical dict — both annual and monthly equivalents (in cents and human-readable labels). Frontend consumers read from this endpoint; never hardcode prices.
+> ⚙️ **iter328 — Stripe-Sync Lock:** subscription pricing is now driven by the
+> existing **Stripe Product/Price objects**. The values in `services/pricing_config.py::SUBSCRIPTION_TIERS`
+> and `services/subscription_service.py::SUBSCRIPTION_PRICES` MIRROR live Stripe Prices.
+> **Do not edit code values without first updating the corresponding Stripe Price.**
+> The `subscription_plans` MongoDB collection is initialized once and not auto-reconciled.
+
+**Public endpoints (display):**
+- `GET /api/pricing-config` — returns the static SUBSCRIPTION_TIERS mirror.
+- `GET /api/subscription-plans` — DB-driven (seeded once from `DEFAULT_PLANS`).
+- `GET /api/payments/subscriptions/tiers` — returns the static SUBSCRIPTION_PRICES mirror.
+
+⚠️ These three endpoints can show small disagreements (e.g. `subscription-plans` exposes monthly equivalents from DEFAULT_PLANS while `pricing-config` shows the rounded yearly mirror). **Stripe is the source of truth for actual billing** via Stripe Checkout — the API responses are display-only.
 
 ### 2.1 Premium Partners Tier
 - Annual subscription: **$100 / yr** (`SUBSCRIPTION_TIERS["partner"]`).

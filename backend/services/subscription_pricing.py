@@ -185,9 +185,9 @@ DEFAULT_PLANS = {
         "plan_id": "partner_pro",
         "name": "Partner Pro",
         "price_monthly": 0.0,
-        "price_yearly": 100.00,
+        "price_yearly": 240.00,
         "original_price_monthly": 0.0,
-        "original_price_yearly": 200.00,
+        "original_price_yearly": 240.00,
         "features": [
             "All Premium benefits",
             "25% buyer premium discount",
@@ -209,28 +209,6 @@ DEFAULT_PLANS = {
         "has_bulk_import": True,
         "has_analytics_export": True,
         "support_level": "priority_chat_email",
-        "is_active": True
-    },
-    # iter326 — Partner tier added to canonical DEFAULT_PLANS as the legacy
-    # pricing_config.SUBSCRIPTION_TIERS["partner"] is now derived from here.
-    # Annual-only billing — no monthly equivalent.
-    "partner": {
-        "plan_id": "partner",
-        "name": "Partner",
-        "price_monthly": 0.0,
-        "price_yearly": 100.00,
-        "original_price_monthly": 0.0,
-        "original_price_yearly": 100.00,
-        "features": [
-            "Standard marketplace access",
-            "Unlimited listings",
-            "Standard buyer premium (5%)",
-            "Standard seller commission (4%)",
-            "Annual billing only"
-        ],
-        "buyer_premium_discount": 0.0,
-        "seller_commission_discount": 0.0,
-        "monthly_listing_limit": -1,
         "is_active": True
     }
 }
@@ -255,9 +233,7 @@ class SubscriptionPricingService:
     # ========== PRICING MANAGEMENT ==========
     
     async def initialize_plans(self):
-        """Initialize default plans if not present in database, migrate existing plans with new fields,
-        and (iter327) reconcile price/feature fields against canonical DEFAULT_PLANS so the public
-        /api/subscription-plans endpoint always returns the source-of-truth values."""
+        """Initialize default plans if not present in database, migrate existing plans with new fields"""
         if self._initialized:
             return
         for plan_id, plan_data in DEFAULT_PLANS.items():
@@ -268,46 +244,18 @@ class SubscriptionPricingService:
                 await self.plans_collection.insert_one(plan_data)
                 logger.info(f"Initialized plan: {plan_id}")
             else:
-                # iter327 reconciliation — sync canonical fields when DB has drifted.
-                # Admin overrides via update_plan_pricing() write a changelog row;
-                # we ONLY reconcile when the DB still matches a prior canonical value
-                # (i.e. no admin override has happened). Field set covers price + display.
-                reconcile_fields = [
-                    "price_monthly", "price_yearly",
-                    "original_price_monthly", "original_price_yearly",
-                    "features", "monthly_listing_limit",
-                    "buyer_premium_discount", "seller_commission_discount",
-                    "is_active", "name",
-                ]
+                # Migration: Add original_price fields if missing
                 updates = {}
-                for field in reconcile_fields:
-                    canonical = plan_data.get(field)
-                    if canonical is None:
-                        continue
-                    if existing.get(field) != canonical:
-                        # Check if this plan/field was admin-overridden recently.
-                        had_admin_change = await self.changelog_collection.find_one(
-                            {"plan_id": plan_id, "field": field},
-                        )
-                        if had_admin_change:
-                            # Respect admin override; do not overwrite.
-                            continue
-                        updates[field] = canonical
-                # Legacy migration: add original_price fields if missing.
-                if "original_price_monthly" not in existing and "original_price_monthly" not in updates:
+                if "original_price_monthly" not in existing:
                     updates["original_price_monthly"] = plan_data.get("original_price_monthly", 0.0)
-                if "original_price_yearly" not in existing and "original_price_yearly" not in updates:
+                if "original_price_yearly" not in existing:
                     updates["original_price_yearly"] = plan_data.get("original_price_yearly", 0.0)
                 if updates:
-                    updates["updated_at"] = datetime.now(timezone.utc).isoformat()
                     await self.plans_collection.update_one(
                         {"plan_id": plan_id},
-                        {"$set": updates},
+                        {"$set": updates}
                     )
-                    logger.info(f"iter327 — Reconciled plan {plan_id} → {list(updates.keys())}")
-        # Bust the in-memory cache after reconciliation.
-        self._plans_cache = None
-        self._plans_cache_ts = 0
+                    logger.info(f"Migrated plan {plan_id} with original price fields")
         self._initialized = True
     
     async def get_all_plans(self) -> List[Dict[str, Any]]:
