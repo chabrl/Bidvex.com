@@ -1,6 +1,37 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter336 — AI-Drafted Follow-Up Emails from Coach Sessions (Jul 02, 2026) ✅ COMPLETE
+
+### Shipped
+1. **Backend**: `POST /api/ai-coach/sessions/{call_log_id}/generate-followup-email` — Gemini 2.5 Flash JSON drafter (subject_en, subject_fr, body). Owner-only + admin. Rate-limited to 3 generations per call. Deterministic bilingual fallback when Gemini output is malformed. Records each attempt on `ai_voice_calls.followup_emails_generated[]` with `used_fallback` flag.
+2. **Backend**: `POST /api/twilio/contractor/emails/send` extended with optional `call_log_id`. When provided, back-references the sent email to the source coach session via `ai_voice_calls.followup_emails_generated.$.sent = true / sent_at / email_row_id`.
+3. **AdminAICoachSessions.jsx**: `FollowUpEmailPanel` in DetailView with generate button, live count (0/3 → 3/3), draft preview, "Open in Email Hub & Send" CTA, sent-badge once a draft is used, and auto-expand-on-return via `location.state.autoExpandCallLogId`.
+4. **ContractorEmailHub.jsx** UX polish:
+   - Reads `location.state.prefill` (source==='ai_followup') on mount and pre-populates subject + body.
+   - "✨ AI-suggested" badges next to Subject and Body labels — disappear the instant the contractor types.
+   - AI info banner + "Regenerate / Régénérer" link back to Coach Sessions (auto-expanding the correct row); banner auto-dismisses the moment the body is edited.
+   - Send payload includes `call_log_id` for backend linkage.
+5. **AdminDashboard.js**: `SECONDARY_TO_PRIMARY` map extended so `?tab=ai-coach-sessions` correctly resolves to `primary='team'` (bug found + fixed by testing agent — otherwise Regenerate link stranded on marketplace tab).
+
+### Tests
+- `test_iter336_followup_email.py` — 5/5 PASS (owner OK, non-owner 404, 4th attempt 429 bilingual, malformed Gemini graceful fallback, ContractorEmailSendBody accepts call_log_id).
+- `test_iter336_e2e_ui_integration.py` — 2/2 PASS (full E2E: seed session → generate → send with call_log_id → Mongo linkage verified).
+- Combined 53/53 across iter321/324/332/334/335/336 — zero regressions on coaching WebSocket, inbound IVR, base email hub endpoints.
+- Full UI E2E via Playwright: banner + badges + regenerate link + auto-expand all verified live against preview.
+
+### Files touched
+- `/app/backend/routes/ai_coach.py` (+220 lines — followup endpoint, prompt builder, extractor, fallback)
+- `/app/backend/routes/twilio.py` (ContractorEmailSendBody + send handler linkage)
+- `/app/frontend/src/pages/admin/AdminAICoachSessions.jsx` (FollowUpEmailPanel + auto-expand)
+- `/app/frontend/src/pages/contractor/ContractorEmailHub.jsx` (prefill + banner + AI badges + regenerate link + call_log_id in send)
+- `/app/frontend/src/pages/AdminDashboard.js` (SECONDARY_TO_PRIMARY team-group entries)
+- `/app/backend/tests/test_iter336_followup_email.py` (new — 5 tests)
+- `/app/backend/tests/test_iter336_e2e_ui_integration.py` (new — 2 tests)
+
+
+
+
 ## iter330 — Promo Sprint: Trial + First-Listing-Free + 50% UI + DB Sync Guard (Jun 30, 2026) ✅ COMPLETE
 
 ### Shipped
