@@ -183,6 +183,7 @@ class ContractorEmailSendBody(BaseModel):
     body_html: str
     client_account_id: Optional[str] = None
     locale: Optional[str] = "en"
+    call_log_id: Optional[str] = None  # iter336 — link an AI-follow-up email back to its source call
 
 
 # Whitelist of admin-grantable contractor permissions.
@@ -1889,6 +1890,29 @@ async def contractor_send_email(body: ContractorEmailSendBody,
         contractor_ip=client_ip,
         contractor_user_agent=user_agent,
     )
+
+    # iter336 — If this email is an AI-generated follow-up, mark the
+    # matching draft in the source call's ai_voice_calls document as
+    # sent so admins can see the full audit trail.
+    if body.call_log_id:
+        try:
+            now = datetime.now(timezone.utc).isoformat()
+            await db.ai_voice_calls.update_one(
+                {
+                    "call_log_id": body.call_log_id,
+                    "call_type": "outbound_coach",
+                    "contractor_id": user.id,
+                    "followup_emails_generated": {"$elemMatch": {"sent": False}},
+                },
+                {"$set": {
+                    "followup_emails_generated.$.sent": True,
+                    "followup_emails_generated.$.sent_at": now,
+                    "followup_emails_generated.$.email_row_id": row.get("id") or row.get("_id"),
+                }},
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[iter336] link email→coach session failed: {e}")
+
     return row
 
 

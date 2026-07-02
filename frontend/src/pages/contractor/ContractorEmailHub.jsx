@@ -16,10 +16,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   Mail, Send, ChevronLeft, Loader2, AlertTriangle, CheckCircle2, Inbox,
+  Sparkles, RefreshCw,
 } from 'lucide-react';
 
 import API_BASE from '../../config';
@@ -49,6 +50,15 @@ export default function ContractorEmailHub() {
   const fr = (i18n.language || 'en').startsWith('fr');
   const { token, user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // iter336 — AI follow-up prefill payload passed via router state from
+  // AdminAICoachSessions → FollowUpEmailPanel. We capture it once on mount
+  // so re-renders don't re-prefill after the user starts editing.
+  const [prefill, setPrefill] = useState(() => {
+    const p = location.state?.prefill;
+    return (p && p.source === 'ai_followup') ? p : null;
+  });
 
   const [agreementOpen, setAgreementOpen] = useState(false);
   const [agreementChecked, setAgreementChecked] = useState(false);
@@ -60,8 +70,28 @@ export default function ContractorEmailHub() {
 
   const [toEmail, setToEmail] = useState('');
   const [clientAccountId, setClientAccountId] = useState('');
-  const [subject, setSubject] = useState('');
-  const [bodyHtml, setBodyHtml] = useState('');
+  const [subject, setSubject] = useState(prefill?.subject || '');
+  const [bodyHtml, setBodyHtml] = useState(prefill?.body || '');
+
+  // Clear the router state after we've captured it so a browser refresh
+  // doesn't re-inject the same draft (would double the "AI-suggested"
+  // signal misleadingly).
+  useEffect(() => {
+    if (location.state?.prefill) {
+      window.history.replaceState({}, document.title);
+    }
+  }, []);
+
+  // AI badge visibility — a field is "AI-suggested" only while it still
+  // matches the pre-filled value. The instant the contractor types, the
+  // badge disappears (trust signal per spec).
+  const subjectIsAiSuggested = !!prefill && subject === prefill.subject && subject.length > 0;
+  const bodyIsAiSuggested    = !!prefill && bodyHtml === prefill.body && bodyHtml.length > 0;
+
+  // Banner rules (per spec):
+  //   • Show when prefill loaded and body has NOT been changed at all.
+  //   • Auto-dismiss the moment the contractor edits the body.
+  const showAiBanner = !!prefill && bodyIsAiSuggested;
 
   const isContractor = user?.role === 'dialer_contractor';
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
@@ -144,11 +174,15 @@ export default function ContractorEmailHub() {
           body_html:          bodyHtml,
           client_account_id:  clientAccountId || null,
           locale:             fr ? 'fr' : 'en',
+          // iter336 — Link this outbound email back to the AI Coach session
+          // that generated the draft (server updates ai_voice_calls.$.sent).
+          call_log_id:        prefill?.call_log_id || null,
         },
         { headers: { Authorization: `Bearer ${token}` } },
       );
       toast.success(fr ? 'Courriel envoyé.' : 'Email sent.');
       setSubject(''); setBodyHtml(''); setToEmail(''); setClientAccountId('');
+      setPrefill(null); // clear the AI banner/badges once sent
       await fetchAll();
     } catch (e) {
       const detail = e?.response?.data?.detail;
@@ -241,6 +275,41 @@ export default function ContractorEmailHub() {
               </Badge>
             </div>
 
+            {showAiBanner && (
+              <div
+                className="rounded-md border border-purple-200 bg-gradient-to-r from-purple-50 to-indigo-50 px-3 py-2 flex items-start gap-2"
+                data-testid="ai-followup-banner"
+              >
+                <Sparkles className="h-4 w-4 text-purple-600 mt-0.5 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-purple-900">
+                    {fr
+                      ? "Brouillon suggéré par l'IA à partir de l'appel."
+                      : 'AI-drafted follow-up from the coach session.'}
+                  </p>
+                  <p className="text-[11px] text-purple-800 mt-0.5">
+                    {fr
+                      ? 'Relisez et personnalisez avant l\'envoi. Le badge disparaît dès que vous modifiez un champ.'
+                      : 'Review and personalise before sending. Badges disappear the moment you edit a field.'}
+                  </p>
+                </div>
+                {prefill?.call_log_id && (
+                  <button
+                    type="button"
+                    onClick={() => navigate(
+                      `/admin?tab=ai-coach-sessions`,
+                      { state: { autoExpandCallLogId: prefill.call_log_id } },
+                    )}
+                    className="text-[11px] font-semibold text-indigo-700 hover:text-indigo-900 hover:underline flex items-center gap-1 whitespace-nowrap flex-shrink-0"
+                    data-testid="ai-followup-regenerate-link"
+                  >
+                    <RefreshCw className="h-3 w-3" />
+                    {fr ? 'Régénérer' : 'Regenerate'}
+                  </button>
+                )}
+              </div>
+            )}
+
             <div>
               <Label htmlFor="recipient-picker" className="text-xs">
                 {fr ? 'Choisir un client recommandé' : 'Pick a referred client'}
@@ -280,7 +349,19 @@ export default function ContractorEmailHub() {
 
             <div>
               <Label htmlFor="subject-input" className="text-xs flex items-center justify-between">
-                <span>{fr ? 'Sujet' : 'Subject'}</span>
+                <span className="flex items-center gap-2">
+                  {fr ? 'Sujet' : 'Subject'}
+                  {subjectIsAiSuggested && (
+                    <Badge
+                      variant="outline"
+                      className="text-[9px] font-medium border-purple-300 text-purple-700 bg-purple-50 px-1.5 py-0"
+                      data-testid="subject-ai-badge"
+                    >
+                      <Sparkles className="h-2.5 w-2.5 mr-0.5" />
+                      {fr ? 'IA suggéré' : 'AI-suggested'}
+                    </Badge>
+                  )}
+                </span>
                 <span className="text-[10px] text-slate-400">
                   {subject.length}/{SUBJECT_MAX}
                 </span>
@@ -296,7 +377,19 @@ export default function ContractorEmailHub() {
 
             <div>
               <Label htmlFor="body-html-input" className="text-xs flex items-center justify-between">
-                <span>{fr ? 'Corps du courriel (HTML accepté)' : 'Body (HTML accepted)'}</span>
+                <span className="flex items-center gap-2">
+                  {fr ? 'Corps du courriel (HTML accepté)' : 'Body (HTML accepted)'}
+                  {bodyIsAiSuggested && (
+                    <Badge
+                      variant="outline"
+                      className="text-[9px] font-medium border-purple-300 text-purple-700 bg-purple-50 px-1.5 py-0"
+                      data-testid="body-ai-badge"
+                    >
+                      <Sparkles className="h-2.5 w-2.5 mr-0.5" />
+                      {fr ? 'IA suggéré' : 'AI-suggested'}
+                    </Badge>
+                  )}
+                </span>
                 <span className="text-[10px] text-slate-400">
                   {bodyHtml.length}/{BODY_MAX}
                 </span>

@@ -1,0 +1,30 @@
+{
+  "summary": "iter336 — AI Follow-Up Emails from Coach Sessions: FULL PASS. Verified end-to-end (backend + frontend UI): (1) 5/5 iter336 backend unit tests pass. (2) NEW E2E test seeds a completed outbound_coach session in Mongo, POSTs /api/ai-coach/sessions/{id}/generate-followup-email → 200 with subject_en/subject_fr/body/count=1/max=3, then POSTs /api/twilio/contractor/emails/send with call_log_id → 200, then Mongo verification confirms ai_voice_calls.followup_emails_generated[$].sent==True + sent_at set + email_row_id back-reference to the new contractor_emails row. (3) Rate-limit test: seeding count=3 returns 429 with bilingual message_en/message_fr envelope. (4) Full UI E2E via Playwright: logged in as admin, deep-linked to /admin?tab=ai-coach-sessions, expanded seeded row (coach-detail-<id>), clicked followup-generate-btn → Gemini returned a real draft ('Following Up on Your 2019 F-150 with BidVex'), clicked followup-open-hub-btn → navigated to /contractor/emails with prefill; verified ai-followup-banner + subject-ai-badge + body-ai-badge + ai-followup-regenerate-link all visible; subject/body pre-populated (43/796 chars). (5) Badge disappearance: typing in subject-input made subject-ai-badge disappear while body-ai-badge + banner stayed. Typing in body-html-input made body-ai-badge AND ai-followup-banner both disappear. (6) Regenerate link navigated back to /admin?tab=ai-coach-sessions AND auto-expanded the target row (coach-detail-<id> visible). (7) Regression smoke: /contractor/emails without prefill renders composer with NO banner + NO badges. Homepage loads without page errors. (8) Ran the FULL related backend suite (iter321/324/332/334/335/336) — 53/53 tests pass, zero regressions on twilio, coach WS, IVR.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter336_followup_email.py",
+    "/app/backend/tests/test_iter336_e2e_ui_integration.py"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "FIXED a real deep-link routing bug in /app/frontend/src/pages/AdminDashboard.js: the SECONDARY_TO_PRIMARY map in the mount effect was missing entries for the tabs under primary='team' (ai-coach-sessions, ai-voice-calls, careers, press-blogs, team-members). Without this, a URL like /admin?tab=ai-coach-sessions would set secondaryTab correctly but leave primaryTab='marketplace', which then triggered the [primaryTab] effect to reset secondaryTab back to a marketplace default. This broke the iter336 Regenerate flow from Email Hub → Coach Sessions until fixed. Added mappings and verified via UI E2E — regenerate link now correctly returns user to the coach sessions tab with auto-expand.",
+    "iter336 backend rate-limit envelope is bilingual (message_en + message_fr) — matches spec exactly.",
+    "The linkage design between contractor_emails and ai_voice_calls is ONE-WAY: contractor_emails does NOT store call_log_id. Instead ai_voice_calls.followup_emails_generated[$].email_row_id back-references the contractor_emails.id. This is by design and cleanly separates PII from the coach-session audit trail. UI 'Sent' badge on the FollowUpEmailPanel is driven by the followup_emails_generated[$].sent flag — correct.",
+    "AI banner + badge disappearance logic in ContractorEmailHub.jsx uses strict equality (subject === prefill.subject) — a single keystroke breaks equality and hides the badge, exactly as spec'd."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter336_e2e_ui_integration.py (new — 2 E2E tests)",
+    "/app/frontend/src/pages/AdminDashboard.js (fixed SECONDARY_TO_PRIMARY missing team-tab entries)"
+  ],
+  "success_rate": {"backend": "100% (53/53 across iter321/324/332/334/335/336)", "frontend": "100% on all 5 iter336 UI acceptance criteria"},
+  "test_credentials": "Admin: charbel911@gmail.com / Anderosli123!@# (works). Test buyer creds in /app/memory/test_credentials.md still 401 on preview but iter336 flows only need admin — no action needed.",
+  "seed_data_creation": "Backend E2E tests self-seed and clean up ai_voice_calls rows via direct Mongo writes (see _seed_session helper). UI E2E flow seeded call_log_id=iter336-uie2e-5bc9622e62e0 and I explicitly deleted it after test.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All iter336 acceptance criteria PASS on preview URL https://prod-verify-2.preview.emergentagent.com. To re-run: pytest /app/backend/tests/test_iter336_followup_email.py -v (5 unit tests, ~13s) AND pytest /app/backend/tests/test_iter336_e2e_ui_integration.py -v (2 E2E tests, ~25s — hits real Gemini so ~1-2 credits per run). The UI-level acceptance criteria (banner/badges/regenerate link) were verified end-to-end via Playwright — no separate test file needed unless we want a persistent Playwright regression suite. Pre-set BOTH bidvex_cookie_consent AND bidvex_cookie_consent_v2 localStorage keys before UI runs. IMPORTANT NOTE for future E1: the ai-coach-sessions tab lives under primary='team', not primary='marketplace' — see the SECONDARY_TO_PRIMARY map in AdminDashboard.js line 283. Any future ?tab= deep-links to team-group tabs must be added to that map."
+}

@@ -290,6 +290,14 @@ const AdminDashboard = () => {
         'system-monitoring':  'analytics',
         // iter321 — deep-link to Live Support tab
         'escalations':        'team',
+        // iter336 — deep-link into the Team → AI Coach Sessions tab so
+        // the ContractorEmailHub "Regenerate" link opens the correct
+        // primary + secondary tabs (and the row auto-expands via router state).
+        'ai-coach-sessions':  'team',
+        'ai-voice-calls':     'team',
+        'careers':            'team',
+        'press-blogs':        'team',
+        'team-members':       'team',
       };
       const inferredPrimary = SECONDARY_TO_PRIMARY[tab];
       if (inferredPrimary) setPrimaryTab(inferredPrimary);

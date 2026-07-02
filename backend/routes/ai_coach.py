@@ -716,3 +716,226 @@ async def admin_get_coach_session(
     doc["client_phone_masked"] = mask_phone(doc.get("client_phone") or "")
     doc.pop("client_phone", None)
     return doc
+
+
+# ─── iter336: AI-generated post-call follow-up email ─────────────────
+
+FOLLOWUP_MAX_GENERATIONS = 3
+
+
+def _format_transcript_excerpt(transcript: List[Dict[str, Any]], last_n: int = 10) -> str:
+    """Format the last N transcript entries as readable dialogue."""
+    recent = transcript[-last_n:] if len(transcript) > last_n else transcript
+    lines = []
+    for entry in recent:
+        speaker = "Contractor" if (entry.get("speaker") == "contractor") else "Client"
+        text = (entry.get("text") or "").strip()
+        if text:
+            lines.append(f"{speaker}: {text[:400]}")
+    return "\n".join(lines) if lines else "Transcript not available"
+
+
+def _build_followup_prompt(session: Dict[str, Any]) -> str:
+    """Build the Gemini prompt with all 8 context fields per the spec."""
+    language = (session.get("language_detected") or "en").lower()
+    lang_instruction = (
+        "Respond entirely in French." if language == "fr"
+        else "Respond entirely in English."
+    )
+    duration_min = (session.get("duration_seconds") or 0) // 60
+    trend = session.get("sentiment_trend") or "unknown"
+    avg_s = session.get("avg_client_sentiment")
+    avg_s_str = f"{avg_s:.2f}" if isinstance(avg_s, (int, float)) else "n/a"
+    flags = ", ".join(session.get("compliance_flags_triggered", []) or []) or "none"
+    summary = session.get("ai_summary") or "Not available"
+    action_items = "; ".join(session.get("action_items") or []) or "none"
+    transcript_excerpt = _format_transcript_excerpt(session.get("transcript") or [], last_n=10)
+
+    return f"""You are a professional sales follow-up email writer for BidVex, Canada's online auction marketplace.
+
+A BidVex contractor just completed a sales call with a potential client. Using the call data below, write a warm, professional, and persuasive follow-up email that:
+- Thanks the client for their time
+- Summarizes the key points discussed
+- Addresses any concerns or questions raised during the call
+- Highlights the specific BidVex benefits most relevant to this client based on the conversation
+- Ends with a clear, single call-to-action (register on bidvex.com, schedule a demo, or reply to this email)
+- Sounds natural and human — never like a template or a bot wrote it
+
+{lang_instruction}
+Keep the email concise (under 250 words). Do not include a subject line in the body. Do not include a signature — it will be added automatically.
+
+CALL DATA:
+- Call duration: {duration_min} minutes
+- Client sentiment trend: {trend}
+- Average client sentiment score: {avg_s_str} (-1.0 = very negative, 1.0 = very positive)
+- Compliance flags triggered: {flags}
+- AI call summary: {summary}
+- Action items identified: {action_items}
+- Detected language: {language}
+- Transcript excerpt (last 10 exchanges for context):
+{transcript_excerpt}
+
+OUTPUT FORMAT — return a JSON object with exactly these fields:
+{{
+  "subject_en": "email subject line in English",
+  "subject_fr": "email subject line in French",
+  "body": "the full email body text — plain text, no HTML, no signature"
+}}
+Output ONLY valid JSON. No prose, no markdown, no explanation outside the JSON."""
+
+
+def _extract_followup_json(raw_text: str) -> Optional[Dict[str, str]]:
+    """Extract subject_en/subject_fr/body from Gemini's output, defensively."""
+    if not raw_text:
+        return None
+    txt = re.sub(r"```(?:json)?", "", raw_text).strip("` \n\t")
+    m = re.search(r"\{.*\}", txt, re.S)
+    if not m:
+        return None
+    try:
+        obj = json.loads(m.group())
+    except Exception:  # noqa: BLE001
+        return None
+    if not isinstance(obj, dict):
+        return None
+    subject_en = (obj.get("subject_en") or "").strip()
+    subject_fr = (obj.get("subject_fr") or "").strip()
+    body = (obj.get("body") or "").strip()
+    if not (subject_en or subject_fr) or not body:
+        return None
+    return {
+        "subject_en": subject_en[:300] or subject_fr[:300],
+        "subject_fr": subject_fr[:300] or subject_en[:300],
+        "body": body[:8000],
+    }
+
+
+def _fallback_followup_draft(session: Dict[str, Any]) -> Dict[str, str]:
+    """Deterministic fallback when Gemini returns malformed JSON. Uses the
+    AI summary if available, otherwise a neutral thank-you."""
+    lang = (session.get("language_detected") or "en").lower()
+    summary = (session.get("ai_summary") or "").strip()
+    if lang == "fr":
+        subject = "Suivi de notre conversation — BidVex"
+        body = (
+            "Bonjour,\n\n"
+            "Merci d'avoir pris le temps de discuter avec nous aujourd'hui à propos de BidVex.\n\n"
+            + (f"Résumé de notre échange : {summary}\n\n" if summary else "")
+            + "N'hésitez pas à répondre à ce courriel si vous avez des questions, ou visitez bidvex.com "
+              "pour créer votre compte et explorer nos enchères en direct.\n\n"
+              "Au plaisir de vous accompagner."
+        )
+    else:
+        subject = "Following up on our call — BidVex"
+        body = (
+            "Hi,\n\n"
+            "Thanks for taking the time to speak with us today about BidVex.\n\n"
+            + (f"Quick recap of what we discussed: {summary}\n\n" if summary else "")
+            + "Please reply to this email with any follow-up questions, or head over to bidvex.com "
+              "to create your account and start bidding right away.\n\n"
+              "Talk soon."
+        )
+    return {"subject_en": subject if lang != "fr" else "Following up on our call — BidVex",
+            "subject_fr": subject if lang == "fr" else "Suivi de notre conversation — BidVex",
+            "body": body}
+
+
+@router.post("/ai-coach/sessions/{call_log_id}/generate-followup-email")
+async def generate_followup_email(
+    call_log_id: str,
+    user: User = Depends(get_current_user),
+    db=Depends(get_db),
+) -> Dict[str, Any]:
+    """One-click Gemini follow-up email drafter for a completed AI coach
+    session. Owner-only + admin. Rate-limited to 3 generations per call."""
+    role = (getattr(user, "role", None) or "").lower()
+    is_admin = role in {"admin", "super_admin"}
+
+    query: Dict[str, Any] = {"call_log_id": call_log_id, "call_type": "outbound_coach"}
+    if not is_admin:
+        query["contractor_id"] = user.id
+
+    session = await db.ai_voice_calls.find_one(query, {"_id": 0})
+    if session is None:
+        # Ownership failures deliberately return the same 404 shape as
+        # "not found" to avoid leaking presence to other contractors.
+        raise HTTPException(404, "Session not found or access denied")
+
+    status = (session.get("ai_session_status") or "").lower()
+    if status not in {"completed", "degraded"}:
+        raise HTTPException(400, "Call session must be completed before generating a follow-up")
+
+    already = int(session.get("followup_email_generated_count", 0) or 0)
+    if already >= FOLLOWUP_MAX_GENERATIONS:
+        raise HTTPException(
+            429,
+            {
+                "error": "rate_limited",
+                "message_en": f"Maximum regenerations reached for this call ({FOLLOWUP_MAX_GENERATIONS}).",
+                "message_fr": f"Nombre maximum de régénérations atteint pour cet appel ({FOLLOWUP_MAX_GENERATIONS}).",
+                "count": already,
+                "max": FOLLOWUP_MAX_GENERATIONS,
+            },
+        )
+
+    api_key = os.environ.get("GEMINI_API_KEY", "").strip()
+    if not api_key:
+        raise HTTPException(503, "AI unavailable (missing GEMINI_API_KEY)")
+
+    prompt = _build_followup_prompt(session)
+    used_fallback = False
+    draft: Optional[Dict[str, str]] = None
+
+    try:
+        from google import genai
+        from google.genai import types as gtypes
+        client = genai.Client(api_key=api_key)
+        resp = await client.aio.models.generate_content(
+            model=os.environ.get("GEMINI_COACH_ANALYSIS_MODEL", "").strip() or ANALYSIS_MODEL_DEFAULT,
+            contents=prompt,
+            config=gtypes.GenerateContentConfig(
+                response_mime_type="application/json",
+                temperature=0.5,
+            ),
+        )
+        raw = getattr(resp, "text", None) or ""
+        draft = _extract_followup_json(raw)
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[followup-email] Gemini call failed: {e}")
+
+    if draft is None:
+        # Never 500 — deterministic fallback per spec.
+        draft = _fallback_followup_draft(session)
+        used_fallback = True
+
+    language = (session.get("language_detected") or "en").lower()
+    subject = draft["subject_fr"] if language == "fr" else draft["subject_en"]
+    now = _now_iso()
+    entry = {
+        "generated_at": now,
+        "language": language,
+        "sent": False,
+        "used_fallback": used_fallback,
+    }
+    try:
+        await db.ai_voice_calls.update_one(
+            {"call_log_id": call_log_id, "call_type": "outbound_coach"},
+            {
+                "$inc": {"followup_email_generated_count": 1},
+                "$push": {"followup_emails_generated": entry},
+            },
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[followup-email] counter update failed: {e}")
+
+    return {
+        "subject": subject,
+        "subject_en": draft["subject_en"],
+        "subject_fr": draft["subject_fr"],
+        "body": draft["body"],
+        "language_detected": language,
+        "call_log_id": call_log_id,
+        "count": already + 1,
+        "max_regenerations": FOLLOWUP_MAX_GENERATIONS,
+        "used_fallback": used_fallback,
+    }

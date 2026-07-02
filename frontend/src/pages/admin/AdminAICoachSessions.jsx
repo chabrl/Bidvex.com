@@ -13,11 +13,12 @@
  */
 import React, { useEffect, useState, useCallback } from 'react';
 import axios from 'axios';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   PhoneCall, Loader2, Bot, User as UserIcon, ChevronDown, ChevronUp,
   RefreshCw, Clock, MessageSquare, AlertTriangle, TrendingUp, TrendingDown,
-  Sparkles, Radio, Download,
+  Sparkles, Radio, Download, Mail, Send, CheckCircle2,
 } from 'lucide-react';
 import API_BASE from '../../config';
 import { useAuth } from '../../contexts/AuthContext';
@@ -48,6 +49,160 @@ function TrendBadge({ trend }) {
     return <Badge className="bg-slate-100 text-slate-700">Stable</Badge>;
   }
   return <span className="text-xs text-slate-400">—</span>;
+}
+
+/**
+ * iter336 — AI-Suggested Follow-Up Email panel.
+ * Only shown when the session is completed/degraded. Rate-limited to 3
+ * generations per call_log_id (server-enforced; client mirrors the counter).
+ */
+function FollowUpEmailPanel({ session, token }) {
+  const navigate = useNavigate();
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [draft, setDraft] = useState(null);
+  const [count, setCount] = useState(session?.followup_email_generated_count || 0);
+
+  // Derive user's UI language from session's detected language + a fallback.
+  const uiLang = (draft?.language_detected || session?.language_detected || 'en').toLowerCase() === 'fr' ? 'fr' : 'en';
+
+  const status = (session?.ai_session_status || '').toLowerCase();
+  const eligible = status === 'completed' || status === 'degraded';
+  const capReached = count >= 3;
+
+  // Was any previous draft already sent?
+  const sentEntry = (session?.followup_emails_generated || []).find((e) => e.sent);
+
+  if (!eligible) return null; // Hide entirely on in-progress / failed / timeout.
+
+  const handleGenerate = async () => {
+    setIsGenerating(true);
+    try {
+      const r = await axios.post(
+        `${API_BASE}/ai-coach/sessions/${session.call_log_id}/generate-followup-email`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      setDraft(r.data);
+      setCount(r.data.count || (count + 1));
+      if (r.data.used_fallback) {
+        toast.warning(uiLang === 'fr'
+          ? "L'IA a répondu de manière imprévue — utilisation d'un modèle de repli."
+          : "AI response was malformed — using a safe fallback draft.");
+      } else {
+        toast.success(uiLang === 'fr' ? 'Brouillon généré.' : 'Draft generated.');
+      }
+    } catch (e) {
+      const errStatus = e?.response?.status;
+      const detail = e?.response?.data?.detail || e?.response?.data;
+      if (errStatus === 429) {
+        const msg = (typeof detail === 'object' && detail?.message_en)
+          ? (uiLang === 'fr' ? detail.message_fr : detail.message_en)
+          : (uiLang === 'fr'
+              ? 'Nombre maximum de régénérations atteint pour cet appel.'
+              : 'Maximum regenerations reached for this call.');
+        toast.error(msg);
+        setCount(3);
+      } else if (errStatus === 400) {
+        toast.error(uiLang === 'fr'
+          ? "L'appel doit être terminé pour générer un suivi."
+          : 'Call session must be completed before generating a follow-up.');
+      } else {
+        toast.error(`${e?.response?.data?.detail || e?.message || 'Failed'}`);
+      }
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleOpenInEmailHub = () => {
+    // Navigate to the existing Contractor Email Hub with prefill state.
+    // The composer picks this up on mount and shows an info banner.
+    navigate('/contractor/emails', {
+      state: {
+        prefill: {
+          subject:  draft.subject,
+          body:     draft.body,
+          language: draft.language_detected,
+          source:   'ai_followup',
+          call_log_id: draft.call_log_id,
+        },
+      },
+    });
+  };
+
+  return (
+    <div className="border border-slate-200 rounded-lg p-4 mt-4" data-testid="ai-followup-email-panel">
+      <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+        <h3 className="font-semibold text-slate-800 text-sm flex items-center gap-2">
+          <Mail className="h-4 w-4 text-blue-600" />
+          {uiLang === 'fr' ? "Courriel de suivi suggéré par l'IA" : 'AI-Suggested Follow-Up Email'}
+        </h3>
+        <div className="flex items-center gap-2">
+          {sentEntry && (
+            <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 flex items-center gap-1" data-testid="followup-sent-badge">
+              <CheckCircle2 className="h-3 w-3" />
+              {uiLang === 'fr' ? 'Envoyé' : 'Sent'}
+            </Badge>
+          )}
+          <button
+            type="button"
+            onClick={handleGenerate}
+            disabled={isGenerating || capReached}
+            className="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-xs font-semibold px-3 py-2 rounded-md transition-colors flex items-center gap-1"
+            data-testid="followup-generate-btn"
+          >
+            {isGenerating
+              ? <><Loader2 className="h-3 w-3 animate-spin" /> {uiLang === 'fr' ? 'Génération…' : 'Generating…'}</>
+              : capReached
+                ? (uiLang === 'fr' ? 'Limite atteinte' : 'Limit reached')
+                : (uiLang === 'fr' ? 'Générer le courriel' : 'Generate Email Draft')}
+          </button>
+        </div>
+      </div>
+
+      {draft && (
+        <div className="bg-slate-50 rounded-md p-3 border border-slate-200" data-testid="followup-draft-preview">
+          <p className="text-xs text-slate-500 mb-1 font-medium">
+            {uiLang === 'fr' ? 'Objet :' : 'Subject:'}
+          </p>
+          <p className="text-sm text-slate-900 mb-3 font-semibold" data-testid="followup-draft-subject">
+            {draft.subject}
+          </p>
+
+          <p className="text-xs text-slate-500 mb-1 font-medium">
+            {uiLang === 'fr' ? 'Aperçu du message :' : 'Email preview:'}
+          </p>
+          <p className="text-sm text-slate-700 mb-3 whitespace-pre-line line-clamp-6" data-testid="followup-draft-body">
+            {draft.body}
+          </p>
+
+          <button
+            type="button"
+            onClick={handleOpenInEmailHub}
+            className="w-full bg-green-600 hover:bg-green-700 text-white text-sm font-semibold py-2 rounded-md transition-colors flex items-center justify-center gap-2"
+            data-testid="followup-open-hub-btn"
+          >
+            <Send className="h-4 w-4" />
+            {uiLang === 'fr' ? 'Ouvrir dans le hub de messagerie & envoyer' : 'Open in Email Hub & Send'}
+          </button>
+
+          {count > 0 && (
+            <p className="text-xs text-slate-400 mt-2 text-center" data-testid="followup-count-label">
+              {uiLang === 'fr' ? `Génération ${count}/3` : `Generation ${count}/3`}
+            </p>
+          )}
+        </div>
+      )}
+
+      {!draft && count > 0 && (
+        <p className="text-xs text-slate-500 italic" data-testid="followup-hint">
+          {uiLang === 'fr'
+            ? `${count}/3 générations utilisées. Cliquez pour générer un nouveau brouillon.`
+            : `${count}/3 generations used. Click to regenerate a fresh draft.`}
+        </p>
+      )}
+    </div>
+  );
 }
 
 function DetailView({ callLogId, token }) {
@@ -123,6 +278,9 @@ function DetailView({ callLogId, token }) {
         </div>
       )}
 
+      {/* iter336 — AI-Suggested Follow-Up Email */}
+      <FollowUpEmailPanel session={doc} token={token} />
+
       {/* Transcript */}
       <div>
         <h4 className="font-semibold text-sm mb-2 flex items-center gap-1"><MessageSquare className="h-4 w-4" /> Transcript</h4>
@@ -179,10 +337,23 @@ function DetailView({ callLogId, token }) {
 
 export default function AdminAICoachSessions() {
   const { token } = useAuth();
+  const location = useLocation();
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(null);
   const [filter, setFilter] = useState({ contractor: '', trend: '', lang: '', complianceOnly: false });
+
+  // iter336 — When the contractor clicks "Regenerate" from the Email Hub
+  // banner, they land back here with autoExpandCallLogId in router state.
+  // Auto-open the matching row so they can re-generate a fresh draft.
+  useEffect(() => {
+    const target = location.state?.autoExpandCallLogId;
+    if (target) {
+      setExpanded(target);
+      // Clear the state so a browser refresh doesn't re-trigger.
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   const load = useCallback(async () => {
     if (!token) return;
