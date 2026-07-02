@@ -241,10 +241,12 @@ async def ivr_incoming(request: Request) -> Response:
     if lang == "fr":
         say_main = ("Si vous connaissez le numéro de poste de votre interlocuteur, "
                     "veuillez l'entrer maintenant, suivi du dièse. "
-                    "Pour parler au soutien général, appuyez sur le zéro.")
+                    "Pour le support général, appuyez sur le zéro. "
+                    "Pour parler à notre assistant IA, appuyez sur le neuf.")
     else:
         say_main = ("If you know your contact's extension, please enter it now, "
-                    "followed by the pound key. To speak with general support, press 0.")
+                    "followed by the pound key. For general support, press 0. "
+                    "To speak with our AI assistant, press 9.")
 
     xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
@@ -271,6 +273,27 @@ async def ivr_route(request: Request) -> Response:
     from_number = form.get("From") or "Unknown"
 
     db = _get_db()
+
+    # iter334 — 9 → BidVex AI Voice Assistant (Gemini Live over Twilio Media Streams).
+    if digits == "9":
+        try:
+            await db.inbound_extension_calls.update_one(
+                {"call_sid": call_sid},
+                {"$set": {
+                    "outcome": "ai_assistant_routed",
+                    "status": "handed_off_ai",
+                    "ended_at": _now_iso(),
+                }},
+            )
+        except Exception:  # noqa: BLE001
+            pass
+        # Redirect to the AI assistant TwiML webhook. Using <Redirect> keeps
+        # the same call context so the AI branch can persist the CallSid.
+        xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Redirect method="POST">{base}/api/twilio/ivr/ai-assistant?lang={lang}</Redirect>
+</Response>"""
+        return _twiml(xml)
 
     # 0 → straight to general support (BidVex human line).
     if digits == "0" or not digits:

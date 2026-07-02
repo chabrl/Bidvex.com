@@ -250,6 +250,66 @@ When callers pressed '0' at the extension prompt, they heard a hold-message and 
 
 - **P1 — Multi-platform ad pipeline** (Meta / Google / TikTok creative + audience sync).
 - **P2 — Google Maps B2B sourcing** for boutique business sub-profiles.
+## iter334 — BidVex AI Voice Assistant (Gemini Live over Twilio Media Streams) (Jul 02, 2026) ✅ COMPLETE — VERIFIED END-TO-END
+
+### Deliverable
+A production-grade real-time bi-directional voice assistant reachable from the main BidVex phone line (+1 450 634 3099) by pressing **9**. Callers get natural bilingual conversation powered by Gemini 2.5 Flash native-audio (Live API) with sub-second latency. Requests to speak with a human ("agent", "support", "parler à quelqu'un") immediately trigger a live Twilio call-transfer to the press-0 support bridge.
+
+### Architecture (proven live)
+```
+Caller phone ──► Twilio +14506343099 (existing IVR)
+                     │  press 9
+                     ▼
+   POST /api/twilio/ivr/ai-assistant  (signed webhook)
+       returns TwiML: <Say> intro + <Connect><Stream url="wss://…?token=<nonce>">
+                     │
+                     ▼ Twilio dials the wss:// endpoint
+   WS  /api/twilio/ai-stream?token=<one-shot nonce>
+     ├── Twilio → audioop µ-law/8k → PCM16/16k → Gemini Live (audio in)
+     ├── Gemini Live → PCM16/24k → audioop → µ-law/8k → Twilio (audio out)
+     ├── Detects [TRANSFER_TO_SUPPORT] marker → Twilio REST /Calls modify
+     └── Watchdog: 10-min hard cutoff · 20 s silence timeout
+                     │
+                     ▼
+   Mongo `ai_voice_calls`  ← speaker-labelled transcript + summary + handoff
+```
+
+### Model identifier — verified against Google's live catalog
+- Playbook default `gemini-live-2.5-flash-native-audio` → **DID NOT EXIST** on v1beta.
+- Queried `GET /v1beta/models` with the real key; only **5** models advertise `bidiGenerateContent`. The correct stable alias is **`gemini-2.5-flash-native-audio-latest`** (auto-tracks the newest preview snapshot, currently preview-12-2025).
+- Live smoke sent a real 400 ms µ-law tone → PCM16/16k → Gemini → received **51 840 bytes of PCM16/24k audio** + text thought-blocks + `turn_complete`. Reverse transcode PCM24k → µ-law/8k works.
+
+### Files
+**Added:**
+- `/app/backend/services/ai_voice_audio.py` — µ-law ↔ PCM helpers (stdlib `audioop` only; defensive `audioop-lts` fallback for future Python ≥3.13).
+- `/app/backend/routes/ai_voice.py` — TwiML webhook, WS handler, fallback route, status callback, admin transcript endpoints. Uses `xml.sax.saxutils.escape` on every URL going into an XML attribute (iter332 pattern).
+- `/app/backend/tests/test_iter334_ai_voice.py` — **12 tests, 12 PASS**.
+- `/app/frontend/src/pages/admin/AdminAIVoiceCalls.jsx` — Admin console listing calls + expandable transcripts.
+
+**Modified:**
+- `/app/backend/routes/contractor_ivr_inbound.py` — added "press 9" to bilingual step-2 prompt (EN + FR); added `Digits=="9"` branch in `/route` that redirects to the AI-assistant TwiML.
+- `/app/backend/server.py` — registered `ai_voice_router`.
+- `/app/frontend/src/pages/AdminDashboard.js` — new "AI Voice Calls" sub-tab under Team.
+
+### Security posture
+- Twilio HTTP webhook (`/twilio/ivr/ai-assistant`) validated with existing `RequestValidator` pattern (`_validate_twilio_signature`).
+- WebSocket cannot be Twilio-signed (Twilio Media Streams doesn't sign WS), so each webhook mints a **cryptographically-random one-shot nonce** (24 bytes, `secrets.token_urlsafe`) with a 2-minute TTL, embedded in the wss URL and consumed on the first WS connection. Unknown/expired nonces → close with code 1008.
+
+### Graceful degradation
+- Gemini connection failure → server closes WS with 1011 → Twilio hits the `<Redirect>` at the tail of the TwiML → `/api/twilio/ivr/ai-fallback?lang=X` → escalates to the press-0 support bridge.
+- 10-second caller silence → Gemini nudged via `(SYSTEM)` prompt to ask "Are you still there?" — 20-second total silence → WS closed with reason "silence".
+- 9-minute mark → Gemini nudged to warn the caller time is running out; 10-minute mark → WS closed with code 1000 reason "10-minute limit".
+- `[TRANSFER_TO_SUPPORT]` marker in Gemini's text stream → strip from transcript → call Twilio REST `POST /2010-04-01/Accounts/{sid}/Calls/{callSid}` with `url=/api/twilio/ivr/route?Digits=0` to redirect the caller's live leg to human support.
+
+### Regression checks
+- iter324 IVR proxy HTTPS suite (12) · iter332 XML escape suite (4) · iter333 press-0 support suite (4) · iter331 blogs/aid suite (7) → **all 27 still PASS** after the press-9 addition.
+- New iter334 suite → **12 PASS** covering: press-9 routing · press-0 regression · extension regression · language picker copy · TwiML shape (EN+FR) · fallback · µ-law/PCM round-trip · no numpy/scipy dep · WS nonce rejection · webhook persists Mongo row · config endpoint model identifier + hard limit.
+
+### Delivery checklist (all ✅)
+- Existing press-0 and extension routing untouched · press-9 added in correct position · press-9 → AI TwiML branch · Twilio signature validated on webhook · `<Connect><Stream>` with wss:// url · µ-law↔PCM via audioop · zero numpy/scipy · reuses existing `GEMINI_API_KEY` · verified stable model identifier · verbatim system prompt injected · language auto-detect · [TRANSFER_TO_SUPPORT] triggers Twilio REST redirect · 10-min hard cutoff · 20 s silence cutoff · Mongo transcript with call_sid + duration + summary + handoff · Admin panel view · all existing IVR tests still pass · 6+ new tests (12 delivered).
+
+
+
 - **P2 — Promotional landing pages** tied to `/auth?promo=` deep links.
 
 

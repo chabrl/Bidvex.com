@@ -1579,9 +1579,12 @@ try:
     try:
         from routes.blogs import router as blogs_router
         from routes.contractor_aid import router as contractor_aid_router
+        from routes.ai_voice import router as ai_voice_router  # iter334 — AI Voice Assistant (Gemini Live)
         api_router.include_router(blogs_router)
         api_router.include_router(contractor_aid_router)
+        api_router.include_router(ai_voice_router)
         logger.info("iter331 — Blogs CRUD + Contractor Aid AI mounted")
+        logger.info("iter334 — AI Voice Assistant (Gemini Live + Twilio Media Streams) mounted")
 
         # Idempotent seed of the 6 default press articles (only inserts
         # rows whose slug is missing). Safe to re-run on every boot.

@@ -94,6 +94,13 @@ const AdminBlogsConsoleLazy = (props) => (
     <_AdminBlogsConsole {...props} />
   </_SuspenseCareers>
 );
+// iter334 — Admin AI Voice Calls console (lazy)
+const _AdminAIVoiceCalls = _lazyCareers(() => import('./admin/AdminAIVoiceCalls'));
+const AdminAIVoiceCallsLazy = (props) => (
+  <_SuspenseCareers fallback={<div className="p-8 text-center text-slate-500">Loading…</div>}>
+    <_AdminAIVoiceCalls {...props} />
+  </_SuspenseCareers>
+);
 // iter321 — Real-time escalation alerts (SSE + chime + desktop notification + tab flash)
 import { EscalationAlertProvider, useEscalationAlerts } from '../components/admin/EscalationAlertProvider';
 import { LifeBuoy } from 'lucide-react';
@@ -219,6 +226,7 @@ const SECONDARY_TABS = {
     { id: 'careers', label: 'Careers', icon: '💼', lucideIcon: Briefcase },
     { id: 'escalations', label: 'Live Support', icon: '🆘', lucideIcon: Briefcase },
     { id: 'press-blogs', label: 'Press / Blog', icon: '📰', lucideIcon: FileText },
+    { id: 'ai-voice-calls', label: 'AI Voice Calls', icon: '🎙️', lucideIcon: Users },
   ],
   logs: [
     { id: 'action-history', label: 'Action History', icon: '📜', lucideIcon: History },
@@ -638,6 +646,9 @@ const AdminDashboard = () => {
         }
         if (secondaryTab === 'press-blogs') {
           return <AdminBlogsConsoleLazy />;
+        }
+        if (secondaryTab === 'ai-voice-calls') {
+          return <AdminAIVoiceCallsLazy />;
         }
         return <TeamManager />;
       case 'logs':
