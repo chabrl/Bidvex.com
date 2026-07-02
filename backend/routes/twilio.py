@@ -313,7 +313,12 @@ async def twiml_webhook(request: Request) -> Response:
     """Twilio's Voice Request URL. Returns TwiML XML that bridges the
     agent to the client, sets caller_id to TWILIO_PHONE_NUMBER (so
     neither party sees the other's real number), and registers
-    recording + status callbacks."""
+    recording + status callbacks.
+
+    iter335: if a CallLogId param is forwarded from the Voice SDK, look
+    up the coach nonce and add a <Start><Stream> block so the audio is
+    silently mirrored to the AI Coach analysis endpoint. The added
+    stream is non-terminal — the <Dial> still bridges normally."""
     form = dict((await request.form()))
     await _verify_twilio_signature(request, form)
 
@@ -324,10 +329,32 @@ async def twiml_webhook(request: Request) -> Response:
     proto = request.headers.get("x-forwarded-proto", "https")
     host  = request.headers.get("x-forwarded-host") or request.headers.get("host") or "bidvex.com"
     base  = f"{proto}://{host}"
+
+    coach_stream_url: Optional[str] = None
+    coach_nonce: Optional[str] = None
+    call_log_id = form.get("CallLogId") or ""
+    if call_log_id:
+        try:
+            from routes.ai_coach import _COACH_NONCES
+            # Locate the most recent unused nonce for this call_log_id.
+            candidates = [
+                (tok, row) for tok, row in _COACH_NONCES.items()
+                if row.get("call_log_id") == call_log_id and not row.get("used")
+            ]
+            if candidates:
+                # Pick the first (there should only be one — but be safe).
+                coach_nonce = candidates[0][0]
+                ws_base = base.replace("https://", "wss://").replace("http://", "ws://")
+                coach_stream_url = f"{ws_base}/api/twilio/coach-stream"
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[twiml] coach nonce lookup failed: {e}")
+
     twiml = build_outbound_twiml(
         client_phone_number=to_number,
         status_callback=f"{base}/api/twilio/call-status-callback",
         recording_callback=f"{base}/api/twilio/recording-callback",
+        coach_stream_url=coach_stream_url,
+        coach_nonce=coach_nonce,
     )
     return Response(content=twiml, media_type="application/xml")
 

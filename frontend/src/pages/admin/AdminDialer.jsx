@@ -33,6 +33,7 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Textarea } from '../../components/ui/textarea';
 import { Badge } from '../../components/ui/badge';
+import AICoachSidebar from './AICoachSidebar';  // iter335 — silent AI coach
 
 const POLL_INTERVAL_MS = 15000; // Mission B2 — 15s polling for AI status
 
@@ -217,12 +218,26 @@ export default function AdminDialer() {
       const callLogId = r.data.call_log_id;
       setActiveCall({ call_log_id: callLogId, status: 'initiated', started_at: new Date().toISOString() });
 
+      // iter335 — Mint the AI Coach nonce BEFORE Twilio picks up the TwiML
+      // Voice Request URL, so the `/twiml` handler can find the nonce
+      // when it looks it up by CallLogId.
+      try {
+        await axios.post(`${API_BASE}/coach/session-init`, { call_log_id: callLogId },
+          { headers: { Authorization: `Bearer ${token}` } });
+      } catch (coachErr) {
+        // Non-fatal — the call still proceeds without coaching.
+        console.warn('[dialer] coach session-init failed (non-fatal):', coachErr?.message);
+      }
+
       // If the browser SDK is ready, dial OUT through the browser so audio
       // streams locally (caller_id = TWILIO_PHONE_NUMBER, set in the TwiML
       // app's Voice Request URL). Otherwise fall back to REST.
       if (twilioDevice && deviceReady) {
         try {
-          const conn = await twilioDevice.connect({ params: { To: phone.trim() } });
+          // iter335 — Pass CallLogId as a custom param; Twilio forwards it
+          // to /api/twilio/twiml as a form field, which the server uses to
+          // look up the coach nonce and inject <Start><Stream>.
+          const conn = await twilioDevice.connect({ params: { To: phone.trim(), CallLogId: callLogId } });
           setTwilioConnection(conn);
           conn.on('accept', () => setActiveCall((p) => p && { ...p, status: 'answered' }));
           conn.on('disconnect', () => {
@@ -485,6 +500,13 @@ export default function AdminDialer() {
                     {fr ? 'Raccrocher' : 'Hang up'}
                   </Button>
                 </div>
+
+                {/* iter335 — Silent AI Coach sidebar (contractor-only) */}
+                <AICoachSidebar
+                  callLogId={activeCall.call_log_id}
+                  token={token}
+                  apiBase={API_BASE}
+                />
               </div>
             )}
           </CardContent>

@@ -151,13 +151,28 @@ def generate_access_token(agent_identity: str, ttl_seconds: int = 3600) -> str:
 
 def build_outbound_twiml(client_phone_number: str,
                          status_callback: str,
-                         recording_callback: str) -> str:
+                         recording_callback: str,
+                         coach_stream_url: Optional[str] = None,
+                         coach_nonce: Optional[str] = None) -> str:
     """Build the TwiML XML returned to Twilio's Voice Request webhook.
     Bridges agent → client, masks both numbers via caller_id, enables
-    recording, registers status + recording callbacks."""
+    recording, registers status + recording callbacks.
+
+    iter335 addition: if `coach_stream_url` + `coach_nonce` are provided,
+    prepend a NON-TERMINAL <Start><Stream> block so the outbound audio is
+    also copied to the BidVex AI Coach WebSocket for silent analysis.
+    The <Dial> then proceeds normally — the caller and contractor never
+    hear anything from Gemini.
+    """
     if not TWILIO_SDK_AVAILABLE:
         raise RuntimeError("Twilio SDK not installed")
     response = VoiceResponse()
+
+    if coach_stream_url and coach_nonce:
+        start = response.start()
+        stream = start.stream(url=coach_stream_url, track="both_tracks")
+        stream.parameter(name="nonce", value=coach_nonce)
+
     dial = Dial(
         caller_id=TWILIO_PHONE_NUMBER,
         record="record-from-answer",

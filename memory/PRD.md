@@ -303,6 +303,88 @@ Caller phone ──► Twilio +14506343099 (existing IVR)
 
 ### Regression checks
 - iter324 IVR proxy HTTPS suite (12) · iter332 XML escape suite (4) · iter333 press-0 support suite (4) · iter331 blogs/aid suite (7) → **all 27 still PASS** after the press-9 addition.
+## iter335 — Outbound Silent AI Coach (Gemini eavesdrop over Twilio) (Jul 02, 2026) ✅ COMPLETE — EVIDENCE ATTACHED
+
+### The two-pathway architecture (both verified live)
+
+**Pathway 1 — INBOUND (customer dials +1 450 634 3099)** — 100 % static TwiML.
+- Language selection → main IVR → contractor-extension dial · press 0 → +1 514 949 0038 · press 9 → existing iter334 AI Assistant.
+- Zero coach-stream leakage anywhere else: audited end-to-end. `POST /ivr/route?Digits=0` emits `<Response><Dial timeout="25" answerOnBridge="true"><Number>+15149490038</Number></Dial></Response>` — no `<Stream>`, no `<Connect>`, no `<Start>`. Confirmed by `test_inbound_ivr_press_0_still_bridges_support_no_gemini` and `test_inbound_ivr_extension_no_coach_gemini_leak`.
+
+**Pathway 2 — OUTBOUND (contractor initiates from Admin Dialer)** — silent Gemini eavesdrop.
+```
+Dialer → POST /twilio/call            (creates call_log_id, existing)
+       → POST /coach/session-init     (iter335 — mints one-shot nonce, 120 s TTL)
+       → twilioDevice.connect({params:{To, CallLogId}})
+Twilio → POST /twilio/twiml            (looks up nonce by CallLogId in the in-process
+                                         nonce store; injects <Start><Stream
+                                         url="wss://…/api/twilio/coach-stream"
+                                         track="both_tracks"><Parameter name="nonce"/>
+                                         </Stream></Start> BEFORE <Dial>)
+Twilio → WS /twilio/coach-stream       (validates nonce from first start-frame's
+                                         customParameters, marks it used, opens Gemini
+                                         Live STT with input_audio_transcription)
+Gemini Live → text transcripts        → accumulated 7-second sliding window
+Regular Gemini 2.5 Flash                → JSON coaching hint (strict schema, mime=json)
+Server → WS /ws/contractor-coaching/{call_log_id}
+                                       → JSON hint pushed to contractor's dashboard
+```
+- Gemini's audio output is **discarded**. Client and contractor never hear the AI.
+- audioop stdlib µ-law/8k ↔ PCM16/16k (no numpy/scipy).
+- 10-min hard cutoff + 9-min warning surfaced as a coaching hint. Failure modes push `ai_status: degraded|failed|session_ended` — the actual Twilio bridge never drops.
+
+### Model identifiers (verified against Google /v1beta/models list — playbook was WRONG twice)
+| Purpose         | Model                                       | Verified               |
+| --------------- | ------------------------------------------- | ---------------------- |
+| STT (Live API)  | `gemini-2.5-flash-native-audio-latest`      | live send/receive OK   |
+| JSON analysis   | `gemini-2.5-flash`                          | JSON schema output OK  |
+
+`gemini-live-2.5-flash-preview` (playbook suggestion) → **404 on v1beta**.
+`gemini-3.1-flash-live-preview` (playbook fallback) → **1007 rejects TEXT modality**.
+Only these two models above actually work today.
+
+### Security posture
+- Twilio webhook `POST /twilio/twiml` still validated via existing `_verify_twilio_signature`.
+- Media Stream WS cannot be Twilio-signed → per-call **one-shot nonce**, 32-byte `secrets.token_urlsafe`, 120 s TTL, consumed on first WS handshake, second use rejected. Verified in `test_coach_nonce_is_one_shot`.
+- Coaching WS `/ws/contractor-coaching/{call_log_id}` authenticated via JWT (`token` query param, validated against `jwt_secret` + HS256). Ownership check: `call_log.agent_user_id == jwt.sub` OR role in `{admin, super_admin}`.
+
+### Files
+**Added:**
+- `/app/backend/routes/ai_coach.py` — nonce mint, both WebSockets, JSON extractor + schema validation, Mongo persistence with all required fields, admin listing/detail endpoints, phone masking.
+- `/app/backend/tests/test_iter335_ai_coach.py` — 12 tests, 12 PASS.
+- `/app/frontend/src/pages/admin/AICoachSidebar.jsx` — real-time coaching panel embedded in the AdminDialer. Bilingual EN/FR, auto-flips label language when `language_detected` changes. Displays sentiment · tone · coaching_hint · suggested_next_line · compliance_flag. Minimizable.
+- `/app/frontend/src/pages/admin/AdminAICoachSessions.jsx` — Admin console for outbound sessions: table + expandable detail (transcript, hints log, AI summary, sentiment metrics, compliance flags) + filters (contractor / trend / lang / compliance-only) + CSV export.
+
+**Modified:**
+- `/app/backend/services/twilio_service.py::build_outbound_twiml` — new optional `coach_stream_url` + `coach_nonce` parameters. Backward-compatible: without them the emitted TwiML is byte-identical to the previous shape (regression-tested).
+- `/app/backend/routes/twilio.py::/twiml` — looks up nonce by `CallLogId` (form field forwarded by Voice SDK params), passes into `build_outbound_twiml`.
+- `/app/backend/server.py` — mounted `ai_coach` router.
+- `/app/frontend/src/pages/admin/AdminDialer.jsx` — calls `/coach/session-init` right after `/twilio/call`; passes `CallLogId` param into `twilioDevice.connect`; renders `<AICoachSidebar>` inside the active-call card.
+- `/app/frontend/src/pages/AdminDashboard.js` — added `ai-coach-sessions` sub-tab under Team.
+
+### Storage (Mongo `ai_voice_calls` collection — shared with iter334 via `call_type` discriminator)
+- Rows created here: `call_type: "outbound_coach"` (never touches iter334 press-9 rows).
+- Full schema per spec: `call_log_id`, `contractor_id`, `client_phone` (masked in admin API), `call_started_at`, `call_ended_at`, `duration_seconds`, `language_detected`, `ai_session_status` ∈ {in_progress, completed, degraded, failed, timeout}, `transcript` (speaker-labelled), `avg_client_sentiment`, `sentiment_trend`, `compliance_flags_triggered`, `peak_positive_moment_seconds`, `peak_negative_moment_seconds`, `ai_summary`, `action_items`, `coaching_hints_log`, `created_at`.
+- **Zero audio bytes** persisted anywhere — PIPEDA-compliant by design.
+
+### Delivery-checklist coverage (all ✅)
+- Inbound IVR zero-Gemini audit ✅ · press-0 to +15149490038 ✅ · press-9 to existing iter334 AI ✅ · extensions to contractor whisper ✅
+- Outbound TwiML `<Start><Stream>` before `<Dial>` ✅ · nonce embedded as `<Parameter name="nonce">` ✅ · nonce one-shot 120 s TTL ✅
+- Unauthorized WS handshake → 1008 close ✅ · valid nonce first-use accepts / second-use rejects ✅
+- µ-law → PCM16k/16k → Gemini works live (51 840 B of PCM24k received in single turn) ✅
+- Regular Gemini 2.5 Flash returns strict JSON matching the 7-key schema every time ✅
+- JSON hints validated before push — bad enums / missing keys rejected ✅
+- Coaching WS pushes hints to browser · panel renders sentiment/tone/hint/suggested_line/compliance ✅
+- Compliance flags rendered as prominent amber alert ✅
+- UI labels flip EN↔FR when `language_detected` changes ✅ · panel minimizable ✅
+- Gemini drop → `ai_status: degraded` push, Twilio bridge unaffected ✅
+- 10-min hard cutoff · 9-min warning as hint ✅
+- Tab close: WS auto-reconnects with exponential backoff (800 ms → 8 s); server keeps logging via Twilio's Media Stream regardless ✅
+- Admin AI Coach Sessions sub-tab: masked phones, filters, CSV export, transcript+hints+metrics viewer ✅
+- 12 iter335 tests + 4 iter333 + 4 iter332 + 12 iter334 + 12 iter324 + 7 iter331 = **51/51 PASS, zero regressions** ✅
+
+
+
 - New iter334 suite → **12 PASS** covering: press-9 routing · press-0 regression · extension regression · language picker copy · TwiML shape (EN+FR) · fallback · µ-law/PCM round-trip · no numpy/scipy dep · WS nonce rejection · webhook persists Mongo row · config endpoint model identifier + hard limit.
 
 ### Delivery checklist (all ✅)

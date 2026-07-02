@@ -1,0 +1,718 @@
+"""
+iter335 — Outbound Contractor AI Coach (silent Gemini eavesdrop).
+
+Completely separate from iter334 (inbound press-9 AI assistant). Runs only
+on OUTBOUND contractor→client calls placed via the Admin Dialer.
+
+Pipeline (verified live against Google):
+    Twilio outbound call
+        ↓ <Start><Stream> (non-terminal — call proceeds to <Dial>)
+    WS /api/twilio/coach-stream?token=<nonce>
+        ↓ audioop µ-law/8k → PCM16/16k
+    Gemini Live (native-audio-latest) session
+        with input_audio_transcription + output_audio_transcription
+        → returns text transcripts of the caller's audio.
+        ↓ every ~7 seconds, accumulated transcript fed into
+    Regular Gemini 2.5 Flash (generate_content) with
+        response_mime_type="application/json" + JSON schema
+        → returns strict coaching hint object.
+        ↓ pushed via
+    WS /api/ws/contractor-coaching/{call_log_id}
+        → contractor's browser dashboard.
+
+Gemini's audio output is DISCARDED. The client and contractor never hear
+the AI. Only the JSON coaching hints reach the contractor's dashboard.
+
+Storage in Mongo `ai_voice_calls` collection (shared with iter334, keyed
+on `call_type` discriminator):
+  call_type = "outbound_coach"     — rows created here.
+  call_type = "inbound_press9"     — rows created by iter334 (untouched).
+"""
+from __future__ import annotations
+
+import asyncio
+import base64
+import json
+import logging
+import os
+import re
+import secrets
+import time
+import uuid
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional, Set
+
+from fastapi import (
+    APIRouter, Depends, HTTPException, Query, Request, WebSocket, WebSocketDisconnect,
+)
+from pydantic import BaseModel
+
+from deps import get_current_user, get_db, User
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(tags=["AI Coach — iter335"])
+
+# ─── Configuration ────────────────────────────────────────────────────
+
+# Live API model — must support input_audio_transcription (native audio).
+STT_MODEL_DEFAULT = "gemini-2.5-flash-native-audio-latest"
+
+# Analysis model — regular chat with strict JSON schema.
+ANALYSIS_MODEL_DEFAULT = "gemini-2.5-flash"
+
+NONCE_TTL_SECONDS = 120           # 2 min from call-init to WS open.
+ANALYSIS_INTERVAL_SECONDS = 7.0   # push a hint every ~7 s.
+MIN_TRANSCRIPT_CHARS = 12         # skip if transcript too short.
+HARD_CALL_LIMIT_SECONDS = 10 * 60
+CALL_WARNING_AT_SECONDS = 9 * 60
+
+
+SYSTEM_PROMPT_COACH = """You are a silent real-time call coach for a BidVex contractor. You are analyzing the last few seconds of a live sales call between the BidVex contractor and a potential client. Neither party hears you — you produce JSON coaching hints for the contractor's dashboard ONLY.
+
+Output ONLY a single valid JSON object matching this exact structure:
+{
+  "sentiment": "positive" | "neutral" | "negative" | "resistant" | "interested",
+  "client_sentiment_score": <number between -1.0 and 1.0>,
+  "tone_alert": null | "getting_impatient" | "confused" | "warming_up" | "about_to_disengage",
+  "coaching_hint": "<short actionable tip for the contractor, 1 sentence>",
+  "compliance_flag": null | "bill_96_required" | "broker_rule_applicable" | "prohibited_claim_detected",
+  "suggested_next_line": "<optional suggested thing contractor could say next>" | null,
+  "language_detected": "en" | "fr" | "mixed"
+}
+
+Rules:
+- If the client expresses interest in registering or pricing: tone_alert="warming_up" and provide a registration-focused coaching_hint.
+- If the client is about to hang up or disengage: tone_alert="about_to_disengage" and provide a retention-focused coaching_hint.
+- If you detect a compliance risk (broker vehicle rules in restricted provinces, Bill 96 French language requirements, prohibited claims): set compliance_flag immediately.
+- Answer in the dominant conversation language.
+- Do NOT wrap the JSON in markdown fences. Do NOT include prose. Only the JSON object."""
+
+
+# ─── Nonce store (in-memory) ──────────────────────────────────────────
+
+_COACH_NONCES: Dict[str, Dict[str, Any]] = {}
+
+
+def _issue_coach_nonce(call_log_id: str, contractor_id: str, client_phone: str) -> str:
+    tok = secrets.token_urlsafe(32)
+    _COACH_NONCES[tok] = {
+        "call_log_id": call_log_id,
+        "contractor_id": contractor_id,
+        "client_phone": client_phone,
+        "expires_at": time.time() + NONCE_TTL_SECONDS,
+        "used": False,
+    }
+    _gc_coach_nonces()
+    return tok
+
+
+def _consume_coach_nonce(tok: str) -> Optional[Dict[str, Any]]:
+    row = _COACH_NONCES.get(tok)
+    if not row:
+        return None
+    if row["used"] or row["expires_at"] < time.time():
+        return None
+    row["used"] = True
+    return row
+
+
+def _peek_coach_nonce(tok: str) -> Optional[Dict[str, Any]]:
+    """Non-consuming lookup — for testing and status introspection."""
+    row = _COACH_NONCES.get(tok)
+    if not row:
+        return None
+    if row["expires_at"] < time.time():
+        return None
+    return row
+
+
+def _gc_coach_nonces() -> None:
+    now = time.time()
+    for k in [k for k, v in _COACH_NONCES.items() if v["expires_at"] < now]:
+        _COACH_NONCES.pop(k, None)
+
+
+# ─── Coaching subscribers (dashboard WS) ──────────────────────────────
+# Keyed by call_log_id → set of WebSocket objects (allow multi-tab).
+
+_COACH_SUBSCRIBERS: Dict[str, Set[WebSocket]] = {}
+
+
+async def _broadcast_to_dashboard(call_log_id: str, payload: Dict[str, Any]) -> None:
+    subs = list(_COACH_SUBSCRIBERS.get(call_log_id, set()))
+    dead: List[WebSocket] = []
+    for ws in subs:
+        try:
+            await ws.send_json(payload)
+        except Exception:  # noqa: BLE001
+            dead.append(ws)
+    if dead:
+        for w in dead:
+            _COACH_SUBSCRIBERS.get(call_log_id, set()).discard(w)
+
+
+# ─── Helpers ──────────────────────────────────────────────────────────
+
+def _get_db():
+    from server import db
+    return db
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+HINT_SCHEMA_KEYS = {
+    "sentiment", "client_sentiment_score", "tone_alert",
+    "coaching_hint", "compliance_flag", "suggested_next_line", "language_detected",
+}
+ALLOWED_SENTIMENT = {"positive", "neutral", "negative", "resistant", "interested"}
+ALLOWED_TONE = {None, "getting_impatient", "confused", "warming_up", "about_to_disengage"}
+ALLOWED_COMPLIANCE = {None, "bill_96_required", "broker_rule_applicable", "prohibited_claim_detected"}
+ALLOWED_LANG = {"en", "fr", "mixed"}
+
+
+def extract_and_validate_hint(raw_text: str) -> Optional[Dict[str, Any]]:
+    """Robustly extract JSON from Gemini's output (playbook warned about
+    markdown fences and prose leakage) and validate the schema. Returns
+    None if the JSON is malformed OR fails schema constraints."""
+    if not raw_text:
+        return None
+    txt = re.sub(r"```(?:json)?", "", raw_text).strip("` \n\t")
+    m = re.search(r"\{.*\}", txt, re.S)
+    if not m:
+        return None
+    try:
+        obj = json.loads(m.group())
+    except Exception:  # noqa: BLE001
+        return None
+    if not isinstance(obj, dict):
+        return None
+    # Fill any missing key with None so downstream can rely on shape.
+    for k in HINT_SCHEMA_KEYS:
+        obj.setdefault(k, None)
+    if obj.get("sentiment") not in ALLOWED_SENTIMENT:
+        return None
+    if obj.get("tone_alert") not in ALLOWED_TONE:
+        obj["tone_alert"] = None
+    if obj.get("compliance_flag") not in ALLOWED_COMPLIANCE:
+        obj["compliance_flag"] = None
+    if obj.get("language_detected") not in ALLOWED_LANG:
+        obj["language_detected"] = "en"
+    # Clamp score.
+    try:
+        s = float(obj.get("client_sentiment_score") or 0)
+    except Exception:  # noqa: BLE001
+        s = 0.0
+    obj["client_sentiment_score"] = max(-1.0, min(1.0, s))
+    return obj
+
+
+def mask_phone(phone: str) -> str:
+    """+15149490038 → +1 514 ***-**38 (per spec)."""
+    if not phone or not phone.startswith("+"):
+        return phone or ""
+    digits = re.sub(r"\D", "", phone)
+    if len(digits) < 4:
+        return phone
+    cc = digits[:1]
+    area = digits[1:4]
+    tail = digits[-2:]
+    return f"+{cc} {area} ***-**{tail}"
+
+
+# ─── HTTP: mint nonce for a call_log ──────────────────────────────────
+
+class CoachSessionInitBody(BaseModel):
+    call_log_id: str
+
+
+@router.post("/coach/session-init")
+async def coach_session_init(
+    body: CoachSessionInitBody,
+    user: User = Depends(get_current_user),
+    db=Depends(get_db),
+) -> Dict[str, Any]:
+    """Called by the AdminDialer right after POST /twilio/call. Mints a
+    one-shot nonce bound to (call_log_id, contractor_id) so the WSS
+    Media Stream that Twilio will open can authenticate itself."""
+    log = await db.call_logs.find_one({"_id": body.call_log_id}, {"_id": 1, "agent_user_id": 1, "client_phone": 1})
+    if not log:
+        raise HTTPException(404, "call_log not found")
+    # Only the owning agent can init coaching for their own call.
+    if log.get("agent_user_id") != user.id:
+        role = (getattr(user, "role", None) or "").lower()
+        if role not in {"admin", "super_admin"}:
+            raise HTTPException(403, "not your call")
+
+    token = _issue_coach_nonce(
+        call_log_id=body.call_log_id,
+        contractor_id=user.id,
+        client_phone=log.get("client_phone") or "",
+    )
+    return {
+        "nonce": token,
+        "call_log_id": body.call_log_id,
+        "coach_ws_path": f"/api/ws/contractor-coaching/{body.call_log_id}",
+        "ttl_seconds": NONCE_TTL_SECONDS,
+    }
+
+
+# ─── WebSocket: coaching push channel (dashboard side) ────────────────
+
+@router.websocket("/ws/contractor-coaching/{call_log_id}")
+async def contractor_coaching_ws(websocket: WebSocket, call_log_id: str) -> None:
+    """Contractor's dashboard subscribes here to receive JSON hints as
+    they are produced. JWT auth via query parameter `token=…` (the
+    browser sub-protocol) — validated against the standard access token
+    lifecycle."""
+    tok = websocket.query_params.get("token") or ""
+    # Verify JWT
+    try:
+        from deps import jwt_secret
+        from jose import jwt as _jwt  # type: ignore[import-not-found]
+        payload = _jwt.decode(tok, jwt_secret, algorithms=["HS256"])
+        sub = payload.get("sub")
+    except Exception:  # noqa: BLE001
+        await websocket.close(code=1008, reason="invalid token")
+        return
+    if not sub:
+        await websocket.close(code=1008, reason="no sub")
+        return
+
+    db = _get_db()
+    log = await db.call_logs.find_one({"_id": call_log_id}, {"_id": 1, "agent_user_id": 1})
+    if not log:
+        await websocket.close(code=1008, reason="call not found")
+        return
+    # Ownership: dashboard client must be the agent who owns the call
+    # OR an admin (support supervisors can shadow).
+    if log.get("agent_user_id") != sub:
+        u = await db.users.find_one({"id": sub}, {"role": 1})
+        role = (u or {}).get("role", "").lower()
+        if role not in {"admin", "super_admin"}:
+            await websocket.close(code=1008, reason="not your call")
+            return
+
+    await websocket.accept()
+    _COACH_SUBSCRIBERS.setdefault(call_log_id, set()).add(websocket)
+    logger.info(f"[ai-coach] dashboard subscribed call_log_id={call_log_id} user={sub}")
+    await websocket.send_json({"type": "call_status", "data": {"status": "subscribed"}, "timestamp": _now_iso()})
+    try:
+        while True:
+            # Keep-alive; we don't expect the dashboard to send anything.
+            msg = await websocket.receive_text()
+            if msg == "ping":
+                await websocket.send_json({"type": "pong", "timestamp": _now_iso()})
+    except WebSocketDisconnect:
+        pass
+    finally:
+        _COACH_SUBSCRIBERS.get(call_log_id, set()).discard(websocket)
+
+
+# ─── WebSocket: Twilio Media Stream side (eavesdrop) ──────────────────
+
+@router.websocket("/twilio/coach-stream")
+async def twilio_coach_stream(websocket: WebSocket) -> None:
+    """Twilio Media Stream (from <Start><Stream>) → silent Gemini analyzer.
+
+    Twilio delivers the nonce in the FIRST 'start' frame under
+    `start.customParameters.nonce`. We validate then open Gemini Live.
+    """
+    await websocket.accept()
+    logger.info("[ai-coach] Twilio Media Stream WS connected — waiting for start frame")
+
+    # Wait for the first `start` frame to validate the nonce.
+    call_log_id: Optional[str] = None
+    contractor_id: Optional[str] = None
+    client_phone: Optional[str] = None
+
+    try:
+        first_raw = await asyncio.wait_for(websocket.receive_text(), timeout=10.0)
+    except asyncio.TimeoutError:
+        await websocket.close(code=1008, reason="no start frame")
+        return
+    try:
+        first = json.loads(first_raw)
+    except Exception:  # noqa: BLE001
+        await websocket.close(code=1008, reason="bad start frame")
+        return
+    if first.get("event") not in {"connected", "start"}:
+        await websocket.close(code=1008, reason="expected start")
+        return
+
+    if first.get("event") == "connected":
+        # Twilio sends {event:'connected',protocol:'Call',version:'1.0.0'} first,
+        # then follows immediately with 'start'. Read the next frame.
+        try:
+            second_raw = await asyncio.wait_for(websocket.receive_text(), timeout=10.0)
+        except asyncio.TimeoutError:
+            await websocket.close(code=1008, reason="no start after connected")
+            return
+        try:
+            first = json.loads(second_raw)
+        except Exception:  # noqa: BLE001
+            await websocket.close(code=1008, reason="bad start frame")
+            return
+
+    if first.get("event") != "start":
+        await websocket.close(code=1008, reason="expected start")
+        return
+
+    start = first.get("start") or {}
+    _stream_sid = start.get("streamSid")  # noqa: F841 — persisted for debug only
+    custom_params = start.get("customParameters") or {}
+    nonce_tok = custom_params.get("nonce") or ""
+    row = _consume_coach_nonce(nonce_tok)
+    if not row:
+        logger.warning(f"[ai-coach] rejecting WS — invalid or expired nonce (len={len(nonce_tok)})")
+        await websocket.close(code=1008, reason="invalid or expired nonce")
+        return
+    call_log_id = row["call_log_id"]
+    contractor_id = row["contractor_id"]
+    client_phone = row["client_phone"]
+    logger.info(f"[ai-coach] Media Stream authenticated for call_log_id={call_log_id}")
+
+    api_key = os.environ.get("GEMINI_API_KEY", "").strip()
+    if not api_key:
+        logger.warning("[ai-coach] GEMINI_API_KEY missing — closing coach WS")
+        await websocket.close(code=1011, reason="ai unavailable")
+        await _broadcast_to_dashboard(call_log_id, {
+            "type": "ai_status", "data": {"status": "failed"}, "timestamp": _now_iso(),
+        })
+        return
+
+    # ── Persist initial ai_voice_calls row for this outbound coach session ──
+    db = _get_db()
+    try:
+        await db.ai_voice_calls.insert_one({
+            "_id": str(uuid.uuid4()),
+            "call_type":       "outbound_coach",
+            "call_log_id":     call_log_id,
+            "contractor_id":   contractor_id,
+            "client_phone":    client_phone,
+            "call_started_at": _now_iso(),
+            "call_ended_at":   None,
+            "duration_seconds": None,
+            "language_detected": None,
+            "ai_session_status": "in_progress",
+            "transcript":       [],
+            "coaching_hints_log": [],
+            "compliance_flags_triggered": [],
+            "avg_client_sentiment": None,
+            "sentiment_trend": None,
+            "peak_positive_moment_seconds": None,
+            "peak_negative_moment_seconds": None,
+            "ai_summary": None,
+            "action_items": None,
+            "created_at": _now_iso(),
+        })
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[ai-coach] insert row failed: {e}")
+
+    # ── Import Gemini SDK ──
+    try:
+        from google import genai
+        from google.genai import types as gtypes
+    except Exception as e:  # noqa: BLE001
+        logger.exception(f"[ai-coach] google-genai import failed: {e}")
+        await websocket.close(code=1011, reason="ai sdk missing")
+        return
+    client = genai.Client(api_key=api_key)
+
+    from services.ai_voice_audio import twilio_mulaw_to_gemini_pcm16
+
+    state: Dict[str, Any] = {
+        "started_at":         time.time(),
+        "closed":             False,
+        "transcript_buffer":  "",     # accumulated STT since last analysis
+        "full_transcript":    [],     # list of {speaker,text,timestamp_seconds,sentiment_at_moment}
+        "hints_log":          [],     # all validated hints
+        "sentiment_series":   [],     # (t, score)
+        "compliance_flags":   set(),
+        "language_final":     None,
+    }
+
+    stt_cfg = gtypes.LiveConnectConfig(
+        response_modalities=["AUDIO"],   # native-audio-only supports AUDIO output
+        input_audio_transcription=gtypes.AudioTranscriptionConfig(),
+        system_instruction=gtypes.Content(parts=[
+            gtypes.Part.from_text(text="You are a passive transcription engine. Do not speak. Do not reply. Only transcribe what you hear.")
+        ]),
+    )
+
+    async def _analyze_and_push(snippet: str) -> None:
+        """Feed accumulated transcript to regular Gemini for JSON hints."""
+        if len(snippet.strip()) < MIN_TRANSCRIPT_CHARS:
+            return
+        analysis_prompt = (
+            f"Last ~7 seconds of a BidVex sales call (transcript):\n"
+            f"---\n{snippet.strip()[:2000]}\n---\n"
+            "Analyze and output the JSON coaching hint per your instructions."
+        )
+        try:
+            resp = await client.aio.models.generate_content(
+                model=os.environ.get("GEMINI_COACH_ANALYSIS_MODEL", "").strip() or ANALYSIS_MODEL_DEFAULT,
+                contents=analysis_prompt,
+                config=gtypes.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    system_instruction=SYSTEM_PROMPT_COACH,
+                    temperature=0.4,
+                ),
+            )
+            raw = getattr(resp, "text", None) or ""
+            hint = extract_and_validate_hint(raw)
+            if hint is None:
+                logger.warning(f"[ai-coach] hint failed schema: raw={raw[:200]!r}")
+                return
+            elapsed = round(time.time() - state["started_at"], 2)
+            state["hints_log"].append({"t": elapsed, **hint})
+            state["sentiment_series"].append((elapsed, hint["client_sentiment_score"]))
+            if hint.get("compliance_flag"):
+                state["compliance_flags"].add(hint["compliance_flag"])
+            if hint.get("language_detected"):
+                state["language_final"] = hint["language_detected"]
+            state["full_transcript"].append({
+                "speaker": "client",  # We can't reliably diarise on 1-track — attribute best-effort.
+                "text": snippet.strip(),
+                "timestamp_seconds": elapsed,
+                "sentiment_at_moment": hint["client_sentiment_score"],
+            })
+            await _broadcast_to_dashboard(call_log_id, {
+                "type": "coaching_hint",
+                "data": hint,
+                "timestamp": _now_iso(),
+                "elapsed_seconds": elapsed,
+            })
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[ai-coach] analysis push failed: {e}")
+            await _broadcast_to_dashboard(call_log_id, {
+                "type": "ai_status", "data": {"status": "degraded", "reason": str(e)[:120]},
+                "timestamp": _now_iso(),
+            })
+
+    async def _persist_final(reason: str) -> None:
+        if state["closed"]:
+            return
+        state["closed"] = True
+        duration = int(time.time() - state["started_at"])
+        # Aggregates
+        avg_s = None
+        trend = None
+        peak_pos = None
+        peak_neg = None
+        if state["sentiment_series"]:
+            scores = [s for _t, s in state["sentiment_series"]]
+            avg_s = round(sum(scores) / len(scores), 3)
+            # Simple trend: compare first-third vs last-third average.
+            if len(scores) >= 3:
+                third = len(scores) // 3
+                first_avg = sum(scores[:third]) / max(third, 1)
+                last_avg = sum(scores[-third:]) / max(third, 1)
+                delta = last_avg - first_avg
+                trend = "improving" if delta > 0.15 else "declining" if delta < -0.15 else "stable"
+            top = max(state["sentiment_series"], key=lambda p: p[1])
+            bot = min(state["sentiment_series"], key=lambda p: p[1])
+            peak_pos = round(top[0], 2)
+            peak_neg = round(bot[0], 2)
+        # Ai summary — best-effort 1 shot.
+        summary_text = None
+        try:
+            joined = " ".join(h.get("coaching_hint", "") for h in state["hints_log"][-20:])
+            if joined.strip():
+                s_resp = await client.aio.models.generate_content(
+                    model=ANALYSIS_MODEL_DEFAULT,
+                    contents=f"Write a concise 2-4 sentence internal summary of a sales call given these coaching hints: {joined[:1200]}",
+                )
+                summary_text = (getattr(s_resp, "text", None) or "").strip()[:800]
+        except Exception:  # noqa: BLE001
+            pass
+
+        try:
+            await db.ai_voice_calls.update_one(
+                {"call_log_id": call_log_id, "call_type": "outbound_coach"},
+                {"$set": {
+                    "call_ended_at":     _now_iso(),
+                    "duration_seconds":  duration,
+                    "ai_session_status": reason,
+                    "transcript":        state["full_transcript"],
+                    "coaching_hints_log": state["hints_log"],
+                    "compliance_flags_triggered": sorted(state["compliance_flags"]),
+                    "avg_client_sentiment": avg_s,
+                    "sentiment_trend":    trend,
+                    "peak_positive_moment_seconds": peak_pos,
+                    "peak_negative_moment_seconds": peak_neg,
+                    "language_detected":  state["language_final"],
+                    "ai_summary":         summary_text,
+                }},
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[ai-coach] persist final failed: {e}")
+
+        await _broadcast_to_dashboard(call_log_id, {
+            "type": "ai_status", "data": {"status": "session_ended", "reason": reason},
+            "timestamp": _now_iso(),
+        })
+
+    try:
+        async with client.aio.live.connect(model=STT_MODEL_DEFAULT, config=stt_cfg) as session:
+            async def upstream_audio() -> None:
+                try:
+                    async for message in websocket.iter_text():
+                        try:
+                            data = json.loads(message)
+                        except Exception:
+                            continue
+                        ev = data.get("event")
+                        if ev == "media":
+                            payload = (data.get("media") or {}).get("payload") or ""
+                            if not payload:
+                                continue
+                            try:
+                                mulaw = base64.b64decode(payload)
+                            except Exception:
+                                continue
+                            pcm16k = twilio_mulaw_to_gemini_pcm16(mulaw)
+                            try:
+                                await session.send_realtime_input(
+                                    audio=gtypes.Blob(mime_type="audio/pcm;rate=16000", data=pcm16k),
+                                )
+                            except Exception as e:  # noqa: BLE001
+                                logger.warning(f"[ai-coach] send audio failed: {e}")
+                        elif ev == "stop":
+                            logger.info(f"[ai-coach] Twilio 'stop' event for call_log_id={call_log_id}")
+                            return
+                except WebSocketDisconnect:
+                    return
+
+            async def downstream_stt() -> None:
+                try:
+                    async for msg in session.receive():
+                        sc = getattr(msg, "server_content", None)
+                        if not sc:
+                            continue
+                        it = getattr(sc, "input_transcription", None)
+                        if it and getattr(it, "text", None):
+                            state["transcript_buffer"] += it.text
+                except Exception as e:  # noqa: BLE001
+                    logger.warning(f"[ai-coach] STT downstream error: {e}")
+
+            async def analyzer_ticker() -> None:
+                """Slice the accumulated transcript every ~7 s and analyse."""
+                warned_time = False
+                while not state["closed"]:
+                    await asyncio.sleep(ANALYSIS_INTERVAL_SECONDS)
+                    elapsed = time.time() - state["started_at"]
+                    if elapsed > HARD_CALL_LIMIT_SECONDS:
+                        # Hard cutoff — end analysis, but the actual Twilio
+                        # call continues (Twilio ignores the WS close).
+                        try:
+                            await websocket.close(code=1000, reason="ai time limit")
+                        except Exception:
+                            pass
+                        return
+                    if elapsed > CALL_WARNING_AT_SECONDS and not warned_time:
+                        warned_time = True
+                        await _broadcast_to_dashboard(call_log_id, {
+                            "type": "coaching_hint",
+                            "data": {
+                                "sentiment": "neutral", "client_sentiment_score": 0.0,
+                                "tone_alert": None,
+                                "coaching_hint": "Call approaching 10-minute AI session limit. Wrap up or the AI analysis will stop.",
+                                "compliance_flag": None, "suggested_next_line": None,
+                                "language_detected": state.get("language_final") or "en",
+                            },
+                            "timestamp": _now_iso(),
+                        })
+                    snippet = state["transcript_buffer"]
+                    state["transcript_buffer"] = ""
+                    if snippet.strip():
+                        await _analyze_and_push(snippet)
+
+            await _broadcast_to_dashboard(call_log_id, {
+                "type": "ai_status", "data": {"status": "active"}, "timestamp": _now_iso(),
+            })
+
+            tasks = [
+                asyncio.create_task(upstream_audio()),
+                asyncio.create_task(downstream_stt()),
+                asyncio.create_task(analyzer_ticker()),
+            ]
+            try:
+                await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+            finally:
+                for t in tasks:
+                    t.cancel()
+
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:  # noqa: BLE001
+        logger.exception(f"[ai-coach] session error: {e}")
+        await _broadcast_to_dashboard(call_log_id, {
+            "type": "ai_status", "data": {"status": "failed", "reason": str(e)[:120]},
+            "timestamp": _now_iso(),
+        })
+        try:
+            await websocket.close(code=1011, reason="gemini error")
+        except Exception:
+            pass
+    finally:
+        await _persist_final(state.get("closed") and "timeout" or "completed")
+
+
+# ─── Diagnostics ──────────────────────────────────────────────────────
+
+@router.get("/coach/config")
+async def coach_config() -> Dict[str, Any]:
+    return {
+        "stt_model":                 os.environ.get("GEMINI_COACH_STT_MODEL", "").strip() or STT_MODEL_DEFAULT,
+        "analysis_model":            os.environ.get("GEMINI_COACH_ANALYSIS_MODEL", "").strip() or ANALYSIS_MODEL_DEFAULT,
+        "api_key_configured":        bool(os.environ.get("GEMINI_API_KEY", "").strip()),
+        "analysis_interval_seconds": ANALYSIS_INTERVAL_SECONDS,
+        "hard_limit_seconds":        HARD_CALL_LIMIT_SECONDS,
+        "nonce_ttl_seconds":         NONCE_TTL_SECONDS,
+    }
+
+
+# ─── Admin endpoints — outbound-coach transcripts ────────────────────
+
+from deps import require_admin  # noqa: E402
+
+
+@router.get("/admin/ai-coach/sessions")
+async def admin_list_coach_sessions(
+    limit: int = Query(60, ge=1, le=200),
+    user: User = Depends(require_admin),
+    db=Depends(get_db),
+) -> Dict[str, Any]:
+    """List outbound coach sessions. Phone numbers returned MASKED per
+    the spec (+1 XXX ***-**NN)."""
+    docs = await db.ai_voice_calls.find(
+        {"call_type": "outbound_coach"},
+        {"_id": 0, "transcript": 0, "coaching_hints_log": 0},
+    ).sort("call_started_at", -1).to_list(limit)
+    for d in docs:
+        d["client_phone_masked"] = mask_phone(d.get("client_phone") or "")
+        # Never expose raw phone in the admin list.
+        d.pop("client_phone", None)
+    return {"sessions": docs, "total": len(docs), "call_type": "outbound_coach"}
+
+
+@router.get("/admin/ai-coach/sessions/{call_log_id}")
+async def admin_get_coach_session(
+    call_log_id: str,
+    user: User = Depends(require_admin),
+    db=Depends(get_db),
+) -> Dict[str, Any]:
+    """Full transcript + coaching hints log for a single outbound coach
+    session. Phone masked."""
+    doc = await db.ai_voice_calls.find_one(
+        {"call_type": "outbound_coach", "call_log_id": call_log_id},
+        {"_id": 0},
+    )
+    if doc is None:
+        raise HTTPException(404, "coach session not found")
+    doc["client_phone_masked"] = mask_phone(doc.get("client_phone") or "")
+    doc.pop("client_phone", None)
+    return doc
