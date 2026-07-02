@@ -133,6 +133,7 @@ async def _validate_twilio_signature(request: Request) -> None:
 
 
 BIDVEX_MAIN_NUMBER = "+14506343099"  # Main BidVex line — also the displayed caller-ID
+BIDVEX_GENERAL_SUPPORT_NUMBER = "+15149490038"  # iter333 — human GA line reached by pressing 0
 
 
 def _twiml(xml: str) -> Response:
@@ -271,30 +272,28 @@ async def ivr_route(request: Request) -> Response:
 
     db = _get_db()
 
-    # 0 → straight to support.
+    # 0 → straight to general support (BidVex human line).
     if digits == "0" or not digits:
-        say = ("Veuillez patienter, nous vous transférons au soutien général."
-               if is_fr else
-               "Please hold, we are transferring you to general support.")
         try:
             await db.inbound_extension_calls.update_one(
                 {"call_sid": call_sid},
-                {"$set": {"outcome": "support_routed", "status": "ended_support", "ended_at": _now_iso()}},
+                {"$set": {
+                    "outcome": "support_routed",
+                    "status": "bridged_support",
+                    "support_number": BIDVEX_GENERAL_SUPPORT_NUMBER,
+                    "ended_at": _now_iso(),
+                }},
             )
         except Exception:  # noqa: BLE001
             pass
-        # Fall back to a polite "leave a message" since we don't currently
-        # have a live support queue endpoint — same fallback as missed
-        # support escalations elsewhere on the platform.
+        # iter333 — Route the caller directly to the BidVex general support
+        # team number. Bare <Dial> block per spec; Twilio bridges the legs
+        # without any pre-recording.
         xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="alice" language="{ 'fr-CA' if is_fr else 'en-US' }">{say}</Say>
-  <Say voice="alice" language="{ 'fr-CA' if is_fr else 'en-US' }">{
-      "Notre équipe de soutien vous rappellera dans les meilleurs délais. Au revoir."
-      if is_fr else
-      "Our support team will return your call as soon as possible. Goodbye."
-  }</Say>
-  <Hangup/>
+  <Dial timeout="25" answerOnBridge="true">
+    <Number>{BIDVEX_GENERAL_SUPPORT_NUMBER}</Number>
+  </Dial>
 </Response>"""
         return _twiml(xml)
 

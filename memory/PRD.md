@@ -221,6 +221,33 @@ In `/app/backend/routes/contractor_ivr_inbound.py` (line ~394), the whisper URL 
 
 
 
+## iter333 — Press '0' → General Support Routing (Jul 02, 2026) ✅ COMPLETE — VERIFIED
+
+### Symptom
+When callers pressed '0' at the extension prompt, they heard a hold-message and were hung up on ("Our support team will return your call as soon as possible. Goodbye.") — never bridged to a live human.
+
+### Fix
+`/app/backend/routes/contractor_ivr_inbound.py`:
+- New constant `BIDVEX_GENERAL_SUPPORT_NUMBER = "+15149490038"`.
+- Replaced the press-'0' branch's `<Say>…<Hangup/>` block with the exact spec:
+  ```xml
+  <Response>
+    <Dial timeout="25" answerOnBridge="true">
+      <Number>+15149490038</Number>
+    </Dial>
+  </Response>
+  ```
+- Ledger row now stamped `outcome=support_routed`, `status=bridged_support`, `support_number=+15149490038` for analytics.
+- Empty `Digits` (Gather timeout) falls through to the same path — safe UX default.
+- No behavior change for real contractor extensions (1220+) — verified.
+
+### Verification
+- Live curl on preview against ext=0 (EN), ext=0 (FR), ext=empty → all emit the exact spec TwiML and parse cleanly through `xml.etree.ElementTree`.
+- New suite `/app/backend/tests/test_iter333_press_zero_support.py` → **4/4 PASS**.
+- iter324 + iter332 regressions → 16/16 still PASS.
+
+
+
 - **P1 — Multi-platform ad pipeline** (Meta / Google / TikTok creative + audience sync).
 - **P2 — Google Maps B2B sourcing** for boutique business sub-profiles.
 - **P2 — Promotional landing pages** tied to `/auth?promo=` deep links.
