@@ -31,6 +31,7 @@ import re
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
+from xml.sax.saxutils import escape as _xml_escape
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import PlainTextResponse, Response
@@ -394,14 +395,20 @@ async def ivr_route(request: Request) -> Response:
     whisper_url = f"{base}/api/twilio/ivr/whisper?lang={lang}&caller_from={safe_from}"
     status_url  = f"{base}/api/twilio/ivr/status?contractor_id={contractor.get('id')}"
 
+    # iter332 — Twilio 12100 hotfix: raw '&' in query strings must be escaped
+    # to '&amp;' when embedded in XML attributes. xml.sax.saxutils.escape
+    # handles '&', '<', '>' — sufficient for our double-quoted attributes.
+    whisper_url_xml = _xml_escape(whisper_url)
+    status_url_xml  = _xml_escape(status_url)
+
     # The <Number url="..."> attribute is the WHISPER URL — Twilio plays
     # that TwiML on the contractor's leg before joining the legs. The
     # caller continues to hear ringing.
     xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Dial callerId="{BIDVEX_MAIN_NUMBER}" timeout="25" answerOnBridge="true"
-        action="{status_url}" method="POST">
-    <Number url="{whisper_url}" method="POST">{personal_phone}</Number>
+        action="{status_url_xml}" method="POST">
+    <Number url="{whisper_url_xml}" method="POST">{personal_phone}</Number>
   </Dial>
 </Response>"""
     return _twiml(xml)

@@ -198,6 +198,29 @@ Reconciled the two-config conflict between `services/pricing_config.py` and `ser
 
 ## Backlog (post-iter331 sign-off, Jun 30 2026)
 - **P1 — Proactive Contractor Nudges** (held per user request): inject context-aware nudges into the BidVex AI Aid chat panel on load (e.g. "Your overlay just bumped to +2% this week", "Your IVR extension hasn't been answered in 7 days") tied to leaderboard/IVR/Stripe state.
+## iter332 — CRITICAL HOTFIX: Twilio Error 12100 XML Escape (Jul 02, 2026) ✅ COMPLETE — VERIFIED
+
+### Symptom (production)
+`GET/POST https://bidvex.com/api/twilio/ivr/route?lang=en` returned TwiML whose `<Number url="…?lang=en&caller_from=+…">` contained a **raw `&`** in the XML attribute. Twilio's strict TwiML parser rejected the document → **Error 12100 "Document parse failure"** → every inbound bridge attempt failed.
+
+### Root cause
+In `/app/backend/routes/contractor_ivr_inbound.py` (line ~394), the whisper URL was built as a raw Python string with `&caller_from=…` and interpolated directly into the XML `<Number url="…">` attribute without XML-attribute escaping.
+
+### Fix
+- Imported `xml.sax.saxutils.escape` at the top of the file.
+- Escaped `whisper_url` and `status_url` via `_xml_escape(...)` before interpolating them into the TwiML attributes.
+- No behavior change for callers — the URL is still the same after Twilio parses the entity.
+
+### Verification
+- New suite `/app/backend/tests/test_iter332_ivr_xml_escape.py` → **4/4 PASS** on preview.
+  - `test_whisper_url_ampersand_is_escaped[en]`
+  - `test_whisper_url_ampersand_is_escaped[fr]`
+  - `test_response_is_strict_xml_parseable` — parses via `xml.etree.ElementTree.fromstring` cleanly.
+  - `test_number_method_and_action_still_correct` — surrounding TwiML structure intact.
+- Full iter324 regression suite (12/12) + iter331 regression (9/9) still PASS.
+
+
+
 - **P1 — Multi-platform ad pipeline** (Meta / Google / TikTok creative + audience sync).
 - **P2 — Google Maps B2B sourcing** for boutique business sub-profiles.
 - **P2 — Promotional landing pages** tied to `/auth?promo=` deep links.
