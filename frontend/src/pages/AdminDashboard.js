@@ -108,6 +108,13 @@ const AdminAICoachSessionsLazy = (props) => (
     <_AdminAICoachSessions {...props} />
   </_SuspenseCareers>
 );
+// iter337 — Admin Ad Campaigns (Gemini-drafted ad copy + CSV export) (lazy)
+const _AdminAdCampaigns = _lazyCareers(() => import('./admin/AdminAdCampaigns'));
+const AdminAdCampaignsLazy = (props) => (
+  <_SuspenseCareers fallback={<div className="p-8 text-center text-slate-500">Loading…</div>}>
+    <_AdminAdCampaigns {...props} />
+  </_SuspenseCareers>
+);
 // iter321 — Real-time escalation alerts (SSE + chime + desktop notification + tab flash)
 import { EscalationAlertProvider, useEscalationAlerts } from '../components/admin/EscalationAlertProvider';
 import { LifeBuoy } from 'lucide-react';
@@ -250,6 +257,8 @@ const MARKETING_TABS = [
   { id: 'affiliate-payouts', label: 'Affiliate Payouts', icon: '💰', lucideIcon: DollarSign },
   // iter217 Phase 5 — Meta Ad Feeds
   { id: 'ad-feeds', label: 'Ad Feeds', icon: '📡', lucideIcon: Megaphone },
+  // iter337 — Gemini-drafted per-listing ad copy for Google + Meta.
+  { id: 'ad-campaigns', label: 'Ad Campaigns', icon: '📢', lucideIcon: Megaphone },
 ];
 
 // ========== FINANCIAL & SAFETY (Cross-Cutting) ==========
@@ -560,6 +569,8 @@ const AdminDashboard = () => {
     if (secondaryTab === 'messaging') return <MessagingOversight />;
     // iter217 Phase 5 — Meta Ad Feeds health dashboard
     if (secondaryTab === 'ad-feeds') return <AdminFeedsPage />;
+    // iter337 — Gemini-drafted ad campaigns (per-listing copy + CSV export)
+    if (secondaryTab === 'ad-campaigns') return <AdminAdCampaignsLazy />;
 
     // Primary tab specific content
     switch (primaryTab) {

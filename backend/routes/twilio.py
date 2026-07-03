@@ -1889,6 +1889,15 @@ async def contractor_send_email(body: ContractorEmailSendBody,
         client_account_id=body.client_account_id,
         contractor_ip=client_ip,
         contractor_user_agent=user_agent,
+        # iter337 — When this send is an AI-drafted follow-up, tag the
+        # outbound with custom args so SendGrid echoes them on Event
+        # Webhook payloads (open/click). Attribution is anchored on
+        # `call_log_id` — the open handler uses this to update
+        # `ai_voice_calls.followup_emails_generated.$.opened_at`.
+        custom_args=(
+            {"call_log_id": body.call_log_id, "email_type": "ai_followup"}
+            if body.call_log_id else None
+        ),
     )
 
     # iter336 — If this email is an AI-generated follow-up, mark the

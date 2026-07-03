@@ -18,7 +18,7 @@ import { toast } from 'sonner';
 import {
   PhoneCall, Loader2, Bot, User as UserIcon, ChevronDown, ChevronUp,
   RefreshCw, Clock, MessageSquare, AlertTriangle, TrendingUp, TrendingDown,
-  Sparkles, Radio, Download, Mail, Send, CheckCircle2,
+  Sparkles, Radio, Download, Mail, Send, CheckCircle2, Eye,
 } from 'lucide-react';
 import API_BASE from '../../config';
 import { useAuth } from '../../contexts/AuthContext';
@@ -61,18 +61,60 @@ function FollowUpEmailPanel({ session, token }) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [draft, setDraft] = useState(null);
   const [count, setCount] = useState(session?.followup_email_generated_count || 0);
+  // iter337 — Poll follow-up status every 30s so the "Sent → Opened"
+  // badge flips live once SendGrid delivers the open webhook.
+  const [status, setStatus] = useState(() => {
+    const drafts = session?.followup_emails_generated || [];
+    const sent = [...drafts].reverse().find((d) => d.sent);
+    return {
+      sent:      !!sent,
+      sent_at:   sent?.sent_at || null,
+      opened:    !!(sent?.opened_at),
+      opened_at: sent?.opened_at || null,
+    };
+  });
 
   // Derive user's UI language from session's detected language + a fallback.
   const uiLang = (draft?.language_detected || session?.language_detected || 'en').toLowerCase() === 'fr' ? 'fr' : 'en';
 
-  const status = (session?.ai_session_status || '').toLowerCase();
-  const eligible = status === 'completed' || status === 'degraded';
+  const sessionStatus = (session?.ai_session_status || '').toLowerCase();
+  const eligible = sessionStatus === 'completed' || sessionStatus === 'degraded';
   const capReached = count >= 3;
 
-  // Was any previous draft already sent?
-  const sentEntry = (session?.followup_emails_generated || []).find((e) => e.sent);
+  useEffect(() => {
+    if (!eligible || !session?.call_log_id) return undefined;
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const r = await axios.get(
+          `${API_BASE}/ai-coach/sessions/${session.call_log_id}/followup-status`,
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+        if (!cancelled) {
+          setStatus({
+            sent:      !!r.data.sent,
+            sent_at:   r.data.sent_at,
+            opened:    !!r.data.opened,
+            opened_at: r.data.opened_at,
+          });
+          if (typeof r.data.generated_count === 'number') {
+            setCount(r.data.generated_count);
+          }
+        }
+      } catch (_e) { /* silent — polling should never toast */ }
+    };
+    poll();
+    const iv = setInterval(poll, 30000); // 30-second cadence per spec
+    return () => { cancelled = true; clearInterval(iv); };
+  }, [eligible, session?.call_log_id, token]);
 
   if (!eligible) return null; // Hide entirely on in-progress / failed / timeout.
+
+  const fmtDateShort = (iso) => {
+    if (!iso) return '';
+    try { return new Date(iso).toLocaleString(uiLang === 'fr' ? 'fr-CA' : 'en-CA', { dateStyle: 'short', timeStyle: 'short' }); }
+    catch { return iso; }
+  };
 
   const handleGenerate = async () => {
     setIsGenerating(true);
@@ -138,10 +180,16 @@ function FollowUpEmailPanel({ session, token }) {
           {uiLang === 'fr' ? "Courriel de suivi suggéré par l'IA" : 'AI-Suggested Follow-Up Email'}
         </h3>
         <div className="flex items-center gap-2">
-          {sentEntry && (
-            <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 flex items-center gap-1" data-testid="followup-sent-badge">
-              <CheckCircle2 className="h-3 w-3" />
-              {uiLang === 'fr' ? 'Envoyé' : 'Sent'}
+          {status.sent && !status.opened && (
+            <Badge className="bg-slate-100 text-slate-700 border-slate-300 flex items-center gap-1" data-testid="followup-sent-not-opened-badge">
+              <Send className="h-3 w-3" />
+              {uiLang === 'fr' ? 'Envoyé — non ouvert' : 'Sent — not opened'}
+            </Badge>
+          )}
+          {status.opened && (
+            <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 flex items-center gap-1" data-testid="followup-opened-badge">
+              <Eye className="h-3 w-3" />
+              {uiLang === 'fr' ? `Ouvert ${fmtDateShort(status.opened_at)}` : `Opened ${fmtDateShort(status.opened_at)}`}
             </Badge>
           )}
           <button
@@ -342,6 +390,8 @@ export default function AdminAICoachSessions() {
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(null);
   const [filter, setFilter] = useState({ contractor: '', trend: '', lang: '', complianceOnly: false });
+  // iter337 — Aggregate open-rate for the header ("X% opened, last 30 days").
+  const [openRate, setOpenRate] = useState(null);
 
   // iter336 — When the contractor clicks "Regenerate" from the Email Hub
   // banner, they land back here with autoExpandCallLogId in router state.
@@ -359,10 +409,16 @@ export default function AdminAICoachSessions() {
     if (!token) return;
     setLoading(true);
     try {
-      const r = await axios.get(`${API_BASE}/admin/ai-coach/sessions?limit=200`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setSessions(r.data?.sessions || []);
+      const [rSessions, rOpenRate] = await Promise.all([
+        axios.get(`${API_BASE}/admin/ai-coach/sessions?limit=200`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        axios.get(`${API_BASE}/admin/ai-coach/followup-open-rate?days=30`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }).catch(() => ({ data: null })),
+      ]);
+      setSessions(rSessions.data?.sessions || []);
+      setOpenRate(rOpenRate.data);
     } catch (e) {
       toast.error(`Failed to load coach sessions: ${e?.response?.data?.detail || e?.message}`);
     } finally { setLoading(false); }
@@ -418,6 +474,23 @@ export default function AdminAICoachSessions() {
           </Button>
         </div>
       </div>
+
+      {/* iter337 — Aggregate open-rate metric card (admin only) */}
+      {openRate && openRate.sent_count > 0 && (
+        <Card className="border-emerald-200 bg-emerald-50" data-testid="followup-open-rate-card">
+          <CardContent className="p-3 flex items-center gap-3">
+            <Eye className="h-5 w-5 text-emerald-700 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-emerald-900" data-testid="followup-open-rate-value">
+                {openRate.open_rate_pct}% of AI follow-up emails opened
+                <span className="text-xs font-normal text-emerald-700 ml-2">
+                  (last {openRate.window_days} days · {openRate.opened_count}/{openRate.sent_count} sent)
+                </span>
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Filters */}
       <Card>
@@ -487,6 +560,7 @@ export default function AdminAICoachSessions() {
                     <th className="px-4 py-3">Lang</th>
                     <th className="px-4 py-3">Trend</th>
                     <th className="px-4 py-3">Compliance</th>
+                    <th className="px-4 py-3">Follow-up</th>
                     <th className="px-4 py-3">Status</th>
                     <th className="px-4 py-3"></th>
                   </tr>
@@ -510,6 +584,21 @@ export default function AdminAICoachSessions() {
                               ? <Badge className="bg-amber-100 text-amber-800 border-amber-300"><AlertTriangle className="h-3 w-3 mr-1" />{flags.length}</Badge>
                               : <span className="text-xs text-slate-400">—</span>}
                           </td>
+                          <td className="px-4 py-3" data-testid={`coach-followup-status-${s.call_log_id}`}>
+                            {s.followup_status === 'opened' && (
+                              <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 text-[10px]">
+                                <Eye className="h-2.5 w-2.5 mr-1" /> Opened
+                              </Badge>
+                            )}
+                            {s.followup_status === 'sent_not_opened' && (
+                              <Badge className="bg-slate-100 text-slate-700 border-slate-300 text-[10px]">
+                                <Send className="h-2.5 w-2.5 mr-1" /> Sent
+                              </Badge>
+                            )}
+                            {(!s.followup_status || s.followup_status === 'not_sent') && (
+                              <span className="text-xs text-slate-400">—</span>
+                            )}
+                          </td>
                           <td className="px-4 py-3">
                             <Badge className={
                               s.ai_session_status === 'completed' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' :
@@ -527,7 +616,7 @@ export default function AdminAICoachSessions() {
                         </tr>
                         {isOpen && (
                           <tr>
-                            <td colSpan={10} className="p-0">
+                            <td colSpan={11} className="p-0">
                               <DetailView callLogId={s.call_log_id} token={token} />
                             </td>
                           </tr>

@@ -1,0 +1,27 @@
+{
+  "summary": "iter337 full backend + frontend verification complete. All 3 directives (D1 SendGrid open-tracking + follow-up polling + admin open-rate, D2 nudges + follow-up targets with dismiss persistence, D3 Ad Campaigns admin panel + Gemini bilingual copy + Google/Meta CSV export) pass end-to-end. Backend unit suite 7/7 pass, iter337 new HTTP integration suite 7/7 pass against live preview URL, iter336 regression 7/7 pass, iter332/334/335 regression 28/28 pass. Frontend UI: all data-testids present on /admin?tab=ad-campaigns, AI Coach Sessions Follow-up column + open-rate card + Opened badge visible, Contractor Dashboard nudges panel + post-call-nudges-card + followup-targets-card rendered and dismiss action works optimistically. SendGrid webhook returns 403 when signature header missing (verified via HTTP call against production preview).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter337_open_tracking_nudges_ads.py",
+    "/app/backend/tests/test_iter337_api_integration.py",
+    "/app/test_reports/pytest/iter337_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Cross-suite conftest issue observed: running test_iter336_followup_email.py + test_iter336_e2e_ui_integration.py in the same pytest session as other suites (e.g. iter337, iter332-335) causes them to fail; run in isolation they pass 7/7. Non-blocking for this iteration but worth investigating shared fixture / DB-cleanup ordering.",
+    "backend/.env has multi-line PEM + values containing commas/spaces; do NOT source via `set -a && . ./.env` — use python-dotenv. Updated the new integration test to load via dotenv_values() so it works reliably.",
+    "Follow-up open-rate aggregate query pulls all `outbound_coach` calls before filtering. If ai_voice_calls grows large, add an index on {call_type:1, 'followup_emails_generated.sent_at':1} to keep this pipeline cheap.",
+    "Ad Campaigns CSV export FR export not supported (English-only). If BidVex plans to ship a French Google Merchant feed, add `?lang=fr` query."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter337_api_integration.py (new)"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "Admin charbel911@gmail.com / Anderosli123!@# (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Seeded via /tmp/seed_ui_test_data.py: 1 nudge (TEST_ui_nudge_760e78db), 1 follow-up target (TEST_ui_target_963c006e), 1 ai_voice_calls row with sent+opened follow-up (TEST_ui_call_4c7336aa). Also seeded a real listing + 3 open-rate rows during pytest runs. All test data cleaned up after tests.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "iter337 is fully verified end-to-end. Backend integration tests in /app/backend/tests/test_iter337_api_integration.py exercise the live preview API + Mongo — safe to re-run as a regression harness. UI seed helper is at /tmp/seed_ui_test_data.py. iter337 pytest JUnit at /app/test_reports/pytest/iter337_results.xml. Note the iter336 suite has cross-run interference when combined with other suites — run iter336 files in isolation.",
+  "rca of the issue": "N/A — all tests pass. Only meta-issue: iter336 tests interfere when co-scheduled with other suites; recommend running via separate pytest invocations."
+}

@@ -231,6 +231,131 @@ async def _handle_engagement(db, event: Dict[str, Any]) -> None:
     )
 
 
+# ─── iter337 — AI Follow-Up Open Tracking ───────────────────────────────
+
+async def _handle_ai_followup_engagement(db, event: Dict[str, Any]) -> None:
+    """iter337 — When a SendGrid `open` event arrives for an outbound
+    tagged with `email_type=ai_followup`, mark the matching entry in
+    `ai_voice_calls.followup_emails_generated[]` as opened.
+
+    The first open (idempotent — only when `opened_at` was still null)
+    ALSO pushes an in-platform notification to the contractor so they
+    know the client just opened their follow-up and can call back
+    while the iron is hot."""
+    etype = (event.get("event") or "").lower()
+    if etype != "open":
+        return
+
+    # SendGrid webhook payload flattens custom_args to top-level keys OR
+    # nests them under `custom_args`. Check both; fall back to the stored
+    # contractor_emails row when SendGrid strips them from the payload.
+    custom = event.get("custom_args") or {}
+    email_type = event.get("email_type") or custom.get("email_type")
+    call_log_id = event.get("call_log_id") or custom.get("call_log_id")
+
+    if not (email_type == "ai_followup" and call_log_id):
+        # Fallback: use sg_message_id to re-hydrate custom_args from
+        # the contractor_emails row we stored at send time.
+        sg_msg_id = event.get("sg_message_id")
+        if sg_msg_id:
+            row = await db.contractor_emails.find_one(
+                {"sendgrid_message_id": sg_msg_id},
+                {"_id": 0, "custom_args": 1},
+            )
+            row_args = (row or {}).get("custom_args") or {}
+            email_type = email_type or row_args.get("email_type")
+            call_log_id = call_log_id or row_args.get("call_log_id")
+
+    if email_type != "ai_followup" or not call_log_id:
+        return
+
+    ts = event.get("timestamp")
+    opened_at = (
+        datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+        if isinstance(ts, (int, float)) and ts > 0
+        else datetime.now(timezone.utc).isoformat()
+    )
+
+    # Find the matching call session. Match the most-recent draft that
+    # has been sent but not yet marked opened. Using arrayFilters keeps
+    # the update atomic and idempotent — a second open for the same
+    # email leaves opened_at unchanged.
+    session = await db.ai_voice_calls.find_one(
+        {"call_log_id": call_log_id, "call_type": "outbound_coach"},
+        {"_id": 0, "contractor_id": 1, "followup_emails_generated": 1, "language_detected": 1},
+    )
+    if not session:
+        logger.info(f"[ai-followup-open] session not found for call_log_id={call_log_id}")
+        return
+
+    # Determine if this open is a "first open" — i.e. any sent draft
+    # still has opened_at unset. Locate the newest sent-but-unopened
+    # entry and update it.
+    drafts = session.get("followup_emails_generated") or []
+    sent_unopened_idxs = [
+        i for i, d in enumerate(drafts)
+        if d.get("sent") and not d.get("opened_at")
+    ]
+    if not sent_unopened_idxs:
+        # Already-opened OR draft was never sent. No-op (idempotent).
+        return
+
+    target_idx = sent_unopened_idxs[-1]  # most-recent sent-unopened
+    # Use array-index projection to update just this entry.
+    field_prefix = f"followup_emails_generated.{target_idx}"
+    await db.ai_voice_calls.update_one(
+        {"call_log_id": call_log_id, "call_type": "outbound_coach"},
+        {"$set": {
+            f"{field_prefix}.opened_at":         opened_at,
+            f"{field_prefix}.opened_user_agent": (event.get("useragent") or "")[:300],
+            f"{field_prefix}.opened_ip":         event.get("ip") or "",
+        }},
+    )
+
+    # Push a platform notification to the contractor — first open only.
+    contractor_id = session.get("contractor_id")
+    if contractor_id:
+        try:
+            from services.notifications_i18n import build_notification
+            lang = (session.get("language_detected") or "en").lower()
+            title_en = "Your follow-up email was opened"
+            title_fr = "Votre courriel de suivi a été ouvert"
+            msg_en = "Your AI-drafted follow-up email was just opened. Now is a great time to call back."
+            msg_fr = "Votre courriel de suivi rédigé par l'IA vient d'être ouvert. C'est le bon moment pour rappeler."
+            doc = {
+                "id":         event.get("sg_event_id") or f"ai_followup_open_{call_log_id}_{target_idx}",
+                "user_id":    contractor_id,
+                "type":       "ai_followup_opened",
+                "title":      title_en,
+                "message":    msg_en,
+                "title_en":   title_en,
+                "message_en": msg_en,
+                "title_fr":   title_fr,
+                "message_fr": msg_fr,
+                "data": {
+                    "call_log_id":       call_log_id,
+                    "opened_at":         opened_at,
+                    "language_detected": lang,
+                    "deep_link":         "/admin?tab=ai-coach-sessions",
+                },
+                "read":       False,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+            # Idempotent insert — if we've already logged this open,
+            # ignore the duplicate write.
+            await db.notifications.update_one(
+                {"id": doc["id"]},
+                {"$setOnInsert": doc},
+                upsert=True,
+            )
+            logger.info(
+                f"[ai-followup-open] first-open notification created "
+                f"call_log_id={call_log_id} contractor_id={contractor_id}"
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[ai-followup-open] notification insert failed: {e}")
+
+
 # ─── Admin Spam Alert ───────────────────────────────────────────────────────
 
 async def _send_spam_alert(event: Dict[str, Any]) -> None:
@@ -295,6 +420,14 @@ async def _process_events(events: List[Dict[str, Any]]) -> Dict[str, int]:
             )
             if campaign_type == "external":
                 await _handle_external_campaign_event(db, ev)
+
+            # iter337 — AI follow-up open tracking. Runs alongside the
+            # generic engagement logger; both handlers are idempotent.
+            # We call the handler on any `open` event and let it perform
+            # the ai_followup discriminator + fallback lookup internally
+            # (SendGrid occasionally strips custom_args from payloads).
+            if etype == "open":
+                await _handle_ai_followup_engagement(db, ev)
 
             if etype in DELIVERABILITY_KILL_EVENTS:
                 await _handle_deliverability_kill(db, ev)

@@ -28,6 +28,7 @@ import {
 } from '../../components/ui/dialog';
 import ContractorAgreementModal from './ContractorAgreementModal';
 import ContractorIter323Panel from './ContractorIter323Panel';
+import ContractorNudgesPanel from './ContractorNudgesPanel';
 
 const POLL_INTERVAL_MS = 60000; // 60s refresh per spec
 
@@ -288,6 +289,9 @@ export default function ContractorDashboard() {
           )}
         </div>
       </header>
+
+      {/* iter337 — Post-call nudges + Today's Follow-Up Targets */}
+      <ContractorNudgesPanel token={token} />
 
       {/* iter316-D — Payout readiness HARD-BLOCK alert when contractor
           has accrued earnings but Stripe banking isn't ready. */}

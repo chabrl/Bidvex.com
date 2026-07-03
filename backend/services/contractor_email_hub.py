@@ -203,10 +203,17 @@ async def send_contractor_email(
     client_account_id: Optional[str] = None,
     contractor_ip: Optional[str] = None,
     contractor_user_agent: Optional[str] = None,
+    custom_args: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
     """Sends an outbound email on behalf of a contractor. Server-side
     signature injection + sender enforcement happens here — the route
     handler does NOT control any of these properties.
+
+    iter337 — Accepts `custom_args` (str→str) which are forwarded to
+    SendGrid as custom args. SendGrid echoes these on Event Webhook
+    payloads (open/click/etc.), enabling attribution of engagement
+    events back to the source AI coach session (`call_log_id`) and
+    email_type (`ai_followup`).
 
     Returns the persisted `contractor_emails` row (a dict)."""
     sig = build_contractor_signature(
@@ -234,6 +241,7 @@ async def send_contractor_email(
             html_content=final_html,
             reply_to=contractor_reply_to,
             reply_to_name=contractor.get("name") or CONTRACTOR_SENDER_NAME,
+            custom_args=custom_args,
         )
     except Exception as exc:  # noqa: BLE001
         sent_status = "failed"
@@ -260,6 +268,9 @@ async def send_contractor_email(
         # iter323 — direction discriminator so Inbound Parse replies
         # can be UNIONed in the "Sent" thread view alongside outbounds.
         "direction":         "outbound",
+        # iter337 — persist the custom args we sent so we can back-fill
+        # engagement events even if the webhook payload omits them.
+        "custom_args":       custom_args or None,
     }
     await db.contractor_emails.insert_one(row)
     row.pop("_id", None)
@@ -276,13 +287,17 @@ async def _sendgrid_dispatch(
     html_content: str,
     reply_to: Optional[str],
     reply_to_name: Optional[str],
+    custom_args: Optional[Dict[str, str]] = None,
 ) -> Optional[str]:
     """Direct SendGrid call. We can't go through services.emails._email_core
     because that path forces FROM=noreply@bidvex.com. Email Hub messages
-    MUST visibly originate from info@bidvex.com per Email Hub spec."""
+    MUST visibly originate from info@bidvex.com per Email Hub spec.
+
+    iter337 — Optional `custom_args` (str→str) are added to the message
+    so SendGrid echoes them on webhook events (opens, clicks, bounces)."""
     api_key = os.environ.get("SENDGRID_API_KEY")
     if not api_key:
-        logger.info(f"[contractor-email] DRY-RUN to={to_email} subj={subject!r}")
+        logger.info(f"[contractor-email] DRY-RUN to={to_email} subj={subject!r} custom_args={custom_args}")
         return None
 
     try:
@@ -292,6 +307,10 @@ async def _sendgrid_dispatch(
             from sendgrid.helpers.mail import ReplyTo  # type: ignore
         except ImportError:
             ReplyTo = None  # type: ignore
+        try:
+            from sendgrid.helpers.mail import CustomArg  # type: ignore
+        except ImportError:
+            CustomArg = None  # type: ignore
     except Exception as e:  # noqa: BLE001
         logger.warning(f"[contractor-email] sendgrid SDK unavailable: {e}")
         return None
@@ -310,6 +329,15 @@ async def _sendgrid_dispatch(
                 message.reply_to = Email(reply_to, reply_to_name or CONTRACTOR_SENDER_NAME)
         except Exception:  # noqa: BLE001
             message.reply_to = Email(reply_to, reply_to_name or CONTRACTOR_SENDER_NAME)
+
+    # iter337 — Attach custom args so open/click webhook events can be
+    # attributed back to this outbound (call_log_id, email_type, etc.).
+    if custom_args and CustomArg is not None:
+        for k, v in custom_args.items():
+            try:
+                message.add_custom_arg(CustomArg(str(k), str(v)))
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"[contractor-email] add_custom_arg failed for {k}: {e}")
 
     client = SendGridAPIClient(api_key)
     response = client.send(message)

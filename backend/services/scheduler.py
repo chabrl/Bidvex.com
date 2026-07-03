@@ -1154,7 +1154,49 @@ def init_scheduler(database):
         replace_existing=True,
     )
 
-    logger.info("Scheduler initialized with 18 jobs")
+    # iter337 — Post-call nudge sweep every 15 min. Scans coach sessions
+    # completed within the last hour and pushes in-platform nudges based
+    # on sentiment/compliance/action-items outcomes.
+    async def post_call_nudge_job():
+        if db_instance is None:
+            return
+        from services.nudge_engine import run_post_call_nudge_sweep, run_action_items_nudge_sweep
+        await run_post_call_nudge_sweep(db_instance)
+        await run_action_items_nudge_sweep(db_instance)
+
+    scheduler.add_job(
+        _tracked("post_call_nudge_sweep", post_call_nudge_job),
+        IntervalTrigger(minutes=15),
+        id="post_call_nudge_sweep",
+        name="iter337 — Post-Call Nudges + Action-Item Reminders",
+        replace_existing=True,
+    )
+
+    # iter337 — Daily Follow-Up Targets @ 09:00 America/Toronto.
+    # During EDT that's 13:00 UTC; during EST it's 14:00 UTC. We schedule
+    # both cron slots and let the idempotency guard suppress duplicates.
+    async def daily_followup_targets_job():
+        if db_instance is None:
+            return
+        from services.nudge_engine import run_daily_followup_targets
+        await run_daily_followup_targets(db_instance)
+
+    scheduler.add_job(
+        _tracked("daily_followup_targets_edt", daily_followup_targets_job),
+        CronTrigger(hour=13, minute=0),
+        id="daily_followup_targets_edt",
+        name="iter337 — Daily Follow-Up Targets (09:00 America/Toronto — EDT)",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        _tracked("daily_followup_targets_est", daily_followup_targets_job),
+        CronTrigger(hour=14, minute=0),
+        id="daily_followup_targets_est",
+        name="iter337 — Daily Follow-Up Targets (09:00 America/Toronto — EST)",
+        replace_existing=True,
+    )
+
+    logger.info("Scheduler initialized with 21 jobs")
     return scheduler
 
 

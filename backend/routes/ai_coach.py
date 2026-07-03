@@ -39,7 +39,7 @@ import re
 import secrets
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Set
 
 from fastapi import (
@@ -690,12 +690,29 @@ async def admin_list_coach_sessions(
     the spec (+1 XXX ***-**NN)."""
     docs = await db.ai_voice_calls.find(
         {"call_type": "outbound_coach"},
+        # iter337 — include followup_emails_generated so we can derive a
+        # compact `followup_status` column for the list view. We keep it
+        # off the wire by rewriting to a compact string after read.
         {"_id": 0, "transcript": 0, "coaching_hints_log": 0},
     ).sort("call_started_at", -1).to_list(limit)
     for d in docs:
         d["client_phone_masked"] = mask_phone(d.get("client_phone") or "")
         # Never expose raw phone in the admin list.
         d.pop("client_phone", None)
+        # iter337 — derive compact per-row followup status.
+        drafts = d.get("followup_emails_generated") or []
+        sent = next((x for x in reversed(drafts) if x.get("sent")), None)
+        if not sent:
+            d["followup_status"] = "not_sent"
+        elif sent.get("opened_at"):
+            d["followup_status"] = "opened"
+        else:
+            d["followup_status"] = "sent_not_opened"
+        d["followup_last_opened_at"] = (sent or {}).get("opened_at")
+        d["followup_last_sent_at"]   = (sent or {}).get("sent_at")
+        # Strip the potentially large array from the list payload; the
+        # detail endpoint still returns it in full.
+        d.pop("followup_emails_generated", None)
     return {"sessions": docs, "total": len(docs), "call_type": "outbound_coach"}
 
 
@@ -939,3 +956,189 @@ async def generate_followup_email(
         "max_regenerations": FOLLOWUP_MAX_GENERATIONS,
         "used_fallback": used_fallback,
     }
+
+
+
+# ─── iter337 — Follow-up open status + open rate + nudges + targets ────
+
+@router.get("/ai-coach/sessions/{call_log_id}/followup-status")
+async def get_followup_status(
+    call_log_id: str,
+    user: User = Depends(get_current_user),
+    db=Depends(get_db),
+) -> Dict[str, Any]:
+    """Lightweight polling endpoint for FollowUpEmailPanel to check the
+    latest sent+opened state (populated by the SendGrid open webhook).
+    Owner-only + admin. Cheap: projects only the 3 arrays we need."""
+    role = (getattr(user, "role", None) or "").lower()
+    is_admin = role in {"admin", "super_admin"}
+    q: Dict[str, Any] = {"call_log_id": call_log_id, "call_type": "outbound_coach"}
+    if not is_admin:
+        q["contractor_id"] = user.id
+    doc = await db.ai_voice_calls.find_one(
+        q,
+        {
+            "_id": 0,
+            "followup_emails_generated": 1,
+            "followup_email_generated_count": 1,
+        },
+    )
+    if doc is None:
+        raise HTTPException(404, "Session not found or access denied")
+    drafts = doc.get("followup_emails_generated") or []
+    sent = next((d for d in reversed(drafts) if d.get("sent")), None)
+    return {
+        "call_log_id":  call_log_id,
+        "generated_count": int(doc.get("followup_email_generated_count") or 0),
+        "max_regenerations": FOLLOWUP_MAX_GENERATIONS,
+        "sent":         bool(sent),
+        "sent_at":      (sent or {}).get("sent_at"),
+        "opened":       bool((sent or {}).get("opened_at")),
+        "opened_at":    (sent or {}).get("opened_at"),
+    }
+
+
+@router.get("/admin/ai-coach/followup-open-rate")
+async def admin_followup_open_rate(
+    days: int = Query(30, ge=1, le=365),
+    user: User = Depends(require_admin),
+    db=Depends(get_db),
+) -> Dict[str, Any]:
+    """Aggregate open-rate across all AI follow-up emails sent in the
+    last N days. Returns count + rate for the admin Coach Sessions
+    header ('X% of AI follow-up emails opened, last 30 days')."""
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    pipeline = [
+        {"$match": {"call_type": "outbound_coach"}},
+        {"$project": {
+            "_id": 0,
+            "drafts": {
+                "$filter": {
+                    "input": {"$ifNull": ["$followup_emails_generated", []]},
+                    "as": "d",
+                    "cond": {"$and": [
+                        {"$eq": ["$$d.sent", True]},
+                        {"$gte": ["$$d.sent_at", cutoff]},
+                    ]},
+                },
+            },
+        }},
+        {"$unwind": "$drafts"},
+        {"$group": {
+            "_id": None,
+            "sent_count":   {"$sum": 1},
+            "opened_count": {"$sum": {"$cond": [{"$ne": ["$drafts.opened_at", None]}, 1, 0]}},
+        }},
+    ]
+    docs = await db.ai_voice_calls.aggregate(pipeline).to_list(1)
+    if not docs:
+        return {"sent_count": 0, "opened_count": 0, "open_rate_pct": 0.0, "window_days": days}
+    row = docs[0]
+    sent = int(row.get("sent_count") or 0)
+    opened = int(row.get("opened_count") or 0)
+    rate = round((opened / sent) * 100.0, 1) if sent > 0 else 0.0
+    return {
+        "sent_count":    sent,
+        "opened_count":  opened,
+        "open_rate_pct": rate,
+        "window_days":   days,
+    }
+
+
+# ─── Nudges ─────────────────────────────────────────────────────────────
+
+@router.get("/ai-coach/nudges")
+async def list_nudges(
+    limit: int = Query(20, ge=1, le=100),
+    user: User = Depends(get_current_user),
+    db=Depends(get_db),
+) -> Dict[str, Any]:
+    """List active (undismissed, unread-or-recent) post-call nudges for
+    the current contractor."""
+    cursor = db.notifications.find(
+        {
+            "user_id": user.id,
+            "type": {"$in": ["contractor_post_call_nudge", "ai_followup_opened"]},
+            "dismissed": {"$ne": True},
+        },
+        {"_id": 0},
+    ).sort("created_at", -1).limit(limit)
+    items = [n async for n in cursor]
+    return {"nudges": items, "total": len(items)}
+
+
+class DismissBody(BaseModel):
+    id: str
+
+
+@router.post("/ai-coach/nudges/dismiss")
+async def dismiss_nudge(
+    body: DismissBody,
+    user: User = Depends(get_current_user),
+    db=Depends(get_db),
+) -> Dict[str, Any]:
+    """Mark a single nudge as dismissed. Idempotent — dismissing twice
+    returns the same shape."""
+    r = await db.notifications.update_one(
+        {"id": body.id, "user_id": user.id},
+        {"$set": {
+            "dismissed": True,
+            "dismissed_at": datetime.now(timezone.utc).isoformat(),
+        }},
+    )
+    if r.matched_count == 0:
+        raise HTTPException(404, "nudge not found")
+    return {"id": body.id, "dismissed": True}
+
+
+# ─── Today's Follow-Up Targets ──────────────────────────────────────────
+
+@router.get("/ai-coach/followup-targets")
+async def list_followup_targets(
+    user: User = Depends(get_current_user),
+    db=Depends(get_db),
+) -> Dict[str, Any]:
+    """Return the pre-built list of at most 5 prioritised follow-up
+    targets for the current contractor. Snapshot is refreshed daily by
+    the scheduler; the endpoint just serves the persisted document."""
+    from services.nudge_engine import FOLLOWUP_TARGET_COLLECTION
+    doc = await db[FOLLOWUP_TARGET_COLLECTION].find_one(
+        {"contractor_id": user.id}, {"_id": 0},
+    )
+    if not doc:
+        return {"items": [], "generated_at": None, "contractor_id": user.id}
+    # Filter out dismissed items — the dashboard doesn't want to see them.
+    visible = [i for i in (doc.get("items") or []) if not i.get("dismissed")]
+    return {
+        "items":          visible,
+        "generated_at":   doc.get("generated_at"),
+        "generated_date": doc.get("generated_date"),
+        "contractor_id":  user.id,
+    }
+
+
+class TargetDismissBody(BaseModel):
+    id: str
+
+
+@router.post("/ai-coach/followup-targets/dismiss")
+async def dismiss_followup_target(
+    body: TargetDismissBody,
+    user: User = Depends(get_current_user),
+    db=Depends(get_db),
+) -> Dict[str, Any]:
+    """Mark a single follow-up target item as dismissed for this
+    contractor. Idempotent — subsequent dismisses return the same shape.
+    The scheduler preserves dismissed=true across daily refreshes so
+    the item stays hidden."""
+    from services.nudge_engine import FOLLOWUP_TARGET_COLLECTION
+    r = await db[FOLLOWUP_TARGET_COLLECTION].update_one(
+        {"contractor_id": user.id, "items.id": body.id},
+        {"$set": {
+            "items.$.dismissed":    True,
+            "items.$.dismissed_at": datetime.now(timezone.utc).isoformat(),
+        }},
+    )
+    if r.matched_count == 0:
+        raise HTTPException(404, "target not found")
+    return {"id": body.id, "dismissed": True}
