@@ -1,6 +1,52 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter337 — Follow-Up Open Rate + Nudges + Ad Campaigns (Jul 03, 2026) ✅ COMPLETE
+
+### Directive 1 — SendGrid Follow-Up Open Rate Tracking
+- **Webhook receiver URL** (production): `https://bidvex.com/api/webhooks/sendgrid` — existing endpoint extended, no new endpoint created.
+- **ECDSA signature validation**: enforced when `SENDGRID_WEBHOOK_PUBLIC_KEY` is set. Verified: unsigned requests receive 403.
+- **Custom args**: `send_contractor_email` now accepts `custom_args`; `/api/twilio/contractor/emails/send` auto-attaches `{call_log_id, email_type: 'ai_followup'}` when a `call_log_id` is provided. Custom args are also persisted on `contractor_emails.custom_args` as a fallback lookup in case SendGrid strips them.
+- **Open handler**: `_handle_ai_followup_engagement` matches the sent-but-unopened draft under `ai_voice_calls.followup_emails_generated[]` and sets `opened_at`. On first open only, an in-platform notification is pushed to the contractor (bilingual title/message).
+- **UI**: `FollowUpEmailPanel` polls `/api/ai-coach/sessions/{call_log_id}/followup-status` every 30s, flipping between `Sent — not opened` / `Opened <date>` badges. AI Coach Sessions list has a new **Follow-up** column. Admin header shows aggregate: `X% of AI follow-up emails opened (last 30 days · K/N)`.
+
+### Directive 2 — Proactive Contractor Nudges
+- **Post-call nudge sweep** every 15 min. Reasons: `declining_sentiment`, `warming_no_followup`, `compliance_flag`, `unactioned_action_items` (24h delay). Idempotent per (call_log_id, reason).
+- **Daily Follow-Up Targets** at 09:00 America/Toronto (both 13:00 UTC EDT + 14:00 UTC EST). Max 5 items per contractor: `demo_expiring` (highest urgency), `no_first_sale`, `idle_30d`. Persisted at `followup_targets`; dismissed items retained across daily refreshes.
+- **UI**: `ContractorNudgesPanel` mounted at top of contractor dashboard — 2 dismissable cards.
+- **In-platform ONLY** — zero email fan-out per spec.
+
+### Directive 3 — Ad Campaigns Foundation
+- Admin nav tab **📢 Ad Campaigns** (under MARKETING_TABS).
+- `POST /api/admin/ad-campaigns` — Gemini 2.5 Flash bilingual copy: `headline_en/fr` ≤40 chars, `description_en/fr` ≤90 chars. Deterministic fallback on malformed output.
+- CRUD: GET/list with filters, PATCH edits, POST regenerate (rate-limited 3/campaign), DELETE.
+- `GET /api/admin/ad-campaigns/export.csv?platform=google|meta|both` — canonical Google Merchant / Meta Catalog columns.
+- Publish-to-Meta/Google out of scope (manual CSV upload by BidVex team).
+
+### Tests
+- `test_iter337_open_tracking_nudges_ads.py` — 7/7 PASS
+- `test_iter337_api_integration.py` (testing agent) — 7/7 PASS
+- Regression: iter336 (7/7), iter332/334/335 (28/28) all pass.
+
+### SendGrid Dashboard Configuration Required (Manual, One-Time)
+BidVex team must configure the SendGrid Event Webhook: Settings → Mail Settings → Event Webhook:
+- **HTTP POST URL**: `https://bidvex.com/api/webhooks/sendgrid`
+- **Events to enable**: `open`, `click`, `bounced`, `dropped`, `spamreport`, `unsubscribe`, `deferred`
+- **Signature verification**: enabled — copy the "Verification Key" from the SendGrid dashboard into `SENDGRID_WEBHOOK_PUBLIC_KEY` (already populated in `/app/backend/.env`).
+
+### Files touched
+- **Backend edited**: `services/contractor_email_hub.py`, `routes/twilio.py`, `routes/sendgrid_webhook.py`, `routes/ai_coach.py`, `services/scheduler.py`, `server.py`
+- **Backend new**: `routes/ad_campaigns.py`, `services/nudge_engine.py`, `tests/test_iter337_open_tracking_nudges_ads.py`
+- **Frontend edited**: `pages/admin/AdminAICoachSessions.jsx`, `pages/contractor/ContractorDashboard.jsx`, `pages/AdminDashboard.js`
+- **Frontend new**: `pages/contractor/ContractorNudgesPanel.jsx`, `pages/admin/AdminAdCampaigns.jsx`
+
+### Known follow-ups (non-blocking)
+- Add compound index `{call_type:1, 'followup_emails_generated.sent_at':1}` to `ai_voice_calls` when the collection grows past ~100k rows.
+- CSV export ships EN copy today. Add `?lang=fr` for French Google Merchant feeds if/when needed.
+
+
+
+
 ## iter336 — AI-Drafted Follow-Up Emails from Coach Sessions (Jul 02, 2026) ✅ COMPLETE
 
 ### Shipped
