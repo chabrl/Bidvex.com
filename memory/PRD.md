@@ -11769,3 +11769,42 @@ location='', city='', region='', country='', postal_code (missing)
 
 - **NOT YET DEPLOYED** to production — user to deploy.
 
+
+---
+
+## Iteration 338 (2026-07-10) — Vehicle-Gate False-Positive Fix, Affiliate 3% Profit Share, contractor@bidvex.com
+
+### 1. P0 — Vehicle listing guard word-boundary fix (reported by user)
+- **Root cause**: `services/vehicle_listing_guard.py` used SUBSTRING matching on model tokens — Kia "rio" matched inside "Ontario"/"interior", blocking alexboul1993@gmail.com's "Absolute Multi-Lot Clearance: Bicycles, Furniture & Extra Goods" 4×. Earlier "x1" (BMW) matched dimension strings ("17x1.5") blocking their Fatbike listing.
+- **Fix**: New `services/word_match.py` (word-boundary matcher, custom lookarounds handling "f-150"/"vin:"/"id.4"). Guard rewritten:
+  - All token lists word-boundary matched.
+  - Model tokens split: UNAMBIGUOUS (auto-flag +5: f-150, silverado, camry…) vs AMBIGUOUS (common words: rio, fit, golf, ninja, vulcan, rebel, 1500, a4, m3, x1, i7… → +5 only when a vehicle brand also present).
+  - AMBIGUOUS_BRAND_TOKENS (ram, smart, genesis, international, lincoln, triumph) only count with an UNAMBIGUOUS co-signal (not another ambiguous model — prevents "Corsair RAM + i7" PC listings flagging).
+  - Non-vehicle brand contexts stripped ("Honda generator", "Yamaha keyboard").
+  - Year+brand-in-title +5; year+brand-in-description-only +3.
+- **Admin notifications**: `enforce_vehicle_dealer_gate` now calls `notify_admins_of_violation(kind="blocked_at_gate")` on EVERY block → `admin_notifications` row + admin email (deduped 6h/seller) so false positives are reviewable. Previously blocks only wrote hidden audit_logs.
+
+### 2. Systemic substring-bug audit (user directive: "fix them all")
+Fixed (word-boundary):
+- `services/category_rules.py` — category_requires_broker ("Carpets"→"car", "Automation"→"auto" false hits) + new shared `is_vehicle_category()`.
+- 8 scattered `any(v in cat …)` call sites → is_vehicle_category: scheduled_jobs.py, auctions_bids.py ×2, auctions.py ×2, connect_payment_engine.py ×2, brokers.py.
+- `routes/trust_safety.py` scam keyword scan.
+- `services/ai_assistant.py` + `ai_assistant_v2.py` FR language detection ("mon" in "money", "je" in "jeans") + intent keywords ("bid" in "forbidden").
+- `routes/marketplace.py` city filter ("Laval" matched "Lavaltrie").
+Audited CLEAN (no substring bug): listing_moderation_scanner (AI-based prohibited items), qc_bilingual_validator (already token-based Bill 96 detection), competitor_scrubber (accent chars), external_email (internal error-message heuristic, not user content).
+
+### 3. Affiliate → 3% of platform profit (lifetime)
+- Replaced iter307 flat $10 credit. `routes/affiliate.py::award_affiliate_commission(payer_id, platform_revenue, source, reference_id)` — 3% of BidVex's pocketed fee (pre-tax, excl. Stripe pass-through), NOT of transaction value. Lifetime, no cap. Pending `platform_credits` → admin approval (existing AdminAffiliatePayouts flow).
+- Hooks: `payment_collection.finalize_auction_payment` (buyer's referrer ← 3% of buyer premium; seller's referrer ← 3% of seller commission — covers settlement, scheduled autocapture, overdue paths), `webhooks._handle_payment_succeeded` (subscription invoices, base = amount_paid − tax), `checkout.session.completed` (one-time subscription checkouts, final_price pre-tax).
+- Constants aligned to 0.03: pricing_config.py (was 0.15), fee_calculator.py (was 0.10), shared.py (was 0.015).
+- `/api/affiliate/stats` copy + AffiliateDashboard.js EN/FR copy updated to 3%.
+
+### 4. Emails → contractor@bidvex.com
+- careers_notifications.py (applicant confirmation contact + footer + reply_to), contractor_aid.py (AI prompt, escalation sections, /api/contractor/aid/info support_email), ContractorAidHub.jsx fallback. ⚠️ USER ACTION: contractor@bidvex.com inbox/alias must exist + be monitored BEFORE production deploy.
+
+### Tests
+- NEW `backend/tests/test_iter338_guard_affiliate_emails.py` (31 tests) + testing-agent `test_iter338_api_smoke.py` (7 API tests).
+- Regression: iter203 + iter205 + broker_v7 suites all pass. Total 109/109 backend, frontend 100%. Report: /app/test_reports/iteration_334.json.
+- Fixed stale assertion in test_iter203 (scheduler job count 16→dynamic).
+
+- **NOT YET DEPLOYED** to production — user to deploy (after confirming contractor@bidvex.com inbox exists).
