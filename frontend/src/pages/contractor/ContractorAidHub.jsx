@@ -392,8 +392,8 @@ export default function ContractorAidHub() {
                 </div>
                 <p className="text-[10px] text-slate-400 mt-2">
                   {fr
-                    ? `Pour une assistance humaine, écrivez à ${info?.support_email || 'support@bidvex.com'}.`
-                    : `For human support, email ${info?.support_email || 'support@bidvex.com'}.`}
+                    ? `Pour une assistance humaine, écrivez à ${info?.support_email || 'contractor@bidvex.com'}.`
+                    : `For human support, email ${info?.support_email || 'contractor@bidvex.com'}.`}
                 </p>
               </div>
             </CardContent>

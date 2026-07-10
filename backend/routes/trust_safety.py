@@ -671,10 +671,11 @@ async def scan_messages_ai(conversation_id: str, current_user: User = Depends(ge
     
     scam_keywords = ["whatsapp", "telegram", "crypto", "send money", "wire transfer", "gift card", "outside platform", "direct payment"]
     
+    from services.word_match import has_word
     flagged_messages = []
     for msg in messages:
         content_lower = msg.get("content", "").lower()
-        found_keywords = [kw for kw in scam_keywords if kw in content_lower]
+        found_keywords = [kw for kw in scam_keywords if has_word(content_lower, kw)]
         
         if found_keywords:
             flagged_messages.append({

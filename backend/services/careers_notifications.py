@@ -27,9 +27,9 @@ def _bilingual_footer() -> str:
 <p style="font-size:11px;color:#64748b;line-height:1.5;">
   BidVex Inc. · 761 Rue Chalifoux, Sherbrooke (Québec) J1G 0A8, Canada<br />
   EN — You received this email because you applied to a BidVex job opening. Replies go to
-  <a href="mailto:support@bidvex.com" style="color:#64748b;">support@bidvex.com</a>.<br />
+  <a href="mailto:contractor@bidvex.com" style="color:#64748b;">contractor@bidvex.com</a>.<br />
   FR — Vous recevez ce courriel parce que vous avez postulé à une offre BidVex. Les réponses sont acheminées à
-  <a href="mailto:support@bidvex.com" style="color:#64748b;">support@bidvex.com</a>.
+  <a href="mailto:contractor@bidvex.com" style="color:#64748b;">contractor@bidvex.com</a>.
 </p>
 """.strip()
 
@@ -59,9 +59,9 @@ async def send_applicant_confirmation(
         "Our team will review it and be in touch within 5\u20137 business days."
     )
     contact_para = (
-        'Questions ? Écrivez-nous à <a href="mailto:support@bidvex.com" style="color:#0b1a30;">support@bidvex.com</a>.'
+        'Questions ? Écrivez-nous à <a href="mailto:contractor@bidvex.com" style="color:#0b1a30;">contractor@bidvex.com</a>.'
     ) if fr else (
-        'Questions? Reach us at <a href="mailto:support@bidvex.com" style="color:#0b1a30;">support@bidvex.com</a>.'
+        'Questions? Reach us at <a href="mailto:contractor@bidvex.com" style="color:#0b1a30;">contractor@bidvex.com</a>.'
     )
     footer = _bilingual_footer()
     body = (
@@ -78,8 +78,8 @@ async def send_applicant_confirmation(
             to_email=to_email,
             subject=subject,
             html_content=body,
-            reply_to="support@bidvex.com",
-            reply_to_name="BidVex Support",
+            reply_to="contractor@bidvex.com",
+            reply_to_name="BidVex Careers",
             categories=["careers", "application_confirmation"],
         )
     except Exception as e:  # noqa: BLE001

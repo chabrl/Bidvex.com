@@ -104,7 +104,7 @@ DEPOSIT_AMOUNT_DOLLARS = 1000
 
 # ============= AFFILIATE REFERRAL =============
 
-AFFILIATE_COMMISSION_RATE = Decimal("0.15")  # 15% of BidVex's commission goes to affiliate
+AFFILIATE_COMMISSION_RATE = Decimal("0.03")  # iter338 — affiliates earn 3% of BidVex's platform profit
 
 # ============= TAX RATES (Quebec / Canada) =============
 

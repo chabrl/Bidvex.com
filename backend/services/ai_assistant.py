@@ -207,9 +207,9 @@ class BidVexAssistant:
         """Detect language (English or French) from text"""
         # Simple keyword-based detection
         french_keywords = ['bonjour', 'merci', 'oui', 'non', 'comment', 'pourquoi', 'enchère', 'livraison']
-        text_lower = text.lower()
-        
-        french_count = sum(1 for keyword in french_keywords if keyword in text_lower)
+        import re as _re
+        words = set(_re.findall(r"[a-zà-ÿ'-]+", text.lower()))
+        french_count = sum(1 for keyword in french_keywords if keyword in words)
         return 'fr' if french_count >= 2 else 'en'
     
     def _format_knowledge_context(self, results: List[Dict]) -> str:

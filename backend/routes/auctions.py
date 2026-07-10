@@ -292,8 +292,9 @@ async def process_ended_auctions():
                     # iter306 — Web Push notification
                     try:
                         from services.push_dispatcher import dispatch_push
+                        from services.category_rules import is_vehicle_category
                         _cat = (listing.get("category") or "").lower()
-                        _is_vehicle = any(v in _cat for v in ("vehicle", "car", "auto"))
+                        _is_vehicle = is_vehicle_category(_cat)
                         await dispatch_push(
                             db, user_id=winner_id, kind="auction_won",
                             title_item=_title_item, amount=_final,
@@ -321,8 +322,9 @@ async def process_ended_auctions():
 
                     # ===== BUG 5: POST-AUCTION EMAILS =====
                     # Derive auction_type for consistent branding (Bug 1)
+                    from services.category_rules import is_vehicle_category
                     _cat = (listing.get("category") or "").lower()
-                    if any(v in _cat for v in ("vehicle", "car", "auto", "truck", "motorcycle", "suv", "van")):
+                    if is_vehicle_category(_cat):
                         _auction_type = "vehicle"
                     else:
                         _auction_type = "marketplace"

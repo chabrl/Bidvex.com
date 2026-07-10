@@ -166,6 +166,24 @@ async def handle_stripe_webhook(request: Request):
         elif event_type == "checkout.session.completed":
             _meta_all = data.get("metadata", {}) or {}
             session_type = _meta_all.get("type", "") or _meta_all.get("transaction_type", "")
+
+            # iter338 — Affiliate 3% profit share on ONE-TIME subscription
+            # checkouts (mode="payment"). Recurring subscriptions are covered
+            # by the invoice.payment_succeeded hook. final_price is pre-tax.
+            try:
+                _plan_uid = _meta_all.get("user_id")
+                _final_price = float(_meta_all.get("final_price") or 0)
+                if _meta_all.get("plan_id") and _plan_uid and _final_price > 0 \
+                        and (data.get("mode") == "payment"):
+                    from routes.affiliate import award_affiliate_commission
+                    await award_affiliate_commission(
+                        db, payer_id=_plan_uid, platform_revenue=_final_price,
+                        source="subscription", reference_id=str(data.get("id")),
+                        description="Subscription purchase (one-time checkout)",
+                    )
+            except Exception as _aff_err:  # noqa: BLE001
+                logger.warning(f"[iter338] affiliate one-time subscription hook failed: {_aff_err}")
+
             if session_type == "subscription_upgrade":
                 pass  # handled by subscription events above
             elif session_type == "vehicle_dealer_annual_fee":
@@ -640,6 +658,23 @@ async def _handle_payment_succeeded(db, invoice):
     user = await db.users.find_one({"stripe_customer_id": customer_id})
     if not user:
         return
+
+    # iter338 — Affiliate 3% profit share on subscription payments.
+    # Base = amount paid minus tax (BidVex's pre-tax revenue). Idempotent
+    # per Stripe invoice id inside award_affiliate_commission.
+    try:
+        _amount_paid = float(invoice.get("amount_paid") or 0) / 100.0
+        _tax = float(invoice.get("tax") or 0) / 100.0
+        _base = round(_amount_paid - _tax, 2)
+        if _base > 0:
+            from routes.affiliate import award_affiliate_commission
+            await award_affiliate_commission(
+                db, payer_id=user["id"], platform_revenue=_base,
+                source="subscription", reference_id=str(invoice.get("id")),
+                description="Subscription payment",
+            )
+    except Exception as _aff_err:  # noqa: BLE001
+        logger.warning(f"[iter338] affiliate subscription commission hook failed: {_aff_err}")
     
     # iter210 — Vehicle dealer annual subscription renewal succeeded → reactivate
     if subscription_id and user.get("vehicle_dealer_subscription_id") == subscription_id:

@@ -20,12 +20,17 @@ from __future__ import annotations
 
 from typing import Tuple, Dict
 
-# Substrings that mark a listing as a road vehicle (broker required).
+# Tokens that mark a listing as a road vehicle (broker required).
+# iter338 — matched with WORD BOUNDARIES (was substring: "carpets" matched
+# "car", "automation" matched "auto"). Plural forms added since word-boundary
+# matching no longer catches them implicitly.
 _VEHICLE_TOKENS = (
     "vehicle", "vehicles", "véhicule", "véhicules", "vehicule", "vehicules",
-    "car", "cars", "auto", "automobile", "truck", "camion",
-    "suv", "van", "motorcycle", "moto", "motorbike",
-    "rv", "vr",
+    "car", "cars", "auto", "autos", "automotive", "automobile", "automobiles",
+    "truck", "trucks", "camion", "camions",
+    "suv", "suvs", "van", "vans", "motorcycle", "motorcycles",
+    "moto", "motos", "motorbike", "motorbikes",
+    "rv", "rvs", "vr",
 )
 
 # Commission rates for non-broker direct categories
@@ -52,7 +57,15 @@ def category_requires_broker(category: str) -> bool:
     cat = _normalize(category)
     if not cat:
         return False
-    return any(tok in cat for tok in _VEHICLE_TOKENS)
+    from services.word_match import has_any_word
+    return has_any_word(cat, _VEHICLE_TOKENS)
+
+
+def is_vehicle_category(category: str) -> bool:
+    """iter338 — shared word-boundary vehicle-category check. Replaces the
+    scattered `any(v in cat for v in ("vehicle","car","auto",…))` substring
+    checks that false-matched "carpets"→"car" and "automation"→"auto"."""
+    return category_requires_broker(category)
 
 
 def commission_rate_for_category(category: str) -> float:

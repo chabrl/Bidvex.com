@@ -499,14 +499,6 @@ async def settle_payment(listing_id: str, current_user: User = Depends(get_curre
         db, listing=doc, collection=coll, settlement=settlement, section=section,
     )
 
-    # iter307 — Referral commission trigger ($10 CAD platform credit
-    # on the buyer's FIRST paid auction). Idempotent + best-effort.
-    try:
-        from routes.affiliate import award_referral_credit_if_first_purchase
-        await award_referral_credit_if_first_purchase(db, current_user.id)
-    except Exception as _ref_exc:  # noqa: BLE001
-        logger.warning(f"[iter307] referral credit hook failed for {listing_id}: {_ref_exc}")
-
     fresh, _c, _s = await _find_listing(db, listing_id)
     return {
         "success": True,

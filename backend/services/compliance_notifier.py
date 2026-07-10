@@ -97,16 +97,37 @@ async def notify_admins_of_violation(
         "created_at": now,
         **(extra or {}),
     }
+    # iter338 — blocked_at_gate now ALSO emails admins (user request: admins
+    # must be able to review false positives). Deduped: max one email per
+    # seller per 6h window so retry spam doesn't flood the inbox.
+    send_email_for_this = True
+    if kind == "blocked_at_gate":
+        try:
+            from datetime import timedelta
+            cutoff = (datetime.now(timezone.utc) - timedelta(hours=6)).isoformat()
+            recent = await db.admin_notifications.find_one(
+                {"subkind": "blocked_at_gate", "seller_id": seller_id,
+                 "created_at": {"$gte": cutoff}},
+                {"_id": 1},
+            )
+            if recent:
+                send_email_for_this = False
+        except Exception:  # noqa: BLE001
+            pass
+
     try:
         await db.admin_notifications.insert_one(notification)
     except Exception as e:
         logger.error("[notify] admin_notifications insert failed: %s", e)
 
     # Dispatch email asynchronously — do NOT block the watchdog/scanner
-    if kind != "blocked_at_gate":  # Don't email for every blocked POST — too noisy
+    if send_email_for_this:
         try:
             recipients = await _admin_recipients(db)
-            subject = f"[BidVex Compliance] Vehicle listing {kind.replace('_',' ')} — {title}"
+            if kind == "blocked_at_gate":
+                subject = f"[BidVex Compliance] Listing blocked at gate — review for false positive — {title}"
+            else:
+                subject = f"[BidVex Compliance] Vehicle listing {kind.replace('_',' ')} — {title}"
             signal_html = "".join(f"<li><code>{s}</code></li>" for s in signals[:8])
             html = f"""
                 <h2>Compliance system action</h2>

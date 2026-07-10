@@ -187,7 +187,8 @@ Please answer the user's question using the context provided above. If the conte
 
             # Check if user needs verification
             needs_verification = False
-            if user_id and any(kw in user_message.lower() for kw in ["bid", "sell", "create listing", "enchérir", "vendre"]):
+            from services.word_match import has_any_word
+            if user_id and has_any_word(user_message.lower(), ["bid", "bids", "bidding", "sell", "selling", "create listing", "enchérir", "vendre"]):
                 user_doc = await self.db.users.find_one({"id": user_id})
                 if user_doc and user_doc.get("role") != "admin":
                     phone_verified = user_doc.get("phone_verified", False)
@@ -217,8 +218,9 @@ Please answer the user's question using the context provided above. If the conte
     def _detect_language(self, text: str) -> str:
         """Detect language (English or French) from text"""
         french_keywords = ['bonjour', 'merci', 'oui', 'non', 'comment', 'pourquoi', 'enchere', 'livraison', 'je', 'vous', 'mon', 'ma', 'est-ce', 'combien', 'quand']
-        text_lower = text.lower()
-        french_count = sum(1 for keyword in french_keywords if keyword in text_lower)
+        import re as _re
+        words = set(_re.findall(r"[a-zà-ÿ'-]+", text.lower()))
+        french_count = sum(1 for keyword in french_keywords if keyword in words)
         return 'fr' if french_count >= 2 else 'en'
 
     def _format_knowledge_context(self, results: List[Dict]) -> str:

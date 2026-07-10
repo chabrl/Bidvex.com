@@ -11,13 +11,16 @@ App-level public route (mounted at app-root, NOT /api):
   GET  /r/{code}                Landing redirect — sets `bidvex_ref` cookie
                                 (30-day) then 302 → / .
 
-Commission contract (iter307):
-  Flat **$10 CAD** platform credit awarded to the referring user when a
-  referred user's FIRST paid auction completes. Idempotent — never awards
-  twice for the same referred user.
+Commission contract (iter338 — replaces the iter307 flat $10 model):
+  **3% of BidVex's net platform revenue** (buyer premium, seller commission,
+  subscription payments — pre-tax, excluding Stripe pass-through fees) on
+  EVERY transaction paid by a referred user, for life. Accrues as
+  `platform_credits` rows (status="pending") that an admin approves before
+  payout. Idempotent per (referrer, revenue_source, reference_id, payer).
 
-Public helper (called from anywhere a payment is collected):
-  await award_referral_credit_if_first_purchase(db, buyer_id)
+Public helper (called from anywhere platform revenue is collected):
+  await award_affiliate_commission(db, payer_id=..., platform_revenue=...,
+                                   source=..., reference_id=...)
 """
 from __future__ import annotations
 
@@ -35,7 +38,7 @@ from deps import User, get_current_user, get_db
 
 logger = logging.getLogger(__name__)
 
-REFERRAL_CREDIT_CAD = 10.0
+AFFILIATE_PROFIT_SHARE_RATE = 0.03  # iter338 — 3% of BidVex's platform profit
 REFERRAL_COOKIE = "bidvex_ref"
 COOKIE_MAX_AGE_DAYS = 30
 PUBLIC_HOST = os.environ.get("PUBLIC_HOST", "https://bidvex.com").rstrip("/")
@@ -233,69 +236,87 @@ async def referral_landing(code: str, request: Request, response: Response):
     return resp
 
 
-# ─── Commission engine — called at payment_collected ─────────────────
+# ─── Commission engine — 3% of platform profit (iter338) ─────────────
 
-async def award_referral_credit_if_first_purchase(db, buyer_id: str) -> Optional[Dict[str, Any]]:
-    """Award $10 CAD platform credit to the referring user IFF:
-       • the buyer was attributed at registration (`referred_by_code` present),
-       • this is the buyer's first paid auction (`first_paid_at` is unset),
-       • the referring user exists and is different from the buyer,
-       • no prior credit exists for this (referrer, buyer) pair.
+async def award_affiliate_commission(
+    db,
+    *,
+    payer_id: str,
+    platform_revenue: float,
+    source: str,                      # "auction_buyer_fee" | "auction_seller_fee" | "subscription"
+    reference_id: str,
+    description: str = "",
+) -> Optional[Dict[str, Any]]:
+    """Award the payer's referrer 3% of the net platform revenue BidVex
+    earned on this transaction.
 
-    Idempotent and safe to call from any payment-collected path.
+    Rules:
+       • the payer must have been attributed at registration (`referred_by_code`),
+       • lifetime — fires on EVERY qualifying payment, no cap,
+       • `platform_revenue` is BidVex's pocketed fee (pre-tax, excluding
+         Stripe pass-through), NOT the transaction value,
+       • idempotent per (referrer, source, reference_id, payer),
+       • accrues as a pending `platform_credits` row for admin approval.
     """
-    if not buyer_id:
+    if not payer_id or not platform_revenue or float(platform_revenue) <= 0:
         return None
-    buyer = await db.users.find_one(
-        {"id": buyer_id},
+    payer = await db.users.find_one(
+        {"id": payer_id},
         {"_id": 0, "id": 1, "name": 1, "email": 1, "referred_by_code": 1, "first_paid_at": 1},
     )
-    if not buyer or buyer.get("first_paid_at"):
-        return None  # already converted (or no buyer)
-    code = buyer.get("referred_by_code")
+    if not payer:
+        return None
+    # Track conversion (referral dashboards mark "converted" off this stamp)
+    if not payer.get("first_paid_at"):
+        await db.users.update_one({"id": payer_id}, {"$set": {"first_paid_at": _now().isoformat()}})
+    code = payer.get("referred_by_code")
     if not code:
-        # Mark first_paid_at anyway so future calls are no-ops.
-        await db.users.update_one({"id": buyer_id}, {"$set": {"first_paid_at": _now().isoformat()}})
         return None
     referrer = await db.users.find_one(
-        {"affiliate_code": code, "id": {"$ne": buyer_id}},
+        {"affiliate_code": code, "id": {"$ne": payer_id}},
         {"_id": 0, "id": 1, "name": 1, "preferred_language": 1},
     )
     if not referrer:
-        await db.users.update_one({"id": buyer_id}, {"$set": {"first_paid_at": _now().isoformat()}})
         return None
-    # Idempotent guard
+
+    # Idempotency guard — one credit per (referrer, source, reference, payer)
     existing = await db.platform_credits.find_one(
-        {"user_id": referrer["id"], "referred_user_id": buyer_id, "source": "referral"},
+        {"user_id": referrer["id"], "source": "referral",
+         "revenue_source": source, "reference_id": reference_id,
+         "referred_user_id": payer_id},
         {"_id": 1},
     )
     if existing:
-        await db.users.update_one({"id": buyer_id}, {"$set": {"first_paid_at": _now().isoformat()}})
+        return None
+
+    amount = round(float(platform_revenue) * AFFILIATE_PROFIT_SHARE_RATE, 2)
+    if amount < 0.01:
         return None
 
     credit_doc = {
         "id": f"REF-{_now().timestamp():.0f}-{secrets.token_hex(3)}",
         "user_id": referrer["id"],
-        "amount": REFERRAL_CREDIT_CAD,
+        "amount": amount,
         "currency": "CAD",
         "source": "referral",
         "status": "pending",  # admin approves → "paid"
-        "referred_user_id": buyer_id,
-        "referred_user_name": buyer.get("name") or "",
+        "commission_base": round(float(platform_revenue), 2),
+        "commission_rate": AFFILIATE_PROFIT_SHARE_RATE,
+        "revenue_source": source,
+        "reference_id": reference_id,
+        "description": (description or "")[:200],
+        "referred_user_id": payer_id,
+        "referred_user_name": payer.get("name") or "",
         "created_at": _now().isoformat(),
     }
     await db.platform_credits.insert_one(credit_doc)
-    await db.users.update_one(
-        {"id": buyer_id},
-        {"$set": {"first_paid_at": _now().isoformat()}},
-    )
 
     # Notify referrer (bell + push, both best-effort)
     try:
         from services.notifications_i18n import create_notification
         await create_notification(
             db, user_id=referrer["id"], kind="referral_credit_earned",
-            params={"amount": REFERRAL_CREDIT_CAD, "referred_name": (buyer.get("name") or "").split(" ")[0]},
+            params={"amount": amount, "referred_name": (payer.get("name") or "").split(" ")[0]},
             data={"action_url": "/dashboard/affiliate"},
         )
     except Exception:
@@ -303,20 +324,20 @@ async def award_referral_credit_if_first_purchase(db, buyer_id: str) -> Optional
     try:
         from services.push_dispatcher import dispatch_push
         fr = (referrer.get("preferred_language") or "").startswith("fr")
-        first_name = (buyer.get("name") or "Someone").split(" ")[0]
+        first_name = (payer.get("name") or "Someone").split(" ")[0]
         await dispatch_push(
             db, user_id=referrer["id"], kind="new_message",  # reuse a generic kind
             sender_name="BidVex Rewards",
-            preview=(f"Vous avez gagné {REFERRAL_CREDIT_CAD:.0f} $ — {first_name} vient de compléter son premier achat !"
+            preview=(f"Vous avez gagné {amount:.2f} $ CAD — commission de 3 % sur une transaction de {first_name} !"
                      if fr else
-                     f"You earned ${REFERRAL_CREDIT_CAD:.0f} CAD — {first_name} just completed their first purchase!"),
+                     f"You earned ${amount:.2f} CAD — 3% commission on {first_name}'s transaction!"),
             url="/dashboard/affiliate",
         )
     except Exception:
         pass
 
     logger.info(
-        f"[iter307] Referral credit ${REFERRAL_CREDIT_CAD} awarded: "
-        f"referrer={referrer['id']} buyer={buyer_id} code={code}"
+        f"[iter338] Affiliate commission ${amount:.2f} (3% of ${float(platform_revenue):.2f}) "
+        f"awarded: referrer={referrer['id']} payer={payer_id} source={source} ref={reference_id}"
     )
     return credit_doc

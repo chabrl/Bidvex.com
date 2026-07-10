@@ -73,7 +73,8 @@ def calculate_connect_checkout(
     hp = Decimal(str(hammer_price))
     cur = currency.upper()
     cat = category.lower() if category else "general"
-    is_vehicle = any(kw in cat for kw in ("vehicle", "car", "auto", "truck", "motorcycle"))
+    from services.category_rules import is_vehicle_category
+    is_vehicle = is_vehicle_category(cat)
 
     # ── Route to correct PricingManager method ──
     if seller_is_partner:
@@ -362,7 +363,8 @@ async def create_connect_checkout_session(
 
     listing_title = listing.get("title", "Auction Purchase")
     category = listing.get("category", "general").lower()
-    is_vehicle = any(kw in category for kw in ("vehicle", "car", "auto", "truck", "motorcycle"))
+    from services.category_rules import is_vehicle_category
+    is_vehicle = is_vehicle_category(category)
 
     # Build itemized line items (GST/QST as separate rows)
     line_items = build_itemized_line_items(

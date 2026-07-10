@@ -564,8 +564,9 @@ async def get_marketplace_items(
             city_list.extend([c.strip() for c in cities.split(",") if c.strip()])
         if city_list:
             norm_cities = {_normalize_city(c) for c in city_list if c}
+            from services.word_match import has_word
             items = [i for i in items if _normalize_city(i.get("city")) in norm_cities
-                     or any(_normalize_city(c) in _normalize_city(i.get("location") or "") for c in city_list)]
+                     or any(has_word(_normalize_city(i.get("location") or ""), _normalize_city(c)) for c in city_list)]
     if seller_id:
         seller_ids = [s.strip() for s in seller_id.split(",") if s.strip()]
         items = [i for i in items if i.get("seller_id") in seller_ids]

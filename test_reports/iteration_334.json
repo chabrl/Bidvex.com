@@ -1,0 +1,41 @@
+{
+  "summary": "Iteration 338 validation — vehicle-listing guard word-boundary fix, affiliate 3% commission model, and contractor@bidvex.com email. All backend suites green (109 tests). Frontend Affiliate Dashboard shows updated 3% copy in both the referral-link card description and the 'Get Paid' how-it-works step; no legacy '$10 CAD platform credit' copy remains.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter338_guard_affiliate_emails.py",
+    "/app/backend/tests/test_iter338_api_smoke.py",
+    "/app/backend/tests/test_iter203_compliance_guard.py",
+    "/app/backend/tests/test_iter205_ford_f150_gap.py",
+    "/app/backend/tests/test_broker_compliance_v7.py",
+    "/app/test_reports/pytest/iter338_run.xml",
+    "/app/test_reports/pytest/iter338_regression.xml",
+    "/app/test_reports/pytest/iter338_api_smoke.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "vehicle_listing_guard.py + word_match.py: word-boundary matcher looks solid, ambiguous-token weighting reasonable; consider adding a metric/counter for gate-hits vs false-positive reversals for ongoing monitoring.",
+    "routes/affiliate.py: award_affiliate_commission idempotency key (source, reference_id) works; recommend adding an index on platform_credits {source:1, reference_id:1, referrer_id:1} to guard against races.",
+    "routes/misc.py::/api/affiliate/stats: commission_rate is returned as a hardcoded string '3% of platform profit'. If the constant AFFILIATE_PROFIT_SHARE_RATE ever changes, this string must be updated in lock-step — worth deriving it dynamically from the constant.",
+    "AffiliateDashboard.js hardcodes the same 3% copy in EN+FR. Same drift risk as above — consider a shared config or reading from /api/affiliate/stats.commission_description as the display source of truth.",
+    "The buyer login redirects to /marketplace, not /dashboard. The seed doc in /app/memory/test_credentials.md and any docs pointing to /dashboard/affiliate should note that the actual mount is /affiliate (not /dashboard/affiliate); either is served by the same page but the URL normalizes to /affiliate.",
+    "API-level negative test for the vehicle gate is masked by an earlier payment_method_required (402) pre-check for non-dealer sellers without a saved card. Fully covered at unit level in test_iter338_guard_affiliate_emails.py — no action needed, just documenting."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter338_api_smoke.py (NEW — API smoke tests: health, affiliate stats/link, contractor email, vehicle gate, multi-lot false-positive, settlement panel)"
+  ],
+  "success_rate": {"backend": "100% (109/109)", "frontend": "100%"},
+  "test_credentials": "Used charbel911@gmail.com / Anderosli123!@# (admin) and testbuyer@bidvex.com / TestBuyer2026! (buyer). testseller creds needed re-seeding via /app/backend/scripts/seed_production_demo.py --execute (idempotent; ran once during this iteration).",
+  "seed_data_creation": "Re-ran /app/backend/scripts/seed_production_demo.py --execute to reset testbuyer/testseller/testdealer credentials (they had drifted). No new production users created; no writes to alexboul1993@gmail.com.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend pytest suite for iter338: 31 unit tests (test_iter338_guard_affiliate_emails.py) + 7 API smoke tests (test_iter338_api_smoke.py) + 71 regression (iter203/iter205/broker_v7) — all green. Frontend affiliate dashboard is served at /affiliate (buyer redirect from /dashboard/affiliate lands there too). Affiliate 3% copy verified in EN via UI. Rate limiter on /api/auth/login triggers 429 after ~5 rapid logins — space out login calls or sleep 60s between suites when running multi-user tests. The API-level vehicle-gate 403 assertion cannot be reached without a saved payment method (a 402 payment_method_required pre-check fires first) — the unit-level guard tests fully cover the block+admin notification path.",
+  "rca of the issue": "N/A — this iteration is a positive validation run for iter338, no defects found. Prior blocker (seller alexboul1993@gmail.com getting 403 on 'Absolute Multi-Lot Clearance...') is confirmed resolved: (a) unit tests exercise the exact reported title and pass, (b) API test on multi-lot clearance title from a non-dealer seller does NOT return vehicle_listing_dealer_required, (c) the reverse case '2018 Honda Civic LX' still blocks (via 402 payment gate at API layer, and via 403 vehicle gate at unit level with admin_notifications row asserted)."
+}

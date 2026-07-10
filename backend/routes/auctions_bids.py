@@ -97,8 +97,9 @@ async def place_bid(request: Request, bid_data: BidCreate, current_user: User = 
         })
 
     # ===== Section branding (Bug 1): derive from category =====
+    from services.category_rules import is_vehicle_category
     _cat = (listing.get("category") or "").lower()
-    if any(v in _cat for v in ("vehicle", "car", "auto", "truck", "motorcycle", "suv", "van")):
+    if is_vehicle_category(_cat):
         _auction_type = "vehicle"
     elif listing.get("is_multi_item") or listing.get("listing_type") == "lots":
         _auction_type = "lots"
@@ -394,8 +395,9 @@ async def place_bid(request: Request, bid_data: BidCreate, current_user: User = 
         # Send push notification
         try:
             from services.push_dispatcher import dispatch_push
+            from services.category_rules import is_vehicle_category
             cat = (listing.get("category") or "").lower()
-            is_vehicle = any(v in cat for v in ("vehicle", "car", "auto"))
+            is_vehicle = is_vehicle_category(cat)
             await dispatch_push(
                 _db, user_id=previous_highest_bidder, kind="outbid",
                 title_item=listing.get("title", "Item"),

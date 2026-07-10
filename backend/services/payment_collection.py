@@ -420,6 +420,28 @@ async def finalize_auction_payment(
             except Exception as e:  # noqa: BLE001
                 logger.warning(f"[payment-collection] contractor commission accrual failed: {e}")
 
+            # iter338 — Affiliate 3% profit-share hook. Fires for BOTH the
+            # buyer's referrer (3% of the buyer premium) and the seller's
+            # referrer (3% of the seller commission). Idempotent inside.
+            try:
+                from routes.affiliate import award_affiliate_commission
+                _aff_ref = f"auction:{section}:{listing_id}" + (
+                    f":lot{lot_number}" if lot_number is not None else "")
+                await award_affiliate_commission(
+                    db, payer_id=winner_id, platform_revenue=platform_fee,
+                    source="auction_buyer_fee", reference_id=_aff_ref,
+                    description=f"Buyer premium on {title}",
+                )
+                if seller_id:
+                    _seller_comm = float(fee.get("seller_commission") or platform_fee)
+                    await award_affiliate_commission(
+                        db, payer_id=seller_id, platform_revenue=_seller_comm,
+                        source="auction_seller_fee", reference_id=_aff_ref,
+                        description=f"Seller commission on {title}",
+                    )
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"[payment-collection] affiliate commission accrual failed: {e}")
+
             return out
 
         # ── NO PAYMENT METHOD → Payment link, 72h deadline (iter302) ──

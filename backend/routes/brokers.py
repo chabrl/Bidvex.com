@@ -874,9 +874,9 @@ async def broker_compliance_check(
     if listing is None:
         raise HTTPException(status_code=404, detail={"error": "listing_not_found"})
 
+    from services.category_rules import is_vehicle_category
     cat = (listing.get("category") or "").lower()
-    vehicle_cats = ("vehicle", "car", "auto", "truck", "motorcycle", "suv", "van", "rv")
-    is_vehicle = bool(listing.get("requires_broker")) or any(v in cat for v in vehicle_cats)
+    is_vehicle = bool(listing.get("requires_broker")) or is_vehicle_category(cat)
     if not is_vehicle:
         return {"status": "not_a_vehicle"}
 

@@ -181,8 +181,8 @@ def test_bill96_autosuspend_sweep_is_importable():
 # ─── Referral commission award helper is importable ──────────────────
 
 def test_award_referral_credit_helper_is_importable():
-    from routes.affiliate import award_referral_credit_if_first_purchase
-    assert callable(award_referral_credit_if_first_purchase)
+    from routes.affiliate import award_affiliate_commission
+    assert callable(award_affiliate_commission)
 
 
 # ─── SEO infra ───────────────────────────────────────────────────────

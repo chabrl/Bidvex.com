@@ -305,8 +305,9 @@ async def process_overdue_auction_payments(db):
                 # iter306 — Web Push
                 try:
                     from services.push_dispatcher import dispatch_push
+                    from services.category_rules import is_vehicle_category
                     _cat = (listing.get("category") or "").lower()
-                    _is_vehicle = any(v in _cat for v in ("vehicle", "car", "auto"))
+                    _is_vehicle = is_vehicle_category(_cat)
                     await dispatch_push(
                         db, user_id=winner_id, kind="payment_due",
                         title_item=listing.get("title", "your item"),

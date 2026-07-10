@@ -788,7 +788,7 @@ STRIPE_PCT = Decimal("0.029")
 STRIPE_FIXED = Decimal("0.30")
 VEHICLE_PLATFORM_FEE_RATE = Decimal("0.025")
 PARTNER_SELLER_COMMISSION_RATE = Decimal("0.03")
-AFFILIATE_COMMISSION_RATE = Decimal("0.10")  # 10% of BidVex platform fee
+AFFILIATE_COMMISSION_RATE = Decimal("0.03")  # iter338 — 3% of BidVex platform profit
 
 BUYER_PREMIUM_RATES = {
     "free": Decimal("0.05"), "basic": Decimal("0.05"), "standard": Decimal("0.05"),
@@ -1248,6 +1248,6 @@ class PricingManager:
 
     @staticmethod
     def affiliate_commission(bidvex_revenue: float) -> float:
-        """Affiliate payout = 10% of BidVex's platform fee revenue."""
+        """Affiliate payout = 3% of BidVex's platform fee revenue (iter338)."""
         rev = Decimal(str(bidvex_revenue))
         return _pm_f(_pm_round(rev * AFFILIATE_COMMISSION_RATE))

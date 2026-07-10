@@ -14,7 +14,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 # ─── Affiliate Constants ───
-AFFILIATE_COMMISSION_RATE = 0.015
+AFFILIATE_COMMISSION_RATE = 0.03
 
 def generate_affiliate_code(user_id: str) -> str:
     """Generate a unique affiliate code. iter211 — Uses `secrets` instead of

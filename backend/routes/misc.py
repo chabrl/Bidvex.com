@@ -157,8 +157,8 @@ async def get_affiliate_stats(current_user: User = Depends(get_current_user)):
         "total_earnings": total_earnings,
         "pending_earnings": pending_earnings,
         "paid_earnings": paid_earnings,
-        "commission_rate": "$10 CAD flat",  # iter307 — flat credit on first paid auction
-        "commission_description": "$10 CAD platform credit when a referred user completes their first paid auction",
+        "commission_rate": "3% of platform profit",  # iter338 — lifetime profit share
+        "commission_description": "You earn 3% of BidVex's net platform revenue on every transaction from users you referred (auction fees & subscriptions) — for life",
         "payout_delay_days": 7,
         "earnings_history": earnings,
         "referrals": referrals

@@ -95,12 +95,12 @@ You answer in the user's preferred language (English or French) and ALWAYS in th
 - Summer 2026 50% discount visible to non-authenticated visitors on /pricing.
 
 ### 8. Escalation
-- If a contractor faces a non-trivial issue (bug, missing feature, ambiguous policy), they should click **"Talk to a Human"** from the AI Assistant widget, or email **support@bidvex.com** with their extension number.
+- If a contractor faces a non-trivial issue (bug, missing feature, ambiguous policy), they should click **"Talk to a Human"** from the AI Assistant widget, or email **contractor@bidvex.com** with their extension number.
 
 ## Style
 - Default to **short, scannable answers** (2–6 sentences or a short bullet list).
 - Use Markdown when it helps (bold key numbers, bullet lists for steps).
-- Do NOT speculate. If a question is outside the BidVex contractor scope, say "I can only help with BidVex contractor operations — for that, please reach out to support@bidvex.com."
+- Do NOT speculate. If a question is outside the BidVex contractor scope, say "I can only help with BidVex contractor operations — for that, please reach out to contractor@bidvex.com."
 
 ## Hard constraints
 - Never quote dollar earnings of other contractors.
@@ -201,12 +201,12 @@ AID_INFO_SECTIONS: List[Dict[str, Any]] = [
         "title_fr": "Bloqué ? Voies d'escalade",
         "body_en": (
             "- For ambiguous policy questions, use the BidVex AI chat below.\n"
-            "- For platform bugs or account access problems, email **support@bidvex.com** with your extension number.\n"
+            "- For platform bugs or account access problems, email **contractor@bidvex.com** with your extension number.\n"
             "- For DNS / Twilio / SendGrid setup issues, ping your admin (admins can hot-toggle most settings)."
         ),
         "body_fr": (
             "- Pour les questions de politique ambiguës, utilisez le chat BidVex AI ci-dessous.\n"
-            "- Pour les bogues ou problèmes d'accès, écrivez à **support@bidvex.com** en mentionnant votre poste.\n"
+            "- Pour les bogues ou problèmes d'accès, écrivez à **contractor@bidvex.com** en mentionnant votre poste.\n"
             "- Pour la configuration DNS / Twilio / SendGrid, contactez votre admin (les admins peuvent basculer la plupart des réglages)."
         ),
     },
@@ -231,7 +231,7 @@ async def get_aid_info(user: User = Depends(get_current_user)) -> Dict[str, Any]
         raise HTTPException(403, "contractor-only")
     return {
         "sections": AID_INFO_SECTIONS,
-        "support_email": "support@bidvex.com",
+        "support_email": "contractor@bidvex.com",
         "main_phone": "+14506343099",
         "model": AID_MODEL_NAME,
     }

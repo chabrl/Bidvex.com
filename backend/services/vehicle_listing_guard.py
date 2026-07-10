@@ -4,21 +4,27 @@ iter203 P0 Compliance — Vehicle Listing Guard
 Centralised, non-AI detection of vehicle-shaped marketplace listings that
 must be funnelled to the dealer-only Vehicle Auctions pipeline.
 
-The previous narrow whitelist (`category in ["vehicle", "vehicles", ...]`)
-let listings slip through when the seller picked "Cars", "Auto", "Truck",
-or any other variant. This module is the **hard-coded gate** that runs at
-the API layer (sprint requirement #2) — independent of the AI scanner —
-so a single seller can never list a vehicle from a non-dealer account
-again.
+iter338 P0 fix — WORD-BOUNDARY matching + ambiguous-token handling.
+The previous implementation used raw substring matching, so the Kia "rio"
+model token matched inside "Ontario"/"interior", "x1" matched inside
+"17x1..." dimensions and "sti" matched inside "listing". A legitimate
+"Bicycles, Furniture & Extra Goods" multi-lot auction was blocked 4 times.
+Fixes:
+  1. Every token list is matched with word boundaries (services.word_match).
+  2. Model names that are common English words ("rio", "fit", "golf",
+     "ninja", "1500"…) only auto-flag when a vehicle BRAND is also present.
+  3. Ambiguous brands ("ram", "lincoln", "international"…) only count when
+     another vehicle signal (model/body/category) co-occurs.
+  4. Non-vehicle brand contexts ("Honda generator", "Yamaha keyboard") are
+     stripped before brand detection.
+  5. Every gate block now dispatches an admin notification so false
+     positives are reviewable (previously only a hidden audit log row).
 
 Public API:
   • is_vehicle_listing(category, title, description) → (bool, signals, strength)
   • check_user_is_verified_dealer(db, user_id)        → (bool, user_doc)
   • enforce_vehicle_dealer_gate(db, user, ...)        → raises 403 on violation
   • should_pause_existing_listing(listing, user_doc)  → bool
-
-The same detection logic feeds the AI scanner prompt, the safety watchdog
-cron job, and the one-shot cleanup script.
 """
 from __future__ import annotations
 
@@ -28,6 +34,8 @@ from datetime import datetime, timezone
 from typing import Iterable, Optional
 
 from fastapi import HTTPException
+
+from services.word_match import first_word_match, has_word
 
 logger = logging.getLogger(__name__)
 
@@ -58,23 +66,31 @@ VEHICLE_CATEGORY_TOKENS: frozenset[str] = frozenset({
 })
 
 # Brand names that typically indicate a vehicle when paired with a year
-# or other vehicle-shaped fields.
+# or a model token. Matched with word boundaries.
 VEHICLE_BRAND_TOKENS: frozenset[str] = frozenset({
-    "honda", "toyota", "ford", "chevrolet", "chevy", "gmc", "dodge", "ram",
+    "honda", "toyota", "ford", "chevrolet", "chevy", "gmc", "dodge",
     "jeep", "chrysler", "nissan", "hyundai", "kia", "mazda", "subaru",
     "volkswagen", "vw", "audi", "bmw", "mercedes", "mercedes-benz",
     "lexus", "acura", "infiniti", "porsche", "jaguar", "land rover",
-    "range rover", "volvo", "mini cooper", "tesla", "cadillac", "lincoln",
+    "range rover", "volvo", "mini cooper", "tesla", "cadillac",
     "buick", "mitsubishi", "fiat", "alfa romeo", "maserati", "bentley",
     "rolls-royce", "rolls royce", "ferrari", "lamborghini", "aston martin",
-    "genesis", "smart", "saturn", "scion", "saab",
+    "saturn", "scion", "saab",
     # Powersports / motorcycle
     "ducati", "harley", "harley-davidson", "yamaha", "kawasaki", "suzuki",
-    "ktm", "triumph", "indian motorcycle", "polaris", "ski-doo", "ski doo",
+    "ktm", "indian motorcycle", "polaris", "ski-doo", "ski doo",
     "sea-doo", "sea doo", "can-am", "can am", "arctic cat",
     # Truck / commercial / heavy
-    "freightliner", "peterbilt", "kenworth", "international",
+    "freightliner", "peterbilt", "kenworth",
     "caterpillar", "komatsu", "john deere", "case ih", "kubota",
+})
+
+# iter338 — Brands that are ALSO common words or major non-vehicle brands
+# (RAM memory, Lincoln welders, International shipping, smart TV, Sega
+# Genesis, Triumph brand). These count as a brand signal ONLY when another
+# vehicle signal (model / body / category) co-occurs.
+AMBIGUOUS_BRAND_TOKENS: frozenset[str] = frozenset({
+    "ram", "smart", "genesis", "international", "lincoln", "triumph",
 })
 
 # Body/style words that increase confidence.
@@ -83,72 +99,117 @@ VEHICLE_BODY_TOKENS: frozenset[str] = frozenset({
     "berline", "berlinette", "cabriolet", "familiale",
 })
 
-# iter205 P0 — Specific model identifiers. ANY of these in the title or
-# description IS sufficient on its own to flag the listing — these are
-# unambiguous vehicle model names that don't appear in any non-vehicle
-# context. This closes the "ford f150" / "honda civic" gap where the user
-# omitted the model year.
-VEHICLE_MODEL_TOKENS: tuple[str, ...] = (
+# iter338 — Non-vehicle product contexts. When a vehicle brand is directly
+# followed by one of these product nouns ("Honda generator", "Yamaha
+# keyboard"), that occurrence is stripped before brand detection.
+_NON_VEHICLE_BRAND_CONTEXT_RE = re.compile(
+    r"(?<![a-z0-9])"
+    r"(honda|yamaha|suzuki|kawasaki|subaru|kubota|toyota|bmw|ford|john deere)"
+    r"\s+"
+    r"(generator|generators|génératrice|generatrice|génératrices|"
+    r"keyboard|keyboards|piano|pianos|clavier|claviers|"
+    r"speaker|speakers|receiver|receivers|amplifier|amplifiers|amp|mixer|"
+    r"guitar|guitars|drum|drums|violin|"
+    r"lawn ?mower|lawnmower|mower|mowers|tondeuse|"
+    r"pressure washer|water pump|pump|snowblower|snow blower|"
+    r"sewing machine|forklift)"
+    r"(?![a-z0-9])"
+)
+
+# iter205/iter338 — Specific model identifiers, split by ambiguity.
+#
+# UNAMBIGUOUS: names that essentially never appear in a non-vehicle context.
+# ANY of these in the title or description auto-flags (+5) on its own.
+UNAMBIGUOUS_MODEL_TOKENS: tuple[str, ...] = (
     # Ford
     "f-150", "f150", "f-250", "f250", "f-350", "f350", "f-450", "f450",
-    "mustang", "ranger", "explorer", "escape", "edge", "expedition",
-    "bronco", "maverick", "transit",
+    "mustang", "bronco",
     # Chevrolet / GMC
-    "silverado", "sierra", "colorado", "canyon", "camaro", "corvette",
-    "tahoe", "suburban", "yukon", "blazer", "equinox", "trailblazer",
-    "malibu", "impala", "trax",
-    # Ram / Dodge
+    "silverado", "camaro", "corvette",
+    # Ram
     "ram 1500", "ram 2500", "ram 3500", "ram1500", "ram2500", "ram3500",
-    "ram-1500", "charger", "challenger", "durango", "journey", "caravan",
+    "ram-1500",
     # Jeep
-    "wrangler", "grand cherokee", "cherokee", "compass", "patriot",
-    "renegade", "gladiator",
+    "grand cherokee",
     # Toyota
-    "tacoma", "tundra", "tacoma trd", "rav4", "rav 4", "highlander",
-    "4runner", "land cruiser", "sequoia", "corolla", "camry", "avalon",
-    "prius", "sienna", "venza", "matrix", "yaris",
+    "tacoma trd", "rav4", "rav 4", "4runner", "land cruiser", "corolla",
+    "camry", "prius", "venza", "yaris",
     # Honda
-    "civic", "accord", "cr-v", "crv", "cr v", "hr-v", "hrv", "passport",
-    "pilot", "ridgeline", "odyssey", "fit", "insight",
+    "cr-v", "crv", "hr-v", "hrv", "ridgeline",
     # Hyundai / Kia
-    "elantra", "sonata", "tucson", "santa fe", "santafe", "kona",
-    "palisade", "veloster",
-    "rio", "forte", "soul", "sportage", "sorento", "telluride", "stinger",
-    "carnival",
+    "elantra", "veloster", "sportage", "sorento",
     # Nissan / Infiniti
-    "altima", "maxima", "sentra", "versa", "leaf", "rogue", "murano",
-    "pathfinder", "frontier", "titan", "armada", "kicks", "qashqai",
-    "qx50", "qx60", "qx80",
-    # Mazda / Subaru / Mitsubishi
+    "altima", "maxima", "sentra", "qashqai", "qx50", "qx60", "qx80",
+    # Mazda / Subaru
     "mazda3", "mazda 3", "mazda6", "mazda 6", "cx-3", "cx-30", "cx-5",
     "cx-9", "cx-50", "miata", "mx-5",
-    "outback", "forester", "impreza", "legacy", "ascent", "wrx", "sti",
-    "lancer", "outlander", "eclipse cross", "rvr",
-    # Volkswagen / Audi / BMW / Mercedes
-    "jetta", "passat", "golf", "tiguan", "atlas", "taos", "id.4", "gli",
-    "gti",
-    "a3", "a4", "a5", "a6", "a7", "a8", "q3", "q5", "q7", "q8", "rs5", "rs7",
-    "320i", "330i", "335i", "340i", "m3", "m4", "m5", "x1", "x3", "x5",
-    "x7", "330e", "i3", "i4", "i7",
-    "c-class", "c300", "c-300", "e-class", "e350", "e-350", "s-class",
-    "glc", "gle", "glk", "gla", "amg",
-    # Lexus / Acura / Volvo / Tesla / Cadillac / Lincoln
+    "impreza", "wrx", "eclipse cross",
+    # Volkswagen
+    "jetta", "passat", "tiguan", "id.4",
+    # BMW / Mercedes
+    "320i", "330i", "335i", "340i", "330e",
+    "c-class", "e-class", "s-class",
+    # Lexus
     "rx350", "rx 350", "nx300", "is300", "is350", "es350", "gs350",
     "gx460", "lx570",
-    "tlx", "rdx", "mdx", "ilx", "nsx",
-    "xc40", "xc60", "xc90", "s60", "s90", "v60", "v90",
-    "model 3", "model y", "model s", "model x", "cybertruck",
-    "escalade", "cts", "ats", "xt4", "xt5", "xt6",
-    "navigator", "aviator", "nautilus", "corsair",
-    # Pickup truck quick patterns (super common in marketplace abuse)
-    "1500", "2500", "3500",  # paired with brand → strong
-    # Powersports / motorcycles common models
-    "ninja", "cbr", "yzf", "r1", "r6", "z900", "mt-07", "mt-09",
-    "harley", "softail", "sportster", "fat boy", "road king", "street glide",
-    "vulcan", "shadow", "rebel",
+    # Volvo / Tesla / Cadillac
+    "xc40", "xc60", "xc90",
+    "model 3", "model y", "model s", "model x", "cybertruck", "escalade",
+    # Motorcycles / powersports
+    "cbr", "yzf", "z900", "mt-07", "mt-09", "harley", "softail",
+    "sportster", "road king", "street glide",
     "polaris rzr", "rzr", "ranger 1000", "ranger 570",
-    "ski-doo", "renegade", "summit", "skandic",
-    "sea-doo", "rxt", "rxp", "gtx", "spark",
+    "ski-doo", "sea-doo", "skandic",
+)
+
+# AMBIGUOUS: model names that double as common English/French words, place
+# names, paper sizes, screw sizes, CPU names, kitchen/camera/PC brands…
+# ("rio" → Ontario is NOT a match anymore thanks to word boundaries, but
+# "Rio" alone can still legitimately appear — e.g. "Rio-themed decor").
+# These auto-flag (+5) ONLY when a vehicle brand is also present.
+AMBIGUOUS_MODEL_TOKENS: tuple[str, ...] = (
+    # Ford
+    "explorer", "escape", "edge", "expedition", "maverick", "transit",
+    "ranger",
+    # Chevrolet / GMC
+    "sierra", "colorado", "canyon", "tahoe", "suburban", "yukon", "blazer",
+    "equinox", "trailblazer", "malibu", "impala", "trax",
+    # Dodge
+    "charger", "challenger", "durango", "journey", "caravan",
+    # Jeep
+    "wrangler", "cherokee", "compass", "patriot", "renegade", "gladiator",
+    # Toyota
+    "tacoma", "tundra", "highlander", "sequoia", "avalon", "sienna",
+    "matrix",
+    # Honda
+    "civic", "accord", "passport", "pilot", "odyssey", "fit", "insight",
+    # Hyundai / Kia
+    "sonata", "tucson", "santa fe", "santafe", "kona", "palisade",
+    "rio", "forte", "soul", "carnival", "telluride", "stinger",
+    # Nissan
+    "versa", "leaf", "rogue", "murano", "pathfinder", "frontier", "titan",
+    "armada", "kicks",
+    # Subaru / Mitsubishi
+    "outback", "forester", "legacy", "ascent", "sti", "lancer",
+    "outlander", "rvr",
+    # Volkswagen / Audi
+    "golf", "atlas", "taos", "gli", "gti",
+    "a3", "a4", "a5", "a6", "a7", "a8", "q3", "q5", "q7", "q8", "rs5", "rs7",
+    # BMW (M3 screws, X1 dimensions, i7 CPUs)
+    "m3", "m4", "m5", "x1", "x3", "x5", "x7", "i3", "i4", "i7",
+    # Mercedes (C300 = Canon cinema camera)
+    "c300", "c-300", "e350", "e-350", "glc", "gle", "glk", "gla", "amg",
+    # Acura / Volvo codes
+    "tlx", "rdx", "mdx", "ilx", "nsx",
+    "s60", "s90", "v60", "v90",
+    # Cadillac / Lincoln
+    "cts", "ats", "xt4", "xt5", "xt6", "navigator", "aviator",
+    "nautilus", "corsair",
+    # Plain pickup numbers
+    "1500", "2500", "3500",
+    # Motorcycles / powersports (Ninja blenders, Canon Rebel, Vulcan ranges)
+    "ninja", "r1", "r6", "fat boy", "vulcan", "shadow", "rebel",
+    "summit", "rxt", "rxp", "gtx", "spark",
 )
 
 # Strong content tokens that on their own indicate a vehicle listing,
@@ -165,19 +226,10 @@ VEHICLE_STRONG_TOKENS: tuple[str, ...] = (
 
 # Year regex — allow 1950 thru 2099 (covers historic and future model years)
 _YEAR_RE = re.compile(r"\b(?:19[5-9]\d|20\d\d)\b")
-# "2018 Honda Civic" / "Honda Civic 2018" pattern
-_YEAR_BRAND_NEAR_RE = None  # built dynamically
 
 
 def _normalise(value: Optional[str]) -> str:
     return (value or "").strip().lower()
-
-
-def _haystack_contains(haystack: str, tokens: Iterable[str]) -> Optional[str]:
-    for tok in tokens:
-        if tok in haystack:
-            return tok
-    return None
 
 
 def is_vehicle_listing(
@@ -190,15 +242,17 @@ def is_vehicle_listing(
     """
     Detect whether a listing is a road/marine/powersport vehicle.
 
-    Detection rules (additive strength score):
-      • Category match               → +5  (auto-flag on its own)
-      • Strong content token         → +5  (auto-flag — VIN / odometer / etc.)
-      • Year + brand combined        → +5  (auto-flag — "2018 Honda Civic")
-      • Brand + model token combined → +5  (auto-flag — "ford f150" with no year)
-      • Specific model token alone   → +5  (auto-flag — VIN-like uniqueness)
-      • Brand in TITLE alone         → +3  (raised in iter205 from +2)
-      • Brand in description alone   → +2
-      • Body type alone              → +1
+    Detection rules (additive strength score, iter338 word-boundary rules):
+      • Category token match              → +5  (auto-flag on its own)
+      • Strong content token              → +5  (auto-flag — VIN / odometer / etc.)
+      • Unambiguous model token           → +5  (auto-flag — "f-150", "silverado")
+      • Ambiguous model + brand present   → +5  (auto-flag — "kia rio", "honda civic")
+      • Ambiguous model alone             → +0  (weak signal, logged only)
+      • Year + brand in TITLE             → +5  (auto-flag — "2018 Honda Civic")
+      • Year + brand in description only  → +3
+      • Brand in TITLE alone              → +3
+      • Brand in description alone        → +2
+      • Body type alone                   → +1
 
     A listing is flagged when total strength ≥ `threshold` (default 4).
 
@@ -213,43 +267,65 @@ def is_vehicle_listing(
     signals: list[str] = []
     strength = 0
 
-    # Category match — strongest signal; substring + token match
-    cat_hit = None
-    for token in VEHICLE_CATEGORY_TOKENS:
-        # Allow either exact category equality or token-presence in compound categories
-        # like "vehicles & motors" or "auto parts & accessories"
-        if token == cat_n or f" {token} " in f" {cat_n} " or token in cat_n.replace("&", " ").replace("/", " ").split():
-            cat_hit = token
-            break
+    # Category match — strongest signal; word-boundary token match
+    cat_hit = first_word_match(cat_n, VEHICLE_CATEGORY_TOKENS)
     if cat_hit:
         signals.append(f"category:{cat_hit}")
         strength += 5
 
     # Strong content tokens (title + description)
-    strong_hit = _haystack_contains(haystack, VEHICLE_STRONG_TOKENS)
+    strong_hit = first_word_match(haystack, VEHICLE_STRONG_TOKENS)
     if strong_hit:
         signals.append(f"strong:{strong_hit.strip()}")
         strength += 5
 
-    # iter205 P0 — Specific model identifiers (closes the "ford f150" gap).
-    # Match in TITLE or DESCRIPTION. A model identifier is unambiguous —
-    # nobody titles a non-vehicle "f-150" or "silverado".
-    model_hit = _haystack_contains(haystack, VEHICLE_MODEL_TOKENS)
+    # Brand detection — strip non-vehicle contexts ("Honda generator") first
+    brand_haystack = _NON_VEHICLE_BRAND_CONTEXT_RE.sub(" ", haystack)
+    brand_title = _NON_VEHICLE_BRAND_CONTEXT_RE.sub(" ", title_n)
+    brand_match = first_word_match(brand_haystack, VEHICLE_BRAND_TOKENS)
+
+    # Unambiguous model identifiers — auto-flag alone
+    model_hit = first_word_match(haystack, UNAMBIGUOUS_MODEL_TOKENS)
     if model_hit:
         signals.append(f"model:{model_hit.strip()}")
         strength += 5
 
-    # Year + brand co-occurrence in title/description
+    # Ambiguous model identifiers — only with a brand co-signal
+    amb_model_hit = first_word_match(haystack, AMBIGUOUS_MODEL_TOKENS)
+
+    # Ambiguous brands ("ram", "lincoln"…) need an UNAMBIGUOUS co-signal
+    # (unambiguous model / body / category). Ambiguous models must NOT
+    # promote ambiguous brands — "Corsair RAM" + "i7" is a PC, not a truck.
+    if not brand_match:
+        amb_brand = first_word_match(brand_haystack, AMBIGUOUS_BRAND_TOKENS)
+        if amb_brand and (
+            model_hit or cat_hit
+            or first_word_match(haystack, VEHICLE_BODY_TOKENS)
+        ):
+            brand_match = amb_brand
+
+    if amb_model_hit:
+        if brand_match:
+            signals.append(f"model:{amb_model_hit.strip()}")
+            strength += 5
+        else:
+            # Weak signal — logged for audit but contributes no strength.
+            signals.append(f"model-weak:{amb_model_hit.strip()}")
+
+    # Year + brand co-occurrence
     year_match = _YEAR_RE.search(haystack)
-    brand_match = _haystack_contains(haystack, VEHICLE_BRAND_TOKENS)
     if year_match and brand_match:
-        signals.append(f"year:{year_match.group()}+brand:{brand_match}")
-        strength += 5
+        if has_word(brand_title, brand_match):
+            signals.append(f"year:{year_match.group()}+brand:{brand_match}")
+            strength += 5
+        else:
+            # Year + brand only in the description ("purchased in 2021,
+            # comes with Yamaha receiver") — suspicious but not conclusive.
+            signals.append(f"year:{year_match.group()}+brand-in-desc:{brand_match}")
+            strength += 3
     elif brand_match:
         # iter205 — brand-in-title is a stronger signal than brand-in-description.
-        # "ford" or "honda" appearing in the TITLE almost always means a vehicle;
-        # whereas in description it could be incidental ("comes with Honda generator").
-        if brand_match in title_n:
+        if has_word(brand_title, brand_match):
             signals.append(f"brand-in-title:{brand_match}")
             strength += 3
         else:
@@ -257,7 +333,7 @@ def is_vehicle_listing(
             strength += 2
 
     # Body style alone
-    body_hit = _haystack_contains(haystack, VEHICLE_BODY_TOKENS)
+    body_hit = first_word_match(haystack, VEHICLE_BODY_TOKENS)
     if body_hit:
         signals.append(f"body:{body_hit}")
         strength += 1
@@ -325,7 +401,9 @@ async def enforce_vehicle_dealer_gate(
     """
     Hard-coded gate. If the listing looks like a vehicle AND the user is
     not a verified dealer, raise HTTPException(403) with the bilingual
-    compliance message. Always logs the attempt to `audit_logs`.
+    compliance message. Always logs the attempt to `audit_logs` AND
+    (iter338) dispatches an admin notification so false positives are
+    reviewable by a human.
 
     Args:
       • db, current_user — injected by the route
@@ -380,6 +458,27 @@ async def enforce_vehicle_dealer_gate(
         "[vehicle_listing_guard] BLOCKED user=%s surface=%s category=%r signals=%s",
         user_id, surface, category, signals,
     )
+
+    # iter338 — Admin notification (in-app + deduped email) on EVERY block
+    # so a human can review possible false positives. Best-effort.
+    try:
+        from services.compliance_notifier import notify_admins_of_violation
+        await notify_admins_of_violation(
+            db,
+            kind="blocked_at_gate",
+            listing={
+                "id": None,
+                "title": title,
+                "category": category,
+                "seller_id": user_id,
+            },
+            signals=signals,
+            seller_email=user_doc.get("email"),
+            extra={"surface": surface, "detection_strength": strength},
+        )
+    except Exception as notify_exc:  # noqa: BLE001
+        logger.warning("[vehicle_listing_guard] admin notify failed: %s", notify_exc)
+
     raise HTTPException(
         status_code=403,
         detail={
