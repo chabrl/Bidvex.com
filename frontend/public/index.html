@@ -41,7 +41,9 @@
         <link rel="alternate" hreflang="en-ca" href="https://bidvex.com/?lang=en" />
         <link rel="alternate" hreflang="fr-ca" href="https://bidvex.com/?lang=fr" />
         <link rel="alternate" hreflang="x-default" href="https://bidvex.com/" />
-        <link rel="canonical" href="https://bidvex.com/" />
+        <!-- iter339 — static canonical removed: it conflicted with the per-page
+             Helmet canonical (every page appeared canonicalized to the homepage).
+             Per-page canonicals are set by src/components/SEO.js. -->
         
         <!-- Favicons & App Icons -->
         <link rel="icon" type="image/png" sizes="32x32" href="%PUBLIC_URL%/bidvex-icon.png" />

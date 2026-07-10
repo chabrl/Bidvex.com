@@ -38,6 +38,7 @@ import VerificationRequiredModal from '../components/VerificationRequiredModal';
 import PrivateSaleBadge, { BusinessSellerBadge, SellerAccountBadge } from '../components/PrivateSaleBadge';
 import PublicBidHistory from '../components/PublicBidHistory';
 import ListingJsonLd from '../components/seo/ListingJsonLd';
+import SEO from '../components/SEO';
 import { useMetaPixelTracking } from '../hooks/useMetaPixelTracking';
 import ListingPromotionModal from '../components/ListingPromotionModal';
 import { HighStakesIndicator, HighStakesTimer, getHighStakesCardStyles, isHighStakes } from '../components/HighStakesBidCard';
@@ -422,7 +423,14 @@ const MultiItemListingDetailPage = () => {
 
   return (
     <div className="min-h-screen py-8 px-4">
-      <ListingJsonLd listing={listing} canonicalUrl={`https://bidvex.com/multi-item-listing/${listing.id}`} />
+      <SEO
+        title={listing.title || 'Multi-Lot Auction'}
+        description={(listing.description || `Bid on ${listing.title || 'this multi-lot auction'} — live lot auction on BidVex.`).slice(0, 155)}
+        path={`/lots/${listing.id}`}
+        type="product"
+        image={(Array.isArray(listing.images) && listing.images[0]) || '/bidvex-og.png'}
+      />
+      <ListingJsonLd listing={listing} canonicalUrl={`https://bidvex.com/lots/${listing.id}`} />
       <div className="max-w-7xl mx-auto">
         {/* Preview Mode Banner */}
         {isPreviewMode && (

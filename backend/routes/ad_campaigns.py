@@ -43,12 +43,14 @@ Document shape:
 """
 from __future__ import annotations
 
+import asyncio
 import csv
 import io
 import json
 import logging
 import os
 import re
+import time
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -463,3 +465,297 @@ async def export_ad_campaigns_csv(
                 f'attachment; filename="bidvex-ad-campaigns-{datetime.now(timezone.utc).date().isoformat()}.csv"',
         },
     )
+
+
+# ════════════════════════════════════════════════════════════════════════
+# iter339 — Direct API Publishing (Meta Marketing API + Google Ads RSA)
+# Feature-flagged: publishing endpoints return 503 until the platform
+# API prerequisites (env vars) are configured. See services/ads_publisher.
+# ════════════════════════════════════════════════════════════════════════
+
+from services import ads_publisher
+
+PERFORMANCE_CACHE_TTL_SECONDS = 3600  # poll platforms at most once per hour
+
+GOOGLE_HEADLINE_MAX = 30
+GOOGLE_DESCRIPTION_MAX = 90
+
+
+class PublishMetaBody(BaseModel):
+    meta_campaign_id:  Optional[str] = None   # attach to existing Meta campaign
+    new_campaign_name: Optional[str] = None   # or create a new one
+    language:          str = "en"             # en | fr — which copy variant
+
+
+class PublishGoogleBody(BaseModel):
+    google_campaign_id: str
+    google_ad_group_id: str
+    language:           str = "en"
+
+
+def _gclip(s: str, max_len: int) -> str:
+    """Clip WITHOUT ellipsis (ad platforms reject '…' overflow chars)."""
+    s = (s or "").strip().replace("\n", " ")
+    if len(s) <= max_len:
+        return s
+    cut = s[:max_len]
+    if " " in cut:
+        cut = cut[: cut.rfind(" ")]
+    return cut.strip()
+
+
+def _fallback_google_variants(headline: str, description: str, lang: str = "en"):
+    """Deterministic 3 headlines (≤30) + 2 descriptions (≤90)."""
+    if lang == "fr":
+        extra_h = ["Enchérissez sur BidVex", "Encans en ligne au Canada"]
+        extra_d = "Enchérissez maintenant sur BidVex — le marché d'encans en ligne du Canada."
+        filler_h = "Encans BidVex en direct"
+        filler_d = "Découvrez des aubaines aux encans en direct sur BidVex dès aujourd'hui."
+    else:
+        extra_h = ["Bid Live on BidVex", "Online Auctions in Canada"]
+        extra_d = "Bid now on BidVex — Canada's online auction marketplace."
+        filler_h = "Live BidVex Auctions"
+        filler_d = "Discover live auction deals on BidVex today."
+    heads = [_gclip(headline, GOOGLE_HEADLINE_MAX)] + [_gclip(h, GOOGLE_HEADLINE_MAX) for h in extra_h]
+    descs = [_gclip(description, GOOGLE_DESCRIPTION_MAX), _gclip(extra_d, GOOGLE_DESCRIPTION_MAX)]
+    heads = list(dict.fromkeys([h for h in heads if h]))[:3]
+    while len(heads) < 3:
+        heads.append(_gclip(filler_h, GOOGLE_HEADLINE_MAX))
+    descs = list(dict.fromkeys([d for d in descs if d]))[:2]
+    while len(descs) < 2:
+        descs.append(_gclip(filler_d, GOOGLE_DESCRIPTION_MAX))
+    return heads, descs
+
+
+async def _generate_google_variants(headline: str, description: str, lang: str = "en"):
+    """Gemini generates 2 extra ≤30-char headline variants + 1 extra ≤90-char
+    description from the base copy. Returns (headlines[3], descriptions[2], used_fallback)."""
+    api_key = os.environ.get("GEMINI_API_KEY", "").strip()
+    base_h = _gclip(headline, GOOGLE_HEADLINE_MAX)
+    base_d = _gclip(description, GOOGLE_DESCRIPTION_MAX)
+    if not api_key:
+        h, d = _fallback_google_variants(headline, description, lang)
+        return h, d, True
+    lang_name = "French" if lang == "fr" else "English"
+    prompt = f"""You write Google Responsive Search Ad copy in {lang_name} for BidVex, Canada's online auction marketplace.
+
+Base headline: {base_h}
+Base description: {base_d}
+
+Produce EXACTLY this JSON:
+{{"headlines": ["<variant 1, max {GOOGLE_HEADLINE_MAX} chars>", "<variant 2, max {GOOGLE_HEADLINE_MAX} chars>"],
+ "descriptions": ["<variant 1, max {GOOGLE_DESCRIPTION_MAX} chars>"]}}
+
+Rules: NEVER exceed the character caps. No emojis, no ALL CAPS, no exclamation-spam.
+Variants must differ meaningfully from the base copy. Output ONLY valid JSON."""
+    try:
+        from google import genai
+        from google.genai import types as gtypes
+        client = genai.Client(api_key=api_key)
+        resp = await client.aio.models.generate_content(
+            model=GEMINI_ANALYSIS_MODEL,
+            contents=prompt,
+            config=gtypes.GenerateContentConfig(
+                response_mime_type="application/json", temperature=0.7),
+        )
+        raw = getattr(resp, "text", None) or ""
+        txt = re.sub(r"```(?:json)?", "", raw).strip("` \n\t")
+        m = re.search(r"\{.*\}", txt, re.S)
+        obj = json.loads(m.group()) if m else {}
+        gen_h = [_gclip(str(h), GOOGLE_HEADLINE_MAX) for h in (obj.get("headlines") or []) if str(h).strip()]
+        gen_d = [_gclip(str(d), GOOGLE_DESCRIPTION_MAX) for d in (obj.get("descriptions") or []) if str(d).strip()]
+        heads = list(dict.fromkeys([base_h] + gen_h))[:3]
+        descs = list(dict.fromkeys([base_d] + gen_d))[:2]
+        if len(heads) == 3 and len(descs) == 2:
+            return heads, descs, False
+        logger.warning(f"[google-variants] insufficient Gemini output — padding with fallback")
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[google-variants] Gemini call failed: {e}")
+    h, d = _fallback_google_variants(headline, description, lang)
+    return h, d, True
+
+
+@router.get("/publish-config")
+async def get_publish_config(user: User = Depends(require_admin)) -> Dict[str, Any]:
+    """Feature-flag state for the admin UI (disabled buttons + tooltips)."""
+    return {"meta": ads_publisher.meta_flag(), "google": ads_publisher.google_flag()}
+
+
+@router.get("/meta/campaigns")
+async def list_meta_platform_campaigns(user: User = Depends(require_admin)) -> Dict[str, Any]:
+    flag = ads_publisher.meta_flag()
+    if not flag["enabled"]:
+        raise HTTPException(503, flag["prerequisite"])
+    try:
+        items = await asyncio.to_thread(ads_publisher.list_meta_campaigns_sync)
+    except Exception as e:  # noqa: BLE001
+        logger.error(f"[meta-ads] list campaigns failed: {e}")
+        raise HTTPException(502, f"Meta API error: {e}")
+    return {"items": items}
+
+
+@router.get("/google/campaigns")
+async def list_google_platform_campaigns(user: User = Depends(require_admin)) -> Dict[str, Any]:
+    flag = ads_publisher.google_flag()
+    if not flag["enabled"]:
+        raise HTTPException(503, flag["prerequisite"])
+    try:
+        items = await asyncio.to_thread(ads_publisher.list_google_campaigns_sync)
+    except Exception as e:  # noqa: BLE001
+        logger.error(f"[google-ads] list campaigns failed: {e}")
+        raise HTTPException(502, f"Google Ads API error: {e}")
+    return {"items": items}
+
+
+@router.get("/google/ad-groups")
+async def list_google_platform_ad_groups(
+    campaign_id: str = Query(...),
+    user: User = Depends(require_admin),
+) -> Dict[str, Any]:
+    flag = ads_publisher.google_flag()
+    if not flag["enabled"]:
+        raise HTTPException(503, flag["prerequisite"])
+    try:
+        items = await asyncio.to_thread(ads_publisher.list_google_ad_groups_sync, campaign_id)
+    except Exception as e:  # noqa: BLE001
+        logger.error(f"[google-ads] list ad groups failed: {e}")
+        raise HTTPException(502, f"Google Ads API error: {e}")
+    return {"items": items}
+
+
+@router.post("/{campaign_id}/publish/meta")
+async def publish_campaign_to_meta(
+    campaign_id: str,
+    body: PublishMetaBody,
+    user: User = Depends(require_admin),
+    db=Depends(get_db),
+) -> Dict[str, Any]:
+    flag = ads_publisher.meta_flag()
+    if not flag["enabled"]:
+        raise HTTPException(503, flag["prerequisite"])
+    doc = await db.ad_campaigns.find_one({"id": campaign_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(404, "campaign not found")
+    if doc.get("status") == "draft":
+        raise HTTPException(400, "Campaign must be marked ready before publishing")
+    if doc.get("meta_ad_id"):
+        raise HTTPException(409, f"Already published to Meta (ad {doc['meta_ad_id']})")
+    try:
+        result = await asyncio.to_thread(
+            ads_publisher.publish_to_meta_sync, doc,
+            body.meta_campaign_id, body.new_campaign_name, body.language)
+    except Exception as e:  # noqa: BLE001
+        logger.error(f"[meta-ads] publish failed for {campaign_id}: {e}")
+        raise HTTPException(502, f"Meta API error: {e}")
+    new_status = "published_both" if doc.get("google_ad_id") else "published_meta"
+    await db.ad_campaigns.update_one({"id": campaign_id}, {"$set": {
+        "meta_ad_id": result["meta_ad_id"],
+        "meta_adset_id": result["meta_adset_id"],
+        "meta_campaign_id": result["meta_campaign_id"],
+        "meta_creative_id": result["meta_creative_id"],
+        "meta_published_at": _now(),
+        "meta_published_by": user.id,
+        "status": new_status,
+        "updated_at": _now(),
+    }})
+    return {"meta_ad_id": result["meta_ad_id"], "status": new_status,
+            "preview_url": result["preview_url"], "ad_status": result["ad_status"]}
+
+
+@router.post("/{campaign_id}/publish/google")
+async def publish_campaign_to_google(
+    campaign_id: str,
+    body: PublishGoogleBody,
+    user: User = Depends(require_admin),
+    db=Depends(get_db),
+) -> Dict[str, Any]:
+    flag = ads_publisher.google_flag()
+    if not flag["enabled"]:
+        raise HTTPException(503, flag["prerequisite"])
+    doc = await db.ad_campaigns.find_one({"id": campaign_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(404, "campaign not found")
+    if doc.get("status") == "draft":
+        raise HTTPException(400, "Campaign must be marked ready before publishing")
+    if doc.get("google_ad_id"):
+        raise HTTPException(409, f"Already published to Google (ad {doc['google_ad_id']})")
+    lang = "fr" if str(body.language or "").lower().startswith("fr") else "en"
+    base_headline = doc.get(f"headline_{lang}") or doc.get("headline_en") or ""
+    base_description = doc.get(f"description_{lang}") or doc.get("description_en") or ""
+    headlines, descriptions, used_fallback = await _generate_google_variants(
+        base_headline, base_description, lang)
+    try:
+        result = await asyncio.to_thread(
+            ads_publisher.create_google_rsa_sync,
+            body.google_ad_group_id, headlines, descriptions,
+            doc.get("landing_url") or f"{BIDVEX_BASE_URL}/")
+    except Exception as e:  # noqa: BLE001
+        logger.error(f"[google-ads] publish failed for {campaign_id}: {e}")
+        raise HTTPException(502, f"Google Ads API error: {e}")
+    new_status = "published_both" if doc.get("meta_ad_id") else "published_google"
+    await db.ad_campaigns.update_one({"id": campaign_id}, {"$set": {
+        "google_ad_id": result["google_ad_id"],
+        "google_ad_resource_name": result["resource_name"],
+        "google_campaign_id": body.google_campaign_id,
+        "google_ad_group_id": body.google_ad_group_id,
+        "google_headlines": headlines,
+        "google_descriptions": descriptions,
+        "google_variants_fallback": used_fallback,
+        "google_published_at": _now(),
+        "google_published_by": user.id,
+        "status": new_status,
+        "updated_at": _now(),
+    }})
+    return {"google_ad_id": result["google_ad_id"], "status": new_status,
+            "headlines": headlines, "descriptions": descriptions}
+
+
+@router.get("/{campaign_id}/performance")
+async def get_campaign_performance(
+    campaign_id: str,
+    user: User = Depends(require_admin),
+    db=Depends(get_db),
+) -> Dict[str, Any]:
+    """Impressions / clicks / spend per published platform. Results are
+    cached in Mongo for 1 hour — we never poll the platform APIs faster."""
+    doc = await db.ad_campaigns.find_one({"id": campaign_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(404, "campaign not found")
+    if not doc.get("meta_ad_id") and not doc.get("google_ad_id"):
+        raise HTTPException(400, "Campaign is not published to any platform yet")
+
+    cache = doc.get("performance_cache") or {}
+    fetched_epoch = float(cache.get("fetched_epoch") or 0)
+    if cache.get("platforms") and (time.time() - fetched_epoch) < PERFORMANCE_CACHE_TTL_SECONDS:
+        return {"campaign_id": campaign_id, "cached": True,
+                "fetched_at": cache.get("fetched_at"), "platforms": cache["platforms"]}
+
+    platforms: Dict[str, Any] = {}
+    if doc.get("meta_ad_id"):
+        if ads_publisher.meta_flag()["enabled"]:
+            try:
+                platforms["meta"] = await asyncio.to_thread(
+                    ads_publisher.fetch_meta_insights_sync, doc["meta_ad_id"])
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"[meta-ads] insights failed: {e}")
+                platforms["meta"] = {"error": str(e)}
+        else:
+            platforms["meta"] = {"error": "api_not_configured"}
+    if doc.get("google_ad_id"):
+        if ads_publisher.google_flag()["enabled"]:
+            try:
+                platforms["google"] = await asyncio.to_thread(
+                    ads_publisher.fetch_google_insights_sync, doc["google_ad_id"])
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"[google-ads] insights failed: {e}")
+                platforms["google"] = {"error": str(e)}
+        else:
+            platforms["google"] = {"error": "api_not_configured"}
+
+    now_iso = _now()
+    await db.ad_campaigns.update_one({"id": campaign_id}, {"$set": {
+        "performance_cache": {"fetched_at": now_iso, "fetched_epoch": time.time(),
+                              "platforms": platforms},
+    }})
+    return {"campaign_id": campaign_id, "cached": False,
+            "fetched_at": now_iso, "platforms": platforms}

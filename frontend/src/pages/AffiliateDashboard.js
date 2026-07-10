@@ -14,6 +14,7 @@ import {
   RefreshCw, Building2, Loader2
 } from 'lucide-react';
 import { formatCurrency } from '../utils/currencyFormatter';
+import { AffiliateEarningsWidget } from '../components/AffiliateEarningsWidget';
 
 const API = API_BASE;
 
@@ -196,6 +197,9 @@ const AffiliateDashboard = () => {
             </p>
           </CardContent>
         </Card>
+
+        {/* iter339 — Earnings widget + activity feed */}
+        <AffiliateEarningsWidget />
 
         {/* Metrics */}
         <div className="grid sm:grid-cols-4 gap-4">

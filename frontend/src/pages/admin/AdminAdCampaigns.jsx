@@ -27,14 +27,18 @@ import { Input } from '../../components/ui/input';
 import { Textarea } from '../../components/ui/textarea';
 import { Badge } from '../../components/ui/badge';
 import { Label } from '../../components/ui/label';
+import { AdPublishControls } from './AdPublishControls';
 
 const HEADLINE_MAX = 40;
 const DESCRIPTION_MAX = 90;
 
 const STATUS_BADGE_CLASSES = {
-  draft:     'bg-slate-100 text-slate-800 border-slate-300',
-  ready:     'bg-emerald-100 text-emerald-800 border-emerald-300',
-  published: 'bg-blue-100 text-blue-800 border-blue-300',
+  draft:            'bg-slate-100 text-slate-800 border-slate-300',
+  ready:            'bg-emerald-100 text-emerald-800 border-emerald-300',
+  published:        'bg-blue-100 text-blue-800 border-blue-300',
+  published_meta:   'bg-blue-100 text-blue-800 border-blue-300',
+  published_google: 'bg-cyan-100 text-cyan-800 border-cyan-300',
+  published_both:   'bg-indigo-100 text-indigo-800 border-indigo-300',
 };
 
 export default function AdminAdCampaigns() {
@@ -48,6 +52,14 @@ export default function AdminAdCampaigns() {
   const [newPlatform, setNewPlatform] = useState('both');
   const [editingId, setEditingId] = useState(null);
   const [editDraft, setEditDraft] = useState({});
+  const [publishConfig, setPublishConfig] = useState(null);
+
+  useEffect(() => {
+    if (!token) return;
+    axios.get(`${API_BASE}/admin/ad-campaigns/publish-config`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }).then((r) => setPublishConfig(r.data)).catch(() => setPublishConfig({ meta: { enabled: false }, google: { enabled: false } }));
+  }, [token]);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -311,6 +323,12 @@ export default function AdminAdCampaigns() {
                       {c.used_fallback && (
                         <Badge className="bg-amber-100 text-amber-800 border-amber-300 text-[10px]">fallback</Badge>
                       )}
+                      {c.meta_ad_id && (
+                        <Badge className="bg-blue-100 text-blue-800 border-blue-300 text-[10px]" data-testid={`ad-meta-active-badge-${c.id}`}>📘 Meta: Active</Badge>
+                      )}
+                      {c.google_ad_id && (
+                        <Badge className="bg-cyan-100 text-cyan-800 border-cyan-300 text-[10px]" data-testid={`ad-google-active-badge-${c.id}`}>🔵 Google: Active</Badge>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
@@ -397,6 +415,12 @@ export default function AdminAdCampaigns() {
                     </p>
                   </div>
                 )}
+                <AdPublishControls
+                  campaign={c}
+                  token={token}
+                  config={publishConfig}
+                  onUpdated={(doc) => setCampaigns((prev) => prev.map((x) => (x.id === doc.id ? { ...x, ...doc } : x)))}
+                />
               </CardContent>
             </Card>
           ))}

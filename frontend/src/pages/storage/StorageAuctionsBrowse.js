@@ -13,6 +13,7 @@ import { Link } from 'react-router-dom';
 import StorageHero from './StorageHero';
 import StorageAuctionCard from './StorageAuctionCard';
 import StorageFooterBanner from './StorageFooterBanner';
+import SEO from '../../components/SEO';
 import { useAuth } from '../../contexts/AuthContext';
 
 const API = API_BASE;
@@ -130,6 +131,11 @@ const StorageAuctionsBrowse = () => {
 
   return (
     <div className="min-h-screen bg-sky-50 dark:bg-slate-900" data-testid="storage-browse-page">
+      <SEO
+        title="Storage Unit Auctions"
+        description="Browse live storage unit auctions across Canada. Bid on abandoned storage lockers from verified facilities — no buyer fees on BidVex."
+        path="/storage-auctions"
+      />
       <StorageHero />
 
       {/* ── PUBLIC STATS BAR (iter171, iter193 single-language) ── */}

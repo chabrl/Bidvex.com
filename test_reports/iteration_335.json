@@ -1,0 +1,33 @@
+{
+  "summary": "iter339 review verification — Affiliate Earnings widget + Ad-campaigns publish controls (feature-flag gated) + SEO. Backend: 20/20 iter339 main tests + 12/12 supplementary tests PASS (100%). Frontend: all data-testid rows on affiliate widget rendered as testbuyer (empty state as expected), Request Payout at $0 gracefully returns 400 with 'Amount 0.0 exceeds available balance 0' toast (no crash), admin Ad Campaigns tab shows Publish-to-Meta and Publish-to-Google buttons DISABLED with tooltip 'API not configured — Meta Business Manager verification + Marketing API approval required' and the flag-note 'Meta & Google APIs not configured'. SEO: homepage/vehicle-auctions/storage-auctions each expose exactly ONE canonical link with the expected bidvex.com URL and correct <title>.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/vehicle-auctions", "issues": ["React hydration warning: <button> nested inside <button> inside VehicleListingCard (vehicle-card-image + vehicle-card-quickview). Not a functional regression but pollutes console with 'In HTML, %s cannot be a descendant of <%s>' errors. Not part of iter339 scope but worth flagging."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter339_earnings_ads.py",
+    "/app/backend/tests/test_iter339_supplement.py",
+    "/app/test_reports/pytest/iter339_verify.xml",
+    "/app/test_reports/pytest/iter339_supplement.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "AdPublishControls tooltip is on a wrapping <span title=...> — works but not accessible on keyboard focus (would benefit from proper Radix Tooltip component). Minor UX polish only.",
+    "AffiliateEarningsWidget silently swallows fetch errors in useEffect (catch block is empty comment) — a network failure would leave summary=null and quietly render nothing. Consider a visible error state.",
+    "publish-config prerequisite string is duplicated between backend (services/ads_publisher.py) and frontend disabledTip literal — small divergence risk."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter339_supplement.py (new — 12 tests)"
+  ],
+  "success_rate": {"backend": "100% (32/32)", "frontend": "100% (all E2E flows in scope pass)"},
+  "test_credentials": "Admin charbel911@gmail.com/Anderosli123!@# and testbuyer@bidvex.com/TestBuyer2026! both verified working on preview.",
+  "seed_data_creation": "Temporarily seeded ad_campaigns doc {id: TEST-ui-verify-fixed, status: ready} to verify AdPublishControls UI rendering (page had 0 real campaigns). Deleted after test. Also seeded/cleaned platform_credits docs via existing iter339 test fixture (self-cleaning).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "iter339 shipped clean. All acceptance criteria met: earnings-summary + commission-events endpoints correct with masked names, feature-flagged publish endpoints return 503 with clear prerequisite, admin UI buttons disabled + note visible, SEO canonicals/titles per-page correct. The AdminAdCampaigns page is at /admin?tab=ad-campaigns. To retest publish controls in a page with 0 real campaigns, seed a doc into ad_campaigns collection with status='ready' (see seed_data_creation for shape).",
+  "rca of the issue": "No issues found. All 3 iter339 deliverables verified working."
+}

@@ -341,3 +341,184 @@ async def award_affiliate_commission(
         f"awarded: referrer={referrer['id']} payer={payer_id} source={source} ref={reference_id}"
     )
     return credit_doc
+
+
+# ─── iter339 — Earnings summary + commission-events feed ─────────────
+
+def mask_referred_name(full_name: str) -> str:
+    """Privacy — 'Alex Brown' → 'Alex B.'; never expose full names/emails."""
+    parts = [p for p in (full_name or "").strip().split() if p]
+    if not parts:
+        return "User"
+    if len(parts) == 1:
+        return parts[0]
+    return f"{parts[0]} {parts[1][0].upper()}."
+
+
+def _parse_dt(value) -> Optional[datetime]:
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _shift_month(year: int, month: int, delta: int) -> tuple:
+    idx = year * 12 + (month - 1) + delta
+    return idx // 12, idx % 12 + 1
+
+
+def compute_projection(monthly: Dict[tuple, float], now: datetime) -> tuple:
+    """projected_next_month = avg of the last 3 COMPLETED calendar months.
+    If activity started this month, use the current month (basis 1).
+    Returns (projection, basis_months)."""
+    if not monthly:
+        return 0.0, 0
+    earliest = min(monthly.keys())
+    this_key = (now.year, now.month)
+    candidates = [_shift_month(now.year, now.month, -d) for d in (1, 2, 3)]
+    considered = [k for k in candidates if k >= earliest]
+    if not considered:
+        considered = [this_key]
+    basis = len(considered)
+    projection = round(sum(monthly.get(k, 0.0) for k in considered) / basis, 2)
+    return projection, basis
+
+
+async def _load_commission_rows(db, user_id: str) -> List[Dict[str, Any]]:
+    """Merged ledger: iter338 platform_credits (referral) + legacy affiliate_earnings."""
+    rows: List[Dict[str, Any]] = []
+    async for c in db.platform_credits.find(
+        {"user_id": user_id, "source": "referral"},
+        {"_id": 0, "amount": 1, "commission_base": 1, "created_at": 1,
+         "status": 1, "referred_user_id": 1},
+    ):
+        rows.append({
+            "amount": float(c.get("amount") or 0),
+            "base": float(c.get("commission_base") or 0),
+            "created_at": _parse_dt(c.get("created_at")),
+            "status": c.get("status") or "pending",
+            "referred_user_id": c.get("referred_user_id"),
+        })
+    async for e in db.affiliate_earnings.find(
+        {"affiliate_id": user_id},
+        {"_id": 0, "commission_amount": 1, "created_at": 1, "status": 1,
+         "referred_user_id": 1},
+    ):
+        rows.append({
+            "amount": float(e.get("commission_amount") or 0),
+            "base": 0.0,
+            "created_at": _parse_dt(e.get("created_at")),
+            "status": e.get("status") or "pending",
+            "referred_user_id": e.get("referred_user_id"),
+        })
+    return rows
+
+
+@affiliate_router.get("/earnings-summary")
+async def get_earnings_summary(current_user: User = Depends(get_current_user)):
+    """iter339 — Lifetime / monthly earnings + transparent 3-month projection."""
+    db = get_db()
+    rows = await _load_commission_rows(db, current_user.id)
+    now = _now()
+    this_key = (now.year, now.month)
+    last_key = _shift_month(now.year, now.month, -1)
+
+    monthly: Dict[tuple, float] = {}
+    this_month = {"earned": 0.0, "transaction_count": 0, "platform_fees_generated": 0.0}
+    last_month = {"earned": 0.0, "transaction_count": 0}
+    lifetime = {"earned": 0.0, "transaction_count": 0}
+    pending_approval = 0.0
+    active_payers_this_month = set()
+
+    for r in rows:
+        lifetime["earned"] += r["amount"]
+        lifetime["transaction_count"] += 1
+        if r["status"] == "pending":
+            pending_approval += r["amount"]
+        dt = r["created_at"]
+        if not dt:
+            continue
+        key = (dt.year, dt.month)
+        monthly[key] = monthly.get(key, 0.0) + r["amount"]
+        if key == this_key:
+            this_month["earned"] += r["amount"]
+            this_month["transaction_count"] += 1
+            this_month["platform_fees_generated"] += r["base"]
+            if r.get("referred_user_id"):
+                active_payers_this_month.add(r["referred_user_id"])
+        elif key == last_key:
+            last_month["earned"] += r["amount"]
+            last_month["transaction_count"] += 1
+
+    projection, basis = compute_projection(monthly, now)
+
+    referred_total = 0
+    code = getattr(current_user, "affiliate_code", None)
+    if not code:
+        u = await db.users.find_one({"id": current_user.id}, {"_id": 0, "affiliate_code": 1})
+        code = (u or {}).get("affiliate_code")
+    if code:
+        referred_total = await db.users.count_documents({"referred_by_code": code})
+
+    return {
+        "this_month": {
+            "earned": round(this_month["earned"], 2),
+            "transaction_count": this_month["transaction_count"],
+            "platform_fees_generated": round(this_month["platform_fees_generated"], 2),
+        },
+        "last_month": {
+            "earned": round(last_month["earned"], 2),
+            "transaction_count": last_month["transaction_count"],
+        },
+        "lifetime": {
+            "earned": round(lifetime["earned"], 2),
+            "transaction_count": lifetime["transaction_count"],
+        },
+        "projected_next_month": projection,
+        "projection_basis_months": basis,
+        "referred_users": {
+            "total": referred_total,
+            "active_this_month": len(active_payers_this_month),
+        },
+        "pending_approval": round(pending_approval, 2),
+        "commission_rate": AFFILIATE_PROFIT_SHARE_RATE,
+    }
+
+
+@affiliate_router.get("/commission-events")
+async def get_commission_events(
+    page: int = 1,
+    limit: int = 10,
+    current_user: User = Depends(get_current_user),
+):
+    """iter339 — Paginated activity feed of commission events with
+    privacy-masked referred-user names (first name + last initial)."""
+    db = get_db()
+    page = max(1, int(page))
+    limit = max(1, min(50, int(limit)))
+    q = {"user_id": current_user.id, "source": "referral"}
+    total = await db.platform_credits.count_documents(q)
+    cursor = (db.platform_credits.find(q, {"_id": 0})
+              .sort("created_at", -1)
+              .skip((page - 1) * limit).limit(limit))
+    items: List[Dict[str, Any]] = []
+    async for c in cursor:
+        name = c.get("referred_user_name") or ""
+        if not name and c.get("referred_user_id"):
+            u = await db.users.find_one({"id": c["referred_user_id"]}, {"_id": 0, "name": 1})
+            name = (u or {}).get("name") or ""
+        items.append({
+            "id": c.get("id"),
+            "date": c.get("created_at"),
+            "referred_user": mask_referred_name(name),
+            "revenue_source": c.get("revenue_source") or "transaction",
+            "platform_fee": round(float(c.get("commission_base") or 0), 2),
+            "commission": round(float(c.get("amount") or 0), 2),
+            "rate": float(c.get("commission_rate") or AFFILIATE_PROFIT_SHARE_RATE),
+            "status": c.get("status") or "pending",
+            "description": c.get("description") or "",
+        })
+    return {"items": items, "total": total, "page": page, "limit": limit,
+            "has_more": page * limit < total}

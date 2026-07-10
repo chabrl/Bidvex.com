@@ -47,6 +47,7 @@ import VehicleListingCard from '../../components/vehicles/VehicleListingCard';
 import VehicleEmptyState from '../../components/vehicles/VehicleEmptyState';
 import VehicleLegalFooter from '../../components/vehicles/VehicleLegalFooter';
 import VehicleSidebar from '../../components/vehicles/VehicleSidebar';
+import SEO from '../../components/SEO';
 import useVehicleCountdown from '../../hooks/useVehicleCountdown';
 // iter294 P1 — Live multi-lot feed widget.
 import LiveMultiLotFeedWidget from '../../components/LiveMultiLotFeedWidget';
@@ -227,6 +228,11 @@ const VehicleAuctionsPage = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 overflow-x-hidden" data-testid="vehicle-auctions-page">
+      <SEO
+        title="Vehicle Auctions"
+        description="Bid on cars, trucks, motorcycles and dealer vehicles across Canada. Live online vehicle auctions on BidVex — transparent fees, verified sellers."
+        path="/vehicle-auctions"
+      />
       {/* HERO (navy, full bleed) — iter303 Directive 3: hero sits flush
           against the CTA strip with zero whitespace below. */}
       <VehicleHero

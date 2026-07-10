@@ -28,6 +28,7 @@ import ListingPromotionModal from '../../components/ListingPromotionModal';
 // Quick-Bid panel and confused buyers. Import removed alongside its render.
 import StorageAuctionClock from '../../components/storage/StorageAuctionClock';
 import ListingJsonLd from '../../components/seo/ListingJsonLd';
+import SEO from '../../components/SEO';
 import { useMetaPixelTracking } from '../../hooks/useMetaPixelTracking';
 import { TrendingUp } from 'lucide-react';
 
@@ -148,6 +149,13 @@ const StorageAuctionDetail = () => {
 
   return (
     <div className="min-h-screen bg-sky-50 dark:bg-slate-900 py-6" data-testid="storage-auction-detail">
+      <SEO
+        title={auction.title || (auction.unit_number ? `Storage Auction ${auction.unit_number}` : 'Storage Unit Auction')}
+        description={(auction.description || 'Bid on this storage unit auction — live on BidVex, no buyer fees.').slice(0, 155)}
+        path={`/storage-auctions/${auction.id}`}
+        type="product"
+        image={(Array.isArray(auction.images) && auction.images[0]) || '/bidvex-og.png'}
+      />
       <ListingJsonLd listing={auction} canonicalUrl={`https://bidvex.com/storage-auctions/${auction.id}`} />
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <Link to="/storage-auctions/browse" className="text-sm text-blue-600 hover:underline">

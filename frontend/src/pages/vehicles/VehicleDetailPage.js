@@ -10,6 +10,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import SafeImage from '../../components/SafeImage';
 import VehicleBidPanel from '../../components/broker/VehicleBidPanel';
 import ListingJsonLd from '../../components/seo/ListingJsonLd';
+import SEO from '../../components/SEO';
 import { useMetaPixelTracking } from '../../hooks/useMetaPixelTracking';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -1116,8 +1117,16 @@ const VehicleDetailPage = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 overflow-x-hidden" data-testid="vehicle-detail-page">
-      {/* iter231 — Schema.org Vehicle JSON-LD for Google Merchant + crawl alignment */}
-      <ListingJsonLd listing={vehicle} canonicalUrl={`https://bidvex.com/vehicles/${vehicle.id}`} />
+      {/* iter231 — Schema.org Vehicle JSON-LD for Google Merchant + crawl alignment
+          iter339 — canonical fixed to the real /vehicle-auctions/:id route + per-page SEO tags */}
+      <SEO
+        title={`${vehicle.year || ''} ${vehicle.make || ''} ${vehicle.model || ''}`.trim() || 'Vehicle Auction'}
+        description={(vehicle.description || `Bid on this ${vehicle.year || ''} ${vehicle.make || ''} ${vehicle.model || ''} — live vehicle auction on BidVex.`).slice(0, 155)}
+        path={`/vehicle-auctions/${vehicle.id}`}
+        type="product"
+        image={(Array.isArray(vehicle.images) && vehicle.images[0]) || '/bidvex-og.png'}
+      />
+      <ListingJsonLd listing={vehicle} canonicalUrl={`https://bidvex.com/vehicle-auctions/${vehicle.id}`} />
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 border-b overflow-x-hidden">
         <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4">
