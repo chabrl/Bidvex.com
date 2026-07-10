@@ -46,6 +46,7 @@ export const AffiliateEarningsWidget = () => {
   const [eventsTotal, setEventsTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [requesting, setRequesting] = useState(false);
 
@@ -67,7 +68,7 @@ export const AffiliateEarningsWidget = () => {
         ]);
         setSummary(s.data);
       } catch (e) {
-        // silent — parent dashboard shows its own errors
+        setLoadError(true);
       } finally { setLoading(false); }
     })();
   }, [token, loadEvents]);

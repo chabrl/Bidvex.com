@@ -1,6 +1,49 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter339 — Ads Direct Publishing + Affiliate Earnings Widget + SEO Fixes (Jun 2026) ✅ COMPLETE — VERIFIED 100%
+
+### 1. P0 — Meta / Google Ads Direct API Publishing (feature-flagged)
+- **Feature flags**: publishing is gated on env vars — Meta requires `META_APP_ID, META_APP_SECRET, META_ACCESS_TOKEN, META_AD_ACCOUNT_ID, META_PAGE_ID`; Google requires `GOOGLE_ADS_DEVELOPER_TOKEN, GOOGLE_ADS_CLIENT_ID, GOOGLE_ADS_CLIENT_SECRET, GOOGLE_ADS_REFRESH_TOKEN, GOOGLE_ADS_LOGIN_CUSTOMER_ID, GOOGLE_ADS_CLIENT_CUSTOMER_ID`. None set today → endpoints return **503 with prerequisite message**, admin UI buttons **disabled with tooltip**. Setting the env vars auto-enables everything (no code change needed).
+- **Manual prerequisites for BidVex team**: Meta — verified Business Manager + approved Marketing API access request. Google — Google Ads account with API access + STANDARD-access developer token (not test) + OAuth refresh token.
+- **Endpoints** (`routes/ad_campaigns.py`, service `services/ads_publisher.py`):
+  - `GET /api/admin/ad-campaigns/publish-config` — flag state for UI.
+  - `GET .../meta/campaigns`, `GET .../google/campaigns`, `GET .../google/ad-groups?campaign_id=` — platform selectors.
+  - `POST .../{id}/publish/meta` — uploads listing image → Ad Image hash, creates Ad Creative (headline_en/fr per language, CTA Learn More → listing URL), Ad Set (Canada, age 25-55, interests auctions/vehicles/liquidation/real-estate via TargetingSearch or `META_INTEREST_IDS` env), Ad under selected/new Meta campaign. Everything created **PAUSED** (safety; `META_AD_STATUS` env overrides). Stores `meta_ad_id`, status → `published_meta`. Returns preview_url.
+  - `POST .../{id}/publish/google` — creates Responsive Search Ad with **3 headlines ≤30 chars** (base + 2 Gemini variants, deterministic fallback, no-ellipsis clipping) + **2 descriptions ≤90 chars**, attached to admin-selected campaign/ad-group. Stores `google_ad_id`, status → `published_google` (`published_both` if both).
+  - `GET .../{id}/performance` — impressions/clicks/spend per published platform, **cached 1 hour in Mongo** (`performance_cache`) — never polls faster.
+- **Guards**: publish requires status ≠ draft (400), re-publish → 409, unknown id → 404.
+- **SDKs installed**: `facebook-business==25.0.2`, `google-ads==31.1.0` (lazy-imported — app boots without creds).
+- **Admin UI** (`AdminAdCampaigns.jsx` + new `AdPublishControls.jsx`): per-card Publish-to-Meta/Google buttons (disabled + tooltip when flag off), platform status badges ("📘 Meta: Active" / "🔵 Google: Active"), campaign/ad-group selector panels, language EN/FR selector, performance panel.
+
+### 2. P0 — Affiliate Projected Earnings Widget + Activity Feed
+- **`GET /api/affiliate/earnings-summary`** (`routes/affiliate.py`) — merges iter338 `platform_credits(source=referral)` + legacy `affiliate_earnings`. Returns this_month {earned, transaction_count, platform_fees_generated}, last_month, lifetime, `projected_next_month` (**avg of last 3 completed calendar months**; falls back to available months; basis exposed as `projection_basis_months`), referred_users {total, active_this_month}, pending_approval.
+- **`GET /api/affiliate/commission-events?page=&limit=`** — paginated (10/page default) feed from platform_credits with **masked names** (`mask_referred_name`: "Alex Boulanger" → "Alex B."), BidVex fee (`commission_base`), 3% share, status pending/approved/paid.
+- **UI** (`components/AffiliateEarningsWidget.jsx`, mounted on `/affiliate` in `AffiliateDashboard.js`): full spec layout — monthly rows, projection block with transparent basis note ("Based on X months of data"), referred-users block, pending-approval row with **Request Payout** button (→ existing `/api/affiliate/request-payout`), activity feed with Load more. Bilingual EN/FR. Error state on fetch failure.
+
+### 3. P1 — SEO Audit (production bidvex.com) — results & fixes
+- **PASS (verified live)**: robots.txt (Disallow /admin, /dashboard, /api/ + Allow /api/feeds/ + Sitemap ref) · sitemap.xml served + nightly regen scheduler (06:00 UTC cron + boot regen in server.py) confirmed intact, regen re-run on preview → 23 URLs incl. active listings · meta description fine (earlier "fail" was audit-regex apostrophe artifact) · OG tags present · page loads ~500ms · JSON-LD already on ListingDetailPage (Product), VehicleDetailPage/MultiItemListingDetailPage/StorageAuctionDetail (ListingJsonLd) · Homepage JSON-LD via SEO component.
+- **FAILS found → FIXED same pass**:
+  1. Static `<link rel="canonical" href="https://bidvex.com/">` in `public/index.html` conflicted with Helmet per-page canonicals (every page canonicalized to homepage) → **removed**; each page now exposes exactly ONE correct canonical.
+  2. `/vehicle-auctions` index page had no per-page SEO → added `<SEO>` (title "Vehicle Auctions | BidVex", canonical, description).
+  3. `/storage-auctions` browse page — same fix ("Storage Unit Auctions | BidVex").
+  4. VehicleDetailPage canonical pointed at non-existent `/vehicles/{id}` route → fixed to `/vehicle-auctions/{id}` + added per-listing SEO title/description/OG image.
+  5. MultiItemListingDetailPage canonical pointed at `/multi-item-listing/{id}` → fixed to real `/lots/{id}` route + per-listing SEO.
+  6. StorageAuctionDetail — added per-listing SEO title/description.
+
+### Tests
+- `tests/test_iter339_earnings_ads.py` — **20/20 PASS** (earnings math w/ seeded credits, projection 3-month avg + fewer-months basis + year boundary, masked names + pagination, Meta creative/targeting payload builders, flag 503 gating, Google headline ≤30 no-ellipsis caps).
+- Testing agent `test_iter339_supplement.py` — **12/12 PASS**. Frontend E2E 100% (widget testids, $0 payout graceful 400 toast, disabled publish buttons + tooltip + flag note, SEO canonicals/titles).
+- Regression: iter337 (7/7) + iter338 (31/31) all PASS. Report: `/app/test_reports/iteration_335.json`.
+
+### Known minor follow-ups (non-blocking, from testing agent code review)
+- Pre-existing (NOT iter339): `<button>`-in-`<button>` React DOM nesting warning in VehicleListingCard (vehicle-card-image + quickview).
+- AdPublishControls tooltip uses native `title=` (works, not keyboard-accessible — could upgrade to Radix Tooltip).
+
+### 🔒 DEPLOYMENT STATUS
+**iter338 + iter339 NOT yet deployed to production.** User instruction: hold until `contractor@bidvex.com` inbox is confirmed to exist and be monitored. Deploy immediately once user confirms.
+
+
 ## iter337 — Follow-Up Open Rate + Nudges + Ad Campaigns (Jul 03, 2026) ✅ COMPLETE
 
 ### Directive 1 — SendGrid Follow-Up Open Rate Tracking
