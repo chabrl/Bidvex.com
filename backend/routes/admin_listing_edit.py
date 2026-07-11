@@ -151,3 +151,144 @@ async def admin_edit_multi_listing(
         "timestamp": now.isoformat(),
     })
     return {"success": True, "id": listing_id, "updated_fields": list(update.keys())}
+
+
+# ═══ iter343 BUG-4 — Admin edits INDIVIDUAL LOTS inside multi-lot auctions ═══
+
+class AdminLotUpdate(BaseModel):
+    """Every editable lot field — general lots AND vehicle multi-lot."""
+    title: Optional[str] = None
+    title_fr: Optional[str] = None
+    description: Optional[str] = None
+    category: Optional[str] = None
+    quantity: Optional[int] = None
+    starting_price: Optional[float] = None
+    reserve_price: Optional[float] = None
+    bid_increment: Optional[float] = None
+    condition: Optional[str] = None
+    location: Optional[str] = None
+    images: Optional[list[str]] = None
+    # Vehicle-lot specific
+    vin: Optional[str] = None
+    year: Optional[int] = None
+    make: Optional[str] = None
+    model: Optional[str] = None
+    mileage: Optional[int] = None
+    location_city: Optional[str] = None
+    location_province: Optional[str] = None
+
+
+def _diff_lot(old_lot: dict, changes: dict) -> tuple[dict, dict]:
+    prev, new = {}, {}
+    for k, v in changes.items():
+        if old_lot.get(k) != v:
+            prev[k] = old_lot.get(k)
+            new[k] = v
+    return prev, new
+
+
+async def _apply_lot_edit(
+    db, *, collection: str, parent_id: str, lot: dict, lot_match: dict,
+    changes: dict, admin: User, action: str, lot_ref,
+):
+    prev_values, new_values = _diff_lot(lot, changes)
+    if not new_values:
+        return {"success": True, "id": parent_id, "updated_fields": [],
+                "message": "No values changed"}
+
+    # Keep current_bid in sync when starting_price changes on a bid-less lot
+    if "starting_price" in new_values and not (lot.get("bid_count") or 0):
+        if "current_bid" in lot:
+            new_values["current_bid"] = new_values["starting_price"]
+
+    now = datetime.now(timezone.utc)
+    set_ops = {f"lots.$.{k}": v for k, v in new_values.items()}
+    set_ops["updated_at"] = now
+    set_ops["last_edited_by_admin"] = admin.email
+    res = await db[collection].update_one(
+        {"id": parent_id, **lot_match}, {"$set": set_ops},
+    )
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Lot not found in auction")
+
+    # Field-level audit trail (spec: admin_id, event_id, lot_id,
+    # fields_changed, previous_values, new_values, timestamp)
+    await db.admin_logs.insert_one({
+        "id": f"edit-lot-{parent_id}-{lot_ref}-{int(now.timestamp())}",
+        "action": action,
+        "admin_email": admin.email,
+        "admin_id": getattr(admin, "id", None),
+        "details": {
+            "event_id": parent_id,
+            "lot_id": lot_ref,
+            "fields_changed": sorted(new_values.keys()),
+            "previous_values": prev_values,
+            "new_values": new_values,
+        },
+        "timestamp": now.isoformat(),
+    })
+    logger.info(f"[ADMIN] {admin.email} edited lot {lot_ref} of {parent_id}: {sorted(new_values.keys())}")
+    return {"success": True, "id": parent_id, "lot": lot_ref,
+            "updated_fields": sorted(new_values.keys())}
+
+
+@admin_listing_edit_router.put("/admin/multi-item-listings/{listing_id}/lots/{lot_number}")
+async def admin_edit_multi_lot(
+    listing_id: str,
+    lot_number: int,
+    data: AdminLotUpdate,
+    current_user: User = Depends(require_admin),
+):
+    """Admin edits ONE lot inside a general multi-item (lots) auction."""
+    db = get_db()
+    listing = await db.multi_item_listings.find_one({"id": listing_id}, {"_id": 0})
+    if not listing:
+        raise HTTPException(status_code=404, detail="Multi-item listing not found")
+    lot = next((l for l in listing.get("lots", []) if l.get("lot_number") == lot_number), None)
+    if not lot:
+        raise HTTPException(status_code=404, detail=f"Lot #{lot_number} not found")
+
+    changes = data.model_dump(exclude_none=True)
+    if not changes:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    if changes.get("quantity") is not None and changes["quantity"] < 1:
+        raise HTTPException(status_code=400, detail="quantity must be >= 1")
+    for k in ("starting_price", "reserve_price", "bid_increment"):
+        if changes.get(k) is not None and changes[k] < 0:
+            raise HTTPException(status_code=400, detail=f"{k} cannot be negative")
+
+    return await _apply_lot_edit(
+        db, collection="multi_item_listings", parent_id=listing_id, lot=lot,
+        lot_match={"lots.lot_number": lot_number}, changes=changes,
+        admin=current_user, action="admin_edit_multi_lot", lot_ref=lot_number,
+    )
+
+
+@admin_listing_edit_router.put("/admin/vehicle-multi-lot-auctions/{event_id}/lots/{lot_id}")
+async def admin_edit_vehicle_multi_lot(
+    event_id: str,
+    lot_id: str,
+    data: AdminLotUpdate,
+    current_user: User = Depends(require_admin),
+):
+    """Admin edits ONE lot inside a vehicle multi-lot auction event."""
+    db = get_db()
+    event = await db.vehicle_multi_lot_auctions.find_one({"id": event_id}, {"_id": 0})
+    if not event:
+        raise HTTPException(status_code=404, detail="Vehicle multi-lot event not found")
+    lot = next((l for l in event.get("lots", []) if l.get("id") == lot_id), None)
+    if not lot:
+        raise HTTPException(status_code=404, detail="Lot not found in event")
+
+    changes = data.model_dump(exclude_none=True)
+    if not changes:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    for k in ("starting_price", "reserve_price", "bid_increment"):
+        if changes.get(k) is not None and changes[k] < 0:
+            raise HTTPException(status_code=400, detail=f"{k} cannot be negative")
+
+    return await _apply_lot_edit(
+        db, collection="vehicle_multi_lot_auctions", parent_id=event_id, lot=lot,
+        lot_match={"lots.id": lot_id}, changes=changes,
+        admin=current_user, action="admin_edit_vehicle_multi_lot", lot_ref=lot_id,
+    )

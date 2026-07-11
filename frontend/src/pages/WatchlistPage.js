@@ -47,7 +47,8 @@ const WatchlistPage = () => {
   };
 
   // Render marketplace listing card
-  const renderListingCard = (listing) => {
+  // Render generic listing-style card (marketplace / vehicle / storage)
+  const renderListingCard = (listing, itemType = 'listing', pathPrefix = '/listing/', sectionLabel = 'Marketplace') => {
     const auctionEndDate = listing.auction_end_date ? new Date(listing.auction_end_date) : null;
     const isEnded = auctionEndDate && new Date() > auctionEndDate;
 
@@ -56,9 +57,9 @@ const WatchlistPage = () => {
         key={listing.id}
         className="overflow-hidden hover:shadow-lg transition-all duration-200 group"
       >
-        <div className="relative cursor-pointer" onClick={() => navigate(`/listing/${listing.id}`)}>
+        <div className="relative cursor-pointer" onClick={() => navigate(`${pathPrefix}${listing.id}`)}>
           <div className="absolute top-2 right-2 z-10" onClick={(e) => e.stopPropagation()}>
-            <WatchlistButton itemId={listing.id} itemType="listing" size="default" />
+            <WatchlistButton itemId={listing.id} itemType={itemType} size="default" />
           </div>
           <Badge className="absolute top-2 left-2 z-10 bg-red-500 hover:bg-red-600">Watched</Badge>
           <div className="aspect-video overflow-hidden bg-gray-100">
@@ -73,8 +74,8 @@ const WatchlistPage = () => {
           <div>
             <h3 className="font-semibold line-clamp-2 mb-2">{getLocalized(listing, "title")}</h3>
             <div className="flex flex-wrap gap-2 mb-2">
-              <Badge variant="secondary" className="text-xs"><Tag className="h-3 w-3 mr-1" />{listing.category}</Badge>
-              <Badge variant="outline" className="text-xs">Marketplace</Badge>
+              <Badge variant="secondary" className="text-xs"><Tag className="h-3 w-3 mr-1" />{listing.category || sectionLabel}</Badge>
+              <Badge variant="outline" className="text-xs">{sectionLabel}</Badge>
             </div>
           </div>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -92,7 +93,7 @@ const WatchlistPage = () => {
             <span className="text-lg font-bold text-primary">{formatListingPrice(listing.current_price, listing.currency)}</span>
           </div>
           <Button 
-            onClick={() => navigate(`/listing/${listing.id}`)} 
+            onClick={() => navigate(`${pathPrefix}${listing.id}`)} 
             className="w-full mt-2"
             variant="outline"
           >
@@ -102,6 +103,37 @@ const WatchlistPage = () => {
       </Card>
     );
   };
+
+  // iter343 BUG-5 — deleted/ended listings show a bilingual placeholder,
+  // never a broken/blank card.
+  const renderUnavailableCard = (item, idx) => (
+    <Card key={`unavailable-${idx}`} className="overflow-hidden border-dashed opacity-80" data-testid="watchlist-unavailable-card">
+      <div className="aspect-video bg-gray-50 flex items-center justify-center">
+        <Clock className="h-10 w-10 text-muted-foreground opacity-40" />
+      </div>
+      <CardContent className="p-4 space-y-3 text-center">
+        <h3 className="font-semibold text-muted-foreground">
+          This listing has ended / Cette annonce est terminée
+        </h3>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-red-500"
+          onClick={async () => {
+            try {
+              await axios.post(`${API}/watchlist/remove`, null,
+                { params: { item_id: item.item_id, item_type: item.item_type },
+                  headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
+              fetchWatchlist();
+            } catch { toast.error('Failed to remove'); }
+          }}
+          data-testid="watchlist-remove-unavailable-btn"
+        >
+          {t('watchlist.remove', 'Remove from watchlist')}
+        </Button>
+      </CardContent>
+    </Card>
+  );
 
   // Render multi-lot auction card
   const renderAuctionCard = (auction) => {
@@ -237,12 +269,21 @@ const WatchlistPage = () => {
                 <div><h2 className="text-2xl font-semibold mb-4">Individual Lots</h2><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">{watchlistData.lots.map(renderLotCard)}</div></div>
               )}
               {watchlistData.listings && watchlistData.listings.length > 0 && (
-                <div><h2 className="text-2xl font-semibold mb-4">Marketplace Items</h2><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">{watchlistData.listings.map(renderListingCard)}</div></div>
+                <div><h2 className="text-2xl font-semibold mb-4">Marketplace Items</h2><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">{watchlistData.listings.map((l) => renderListingCard(l))}</div></div>
+              )}
+              {watchlistData.vehicles && watchlistData.vehicles.length > 0 && (
+                <div><h2 className="text-2xl font-semibold mb-4">Vehicles</h2><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">{watchlistData.vehicles.map((v) => renderListingCard(v, 'vehicle', '/vehicle-auctions/', 'Vehicle'))}</div></div>
+              )}
+              {watchlistData.storage && watchlistData.storage.length > 0 && (
+                <div><h2 className="text-2xl font-semibold mb-4">Storage Auctions</h2><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">{watchlistData.storage.map((s) => renderListingCard(s, 'storage', '/storage-auctions/', 'Storage'))}</div></div>
+              )}
+              {watchlistData.unavailable && watchlistData.unavailable.length > 0 && (
+                <div><h2 className="text-2xl font-semibold mb-4 text-muted-foreground">No Longer Available</h2><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">{watchlistData.unavailable.map(renderUnavailableCard)}</div></div>
               )}
             </TabsContent>
             <TabsContent value="auctions">{watchlistData.auctions && watchlistData.auctions.length > 0 ? (<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">{watchlistData.auctions.map(renderAuctionCard)}</div>) : (<div className="text-center py-12"><p className="text-muted-foreground">No auctions in your watchlist</p></div>)}</TabsContent>
             <TabsContent value="lots">{watchlistData.lots && watchlistData.lots.length > 0 ? (<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">{watchlistData.lots.map(renderLotCard)}</div>) : (<div className="text-center py-12"><p className="text-muted-foreground">No lots in your watchlist</p></div>)}</TabsContent>
-            <TabsContent value="marketplace">{watchlistData.listings && watchlistData.listings.length > 0 ? (<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">{watchlistData.listings.map(renderListingCard)}</div>) : (<div className="text-center py-12"><p className="text-muted-foreground">No marketplace items in your watchlist</p></div>)}</TabsContent>
+            <TabsContent value="marketplace">{watchlistData.listings && watchlistData.listings.length > 0 ? (<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">{watchlistData.listings.map((l) => renderListingCard(l))}</div>) : (<div className="text-center py-12"><p className="text-muted-foreground">No marketplace items in your watchlist</p></div>)}</TabsContent>
           </Tabs>
         ) : (
           <Card className="p-12">

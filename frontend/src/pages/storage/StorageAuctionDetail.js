@@ -29,6 +29,7 @@ import ListingPromotionModal from '../../components/ListingPromotionModal';
 import StorageAuctionClock from '../../components/storage/StorageAuctionClock';
 import ListingJsonLd from '../../components/seo/ListingJsonLd';
 import SEO from '../../components/SEO';
+import WatchlistButton from '../../components/WatchlistButton';
 import { useMetaPixelTracking } from '../../hooks/useMetaPixelTracking';
 import { TrendingUp } from 'lucide-react';
 
@@ -218,9 +219,13 @@ const StorageAuctionDetail = () => {
 
             {/* Unit details */}
             <Card className="p-5">
-              <h1 className="text-2xl font-bold mb-2">
-                Unit #{auction.unit_number} — {auction.unit_size}
-              </h1>
+              <div className="flex items-start justify-between gap-3">
+                <h1 className="text-2xl font-bold mb-2">
+                  Unit #{auction.unit_number} — {auction.unit_size}
+                </h1>
+                {/* iter343 BUG-5 — storage auctions are watchable */}
+                <WatchlistButton itemId={auction.id} itemType="storage" size="default" />
+              </div>
               <div className="flex flex-wrap gap-2 mb-3">
                 <Badge variant="outline" className="capitalize">{(auction.unit_type || '').replace(/_/g, ' ')}</Badge>
                 {auction.is_lien_unit && (

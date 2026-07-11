@@ -294,7 +294,7 @@ const MapSearchPanel = ({
               {t.currentBid}: {fmtCurrency(price, m.currency || 'CAD')}
             </div>
             <a
-              href={`/listing/${m.id}`}
+              href={m.detail_path || `/listing/${m.id}`}
               data-testid={`bvx-map-view-listing-${m.id}`}
               style={{
                 display: 'block',

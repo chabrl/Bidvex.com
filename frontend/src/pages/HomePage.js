@@ -26,8 +26,10 @@ import useMarketplaceSync from '../hooks/useMarketplaceSync';
 import HomepageVehicleCarousel from '../components/vehicles/HomepageVehicleCarousel';
 import ProfessionalAuctionsPromo from '../components/ProfessionalAuctionsPromo';
 
-// Smart routing: vehicles go to /vehicle-auctions/:id, everything else to /listing/:id
+// Smart routing: backend now tags items with `detail_path` (iter343) —
+// vehicles → /vehicle-auctions/:id, lots → /lots/:id, storage → /storage-auctions/:id
 const getItemDetailPath = (item) => {
+  if (item.detail_path) return item.detail_path;
   const cat = (item.category || '').toLowerCase();
   if (cat === 'vehicle' || cat === 'vehicles' || cat === 'car' || cat === 'auto') {
     return `/vehicle-auctions/${item.id}`;

@@ -48,18 +48,28 @@ export const CostBreakdown = ({
   currency = 'CAD',
   compact = false,
   className = '',
+  // iter343 BUG-6 — lot quantity semantics. BidVex bid model:
+  //   • default: the bid is a PER-LOT TOTAL (covers all N items)
+  //   • multiplyByQuantity=true (listing.multiply_hammer_by_quantity):
+  //     the bid is PER ITEM → effective hammer = bid × quantity
+  quantity = 1,
+  multiplyByQuantity = false,
 }) => {
   const { i18n } = useTranslation();
   const isFr = (i18n.language || 'en').toLowerCase().startsWith('fr');
   const [fee, setFee] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const qty = Math.max(1, parseInt(quantity, 10) || 1);
+  const perItem = multiplyByQuantity && qty > 1;
+  const effectiveHammer = perItem ? hammerPrice * qty : hammerPrice;
+
   useEffect(() => {
     let alive = true;
-    if (!hammerPrice || hammerPrice <= 0) { setFee(null); setLoading(false); return; }
+    if (!effectiveHammer || effectiveHammer <= 0) { setFee(null); setLoading(false); return; }
     setLoading(true);
     const params = {
-      hammer_price: hammerPrice,
+      hammer_price: effectiveHammer,
       auction_type: auctionType,
       seller_account_type: sellerAccountType,
       buyer_tier: buyerTier,
@@ -74,7 +84,7 @@ export const CostBreakdown = ({
       .catch(() => { if (alive) setFee(null); })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
-  }, [hammerPrice, auctionType, sellerAccountType, sellerUserId, sellerTier, buyerTier, partnerBpRate, paymentMethod, cardType]);
+  }, [effectiveHammer, auctionType, sellerAccountType, sellerUserId, sellerTier, buyerTier, partnerBpRate, paymentMethod, cardType]);
 
   if (loading || !fee) {
     return (
@@ -148,7 +158,30 @@ export const CostBreakdown = ({
 
   return (
     <div className={wrapperCls} data-testid={`cost-breakdown-${accountKind}`}>
-      <Row label={isFr ? 'Prix au marteau' : 'Hammer Price'} value={fmt(fee.hammer_price, currency)} testid="cb-hammer" />
+      {/* iter343 BUG-6 — quantity is always shown prominently for multi-item lots */}
+      {qty > 1 && (
+        <Row
+          label={isFr ? 'Quantité' : 'Quantity'}
+          value={isFr ? `${qty} articles` : `${qty} items`}
+          testid="cb-quantity"
+        />
+      )}
+      {perItem && (
+        <Row
+          label={isFr ? 'Prix par article' : 'Price per item'}
+          value={fmt(hammerPrice, currency)}
+          testid="cb-price-per-item"
+        />
+      )}
+      <Row
+        label={perItem
+          ? (isFr ? `Prix au marteau (${qty} × unité)` : `Hammer Price (${qty} × unit)`)
+          : qty > 1
+            ? (isFr ? `Prix au marteau (total pour ${qty} articles)` : `Hammer Price (total for ${qty} items)`)
+            : (isFr ? 'Prix au marteau' : 'Hammer Price')}
+        value={fmt(fee.hammer_price, currency)}
+        testid="cb-hammer"
+      />
       {/* iter283-vehicle-bp-zero — Hide the fee row entirely when 0
           (e.g. storage_facility cash route). A zero-value row is
           misleading. */}

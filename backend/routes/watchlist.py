@@ -35,8 +35,8 @@ async def add_to_watchlist(
     """Add an item to user's watchlist"""
     db = get_db()
     try:
-        if item_type not in ['listing', 'auction', 'lot']:
-            raise HTTPException(status_code=400, detail="Invalid item_type. Must be 'listing', 'auction', or 'lot'")
+        if item_type not in ['listing', 'auction', 'lot', 'vehicle', 'storage']:
+            raise HTTPException(status_code=400, detail="Invalid item_type. Must be 'listing', 'auction', 'lot', 'vehicle', or 'storage'")
 
         if item_type == 'listing':
             item = await db.listings.find_one({"id": item_id}, {"_id": 0})
@@ -46,6 +46,16 @@ async def add_to_watchlist(
             item = await db.multi_item_listings.find_one({"id": item_id}, {"_id": 0})
             if not item:
                 raise HTTPException(status_code=404, detail="Auction not found")
+        elif item_type == 'vehicle':
+            # iter343 BUG-5 — vehicle listings are watchable too
+            item = await db.vehicle_listings.find_one({"id": item_id}, {"_id": 0, "id": 1})
+            if not item:
+                raise HTTPException(status_code=404, detail="Vehicle listing not found")
+        elif item_type == 'storage':
+            # iter343 BUG-5 — storage auctions are watchable too
+            item = await db.storage_auctions.find_one({"id": item_id}, {"_id": 0, "id": 1})
+            if not item:
+                raise HTTPException(status_code=404, detail="Storage auction not found")
         elif item_type == 'lot':
             item = await db.multi_item_listings.find_one(
                 {"lots.lot_number": {"$exists": True}}, {"_id": 0}
@@ -97,62 +107,118 @@ async def remove_from_watchlist(
 
 @watchlist_router.get("/watchlist")
 async def get_watchlist(current_user: User = Depends(get_current_user)):
-    """Get user's watchlist with item details"""
+    """User's watchlist with item details (iter343 BUG-5 overhaul).
+
+    ROOT CAUSES fixed:
+      • Rows whose lookup failed (deleted/ended-purged docs) were silently
+        DROPPED while `total` counted raw rows → count/cards mismatch and
+        "missing" items. Unresolvable rows now come back as
+        `unavailable: true` placeholders.
+      • Lot cards read `lot.current_price`, but raw lot docs only carry
+        `current_bid` (current_price is computed in the lots GET endpoint)
+        → blank prices. Normalized here.
+      • Vehicle & storage collections were not supported at all.
+    """
     db = get_db()
     try:
         watchlist_items = await db.watchlist.find(
             {"user_id": current_user.id}, {"_id": 0}
         ).sort("added_at", -1).to_list(200)
 
+        result = {"listings": [], "auctions": [], "lots": [],
+                  "vehicles": [], "storage": [], "unavailable": [],
+                  "total": len(watchlist_items)}
         if not watchlist_items:
-            return {"listings": [], "auctions": [], "lots": [], "total": 0}
+            return result
 
-        listing_items = [i for i in watchlist_items if i.get("item_type", "listing") == "listing"]
-        auction_items = [i for i in watchlist_items if i.get("item_type") == "auction"]
-        lot_items = [i for i in watchlist_items if i.get("item_type") == "lot"]
+        def _placeholder(item):
+            return {
+                "unavailable": True,
+                "item_id": item.get("item_id") or item.get("listing_id"),
+                "item_type": item.get("item_type", "listing"),
+                "watchlist_added_at": item.get("added_at"),
+            }
 
-        result = {"listings": [], "auctions": [], "lots": [], "total": len(watchlist_items)}
+        by_type = {}
+        for i in watchlist_items:
+            by_type.setdefault(i.get("item_type", "listing"), []).append(i)
 
-        if listing_items:
-            listing_ids = [i.get("item_id") or i.get("listing_id") for i in listing_items]
-            listings = await db.listings.find(
-                {"id": {"$in": listing_ids}, "status": {"$ne": "deleted"}}, {"_id": 0}
-            ).to_list(100)
-            listings_map = {l["id"]: l for l in listings}
-            for item in listing_items:
+        # ── Simple id→doc collections ─────────────────────────────────
+        simple_specs = [
+            ("listing", db.listings,           "listings"),
+            ("auction", db.multi_item_listings, "auctions"),
+            ("vehicle", db.vehicle_listings,    "vehicles"),
+            ("storage", db.storage_auctions,    "storage"),
+        ]
+        for type_key, coll, out_key in simple_specs:
+            items = by_type.get(type_key) or []
+            if not items:
+                continue
+            ids = [i.get("item_id") or i.get("listing_id") for i in items]
+            docs = await coll.find(
+                {"id": {"$in": ids}, "status": {"$ne": "deleted"}}, {"_id": 0}
+            ).to_list(200)
+            doc_map = {d["id"]: d for d in docs}
+            for item in items:
                 item_id = item.get("item_id") or item.get("listing_id")
-                listing = listings_map.get(item_id)
-                if listing:
-                    result["listings"].append({**listing, "watchlist_added_at": item["added_at"], "watchlist_type": "listing"})
+                doc = doc_map.get(item_id)
+                if not doc:
+                    result["unavailable"].append(_placeholder(item))
+                    continue
+                # Normalize price/title/images across collections
+                if doc.get("current_price") in (None, 0):
+                    doc["current_price"] = doc.get("current_bid") or doc.get("starting_price")
+                if not doc.get("title"):
+                    if type_key == "vehicle":
+                        doc["title"] = " ".join(str(x) for x in (doc.get("year"), doc.get("make"), doc.get("model")) if x).strip() or "Vehicle"
+                    elif type_key == "storage":
+                        doc["title"] = doc.get("description_en") or f"Storage unit {doc.get('unit_size') or ''}".strip()
+                if not doc.get("images"):
+                    doc["images"] = doc.get("photos") or []
+                if not doc.get("city"):
+                    doc["city"] = doc.get("facility_city")
+                if not doc.get("region"):
+                    doc["region"] = doc.get("province") or doc.get("facility_province")
+                if not doc.get("auction_end_date"):
+                    end = doc.get("end_time") or doc.get("end_date")
+                    doc["auction_end_date"] = end if isinstance(end, str) else (end.isoformat() if end else None)
+                result[out_key].append({**doc, "watchlist_added_at": item["added_at"], "watchlist_type": type_key})
 
-        if auction_items:
-            auction_ids = [i["item_id"] for i in auction_items]
-            auctions = await db.multi_item_listings.find(
-                {"id": {"$in": auction_ids}, "status": {"$ne": "deleted"}}, {"_id": 0}
-            ).to_list(100)
-            auctions_map = {a["id"]: a for a in auctions}
-            for item in auction_items:
-                auction = auctions_map.get(item["item_id"])
-                if auction:
-                    result["auctions"].append({**auction, "watchlist_added_at": item["added_at"], "watchlist_type": "auction"})
-
+        # ── Individual lots ("auction_id:lot_number") ─────────────────
+        lot_items = by_type.get("lot") or []
         if lot_items:
+            parent_ids = list({i["item_id"].split(":")[0] for i in lot_items if ":" in i["item_id"]})
+            parents = await db.multi_item_listings.find(
+                {"id": {"$in": parent_ids}}, {"_id": 0}
+            ).to_list(200)
+            parent_map = {p["id"]: p for p in parents}
             for item in lot_items:
                 item_id = item["item_id"]
-                if ":" in item_id:
-                    auction_id, lot_number = item_id.split(":")
-                    lot_number = int(lot_number)
-                    auction = await db.multi_item_listings.find_one({"id": auction_id}, {"_id": 0})
-                    if auction:
-                        lot = next((l for l in auction.get("lots", []) if l.get("lot_number") == lot_number), None)
-                        if lot:
-                            result["lots"].append({
-                                "auction_id": auction_id,
-                                "auction_title": auction.get("title"),
-                                "lot": lot,
-                                "watchlist_added_at": item["added_at"],
-                                "watchlist_type": "lot"
-                            })
+                if ":" not in item_id:
+                    result["unavailable"].append(_placeholder(item))
+                    continue
+                auction_id, lot_number = item_id.split(":")
+                auction = parent_map.get(auction_id)
+                lot = None
+                if auction:
+                    try:
+                        lot = next((l for l in auction.get("lots", []) if l.get("lot_number") == int(lot_number)), None)
+                    except ValueError:
+                        lot = None
+                if not auction or not lot:
+                    result["unavailable"].append(_placeholder(item))
+                    continue
+                # iter343 — raw lots carry `current_bid`; normalize price
+                if lot.get("current_price") in (None, 0):
+                    lot = {**lot, "current_price": lot.get("current_bid") or lot.get("starting_price")}
+                result["lots"].append({
+                    "auction_id": auction_id,
+                    "auction_title": auction.get("title"),
+                    "auction_status": auction.get("status"),
+                    "lot": lot,
+                    "watchlist_added_at": item["added_at"],
+                    "watchlist_type": "lot",
+                })
 
         return result
     except Exception as e:

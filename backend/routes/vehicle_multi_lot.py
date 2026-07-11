@@ -218,6 +218,19 @@ async def create_multi_lot_auction(
         "updated_at":               now,
     }
 
+    # iter343 BUG-1 — event-level geo (first lot's city centroid) so the
+    # event appears in "Search by Map".
+    try:
+        from utils import build_geo_point
+        for _l in lots:
+            if _l.get("location_city"):
+                _geo = build_geo_point(_l["location_city"], province=_l.get("location_province"))
+                if _geo:
+                    event_doc["geo"] = {**_geo, "source": "city_centroid"}
+                break
+    except Exception:  # noqa: BLE001
+        pass
+
     await _db.vehicle_multi_lot_auctions.insert_one(event_doc)
     return _serialise(event_doc)
 

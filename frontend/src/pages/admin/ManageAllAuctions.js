@@ -14,6 +14,7 @@ import { AsyncButton } from '../../components/ui/async-button';
 import { toast } from 'sonner';
 import { Package, Search, Edit2, Trash2, Pause, Archive, XCircle, Eye, AlertTriangle, Download, Star, Play, Clock } from 'lucide-react';
 import { formatCurrency } from '../../utils/currencyFormatter';
+import AdminLotEditorModal from './AdminLotEditorModal';
 
 const API = API_BASE;
 
@@ -32,6 +33,8 @@ const ManageAllAuctions = () => {
   const [editModal, setEditModal] = useState({ open: false, listing: null, form: {} });
   // FEATURE PATCH v9 / Feature 1 — Edit auction end time
   const [endTimeModal, setEndTimeModal] = useState({ open: false, listing: null, newEndTime: '', reason: '', history: [] });
+  // iter343 BUG-4 — per-lot editor for multi-lot auctions
+  const [lotEditor, setLotEditor] = useState({ open: false, listing: null });
   // iter311 — performance + capacity telemetry from the unified endpoint
   const [perfMeta, setPerfMeta] = useState({ total: 0, server_ms: 0, by_section: {} });
 
@@ -688,6 +691,20 @@ const ManageAllAuctions = () => {
                       <Edit2 className="h-4 w-4 mr-1" />
                       Edit
                     </Button>
+                    {/* iter343 BUG-4 — per-lot editor for multi-lot auctions */}
+                    {(listing.type === 'multi' || ['lots', 'vehicle_multi', 'vehicle_multi_lot'].includes(listing._section)) && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-cyan-300 text-cyan-700 hover:bg-cyan-50"
+                        onClick={() => setLotEditor({ open: true, listing })}
+                        data-testid={`edit-lots-btn-${listing.id}`}
+                        title="Edit individual lots (title, quantity, prices…)"
+                      >
+                        <Edit2 className="h-4 w-4 mr-1" />
+                        Lots
+                      </Button>
+                    )}
                     <Button
                       size="sm"
                       variant="outline"
@@ -704,9 +721,8 @@ const ManageAllAuctions = () => {
                       variant={listing.is_featured ? 'default' : 'outline'}
                       className={listing.is_featured ? 'bg-amber-500 hover:bg-amber-600 text-white' : ''}
                       onClick={() => handleToggleFeature(listing)}
-                      disabled={listing.type === 'multi'}
                       data-testid={`feature-btn-${listing.id}`}
-                      title={listing.type === 'multi' ? 'Feature not available for multi-item listings' : ''}
+                      title="Feature this listing on the homepage"
                     >
                       <Star className="h-4 w-4 mr-1" />
                       {listing.is_featured ? 'Featured' : 'Feature'}
@@ -1006,6 +1022,14 @@ const ManageAllAuctions = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* iter343 BUG-4 — per-lot editor */}
+      <AdminLotEditorModal
+        open={lotEditor.open}
+        onOpenChange={(o) => setLotEditor((m) => ({ ...m, open: o }))}
+        listing={lotEditor.listing}
+        headers={headers}
+      />
     </div>
   );
 };

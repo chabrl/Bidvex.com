@@ -48,10 +48,19 @@ const BidConfirmationDialog = ({
   // selling an "auto-grade tool" on Marketplace must NOT trigger the
   // vehicle-only fee/tax block here.
   isVehicleListing = false,
+  // iter343 BUG-6 — lot quantity semantics (bid model):
+  //   default → bid is a PER-LOT TOTAL covering all N items
+  //   multiplyByQuantity → bid is PER ITEM (effective hammer = bid × qty)
+  quantity = 1,
+  multiplyByQuantity = false,
 }) => {
   const [costBreakdown, setCostBreakdown] = useState(null);
   const [calculating, setCalculating] = useState(false);
   const [error, setError] = useState(null);
+
+  const qty = Math.max(1, parseInt(quantity, 10) || 1);
+  const perItem = multiplyByQuantity && qty > 1;
+  const effectiveHammer = perItem ? bidAmount * qty : bidAmount;
 
   // iter292 — Authoritative source: the explicit prop set by the call
   // site (true only on VehicleDetailPage). Category text matching
@@ -98,7 +107,7 @@ const BidConfirmationDialog = ({
     
     try {
       const response = await axios.post(`${API}/payments/tax/calculate`, {
-        hammer_price: bidAmount,
+        hammer_price: effectiveHammer,
         category: category,
         buyer_tier: buyerTier,
         seller_tier: sellerTier,
@@ -180,10 +189,29 @@ const BidConfirmationDialog = ({
             </div>
           ) : costBreakdown ? (
             <>
+              {/* iter343 BUG-6 — quantity always visible for multi-item lots */}
+              {qty > 1 && (
+                <div className="flex justify-between items-center" data-testid="bid-confirm-quantity">
+                  <span className="text-sm font-medium">Quantity</span>
+                  <span className="font-semibold">{qty} items</span>
+                </div>
+              )}
+              {perItem && (
+                <div className="flex justify-between items-center text-sm" data-testid="bid-confirm-per-item">
+                  <span className="text-muted-foreground">Your bid (per item)</span>
+                  <span>{formatCurrency(bidAmount)}</span>
+                </div>
+              )}
               {/* Hammer Price */}
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">Hammer Price</span>
+                  <span className="text-sm font-medium">
+                    {perItem
+                      ? `Hammer Price (${qty} × ${formatCurrency(bidAmount)})`
+                      : qty > 1
+                        ? `Hammer Price (total for ${qty} items)`
+                        : 'Hammer Price'}
+                  </span>
                   <Badge variant="outline" className="text-xs">Your Bid</Badge>
                 </div>
                 <span className="font-semibold">{formatCurrency(costBreakdown.hammer_price)}</span>

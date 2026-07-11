@@ -1360,6 +1360,16 @@ async def create_multi_item_listing(
         listing_dict["is_demo_sandbox"] = True
         listing_dict["is_demo"] = True
 
+    # iter343 BUG-1 — geo enrichment (city centroid) so multi-lot auctions
+    # appear in "Search by Map". Parity with single-listing creation.
+    try:
+        from utils import build_geo_point
+        _geo = build_geo_point(listing_dict.get("city"), province=listing_dict.get("region"))
+        if _geo:
+            listing_dict["geo"] = {**_geo, "source": "city_centroid"}
+    except Exception as _ge:  # noqa: BLE001
+        logger.warning(f"[iter343-geo] multi-item geo enrichment skipped: {_ge}")
+
     await db.multi_item_listings.insert_one(listing_dict)
     listing_dict.pop("_id", None)
 

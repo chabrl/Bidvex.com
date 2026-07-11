@@ -171,3 +171,7 @@ localStorage.setItem('bidvex_cookie_consent_v2', consent);
 ```
 Otherwise the Law-25 consent banner intercepts pointer events on Send buttons,
 blog tile anchors, and pricing CTAs.
+
+## iter343 note (Jul 11, 2026)
+- `testbuyer@bidvex.com` / `TestBuyer2026!` and `testseller@bidvex.com` / `TestSeller2026!` were RE-SEEDED in this fork's preview DB (they were missing after the fork). Same passwords as documented above.
+- Persistent UI-test listings seeded (do not delete): `ui343-single` (marketplace, qty=10 per-item), `ui343-multi` (multi-lot, featured, 2 lots), `ui343-vehicle` (featured), `ui343-storage`, `ui343-vml` (live vehicle multi-lot event). All geocoded to Montréal.

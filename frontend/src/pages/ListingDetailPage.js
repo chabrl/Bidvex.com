@@ -842,6 +842,8 @@ const ListingDetailPage = () => {
                     {bidAmount && parseFloat(bidAmount) > 0 && (
                       <CostBreakdown
                         hammerPrice={parseFloat(bidAmount)}
+                        quantity={listing.quantity || 1}
+                        multiplyByQuantity={!!listing.multiply_hammer_by_quantity}
                         auctionType={listing.category_type || (listing.is_vehicle ? 'vehicle' : 'lots')}
                         sellerUserId={listing.seller_id}
                         paymentMethod={(listing.payment_method || 'stripe').replace('-', '_')}
@@ -1313,6 +1315,8 @@ const ListingDetailPage = () => {
         }}
         onConfirm={confirmPlaceBid}
         bidAmount={pendingBidAmount}
+        quantity={listing?.quantity || 1}
+        multiplyByQuantity={!!listing?.multiply_hammer_by_quantity}
         listingTitle={listing?.title}
         category={listing?.category || 'general'}
         sellerIsBusiness={seller?.is_tax_registered || seller?.account_type === 'business' || false}

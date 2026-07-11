@@ -30,6 +30,67 @@ def get_db():
     return _db
 
 
+# iter343 BUG-2 — homepage sections previously queried ONLY db.listings,
+# silently omitting multi-lot auctions, vehicles and storage. Normalizer
+# maps any collection's doc to the homepage card shape with a routing path.
+_SECTION_PATHS = {
+    "marketplace":       "/listing/",
+    "lots":              "/lots/",
+    "vehicle":           "/vehicle-auctions/",
+    "vehicle_multi_lot": "/vehicle-multi-lot/",
+    "storage":           "/storage-auctions/",
+}
+
+
+def _norm_home_item(doc, section):
+    """Normalize a doc for homepage cards: title/images/price/end date."""
+    d = dict(doc)
+    d.pop("_id", None)
+    if not d.get("title"):
+        if section == "vehicle":
+            d["title"] = " ".join(str(x) for x in (d.get("year"), d.get("make"), d.get("model")) if x).strip() or "Vehicle"
+        elif section == "storage":
+            d["title"] = d.get("description_en") or f"Storage unit {d.get('unit_size') or ''}".strip()
+    if not d.get("images"):
+        imgs = d.get("photos") or []
+        if not imgs:
+            for l in (d.get("lots") or []):
+                lot_imgs = l.get("images") or l.get("media") or []
+                if lot_imgs:
+                    imgs = lot_imgs
+                    break
+        d["images"] = imgs if isinstance(imgs, list) else []
+    if d.get("current_price") in (None, 0):
+        price = d.get("current_bid")
+        if price in (None, 0) and d.get("lots"):
+            try:
+                price = sum(float(l.get("current_bid") or l.get("starting_price") or 0) for l in d["lots"])
+            except Exception:  # noqa: BLE001
+                price = None
+        d["current_price"] = price
+    if not d.get("auction_end_date"):
+        end = d.get("end_time") or d.get("end_date")
+        if end is not None and not isinstance(end, str):
+            try:
+                end = end.isoformat()
+            except Exception:  # noqa: BLE001
+                end = None
+        if not end and d.get("lots"):
+            lot_ends = [l.get("end_time") for l in d["lots"] if l.get("end_time")]
+            if lot_ends:
+                end = min(e if isinstance(e, str) else e.isoformat() for e in lot_ends)
+        d["auction_end_date"] = end
+    d["total_lots"] = len(d.get("lots") or []) or d.get("total_lots")
+    d.pop("lots", None)
+    d.pop("bids", None)
+    d["_section"] = section
+    d["detail_path"] = f"{_SECTION_PATHS[section]}{d.get('id')}"
+    return d
+
+
+_PUBLIC_GUARD = {"is_demo": {"$ne": True}, "is_demo_sandbox": {"$ne": True}}
+
+
 @carousel_router.get("/carousel/ending-soon")
 async def get_ending_soon_listings(limit: int = 12, user_id: Optional[str] = Query(None)):
     """Get listings ending soon. If user_id is provided, re-sort by interest affinity."""
@@ -41,7 +102,7 @@ async def get_ending_soon_listings(limit: int = 12, user_id: Optional[str] = Que
         listings = await db.listings.find(
             {
                 "status": "active",
-                "is_demo": {"$ne": True},  # iter211 P4 — exclude demo listings
+                **_PUBLIC_GUARD,
                 "auction_end_date": {
                     "$gte": current_time.isoformat(),
                     "$lte": twenty_four_hours_later.isoformat(),
@@ -49,6 +110,36 @@ async def get_ending_soon_listings(limit: int = 12, user_id: Optional[str] = Que
             },
             {"_id": 0},
         ).sort("auction_end_date", 1).limit(limit * 2).to_list(limit * 2)
+        listings = [_norm_home_item(x, "marketplace") for x in listings]
+
+        # iter343 BUG-2 — multi-lot (lots) auctions ending in the window
+        try:
+            multi = await db.multi_item_listings.find(
+                {
+                    "status": "active",
+                    **_PUBLIC_GUARD,
+                    "auction_end_date": {
+                        "$gte": current_time.isoformat(),
+                        "$lte": twenty_four_hours_later.isoformat(),
+                    },
+                },
+                {"_id": 0},
+            ).sort("auction_end_date", 1).limit(limit).to_list(limit)
+            listings.extend(_norm_home_item(x, "lots") for x in multi)
+        except Exception as e:
+            logger.warning(f"[ending-soon] multi_item merge failed: {e}")
+
+        # iter343 BUG-2 — LIVE vehicle multi-lot events (event-level status)
+        try:
+            vml = await db.vehicle_multi_lot_auctions.find(
+                {"status": {"$in": ["live", "active"]}, **_PUBLIC_GUARD},
+                {"_id": 0, "bids": 0},
+            ).limit(limit).to_list(limit)
+            listings.extend(_norm_home_item(x, "vehicle_multi_lot") for x in vml)
+        except Exception as e:
+            logger.warning(f"[ending-soon] vehicle_multi_lot merge failed: {e}")
+
+        listings.sort(key=lambda x: x.get("auction_end_date") or "9999")
 
         # AI Personalization: boost categories the user has shown interest in
         if user_id and listings:
@@ -84,15 +175,34 @@ async def get_ending_soon_listings(limit: int = 12, user_id: Optional[str] = Que
 
 @carousel_router.get("/carousel/featured")
 async def get_featured_listings(limit: int = 12):
-    """Get featured/promoted listings"""
+    """Featured/promoted listings from ALL collections (iter343 BUG-2).
+
+    ROOT CAUSE: the promote flow writes `is_promoted` OR `is_featured`
+    across multiple collections, but this query only read `is_promoted`
+    on db.listings. Now reads BOTH flags across all five collections.
+    """
     try:
         db = get_db()
-        listings = await db.listings.find(
-            {"status": "active", "is_promoted": True, "is_demo": {"$ne": True}},  # iter211 P4
-            {"_id": 0},
-        ).sort("created_at", -1).limit(limit).to_list(limit)
-
-        return listings
+        flag_or = {"$or": [{"is_promoted": True}, {"is_featured": True}]}
+        out = []
+        sources = [
+            ("listings", "marketplace", ["active"]),
+            ("multi_item_listings", "lots", ["active"]),
+            ("vehicle_listings", "vehicle", ["active"]),
+            ("vehicle_multi_lot_auctions", "vehicle_multi_lot", ["live", "active", "upcoming"]),
+            ("storage_auctions", "storage", ["active"]),
+        ]
+        for coll_name, section, statuses in sources:
+            try:
+                rows = await db[coll_name].find(
+                    {"status": {"$in": statuses}, **_PUBLIC_GUARD, **flag_or},
+                    {"_id": 0, "bids": 0},
+                ).sort("created_at", -1).limit(limit).to_list(limit)
+                out.extend(_norm_home_item(x, section) for x in rows)
+            except Exception as e:
+                logger.warning(f"[featured] {coll_name} failed: {e}")
+        out.sort(key=lambda x: str(x.get("created_at") or ""), reverse=True)
+        return out[:limit]
 
     except Exception as e:
         logger.error(f"Error fetching featured listings: {str(e)}")
@@ -234,9 +344,21 @@ async def get_new_listings(limit: int = 12):
         db = get_db()
         seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
         listings = await db.listings.find(
-            {"status": "active", "created_at": {"$gte": seven_days_ago.isoformat()}},
+            {"status": "active", **_PUBLIC_GUARD, "created_at": {"$gte": seven_days_ago.isoformat()}},
             {"_id": 0},
         ).sort("created_at", -1).limit(limit).to_list(limit)
+        listings = [_norm_home_item(x, "marketplace") for x in listings]
+        # iter343 BUG-2 — include new multi-lot (lots) auctions
+        try:
+            multi = await db.multi_item_listings.find(
+                {"status": "active", **_PUBLIC_GUARD, "created_at": {"$gte": seven_days_ago.isoformat()}},
+                {"_id": 0},
+            ).sort("created_at", -1).limit(limit).to_list(limit)
+            listings.extend(_norm_home_item(x, "lots") for x in multi)
+        except Exception as e:
+            logger.warning(f"[new-listings] multi_item merge failed: {e}")
+        listings.sort(key=lambda x: str(x.get("created_at") or ""), reverse=True)
+        listings = listings[:limit]
         await cache_set(cache_key, listings, 60)
         return listings
     except Exception as e:
@@ -294,11 +416,20 @@ async def get_top_sellers(limit: int = 10):
 
 @carousel_router.get("/stats/hot-items")
 async def get_hot_items(limit: int = 10):
-    """Hot items by views"""
+    """Hot items by views — includes multi-lot auctions (iter343 BUG-2)."""
     db = get_db()
     listings = await db.listings.find(
-        {"status": "active"},
+        {"status": "active", **_PUBLIC_GUARD},
         {"_id": 0},
     ).sort("views", -1).limit(limit).to_list(limit)
-
-    return listings
+    listings = [_norm_home_item(x, "marketplace") for x in listings]
+    try:
+        multi = await db.multi_item_listings.find(
+            {"status": "active", **_PUBLIC_GUARD},
+            {"_id": 0},
+        ).sort("views", -1).limit(limit).to_list(limit)
+        listings.extend(_norm_home_item(x, "lots") for x in multi)
+    except Exception as e:
+        logger.warning(f"[hot-items] multi_item merge failed: {e}")
+    listings.sort(key=lambda x: x.get("views") or 0, reverse=True)
+    return listings[:limit]

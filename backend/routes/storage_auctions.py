@@ -1118,6 +1118,15 @@ async def create_storage_auction(
     from services.demo_filter import tag_listing_if_demo
     await tag_listing_if_demo(db, facility.get("user_id") or facility.get("id"), doc)
 
+    # iter343 BUG-1 — geo enrichment (facility city centroid) for map search
+    try:
+        from utils import build_geo_point
+        _geo = build_geo_point(doc.get("facility_city"), province=doc.get("facility_province"))
+        if _geo:
+            doc["geo"] = {**_geo, "source": "city_centroid"}
+    except Exception:  # noqa: BLE001
+        pass
+
     await db.storage_auctions.insert_one(doc.copy())
     doc.pop("_id", None)
 

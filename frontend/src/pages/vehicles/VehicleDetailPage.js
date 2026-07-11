@@ -45,6 +45,7 @@ import useVehicleBidding from '../../hooks/useVehicleBidding';
 import { PricingEstimate } from '../../components/vehicles/PricingBreakdown';
 // iter293 — Directive P1: Upcoming countdown badge.
 import UpcomingCountdownBadge from '../../components/UpcomingCountdownBadge';
+import WatchlistButton from '../../components/WatchlistButton';
 import ListingLogisticsDetails from '../../components/ListingLogisticsDetails';
 import MessageSellerModal from '../../components/MessageSellerModal';
 import { MessageSquare, ShieldCheck, Mail, Share2 } from 'lucide-react';
@@ -1153,6 +1154,8 @@ const VehicleDetailPage = () => {
                 <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-900 dark:text-white break-words min-w-0">
                   {vehicle.year} {vehicle.make} {vehicle.model}
                 </h1>
+                {/* iter343 BUG-5 — vehicles are watchable */}
+                <WatchlistButton itemId={vehicle.id} itemType="vehicle" size="default" />
                 {vehicle.auction_type === 'live' && <LiveAuctionBadge />}
                 {/* iter293 — Directive P1: Upcoming countdown badge. */}
                 {vehicle.status === 'active' && vehicle.start_time && (
