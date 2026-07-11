@@ -277,6 +277,9 @@ const WatchlistPage = () => {
               {watchlistData.storage && watchlistData.storage.length > 0 && (
                 <div><h2 className="text-2xl font-semibold mb-4">Storage Auctions</h2><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">{watchlistData.storage.map((s) => renderListingCard(s, 'storage', '/storage-auctions/', 'Storage'))}</div></div>
               )}
+              {watchlistData.vehicle_multi_lot && watchlistData.vehicle_multi_lot.length > 0 && (
+                <div data-testid="watchlist-vehicle-multi-lot-section"><h2 className="text-2xl font-semibold mb-4">Vehicle Multi-Lot Auctions</h2><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">{watchlistData.vehicle_multi_lot.map((v) => renderListingCard(v, 'vehicle_multi_lot', '/vehicle-multi-lot/', 'Vehicle Multi-Lot'))}</div></div>
+              )}
               {watchlistData.unavailable && watchlistData.unavailable.length > 0 && (
                 <div><h2 className="text-2xl font-semibold mb-4 text-muted-foreground">No Longer Available</h2><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">{watchlistData.unavailable.map(renderUnavailableCard)}</div></div>
               )}

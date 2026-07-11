@@ -12,6 +12,7 @@ import {
 import { toast } from 'sonner';
 import UpcomingCountdownBadge from '../../components/UpcomingCountdownBadge';
 import { getTimingModeShortLabel } from '../../lib/vehicleMultiLotTimingModes';
+import WatchlistButton from '../../components/WatchlistButton';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -333,6 +334,18 @@ const VehicleMultiLotDetailPage = () => {
                 {notifying ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <BellRing className="h-4 w-4 mr-1" />}
                 Notify me when live
               </Button>
+              {/* iter345 BUG-2 — save the whole VML event to the buyer's watchlist */}
+              <div data-testid="vml-watchlist-btn-wrapper">
+                <WatchlistButton itemId={event.id} itemType="vehicle_multi_lot" size="default" showLabel />
+              </div>
+            </div>
+          )}
+          {event.status !== 'upcoming' && (
+            <div className="flex items-center gap-2">
+              {/* iter345 BUG-2 — save the whole VML event to the buyer's watchlist */}
+              <div data-testid="vml-watchlist-btn-wrapper">
+                <WatchlistButton itemId={event.id} itemType="vehicle_multi_lot" size="default" showLabel />
+              </div>
             </div>
           )}
         </div>

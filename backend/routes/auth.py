@@ -344,10 +344,24 @@ async def register(user_data: UserCreate, request: Request, background_tasks: Ba
     # Frontend may post either `phone` or `mobile_number`. Both normalise to
     # the digits-only canonical form so cosmetic differences like "+1 514..."
     # vs "514..." vs "(514) 555-..." cannot bypass the check.
-    DUPLICATE_MSG = (
-        "Your email or mobile phone is already registered in BidVex. "
-        "If you believe this is an error, please contact support immediately at service@bidvex.com"
-    )
+    # iter345 — Bilingual duplicate error envelope (409). Frontend can
+    # read either message_en/message_fr or fall back to detail.
+    DUPLICATE_DETAIL = {
+        "error": "duplicate_account",
+        "message_en": (
+            "Your email or mobile phone is already registered in BidVex. "
+            "If you believe this is an error, please contact support "
+            "immediately at service@bidvex.com."
+        ),
+        "message_fr": (
+            "Votre courriel ou numéro de téléphone mobile est déjà "
+            "enregistré sur BidVex. Si vous croyez qu'il s'agit d'une "
+            "erreur, veuillez contacter le support immédiatement à "
+            "service@bidvex.com."
+        ),
+    }
+    # Retained for legacy 400 callers below (existing behavior preserved).
+    DUPLICATE_MSG = DUPLICATE_DETAIL["message_en"]
 
     normalized_email = user_data.email.strip().lower()
     raw_phone = (user_data.mobile_number or user_data.phone or "").strip()
@@ -359,7 +373,7 @@ async def register(user_data: UserCreate, request: Request, background_tasks: Ba
     # Check email uniqueness
     existing_by_email = await db.users.find_one({"email": normalized_email}, {"_id": 0, "id": 1})
     if existing_by_email:
-        raise HTTPException(status_code=400, detail=DUPLICATE_MSG)
+        raise HTTPException(status_code=409, detail=DUPLICATE_DETAIL)
 
     # Check mobile uniqueness (only for verified accounts when a phone is provided)
     if has_phone:
@@ -378,7 +392,7 @@ async def register(user_data: UserCreate, request: Request, background_tasks: Ba
             {"_id": 0, "id": 1},
         )
         if existing_by_phone:
-            raise HTTPException(status_code=400, detail=DUPLICATE_MSG)
+            raise HTTPException(status_code=409, detail=DUPLICATE_DETAIL)
     
     hashed_pwd = hash_password(user_data.password)
     
@@ -482,7 +496,30 @@ async def register(user_data: UserCreate, request: Request, background_tasks: Ba
     if not has_phone:
         user_doc.pop("mobile_number_normalized", None)
 
-    await db.users.insert_one(user_doc)
+    # iter345 — Guard the race between the pre-check `find_one` above and
+    # this insert. Rapid double-submissions of the same signup form
+    # previously produced a 500 (DuplicateKeyError) because both requests
+    # passed the pre-check before either row was inserted. Catch the
+    # DuplicateKeyError explicitly and surface the same bilingual 409
+    # envelope the pre-check uses.
+    try:
+        await db.users.insert_one(user_doc)
+    except Exception as e:  # noqa: BLE001
+        # Detect DuplicateKey — pymongo raises DuplicateKeyError with
+        # code 11000. Match on either exception class or error text.
+        try:
+            from pymongo.errors import DuplicateKeyError
+            is_dupe = isinstance(e, DuplicateKeyError)
+        except Exception:
+            is_dupe = False
+        if is_dupe or "E11000" in str(e) or "duplicate key" in str(e).lower():
+            logger.info(
+                f"[register] race-condition duplicate-key on email={normalized_email} — "
+                f"returning 409 to caller"
+            )
+            raise HTTPException(status_code=409, detail=DUPLICATE_DETAIL)
+        # Anything else is a real 500 — bubble up.
+        raise
 
     # iter272 — Campaign attribution binding. The frontend sends the
     # captured UTM blob in `campaign_tracking`. We persist it onto the

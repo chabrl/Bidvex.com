@@ -47,17 +47,28 @@ const WatchlistButton = ({
       const response = await axios.get(`${API}/watchlist`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
-      
-      // Check if item is in watchlist based on type
+
+      // iter345 BUG-2 — fully-typed presence check (previously only
+      // listing/auction/lot were verified → heart never lit up for
+      // vehicle / storage / vehicle_multi_lot).
+      const bucketByType = {
+        listing:            response.data.listings || [],
+        auction:            response.data.auctions || [],
+        vehicle:            response.data.vehicles || [],
+        storage:            response.data.storage || [],
+        vehicle_multi_lot:  response.data.vehicle_multi_lot || [],
+      };
       let isWatched = false;
-      if (actualItemType === 'listing' && response.data.listings) {
-        isWatched = response.data.listings.some(item => item.id === actualItemId);
-      } else if (actualItemType === 'auction' && response.data.auctions) {
-        isWatched = response.data.auctions.some(item => item.id === actualItemId);
-      } else if (actualItemType === 'lot' && response.data.lots) {
-        isWatched = response.data.lots.some(item => item.lot?.lot_number && item.auction_id && `${item.auction_id}:${item.lot.lot_number}` === actualItemId);
+      if (actualItemType === 'lot') {
+        isWatched = (response.data.lots || []).some(
+          (item) => item.lot?.lot_number && item.auction_id &&
+                    `${item.auction_id}:${item.lot.lot_number}` === actualItemId
+        );
+      } else {
+        const bucket = bucketByType[actualItemType] || [];
+        isWatched = bucket.some((item) => item.id === actualItemId);
       }
-      
+
       setIsInWatchlist(isWatched);
     } catch (error) {
       console.error('Error checking watchlist status:', error);
@@ -116,7 +127,7 @@ const WatchlistButton = ({
     <button
       onClick={handleToggleWatchlist}
       disabled={isLoading}
-      data-testid={`watchlist-btn-${itemType}-${itemId}`}
+      data-testid={`watchlist-btn-${actualItemType}-${actualItemId}`}
       className={`
         inline-flex items-center gap-2 transition-all duration-200
         hover:scale-110 active:scale-95

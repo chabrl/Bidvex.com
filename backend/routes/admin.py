@@ -130,6 +130,100 @@ async def impersonate_user(
     }
 
 
+# ─── iter345 — Impersonation History ───
+
+@admin_router.get("/impersonation-history")
+async def get_impersonation_history(
+    admin_id: Optional[str] = Query(None, description="Filter by acting admin id"),
+    target_user_id: Optional[str] = Query(None, description="Filter by impersonated user id"),
+    start_date: Optional[str] = Query(None, description="ISO datetime — sessions on/after"),
+    end_date: Optional[str] = Query(None, description="ISO datetime — sessions on/before"),
+    limit: int = Query(200, ge=1, le=1000),
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+) -> Dict[str, Any]:
+    """Compliance & audit view of every admin impersonation session.
+
+    Each row is a materialized session with:
+      admin_id, admin_email, target_user_id, target_email,
+      started_at, expires_at, duration_minutes,
+      actions_during_session (list of admin_log entries whose
+      `impersonated_by` matches the acting admin between start/expiry).
+    """
+    await require_admin(credentials)
+    db = get_db()
+
+    query: Dict[str, Any] = {"action": "impersonation_started"}
+    if admin_id:
+        query["admin_id"] = admin_id
+    if target_user_id:
+        query["target_user_id"] = target_user_id
+    if start_date or end_date:
+        ts_q: Dict[str, str] = {}
+        if start_date:
+            ts_q["$gte"] = start_date
+        if end_date:
+            ts_q["$lte"] = end_date
+        query["timestamp"] = ts_q
+
+    starts = await db.admin_logs.find(query, {"_id": 0}).sort("timestamp", -1).limit(limit).to_list(limit)
+
+    sessions: List[Dict[str, Any]] = []
+    for row in starts:
+        started_at = row.get("timestamp")
+        details = row.get("details") or {}
+        expires_at = details.get("expires_at")
+        # Session ended at min(expires_at, now).
+        try:
+            start_dt = datetime.fromisoformat(started_at.replace("Z", "+00:00")) if started_at else None
+            expires_dt = datetime.fromisoformat(expires_at.replace("Z", "+00:00")) if expires_at else None
+        except Exception:  # noqa: BLE001
+            start_dt = expires_dt = None
+        now = datetime.now(timezone.utc)
+        ended_at_dt = min(expires_dt, now) if expires_dt else None
+        duration_minutes: Optional[float] = None
+        if start_dt and ended_at_dt:
+            duration_minutes = round((ended_at_dt - start_dt).total_seconds() / 60.0, 2)
+
+        # Pull actions whose `details.impersonated_by` matches this admin
+        # AND whose timestamp falls between started_at & expires_at.
+        # NB: not every admin_log row is guaranteed to have that field —
+        # the frontend can display the count as "≥N" if provisional.
+        action_query: Dict[str, Any] = {
+            "$or": [
+                {"details.impersonated_by": row.get("admin_id")},
+                {"admin_id": row.get("admin_id"), "target_user_id": row.get("target_user_id")},
+            ],
+        }
+        ts_filter: Dict[str, str] = {}
+        if started_at:
+            ts_filter["$gte"] = started_at
+        if expires_at:
+            ts_filter["$lte"] = expires_at
+        if ts_filter:
+            action_query["timestamp"] = ts_filter
+        actions_cursor = db.admin_logs.find(
+            action_query,
+            {"_id": 0, "id": 1, "action": 1, "timestamp": 1, "target_type": 1,
+             "target_id": 1, "details": 1},
+        ).sort("timestamp", 1).limit(50)
+        actions = await actions_cursor.to_list(50)
+
+        sessions.append({
+            "session_id":         row.get("id"),
+            "admin_id":           row.get("admin_id"),
+            "admin_email":        row.get("admin_email"),
+            "target_user_id":     row.get("target_user_id"),
+            "target_email":       row.get("target_email"),
+            "started_at":         started_at,
+            "expires_at":         expires_at,
+            "duration_minutes":   duration_minutes,
+            "actions_count":      len(actions),
+            "actions":            actions,
+        })
+
+    return {"sessions": sessions, "count": len(sessions)}
+
+
 # ========== USER MANAGEMENT ==========
 
 @admin_router.get("/users")
@@ -568,7 +662,7 @@ async def extend_subscription(
     if current_end:
         try:
             end_dt = datetime.fromisoformat(current_end.replace('Z', '+00:00'))
-        except:
+        except Exception:  # noqa: BLE001
             end_dt = datetime.now(timezone.utc)
     else:
         end_dt = datetime.now(timezone.utc)

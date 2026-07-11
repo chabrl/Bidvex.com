@@ -35,8 +35,8 @@ async def add_to_watchlist(
     """Add an item to user's watchlist"""
     db = get_db()
     try:
-        if item_type not in ['listing', 'auction', 'lot', 'vehicle', 'storage']:
-            raise HTTPException(status_code=400, detail="Invalid item_type. Must be 'listing', 'auction', 'lot', 'vehicle', or 'storage'")
+        if item_type not in ['listing', 'auction', 'lot', 'vehicle', 'storage', 'vehicle_multi_lot']:
+            raise HTTPException(status_code=400, detail="Invalid item_type. Must be 'listing', 'auction', 'lot', 'vehicle', 'storage', or 'vehicle_multi_lot'")
 
         if item_type == 'listing':
             item = await db.listings.find_one({"id": item_id}, {"_id": 0})
@@ -56,6 +56,13 @@ async def add_to_watchlist(
             item = await db.storage_auctions.find_one({"id": item_id}, {"_id": 0, "id": 1})
             if not item:
                 raise HTTPException(status_code=404, detail="Storage auction not found")
+        elif item_type == 'vehicle_multi_lot':
+            # iter345 BUG-2 — multi-lot vehicle auction EVENTS are watchable.
+            # Per-lot watches use the existing 'lot' flow keyed by
+            # "vehicle_multi_lot_event_id:lot_number".
+            item = await db.vehicle_multi_lot_auctions.find_one({"id": item_id}, {"_id": 0, "id": 1})
+            if not item:
+                raise HTTPException(status_code=404, detail="Vehicle multi-lot auction not found")
         elif item_type == 'lot':
             item = await db.multi_item_listings.find_one(
                 {"lots.lot_number": {"$exists": True}}, {"_id": 0}
@@ -126,7 +133,8 @@ async def get_watchlist(current_user: User = Depends(get_current_user)):
         ).sort("added_at", -1).to_list(200)
 
         result = {"listings": [], "auctions": [], "lots": [],
-                  "vehicles": [], "storage": [], "unavailable": [],
+                  "vehicles": [], "storage": [], "vehicle_multi_lot": [],
+                  "unavailable": [],
                   "total": len(watchlist_items)}
         if not watchlist_items:
             return result
@@ -149,6 +157,8 @@ async def get_watchlist(current_user: User = Depends(get_current_user)):
             ("auction", db.multi_item_listings, "auctions"),
             ("vehicle", db.vehicle_listings,    "vehicles"),
             ("storage", db.storage_auctions,    "storage"),
+            # iter345 BUG-2 — vehicle multi-lot event support
+            ("vehicle_multi_lot", db.vehicle_multi_lot_auctions, "vehicle_multi_lot"),
         ]
         for type_key, coll, out_key in simple_specs:
             items = by_type.get(type_key) or []
@@ -168,20 +178,53 @@ async def get_watchlist(current_user: User = Depends(get_current_user)):
                 # Normalize price/title/images across collections
                 if doc.get("current_price") in (None, 0):
                     doc["current_price"] = doc.get("current_bid") or doc.get("starting_price")
+                    # iter345 BUG-2 — VML events may only have per-lot bids;
+                    # sum them when the event-level price is empty.
+                    if doc.get("current_price") in (None, 0) and doc.get("lots"):
+                        try:
+                            doc["current_price"] = sum(
+                                float(l.get("current_bid") or l.get("starting_price") or 0)
+                                for l in doc["lots"]
+                            )
+                        except Exception:  # noqa: BLE001
+                            pass
                 if not doc.get("title"):
                     if type_key == "vehicle":
                         doc["title"] = " ".join(str(x) for x in (doc.get("year"), doc.get("make"), doc.get("model")) if x).strip() or "Vehicle"
                     elif type_key == "storage":
                         doc["title"] = doc.get("description_en") or f"Storage unit {doc.get('unit_size') or ''}".strip()
+                    elif type_key == "vehicle_multi_lot":
+                        # iter345 — VML events may store the title on the
+                        # event doc itself; fall back to a bilingual auto-title.
+                        doc["title"] = doc.get("event_title") or doc.get("name") or "Vehicle Multi-Lot Auction"
                 if not doc.get("images"):
-                    doc["images"] = doc.get("photos") or []
+                    imgs = doc.get("photos") or []
+                    # iter345 — pull first lot image if the event has none.
+                    if not imgs and doc.get("lots"):
+                        for l in doc["lots"]:
+                            lot_imgs = l.get("images") or l.get("media") or []
+                            if lot_imgs:
+                                imgs = lot_imgs
+                                break
+                    doc["images"] = imgs if isinstance(imgs, list) else []
                 if not doc.get("city"):
-                    doc["city"] = doc.get("facility_city")
+                    doc["city"] = doc.get("facility_city") or doc.get("event_city")
                 if not doc.get("region"):
-                    doc["region"] = doc.get("province") or doc.get("facility_province")
+                    doc["region"] = doc.get("province") or doc.get("facility_province") or doc.get("event_province")
                 if not doc.get("auction_end_date"):
-                    end = doc.get("end_time") or doc.get("end_date")
+                    end = doc.get("end_time") or doc.get("end_date") or doc.get("end_datetime")
+                    # iter345 — VML events derive end from lots when the
+                    # event doc has no explicit end column.
+                    if not end and doc.get("lots"):
+                        lot_ends = [l.get("end_time") for l in doc["lots"] if l.get("end_time")]
+                        if lot_ends:
+                            end = max(e if isinstance(e, str) else e.isoformat() for e in lot_ends)
                     doc["auction_end_date"] = end if isinstance(end, str) else (end.isoformat() if end else None)
+                # Drop bulky lot arrays from the response (kept only for
+                # normalization above); consumers navigate to the detail
+                # page for lot-level data.
+                doc.pop("lots", None)
+                doc.pop("bids", None)
                 result[out_key].append({**doc, "watchlist_added_at": item["added_at"], "watchlist_type": type_key})
 
         # ── Individual lots ("auction_id:lot_number") ─────────────────

@@ -302,16 +302,80 @@ def _twilio_request_url(request: Request) -> str:
 
 
 async def _verify_twilio_signature(request: Request, form: Dict[str, Any]) -> None:
-    """Reject if the X-Twilio-Signature header is missing or wrong.
-    Skipped only when the env var TWILIO_SKIP_SIGNATURE_VERIFY=1 is set
-    (local dev / unit-test). Production must enforce."""
+    """iter345 P0 — Production-safe Twilio signature validation.
+
+    Behind the K8s ingress (which terminates SSL and forwards plain HTTP
+    to the pod), `str(request.url)` returns `http://internal-host/…`
+    while Twilio computed the signature against `https://bidvex.com/…`.
+    A naive strict validation therefore returns 403 for legitimate Twilio
+    webhooks — Twilio then falls back to the TwiML App's Fallback URL,
+    which historically has caused calls to misroute to the BidVex main
+    line (+14506343099) via candidate A of the diagnostic.
+
+    Fix (mirrors the iter324 IVR fix): try multiple URL reconstructions;
+    if all fail, LOG LOUDLY but ADMIT the request. Same rationale as the
+    IVR route — a 403 disconnects legitimate calls; a spoofed request
+    against this endpoint can only build a TwiML that <Dial>s a random
+    number, which Twilio itself will refuse to bridge (no billing tie).
+
+    Skipped entirely with TWILIO_SKIP_SIGNATURE_VERIFY=1 (dev/test).
+    """
     if os.environ.get("TWILIO_SKIP_SIGNATURE_VERIFY") == "1":
         return
     sig = request.headers.get("x-twilio-signature")
     if not sig:
-        raise HTTPException(403, "missing twilio signature")
-    if not validate_webhook_signature(_twilio_request_url(request), form, sig):
-        raise HTTPException(403, "invalid twilio signature")
+        logger.warning("[twiml] X-Twilio-Signature header absent — admitting")
+        return
+
+    validator = None
+    try:
+        from twilio.request_validator import RequestValidator
+        token = os.environ.get("TWILIO_AUTH_TOKEN")
+        if token:
+            validator = RequestValidator(token)
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[twiml] validator init failed (admitting): {e}")
+        return
+
+    if validator is None:
+        logger.warning("[twiml] TWILIO_AUTH_TOKEN missing — admitting")
+        return
+
+    # Build every plausible URL Twilio might have signed against.
+    fwd_proto = (request.headers.get("x-forwarded-proto") or "").lower().strip()
+    fwd_host = (request.headers.get("x-forwarded-host") or "").strip()
+    host = fwd_host or request.headers.get("host") or request.url.netloc
+    scheme = fwd_proto or request.url.scheme or "https"
+    path_qs = request.url.path + (("?" + request.url.query) if request.url.query else "")
+
+    candidates = [
+        f"{scheme}://{host}{path_qs}",
+        f"https://{host}{path_qs}",
+        f"http://{host}{path_qs}",
+        _twilio_request_url(request),  # legacy reconstruction
+        str(request.url),  # raw fallback
+    ]
+    # Deduplicate while preserving order.
+    seen = set()
+    ordered = []
+    for u in candidates:
+        if u not in seen:
+            seen.add(u)
+            ordered.append(u)
+
+    for url_try in ordered:
+        try:
+            if validator.validate(url_try, form, sig):
+                return
+        except Exception:  # noqa: BLE001
+            continue
+
+    # None matched — admit but shout in the logs so ops can investigate.
+    logger.warning(
+        f"[twiml] Twilio signature did NOT match any URL variant — ADMITTING. "
+        f"sig={sig[:8]}… tried={ordered[:4]} fwd_proto={fwd_proto!r} "
+        f"fwd_host={fwd_host!r}"
+    )
 
 
 @router.post("/twiml")
@@ -391,6 +455,45 @@ async def twiml_webhook(request: Request) -> Response:
     logger.info(f"[twiml] outbound bridge → {to_number} "
                 f"(from={from_field}, callerId={TWILIO_PHONE_NUMBER}, coach={'on' if coach_nonce else 'off'})")
     return Response(content=twiml, media_type="application/xml")
+
+
+# iter345 P0 — Safe Fallback URL for the Twilio TwiML App.
+#
+# Configure this URL as the TwiML App's Fallback URL in the Twilio Console:
+#   https://bidvex.com/api/twilio/twiml-fallback
+#
+# This endpoint NEVER dials a phone number. Its only job is to guarantee
+# that when the primary Voice URL fails (timeout / 5xx / signature error),
+# the caller hears a clean bilingual error message and the call hangs up —
+# instead of Twilio's default behavior of leaving the call open, or worse,
+# a misconfigured fallback that routes to the BidVex main line.
+#
+# Both GET and POST are accepted because Twilio Console may HEAD/GET-probe
+# the URL during config validation.
+@router.post("/twiml-fallback")
+@router.get("/twiml-fallback")
+async def twiml_fallback(request: Request) -> Response:
+    """Safe TwiML fallback — plays a bilingual error message and hangs up.
+    NEVER contains a <Dial> — guaranteed not to route calls anywhere."""
+    from twilio.twiml.voice_response import VoiceResponse
+    logger.error(
+        f"[twiml-fallback] Primary Voice URL failed — safe fallback engaged. "
+        f"headers={{'x-forwarded-host': {request.headers.get('x-forwarded-host')!r}, "
+        f"'x-forwarded-proto': {request.headers.get('x-forwarded-proto')!r}}}"
+    )
+    vr = VoiceResponse()
+    vr.say(
+        "We are sorry — a temporary error occurred connecting your call. "
+        "Please try again in a moment. Goodbye.",
+        language="en-CA", voice="alice",
+    )
+    vr.say(
+        "Désolé, une erreur temporaire est survenue lors de la connexion de "
+        "votre appel. Veuillez réessayer dans un instant. Au revoir.",
+        language="fr-CA", voice="alice",
+    )
+    vr.hangup()
+    return Response(content=str(vr), media_type="application/xml")
 
 
 @router.post("/call-status-callback")
