@@ -460,7 +460,7 @@ async def create_review(
         {"id": data.transaction_id, "payment_status": "paid"}, {"_id": 0}
     )
     if bn:
-        if bn["buyer_id"] != user["id"]:
+        if bn["buyer_id"] != user["id"] and user.get("role") not in ("admin", "super_admin"):
             raise HTTPException(status_code=403, detail="You can only review your own purchases")
         auction = await db.multi_item_listings.find_one({"id": bn["auction_id"]}, {"_id": 0})
         if auction:
@@ -568,7 +568,7 @@ async def update_review(
     review = await db.reviews.find_one({"id": review_id}, {"_id": 0})
     if not review:
         raise HTTPException(status_code=404, detail="Review not found")
-    if review["buyer_id"] != user["id"]:
+    if review["buyer_id"] != user["id"] and user.get("role") not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="You can only edit your own reviews")
 
     editable_until = datetime.fromisoformat(review["editable_until"])

@@ -798,7 +798,7 @@ async def record_storage_payment(
     a = await db.storage_auctions.find_one({"id": auction_id}, {"_id": 0})
     if not a:
         raise HTTPException(status_code=404, detail="Auction not found")
-    if a.get("winning_bidder_id") != current_user.id:
+    if a.get("winning_bidder_id") != current_user.id and getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="You did not win this auction")
     method = (payload.get("payment_method") or "").lower()
     if method not in PAYMENT_METHODS:

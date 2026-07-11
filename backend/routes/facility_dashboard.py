@@ -40,7 +40,7 @@ def _is_facility(user: User) -> bool:
 
 
 def _is_admin(user: User) -> bool:
-    return (getattr(user, "role", "") or "").lower() in ("admin", "superadmin")
+    return (getattr(user, "role", "") or "").lower() in ("admin", "super_admin")
 
 
 async def _require_facility(user: User = Depends(get_current_user)) -> User:

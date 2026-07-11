@@ -22,7 +22,7 @@ async def validate_seller(db, current_user: User, agreement_accepted: bool):
     Run all gatekeeping checks before a seller can create a listing.
     Raises HTTPException on failure; returns agreement_metadata on success.
     """
-    is_admin = (getattr(current_user, "role", "") or "").lower() in ("admin", "superadmin")
+    is_admin = (getattr(current_user, "role", "") or "").lower() in ("admin", "super_admin")
     # iter223 — Demo accounts bypass all seller gatekeeping (partner fee,
     # phone verification, payment method on file). Their listings get
     # `is_demo_sandbox=true` server-side and are invisible to the public

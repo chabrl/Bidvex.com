@@ -981,7 +981,7 @@ async def set_relationship_bid_cap(
     rel = await db.broker_buyer_relationships.find_one({"id": rel_id}, {"_id": 0})
     if not rel:
         raise HTTPException(status_code=404, detail={"error": "relationship_not_found"})
-    if rel["buyer_user_id"] != current_user.id:
+    if rel["buyer_user_id"] != current_user.id and getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail={"error": "not_your_relationship"})
 
     if payload.bid_cap is not None and payload.bid_cap <= 0:
@@ -1190,7 +1190,7 @@ async def accept_custom_terms(
     rel = await db.broker_buyer_relationships.find_one({"id": rel_id}, {"_id": 0})
     if not rel:
         raise HTTPException(status_code=404, detail={"error": "relationship_not_found"})
-    if rel["buyer_user_id"] != current_user.id:
+    if rel["buyer_user_id"] != current_user.id and getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail={"error": "not_your_relationship"})
 
     now = _utcnow()
@@ -1214,12 +1214,12 @@ async def accept_custom_terms(
 
 
 
-async def _require_broker_owns_relationship(db, rel_id: str, user_id: str) -> Dict[str, Any]:
+async def _require_broker_owns_relationship(db, rel_id: str, user_id: str, role: str = None) -> Dict[str, Any]:
     rel = await db.broker_buyer_relationships.find_one({"id": rel_id}, {"_id": 0})
     if not rel:
         raise HTTPException(status_code=404, detail={"error": "relationship_not_found"})
     broker = await db.brokers.find_one({"id": rel["broker_id"]}, {"_id": 0, "id": 1, "user_id": 1})
-    if not broker or broker["user_id"] != user_id:
+    if (not broker or broker["user_id"] != user_id) and role not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail={"error": "not_your_relationship"})
     return rel
 
@@ -1227,7 +1227,7 @@ async def _require_broker_owns_relationship(db, rel_id: str, user_id: str) -> Di
 @brokers_router.post("/broker-relationships/{rel_id}/approve")
 async def approve_buyer(rel_id: str, current_user: User = Depends(get_current_user)):
     db = get_db()
-    rel = await _require_broker_owns_relationship(db, rel_id, current_user.id)
+    rel = await _require_broker_owns_relationship(db, rel_id, current_user.id, current_user.role)
     if rel["status"] not in ("pending", "approved"):
         raise HTTPException(status_code=400, detail={"error": "invalid_state", "current_status": rel["status"]})
     await db.broker_buyer_relationships.update_one(
@@ -1245,7 +1245,7 @@ async def approve_buyer(rel_id: str, current_user: User = Depends(get_current_us
 @brokers_router.post("/broker-relationships/{rel_id}/reject")
 async def reject_buyer(rel_id: str, reason: str = Body("", embed=True), current_user: User = Depends(get_current_user)):
     db = get_db()
-    rel = await _require_broker_owns_relationship(db, rel_id, current_user.id)
+    rel = await _require_broker_owns_relationship(db, rel_id, current_user.id, current_user.role)
     # iter225 Task 5 — auto refund/release the $500 escrow deposit
     pi_id = rel.get("deposit_stripe_payment_intent_id")
     refund_result: Dict[str, Any] = {"action": "noop"}
@@ -1274,7 +1274,7 @@ async def reject_buyer(rel_id: str, reason: str = Body("", embed=True), current_
 @brokers_router.patch("/broker-relationships/{rel_id}/bid-limit")
 async def set_bid_limit(rel_id: str, max_bid_amount_cad: float = Body(..., embed=True), current_user: User = Depends(get_current_user)):
     db = get_db()
-    await _require_broker_owns_relationship(db, rel_id, current_user.id)
+    await _require_broker_owns_relationship(db, rel_id, current_user.id, current_user.role)
     if max_bid_amount_cad < 0:
         raise HTTPException(status_code=422, detail={"error": "negative_limit"})
     await db.broker_buyer_relationships.update_one(
@@ -1287,7 +1287,7 @@ async def set_bid_limit(rel_id: str, max_bid_amount_cad: float = Body(..., embed
 @brokers_router.post("/broker-relationships/{rel_id}/release-deposit")
 async def release_deposit_endpoint(rel_id: str, current_user: User = Depends(get_current_user)):
     db = get_db()
-    rel = await _require_broker_owns_relationship(db, rel_id, current_user.id)
+    rel = await _require_broker_owns_relationship(db, rel_id, current_user.id, current_user.role)
     pi_id = rel.get("deposit_stripe_payment_intent_id")
     if not pi_id:
         raise HTTPException(status_code=400, detail={"error": "no_deposit_on_file"})
@@ -1306,7 +1306,7 @@ async def release_deposit_endpoint(rel_id: str, current_user: User = Depends(get
 @brokers_router.post("/broker-relationships/{rel_id}/terminate")
 async def terminate_relationship(rel_id: str, current_user: User = Depends(get_current_user)):
     db = get_db()
-    rel = await _require_broker_owns_relationship(db, rel_id, current_user.id)
+    rel = await _require_broker_owns_relationship(db, rel_id, current_user.id, current_user.role)
     # iter225 Task 5 — auto refund (if captured) or release (if still held) the $500 escrow
     pi_id = rel.get("deposit_stripe_payment_intent_id")
     refund_result: Dict[str, Any] = {"action": "noop"}
@@ -1349,7 +1349,7 @@ async def buyer_terminate_relationship(
     rel = await db.broker_buyer_relationships.find_one({"id": rel_id}, {"_id": 0})
     if not rel:
         raise HTTPException(status_code=404, detail={"error": "relationship_not_found"})
-    if rel["buyer_user_id"] != current_user.id:
+    if rel["buyer_user_id"] != current_user.id and getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail={"error": "not_your_relationship"})
     if rel.get("status") in ("terminated", "rejected"):
         raise HTTPException(status_code=400, detail={
@@ -1487,7 +1487,7 @@ async def buyer_terminate_relationship(
 @brokers_router.post("/broker-relationships/{rel_id}/suspend")
 async def suspend_relationship(rel_id: str, reason: str = Body("", embed=True), current_user: User = Depends(get_current_user)):
     db = get_db()
-    await _require_broker_owns_relationship(db, rel_id, current_user.id)
+    await _require_broker_owns_relationship(db, rel_id, current_user.id, current_user.role)
     await db.broker_buyer_relationships.update_one(
         {"id": rel_id},
         {"$set": {"status": "suspended", "can_bid": False, "suspended_reason": reason, "updated_at": _utcnow()}},
@@ -2346,7 +2346,7 @@ async def get_invoice_pdf(
         raise HTTPException(status_code=404, detail={"error": "broker_not_found"})
     is_owner = broker.get("user_id") == current_user.id
     is_buyer = inv.get("buyer_user_id") == current_user.id
-    is_admin = (current_user.role or "") in ("admin", "superadmin")
+    is_admin = (current_user.role or "") in ("admin", "super_admin")
     if not (is_owner or is_buyer or is_admin):
         raise HTTPException(status_code=403, detail={"error": "not_authorized"})
 

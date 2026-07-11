@@ -212,7 +212,7 @@ async def mark_best_reply(
     question = await db.community_questions.find_one({"id": question_id})
     if not question:
         raise HTTPException(status_code=404, detail="Question not found")
-    if question["author_id"] != current_user.id:
+    if question["author_id"] != current_user.id and getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Only the question author can mark best reply")
 
     reply_id = data.get("reply_id")

@@ -89,7 +89,7 @@ def test_google_feed_shipping_block_always_present():
     xml = meta_item_to_google_xml(minimal_item)
     assert "<g:shipping>" in xml
     assert "<g:country>CA</g:country>" in xml
-    assert "<g:service>Buyer Arranges Pickup</g:service>" in xml
+    assert "<g:service>Buyer Arranges Transport</g:service>" in xml
     assert "<g:price>0.00 CAD</g:price>" in xml
 
 

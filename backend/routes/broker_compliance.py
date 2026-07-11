@@ -202,7 +202,7 @@ async def admin_invoice_action(
     """Admin resolution after 72h timeout or non-responsive flag.
     `re_auction` — relist the listing; `deposit_forfeit` — capture the
     $500 Stripe hold; `suspend_buyer` — mark buyer account suspended."""
-    if (current_user.role or "") not in ("admin", "superadmin"):
+    if (current_user.role or "") not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail={"error": "admin_only"})
     db  = get_db()
     inv = await db.broker_invoices.find_one({"id": invoice_id}, {"_id": 0})
@@ -291,7 +291,7 @@ async def admin_resolve_dispute(
     current_user: User = Depends(get_current_user),
 ):
     """Admin decides where the $500 deposit goes."""
-    if (current_user.role or "") not in ("admin", "superadmin"):
+    if (current_user.role or "") not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail={"error": "admin_only"})
     db  = get_db()
     inv = await db.broker_invoices.find_one({"id": invoice_id}, {"_id": 0})
@@ -428,7 +428,7 @@ async def admin_missing_title_transfers(current_user: User = Depends(get_current
     Admin dashboard polls this for the "Broker has not filed title transfer"
     notification list.
     """
-    if (current_user.role or "") not in ("admin", "superadmin"):
+    if (current_user.role or "") not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail={"error": "admin_only"})
     db = get_db()
     cutoff = _utcnow() - timedelta(days=14)
@@ -477,7 +477,7 @@ async def rate_broker(
     """
     db  = get_db()
     rel = await db.broker_buyer_relationships.find_one({"id": rel_id}, {"_id": 0})
-    if not rel or rel.get("buyer_user_id") != current_user.id:
+    if not rel or (rel.get("buyer_user_id") != current_user.id and getattr(current_user, "role", None) not in ("admin", "super_admin")):
         raise HTTPException(status_code=403, detail={"error": "not_authorized"})
 
     # Require a released invoice for this broker × buyer pair

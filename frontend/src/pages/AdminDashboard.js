@@ -408,6 +408,7 @@ const AdminDashboard = () => {
 
     const isAdmin = user.role === 'admin' || 
                     user.role === 'superadmin' || 
+                    user.role === 'super_admin' ||
                     user.account_type === 'admin' || 
                     user.email?.endsWith('@admin.bazario.com');
     

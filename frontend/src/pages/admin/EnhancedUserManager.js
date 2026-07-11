@@ -29,7 +29,7 @@ import {
   Copy, Check, Eye, EyeOff, Building2, User, Shield, Mail,
   Phone, AlertTriangle, X, Ban, Trash2, MapPin, MoreVertical,
   Key, Edit, Crown, Theater, CreditCard, Receipt, Star,
-  Headphones,
+  Headphones, LogIn,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -503,6 +503,35 @@ const EnhancedUserManager = () => {
       toast.success(`Reset email sent to ${u.email}`);
     } catch (e) {
       toast.error('Reset failed');
+    }
+  };
+
+  // iter344 — Admin impersonation: swap to a 1-hour user-scoped JWT.
+  const handleImpersonate = async (u) => {
+    if (!window.confirm(`Log in as ${u.email}? You will act as this user until you exit impersonation (max 1 hour).`)) return;
+    try {
+      const r = await axios.post(
+        `${API}/admin/impersonate/${u.id}`, {},
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      const impTok = r.data?.access_token;
+      if (!impTok) throw new Error('no token');
+      localStorage.setItem('bidvex_admin_backup_token', localStorage.getItem('token') || '');
+      const rt = localStorage.getItem('refresh_token');
+      if (rt) {
+        localStorage.setItem('bidvex_admin_backup_refresh', rt);
+        localStorage.removeItem('refresh_token');
+      }
+      localStorage.setItem('bidvex_impersonation', JSON.stringify({
+        target_user_id: u.id,
+        target_name: u.name,
+        target_email: u.email,
+        started_at: Date.now(),
+      }));
+      localStorage.setItem('token', impTok);
+      window.location.href = '/';
+    } catch (e) {
+      toast.error(e?.response?.data?.detail?.message_en || e?.response?.data?.detail || 'Impersonation failed');
     }
   };
 
@@ -1060,6 +1089,16 @@ const EnhancedUserManager = () => {
                       <DropdownMenuItem onClick={() => openEditProfile(user)} data-testid={`edit-profile-${user.id}`}>
                         <Edit className="h-3.5 w-3.5 mr-2" /> Edit Profile
                       </DropdownMenuItem>
+                      {/* iter344 — impersonation (never offered for admin accounts) */}
+                      {!(user.role === 'admin' || user.role === 'super_admin' || user.is_admin) && (
+                        <DropdownMenuItem
+                          onClick={() => handleImpersonate(user)}
+                          className="text-red-600 focus:text-red-700"
+                          data-testid={`impersonate-user-${user.id}`}
+                        >
+                          <LogIn className="h-3.5 w-3.5 mr-2" /> Login As User
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuItem onClick={() => handleResetPassword(user)} data-testid={`reset-password-${user.id}`}>
                         <Key className="h-3.5 w-3.5 mr-2" /> Reset Password
                       </DropdownMenuItem>

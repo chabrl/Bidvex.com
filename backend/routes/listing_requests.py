@@ -110,7 +110,8 @@ async def submit_listing_change_request(
     doc = found["doc"]
     user_id    = user.id if hasattr(user, "id") else user.get("id")
     user_email = user.email if hasattr(user, "email") else user.get("email")
-    if doc.get("seller_id") and doc["seller_id"] != user_id:
+    user_role  = user.role if hasattr(user, "role") else user.get("role")
+    if doc.get("seller_id") and doc["seller_id"] != user_id and user_role not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Only the listing owner can submit a change request")
 
     # Block duplicate pending requests for the same listing (avoid inbox spam).

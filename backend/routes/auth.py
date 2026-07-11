@@ -880,7 +880,7 @@ async def get_me(current_user: dict = Depends(get_current_user_from_token)):
 
     # Phase 6.2 hotfix — derive is_admin flag for the frontend.
     current_user["is_admin"] = (
-        (current_user.get("role") or "").lower() in ("admin", "superadmin")
+        (current_user.get("role") or "").lower() in ("admin", "super_admin")
         or current_user.get("account_type") == "admin"
         or (current_user.get("email") or "").endswith("@admin.bazario.com")
     )

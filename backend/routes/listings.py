@@ -243,7 +243,7 @@ async def create_listing(
     # iter310 — Auto-translate missing French copy via Gemini 2.5 Flash before
     # the hard-gate runs. Runs for EVERYONE (incl. admins) so the resulting
     # MongoDB row always has clean bilingual copy.
-    _is_admin_role = (getattr(current_user, "role", "") or "").lower() in ("admin", "superadmin")
+    _is_admin_role = (getattr(current_user, "role", "") or "").lower() in ("admin", "super_admin")
     from services.bill96_autofill import autofill_qc_french_copy
     _bill96_autofill_result = await autofill_qc_french_copy(listing_data)
     if not _is_admin_role:
@@ -303,7 +303,7 @@ async def create_listing(
         # Phase 6.0 hotfix — Admin power-user override: admins skip the
         # `facility_name required` validation and any other client-side
         # gates so they can list a unit on behalf of a facility manager.
-        is_admin = (getattr(current_user, "role", "") or "").lower() in ("admin", "superadmin")
+        is_admin = (getattr(current_user, "role", "") or "").lower() in ("admin", "super_admin")
 
         # Phase 6.2 Task 2 — Role gate: only `storage_facility` accounts may
         # create storage_locker listings. Admins bypass.
@@ -964,7 +964,7 @@ async def update_listing(listing_id: str, updates: Dict[str, Any], current_user:
     listing = await db.listings.find_one({"id": listing_id}, {"_id": 0})
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
-    if listing["seller_id"] != current_user.id:
+    if listing["seller_id"] != current_user.id and getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Not authorized")
     allowed_fields = ["title", "description", "category", "condition", "images", "location", "city", "region", "country", "postal_code", "status",
                       "title_en", "title_fr", "description_en", "description_fr"]
@@ -1010,7 +1010,7 @@ async def delete_listing(listing_id: str, current_user: User = Depends(get_curre
     listing = await db.listings.find_one({"id": listing_id})
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
-    if listing["seller_id"] != current_user.id:
+    if listing["seller_id"] != current_user.id and getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Not authorized")
     await db.listings.delete_one({"id": listing_id})
     return {"message": "Listing deleted successfully"}
@@ -1062,7 +1062,7 @@ async def upload_listing_images(
             "message_fr": "Annonce introuvable.",
         })
 
-    if listing.get("seller_id") != current_user.id:
+    if listing.get("seller_id") != current_user.id and getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail={
             "error": "not_authorized",
             "message_en": "You are not authorized to upload images to this listing.",
@@ -1729,7 +1729,7 @@ async def request_listing_deletion(
     listing = await db.listings.find_one({"id": listing_id})
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
-    if listing["seller_id"] != current_user.id:
+    if listing["seller_id"] != current_user.id and getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Not your listing")
 
     deletion_request = {
@@ -1767,7 +1767,7 @@ async def request_multi_listing_deletion(
     listing = await db.multi_item_listings.find_one({"id": listing_id})
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
-    if listing["seller_id"] != current_user.id:
+    if listing["seller_id"] != current_user.id and getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Not your listing")
 
     deletion_request = {
@@ -1808,7 +1808,7 @@ async def update_listing_translations(
     listing = await db.listings.find_one({"id": listing_id}, {"_id": 0})
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
-    if listing["seller_id"] != current_user.id and current_user.role != "admin":
+    if listing["seller_id"] != current_user.id and current_user.role not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Not authorized")
 
     allowed = ["title_en", "title_fr", "description_en", "description_fr"]
@@ -1832,7 +1832,7 @@ async def update_multi_listing_translations(
     listing = await db.multi_item_listings.find_one({"id": listing_id}, {"_id": 0})
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
-    if listing["seller_id"] != current_user.id and current_user.role != "admin":
+    if listing["seller_id"] != current_user.id and current_user.role not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Not authorized")
 
     allowed = ["title_en", "title_fr", "description_en", "description_fr"]

@@ -125,7 +125,7 @@ async def save_draft(body: DraftSaveBody, current_user: User = Depends(get_curre
         existing = await db.seller_drafts.find_one({"id": body.draft_id}, {"_id": 0})
         if not existing:
             raise HTTPException(status_code=404, detail="draft_not_found")
-        if existing.get("seller_id") != current_user.id:
+        if existing.get("seller_id") != current_user.id and getattr(current_user, "role", None) not in ("admin", "super_admin"):
             raise HTTPException(status_code=403, detail="not_your_draft")
         await db.seller_drafts.update_one(
             {"id": body.draft_id},
@@ -221,7 +221,7 @@ async def get_draft(draft_id: str, current_user: User = Depends(get_current_user
     doc = await db.seller_drafts.find_one({"id": draft_id}, {"_id": 0})
     if not doc:
         raise HTTPException(status_code=404, detail="draft_not_found")
-    if doc.get("seller_id") != current_user.id:
+    if doc.get("seller_id") != current_user.id and getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="not_your_draft")
     return {
         "id":         doc["id"],
@@ -241,7 +241,7 @@ async def delete_draft(draft_id: str, current_user: User = Depends(get_current_u
     doc = await db.seller_drafts.find_one({"id": draft_id}, {"_id": 0, "seller_id": 1})
     if not doc:
         raise HTTPException(status_code=404, detail="draft_not_found")
-    if doc["seller_id"] != current_user.id:
+    if doc["seller_id"] != current_user.id and getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="not_your_draft")
     await db.seller_drafts.delete_one({"id": draft_id})
     return {"success": True}
@@ -255,7 +255,7 @@ async def restore_draft(draft_id: str, current_user: User = Depends(get_current_
     doc = await db.seller_drafts.find_one({"id": draft_id}, {"_id": 0})
     if not doc:
         raise HTTPException(status_code=404, detail="draft_not_found")
-    if doc.get("seller_id") != current_user.id:
+    if doc.get("seller_id") != current_user.id and getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="not_your_draft")
     if doc.get("status") != "draft_expired":
         raise HTTPException(status_code=400, detail={"error": "not_expired", "message_en": "Draft is not in expired state.", "message_fr": "Le brouillon n'est pas expiré."})

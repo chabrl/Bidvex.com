@@ -120,7 +120,7 @@ async def confirm_pickup_code(
         )
 
     # Only the seller of the txn may confirm
-    if txn.get("pickup_code_seller_id") and txn["pickup_code_seller_id"] != current_user.id:
+    if txn.get("pickup_code_seller_id") and txn["pickup_code_seller_id"] != current_user.id and getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(
             status_code=403,
             detail={

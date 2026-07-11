@@ -303,9 +303,13 @@ class TestMapperExclusions:
         assert c["moderation_pending"] == 1
 
     def test_excludes_no_images(self):
+        """iter289 — no-image listings are no longer excluded; they get a
+        placeholder image so ads keep targeting them."""
         c = _fresh_exclusion_counter()
-        assert map_listing_to_meta_item(_good_listing(images=[]), "marketplace", {}, c) is None
-        assert c["no_images"] == 1
+        item = map_listing_to_meta_item(_good_listing(images=[]), "marketplace", {}, c)
+        assert item is not None
+        assert item["image_link"]
+        assert c.get("placeholder_used", 0) == 1
 
     def test_base64_only_images_use_branded_placeholder(self):
         """Listings with base64-only images are no longer excluded — they
@@ -419,7 +423,7 @@ class TestCustomLabels:
     def test_custom_label_2_is_normalized_region(self):
         item = map_listing_to_meta_item(_good_listing(region="quebec"), "marketplace",
                                         {}, _fresh_exclusion_counter())
-        assert item["custom_label_2"] == "QC"
+        assert item["custom_label_2"] == "CA-QC"
 
     def test_custom_label_3_marks_ending_soon(self):
         soon = (datetime.now(timezone.utc) + timedelta(hours=6)).isoformat()
@@ -489,8 +493,8 @@ class TestSeedItems:
     def test_seed_items_cover_qc_and_on(self):
         from services.meta_feed_mapper import build_seed_items
         regions = {s["region"] for s in build_seed_items(5)}
-        assert "QC" in regions
-        assert "ON" in regions
+        assert "CA-QC" in regions
+        assert "CA-ON" in regions
 
     def test_seed_items_are_deterministic(self):
         from services.meta_feed_mapper import build_seed_items
@@ -685,7 +689,7 @@ class TestFeedEndpoint:
             "neighborhood,city,region,country,postal_code,"
             "additional_image_link,google_product_category,"
             "custom_label_0,custom_label_1,"
-            "custom_label_2,custom_label_3"
+            "custom_label_2,custom_label_3,shipping"
         )
         assert first_line == expected, f"header mismatch:\n{first_line}\n--vs--\n{expected}"
 
@@ -708,8 +712,12 @@ class TestFeedEndpoint:
         assert len(rows) >= 6, f"expected >=5 data rows + header, got {len(rows)}"
 
     def test_csv_contains_seed_rows_in_unfiltered_feed(self, api_base):
+        """Seeds pad the unfiltered feed ONLY when <5 real items exist."""
         r = requests.get(f"{api_base}/api/feeds/facebook-local", timeout=15)
-        assert "BIDVEX-SEED-" in r.text
+        data_rows = [ln for ln in r.text.split("\r\n") if ln.strip()][1:]
+        real_rows = [ln for ln in data_rows if "BIDVEX-SEED-" not in ln]
+        if len(real_rows) < 5:
+            assert "BIDVEX-SEED-" in r.text
 
     def test_csv_no_seed_rows_in_filtered_feed(self, api_base):
         r = requests.get(f"{api_base}/api/feeds/facebook-local?province=NU", timeout=15)

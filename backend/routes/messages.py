@@ -188,7 +188,7 @@ async def send_message(request: Request, msg: MessageCreate, current_user: User 
         })
 
     # iter196 — gate thread creation
-    is_admin = (current_user.role or "").lower() in ("admin", "superadmin") if hasattr(current_user, "role") else False
+    is_admin = (current_user.role or "").lower() in ("admin", "super_admin") if hasattr(current_user, "role") else False
     gate_error = await _can_open_thread(current_user.id, msg.receiver_id, msg.listing_id, is_admin, msg.conversation_id)
     if gate_error:
         ERROR_DETAILS = {
@@ -609,7 +609,7 @@ async def share_item_details_in_chat(
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
 
-    if listing.get("seller_id") != current_user.id:
+    if listing.get("seller_id") != current_user.id and getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Only the seller can share item details")
 
     receiver_id = [p for p in convo.get("participants", []) if p != current_user.id][0]

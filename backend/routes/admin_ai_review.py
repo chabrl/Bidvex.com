@@ -426,7 +426,7 @@ async def request_manual_vehicle_review(
     # 5. In-app admin notifications (so the admin badge counter rises)
     try:
         admin_users = await db.users.find(
-            {"role": {"$in": ["admin", "superadmin"]}},
+            {"role": {"$in": ["admin", "super_admin"]}},
             {"_id": 0, "id": 1, "email": 1},
         ).to_list(length=50)
         if admin_users:
@@ -610,7 +610,7 @@ async def flag_listing_for_ai_review(
             "status": listing.get("status") or "active",
         }
 
-    if listing.get("seller_id") != current_user.id and current_user.role not in ("admin", "superadmin"):
+    if listing.get("seller_id") != current_user.id and current_user.role not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Not authorized")
 
     now = datetime.now(timezone.utc)
@@ -1212,7 +1212,7 @@ async def seller_correct_category(
     (normal review queue / active)."""
     db = get_db()
     collection, listing = await _resolve_listing(db, listing_id, payload.listing_type)
-    if listing.get("seller_id") != current_user.id:
+    if listing.get("seller_id") != current_user.id and getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Not authorized")
     if listing.get("status") != "pending_ai_review":
         raise HTTPException(status_code=400, detail={
@@ -1269,7 +1269,7 @@ async def seller_withdraw_from_review(
     """Seller withdraws their flagged listing — sets status='withdrawn'."""
     db = get_db()
     collection, listing = await _resolve_listing(db, listing_id, listing_type)
-    if listing.get("seller_id") != current_user.id:
+    if listing.get("seller_id") != current_user.id and getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Not authorized")
     if listing.get("status") != "pending_ai_review":
         raise HTTPException(status_code=400, detail={
@@ -1319,7 +1319,7 @@ async def seller_resubmit_for_review(
     """
     db = get_db()
     collection, listing = await _resolve_listing(db, listing_id, listing_type)
-    if listing.get("seller_id") != current_user.id:
+    if listing.get("seller_id") != current_user.id and getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Not authorized")
     if listing.get("status") not in ("pending_ai_review", "pending_admin_review", "draft"):
         raise HTTPException(status_code=400, detail={

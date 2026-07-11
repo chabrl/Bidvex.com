@@ -45,6 +45,7 @@ from services.meta_feed_mapper import (
     META_MIN_CATALOG_ITEMS,
     build_seed_items,
     map_listing_to_meta_item,
+    map_multi_lot_listing_to_meta_items,
 )
 
 logger = logging.getLogger(__name__)
@@ -99,6 +100,9 @@ async def _walk_active_listings(
     query: Dict[str, Any] = {
         "status": {"$in": ["active", "ended", "sold", "closed", "completed"]}
     }
+    # iter344 BUG-3 — vehicle multi-lot EVENTS use live/upcoming/ended
+    # statuses instead of active/sold.
+    vml_query: Dict[str, Any] = {"status": {"$in": ["live", "ended"]}}
     if category:
         query["category"] = category
     if province:
@@ -115,7 +119,14 @@ async def _walk_active_listings(
     out: List[Tuple[str, Dict[str, Any]]] = []
     for collection_name, listing_type in collections:
         coll = db[collection_name]
-        async for doc in coll.find(query, {"_id": 0}):
+        q = query
+        if collection_name == "vehicle_multi_lot_auctions":
+            q = {**vml_query}
+            if category:
+                q["category"] = category
+            if "$or" in query:
+                q["$or"] = query["$or"]
+        async for doc in coll.find(q, {"_id": 0}):
             out.append((listing_type, doc))
     return out
 
@@ -166,6 +177,11 @@ async def _build_feed_items(
     items: List[Dict[str, Any]] = []
     for ltype, doc in docs:
         seller = sellers_by_id.get(doc.get("seller_id"), {})
+        # iter344 BUG-3 — multi-lot auctions decompose into one item PER LOT
+        # (Google Merchant + Meta list purchasable lots, not parent events).
+        if ltype in ("lots", "vehicle_multi_lot") and doc.get("lots"):
+            items.extend(map_multi_lot_listing_to_meta_items(doc, ltype, seller, exclusions))
+            continue
         item = map_listing_to_meta_item(doc, ltype, seller, exclusions)
         if item is not None:
             items.append(item)

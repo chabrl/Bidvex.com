@@ -831,7 +831,7 @@ async def create_auction_checkout(
         raise HTTPException(status_code=404, detail="Listing not found")
     
     # Verify buyer is the winner
-    if listing.get("winning_bidder_id") != current_user.id:
+    if listing.get("winning_bidder_id") != current_user.id and getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Only the winning bidder can checkout")
     
     # Check if already paid
@@ -1705,7 +1705,7 @@ async def auction_winner_preview(
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
 
-    if listing.get("winner_id") != current_user.id:
+    if listing.get("winner_id") != current_user.id and getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Only the auction winner can view this checkout")
 
     if listing.get("payment_status") == "paid":
@@ -1809,7 +1809,7 @@ async def auction_winner_checkout(
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
 
-    if listing.get("winner_id") != current_user.id:
+    if listing.get("winner_id") != current_user.id and getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Only the auction winner can checkout")
 
     if listing.get("status") not in ("ended", "won", "pending_payment"):
@@ -1937,7 +1937,7 @@ async def offline_checkout(
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
 
-    if listing.get("winner_id") != current_user.id:
+    if listing.get("winner_id") != current_user.id and getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Only the auction winner can checkout")
 
     if listing.get("status") not in ("ended", "won", "pending_payment"):
@@ -2102,7 +2102,7 @@ async def get_offline_order(
     order = await db.offline_orders.find_one({"id": order_id}, {"_id": 0})
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-    if order.get("buyer_id") != current_user.id and order.get("seller_id") != current_user.id:
+    if order.get("buyer_id") != current_user.id and order.get("seller_id") != current_user.id and getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Not authorized")
     return order
 

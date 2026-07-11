@@ -165,6 +165,7 @@ _TYPE_PREFIX_MAP = {
     "lots":           "LOT",
     "multi_lot":      "LOT",
     "multi_item":     "LOT",
+    "vehicle_multi_lot": "VML",
     "vehicle":        "VEH",
     "vehicles":       "VEH",
     "vehicle_dealer": "VEH",

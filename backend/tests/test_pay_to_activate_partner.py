@@ -424,7 +424,7 @@ class TestHealthAndBasicEndpoints:
         assert response.status_code == 200
         data = response.json()
         assert "access_token" in data
-        assert data.get("user", {}).get("role") in ["admin", "superadmin"]
+        assert data.get("user", {}).get("role") in ["admin", "super_admin"]
         print(f"Admin login successful: {data['user'].get('email')}")
 
 

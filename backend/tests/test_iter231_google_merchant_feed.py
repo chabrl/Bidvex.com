@@ -111,18 +111,23 @@ def test_g_identifier_exists_is_no_for_auctions():
 
 
 def test_g_id_matches_listing_id_uuid_format():
-    """Three-Surface Mirroring proof: g:id must be the raw listing.id UUID."""
+    """Three-Surface Mirroring proof: g:id is the raw listing.id UUID for
+    single listings, or the iter344 per-lot form
+    `LOT-<uuid>-L<n>` / `VML-<uuid>-<hex8>` for decomposed multi-lot items."""
     status, body = _fetch(5)
     root = ET.fromstring(body)
     items = root.findall(".//item")
     import re
     uuid_re = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
+    lot_re = re.compile(r"^(LOT|VML)-[0-9a-z\-]+-(L\d+|[0-9a-f]{1,8})$", re.I)
     for it in items:
         gid = it.find("g:id", NS).text
         # Allow seed prefixes only when seed-padded
         if gid.startswith("BIDVEX-SEED-"):
             continue
-        assert uuid_re.match(gid), f"g:id must be a UUID matching listing.id: {gid!r}"
+        assert uuid_re.match(gid) or lot_re.match(gid), (
+            f"g:id must be a listing UUID or a per-lot id: {gid!r}"
+        )
 
 
 def test_g_id_matches_meta_csv_id_for_same_listing():

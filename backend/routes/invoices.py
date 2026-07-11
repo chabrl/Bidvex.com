@@ -241,7 +241,7 @@ async def generate_lots_won_invoice(
         lang: Language code ('en' or 'fr') - uses buyer's preference if not specified
     """
     # Check permissions (admin or own invoice)
-    if current_user.account_type != "admin" and current_user.id != user_id:
+    if current_user.account_type != "admin" and getattr(current_user, "role", None) not in ("admin", "super_admin") and current_user.id != user_id:
         raise HTTPException(status_code=403, detail="Not authorized")
     
     # Fetch auction
@@ -393,7 +393,7 @@ async def generate_payment_letter(
     Requires admin privileges or matching user_id
     """
     # Check permissions
-    if current_user.account_type != "admin" and current_user.id != user_id:
+    if current_user.account_type != "admin" and getattr(current_user, "role", None) not in ("admin", "super_admin") and current_user.id != user_id:
         raise HTTPException(status_code=403, detail="Not authorized")
     
     # Fetch auction
@@ -549,7 +549,7 @@ async def get_user_invoices(
     """Get all invoices for a user, each with a fresh signed download URL."""
     from services.cloud_storage import generate_signed_url
 
-    if current_user.account_type != "admin" and current_user.id != user_id:
+    if current_user.account_type != "admin" and getattr(current_user, "role", None) not in ("admin", "super_admin") and current_user.id != user_id:
         raise HTTPException(status_code=403, detail="Not authorized")
     
     invoices = await db.invoices.find({"user_id": user_id}, {"_id": 0}).to_list(100)

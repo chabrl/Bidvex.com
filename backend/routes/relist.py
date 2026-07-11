@@ -90,7 +90,7 @@ async def _resolve(db, listing_id: str):
 
 def _is_trusted_vehicle_seller(user_doc: Dict[str, Any]) -> bool:
     return bool(
-        user_doc.get("role") in ("admin", "superadmin")
+        user_doc.get("role") in ("admin", "super_admin")
         or user_doc.get("is_partner")
         or user_doc.get("is_vehicle_dealer")
         or user_doc.get("is_storage_facility")
@@ -106,7 +106,7 @@ async def relist_listing(
 ):
     db = get_db()
     user_id = user.id if hasattr(user, "id") else user.get("id")
-    is_admin = getattr(user, "role", None) in ("admin", "superadmin")
+    is_admin = getattr(user, "role", None) in ("admin", "super_admin")
 
     coll_name, section, doc = await _resolve(db, listing_id)
     if not doc:

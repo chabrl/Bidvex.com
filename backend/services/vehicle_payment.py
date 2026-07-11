@@ -33,7 +33,8 @@ class PaymentService:
         invoice_id: str,
         user_id: str,
         base_url: str,
-        origin_url: str
+        origin_url: str,
+        user_role: str = None
     ) -> Dict[str, Any]:
         """
         Create Stripe checkout session for invoice payment
@@ -44,8 +45,8 @@ class PaymentService:
         if not invoice:
             raise ValueError("Invoice not found")
         
-        # Verify user owns this invoice
-        if invoice.get("buyer_id") != user_id:
+        # Verify user owns this invoice (admins bypass)
+        if invoice.get("buyer_id") != user_id and user_role not in ("admin", "super_admin"):
             raise ValueError("Not authorized to pay this invoice")
         
         # Check if already paid

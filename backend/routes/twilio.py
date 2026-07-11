@@ -1722,6 +1722,17 @@ async def get_my_agreement_status(user: User = Depends(get_current_user)) -> Dic
     }
 
 
+@router.get("/admin/contractor-agreements")
+async def admin_list_contractor_agreements(user: User = Depends(require_admin)) -> Dict[str, Any]:
+    """iter344 — READ-ONLY admin access to signed contractor agreements
+    (legal audit records: name, IP, timestamp, version). There are
+    deliberately NO admin write/modify/delete endpoints for the
+    `contractor_agreements` collection — signing is contractor-only."""
+    db = get_db()
+    rows = await db.contractor_agreements.find({}, {"_id": 0}).sort("signed_at", -1).to_list(500)
+    return {"agreements": rows, "count": len(rows), "read_only": True}
+
+
 @router.post("/contractor/agreements/sign")
 async def sign_agreement(body: SignAgreementBody,
                           request: Request,

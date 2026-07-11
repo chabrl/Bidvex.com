@@ -4,7 +4,7 @@ Admin Edit Auction End Time.
 
 PATCH /api/admin/auctions/{listing_id}/end-time
 
-Allows admin/superadmin to extend or change the end time of a single-item
+Allows admin/super_admin to extend or change the end time of a single-item
 listing or multi-item auction. Produces an immutable audit trail and queues
 bilingual notification emails to the seller, all bidders (active + outbid),
 and watchlist subscribers.

@@ -40,6 +40,7 @@ LISTING_TYPE_TO_PATH = {
     "lots":        "lots",
     "multi_lot":   "lots",
     "vehicle":     "vehicle-auctions",
+    "vehicle_multi_lot": "vehicle-multi-lot",
     "storage":     "storage-auctions",
 }
 
@@ -53,6 +54,8 @@ COLLECTION_TO_TYPE = {
     "multi_item_listings": "lots",
     "vehicle_listings":    "vehicle",
     "storage_auctions":    "storage",
+    # iter344 BUG-3 — vehicle multi-lot EVENTS decompose into per-lot items.
+    "vehicle_multi_lot_auctions": "vehicle_multi_lot",
 }
 
 # iter289 — Per-section S3 placeholder URLs so listings missing images
@@ -65,6 +68,7 @@ COLLECTION_TO_TYPE = {
 _PLACEHOLDER_FALLBACK = f"{BIDVEX_BASE_URL}/assets/placeholder-ad.jpg"
 SECTION_PLACEHOLDERS = {
     "vehicle":     _PLACEHOLDER_FALLBACK,
+    "vehicle_multi_lot": _PLACEHOLDER_FALLBACK,
     "storage":     _PLACEHOLDER_FALLBACK,
     "lots":        _PLACEHOLDER_FALLBACK,
     "marketplace": _PLACEHOLDER_FALLBACK,
@@ -75,6 +79,7 @@ TYPE_PREFIX = {
     "marketplace": "MKT",
     "lots":        "LOT",
     "vehicle":     "VEH",
+    "vehicle_multi_lot": "VML",
     "storage":     "STO",
 }
 
@@ -636,6 +641,177 @@ def map_listing_to_meta_item(
     # didn't match the crawled-page current bid.
 
     return item
+
+
+# ── iter344 BUG-3 — Multi-lot decomposition (one catalog item per LOT) ─
+def _lot_image_urls(lot: Dict[str, Any]) -> List[str]:
+    """Direct S3 photo URLs from a lot. `images` is a list of URL strings;
+    vehicle lots store `media` as [{type, url, category}, …]."""
+    urls: List[str] = []
+    for u in (lot.get("images") or []):
+        if isinstance(u, str):
+            urls.append(u)
+    for m in (lot.get("media") or []):
+        if isinstance(m, dict) and isinstance(m.get("url"), str):
+            urls.append(m["url"])
+        elif isinstance(m, str):
+            urls.append(m)
+    return urls
+
+
+def map_multi_lot_listing_to_meta_items(
+    listing: Dict[str, Any],
+    listing_type: str,
+    seller: Dict[str, Any],
+    exclusion_counter: Dict[str, int],
+) -> List[Dict[str, Any]]:
+    """iter344 BUG-3 — Decompose a multi-lot auction (general `lots` or
+    `vehicle_multi_lot`) into ONE catalog item per lot so Google Merchant
+    and Meta list the individual purchasable lots instead of the parent
+    auction event.
+
+      • id   = "<PREFIX>-<parent_id>-L<lot_number>" (general) or
+               "VML-<parent_id>-<lot_id[:8]>" (vehicle multi-lot)
+      • link = lot-specific deep link `…/<parent_id>?lot=<ref>`
+      • image_link = the lot's own direct S3 photo URL
+      • availability flips per-lot (sold/ended lots → out of stock)
+    """
+    out: List[Dict[str, Any]] = []
+    status = (listing.get("status") or "").lower()
+    if status in ("pending_review", "manual_review"):
+        exclusion_counter["moderation_pending"] += 1
+        return out
+    if status not in ("active", "live", "ended", "sold", "closed", "completed"):
+        return out
+    if _is_demo(seller):
+        exclusion_counter["demo_account"] += 1
+        return out
+
+    parent_id = listing.get("id")
+    if not parent_id:
+        exclusion_counter["no_title"] += 1
+        return out
+
+    parent_title = _strip_html(listing.get("title"), 120) or "Auction event"
+    parent_ended = status in ("ended", "sold", "closed", "completed")
+    path = LISTING_TYPE_TO_PATH.get(listing_type, "lots")
+    prefix = TYPE_PREFIX.get(listing_type, "LOT")
+    lots = listing.get("lots") or []
+    # First lot with a city — vehicle multi-lot events carry location on
+    # each lot, not the parent.
+    first_lot_city = next(
+        (l for l in lots if isinstance(l, dict) and (l.get("location_city") or l.get("city"))),
+        {},
+    )
+
+    for lot in lots:
+        if not isinstance(lot, dict):
+            continue
+        lot_status = (lot.get("lot_status") or lot.get("status") or "").lower()
+        if lot_status in ("cancelled", "deleted", "draft"):
+            continue
+
+        if listing_type == "vehicle_multi_lot":
+            lot_ref = lot.get("id")
+            if not lot_ref:
+                continue
+            item_id = f"{prefix}-{parent_id}-{str(lot_ref)[:8]}"
+            lot_title = _strip_html(lot.get("title"), 150) or " ".join(
+                str(x) for x in (lot.get("year"), lot.get("make"), lot.get("model")) if x
+            ).strip()
+        else:
+            lot_ref = lot.get("lot_number")
+            if lot_ref is None:
+                continue
+            item_id = f"{prefix}-{parent_id}-L{lot_ref}"
+            lot_title = _strip_html(lot.get("title"), 150)
+        if not lot_title:
+            lot_title = f"{parent_title} — Lot {lot_ref}"
+
+        # Location — lot fields first, then parent fields.
+        city = (
+            lot.get("location_city") or lot.get("city")
+            or listing.get("city") or listing.get("location_city")
+            or first_lot_city.get("location_city") or first_lot_city.get("city")
+            or ""
+        ).strip()
+        region_iso = _iso_region_code(
+            lot.get("location_province") or lot.get("province")
+            or listing.get("region") or listing.get("province")
+            or listing.get("location_province")
+            or first_lot_city.get("location_province")
+        )
+        if not city or not region_iso:
+            exclusion_counter["no_location"] += 1
+            continue
+        region_iso_3166_2 = f"CA-{region_iso}"
+        lat = listing.get("latitude") or (listing.get("geo") or {}).get("lat")
+        lng = listing.get("longitude") or (listing.get("geo") or {}).get("lng")
+        if not lat or not lng:
+            lat, lng = _geocode(city, region_iso)
+        if FEED_REQUIRE_GEO and (not lat or not lng):
+            exclusion_counter["no_location"] += 1
+            continue
+
+        primary_image, extra_images = _first_valid_image(_lot_image_urls(lot), None)
+        if not primary_image:
+            primary_image = (
+                listing.get("placeholder_image_url")
+                or SECTION_PLACEHOLDERS.get(listing_type, BIDVEX_PLACEHOLDER_IMAGE)
+            )
+            exclusion_counter["placeholder_used"] = exclusion_counter.get("placeholder_used", 0) + 1
+
+        price_val = (
+            lot.get("current_bid") or lot.get("current_price")
+            or lot.get("high_bid") or lot.get("starting_price") or 0
+        )
+        sold_out = parent_ended or lot_status in ("ended", "sold")
+        description = _strip_html(lot.get("description"), 5000) or (
+            f"Lot {lot_ref} of {parent_title} — Listed on BidVex"
+        )
+
+        item: Dict[str, Any] = {
+            "id":              item_id,
+            "title":           lot_title,
+            "description":     description,
+            "availability":    "out of stock" if sold_out else "in stock",
+            "condition":       _map_condition(lot.get("condition")),
+            "price":           _price_str_from_value(price_val),
+            "link":            f"{BIDVEX_BASE_URL}/{path}/{parent_id}?lot={lot_ref}",
+            "image_link":      primary_image,
+            "brand":           _brand(listing),
+            "city":            city,
+            "region":          region_iso_3166_2,
+            "country":         "CA",
+            "postal_code":     _normalize_postal(
+                lot.get("location_postal_code") or listing.get("postal_code")
+            ),
+            "neighborhood":    city[:200],
+            "shipping": [{
+                "country": "CA",
+                "price":   "0 CAD",
+                "service": "Buyer Arranges Transport",
+            }],
+            "google_product_category": _google_product_category(
+                lot.get("category") or listing.get("category")
+                or ("vehicle" if listing_type == "vehicle_multi_lot" else None)
+            ),
+            "custom_label_0":  listing_type,
+            "custom_label_1":  listing.get("seller_account_type") or "individual",
+            "custom_label_2":  region_iso_3166_2,
+            "custom_label_3":  "auction_ending_soon" if _auction_ends_within_24h(listing) else "auction_active",
+        }
+        if lat and lng:
+            try:
+                item["latitude"]  = float(lat)
+                item["longitude"] = float(lng)
+            except (TypeError, ValueError):
+                pass
+        if extra_images:
+            item["additional_image_link"] = ",".join(extra_images)
+        out.append(item)
+
+    return out
 
 
 # ── Seed items — Meta Commerce Manager 5-product minimum ─────────────

@@ -62,7 +62,7 @@ class TestSubscriptionOverrideSystem:
         # If test user not found, use first non-admin user
         if not test_user:
             for user in users:
-                if user.get("role") not in ["admin", "superadmin", "super_admin"]:
+                if user.get("role") not in ["admin", "super_admin"]:
                     test_user = user
                     break
         

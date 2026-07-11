@@ -78,6 +78,58 @@ async def require_admin(credentials: HTTPAuthorizationCredentials):
     return current_user
 
 
+# ─── iter344 — Admin Impersonation (P0 superuser) ───
+
+@admin_router.post("/impersonate/{user_id}")
+async def impersonate_user(
+    user_id: str,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """Mint a 1-hour JWT for the target user carrying an `impersonated_by`
+    claim. Admins cannot impersonate other admin accounts."""
+    current_user = await require_admin(credentials)
+    db = get_db()
+    target = await db.users.find_one({"id": user_id}, {"_id": 0, "password": 0})
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+    if target.get("role") in ("admin", "super_admin"):
+        raise HTTPException(status_code=403, detail={
+            "error": "cannot_impersonate_admin",
+            "message_en": "Admin accounts cannot be impersonated.",
+            "message_fr": "Les comptes administrateurs ne peuvent pas être usurpés.",
+        })
+    jwt_secret = os.environ.get("JWT_SECRET", "dev-secret-key-change-in-production")
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(hours=1)
+    token = jwt.encode({
+        "sub": user_id,
+        "email": target.get("email"),
+        "type": "access",
+        "impersonated_by": current_user.id,
+        "exp": expires_at,
+    }, jwt_secret, algorithm="HS256")
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "action": "impersonation_started",
+        "admin_id": current_user.id,
+        "admin_email": current_user.email,
+        "target_user_id": user_id,
+        "target_email": target.get("email"),
+        "details": {"expires_at": expires_at.isoformat()},
+        "timestamp": now.isoformat(),
+    })
+    return {
+        "access_token": token,
+        "expires_in": 3600,
+        "user": {
+            "id": target.get("id"),
+            "name": target.get("name"),
+            "email": target.get("email"),
+            "role": target.get("role"),
+        },
+    }
+
+
 # ========== USER MANAGEMENT ==========
 
 @admin_router.get("/users")

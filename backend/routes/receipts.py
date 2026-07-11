@@ -41,7 +41,7 @@ async def get_receipt(receipt_id: str, user=Depends(get_current_user)):
     row = await db.receipts.find_one({"id": receipt_id}, {"_id": 0})
     if not row:
         raise HTTPException(status_code=404, detail="Receipt not found")
-    is_admin = getattr(user, "role", None) in ("admin", "superadmin")
+    is_admin = getattr(user, "role", None) in ("admin", "super_admin")
     if row.get("user_id") != user_id and not is_admin:
         raise HTTPException(status_code=403, detail="Not your receipt")
     return row

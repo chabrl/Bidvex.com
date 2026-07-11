@@ -1749,6 +1749,13 @@ async def create_critical_indexes(database):
                     logger.warning(f"[critical-index] mobile index migration failed: {e2}")
             logger.warning(f"[critical-index] {coll} {keys}: {e}")
     logger.info(f"✅ Critical database indexes verified ({ok}/{len(critical)} ok)")
+    # iter344 — canonical role normalization: "superadmin" → "super_admin"
+    try:
+        res = await database.users.update_many({"role": "superadmin"}, {"$set": {"role": "super_admin"}})
+        if res.modified_count:
+            logger.info(f"[role-normalize] migrated {res.modified_count} user(s) superadmin → super_admin")
+    except Exception as e:
+        logger.warning(f"[role-normalize] failed: {e}")
 
 
 # ─── Static Frontend & SPA Catch-All (MUST be last) ───

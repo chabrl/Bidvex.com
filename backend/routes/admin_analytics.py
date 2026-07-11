@@ -158,7 +158,7 @@ async def get_admin_analytics(
     users = [u for u in users if not u.get("is_demo")]
     users_by_role: Dict[str, int] = defaultdict(int)
     for u in users:
-        if u.get("role") in ("admin", "superadmin"):
+        if u.get("role") in ("admin", "super_admin"):
             users_by_role["admin"] += 1
         elif u.get("is_vehicle_dealer"):
             users_by_role["vehicle_dealer"] += 1

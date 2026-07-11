@@ -216,6 +216,20 @@ export default function AdminDialer() {
       toast.error(fr ? 'Le numéro doit être au format E.164 (+14155550123).' : 'Phone must be E.164 format (+14155550123).');
       return;
     }
+    // iter344 BUG-1 — pre-call microphone check (Twilio 31402 AcquisitionFailedError guard).
+    // Verify the browser can actually acquire audio BEFORE placing the call.
+    if (twilioDevice && deviceReady) {
+      try {
+        const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        micStream.getTracks().forEach((t) => t.stop());
+      } catch (micErr) {
+        console.error('[dialer] mic pre-check failed:', micErr);
+        toast.error(fr
+          ? "Impossible d'accéder au microphone. Vérifiez les permissions du navigateur et qu'aucune autre application n'utilise le micro, puis réessayez."
+          : 'Cannot access your microphone. Check browser permissions and make sure no other app is using the mic, then try again.');
+        return;
+      }
+    }
     try {
       const r = await axios.post(`${API_BASE}/twilio/call`, {
         client_phone: phone.trim(),

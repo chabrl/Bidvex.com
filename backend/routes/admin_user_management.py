@@ -455,6 +455,17 @@ async def admin_reset_password(
         action="reset_password", target_user_id=user_id,
         content={"email_sent": sent},
     )
+    # iter344 — explicit Admin Logs entry per spec
+    try:
+        await db.admin_logs.insert_one({
+            "id": str(uuid.uuid4()),
+            "action": "password_reset_triggered",
+            "admin_id": current_user.id,
+            "target_user_id": user_id,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        })
+    except Exception as exc:
+        logger.warning(f"[admin_reset_password] admin_logs write failed: {exc}")
     return {"success": sent, "email_sent": sent}
 
 

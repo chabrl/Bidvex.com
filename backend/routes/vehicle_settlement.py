@@ -300,7 +300,7 @@ async def dealer_confirm_settlement(
     db = get_db()
     settlement = await _load_settlement_or_404(db, vehicle_id)
 
-    if settlement.get("seller_id") != current_user.id:
+    if settlement.get("seller_id") != current_user.id and getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="You are not the dealer for this vehicle")
 
     if settlement.get("settlement_status") not in {"AWAITING_DEALER_CONFIRMATION", "DISPUTED"}:
@@ -430,7 +430,7 @@ async def upload_settlement_proof(
 
     db = get_db()
     settlement = await _load_settlement_or_404(db, vehicle_id)
-    if settlement.get("seller_id") != current_user.id:
+    if settlement.get("seller_id") != current_user.id and getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="You are not the dealer for this vehicle")
 
     if file.content_type not in ALLOWED_PROOF_MIME:
@@ -540,7 +540,7 @@ async def buyer_acknowledge_settlement(
     """Buyer confirms receipt — transitions DEALER_CONFIRMED → FULLY_SETTLED."""
     db = get_db()
     settlement = await _load_settlement_or_404(db, vehicle_id)
-    if settlement.get("buyer_id") != current_user.id:
+    if settlement.get("buyer_id") != current_user.id and getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="You are not the buyer for this vehicle")
     if settlement.get("settlement_status") != "DEALER_CONFIRMED":
         raise HTTPException(
@@ -579,7 +579,7 @@ async def buyer_dispute_settlement(
     """Buyer disputes the dealer's confirmation. Escalates to admin queue."""
     db = get_db()
     settlement = await _load_settlement_or_404(db, vehicle_id)
-    if settlement.get("buyer_id") != current_user.id:
+    if settlement.get("buyer_id") != current_user.id and getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="You are not the buyer for this vehicle")
     if settlement.get("settlement_status") not in {"AWAITING_DEALER_CONFIRMATION", "DEALER_CONFIRMED"}:
         raise HTTPException(

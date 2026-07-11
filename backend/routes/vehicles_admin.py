@@ -731,8 +731,8 @@ async def pay_invoice(
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
     
-    # Verify buyer owns the invoice
-    if invoice.get("buyer_id") != user["id"]:
+    # Verify buyer owns the invoice (admins bypass)
+    if invoice.get("buyer_id") != user["id"] and user.get("role") not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Not authorized to pay this invoice")
     
     if invoice.get("payment_status") == InvoiceStatus.PAID:
@@ -986,7 +986,8 @@ async def create_invoice_checkout(
             invoice_id,
             user["id"],
             base_url,
-            origin_url
+            origin_url,
+            user.get("role")
         )
         return result
     except ValueError as e:

@@ -88,9 +88,12 @@ async def get_trust_scores(current_user: User = Depends(get_current_user)):
     
     scores = []
     for user in users:
-        trust_score = await calculate_trust_score(user["id"])
+        uid = user.get("id")
+        if not uid:
+            continue
+        trust_score = await calculate_trust_score(uid)
         scores.append({
-            "user_id": user["id"],
+            "user_id": uid,
             "name": user.get("name"),
             "email": user.get("email"),
             "trust_score": trust_score,

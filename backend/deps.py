@@ -107,7 +107,7 @@ async def get_current_user(request: Request, credentials: Optional[HTTPAuthoriza
 
 async def require_admin(current_user: User = Depends(get_current_user)) -> User:
     """Unified admin gate — use as a FastAPI dependency on any admin route."""
-    if current_user.role not in ("admin", "superadmin"):
+    if current_user.role not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
 

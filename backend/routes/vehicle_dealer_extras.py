@@ -99,7 +99,7 @@ async def admin_list_dealer_licenses(
     user: dict = Depends(get_current_user),
 ):
     """Admin: list all license submissions (optionally filtered by status)."""
-    if user.get("role") not in ("admin", "superadmin"):
+    if user.get("role") not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Admin access required")
     db = _get_db()
     query = {}
@@ -119,7 +119,7 @@ async def admin_pilot_conversions(
     Admin: count vehicle listings sourced from a specific utm_source (default = pilot welcome banner).
     Returns total and a sample of the most recent 25 listings (id, title, seller_id, created_at).
     """
-    if user.get("role") not in ("admin", "superadmin"):
+    if user.get("role") not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Admin access required")
     db = _get_db()
     query = {"utm_source": utm_source}
@@ -138,7 +138,7 @@ async def admin_decide_dealer_license(
     user: dict = Depends(get_current_user),
 ):
     """Admin approves or rejects a license. Sends bilingual email to user on status change."""
-    if user.get("role") not in ("admin", "superadmin"):
+    if user.get("role") not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Admin access required")
     db = _get_db()
 
@@ -280,7 +280,7 @@ async def get_unlock_fee_quote(listing_id: str, user: dict = Depends(get_current
     )
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
-    if listing.get("winner_id") != user["id"]:
+    if listing.get("winner_id") != user["id"] and user.get("role") not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Only the winning bidder can pay the unlock fee")
     if listing.get("unlock_paid_at"):
         raise HTTPException(status_code=400, detail="Unlock fee already paid")
@@ -315,7 +315,7 @@ async def create_unlock_fee_checkout(
     listing = await db.vehicle_listings.find_one({"id": listing_id}, {"_id": 0})
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
-    if listing.get("winner_id") != user["id"]:
+    if listing.get("winner_id") != user["id"] and user.get("role") not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Only the winning bidder can pay the unlock fee")
     if listing.get("unlock_paid_at"):
         raise HTTPException(status_code=400, detail="Unlock fee already paid")
@@ -382,7 +382,7 @@ async def confirm_unlock_fee(
     listing = await db.vehicle_listings.find_one({"id": listing_id}, {"_id": 0})
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
-    if listing.get("winner_id") != user["id"]:
+    if listing.get("winner_id") != user["id"] and user.get("role") not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Only the winning bidder")
     if listing.get("unlock_paid_at"):
         return {"success": True, "already_unlocked": True}
@@ -415,7 +415,7 @@ async def get_dealer_contact_after_unlock(
     listing = await db.vehicle_listings.find_one({"id": listing_id}, {"_id": 0})
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
-    if listing.get("winner_id") != user["id"]:
+    if listing.get("winner_id") != user["id"] and user.get("role") not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Only the winning bidder can view dealer contact")
     if not listing.get("unlock_paid_at"):
         raise HTTPException(

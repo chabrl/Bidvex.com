@@ -385,7 +385,7 @@ async def get_settle_context(listing_id: str, current_user: User = Depends(get_c
     doc, _coll, section = await _find_listing(db, listing_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Listing not found")
-    if _winner_id(doc) != current_user.id:
+    if _winner_id(doc) != current_user.id and getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Only the winning buyer can settle this payment")
 
     status = _payment_status(doc)
@@ -424,7 +424,7 @@ async def settle_payment(listing_id: str, current_user: User = Depends(get_curre
     doc, coll, section = await _find_listing(db, listing_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Listing not found")
-    if _winner_id(doc) != current_user.id:
+    if _winner_id(doc) != current_user.id and getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Only the winning buyer can settle this payment")
 
     status = _payment_status(doc)

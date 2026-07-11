@@ -648,7 +648,7 @@ async def create_promotion(data: Dict[str, Any], current_user: User = Depends(ge
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
     
-    if listing["seller_id"] != current_user.id:
+    if listing["seller_id"] != current_user.id and getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Not authorized to promote this listing")
     
     promotion_id = str(uuid.uuid4())

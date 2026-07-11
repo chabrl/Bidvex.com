@@ -213,7 +213,7 @@ async def buyer_request_clearance(
             "message_en": "No cleanout hold exists for this invoice.",
             "message_fr": "Aucune retenue de sécurité n'existe pour cette facture.",
         })
-    if hold.get("buyer_id") != current_user.id and (getattr(current_user, "role", "") or "").lower() not in ("admin", "superadmin"):
+    if hold.get("buyer_id") != current_user.id and (getattr(current_user, "role", "") or "").lower() not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Only the buyer or an admin can request clearance.")
     if hold.get("status") in {"released", "forfeited", "captured", "pending_verification"}:
         # Idempotent — return current state.
@@ -283,7 +283,7 @@ async def buyer_get_cleanout_status(
     if not hold:
         return {"has_hold": False}
     invoice = await db.broker_invoices.find_one({"id": invoice_id}, {"_id": 0})
-    if hold.get("buyer_id") != current_user.id and (getattr(current_user, "role", "") or "").lower() not in ("admin", "superadmin"):
+    if hold.get("buyer_id") != current_user.id and (getattr(current_user, "role", "") or "").lower() not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Not authorized")
 
     # Compute deadline
