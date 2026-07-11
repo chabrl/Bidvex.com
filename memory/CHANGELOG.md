@@ -1716,3 +1716,39 @@ EMERGENT_LLM_KEY=sk-emergent-…         (optional; preview uses it. If missing 
 - NEW backend/tests/test_iter342_sprint.py (24 tests) — all pass; iter338/340/341 suites pass (59 total)
 - test_iter318_careers_live.py now module-skips when its seed job is archived (admin archived it in live data — environmental, not code)
 - Testing agent iteration_338.json: backend 100%, frontend ~100% after fixes
+
+## iter343 — Six Regression Fixes (2026-07-11) — root-cause-first, 21 new tests + 88 prior tests pass
+
+### BUG 1 — Map search (ROOT CAUSE: /marketplace/items/geo queried ONLY db.listings)
+- geo_search.py rewritten: unions 5 collections (listings, multi_item_listings, vehicle_listings, vehicle_multi_lot_auctions event-level, storage_auctions) with normalized card shape + `_section` + `detail_path`; 2dsphere indexes ensured on all 5 (previously only 2)
+- Creation-time geo (city centroid via build_geo_point) added to multi-item, vehicle multi-lot event (first lot's city) and storage creation — these NEVER stored coordinates before
+- scripts/backfill_geo.py — idempotent backfill, run twice (verified idempotent). MapSearchPanel popup + HomePage getItemDetailPath now use detail_path
+- UI verified: 6 markers at Montréal; storage popup links to /storage-auctions/{id}
+
+### BUG 2 — Homepage (ROOT CAUSE: all carousel queries hit ONLY db.listings; featured read ONLY is_promoted)
+- /carousel/featured: reads is_promoted OR is_featured across all 5 collections; /carousel/ending-soon merges multi_item + live vehicle_multi_lot events; new-listings + hot-items merge multi_item
+- ManageAllAuctions: stale `disabled` on Feature button for multi rows removed (backend feature toggle was already cross-collection since iter290)
+- Verified: featured returns ui343-multi (/lots/ path) + ui343-vehicle; /lots/{id} nav works
+
+### BUG 3 — Twilio (ROOT CAUSE: TWILIO_AUTH_TOKEN in env was the ROTATED token 5160a348…)
+- Updated env to user-provided 6c24a71b… → live REST auth check now logs "✅ Twilio Auth Token: VALID"; /api/twilio/config auth_valid=true
+- Env audit: ACCOUNT_SID ✓, AUTH_TOKEN ✓ (fixed), PHONE_NUMBER ✓ (+1 CA), TWIML_APP_SID ✓ (APaedb0af0…), API_KEY ✓ (SKa375587b…), API_SECRET ✓
+- REAL TEST CALL still needs Charbel (agent cannot place calls); TwiML app URLs must be confirmed in Twilio Console. PRODUCTION env var must be updated too + redeploy
+
+### BUG 4 — Admin per-lot editing (ROOT CAUSE: no lot-edit endpoint existed at all; admin UI navigated away)
+- NEW PUT /api/admin/multi-item-listings/{id}/lots/{lot_number} + PUT /api/admin/vehicle-multi-lot-auctions/{event_id}/lots/{lot_id} (admin-only) — all fields (title/title_fr/description/category/quantity/prices/condition/location/images + vehicle vin/year/make/model/mileage); syncs current_bid on bid-less lots; writes field-level diff to admin_logs {admin_id, event_id, lot_id, fields_changed, previous_values, new_values, timestamp}
+- NEW AdminLotEditorModal.js + "Lots" button per multi row in ManageAllAuctions — UI-verified E2E (edit persisted + audit row confirmed)
+
+### BUG 5 — Watchlist (ROOT CAUSES: silent drops of dead lookups → count mismatch; lots render current_price but raw lots only carry current_bid; vehicle/storage types unsupported)
+- GET /watchlist: unavailable placeholders ("This listing has ended / Cette annonce est terminée" card), lot price normalization, vehicles+storage sections, single $in parent fetch, total = resolved + unavailable
+- watchlist/add accepts vehicle + storage types; WatchlistButton added to VehicleDetailPage + StorageAuctionDetail; WatchlistButton now has data-testid
+- UI-verified: marketplace + vehicle + storage all appear on /watchlist with prices
+
+### BUG 6 — Quantity (BID MODEL CONFIRMED: bids are PER-LOT totals by DEFAULT; PER-ITEM × quantity ONLY when listing.multiply_hammer_by_quantity=true — same rule the fee engine + payments use at charge time)
+- CostBreakdown: quantity/multiplyByQuantity props → "Quantity: N items" row always shown for N>1; per-item mode shows "Price per item" + "Hammer Price (N × unit)" and multiplies the fee-preview hammer; per-lot mode labels "Hammer Price (total for N items)"
+- BidConfirmationDialog: same semantics + quantity row; tax calc uses effective hammer
+- UI-verified: bid $30 on qty-10 per-item listing → "Quantity 10 items / $30.00 per item / Hammer (10 × unit) $300.00"
+
+### Misc
+- test users testbuyer/testseller re-seeded (missing after fork); persistent ui343-* UI-test listings seeded (see test_credentials.md)
+- tests/test_iter343_regressions.py (21 tests) — all pass; zero regressions on 88 prior tests

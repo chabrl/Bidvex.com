@@ -43,6 +43,12 @@ const VEHICLE_EXTRA_FIELDS = [
   { key: 'location_province', label: 'Province',  type: 'text' },
 ];
 
+const errText = (e, fallback) => {
+  const d = e?.response?.data?.detail;
+  if (typeof d === 'string') return d;
+  return d?.message_en || d?.message || fallback;
+};
+
 export default function AdminLotEditorModal({ open, onOpenChange, listing, headers }) {
   const isVehicle = listing?._section === 'vehicle_multi' || listing?._section === 'vehicle_multi_lot';
   const [loading, setLoading] = useState(false);
@@ -63,7 +69,7 @@ export default function AdminLotEditorModal({ open, onOpenChange, listing, heade
       const doc = r.data?.event || r.data?.listing || r.data;
       setLots(Array.isArray(doc?.lots) ? doc.lots : []);
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Failed to load lots');
+      toast.error(errText(e, 'Failed to load lots'));
     } finally {
       setLoading(false);
     }
@@ -103,7 +109,7 @@ export default function AdminLotEditorModal({ open, onOpenChange, listing, heade
       setEditingLot(null);
       fetchLots();
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Failed to save lot');
+      toast.error(errText(e, 'Failed to save lot'));
     } finally {
       setSaving(false);
     }

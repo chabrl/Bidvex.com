@@ -116,6 +116,7 @@ const WatchlistButton = ({
     <button
       onClick={handleToggleWatchlist}
       disabled={isLoading}
+      data-testid={`watchlist-btn-${itemType}-${itemId}`}
       className={`
         inline-flex items-center gap-2 transition-all duration-200
         hover:scale-110 active:scale-95
