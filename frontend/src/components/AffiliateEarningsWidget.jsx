@@ -7,7 +7,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import { DollarSign, TrendingUp, Users, Loader2, ArrowRight } from 'lucide-react';
+import { DollarSign, TrendingUp, Users, Loader2, ArrowRight, Share2, Copy } from 'lucide-react';
 import API_BASE from '../config';
 import { useAuth } from '../contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -49,6 +49,8 @@ export const AffiliateEarningsWidget = () => {
   const [loadError, setLoadError] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [requesting, setRequesting] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const [refLink, setRefLink] = useState('');
 
   const headers = { Authorization: `Bearer ${token}` };
 
@@ -91,6 +93,45 @@ export const AffiliateEarningsWidget = () => {
     } catch (e) {
       toast.error(e?.response?.data?.detail || (fr ? 'Échec de la demande de paiement' : 'Payout request failed'));
     } finally { setRequesting(false); }
+  };
+
+  // iter340 P1 — generate + download the Pillow share card PNG.
+  const handleShareCard = async () => {
+    setSharing(true);
+    try {
+      const res = await fetch(`${API_BASE}/affiliate/share-card?lang=${fr ? 'fr' : 'en'}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.detail || `HTTP ${res.status}`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'bidvex-earnings-projection.png';
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success(fr ? 'Carte de projection téléchargée !' : 'Projection card downloaded!');
+    } catch (e) {
+      toast.error(e.message || (fr ? 'Échec de la génération de la carte' : 'Card generation failed'));
+    } finally { setSharing(false); }
+  };
+
+  const handleCopyLink = async () => {
+    try {
+      let link = refLink;
+      if (!link) {
+        const r = await axios.get(`${API_BASE}/affiliate/my-referral-link`, { headers });
+        link = r.data?.referral_link || '';
+        setRefLink(link);
+      }
+      await navigator.clipboard.writeText(link);
+      toast.success(fr ? 'Lien de parrainage copié !' : 'Referral link copied!');
+    } catch {
+      toast.error(fr ? 'Échec de la copie du lien' : 'Failed to copy link');
+    }
   };
 
   if (loading) {
@@ -194,6 +235,29 @@ export const AffiliateEarningsWidget = () => {
             {requesting ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : null}
             {fr ? 'Demander un paiement' : 'Request Payout'}
             <ArrowRight className="h-3.5 w-3.5 ml-1" />
+          </Button>
+        </div>
+
+        {/* iter340 P1 — share card + copy link */}
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            className="flex-1 bg-[#0B2545] hover:bg-[#123869] text-white"
+            onClick={handleShareCard}
+            disabled={sharing}
+            data-testid="ew-share-card-btn"
+          >
+            {sharing ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Share2 className="h-3.5 w-3.5 mr-1.5" />}
+            {fr ? 'Partager ma projection' : 'Share My Projection'}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleCopyLink}
+            data-testid="ew-copy-link-btn"
+          >
+            <Copy className="h-3.5 w-3.5 mr-1.5" />
+            {fr ? 'Copier le lien' : 'Copy Link'}
           </Button>
         </div>
 

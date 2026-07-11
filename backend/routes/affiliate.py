@@ -522,3 +522,52 @@ async def get_commission_events(
         })
     return {"items": items, "total": total, "page": page, "limit": limit,
             "has_more": page * limit < total}
+
+
+# ─── iter340 P1 — "Share My Projection" social card ───────────────────
+
+SHARE_CARD_DAILY_LIMIT = 10
+
+
+@affiliate_router.get("/share-card")
+async def get_share_card(lang: str = "en",
+                         current_user: User = Depends(get_current_user)):
+    """On-demand 600×315 PNG share card (Pillow + QR). Never stored in S3.
+    Rate-limited to 10 generations per affiliate per day."""
+    import asyncio
+    from pymongo import ReturnDocument
+    from services.share_card import build_share_card_png
+
+    db = get_db()
+    lang = "fr" if str(lang or "").lower().startswith("fr") else "en"
+
+    today = _now().date().isoformat()
+    counter = await db.share_card_generations.find_one_and_update(
+        {"user_id": current_user.id, "date": today},
+        {"$inc": {"count": 1},
+         "$setOnInsert": {"user_id": current_user.id, "date": today}},
+        upsert=True, return_document=ReturnDocument.AFTER,
+    )
+    if (counter or {}).get("count", 1) > SHARE_CARD_DAILY_LIMIT:
+        raise HTTPException(429, "Daily share-card limit reached (10/day). Try again tomorrow.")
+
+    code = await _ensure_referral_code(db, current_user.id)
+    rows = await _load_commission_rows(db, current_user.id)
+    now = _now()
+    monthly: Dict[tuple, float] = {}
+    for r in rows:
+        dt = r["created_at"]
+        if dt:
+            key = (dt.year, dt.month)
+            monthly[key] = monthly.get(key, 0.0) + r["amount"]
+    projection, _basis = compute_projection(monthly, now)
+
+    png = await asyncio.to_thread(
+        build_share_card_png, projection, _public_referral_link(code), lang)
+    return Response(
+        content=png, media_type="image/png",
+        headers={
+            "Content-Disposition": 'inline; filename="bidvex-earnings-projection.png"',
+            "Cache-Control": "no-store",
+        },
+    )

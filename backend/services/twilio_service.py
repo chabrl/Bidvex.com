@@ -166,6 +166,10 @@ def build_outbound_twiml(client_phone_number: str,
     """
     if not TWILIO_SDK_AVAILABLE:
         raise RuntimeError("Twilio SDK not installed")
+    # iter340 P0 — defense-in-depth: the dialed destination must never be
+    # the BidVex main line itself (callerId and destination are separate).
+    if TWILIO_PHONE_NUMBER and client_phone_number == TWILIO_PHONE_NUMBER:
+        raise ValueError("Refusing to build TwiML that dials TWILIO_PHONE_NUMBER (self-dial guard)")
     response = VoiceResponse()
 
     if coach_stream_url and coach_nonce:

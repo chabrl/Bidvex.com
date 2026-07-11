@@ -171,11 +171,16 @@ const VehicleListingCard = ({ vehicle, countdown, onClick, onQuickView, compact 
       className="group relative flex flex-col rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 overflow-hidden focus-within:ring-2 focus-within:ring-cyan-500"
       data-testid={`vehicle-card-${vehicle.id}`}
     >
-      {/* Image — explicit aspect-ratio prevents CLS */}
-      <button
-        type="button"
+      {/* Image — explicit aspect-ratio prevents CLS.
+          iter340 — role="button" div instead of <button>: the quick-view
+          overlay contains a real <button>, and interactive elements must
+          not nest (React DOM warning). Visual output is identical. */}
+      <div
+        role="button"
+        tabIndex={0}
         onClick={onClick}
-        className="relative block aspect-[16/10] w-full bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 overflow-hidden"
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick?.(); } }}
+        className="relative block aspect-[16/10] w-full bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 overflow-hidden cursor-pointer"
         aria-label={cardTitle}
         data-testid={`vehicle-card-image-${vehicle.id}`}
       >
@@ -308,7 +313,7 @@ const VehicleListingCard = ({ vehicle, countdown, onClick, onQuickView, compact 
             </button>
           </div>
         )}
-      </button>
+      </div>
 
       {/* Body */}
       <div className="flex flex-col flex-1 p-4 gap-3">

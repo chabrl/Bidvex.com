@@ -139,6 +139,11 @@ const AdminErrorLogsPage = lazy(() => import('./pages/admin/AdminErrorLogsPage')
 const VehicleMultiLotDetailPage = lazy(() => import('./pages/vehicles/VehicleMultiLotDetailPage'));
 // iter316 Phase B — Twilio Dialer + AI Voice Intelligence + Contractor surfaces
 const AdminDialer = lazy(() => import('./pages/admin/AdminDialer'));
+const PromoCanadaDayPage = lazy(() => import('./pages/PromoCanadaDayPage'));
+
+// iter340 — /register deep links (promo campaigns) redirect to /auth
+// preserving the query string (?promo=canada-day etc.).
+const RegisterRedirect = () => <Navigate to={`/auth${window.location.search}`} replace />;
 const ContractorDashboard = lazy(() => import('./pages/contractor/ContractorDashboard'));
 // iter317 Directive 3 — Contractor Email Hub
 const ContractorEmailHub = lazy(() => import('./pages/contractor/ContractorEmailHub'));
@@ -455,6 +460,9 @@ const App = () => {
           <Route path="/auth" element={<AuthPage />} />
           {/* iter293 — /login is a common deep link; redirect to /auth */}
           <Route path="/login" element={<Navigate to="/auth" replace />} />
+          {/* iter340 — promo campaign deep links */}
+          <Route path="/register" element={<RegisterRedirect />} />
+          <Route path="/promo/canada-day" element={<ErrorBoundary scope="promo-canada-day"><PromoCanadaDayPage /></ErrorBoundary>} />
           <Route path="/auth/google/finish" element={<GoogleAuthFinishPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />

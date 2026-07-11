@@ -1,0 +1,28 @@
+{
+  "summary": "iter340 UI E2E + backend spot-check testing complete. All 4 iter340 deliverables verified working on preview: (1) Canada Day promo landing page EN + FR bilingual copy correct, white headline on navy bg, 4 feature blocks, trust badges, CTA works. (2) CTA → /auth?promo=canada-day lands on REGISTER tab with canada-day banner visible; /register?promo=canada-day correctly redirects preserving query string. (3) End-to-end MongoDB verification: registering with promo_code='canada-day' sets first_listing_free=true, first_month_free=true, promo_code_used='canada-day'; control registration WITHOUT promo has all three fields None (regression intact). (4) Backend GET /api/affiliate/share-card returns 401 unauth, 200 image/png 600x315 (~27KB) for both lang=en and lang=fr. (5) Affiliate earnings widget on /affiliate shows both new buttons: Copy Link → 'Referral link copied!' toast fires; Share My Projection → triggers bidvex-earnings-projection.png download (27054 bytes) + 'Projection card downloaded!' toast. (6) /vehicle-auctions: console clean — NO 'validateDOMNesting' / 'cannot be a descendant of <button>' warnings; div role=button fix in VehicleListingCard.js line 178-186 verified in code. (7) Regression: invalid trial coupon /auth?promo=BVX-TRIAL-INVALID123 renders '⚠️ Trial code not applied' banner without crash. (8) Admin login charbel911@gmail.com → /admin Admin Control Panel renders (User Management + Vehicles + Dialer & Contractors tabs).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/vehicle-auctions", "issues": ["Preview env has ZERO active vehicle listings so VehicleListingCard could not be visually rendered on public pages (Homepage carousel, Marketplace, Vehicle Auctions all empty). Button-nesting fix verified only via absence of console warning + source-code review. If main agent wants a visual test, seed at least one live vehicle auction."]},
+      {"screen": "Global (all pages)", "issues": ["Duplicate [Meta Pixel] warning appears twice on every page — 'Duplicate Pixel ID: 825987810565038.' Pre-existing, not iter340-related. Consider deduping the pixel snippet load."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter340_dialer_sharecard_promo.py"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "AuthPage.js line 60: promo query is upper-cased then compared to 'CANADA-DAY' (uppercase) — works, but slightly inconsistent with the registration payload that sends the lowercase 'canada-day'. Not a bug; just note for future consistency.",
+    "VehicleListingCard.js line 178: div role=button correctly replaces outer <button>. Ensure focus-visible ring is still applied via focus-within:ring-2 on the article (line 171) — already present, good.",
+    "AffiliateEarningsWidget.jsx uses fetch() for share-card while everything else uses axios — inconsistent, but intentional (need blob() response); consider adding a short comment or use axios responseType:'blob' for consistency.",
+    "PromoCanadaDayPage.jsx line 78: uses navigate('/auth?promo=canada-day') hard-coded — fine, but could route through a constant if reused. Non-blocking."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "testbuyer@bidvex.com / TestBuyer2026! (re-seeded via /app/backend/scripts/iter308_reseed_test_fixtures.py — testbuyer credentials had drifted again on preview; script was re-run and login now works). Admin charbel911@gmail.com / Anderosli123!@# works.",
+  "seed_data_creation": "Re-ran /app/backend/scripts/iter308_reseed_test_fixtures.py to fix drifted testbuyer/testseller/testdealer bcrypt hashes. 2 throwaway TEST_iter340_*@bidvex.com users were created during MongoDB flag verification and cleaned up (db.users.delete_many prefix='test_iter340_').",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All iter340 UI E2E + Mongo persistence checks passed. Preview env has zero live vehicle auctions so VehicleListingCard cannot be visually validated on public listing pages — the button-nesting fix was confirmed only via clean console + source review. testbuyer credentials will likely drift again; run iter308_reseed_test_fixtures.py if login returns 401. Twilio real-call testing is still blocked by invalid preview auth token (known env issue).",
+  "rca of the issue": "N/A — no issues found. testbuyer 401 was resolved by re-running the standard reseed script (recurring drift, not iter340 bug)."
+}

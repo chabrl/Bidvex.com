@@ -323,7 +323,33 @@ async def twiml_webhook(request: Request) -> Response:
     form = dict((await request.form()))
     await _verify_twilio_signature(request, form)
 
-    to_number = form.get("To") or form.get("Called") or ""
+    # iter340 P0 — direction-aware routing guard.
+    # SDK-originated outbound legs have From="client:agent-...". Only those
+    # may bridge to an arbitrary number. Anything else (inbound calls to the
+    # BidVex main line whose voice handler is this same TwiML App, fallback
+    # retries with no custom To param, etc.) must NEVER be answered with
+    # <Dial><Number>TWILIO_PHONE_NUMBER</Number></Dial> — that self-dial was
+    # how calls ended up ringing the BidVex main line instead of the client.
+    from_field = (form.get("From") or form.get("Caller") or "").strip()
+    direction  = (form.get("Direction") or "").lower()
+    to_number  = (form.get("To") or "").strip()
+    is_sdk_outbound = from_field.startswith("client:")
+
+    if not is_sdk_outbound or (TWILIO_PHONE_NUMBER and to_number == TWILIO_PHONE_NUMBER):
+        if is_sdk_outbound:
+            logger.error(f"[twiml] REFUSED self-dial of main line (from={from_field})")
+            raise HTTPException(400, "refusing to dial the BidVex main number")
+        # Inbound call to the BidVex main line — greet, never self-dial.
+        logger.info(f"[twiml] inbound call handled (from={from_field}, direction={direction})")
+        from twilio.twiml.voice_response import VoiceResponse
+        vr = VoiceResponse()
+        vr.say("Thank you for calling BidVex. Please contact us at support at bidvex dot com. Goodbye.",
+               language="en-CA")
+        vr.say("Merci d'avoir appelé BidVex. Veuillez nous écrire à support arobase bidvex point com. Au revoir.",
+               language="fr-CA")
+        vr.hangup()
+        return Response(content=str(vr), media_type="application/xml")
+
     if not validate_e164(to_number):
         raise HTTPException(400, "invalid To param")
 
@@ -357,6 +383,8 @@ async def twiml_webhook(request: Request) -> Response:
         coach_stream_url=coach_stream_url,
         coach_nonce=coach_nonce,
     )
+    logger.info(f"[twiml] outbound bridge → {to_number} "
+                f"(from={from_field}, callerId={TWILIO_PHONE_NUMBER}, coach={'on' if coach_nonce else 'off'})")
     return Response(content=twiml, media_type="application/xml")
 
 

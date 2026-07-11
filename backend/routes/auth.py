@@ -523,6 +523,28 @@ async def register(user_data: UserCreate, request: Request, background_tasks: Ba
         except Exception as _coupon_exc:  # noqa: BLE001
             logger.warning(f"[iter274 coupon-redemption] non-fatal: {_coupon_exc}")
 
+    # iter340 — Canada-Day campaign promo (?promo=canada-day). Flags are
+    # applied only within the validity window (through 2026-07-31). After
+    # expiry registration still succeeds — flags are simply not applied.
+    try:
+        _promo_raw = (user_data.promo_code or "").strip().lower()
+        if _promo_raw == "canada-day":
+            from services.fee_calculator import canada_day_promo_active
+            if canada_day_promo_active(now):
+                _cd_flags = {
+                    "first_listing_free": True,
+                    "first_month_free": True,
+                    "promo_code_used": "canada-day",
+                    "promo_applied_at": now.isoformat(),
+                }
+                await db.users.update_one({"id": user_id}, {"$set": _cd_flags})
+                user_doc.update(_cd_flags)
+                logger.info(f"[iter340] canada-day promo applied user={user_id}")
+            else:
+                logger.info(f"[iter340] canada-day promo EXPIRED — no flags applied (user={user_id})")
+    except Exception as _promo_exc:  # noqa: BLE001
+        logger.warning(f"[iter340 canada-day promo] non-fatal: {_promo_exc}")
+
     # ── Affiliate Referral Tracking ──
     # iter307 — Fall back to the `bidvex_ref` cookie set by /r/{code}
     # landing if the registration body didn't carry an explicit `ref_code`.

@@ -36,7 +36,7 @@ from services.payment_idempotency import (
     reserve_charge_row,
     rollback_stripe_charge,
 )
-from services.fee_calculator import calculate_fee
+from services.fee_calculator import calculate_fee, promo_first_listing_waiver_applies
 
 logger = logging.getLogger(__name__)
 
@@ -291,6 +291,14 @@ async def settle_cash_or_etransfer(
     # Apply discounts.
     buyer_commission = max(0.0, round(buyer_commission - promo_meta["buyer_discount_amount"], 2))
     seller_commission = max(0.0, round(seller_commission - promo_meta["seller_discount_amount"], 2))
+
+    # iter340 — Canada-Day promo: the account's FIRST listing settles with
+    # zero seller commission. Consumption is atomic/idempotent.
+    if seller_commission > 0 and promo_first_listing_waiver_applies(seller):
+        from services.trial_promo import try_consume_first_listing_free
+        if await try_consume_first_listing_free(db, seller_id):
+            result["fee_breakdown"]["promo_first_listing_waiver"] = seller_commission
+            seller_commission = 0.0
 
     # --- Deposit credit lookup (winner's deposit, if any) ---
     deposit_doc = await db.bidding_deposits.find_one(
@@ -553,6 +561,15 @@ async def settle_stripe_full(
     buyer_total = max(0.0, round(buyer_total - promo_meta["buyer_discount_amount"], 2))
     seller_payout = round(seller_payout + promo_meta["seller_discount_amount"], 2)
 
+    # iter340 — Canada-Day promo: waive the remaining seller commission on
+    # the account's first listing by returning it to the payout.
+    _remaining_commission = max(0.0, round(float(fee["seller_commission"]) - promo_meta["seller_discount_amount"], 2))
+    if _remaining_commission > 0 and promo_first_listing_waiver_applies(seller):
+        from services.trial_promo import try_consume_first_listing_free
+        if await try_consume_first_listing_free(db, seller_id):
+            seller_payout = round(seller_payout + _remaining_commission, 2)
+            promo_meta["first_listing_waiver"] = _remaining_commission
+
     # iter298 BUG 3/4 — expose the full fee breakdown so the
     # payment-collection layer can stamp `net_payout_amount` and issue
     # itemized receipts without re-running the fee engine.
@@ -564,6 +581,7 @@ async def settle_stripe_full(
         "buyer_total_charged": buyer_total,
         "seller_commission": float(fee["seller_commission"]),
         "seller_payout": seller_payout,
+        "promo_first_listing_waiver": promo_meta.get("first_listing_waiver", 0.0),
     }
 
     # Deposit credit — bidding deposits (marketplace/lots) OR storage deposits.

@@ -55,6 +55,37 @@ STORAGE_FACILITY_RATE   = Decimal("0.050")    # 5% facility commission
 QC_GST_RATE = Decimal("0.05")
 QC_QST_RATE = Decimal("0.09975")
 
+# ─── iter340 — Canada-Day promo guards (registration flag → fee waiver) ───
+CANADA_DAY_PROMO_CODE = "canada-day"
+
+
+def promo_first_listing_waiver_applies(user_doc: Optional[dict]) -> bool:
+    """True iff the account carries the `first_listing_free` promo flag
+    (canada-day registration) and hasn't consumed it. Atomic consumption
+    lives in services.trial_promo.try_consume_first_listing_free."""
+    if not user_doc:
+        return False
+    return bool(user_doc.get("first_listing_free")) and not bool(user_doc.get("first_listing_free_used"))
+
+
+def promo_first_month_waiver_applies(user_doc: Optional[dict]) -> bool:
+    """True iff the account carries `first_month_free` (canada-day) and has
+    never redeemed a subscription trial. Honored via Stripe
+    trial_period_days=30 in the subscription checkout path (iter330 gate)."""
+    if not user_doc:
+        return False
+    return bool(user_doc.get("first_month_free")) and not bool(user_doc.get("trial_redeemed_at"))
+
+
+CANADA_DAY_PROMO_EXPIRY_ISO = "2026-07-31T23:59:59+00:00"
+
+
+def canada_day_promo_active(now) -> bool:
+    """Graceful expiry gate — after 2026-07-31 registration with the code
+    still succeeds, but the promo flags are not applied."""
+    from datetime import datetime as _dt
+    return now <= _dt.fromisoformat(CANADA_DAY_PROMO_EXPIRY_ISO)
+
 STRIPE_RATES: Dict[str, Decimal] = {
     "domestic":      Decimal("0.029"),
     "international": Decimal("0.039"),

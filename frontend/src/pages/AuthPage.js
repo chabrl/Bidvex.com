@@ -17,7 +17,7 @@ import { consumeCampaignTracking } from '../lib/campaignTracking';
 const API = API_BASE;
 
 const AuthPage = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { login, register } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -52,11 +52,20 @@ const AuthPage = () => {
   // also pre-stashed in formData so the register POST carries it.
   const [trialCoupon, setTrialCoupon] = useState(null);
   const [trialCouponError, setTrialCouponError] = useState('');
+  // iter340 — Canada-Day campaign promo (?promo=canada-day)
+  const [canadaDayPromo, setCanadaDayPromo] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const promo = (params.get('promo') || '').toUpperCase().trim();
     if (!promo) return;
+    // iter340 — Canada-Day campaign code: not a BVX coupon — pre-fill the
+    // promo_code and show the promo welcome banner, skip coupon validation.
+    if (promo === 'CANADA-DAY') {
+      setCanadaDayPromo(true);
+      setFormData((prev) => ({ ...prev, promo_code: 'canada-day' }));
+      return;
+    }
     let cancelled = false;
     (async () => {
       try {
@@ -333,6 +342,22 @@ const AuthPage = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* iter340 — Canada-Day promo welcome banner */}
+          {canadaDayPromo && !isLogin && (
+            <div
+              className="rounded-lg border-2 border-red-300 bg-red-50 px-4 py-3"
+              data-testid="canada-day-promo-banner"
+            >
+              <p className="text-sm font-bold text-red-900">
+                🇨🇦 {i18n.language?.startsWith('fr') ? 'Spécial fête du Canada débloqué !' : 'Canada Day Special unlocked!'}
+              </p>
+              <p className="text-xs text-red-700 mt-1">
+                {i18n.language?.startsWith('fr')
+                  ? 'Inscrivez-vous maintenant — votre première annonce et votre premier mois sont 100 % GRATUITS.'
+                  : 'Register now — your first listing and first month are 100% FREE.'}
+              </p>
+            </div>
+          )}
           {/* iter274 — Trial coupon unlock banner / error */}
           {trialCoupon && (
             <div
