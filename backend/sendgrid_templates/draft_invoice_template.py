@@ -154,7 +154,7 @@ def build_draft_invoice_html(result) -> str:
 <tr><td style="background-color:{C['navy']};padding:28px 30px;text-align:center;">
 <img src="{LOGO_URL}" alt="BidVex" width="80" style="display:inline-block;width:80px;height:auto;opacity:0.7;margin-bottom:12px;" /><br/>
 <p style="margin:0 0 6px;font-family:{FONT};font-size:12px;color:rgba(255,255,255,0.6);">BidVex Canada | Sherbrooke, QC</p>
-<p style="margin:0 0 6px;font-family:{FONT};font-size:12px;color:rgba(255,255,255,0.5);"><a href="mailto:support@bidvex.com" style="color:{C['sky']};text-decoration:none;" clicktracking=off>support@bidvex.com</a></p>
+<p style="margin:0 0 6px;font-family:{FONT};font-size:12px;color:rgba(255,255,255,0.5);"><a href="mailto:service@bidvex.com" style="color:{C['sky']};text-decoration:none;" clicktracking=off>service@bidvex.com</a></p>
 <p style="margin:0;font-family:{FONT};font-size:11px;color:rgba(255,255,255,0.35);"><a href="{CTA_BASE}/legal" style="color:rgba(255,255,255,0.45);text-decoration:underline;" clicktracking=off>Privacy</a> &nbsp;|&nbsp; <a href="{CTA_BASE}/legal" style="color:rgba(255,255,255,0.45);text-decoration:underline;" clicktracking=off>Terms</a></p>
 <p style="margin:8px 0 0;font-family:{FONT};font-size:11px;color:rgba(255,255,255,0.3);">&copy; 2026 BidVex Inc.</p>
 </td></tr>

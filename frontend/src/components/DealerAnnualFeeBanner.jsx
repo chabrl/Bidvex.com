@@ -116,7 +116,7 @@ const DealerAnnualFeeBanner = ({ user }) => {
               {isFr ? 'Payer les frais — 100,00 $/an' : 'Pay Annual Fee — $100.00/yr'}
             </button>
             <p className="text-[11px] text-amber-700 mt-3">
-              {isFr ? 'Questions ? partners@bidvex.ca' : 'Questions? partners@bidvex.ca'}
+              {isFr ? 'Questions ? contractor@bidvex.com' : 'Questions? contractor@bidvex.com'}
             </p>
           </div>
         </div>

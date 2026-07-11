@@ -261,7 +261,7 @@ const TermsOfServicePage = () => {
             </BlueBox>
 
             <SH id="contact" n="13">Contact Information</SH>
-            <GreenBox><p><strong>BidVex Legal Department</strong><br />Email: <a href="mailto:support@bidvex.com" className="text-blue-600 underline">support@bidvex.com</a></p></GreenBox>
+            <GreenBox><p><strong>BidVex Legal Department</strong><br />Email: <a href="mailto:service@bidvex.com" className="text-blue-600 underline">service@bidvex.com</a></p></GreenBox>
 
             <SH id="vehicle-opc" n="14">Vehicle Auctions — Platform Role &amp; Provincial Dealer Compliance</SH>
             <p>BidVex is a technology platform and auction facilitator only. BidVex is not a vendor, dealer, or party to vehicle sale contracts. Only sellers holding a verified provincial dealer licence (OMVIC, AMVIC, VSA, SAAQ, FCAA, MVSDA or the analogous regulator in their province) may list road vehicles.</p>
@@ -360,10 +360,10 @@ const TermsOfServicePage = () => {
             <h3 className="text-base font-semibold mt-4">22.6 Conduct &amp; Brand Representation</h3>
             <p>Contractors are public-facing representatives of BidVex Inc. and must comply with all of the following at all times:</p>
             <ul className="list-disc pl-5 space-y-1 mt-2 text-sm">
-              <li>Use only the BidVex-issued partner email signature, extension number, and <em>partners@bidvex.ca</em> sender identity for outbound contact.</li>
+              <li>Use only the BidVex-issued partner email signature, extension number, and <em>contractor@bidvex.com</em> sender identity for outbound contact.</li>
               <li>Never promise pricing, discounts, or commercial terms beyond what is published on the official BidVex pricing page.</li>
               <li>Never disparage competitors or other platforms in client communications.</li>
-              <li>Escalate any technical, billing, regulatory, or legal inquiry to <a href="mailto:support@bidvex.com" className="text-blue-600 underline">support@bidvex.com</a>; do not attempt to interpret platform rules, tax law, or compliance obligations on behalf of BidVex.</li>
+              <li>Escalate any technical, billing, regulatory, or legal inquiry to <a href="mailto:service@bidvex.com" className="text-blue-600 underline">service@bidvex.com</a>; do not attempt to interpret platform rules, tax law, or compliance obligations on behalf of BidVex.</li>
               <li>Submit to BidVex's discretionary review of inbound IVR call recordings, outbound email logs, and Add-a-Client account creations for quality assurance and fraud prevention.</li>
             </ul>
 
@@ -478,7 +478,7 @@ const TermsOfServicePage = () => {
             </BlueBox>
 
             <SH id="contact" n="13">Contact</SH>
-            <GreenBox><p><strong>Département juridique BidVex</strong><br />Courriel : <a href="mailto:support@bidvex.com" className="text-blue-600 underline">support@bidvex.com</a></p></GreenBox>
+            <GreenBox><p><strong>Département juridique BidVex</strong><br />Courriel : <a href="mailto:service@bidvex.com" className="text-blue-600 underline">service@bidvex.com</a></p></GreenBox>
 
             <SH id="vehicle-opc" n="14">Enchères de véhicules — Rôle de la plateforme et conformité concessionnaires provinciaux</SH>
             <p>BidVex est une plateforme technologique et un facilitateur d'enchères uniquement. Seuls les vendeurs détenant une licence de concessionnaire provinciale vérifiée (OMVIC, AMVIC, VSA, SAAQ, FCAA, MVSDA ou le régulateur analogue de leur province) peuvent lister des véhicules routiers.</p>
@@ -577,10 +577,10 @@ const TermsOfServicePage = () => {
             <h3 className="text-base font-semibold mt-4">22.6 Conduite et représentation de la marque</h3>
             <p>Les contractants sont des représentants publics de BidVex Inc. et doivent se conformer en tout temps à ce qui suit :</p>
             <ul className="list-disc pl-5 space-y-1 mt-2 text-sm">
-              <li>Utiliser uniquement la signature de courriel partenaire émise par BidVex, le numéro de poste et l'identité d'expéditeur <em>partners@bidvex.ca</em> pour les communications sortantes.</li>
+              <li>Utiliser uniquement la signature de courriel partenaire émise par BidVex, le numéro de poste et l'identité d'expéditeur <em>contractor@bidvex.com</em> pour les communications sortantes.</li>
               <li>Ne jamais promettre des prix, des rabais ou des conditions commerciales au-delà de ce qui est publié sur la page de tarification officielle de BidVex.</li>
               <li>Ne jamais dénigrer les concurrents ou d'autres plateformes dans les communications avec les clients.</li>
-              <li>Faire remonter toute demande technique, de facturation, réglementaire ou juridique à <a href="mailto:support@bidvex.com" className="text-blue-600 underline">support@bidvex.com</a>; ne jamais tenter d'interpréter les règles de la plateforme, le droit fiscal ou les obligations de conformité au nom de BidVex.</li>
+              <li>Faire remonter toute demande technique, de facturation, réglementaire ou juridique à <a href="mailto:service@bidvex.com" className="text-blue-600 underline">service@bidvex.com</a>; ne jamais tenter d'interpréter les règles de la plateforme, le droit fiscal ou les obligations de conformité au nom de BidVex.</li>
               <li>Se soumettre à l'examen discrétionnaire de BidVex des enregistrements d'appels IVR entrants, des journaux de courriels sortants et des créations de comptes Add-a-Client pour assurance qualité et prévention de la fraude.</li>
             </ul>
 

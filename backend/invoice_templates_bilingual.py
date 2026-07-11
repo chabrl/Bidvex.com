@@ -183,7 +183,7 @@ def lots_won_template(data: Dict[str, Any], lang: str = "en") -> str:
             <div class="header-text">
                 <h1>BidVex</h1>
                 <p>{t('online_auction_platform', lang)}</p>
-                <p>www.bidvex.com | support@bidvex.com</p>
+                <p>www.bidvex.com | service@bidvex.com</p>
             </div>
         </div>
 

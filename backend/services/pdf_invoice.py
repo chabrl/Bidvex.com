@@ -66,7 +66,7 @@ async def generate_invoice_pdf(db, invoice_id: str, lang: str = "en") -> Optiona
             "vehicle": "VEHICLE",
             "invoice_details": "INVOICE DETAILS",
             "seller_settlement": "SELLER SETTLEMENT STATEMENT",
-            "footer_contact": "Questions? Contact support@bidvex.com",
+            "footer_contact": "Questions? Contact service@bidvex.com",
         },
         "fr": {
             "invoice": "FACTURE",
@@ -74,7 +74,7 @@ async def generate_invoice_pdf(db, invoice_id: str, lang: str = "en") -> Optiona
             "vehicle": "VÉHICULE",
             "invoice_details": "DÉTAILS DE LA FACTURE",
             "seller_settlement": "RELEVÉ DE RÈGLEMENT DU VENDEUR",
-            "footer_contact": "Des questions ? Contactez support@bidvex.com",
+            "footer_contact": "Des questions ? Contactez service@bidvex.com",
         },
     }
     L = LABELS.get(lang, LABELS["en"])

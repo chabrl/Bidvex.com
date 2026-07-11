@@ -131,7 +131,7 @@ def test_iter281_no_external_links_doctrine_present():
     assert "No External Links Doctrine" in src
     # The whitelist of acceptable external links.
     for ok in (
-        "support@bidvex.com",
+        "service@bidvex.com",
         "unsubscribe@bidvex.com",
         "https://bidvex.com",
     ):

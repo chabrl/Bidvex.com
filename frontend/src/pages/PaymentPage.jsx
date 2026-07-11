@@ -76,7 +76,7 @@ const PaymentPage = () => {
         window.location.href = r.data.checkout_url;
         return;
       }
-      setManualMsg(r.data?.manual_instructions || 'Please contact support@bidvex.com to arrange payment.');
+      setManualMsg(r.data?.manual_instructions || 'Please contact service@bidvex.com to arrange payment.');
     } catch (e) {
       setManualMsg(e?.response?.data?.detail || 'Failed to initiate checkout. Please contact support.');
     } finally {
@@ -117,7 +117,7 @@ const PaymentPage = () => {
               {error || 'This payment link is no longer valid or has expired.'}
             </p>
             <Button asChild variant="outline" data-testid="payment-page-contact">
-              <a href="mailto:support@bidvex.com">
+              <a href="mailto:service@bidvex.com">
                 <Mail className="h-3.5 w-3.5 mr-1.5" />
                 Contact Support
               </a>
@@ -146,7 +146,7 @@ const PaymentPage = () => {
               This payment link has expired. Please reach out to support to issue a new one.
             </p>
             <Button asChild variant="outline" data-testid="payment-page-expired-contact">
-              <a href="mailto:support@bidvex.com">Contact Support</a>
+              <a href="mailto:service@bidvex.com">Contact Support</a>
             </Button>
           </div>
         )}
@@ -208,7 +208,7 @@ const PaymentPage = () => {
                 Copy Reference ID
               </Button>
               <Button asChild size="sm" variant="outline">
-                <a href="mailto:support@bidvex.com" data-testid="payment-page-email-support">
+                <a href="mailto:service@bidvex.com" data-testid="payment-page-email-support">
                   <Mail className="h-3.5 w-3.5 mr-1.5" />
                   Email Support
                 </a>

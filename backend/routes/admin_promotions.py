@@ -691,7 +691,7 @@ async def send_partner_outreach_blast(
             # iter254 Mission 4 / iter270 — Partner-program campaigns
             # now ship FROM the unified noreply@bidvex.com sender for
             # DKIM alignment. Reply-To routes partner replies to the
-            # partners@bidvex.ca inbox.
+            # contractor@bidvex.com inbox.
             from services.emails._email_core import (
                 B2B_PARTNER_REPLY_TO as _B2B_REPLY,
                 B2B_PARTNER_REPLY_TO_NAME as _B2B_REPLY_NAME,

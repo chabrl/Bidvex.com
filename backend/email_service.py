@@ -194,7 +194,7 @@ Si vous avez des questions, n'hésitez pas à nous contacter.
 
 Cordialement,
 L'équipe BidVex
-support@bidvex.com
+service@bidvex.com
 """
         
         return f"""
@@ -216,7 +216,7 @@ If you have any questions, please don't hesitate to contact us.
 
 Sincerely,
 The BidVex Team
-support@bidvex.com
+service@bidvex.com
 """
     
     def _generate_seller_email_body(
@@ -255,7 +255,7 @@ Si vous avez des questions, n'hésitez pas à nous contacter.
 
 Cordialement,
 L'équipe BidVex
-support@bidvex.com
+service@bidvex.com
 """
         
         return f"""
@@ -282,7 +282,7 @@ If you have any questions, please don't hesitate to contact us.
 
 Sincerely,
 The BidVex Team
-support@bidvex.com
+service@bidvex.com
 """
     
     async def get_sent_emails(self) -> List[Dict[str, Any]]:

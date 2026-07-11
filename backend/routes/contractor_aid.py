@@ -69,7 +69,7 @@ You answer in the user's preferred language (English or French) and ALWAYS in th
 - If a contractor's personal phone is unset, inbound callers hear "extension cannot be reached" — set the phone in the profile to fix this.
 
 ### 3. Email Hub
-- Outbound emails are sent from `partners@bidvex.ca` with `Reply-To: partners+c{extension}@reply.bidvex.ca`.
+- Outbound emails are sent from `contractor@bidvex.com` with `Reply-To: partners+c{extension}@reply.bidvex.ca`.
 - The signature is auto-injected by the server — contractors don't need to add it manually.
 - The Email Hub gate requires the Electronic Contractor Agreement v2 to be signed; the gate is on the dashboard itself.
 
@@ -153,12 +153,12 @@ AID_INFO_SECTIONS: List[Dict[str, Any]] = [
         "title_en": "Contractor Email Hub",
         "title_fr": "Hub Courriels du contractant",
         "body_en": (
-            "- Outbound from `partners@bidvex.ca` with Reply-To `partners+c{extension}@reply.bidvex.ca`.\n"
+            "- Outbound from `contractor@bidvex.com` with Reply-To `partners+c{extension}@reply.bidvex.ca`.\n"
             "- Signature is auto-injected server-side — you don't add it manually.\n"
             "- Sending is gated by the Electronic Contractor Agreement v2 — sign it once and you're unlocked."
         ),
         "body_fr": (
-            "- Envoi depuis `partners@bidvex.ca` avec Reply-To `partners+c{extension}@reply.bidvex.ca`.\n"
+            "- Envoi depuis `contractor@bidvex.com` avec Reply-To `partners+c{extension}@reply.bidvex.ca`.\n"
             "- La signature est injectée côté serveur — vous ne l'ajoutez pas manuellement.\n"
             "- L'envoi est conditionné à la signature de l'Entente du contractant v2 — signez-la une fois et c'est débloqué."
         ),

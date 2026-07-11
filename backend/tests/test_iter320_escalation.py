@@ -28,8 +28,8 @@ from services.genai_direct_client import WATCHDOG_SYSTEM_INSTRUCTION
 class TestSystemPromptCoverage:
     def test_prompt_contains_iter319_platform_matrix_section(self):
         assert "# 6. BidVex Platform Matrix" in WATCHDOG_SYSTEM_INSTRUCTION
-        assert "info@bidvex.com" in WATCHDOG_SYSTEM_INSTRUCTION
-        assert "support@bidvex.com" in WATCHDOG_SYSTEM_INSTRUCTION
+        assert "office@bidvex.com" in WATCHDOG_SYSTEM_INSTRUCTION
+        assert "service@bidvex.com" in WATCHDOG_SYSTEM_INSTRUCTION
         assert "claude-sonnet-4-6" in WATCHDOG_SYSTEM_INSTRUCTION
         assert "leaderboard" in WATCHDOG_SYSTEM_INSTRUCTION.lower()
         assert "5.0%" in WATCHDOG_SYSTEM_INSTRUCTION
@@ -52,14 +52,14 @@ class TestSystemPromptCoverage:
         assert "quel est exactement le problème" in WATCHDOG_SYSTEM_INSTRUCTION.lower()
 
     def test_prompt_drops_legacy_partners_bidvex_ca_email_hub_claim(self):
-        # iter318 swap — Email Hub now uses info@bidvex.com. The prompt
-        # must NOT claim contractor emails originate from partners@bidvex.ca.
+        # iter318 swap — Email Hub now uses office@bidvex.com. The prompt
+        # must NOT claim contractor emails originate from contractor@bidvex.com.
         msg = WATCHDOG_SYSTEM_INSTRUCTION.lower()
-        # We allow `partners@bidvex.ca` to appear ONLY in the
+        # We allow `contractor@bidvex.com` to appear ONLY in the
         # "never-invent-an-external-email" guidance line — but the Email
-        # Hub section MUST cite info@bidvex.com instead.
-        # Validate that the Email Hub section mentions info@bidvex.com.
-        assert "info@bidvex.com" in msg
+        # Hub section MUST cite office@bidvex.com instead.
+        # Validate that the Email Hub section mentions office@bidvex.com.
+        assert "office@bidvex.com" in msg
         assert "email hub" in msg
 
 

@@ -55,7 +55,7 @@ def _warning_email_html(dealer_name: str, last4: str | None = None) -> str:
           la suspension automatique de vos annonces de véhicules.
         </p>
         <p style="color:#94a3b8;font-size:12px;margin-top:14px;">
-          Questions? Contact us at <a href="mailto:partners@bidvex.ca" style="color:#2563eb;">partners@bidvex.ca</a>
+          Questions? Contact us at <a href="mailto:contractor@bidvex.com" style="color:#2563eb;">contractor@bidvex.com</a>
         </p>
       </div>
     </div>

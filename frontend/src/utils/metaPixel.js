@@ -39,6 +39,7 @@ const CONSENT_KEY_ANALYTICS = 'analytics_consent';
 
 let _initAttempted = false;
 let _initialized = false;
+let _lastPageViewPath = null;
 const _queue = [];
 
 // ── SPA dedupe protection (per-tab, per-session) ────────────────────
@@ -132,25 +133,59 @@ const _hasConsent = () => {
 };
 
 const _loadFbqScript = () => {
-  /* eslint-disable */
-  !(function (f, b, e, v, n, t, s) {
-    if (f.fbq) return;
-    n = f.fbq = function () {
-      n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments);
-    };
-    if (!f._fbq) f._fbq = n;
-    n.push = n;
-    n.loaded = !0;
-    n.version = '2.0';
-    n.queue = [];
-    t = b.createElement(e);
-    t.async = !0;
-    t.src = v;
-    s = b.getElementsByTagName(e)[0];
-    s.parentNode.insertBefore(t, s);
-  })(window, document, 'script', 'https://connect.facebook.net/en_US/fbevents.js');
-  /* eslint-enable */
+  _installFbqStub();
+  // Load the real fbevents.js exactly once (the stub never auto-loads it).
+  if (!document.querySelector('script[src*="fbevents.js"]')) {
+    const t = document.createElement('script');
+    t.async = true;
+    t.src = 'https://connect.facebook.net/en_US/fbevents.js';
+    const s = document.getElementsByTagName('script')[0];
+    if (s && s.parentNode) s.parentNode.insertBefore(t, s);
+    else document.head.appendChild(t);
+  }
 };
+
+/**
+ * iter342 — fbq stub with a built-in `init` dedupe guard.
+ *
+ * The duplicate "Duplicate Pixel ID" warning was NOT caused by our JS: the
+ * admin's GTM container (GTM-MQ34GTF4) carries its own Meta Pixel tag that
+ * calls fbq('init', …) twice per page load. We cannot edit the GTM
+ * container from code, so the stub itself swallows any repeat init for a
+ * pixel ID already initialised this page load — guaranteeing exactly ONE
+ * fbq('init') per pixel per page load regardless of the caller (our code,
+ * GTM, or any third-party snippet).
+ *
+ * Installed at module import time so it exists BEFORE GTM's snippet runs
+ * (GTM's bootstrap keeps a pre-existing window.fbq: `if (f.fbq) return`).
+ */
+const _installFbqStub = () => {
+  if (typeof window === 'undefined' || window.fbq) return;
+  const seenInits = new Set();
+  const n = function () {
+    if (arguments[0] === 'init') {
+      const id = String(arguments[1] || '');
+      if (seenInits.has(id)) {
+        console.debug('[meta-pixel] duplicate fbq(init) swallowed for pixel', id);
+        return;
+      }
+      seenInits.add(id);
+      window._fbPixelInitialized = true;
+    }
+    if (n.callMethod) n.callMethod.apply(n, arguments);
+    else n.queue.push(arguments);
+  };
+  window.fbq = n;
+  if (!window._fbq) window._fbq = n;
+  n.push = n;
+  n.loaded = true;
+  n.version = '2.0';
+  n.queue = [];
+};
+
+// Install the guarded stub as early as possible (module import runs before
+// MarketingPixelLoader fetches site-config and injects GTM).
+if (typeof window !== 'undefined') _installFbqStub();
 
 const _flushQueue = () => {
   if (!_initialized || typeof window === 'undefined' || !window.fbq) return;
@@ -168,7 +203,7 @@ const _flushQueue = () => {
 
 /** Initializes the pixel if env var + consent are present. Safe to call repeatedly. */
 export const initMetaPixel = () => {
-  if (_initAttempted) return;
+  if (_initAttempted || _initialized) return;
   if (typeof window === 'undefined') return;
   if (!PIXEL_ID) {
     // eslint-disable-next-line no-console
@@ -180,8 +215,20 @@ export const initMetaPixel = () => {
 
   _initAttempted = true;
   try {
+    // iter342 — window-scoped guard: fbq('init') must run exactly ONCE per
+    // page load, or Meta logs "Duplicate Pixel ID". Survives repeated
+    // callers (App boot, MarketingPixelLoader, consent re-grants).
+    if (window._fbPixelInitialized) {
+      _initialized = true;
+      _flushQueue();
+      return;
+    }
+    window._fbPixelInitialized = true;
     _loadFbqScript();
     window.fbq('init', PIXEL_ID);
+    // Initial PageView — record the path so the route-change tracker
+    // (trackPageView) never double-fires for the landing route.
+    _lastPageViewPath = `${window.location.pathname}${window.location.search}`;
     window.fbq('track', 'PageView');
     _initialized = true;
     _flushQueue();
@@ -190,11 +237,26 @@ export const initMetaPixel = () => {
   }
 };
 
+/**
+ * PageView — SINGLE entry point for SPA route-change tracking (iter342).
+ * Dedupes by path: fires exactly once per distinct route, never on
+ * re-renders, and never duplicates the initial PageView fired by init.
+ */
+export const trackPageView = (path) => {
+  if (typeof window === 'undefined' || typeof window.fbq !== 'function') return;
+  const p = path || `${window.location.pathname}${window.location.search}`;
+  if (p === _lastPageViewPath) return;
+  _lastPageViewPath = p;
+  try { window.fbq('track', 'PageView'); }
+  catch (e) { console.debug('[meta-pixel] PageView swallowed:', e); }
+};
+
 export const notifyConsentGranted = () => {
   if (typeof window !== 'undefined') {
     try { window.localStorage.setItem(CONSENT_KEY_CANONICAL, 'true'); }
     catch (e) { console.debug('[meta-pixel] consent localStorage write failed:', e); }
   }
+  if (_initialized) return; // iter341 — already live, never re-init
   _initAttempted = false;
   initMetaPixel();
 };

@@ -273,7 +273,7 @@ def generate_vehicle_invoice_pdf(
     elements.append(Paragraph(
         f"{BIDVEX_LEGAL_NAME} | {BIDVEX_ADDRESS}<br/>"
         f"GST/TPS #: {BIDVEX_GST_NUMBER} | QST/TVQ #: {BIDVEX_QST_NUMBER}<br/>"
-        "Questions? support@bidvex.com — Des questions ? support@bidvex.com",
+        "Questions? service@bidvex.com — Des questions ? service@bidvex.com",
         footer_style
     ))
     
@@ -519,7 +519,7 @@ def generate_general_invoice_pdf(
     elements.append(Paragraph(
         f"{BIDVEX_LEGAL_NAME} | {BIDVEX_ADDRESS}<br/>"
         f"GST/TPS #: {BIDVEX_GST_NUMBER} | QST/TVQ #: {BIDVEX_QST_NUMBER}<br/>"
-        "Questions? support@bidvex.com — Des questions ? support@bidvex.com",
+        "Questions? service@bidvex.com — Des questions ? service@bidvex.com",
         footer_style
     ))
     

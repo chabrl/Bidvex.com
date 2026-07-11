@@ -49,7 +49,7 @@ export default function RefundPolicyPage() {
           </h3>
           <p className="text-sm text-slate-700 dark:text-slate-200">
             {t.contact_body}{' '}
-            <a href="mailto:support@bidvex.com?subject=Dispute%20Resolution" className="text-blue-600 hover:underline">support@bidvex.com</a>
+            <a href="mailto:service@bidvex.com?subject=Dispute%20Resolution" className="text-blue-600 hover:underline">service@bidvex.com</a>
             {' · '}
             <a href="tel:+14506343099" className="text-blue-600 hover:underline">+1 (450) 634-3099</a>
           </p>
@@ -118,7 +118,7 @@ const COPY = {
           <>
             <p>A buyer wishing to claim a refund under §3(a)-(c) must:</p>
             <ol>
-              <li>Submit a written claim to <strong>support@bidvex.com</strong> within seventy-two (72) hours of the auction close (vehicles) or forty-eight (48) hours of pickup (storage / multi-lot);</li>
+              <li>Submit a written claim to <strong>service@bidvex.com</strong> within seventy-two (72) hours of the auction close (vehicles) or forty-eight (48) hours of pickup (storage / multi-lot);</li>
               <li>Include the lot URL, photographs of the discrepancy, copies of correspondence with the seller or broker, and the buyer's BidVex user ID;</li>
               <li>Cooperate with BidVex Resolutions' investigation, including providing a sworn statement if requested.</li>
             </ol>
@@ -197,7 +197,7 @@ const COPY = {
           <>
             <p>Un acheteur souhaitant réclamer un remboursement aux termes du §3 (a)-(c) doit :</p>
             <ol>
-              <li>Soumettre une réclamation écrite à <strong>support@bidvex.com</strong> dans les soixante-douze (72) heures de la clôture de l'encan (véhicules) ou quarante-huit (48) heures de la collecte (entreposage / lots multiples) ;</li>
+              <li>Soumettre une réclamation écrite à <strong>service@bidvex.com</strong> dans les soixante-douze (72) heures de la clôture de l'encan (véhicules) ou quarante-huit (48) heures de la collecte (entreposage / lots multiples) ;</li>
               <li>Inclure l'URL du lot, des photographies de l'écart, des copies de la correspondance avec le vendeur ou le courtier, et l'identifiant utilisateur BidVex ;</li>
               <li>Coopérer avec l'enquête de BidVex Résolutions, y compris fournir une déclaration sous serment sur demande.</li>
             </ol>

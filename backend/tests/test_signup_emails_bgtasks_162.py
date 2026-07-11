@@ -55,7 +55,7 @@ def _read_recent_log(tail_lines: int = 2000) -> str:
 class TestCodePathInspection:
     def test_admin_notifications_no_hardcoded_constant(self):
         src = Path("/app/backend/services/admin_notifications.py").read_text()
-        # Ensure no module-level constant like: ADMIN_EMAIL = "info@bidvex.com"
+        # Ensure no module-level constant like: ADMIN_EMAIL = "office@bidvex.com"
         assert not re.search(r'^ADMIN_EMAIL\s*=\s*["\']', src, re.MULTILINE), \
             "admin_notifications.py should NOT have module-level hardcoded ADMIN_EMAIL"
         assert "_resolve_admin_email" in src, "Expected _resolve_admin_email() helper"
@@ -63,7 +63,7 @@ class TestCodePathInspection:
         assert "ADMIN_EMAIL" in src
 
     def test_resolve_admin_email_precedence(self):
-        """ADMIN_NOTIFICATION_EMAIL → ADMIN_EMAIL → info@bidvex.com"""
+        """ADMIN_NOTIFICATION_EMAIL → ADMIN_EMAIL → office@bidvex.com"""
         import sys
         sys.path.insert(0, "/app/backend")
         from services.admin_notifications import _resolve_admin_email
@@ -72,7 +72,7 @@ class TestCodePathInspection:
         orig_admin = os.environ.pop("ADMIN_EMAIL", None)
         try:
             # Case 1: no env → fallback
-            assert _resolve_admin_email() == "info@bidvex.com"
+            assert _resolve_admin_email() == "office@bidvex.com"
 
             # Case 2: only ADMIN_EMAIL set
             os.environ["ADMIN_EMAIL"] = "fallback@example.com"

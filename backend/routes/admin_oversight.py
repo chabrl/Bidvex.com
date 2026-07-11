@@ -578,7 +578,7 @@ async def admin_test_email(
         )
         send_kwargs = {
             "is_marketing": True,
-            "reply_to": "support@bidvex.com",
+            "reply_to": "service@bidvex.com",
             "reply_to_name": "BidVex Support",
             "categories": ["marketing", "promotional", "iter270-test"],
         }
@@ -587,11 +587,11 @@ async def admin_test_email(
         body_html = (
             "<p>This is a <strong>partner</strong> test email.</p>"
             "<p>From: <code>noreply@bidvex.com</code> · Reply-To: "
-            "<code>partners@bidvex.ca</code>.</p>"
+            "<code>contractor@bidvex.com</code>.</p>"
         )
         send_kwargs = {
             "is_marketing": True,
-            "reply_to": "partners@bidvex.ca",
+            "reply_to": "contractor@bidvex.com",
             "reply_to_name": "BidVex Partner Team",
             "from_name": "BidVex Canada",
             "categories": ["partner", "marketing", "iter270-test"],
@@ -601,10 +601,10 @@ async def admin_test_email(
         body_html = (
             "<p>This is a <strong>transactional</strong> test email.</p>"
             "<p>From: <code>noreply@bidvex.com</code> · Reply-To: "
-            "<code>support@bidvex.com</code> · Category: <code>transactional</code>.</p>"
+            "<code>service@bidvex.com</code> · Category: <code>transactional</code>.</p>"
         )
         send_kwargs = {
-            "reply_to": "support@bidvex.com",
+            "reply_to": "service@bidvex.com",
             "reply_to_name": "BidVex Support",
             "categories": ["transactional", "iter270-test"],
         }
@@ -948,7 +948,7 @@ async def reject_affiliate_payout(
                         f"${float(payout.get('amount') or 0):,.2f} {payout.get('currency', 'CAD')}</strong> "
                         "could not be processed.</p>"
                         f"<p><strong>Reason:</strong> {body.reason}</p>"
-                        "<p>Please reach out to <a href='mailto:support@bidvex.com'>support@bidvex.com</a> "
+                        "<p>Please reach out to <a href='mailto:service@bidvex.com'>service@bidvex.com</a> "
                         "if you'd like to discuss this decision.</p>"
                     ),
                     "cta_label": "Open Affiliate Dashboard",

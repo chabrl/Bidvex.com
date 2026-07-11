@@ -23,6 +23,7 @@ import Papa from 'papaparse';
 import { useDropzone } from 'react-dropzone';
 import RichTextEditor from '../components/RichTextEditor';
 import LocationSelector from '../components/LocationSelector';
+import ListingBlockDialog from '../components/ListingBlockDialog';
 import CategorySelector from '../components/CategorySelector';
 import InfoTip from '../components/InfoTip';
 import useGeoLocation from '../hooks/useGeoLocation';
@@ -40,6 +41,13 @@ const CreateMultiItemListing = () => {
   const geo = useGeoLocation();
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
+  // iter342 — context-aware listing block dialog (typed block_reason)
+  const [blockDialogOpen, setBlockDialogOpen] = useState(false);
+  const [blockReason, setBlockReason] = useState('vehicle_dealer_required');
+  const [blockSignals, setBlockSignals] = useState([]);
+  const [blockMessages, setBlockMessages] = useState(null);
+  const [blockReviewRequested, setBlockReviewRequested] = useState(false);
+  const [blockReviewSubmitting, setBlockReviewSubmitting] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [languageReady, setLanguageReady] = useState(false);
   // iter299 P0 — Bill 96 inline error for the French title field.
@@ -720,10 +728,22 @@ const CreateMultiItemListing = () => {
         toast.error(qcMsg);
       } else {
         const detail = error.response?.data?.detail;
-        const readable = typeof detail === 'string'
-          ? detail
-          : (detail?.message_en || detail?.message || null);
-        toast.error(readable || t('createListing.createFailed', 'Failed to create listing'));
+        // iter342 — typed block reason → context-aware dialog (never a raw toast)
+        if (detail && typeof detail === 'object' && (detail.block_reason || detail.error === 'vehicle_listing_dealer_required')) {
+          setBlockReason(detail.block_reason || 'vehicle_dealer_required');
+          setBlockSignals(Array.isArray(detail.signals) ? detail.signals : []);
+          setBlockMessages(detail.message_en || detail.message_fr
+            ? { en: detail.message_en, fr: detail.message_fr }
+            : null);
+          setBlockReviewRequested(false);
+          setBlockReviewSubmitting(false);
+          setBlockDialogOpen(true);
+        } else {
+          const readable = typeof detail === 'string'
+            ? detail
+            : (detail?.message_en || detail?.message || null);
+          toast.error(readable || t('createListing.createFailed', 'Failed to create listing'));
+        }
       }
     } finally {
       setLoading(false);
@@ -2592,8 +2612,53 @@ const CreateMultiItemListing = () => {
     );
   }
 
+  // iter342 — Request Manual Review (iter312 flow): saves the multi-lot
+  // draft as a locked pending_admin_review stub for admin triage.
+  const handleRequestManualReview = async () => {
+    if (blockReviewRequested || blockReviewSubmitting) return;
+    setBlockReviewSubmitting(true);
+    try {
+      await axios.post(`${API_BASE}/listings/request-manual-vehicle-review`, {
+        title:            formData.title || '',
+        title_en:         formData.title_en || '',
+        title_fr:         formData.title_fr || '',
+        description:      formData.description || '',
+        description_en:   formData.description_en || '',
+        description_fr:   formData.description_fr || '',
+        category:         formData.category || 'multi_lot',
+        condition:        'good',
+        currency:         formData.currency || 'CAD',
+        starting_price:   0,
+        location:         formData.location || '',
+        city:             formData.city || '',
+        region:           formData.region || '',
+        country:          formData.country || '',
+        detected_signals: blockSignals,
+        images:           [],
+        images_count:     0,
+        listing_id:       null,
+      });
+      setBlockReviewRequested(true);
+    } catch (e) {
+      const d = e?.response?.data?.detail;
+      toast.error((typeof d === 'string' ? d : d?.message_en) || 'Failed to submit manual review request');
+    } finally {
+      setBlockReviewSubmitting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen py-8 px-4">
+      <ListingBlockDialog
+        open={blockDialogOpen}
+        onOpenChange={setBlockDialogOpen}
+        reason={blockReason}
+        signals={blockSignals}
+        messages={blockMessages}
+        reviewRequested={blockReviewRequested}
+        reviewSubmitting={blockReviewSubmitting}
+        onRequestReview={handleRequestManualReview}
+      />
       <div className="max-w-6xl mx-auto">
         <Card className="glassmorphism">
           <CardHeader>

@@ -93,6 +93,17 @@ AMBIGUOUS_BRAND_TOKENS: frozenset[str] = frozenset({
     "ram", "smart", "genesis", "international", "lincoln", "triumph",
 })
 
+# iter342 — Conservative vehicle-context nouns for FREE-TEXT co-signals.
+# Deliberately excludes words with common non-vehicle meanings in listing
+# copy ("pickup" = item collection, "van" = shelving, "boat" = shoes).
+CONTENT_VEHICLE_CONTEXT_TOKENS: frozenset[str] = frozenset({
+    "motorcycle", "motorcycles", "motorbike", "motorbikes", "moped",
+    "scooter", "scooters", "snowmobile", "snowmobiles", "atv", "atvs",
+    "suv", "suvs", "minivan", "minivans", "jetski", "watercraft",
+    "powersport", "powersports", "moto", "motos", "motoneige",
+    "motoneiges", "vtt",
+})
+
 # Body/style words that increase confidence.
 VEHICLE_BODY_TOKENS: frozenset[str] = frozenset({
     "sedan", "coupe", "hatchback", "wagon", "convertible", "roadster",
@@ -218,7 +229,7 @@ VEHICLE_STRONG_TOKENS: tuple[str, ...] = (
     "vin:", "vin#", "vin number", "vin no", "n.i.v", "niv:",
     "odometer", "odomètre", "kilometrage", "kilométrage", "mileage",
     "engine size", "engine number", "engine no.", "transmission:",
-    "horsepower", "cylinder", "cylinders", "cylindrée",
+    "horsepower", "cylindrée",
     "fuel type", "type de carburant", "drivetrain",
     "registered with the saaq", "registered with omvic",
     "carfax", "carproof",
@@ -226,6 +237,13 @@ VEHICLE_STRONG_TOKENS: tuple[str, ...] = (
 
 # Year regex — allow 1950 thru 2099 (covers historic and future model years)
 _YEAR_RE = re.compile(r"\b(?:19[5-9]\d|20\d\d)\b")
+
+# iter342 P0 — "cylinder" alone is NOT a vehicle signal (glass cylinder
+# vases, hydraulic cylinders, propane cylinders blocked Alex's vase).
+# Only numeric ENGINE phrasing counts: "4 cylinder", "6-cylinder", "8 cyl".
+_ENGINE_CYL_RE = re.compile(
+    r"\b(?:\d{1,2}|four|six|eight|ten|twelve|quatre|huit|douze)[\s-]?(?:cylinder|cylindre)s?\b"
+)
 
 
 def _normalise(value: Optional[str]) -> str:
@@ -278,6 +296,12 @@ def is_vehicle_listing(
     if strong_hit:
         signals.append(f"strong:{strong_hit.strip()}")
         strength += 5
+    else:
+        # iter342 — numeric engine-cylinder phrasing ("4-cylinder engine")
+        cyl_hit = _ENGINE_CYL_RE.search(haystack)
+        if cyl_hit:
+            signals.append(f"strong:{cyl_hit.group().strip()}")
+            strength += 5
 
     # Brand detection — strip non-vehicle contexts ("Honda generator") first
     brand_haystack = _NON_VEHICLE_BRAND_CONTEXT_RE.sub(" ", haystack)
@@ -290,7 +314,12 @@ def is_vehicle_listing(
         signals.append(f"model:{model_hit.strip()}")
         strength += 5
 
-    # Ambiguous model identifiers — only with a brand co-signal
+    # iter342 — vehicle-category words in the CONTENT ("Ninja motorcycle",
+    # "Vulcan scooter") count as vehicle context for ambiguous models, so
+    # "Ninja motorcycle 2019" flags while "Ninja blender" never does.
+    content_cat_hit = first_word_match(haystack, CONTENT_VEHICLE_CONTEXT_TOKENS)
+
+    # Ambiguous model identifiers — only with a brand/vehicle-context co-signal
     amb_model_hit = first_word_match(haystack, AMBIGUOUS_MODEL_TOKENS)
 
     # Ambiguous brands ("ram", "lincoln"…) need an UNAMBIGUOUS co-signal
@@ -305,7 +334,7 @@ def is_vehicle_listing(
             brand_match = amb_brand
 
     if amb_model_hit:
-        if brand_match:
+        if brand_match or content_cat_hit:
             signals.append(f"model:{amb_model_hit.strip()}")
             strength += 5
         else:
@@ -474,16 +503,21 @@ async def enforce_vehicle_dealer_gate(
             },
             signals=signals,
             seller_email=user_doc.get("email"),
-            extra={"surface": surface, "detection_strength": strength},
+            extra={"surface": surface, "detection_strength": strength,
+                   "gate": "vehicle_gate"},
         )
     except Exception as notify_exc:  # noqa: BLE001
         logger.warning("[vehicle_listing_guard] admin notify failed: %s", notify_exc)
 
+    from services.block_messages import BLOCK_MESSAGES
     raise HTTPException(
         status_code=403,
         detail={
             "error": "vehicle_listing_dealer_required",
+            "block_reason": "vehicle_dealer_required",
             "message": DEALER_ONLY_BILINGUAL_MESSAGE,
+            "message_en": BLOCK_MESSAGES["vehicle_dealer_required"]["en"],
+            "message_fr": BLOCK_MESSAGES["vehicle_dealer_required"]["fr"],
             "signals": signals,
         },
     )

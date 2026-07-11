@@ -229,13 +229,16 @@ async def lifespan(app):
 
     # iter316 Mission 1 — Twilio dialer configuration check (non-fatal).
     try:
-        from services.twilio_service import verify_twilio_config
+        from services.twilio_service import verify_twilio_config, verify_twilio_auth
         s = verify_twilio_config()
         if s["configured"]:
             logger.info("iter316 — Twilio dialer fully configured.")
         else:
             logger.warning(f"iter316 — Twilio dialer partial config. Missing: {s['missing']}. "
                            f"can_mint_tokens={s['can_mint_tokens']}, can_place_calls={s['can_place_calls']}.")
+        # iter342 — live auth-token validation (background, logs VALID/INVALID)
+        import asyncio as _aio
+        _aio.get_event_loop().create_task(verify_twilio_auth(force=True))
     except Exception as e:
         logger.warning(f"Twilio config check failed (non-fatal): {e}")
 

@@ -210,7 +210,7 @@ Please answer the user's question using the context provided above. If the conte
             logger.error(f"Error in AI chat: {e}", exc_info=True)
             return {
                 "success": False,
-                "message": "I apologize, but I'm experiencing technical difficulties. Please try again or contact support@bidvex.com." if language == "en" else "Je m'excuse, mais je rencontre des difficultes techniques. Veuillez reessayer ou contacter support@bidvex.com.",
+                "message": "I apologize, but I'm experiencing technical difficulties. Please try again or contact service@bidvex.com." if language == "en" else "Je m'excuse, mais je rencontre des difficultes techniques. Veuillez reessayer ou contacter service@bidvex.com.",
                 "error": str(e),
                 "language": language
             }
@@ -453,7 +453,7 @@ Please answer the user's question using the context provided above. If the conte
         if "support" in content_lower or "contact" in content_lower:
             rich_content["action_buttons"].append({
                 "text": "Contact Support" if language == "en" else "Contacter le support",
-                "action": "contact_support", "url": "mailto:support@bidvex.com",
+                "action": "contact_support", "url": "mailto:service@bidvex.com",
                 "style": "secondary", "icon": "mail"
             })
 

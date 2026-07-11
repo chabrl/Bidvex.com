@@ -427,7 +427,7 @@ function EscalationDetailDialog({ token, ticketId, open, onClose, onUpdated }) {
                   />
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[10px] text-slate-400">
-                      Reply-To: <strong>support@bidvex.com</strong> · {replyDraft.length}/2500
+                      Reply-To: <strong>service@bidvex.com</strong> · {replyDraft.length}/2500
                     </span>
                     <Button
                       onClick={handleSendReply}

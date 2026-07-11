@@ -178,8 +178,8 @@ const ResubscribePage = () => {
       </h1>
       <p className="text-base leading-relaxed text-center" style={{ color: '#334155' }}>
         {fr
-          ? <>Ce lien de réabonnement est invalide ou expiré. Contactez <a href="mailto:support@bidvex.com" style={{ color: '#2563eb', textDecoration: 'underline' }}>support@bidvex.com</a> si vous avez besoin d'aide.</>
-          : <>This resubscribe link is invalid or has expired. Please contact <a href="mailto:support@bidvex.com" style={{ color: '#2563eb', textDecoration: 'underline' }}>support@bidvex.com</a> if you need assistance.</>}
+          ? <>Ce lien de réabonnement est invalide ou expiré. Contactez <a href="mailto:service@bidvex.com" style={{ color: '#2563eb', textDecoration: 'underline' }}>service@bidvex.com</a> si vous avez besoin d'aide.</>
+          : <>This resubscribe link is invalid or has expired. Please contact <a href="mailto:service@bidvex.com" style={{ color: '#2563eb', textDecoration: 'underline' }}>service@bidvex.com</a> if you need assistance.</>}
       </p>
       {errorCode && (
         <p className="text-xs mt-4 text-center font-mono" style={{ color: '#94a3b8' }}>

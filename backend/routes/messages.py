@@ -183,8 +183,8 @@ async def send_message(request: Request, msg: MessageCreate, current_user: User 
     if sender_doc and sender_doc.get("messaging_suspended"):
         raise HTTPException(status_code=403, detail={
             "code": "messaging_suspended",
-            "message_en": "Your messaging privileges have been suspended. Contact support@bidvex.com.",
-            "message_fr": "Vos privilèges de messagerie ont été suspendus. Contactez support@bidvex.com.",
+            "message_en": "Your messaging privileges have been suspended. Contact service@bidvex.com.",
+            "message_fr": "Vos privilèges de messagerie ont été suspendus. Contactez service@bidvex.com.",
         })
 
     # iter196 — gate thread creation

@@ -221,7 +221,7 @@ const EmailSettings = () => {
         <CardContent>
           <div className="space-y-2 text-sm">
             {[
-              { trigger: 'Partner Application Received', to: 'Applicant + partners@bidvex.ca', status: config?.configured },
+              { trigger: 'Partner Application Received', to: 'Applicant + contractor@bidvex.com', status: config?.configured },
               { trigger: 'Partner Verified', to: 'Applicant', status: config?.configured },
               { trigger: 'Partner Rejected', to: 'Applicant', status: config?.configured },
             ].map((email, i) => (

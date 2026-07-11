@@ -210,7 +210,7 @@ def test_iter271_create_and_get_campaign():
         doc = r.json()
         assert doc["status"] == "draft"
         assert doc["from_email"] == "noreply@bidvex.ca"
-        assert doc["reply_to_email"] == "support@bidvex.com"
+        assert doc["reply_to_email"] == "service@bidvex.com"
         assert doc["analytics"]["delivered"] == 0
     finally:
         _delete(token, cid)

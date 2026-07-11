@@ -148,8 +148,8 @@ TRANSLATIONS = {
         "fr": "Questions?"
     },
     "contact_us": {
-        "en": "Contact us at support@bidvex.com or {}",
-        "fr": "Contactez-nous à support@bidvex.com ou {}"
+        "en": "Contact us at service@bidvex.com or {}",
+        "fr": "Contactez-nous à service@bidvex.com ou {}"
     },
     "thank_you": {
         "en": "Thank you for your business!",

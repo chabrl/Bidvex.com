@@ -1120,6 +1120,17 @@ async def create_storage_auction(
 
     await db.storage_auctions.insert_one(doc.copy())
     doc.pop("_id", None)
+
+    # iter342 — prohibited-items scan on the storage path (parity with
+    # marketplace + lots). Best-effort, fail-open.
+    try:
+        import asyncio as _aio
+        from services.listing_moderation_scanner import scan_listing_for_violations
+        _aio.create_task(scan_listing_for_violations(
+            db, listing_id=auction_id, collection="storage_auctions",
+        ))
+    except Exception:  # noqa: BLE001
+        pass
     return doc
 
 
@@ -2187,11 +2198,11 @@ async def admin_reject_facility(
                     f"<p>Hello {owner.get('name','')},</p>"
                     f"<p>Your storage facility application was not approved.</p>"
                     f"<p><b>Reason:</b> {reason}</p>"
-                    f"<p>To appeal or resubmit: <a href=\"mailto:support@bidvex.com\">support@bidvex.com</a></p>"
+                    f"<p>To appeal or resubmit: <a href=\"mailto:service@bidvex.com\">service@bidvex.com</a></p>"
                     f"<hr><p>Bonjour {owner.get('name','')},</p>"
                     f"<p>Votre demande d'installation de stockage n'a pas été approuvée.</p>"
                     f"<p><b>Raison :</b> {reason}</p>"
-                    f"<p>Pour faire appel : <a href=\"mailto:support@bidvex.com\">support@bidvex.com</a></p>"
+                    f"<p>Pour faire appel : <a href=\"mailto:service@bidvex.com\">service@bidvex.com</a></p>"
                 )
                 from services.emails._email_core import send_email
                 background_tasks.add_task(send_email, owner["email"], subject, body)

@@ -23,7 +23,7 @@ import httpx
 logger = logging.getLogger(__name__)
 
 NOMINATIM_BASE = "https://nominatim.openstreetmap.org/search"
-USER_AGENT = "BidVex/1.0 (support@bidvex.com)"
+USER_AGENT = "BidVex/1.0 (service@bidvex.com)"
 
 _last_call_ts: float = 0.0
 _lock = asyncio.Lock()

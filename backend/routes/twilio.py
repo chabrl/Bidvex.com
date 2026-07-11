@@ -206,11 +206,16 @@ async def get_dialer_config(user: User = Depends(require_dialer_access)) -> Dict
     # direct Gemini API (not Emergent LLM Key — audio analysis isn't
     # covered by the universal key).
     gemini_key_set = bool(os.environ.get("GEMINI_API_KEY", "").strip())
+    # iter342 — live auth-token check so the UI can show a hard error banner
+    from services.twilio_service import verify_twilio_auth
+    auth = await verify_twilio_auth()
     return {
         "configured":          s["configured"],
         "can_mint_tokens":     s["can_mint_tokens"],
         "can_place_calls":     s["can_place_calls"],
         "missing":             s["missing"],
+        "auth_valid":          auth.get("valid"),
+        "auth_error":          auth.get("error"),
         "twilio_phone_number": TWILIO_PHONE_NUMBER if s["can_place_calls"] else None,
         "ai_voice_configured": gemini_key_set,
         "ai_voice_missing":    [] if gemini_key_set else ["GEMINI_API_KEY"],
@@ -1853,7 +1858,7 @@ def _require_agreement_signed(db_obj, contractor_id: str):
 async def contractor_send_email(body: ContractorEmailSendBody,
                                   request: Request,
                                   user: User = Depends(require_dialer_access)) -> Dict[str, Any]:
-    """Sends an outbound email via info@bidvex.com on behalf of the
+    """Sends an outbound email via office@bidvex.com on behalf of the
     contractor. Server-side signature injection is non-overridable.
     Gated by the signed agreement (Directive 2)."""
     db = get_db()

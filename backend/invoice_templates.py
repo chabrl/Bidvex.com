@@ -186,7 +186,7 @@ def lots_won_template(data: Dict[str, Any], lang: str = "en") -> str:
             <div class="header-text">
                 <h1>BidVex</h1>
                 <p>{t('online_auction_platform', lang)}</p>
-                <p>www.bidvex.com | support@bidvex.com</p>
+                <p>www.bidvex.com | service@bidvex.com</p>
             </div>
         </div>
 
@@ -293,7 +293,7 @@ def lots_won_template(data: Dict[str, Any], lang: str = "en") -> str:
             <p><strong>Pickup Deadline:</strong> Within 7 days of payment</p>
             ''' if data['auction'].get('location') else ''}
             
-            <p style="margin-top: 20px;"><strong>Questions?</strong> Contact us at support@bidvex.com or {data['buyer']['phone']}</p>
+            <p style="margin-top: 20px;"><strong>Questions?</strong> Contact us at service@bidvex.com or {data['buyer']['phone']}</p>
         </div>
 
         <div class="footer">
@@ -469,7 +469,7 @@ def payment_letter_template(data: Dict[str, Any]) -> str:
             <div class="header-text">
                 <h1>BidVex</h1>
                 <p>Online Auction Platform</p>
-                <p>www.bidvex.com | support@bidvex.com</p>
+                <p>www.bidvex.com | service@bidvex.com</p>
             </div>
         </div>
 
@@ -555,7 +555,7 @@ def payment_letter_template(data: Dict[str, Any]) -> str:
 
         <div class="contact-box">
             <h4>📞 Need Assistance?</h4>
-            <p style="margin: 5px 0;">Email: <strong>support@bidvex.com</strong></p>
+            <p style="margin: 5px 0;">Email: <strong>service@bidvex.com</strong></p>
             <p style="margin: 5px 0;">Phone: <strong>{data['buyer']['phone']}</strong></p>
             <p style="margin: 5px 0; font-size: 9pt; color: #666;">
                 Business Hours: Monday-Friday, 9:00 AM - 5:00 PM EST
@@ -778,7 +778,7 @@ def seller_statement_template(data: Dict[str, Any]) -> str:
             <div class="header-text">
                 <h1>BidVex</h1>
                 <p>Online Auction Platform</p>
-                <p>www.bidvex.com | support@bidvex.com</p>
+                <p>www.bidvex.com | service@bidvex.com</p>
             </div>
         </div>
 
@@ -1011,7 +1011,7 @@ def seller_receipt_template(data: Dict[str, Any]) -> str:
             <div class="header-text">
                 <h1>BidVex</h1>
                 <p>Online Auction Platform</p>
-                <p>www.bidvex.com | support@bidvex.com</p>
+                <p>www.bidvex.com | service@bidvex.com</p>
             </div>
         </div>
 
@@ -1088,7 +1088,7 @@ def seller_receipt_template(data: Dict[str, Any]) -> str:
         <div class="footer">
             <p>Thank you for your partnership with BidVex</p>
             <p>BidVex © {datetime.now().year} | All rights reserved</p>
-            <p style="margin-top: 10px;">Questions? Contact us at support@bidvex.com</p>
+            <p style="margin-top: 10px;">Questions? Contact us at service@bidvex.com</p>
         </div>
     </body>
     </html>
@@ -1254,7 +1254,7 @@ def commission_invoice_template(data: Dict[str, Any]) -> str:
             <div class="header-text">
                 <h1>BidVex</h1>
                 <p>Online Auction Platform</p>
-                <p>www.bidvex.com | support@bidvex.com</p>
+                <p>www.bidvex.com | service@bidvex.com</p>
             </div>
         </div>
 

@@ -163,7 +163,7 @@ export const ResubmitApplicationPanel = ({
                 {isFr
                   ? 'Nombre maximum de tentatives atteint. Contactez '
                   : 'Maximum resubmission attempts reached. Please contact '}
-                <a href="mailto:partners@bidvex.ca" className="underline font-semibold">partners@bidvex.ca</a>
+                <a href="mailto:contractor@bidvex.com" className="underline font-semibold">contractor@bidvex.com</a>
                 {isFr ? " pour obtenir de l'aide." : ' for assistance.'}
               </span>
             </p>
@@ -180,7 +180,7 @@ export const ResubmitApplicationPanel = ({
 
         <p className="text-[11px] text-slate-500 dark:text-slate-500 mt-2">
           {isFr ? 'Questions ? Contactez-nous à ' : 'Questions? Contact us at '}
-          <a href="mailto:partners@bidvex.ca" className="underline">partners@bidvex.ca</a>
+          <a href="mailto:contractor@bidvex.com" className="underline">contractor@bidvex.com</a>
         </p>
       </div>
 

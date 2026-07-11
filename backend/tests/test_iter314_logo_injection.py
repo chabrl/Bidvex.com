@@ -296,7 +296,7 @@ def test_send_email_is_idempotent_for_already_wrapped_html(monkeypatch):
         lang="en", email_subject="x", email_headline="h", email_subheadline="s",
         greeting="Hi", first_name="X",
         body_html="<p>body</p>", cta_block="", secondary_block="",
-        team_signature="BidVex Team", support_email="support@bidvex.com",
+        team_signature="BidVex Team", support_email="service@bidvex.com",
         current_year=2026, corp_address="x", unsubscribe_url="https://bidvex.com/unsub",
     )
 

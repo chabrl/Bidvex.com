@@ -181,11 +181,11 @@ class TestRecipientValidator:
 
 class TestSenderHardLock:
     def test_sender_is_info_bidvex_com(self):
-        # iter323 sender restored to partners@bidvex.ca (per the original
+        # iter323 sender restored to contractor@bidvex.com (per the original
         # iter317 spec) now that SendGrid is authenticated for
-        # `reply.bidvex.ca`. Old iter318 assertion (info@bidvex.com)
+        # `reply.bidvex.ca`. Old iter318 assertion (office@bidvex.com)
         # superseded; see /app/memory/CHANGELOG.md.
-        assert CONTRACTOR_SENDER_EMAIL == "partners@bidvex.ca"
+        assert CONTRACTOR_SENDER_EMAIL == "contractor@bidvex.com"
 
     def test_support_phone_is_hardcoded_exactly(self):
         assert SUPPORT_PHONE == "+1 450 634 3099"

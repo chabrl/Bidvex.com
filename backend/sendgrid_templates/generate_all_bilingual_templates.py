@@ -81,7 +81,7 @@ def footer():
         f'<tr><td style="background-color:{C["navy"]};padding:28px 30px;text-align:center;">'
         f'<img src="{LOGO_URL}" alt="BidVex" width="80" style="display:inline-block;width:80px;height:auto;opacity:0.7;margin-bottom:12px;" /><br/>'
         f'<p style="margin:0 0 6px;font-family:{FONT};font-size:12px;color:rgba(255,255,255,0.6);">BidVex Canada | Sherbrooke, QC</p>'
-        f'<p style="margin:0 0 6px;font-family:{FONT};font-size:12px;color:rgba(255,255,255,0.5);"><a href="mailto:support@bidvex.com" style="color:{C["sky"]};text-decoration:none;" clicktracking=off>support@bidvex.com</a></p>'
+        f'<p style="margin:0 0 6px;font-family:{FONT};font-size:12px;color:rgba(255,255,255,0.5);"><a href="mailto:service@bidvex.com" style="color:{C["sky"]};text-decoration:none;" clicktracking=off>service@bidvex.com</a></p>'
         f'<p style="margin:0;font-family:{FONT};font-size:11px;color:rgba(255,255,255,0.35);"><a href="{CTA_BASE}/legal" style="color:rgba(255,255,255,0.45);text-decoration:underline;" clicktracking=off>Privacy</a> &nbsp;|&nbsp; <a href="{CTA_BASE}/legal" style="color:rgba(255,255,255,0.45);text-decoration:underline;" clicktracking=off>Terms</a></p>'
         f'<p style="margin:8px 0 0;font-family:{FONT};font-size:11px;color:rgba(255,255,255,0.3);">&copy; {{{{current_year}}}} BidVex Inc.</p>'
         f'</td></tr>'
@@ -148,11 +148,11 @@ TEMPLATES.append(("auth_password_changed_bilingual", wrap(
     body(
         lang_label("ENGLISH") +
         p("Hi {{first_name}}, your BidVex password was successfully changed. If you made this change, no further action is needed.") +
-        p("If you did NOT change your password, please reset it immediately and contact <a href=\"mailto:support@bidvex.com\" style=\"color:#2186C6;\" clicktracking=off>support@bidvex.com</a>.") +
+        p("If you did NOT change your password, please reset it immediately and contact <a href=\"mailto:service@bidvex.com\" style=\"color:#2186C6;\" clicktracking=off>service@bidvex.com</a>.") +
         divider() +
         lang_label("FRAN&Ccedil;AIS") +
         p("Bonjour {{first_name}}, votre mot de passe BidVex a &eacute;t&eacute; modifi&eacute; avec succ&egrave;s. Si vous avez effectu&eacute; ce changement, aucune action suppl&eacute;mentaire n'est requise.") +
-        p("Si vous n'avez PAS modifi&eacute; votre mot de passe, veuillez le r&eacute;initialiser imm&eacute;diatement et contacter <a href=\"mailto:support@bidvex.com\" style=\"color:#2186C6;\" clicktracking=off>support@bidvex.com</a>.")
+        p("Si vous n'avez PAS modifi&eacute; votre mot de passe, veuillez le r&eacute;initialiser imm&eacute;diatement et contacter <a href=\"mailto:service@bidvex.com\" style=\"color:#2186C6;\" clicktracking=off>service@bidvex.com</a>.")
     ) +
     cta("Go to BidVex", "Aller sur BidVex", CTA_BASE) + footer()
 )))
@@ -222,11 +222,11 @@ TEMPLATES.append(("admin_account_suspended_bilingual", wrap(
         lang_label("ENGLISH") +
         p("Hi {{first_name}}, your BidVex account has been suspended for the following reason:") +
         card(f'<p style="font-family:{FONT};font-size:15px;font-weight:bold;color:{C["red"]};margin:0;">{{{{reason}}}}</p>') +
-        p("If you believe this is an error, please contact our support team at <a href=\"mailto:support@bidvex.com\" style=\"color:#2186C6;\" clicktracking=off>support@bidvex.com</a> with your account details.") +
+        p("If you believe this is an error, please contact our support team at <a href=\"mailto:service@bidvex.com\" style=\"color:#2186C6;\" clicktracking=off>service@bidvex.com</a> with your account details.") +
         divider() +
         lang_label("FRAN&Ccedil;AIS") +
         p("Bonjour {{first_name}}, votre compte BidVex a &eacute;t&eacute; suspendu pour la raison suivante :") +
-        p("Si vous croyez qu'il s'agit d'une erreur, veuillez contacter notre &eacute;quipe de support &agrave; <a href=\"mailto:support@bidvex.com\" style=\"color:#2186C6;\" clicktracking=off>support@bidvex.com</a>.")
+        p("Si vous croyez qu'il s'agit d'une erreur, veuillez contacter notre &eacute;quipe de support &agrave; <a href=\"mailto:service@bidvex.com\" style=\"color:#2186C6;\" clicktracking=off>service@bidvex.com</a>.")
     ) + footer()
 )))
 
@@ -442,11 +442,11 @@ TEMPLATES.append(("seller_listing_rejected_bilingual", wrap(
             f'<p style="font-family:{FONT};font-size:13px;color:{C["text_med"]};margin:0 0 4px;">Reason / Raison :</p>'
             f'<p style="font-family:{FONT};font-size:14px;color:{C["red"]};margin:0;font-weight:bold;">{{{{reason}}}}</p>'
         ) +
-        p("You may edit and resubmit your listing. If you have questions, please contact <a href=\"mailto:support@bidvex.com\" style=\"color:#2186C6;\" clicktracking=off>support@bidvex.com</a>.") +
+        p("You may edit and resubmit your listing. If you have questions, please contact <a href=\"mailto:service@bidvex.com\" style=\"color:#2186C6;\" clicktracking=off>service@bidvex.com</a>.") +
         divider() +
         lang_label("FRAN&Ccedil;AIS") +
         p("Bonjour {{first_name}}, malheureusement, votre annonce a &eacute;t&eacute; refus&eacute;e par notre &eacute;quipe de r&eacute;vision.") +
-        p("Vous pouvez modifier et resoumettre votre annonce. Pour toute question, contactez <a href=\"mailto:support@bidvex.com\" style=\"color:#2186C6;\" clicktracking=off>support@bidvex.com</a>.")
+        p("Vous pouvez modifier et resoumettre votre annonce. Pour toute question, contactez <a href=\"mailto:service@bidvex.com\" style=\"color:#2186C6;\" clicktracking=off>service@bidvex.com</a>.")
     ) +
     cta("Edit Listing", "Modifier l'annonce", CTA_BASE + "/dashboard/listings") + footer()
 )))

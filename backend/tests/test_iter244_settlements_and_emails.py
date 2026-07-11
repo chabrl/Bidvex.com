@@ -301,7 +301,7 @@ def test_iter244_build_email_payload_body_html_override_wraps_with_template():
     assert inner in html
     # Wrapped inside BidVex chrome.
     assert "761 Rue Chalifoux" in html
-    assert "support@bidvex.com" in html
+    assert "service@bidvex.com" in html
     assert "Unsubscribe" in html
 
 

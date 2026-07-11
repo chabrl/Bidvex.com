@@ -10,7 +10,7 @@ Spec-locked rules:
   • FROM:        noreply@bidvex.ca  (acquisition domain)
                  — falls back to noreply@bidvex.com when .ca DNS
                    is not yet authenticated.
-  • Reply-To:    support@bidvex.com
+  • Reply-To:    service@bidvex.com
   • List-Unsubscribe + List-Unsubscribe-Post: One-Click
   • Precedence:  bulk
   • Click tracking OFF
@@ -48,7 +48,7 @@ EXTERNAL_FROM_EMAIL = os.environ.get(
     "EXTERNAL_FROM_EMAIL", "noreply@bidvex.ca",
 )
 EXTERNAL_FROM_NAME = os.environ.get("EXTERNAL_FROM_NAME", "BidVex Canada")
-EXTERNAL_REPLY_TO = os.environ.get("EXTERNAL_REPLY_TO", "support@bidvex.com")
+EXTERNAL_REPLY_TO = os.environ.get("EXTERNAL_REPLY_TO", "service@bidvex.com")
 EXTERNAL_REPLY_TO_NAME = os.environ.get(
     "EXTERNAL_REPLY_TO_NAME", "BidVex Support",
 )

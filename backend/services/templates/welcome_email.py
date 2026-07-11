@@ -132,7 +132,7 @@ def _shell(*, headline_en: str, headline_fr: str, hero_emoji: str,
           <td style="background-color:{_BRAND_NAVY};padding:28px 30px;text-align:center;">
             <img src="{_LOGO_FOOTER}" alt="BidVex" width="80" style="display:inline-block;width:80px;height:auto;opacity:0.7;margin-bottom:12px;" /><br/>
             <p style="margin:0 0 6px;font-family:{_FONT_STACK};font-size:12px;color:rgba(255,255,255,0.6);">BidVex Canada | Sherbrooke, QC</p>
-            <p style="margin:0 0 6px;font-family:{_FONT_STACK};font-size:12px;color:rgba(255,255,255,0.5);"><a href="mailto:support@bidvex.com" style="color:{_BRAND_CYAN};text-decoration:none;">support@bidvex.com</a></p>
+            <p style="margin:0 0 6px;font-family:{_FONT_STACK};font-size:12px;color:rgba(255,255,255,0.5);"><a href="mailto:service@bidvex.com" style="color:{_BRAND_CYAN};text-decoration:none;">service@bidvex.com</a></p>
             <p style="margin:0;font-family:{_FONT_STACK};font-size:11px;color:rgba(255,255,255,0.35);"><a href="https://bidvex.com/legal" style="color:rgba(255,255,255,0.45);text-decoration:underline;">Privacy</a> &nbsp;|&nbsp; <a href="https://bidvex.com/legal" style="color:rgba(255,255,255,0.45);text-decoration:underline;">Terms</a></p>
             <p style="margin:8px 0 0;font-family:{_FONT_STACK};font-size:11px;color:rgba(255,255,255,0.3);">&copy; {current_year} BidVex Inc.</p>
           </td>
@@ -271,7 +271,7 @@ def render_welcome_email(*, first_name: str = "", marketplace_url: str = "https:
           <td style="background-color:{_BRAND_NAVY};padding:28px 30px;text-align:center;">
             <img src="{_LOGO_FOOTER}" alt="BidVex" width="80" style="display:inline-block;width:80px;height:auto;opacity:0.7;margin-bottom:12px;" /><br/>
             <p style="margin:0 0 6px;font-family:{_FONT_STACK};font-size:12px;color:rgba(255,255,255,0.6);">BidVex Canada | Sherbrooke, QC</p>
-            <p style="margin:0 0 6px;font-family:{_FONT_STACK};font-size:12px;color:rgba(255,255,255,0.5);"><a href="mailto:support@bidvex.com" style="color:{_BRAND_CYAN};text-decoration:none;">support@bidvex.com</a></p>
+            <p style="margin:0 0 6px;font-family:{_FONT_STACK};font-size:12px;color:rgba(255,255,255,0.5);"><a href="mailto:service@bidvex.com" style="color:{_BRAND_CYAN};text-decoration:none;">service@bidvex.com</a></p>
             <p style="margin:0;font-family:{_FONT_STACK};font-size:11px;color:rgba(255,255,255,0.35);"><a href="https://bidvex.com/legal" style="color:rgba(255,255,255,0.45);text-decoration:underline;">Privacy</a> &nbsp;|&nbsp; <a href="https://bidvex.com/legal" style="color:rgba(255,255,255,0.45);text-decoration:underline;">Terms</a></p>
             <p style="margin:8px 0 0;font-family:{_FONT_STACK};font-size:11px;color:rgba(255,255,255,0.3);">&copy; {current_year} BidVex Inc.</p>
           </td>

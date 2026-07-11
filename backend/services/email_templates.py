@@ -16,7 +16,7 @@ from typing import Any, Dict, Optional
 
 # Locked corporate identity for the footer (matches iter232/iter237).
 _CORP_ADDRESS = "761 Rue Chalifoux, Sherbrooke (Québec) J1G 0A8"
-_SUPPORT_EMAIL = "support@bidvex.com"
+_SUPPORT_EMAIL = "service@bidvex.com"
 _PUBLIC_URL = "https://bidvex.com"
 
 BIDVEX_EMAIL_TEMPLATE = """<!DOCTYPE html>

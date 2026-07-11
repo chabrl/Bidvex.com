@@ -27,8 +27,8 @@ Test roster (10 tests):
        toast subtitle.
 
   Mission 4 — Email branding constants:
-    9. `B2B_PARTNER_FROM_EMAIL == "partners@bidvex.ca"` and
-       `TRANSACTIONAL_FROM_EMAIL == "support@bidvex.com"`.
+    9. `B2B_PARTNER_FROM_EMAIL == "contractor@bidvex.com"` and
+       `TRANSACTIONAL_FROM_EMAIL == "service@bidvex.com"`.
    10. `send_email()` accepts and propagates `from_email`/`from_name`/
        `reply_to` overrides to the SendGrid Mail message (verified via
        the logged-only fallback path).
@@ -375,11 +375,11 @@ def test_iter254_email_branding_constants_match_spec():
         TRANSACTIONAL_FROM_NAME,
     )
     # iter270 collapsed all outbound FROMs to noreply@bidvex.com (DKIM);
-    # partners@bidvex.ca lives on as the Reply-To.
+    # contractor@bidvex.com lives on as the Reply-To.
     assert B2B_PARTNER_FROM_EMAIL == "noreply@bidvex.com"
     assert TRANSACTIONAL_FROM_EMAIL == "noreply@bidvex.com"
     from services.emails._email_core import TRANSACTIONAL_REPLY_TO
-    assert TRANSACTIONAL_REPLY_TO == "support@bidvex.com"
+    assert TRANSACTIONAL_REPLY_TO == "service@bidvex.com"
     assert B2B_PARTNER_FROM_NAME  # non-empty
     assert TRANSACTIONAL_FROM_NAME  # non-empty
 
@@ -394,13 +394,13 @@ async def test_iter254_send_email_accepts_branding_overrides():
         to_email="test@example.com",
         subject="iter254 branding test",
         html_content="<p>body</p>",
-        from_email="partners@bidvex.ca",
+        from_email="contractor@bidvex.com",
         from_name="BidVex Partner Program",
-        reply_to="partners@bidvex.ca",
+        reply_to="contractor@bidvex.com",
     )
     assert res["status"] in ("logged", "sent")
     # When SendGrid is unavailable the envelope echoes the overrides.
     if res["status"] == "logged":
-        assert res["from_email"] == "partners@bidvex.ca"
+        assert res["from_email"] == "contractor@bidvex.com"
         assert res["from_name"] == "BidVex Partner Program"
-        assert res["reply_to"] == "partners@bidvex.ca"
+        assert res["reply_to"] == "contractor@bidvex.com"

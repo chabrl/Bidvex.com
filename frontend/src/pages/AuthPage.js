@@ -168,7 +168,7 @@ const AuthPage = () => {
       } else {
         const errorMessage = extractErrorMessage(error);
         // Phase 6.0 / Task 2 — duplicate email/mobile gets a persistent overlay
-        // alert that links to support@bidvex.com so the user can copy/click.
+        // alert that links to service@bidvex.com so the user can copy/click.
         if (errorMessage && errorMessage.toLowerCase().includes('already registered in bidvex')) {
           setFormError(errorMessage);
         } else {
@@ -416,8 +416,8 @@ const AuthPage = () => {
             >
               <p className="font-semibold mb-1">⚠️ {t('auth.duplicateTitle', 'Account already exists')}</p>
               <p className="leading-relaxed">
-                {formError.split('support@bidvex.com')[0]}
-                <a href="mailto:support@bidvex.com" className="font-semibold underline">support@bidvex.com</a>
+                {formError.split('service@bidvex.com')[0]}
+                <a href="mailto:service@bidvex.com" className="font-semibold underline">service@bidvex.com</a>
               </p>
             </div>
           )}

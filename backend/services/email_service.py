@@ -132,7 +132,7 @@ async def send_template_email(
         from_email=Email(from_email, from_name),
         to_emails=To(to_email, to_name),
     )
-    message.reply_to = Email("support@bidvex.com", "BidVex Support")
+    message.reply_to = Email("service@bidvex.com", "BidVex Support")
     message.template_id = template_id
     message.dynamic_template_data = dynamic_data
 
@@ -238,7 +238,7 @@ async def send_html_email(
         subject=subject or "BidVex",
         html_content=html_content,
     )
-    message.reply_to = Email("support@bidvex.com", "BidVex Support")
+    message.reply_to = Email("service@bidvex.com", "BidVex Support")
 
     # iter270 — Spam-busting headers + tracking parity with template path.
     try:
@@ -664,7 +664,7 @@ def _p0_wrap(hero_color: str, emoji: str, headline: str, body_html: str, lang: s
 <tr><td style="background-color:#0B2545;text-align:center;padding:24px 40px;border-radius:0 0 10px 10px;margin-top:8px;">
 <img src="{LOGO_URL}" width="80" style="opacity:0.7;margin-bottom:12px;">
 <p style="color:#94A3B8;font-size:12px;margin:4px 0;">BidVex Canada | Sherbrooke, QC</p>
-<p style="color:#94A3B8;font-size:12px;margin:4px 0;">support@bidvex.com | bidvex.com</p>
+<p style="color:#94A3B8;font-size:12px;margin:4px 0;">service@bidvex.com | bidvex.com</p>
 <p style="color:#94A3B8;font-size:11px;margin:12px 0 0 0;">&copy; {yr} BidVex Canada. {footer_line}.</p>
 </td></tr>
 </table>

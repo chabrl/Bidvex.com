@@ -147,12 +147,12 @@ async def send_bidding_suspended_email(*, to_email: str, to_name: str,
         f"<p style='margin:0;'>After three failed payment attempts for <strong>{listing_title}</strong>, "
         f"your bidding privileges on BidVex have been <strong>suspended</strong>. "
         f"To restore your account, settle your outstanding balance and contact "
-        f"<a href='mailto:support@bidvex.com'>support@bidvex.com</a>.</p>",
+        f"<a href='mailto:service@bidvex.com'>service@bidvex.com</a>.</p>",
         f"<p style='margin:0 0 8px 0;'>Bonjour <strong>{to_name}</strong>,</p>"
         f"<p style='margin:0;'>Après trois tentatives de paiement échouées pour <strong>{listing_title}</strong>, "
         f"vos privilèges d'enchères sur BidVex ont été <strong>suspendus</strong>. "
         f"Pour rétablir votre compte, réglez votre solde impayé et contactez "
-        f"<a href='mailto:support@bidvex.com'>support@bidvex.com</a>.</p>",
+        f"<a href='mailto:service@bidvex.com'>service@bidvex.com</a>.</p>",
     )}
     """
     return await send_email(

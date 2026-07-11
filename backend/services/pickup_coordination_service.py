@@ -144,7 +144,7 @@ def _send_bilingual_pickup_email(
   </p>
   <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;" />
   <p style="font-size:12px;color:#64748b;">
-    BidVex \u00b7 support@bidvex.com<br/>
+    BidVex \u00b7 service@bidvex.com<br/>
     {bidvex_disclaimer}
   </p>
 </body></html>

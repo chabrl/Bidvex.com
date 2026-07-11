@@ -101,7 +101,7 @@ def email_1_welcome(name: str) -> tuple[str, str]:
         <li>🏷️ <a href="https://www.bidvex.com/create-listing" style="color:{BRAND_BLUE};">Lister votre premier article</a></li>
         <li>💡 <a href="https://www.bidvex.com/how-it-works" style="color:{BRAND_BLUE};">Découvrir le fonctionnement</a></li>
       </ul>
-      <p style="color:#64748b;font-size:12px;">Besoin d'aide ? <a href="mailto:support@bidvex.com">support@bidvex.com</a></p>
+      <p style="color:#64748b;font-size:12px;">Besoin d'aide ? <a href="mailto:service@bidvex.com">service@bidvex.com</a></p>
     """
     return subject, _wrap(body)
 

@@ -93,7 +93,7 @@ export default function BlogsPage() {
           </p>
           <p className="text-xs sm:text-sm text-cyan-200 mt-6">
             {fr ? 'Vous représentez la presse ou les médias ? Écrivez à ' : 'Press or media inquiries? Email '}
-            <a href="mailto:support@bidvex.com" className="underline hover:text-white" data-testid="blogs-press-email">support@bidvex.com</a>
+            <a href="mailto:service@bidvex.com" className="underline hover:text-white" data-testid="blogs-press-email">service@bidvex.com</a>
             {fr ? ' — nous répondons sous 24 h ouvrables.' : ' — we respond within 1 business day.'}
           </p>
         </div>

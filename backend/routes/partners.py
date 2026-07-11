@@ -222,7 +222,7 @@ async def apply_for_partner(
                 <li>Documents: {len(cert_urls)} certification(s) + business registration document</li>
               </ul>
               <p style="color: #64748b; font-size: 12px; margin-top: 20px;">
-                Questions? Contact us at <a href="mailto:partners@bidvex.ca" style="color: #2563eb;">partners@bidvex.ca</a>
+                Questions? Contact us at <a href="mailto:contractor@bidvex.com" style="color: #2563eb;">contractor@bidvex.com</a>
               </p>
             </div>
             """
@@ -276,7 +276,7 @@ async def apply_for_partner(
 
     return {
         "success": True,
-        "message": "Partner application submitted. Our team will review your documents and reach out at partners@bidvex.ca.",
+        "message": "Partner application submitted. Our team will review your documents and reach out at contractor@bidvex.com.",
         "verification_status": "pending"
     }
 
@@ -491,7 +491,7 @@ async def request_partner_resubmission(
         body = reason_fr if is_fr else reason_en
         cta = (f"<a href='{frontend_url}/become-partner' style='background:#0f172a;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block;margin-top:12px;'>"
                f"{'Soumettre à nouveau' if is_fr else 'Resubmit application'}</a>")
-        html = f"<p>{body}</p>{cta}<p style='font-size:12px;color:#64748b;margin-top:18px;'>BidVex · partners@bidvex.ca</p>"
+        html = f"<p>{body}</p>{cta}<p style='font-size:12px;color:#64748b;margin-top:18px;'>BidVex · contractor@bidvex.com</p>"
         send_email(to_email=partner["email"], subject=subject, html_content=html)
     except Exception as exc:
         logger.warning(f"[partner-resubmission-req] email failed for {partner.get('email')}: {exc}")

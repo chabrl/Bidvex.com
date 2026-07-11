@@ -30,6 +30,7 @@ import useGeoLocation from '../hooks/useGeoLocation';
 // iter299 P0 — Bill 96 French-title helpers + shared input field
 import { isQuebecListing, validateFrenchTitle, humanizeQcError } from '../utils/bill96';
 import FrenchTitleField from '../components/FrenchTitleField';
+import ListingBlockDialog from '../components/ListingBlockDialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip';
 
 const API = API_BASE;
@@ -220,6 +221,9 @@ const CreateListingPage = () => {
   // iter207 — Vehicle compliance warning dialog (replaces narrow top-right toast)
   const [vehicleComplianceOpen, setVehicleComplianceOpen] = useState(false);
   const [vehicleComplianceSignals, setVehicleComplianceSignals] = useState([]);
+  // iter342 — typed block reason from the backend (context-aware messages)
+  const [blockReason, setBlockReason] = useState('vehicle_dealer_required');
+  const [blockMessages, setBlockMessages] = useState(null);
   // Phase 6.0 hotfix — Manual Review request state inside the vehicle-block modal
   const [vehicleComplianceReviewRequested, setVehicleComplianceReviewRequested] = useState(false);
   const [vehicleComplianceReviewSubmitting, setVehicleComplianceReviewSubmitting] = useState(false);
@@ -360,7 +364,11 @@ const CreateListingPage = () => {
     } catch (error) {
       console.error('Failed to create listing:', error);
       const detail = error?.response?.data?.detail;
-      if (detail && typeof detail === 'object' && detail.error === 'vehicle_listing_dealer_required') {
+      if (detail && typeof detail === 'object' && (detail.block_reason || detail.error === 'vehicle_listing_dealer_required')) {
+        setBlockReason(detail.block_reason || 'vehicle_dealer_required');
+        setBlockMessages(detail.message_en || detail.message_fr
+          ? { en: detail.message_en, fr: detail.message_fr }
+          : null);
         setVehicleComplianceSignals(Array.isArray(detail.signals) ? detail.signals : []);
         setVehicleComplianceReviewRequested(false);
         setVehicleComplianceReviewSubmitting(false);
@@ -1503,161 +1511,17 @@ const CreateListingPage = () => {
         />
       )}
 
-      {/* iter207 — Vehicle compliance warning dialog (replaces collapsed top-right toast) */}
-      <Dialog open={vehicleComplianceOpen} onOpenChange={setVehicleComplianceOpen}>
-        <DialogContent
-          data-testid="vehicle-compliance-dialog"
-          className="sm:max-w-2xl border-rose-200"
-        >
-          <DialogHeader>
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-rose-100 mb-2">
-              <ShieldAlert className="h-6 w-6 text-rose-600" />
-            </div>
-            <DialogTitle
-              data-testid="vehicle-compliance-dialog-title"
-              className="text-center text-xl font-semibold text-slate-900"
-            >
-              {(i18n.language || 'en').toLowerCase().startsWith('fr')
-                ? 'Annonce de véhicule refusée'
-                : 'Vehicle listing not allowed'}
-            </DialogTitle>
-            <DialogDescription
-              data-testid="vehicle-compliance-dialog-body"
-              className="text-center text-sm leading-relaxed text-slate-600 pt-2"
-            >
-              {(i18n.language || 'en').toLowerCase().startsWith('fr') ? (
-                <>
-                  Les annonces de véhicules sont réservées aux concessionnaires licenciés.
-                  Veuillez faire vérifier votre licence par votre organisme provincial
-                  (OMVIC, AMVIC, VSA, SAAQ, FCAA, etc.) avant de publier des véhicules,
-                  ou continuez dans la section <strong>Enchères de véhicules</strong>.
-                </>
-              ) : (
-                <>
-                  Vehicle listings are restricted to licensed dealers only.
-                  Please get your provincial dealer licence verified
-                  (OMVIC, AMVIC, VSA, SAAQ, FCAA, etc.) before posting vehicles,
-                  or browse the <strong>Vehicle Auctions</strong> section instead.
-                </>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-
-          {vehicleComplianceSignals.length > 0 && (
-            <div
-              data-testid="vehicle-compliance-signals"
-              className="mt-2 rounded-md bg-slate-50 border border-slate-200 px-3 py-2"
-            >
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1">
-                {(i18n.language || 'en').toLowerCase().startsWith('fr')
-                  ? 'Signaux détectés'
-                  : 'Detected signals'}
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {vehicleComplianceSignals.map((sig, i) => (
-                  <span
-                    key={i}
-                    className="font-mono text-[11px] bg-white border border-slate-200 rounded px-2 py-0.5 text-slate-700"
-                  >
-                    {sig}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <DialogFooter
-            data-testid="vehicle-compliance-footer"
-            className="mt-4 flex flex-col sm:flex-row sm:flex-wrap sm:items-stretch sm:justify-center gap-3 py-2"
-          >
-            {vehicleComplianceReviewRequested ? (
-              <div
-                data-testid="vehicle-compliance-review-submitted"
-                className="w-full rounded-lg border border-slate-200 bg-slate-50 text-center"
-                style={{ padding: '24px' }}
-              >
-                <p className="text-base font-semibold text-emerald-900 mb-2">
-                  ✅ {(i18n.language || 'en').toLowerCase().startsWith('fr')
-                      ? 'Demande de révision soumise'
-                      : 'Review Request Submitted'}
-                </p>
-                <p className="text-sm text-slate-700 leading-relaxed max-w-md mx-auto">
-                  {(i18n.language || 'en').toLowerCase().startsWith('fr') ? (
-                    <>
-                      Notre équipe vérifiera manuellement cette annonce dans 5 à 50 minutes.
-                      Vous recevrez un courriel et une notification système instantanée dès l'approbation.
-                    </>
-                  ) : (
-                    <>
-                      Our team will manually verify this listing within 5 to 50 minutes.
-                      You will receive an instant email and system notification once approved.
-                    </>
-                  )}
-                </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-4"
-                  onClick={() => setVehicleComplianceOpen(false)}
-                  data-testid="vehicle-compliance-review-close-btn"
-                >
-                  {(i18n.language || 'en').toLowerCase().startsWith('fr') ? 'Fermer' : 'Close'}
-                </Button>
-              </div>
-            ) : (
-              <>
-                <Button
-                  variant="outline"
-                  data-testid="vehicle-compliance-secondary-btn"
-                  onClick={() => {
-                    setVehicleComplianceOpen(false);
-                    navigate('/vehicle-auctions');
-                  }}
-                  className="flex-1 sm:flex-none sm:min-w-[180px] whitespace-nowrap h-11"
-                >
-                  <ExternalLink className="mr-2 h-4 w-4 flex-shrink-0" />
-                  <span className="truncate">
-                    {(i18n.language || 'en').toLowerCase().startsWith('fr')
-                      ? 'Enchères de véhicules'
-                      : 'Go to Vehicle Auctions'}
-                  </span>
-                </Button>
-                <Button
-                  data-testid="vehicle-compliance-primary-btn"
-                  onClick={() => {
-                    setVehicleComplianceOpen(false);
-                    navigate('/vehicle-auctions/dealer-license');
-                  }}
-                  className="flex-1 sm:flex-none sm:min-w-[180px] whitespace-nowrap h-11 bg-rose-600 hover:bg-rose-700 text-white"
-                >
-                  <span className="truncate">
-                    {(i18n.language || 'en').toLowerCase().startsWith('fr')
-                      ? 'Vérifier ma licence'
-                      : 'Verify dealer licence'}
-                  </span>
-                </Button>
-                <Button
-                  variant="outline"
-                  data-testid="vehicle-compliance-manual-review-btn"
-                  onClick={handleRequestManualVehicleReview}
-                  disabled={vehicleComplianceReviewSubmitting}
-                  className="flex-1 sm:flex-none sm:min-w-[180px] whitespace-nowrap h-11 border-amber-400 bg-amber-50 text-amber-900 hover:bg-amber-100 hover:border-amber-500 disabled:opacity-60"
-                  style={{ paddingLeft: 20, paddingRight: 20 }}
-                >
-                  <Search className="mr-2 h-4 w-4 flex-shrink-0" />
-                  <span className="truncate">
-                    {vehicleComplianceReviewSubmitting
-                      ? ((i18n.language || 'en').toLowerCase().startsWith('fr') ? 'Envoi…' : 'Sending…')
-                      : ((i18n.language || 'en').toLowerCase().startsWith('fr')
-                          ? 'Révision manuelle'
-                          : 'Request Manual Review')}
-                  </span>
-                </Button>
-              </>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* iter342 — Context-aware listing block dialog (typed block_reason) */}
+      <ListingBlockDialog
+        open={vehicleComplianceOpen}
+        onOpenChange={setVehicleComplianceOpen}
+        reason={blockReason}
+        signals={vehicleComplianceSignals}
+        messages={blockMessages}
+        reviewRequested={vehicleComplianceReviewRequested}
+        reviewSubmitting={vehicleComplianceReviewSubmitting}
+        onRequestReview={handleRequestManualVehicleReview}
+      />
 
       {/* FEATURE PATCH v9 / Feature 3 — AI category mismatch popup */}
       <Dialog open={aiMismatchModal.open} onOpenChange={(v) => !v && handleAiMismatchCorrect()}>

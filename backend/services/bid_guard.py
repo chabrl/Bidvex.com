@@ -21,8 +21,8 @@ async def ensure_bidding_allowed(db, user_id: str) -> None:
             detail={
                 "error": "bidding_suspended",
                 "message_en": ("Your bidding privileges are suspended due to an unresolved "
-                               "overdue payment. Please contact support@bidvex.com."),
+                               "overdue payment. Please contact service@bidvex.com."),
                 "message_fr": ("Vos privilèges d'enchères sont suspendus en raison d'un paiement "
-                               "en retard non résolu. Veuillez contacter support@bidvex.com."),
+                               "en retard non résolu. Veuillez contacter service@bidvex.com."),
             },
         )

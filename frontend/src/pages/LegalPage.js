@@ -252,7 +252,7 @@ const LegalPage = ({ documentType = 'both' }) => {
               {/* 17 */}
               <h3 className="text-lg font-semibold">17. Contact Information</h3>
               <p>BidVex Legal &amp; Data Protection Officer</p>
-              <p><strong>Email:</strong> <a href="mailto:support@bidvex.com" className="text-primary hover:underline">support@bidvex.com</a></p>
+              <p><strong>Email:</strong> <a href="mailto:service@bidvex.com" className="text-primary hover:underline">service@bidvex.com</a></p>
 
               {/* Cross-Border Compliance (Bilingual - Bill 96) */}
               <CrossBorderLegalSection />
@@ -434,7 +434,7 @@ const LegalPage = ({ documentType = 'both' }) => {
                 <li><strong>Portability:</strong> The right to receive your data in a structured, machine-readable format.</li>
                 <li><strong>Withdrawal of Consent:</strong> The right to stop processing for specific purposes (e.g., marketing).</li>
               </ul>
-              <p><strong>To exercise these rights,</strong> please contact our Data Protection Officer at <a href="mailto:support@bidvex.com" className="text-primary hover:underline">support@bidvex.com</a>.</p>
+              <p><strong>To exercise these rights,</strong> please contact our Data Protection Officer at <a href="mailto:service@bidvex.com" className="text-primary hover:underline">service@bidvex.com</a>.</p>
 
               {/* 9 */}
               <h3 className="text-lg font-semibold">9. Data Retention</h3>
@@ -448,7 +448,7 @@ const LegalPage = ({ documentType = 'both' }) => {
               <h3 className="text-lg font-semibold">10. Contact Us</h3>
               <p>For questions regarding this policy or our data practices, please contact:</p>
               <p>BidVex Data Protection Officer</p>
-              <p><strong>Email:</strong> <a href="mailto:support@bidvex.com" className="text-primary hover:underline">support@bidvex.com</a></p>
+              <p><strong>Email:</strong> <a href="mailto:service@bidvex.com" className="text-primary hover:underline">service@bidvex.com</a></p>
 
               {/* Law 25: AI Disclosure (Bilingual - Bill 96) */}
               <AIDisclosureLegalSection />
@@ -614,7 +614,7 @@ const LegalPage = ({ documentType = 'both' }) => {
               </section>
               <section className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-6">
                 <h2 className="text-2xl font-semibold mb-4"><span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full inline-flex items-center justify-center text-blue-600 text-sm font-bold mr-2">10</span>Nous contacter</h2>
-                <p>Courriel : <a href="mailto:support@bidvex.com" className="text-blue-600 hover:underline">support@bidvex.com</a></p>
+                <p>Courriel : <a href="mailto:service@bidvex.com" className="text-blue-600 hover:underline">service@bidvex.com</a></p>
               </section>
 
               {/* FR Addendum */}

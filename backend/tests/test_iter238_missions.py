@@ -19,7 +19,7 @@ def test_email_template_includes_corporate_footer():
     assert "{corp_address}" in BIDVEX_EMAIL_TEMPLATE
     rendered = build_email_payload("welcome", {"first_name": "X", "email": "x@x.com"}, {})
     assert "761 Rue Chalifoux, Sherbrooke (Québec) J1G 0A8" in rendered["html_content"]
-    assert "support@bidvex.com" in rendered["html_content"]
+    assert "service@bidvex.com" in rendered["html_content"]
 
 
 @pytest.mark.parametrize("email_type", [
@@ -54,7 +54,7 @@ def test_build_email_payload_supports_all_types(email_type):
     assert "Test" in payload["html_content"]
     # Footer must always be there.
     assert "761 Rue Chalifoux" in payload["html_content"]
-    assert "support@bidvex.com" in payload["html_content"]
+    assert "service@bidvex.com" in payload["html_content"]
 
 
 def test_build_email_payload_handles_french():

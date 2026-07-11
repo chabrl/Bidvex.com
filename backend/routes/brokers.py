@@ -1450,7 +1450,7 @@ async def buyer_terminate_relationship(
                     <li>You are no longer able to place bids under this broker's licence.</li>
                     <li>You're free to partner with another broker at any time from <a href="https://bidvex.com/brokers">bidvex.com/brokers</a>.</li>
                   </ul>
-                  <p style="color:#64748b;font-size:12px;margin-top:24px">If you didn't initiate this action, contact support@bidvex.com immediately.</p>
+                  <p style="color:#64748b;font-size:12px;margin-top:24px">If you didn't initiate this action, contact service@bidvex.com immediately.</p>
                 </div>
                 """,
             )
@@ -1758,11 +1758,11 @@ async def _notify_broker_decision(db, broker_doc, *, decision, current_user, rej
                 f"<p>Hello {user.get('name','')},</p>"
                 f"<p>Your broker application was not approved.</p>"
                 f"<p><b>Reason:</b> {rejection_reason or 'Please contact support'}</p>"
-                f"<p>To appeal or resubmit: <a href=\"mailto:support@bidvex.com\">support@bidvex.com</a></p>"
+                f"<p>To appeal or resubmit: <a href=\"mailto:service@bidvex.com\">service@bidvex.com</a></p>"
                 f"<hr><p>Bonjour {user.get('name','')},</p>"
                 f"<p>Votre demande de courtier n'a pas été approuvée.</p>"
                 f"<p><b>Raison :</b> {rejection_reason or 'Veuillez contacter le support'}</p>"
-                f"<p>Pour faire appel ou soumettre à nouveau : <a href=\"mailto:support@bidvex.com\">support@bidvex.com</a></p>"
+                f"<p>Pour faire appel ou soumettre à nouveau : <a href=\"mailto:service@bidvex.com\">service@bidvex.com</a></p>"
             )
         from services.emails._email_core import send_email
         await send_email(to_email=user["email"], subject=subject, html_content=body)

@@ -1327,7 +1327,7 @@ async def marketing_unsubscribe_by_token(data: dict = Body(...)):
         })
         return {"status": "unsubscribed", "success": True, "message": "You have been successfully unsubscribed."}
 
-    return {"status": "error", "message": "Could not process unsubscribe request. Please contact support@bidvex.com."}
+    return {"status": "error", "message": "Could not process unsubscribe request. Please contact service@bidvex.com."}
 
 
 

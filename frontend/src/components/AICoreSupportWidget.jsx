@@ -443,8 +443,8 @@ const AICoreSupportWidget = () => {
         {
           role:    'system',
           content: (isFr
-            ? '❌ Échec de la création du ticket. Veuillez réessayer ou écrire à support@bidvex.com.'
-            : '❌ Could not create your ticket. Please retry or email support@bidvex.com.'),
+            ? '❌ Échec de la création du ticket. Veuillez réessayer ou écrire à service@bidvex.com.'
+            : '❌ Could not create your ticket. Please retry or email service@bidvex.com.'),
           ts:      new Date().toISOString(),
           error:   true,
         },

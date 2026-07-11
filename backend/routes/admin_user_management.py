@@ -436,7 +436,7 @@ async def admin_reset_password(
                   </a>
                 </div>
                 <p style="color:#64748b;font-size:11px;text-align:center;">
-                  If you did not expect this email, contact support@bidvex.com.
+                  If you did not expect this email, contact service@bidvex.com.
                 </p>
               </div>
             </div>

@@ -282,7 +282,7 @@ function CampaignWizard({ campaignId, headers, onClose }) {
     cta_label_en: 'Register Now',
     cta_label_fr: "S'inscrire maintenant",
     cta_url: 'https://bidvex.com/register',
-    reply_to_email: 'support@bidvex.com',
+    reply_to_email: 'service@bidvex.com',
     // iter274 — Auctioneer free-trial coupon attachment. When toggled
     // on, every recipient gets a unique BVX-TRIAL-* code minted at
     // send-time and {trial_signup_url} in the body is substituted to
@@ -309,7 +309,7 @@ function CampaignWizard({ campaignId, headers, onClose }) {
           cta_label_en: r.data.cta_label_en || 'Register Now',
           cta_label_fr: r.data.cta_label_fr || "S'inscrire maintenant",
           cta_url: r.data.cta_url || 'https://bidvex.com/register',
-          reply_to_email: r.data.reply_to_email || 'support@bidvex.com',
+          reply_to_email: r.data.reply_to_email || 'service@bidvex.com',
           attach_trial_coupon: !!r.data.attach_trial_coupon,
           trial_partner_type: r.data.trial_partner_type || 'dealer',
         });

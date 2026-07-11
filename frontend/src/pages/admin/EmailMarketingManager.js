@@ -1231,7 +1231,7 @@ const EmailMarketingManager = () => {
                     type="email"
                     value={campaignData.reply_to}
                     onChange={(e) => setCampaignData(prev => ({ ...prev, reply_to: e.target.value }))}
-                    placeholder="support@bidvex.com"
+                    placeholder="service@bidvex.com"
                   />
                 </div>
               </div>

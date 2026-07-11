@@ -122,7 +122,7 @@ const AIAssistant = () => {
       setManualDetails('');
       toast.success(isFr ? 'Ticket créé' : 'Ticket created');
     } catch (e) {
-      toast.error(isFr ? 'Échec de la création — réessayez ou écrivez à support@bidvex.com' : 'Could not create ticket — retry or email support@bidvex.com');
+      toast.error(isFr ? 'Échec de la création — réessayez ou écrivez à service@bidvex.com' : 'Could not create ticket — retry or email service@bidvex.com');
     } finally {
       setManualSubmitting(false);
     }
@@ -738,11 +738,11 @@ const AIAssistant = () => {
             ...out,
             {
               role: 'assistant',
-              content: 'Service temporarily unavailable. Please retry in a moment, or email support@bidvex.com for immediate help.\n\nService temporairement indisponible. Veuillez réessayer dans un instant ou écrire à support@bidvex.com pour de l\'aide immédiate.',
+              content: 'Service temporarily unavailable. Please retry in a moment, or email service@bidvex.com for immediate help.\n\nService temporairement indisponible. Veuillez réessayer dans un instant ou écrire à service@bidvex.com pour de l\'aide immédiate.',
               rich_content: {
                 has_rich_content: true,
                 action_buttons: [
-                  { text: 'Email Support / Contacter le support', action: 'email', url: 'support@bidvex.com', icon: 'mail', style: 'primary' },
+                  { text: 'Email Support / Contacter le support', action: 'email', url: 'service@bidvex.com', icon: 'mail', style: 'primary' },
                 ],
               },
             },
@@ -1090,7 +1090,7 @@ const AIAssistant = () => {
                 className="px-4 py-2 bg-amber-50 dark:bg-amber-900/30 border-b border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-xs flex-shrink-0"
                 data-testid="ai-degraded-banner"
               >
-                <span className="font-semibold">⚠ Service degraded.</span> Some replies may fail. Email <a href="mailto:support@bidvex.com" className="underline">support@bidvex.com</a> for urgent help.
+                <span className="font-semibold">⚠ Service degraded.</span> Some replies may fail. Email <a href="mailto:service@bidvex.com" className="underline">service@bidvex.com</a> for urgent help.
               </div>
             )}
 

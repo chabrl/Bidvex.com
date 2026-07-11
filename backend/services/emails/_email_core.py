@@ -18,8 +18,8 @@ logger = logging.getLogger(__name__)
 SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY")
 # iter270 Deliverability fix — Canonical FROM = noreply@bidvex.com so
 # DKIM/SPF/DMARC alignment is consistent across every outbound path.
-# Reply-To is set per email-type (support@bidvex.com for transactional,
-# partners@bidvex.ca for partner-related) so users still reach the right
+# Reply-To is set per email-type (service@bidvex.com for transactional,
+# contractor@bidvex.com for partner-related) so users still reach the right
 # inbox when they hit Reply.
 FROM_EMAIL = os.environ.get("SENDGRID_FROM_EMAIL", "noreply@bidvex.com")
 FROM_NAME = os.environ.get("SENDGRID_FROM_NAME", "BidVex Canada")
@@ -30,13 +30,13 @@ FROM_NAME = os.environ.get("SENDGRID_FROM_NAME", "BidVex Canada")
 # address remains only as a Reply-To target for partner inboxes.
 B2B_PARTNER_FROM_EMAIL = "noreply@bidvex.com"
 B2B_PARTNER_FROM_NAME = "BidVex Canada"
-B2B_PARTNER_REPLY_TO = "partners@bidvex.ca"
+B2B_PARTNER_REPLY_TO = "contractor@bidvex.com"
 B2B_PARTNER_REPLY_TO_NAME = "BidVex Partner Team"
 TRANSACTIONAL_FROM_EMAIL = "noreply@bidvex.com"
 TRANSACTIONAL_FROM_NAME = "BidVex Canada"
-TRANSACTIONAL_REPLY_TO = "support@bidvex.com"
+TRANSACTIONAL_REPLY_TO = "service@bidvex.com"
 TRANSACTIONAL_REPLY_TO_NAME = "BidVex Support"
-MARKETING_REPLY_TO = "support@bidvex.com"
+MARKETING_REPLY_TO = "service@bidvex.com"
 MARKETING_REPLY_TO_NAME = "BidVex Support"
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "https://www.bidvex.com")
 
@@ -222,7 +222,7 @@ async def send_email(
     """iter244 Mission 2 — Canonical low-level SendGrid dispatcher.
     iter254 Mission 4 — Now accepts optional `from_email`/`from_name`/
     `reply_to` overrides so individual outbound paths can stamp branded
-    headers (`partners@bidvex.ca` for B2B blasts, `support@bidvex.com`
+    headers (`contractor@bidvex.com` for B2B blasts, `service@bidvex.com`
     for transactional). Defaults preserve the existing global FROM.
 
     iter266 Mission 2 — Universal suppression gate. Skips every send
@@ -445,8 +445,8 @@ async def send_unified_email(
       - `subject_override`:   override the registry's auto-derived subject
 
     iter254 Mission 4 — Optional from_email/from_name/reply_to overrides
-    let callers stamp branded outbound headers (e.g. `partners@bidvex.ca`
-    for B2B blasts, `support@bidvex.com` for transactional).
+    let callers stamp branded outbound headers (e.g. `contractor@bidvex.com`
+    for B2B blasts, `service@bidvex.com` for transactional).
 
     iter266 Mission 2 — `is_marketing=True` activates the marketing
     suppression gate so opt-out users never receive promo blasts even

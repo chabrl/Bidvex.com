@@ -199,7 +199,7 @@ class BidVexAssistant:
             logger.error(f"Error in AI chat: {e}", exc_info=True)
             return {
                 "success": False,
-                "message": "I apologize, but I'm experiencing technical difficulties. Please try again or contact support@bidvex.com." if language == "en" else "Je m'excuse, mais je rencontre des difficultés techniques. Veuillez réessayer ou contacter support@bidvex.com.",
+                "message": "I apologize, but I'm experiencing technical difficulties. Please try again or contact service@bidvex.com." if language == "en" else "Je m'excuse, mais je rencontre des difficultés techniques. Veuillez réessayer ou contacter service@bidvex.com.",
                 "error": str(e)
             }
     

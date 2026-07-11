@@ -94,7 +94,7 @@ async def test_service_initialization():
             print_info("This is expected for testing without credentials")
         
         # Test default values
-        assert service1.from_email == os.environ.get('SENDGRID_FROM_EMAIL', 'support@bidvex.com')
+        assert service1.from_email == os.environ.get('SENDGRID_FROM_EMAIL', 'service@bidvex.com')
         print_success(f"Default from_email: {service1.from_email}")
         
         return True

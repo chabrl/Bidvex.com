@@ -52,7 +52,7 @@ async def send_vehicle_deposit_captured_email(
         f"(${fee_total:.2f} CAD platform fee) was not paid within 48 hours of "
         f"the deadline. Amount captured: <strong>${amt:.2f} CAD</strong>. "
         f"This brings your account into good standing — no further action is required. "
-        f"If you believe this was in error, contact support@bidvex.com within 14 days."
+        f"If you believe this was in error, contact service@bidvex.com within 14 days."
     )
     body_fr = (
         f"Votre dépôt d'enchère de 500 $ pour <strong>{veh_title}</strong> a été "
@@ -60,7 +60,7 @@ async def send_vehicle_deposit_captured_email(
         f"({fee_total:.2f} $ CAD de frais de plateforme) n'a pas été payée dans les "
         f"48 heures suivant l'échéance. Montant saisi : <strong>{amt:.2f} $ CAD</strong>. "
         f"Votre compte est maintenant en règle — aucune autre action requise. "
-        f"Si vous croyez qu'il s'agit d'une erreur, contactez support@bidvex.com dans les 14 jours."
+        f"Si vous croyez qu'il s'agit d'une erreur, contactez service@bidvex.com dans les 14 jours."
     )
 
     html = _storage_panel(

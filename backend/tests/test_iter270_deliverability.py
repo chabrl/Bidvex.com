@@ -48,10 +48,10 @@ def test_iter270_canonical_from_is_noreply_dotcom():
 
 def test_iter270_partner_from_collapsed_to_noreply():
     src = _read("services/emails/_email_core.py")
-    # Partner B2B FROM is now noreply@bidvex.com (was partners@bidvex.ca).
+    # Partner B2B FROM is now noreply@bidvex.com (was contractor@bidvex.com).
     assert 'B2B_PARTNER_FROM_EMAIL = "noreply@bidvex.com"' in src
-    # Reply-To stays partners@bidvex.ca.
-    assert 'B2B_PARTNER_REPLY_TO = "partners@bidvex.ca"' in src
+    # Reply-To stays contractor@bidvex.com.
+    assert 'B2B_PARTNER_REPLY_TO = "contractor@bidvex.com"' in src
 
 
 def test_iter270_send_email_forces_canonical_sender():
@@ -62,7 +62,7 @@ def test_iter270_send_email_forces_canonical_sender():
 
 
 def test_iter270_no_legacy_dotca_support_in_outbound_templates():
-    """Email body templates must reference support@bidvex.com — not .ca."""
+    """Email body templates must reference service@bidvex.com — not .ca."""
     for path in (
         "services/emails/_email_core.py",
         "services/emails/email_marketplace.py",
@@ -99,10 +99,10 @@ def test_iter270_admin_promotions_partner_path_uses_reply_to():
 
 
 def test_iter270_pdf_footers_use_dotcom_support():
-    """PDF generators contact lines route to support@bidvex.com."""
+    """PDF generators contact lines route to service@bidvex.com."""
     for path in ("services/invoice_generator.py", "services/pdf_invoice.py"):
         src = _read(path)
-        assert "support@bidvex.com" in src
+        assert "service@bidvex.com" in src
         assert "support@bidvex.ca" not in src, f"{path}: legacy .ca contact still in PDF"
 
 
@@ -190,7 +190,7 @@ def test_iter270_test_email_transactional_live_send():
     assert data.get("success") is True
     res = data.get("result") or {}
     assert res.get("from") == "noreply@bidvex.com"
-    assert res.get("reply_to") == "support@bidvex.com"
+    assert res.get("reply_to") == "service@bidvex.com"
     assert res.get("status") in ("sent", "logged")
 
 
@@ -225,4 +225,4 @@ def test_iter270_test_email_partner_live_send():
     assert data.get("type") == "partner"
     res = data.get("result") or {}
     assert res.get("from") == "noreply@bidvex.com"
-    assert res.get("reply_to") == "partners@bidvex.ca"
+    assert res.get("reply_to") == "contractor@bidvex.com"

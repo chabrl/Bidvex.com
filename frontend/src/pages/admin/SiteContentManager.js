@@ -364,7 +364,7 @@ const SiteContentManager = () => {
                   <Input
                     value={langData.link_value || ''}
                     onChange={(e) => handleContentChange(config.key, currentLang, 'link_value', e.target.value)}
-                    placeholder={langData.link_type === 'mailto' ? 'support@bidvex.com' : '/page-url'}
+                    placeholder={langData.link_type === 'mailto' ? 'service@bidvex.com' : '/page-url'}
                     className="max-w-xl"
                   />
                 </div>

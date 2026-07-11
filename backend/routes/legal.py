@@ -117,8 +117,8 @@ async def get_legal_pages_admin(
                         "fr": {"title": "Conditions d'utilisation", "content": "", "link_type": "page", "link_value": "/terms-of-service"}
                     },
                     "support": {
-                        "en": {"title": "Contact Support", "content": "", "link_type": "mailto", "link_value": "support@bidvex.com"},
-                        "fr": {"title": "Contacter le support", "content": "", "link_type": "mailto", "link_value": "support@bidvex.com"}
+                        "en": {"title": "Contact Support", "content": "", "link_type": "mailto", "link_value": "service@bidvex.com"},
+                        "fr": {"title": "Contacter le support", "content": "", "link_type": "mailto", "link_value": "service@bidvex.com"}
                     }
                 },
                 "updated_at": None,
@@ -263,15 +263,15 @@ async def seed_legal_pages(
                 "support": {
                     "en": {
                         "title": "Contact Support",
-                        "content": "<h1>Contact Support</h1><p>Need help? Our support team is here for you.</p><p>Email: support@bidvex.com</p>",
+                        "content": "<h1>Contact Support</h1><p>Need help? Our support team is here for you.</p><p>Email: service@bidvex.com</p>",
                         "link_type": "mailto",
-                        "link_value": "support@bidvex.com"
+                        "link_value": "service@bidvex.com"
                     },
                     "fr": {
                         "title": "Contacter le support",
-                        "content": "<h1>Contacter le support</h1><p>Besoin d'aide? Notre équipe de support est là pour vous.</p><p>Email: support@bidvex.com</p>",
+                        "content": "<h1>Contacter le support</h1><p>Besoin d'aide? Notre équipe de support est là pour vous.</p><p>Email: service@bidvex.com</p>",
                         "link_type": "mailto",
-                        "link_value": "support@bidvex.com"
+                        "link_value": "service@bidvex.com"
                     }
                 }
             },

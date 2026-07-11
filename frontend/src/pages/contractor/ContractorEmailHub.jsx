@@ -6,7 +6,7 @@
  *   • Sent log (most-recent 50 outbound emails)
  *
  * Server enforces:
- *   • FROM is locked to info@bidvex.com (visible read-only here).
+ *   • FROM is locked to office@bidvex.com (visible read-only here).
  *   • Signature is appended server-side; we DO NOT preview it here so
  *     the user can't accidentally edit it. The Sent log surfaces the
  *     final rendered HTML.
@@ -248,8 +248,8 @@ export default function ContractorEmailHub() {
           </h1>
           <p className="text-sm text-slate-500 mt-1">
             {fr
-              ? `Envoyez des courriels depuis ${meta?.sender_email || 'info@bidvex.com'} avec votre signature BidVex.`
-              : `Send emails from ${meta?.sender_email || 'info@bidvex.com'} with your BidVex signature appended.`}
+              ? `Envoyez des courriels depuis ${meta?.sender_email || 'office@bidvex.com'} avec votre signature BidVex.`
+              : `Send emails from ${meta?.sender_email || 'office@bidvex.com'} with your BidVex signature appended.`}
           </p>
         </div>
         <Button
@@ -271,7 +271,7 @@ export default function ContractorEmailHub() {
                 {fr ? 'Nouveau courriel' : 'New Email'}
               </h2>
               <Badge variant="outline" className="text-xs" data-testid="locked-sender-badge">
-                {fr ? 'De :' : 'From:'} {meta?.sender_email || 'info@bidvex.com'}
+                {fr ? 'De :' : 'From:'} {meta?.sender_email || 'office@bidvex.com'}
               </Badge>
             </div>
 

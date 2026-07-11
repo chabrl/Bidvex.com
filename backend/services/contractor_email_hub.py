@@ -2,8 +2,8 @@
 iter317 Directive 3 — Contractor Email Hub (iter318 sender update).
 
 Server-side outbound email pipeline for contractors. Enforces:
-  • Sender FROM = info@bidvex.com    (hardcoded, never overridable)
-  • Reply-To    = support@bidvex.com  (hardcoded, never overridable)
+  • Sender FROM = office@bidvex.com    (hardcoded, never overridable)
+  • Reply-To    = service@bidvex.com  (hardcoded, never overridable)
   • Mandatory BidVex signature block appended on every send
   • Canonical CDN logo URL (iter314 token) — NEVER the bidvex.com/assets path
   • Hardcoded support number +1 450 634 3099 — NOT a dynamic variable
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 
 # ─── Hard-locked sender identity (Email Hub only) ───────────────────────
-# iter323 — sender restored to partners@bidvex.ca (per the original
+# iter323 — sender restored to contractor@bidvex.com (per the original
 # directive in iter317), now that SendGrid sender authentication is in
 # place for the `reply.bidvex.ca` subdomain. Per-contractor Reply-To
 # addresses use the `partners+c{contractor_id}@reply.bidvex.ca` tag so
@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 #   • MX record on `reply.bidvex.ca` → mx.sendgrid.net (priority 10)
 #   • Inbound Parse webhook URL: POST /api/sendgrid/inbound-parse
 
-CONTRACTOR_SENDER_EMAIL = "partners@bidvex.ca"
+CONTRACTOR_SENDER_EMAIL = "contractor@bidvex.com"
 CONTRACTOR_SENDER_NAME = "BidVex Partners"
 
 # Per-contractor reply-to subdomain. The {contractor_id} suffix is the
@@ -109,7 +109,7 @@ def build_contractor_signature(
     Locked attributes:
       • Logo = BIDVEX_CDN_LOGO_URL  (CDN, NOT bidvex.com/assets)
       • Support phone = SUPPORT_PHONE  (hardcoded, NOT a variable)
-      • Sender / displayed email = partners@bidvex.ca (Email Hub spec, iter323)
+      • Sender / displayed email = contractor@bidvex.com (Email Hub spec, iter323)
       • Direct extension = contractor_extension if set (iter323)
 
     The block carries a hidden idempotency token so re-injection is a no-op.
@@ -278,7 +278,7 @@ async def send_contractor_email(
 
 
 # ─── SendGrid raw dispatcher (BYPASSES canonical send_email so we keep
-#     the info@bidvex.com Email Hub FROM intact) ─────────────────────────
+#     the office@bidvex.com Email Hub FROM intact) ─────────────────────────
 
 async def _sendgrid_dispatch(
     *,
@@ -291,7 +291,7 @@ async def _sendgrid_dispatch(
 ) -> Optional[str]:
     """Direct SendGrid call. We can't go through services.emails._email_core
     because that path forces FROM=noreply@bidvex.com. Email Hub messages
-    MUST visibly originate from info@bidvex.com per Email Hub spec.
+    MUST visibly originate from office@bidvex.com per Email Hub spec.
 
     iter337 — Optional `custom_args` (str→str) are added to the message
     so SendGrid echoes them on webhook events (opens, clicks, bounces)."""

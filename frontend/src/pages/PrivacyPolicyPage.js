@@ -241,7 +241,7 @@ const PrivacyPolicyPage = () => {
               <RightItem icon="📦" title="Portability" desc="Receive your data in a structured, machine-readable format." />
               <RightItem icon="🚫" title="Withdrawal of Consent" desc="Stop processing for specific purposes (e.g., marketing)." />
             </div>
-            <BlueBox><p><strong>To exercise these rights,</strong> please contact our Data Protection Officer at <a href="mailto:support@bidvex.com" className="underline">support@bidvex.com</a>.</p></BlueBox>
+            <BlueBox><p><strong>To exercise these rights,</strong> please contact our Data Protection Officer at <a href="mailto:service@bidvex.com" className="underline">service@bidvex.com</a>.</p></BlueBox>
 
             <SH id="retention" n="9">Data Retention</SH>
             <div className="space-y-3 mt-4">
@@ -256,7 +256,7 @@ const PrivacyPolicyPage = () => {
             <SH id="contact" n="10">Contact Us</SH>
             <GreenBox>
               <p className="font-semibold text-lg mb-2">BidVex Data Protection Officer</p>
-              <p className="text-sm">Email: <a href="mailto:support@bidvex.com" className="text-blue-600 underline">support@bidvex.com</a></p>
+              <p className="text-sm">Email: <a href="mailto:service@bidvex.com" className="text-blue-600 underline">service@bidvex.com</a></p>
             </GreenBox>
 
             {/* NEW: 11 Stripe Payment Data */}
@@ -366,7 +366,7 @@ const PrivacyPolicyPage = () => {
               <RightItem icon="📦" title="Portabilité" desc="Recevoir vos données dans un format structuré." />
               <RightItem icon="🚫" title="Retrait du consentement" desc="Cesser le traitement marketing." />
             </div>
-            <BlueBox><p><strong>Pour exercer ces droits,</strong> contactez notre responsable de la protection des données à <a href="mailto:support@bidvex.com" className="underline">support@bidvex.com</a>.</p></BlueBox>
+            <BlueBox><p><strong>Pour exercer ces droits,</strong> contactez notre responsable de la protection des données à <a href="mailto:service@bidvex.com" className="underline">service@bidvex.com</a>.</p></BlueBox>
 
             <SH id="retention" n="9">Conservation des données</SH>
             <div className="space-y-3 mt-4">
@@ -378,7 +378,7 @@ const PrivacyPolicyPage = () => {
             <SH id="contact" n="10">Nous contacter</SH>
             <GreenBox>
               <p className="font-semibold text-lg mb-2">Responsable de la protection des données BidVex</p>
-              <p className="text-sm">Courriel : <a href="mailto:support@bidvex.com" className="text-blue-600 underline">support@bidvex.com</a></p>
+              <p className="text-sm">Courriel : <a href="mailto:service@bidvex.com" className="text-blue-600 underline">service@bidvex.com</a></p>
             </GreenBox>
 
             <SH id="stripe-data" n="11">Données de paiement Stripe</SH>

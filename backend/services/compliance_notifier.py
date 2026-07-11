@@ -27,6 +27,19 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+# iter342 — Universal block-notification inbox. ALL automated listing
+# blocks (vehicle gate, AI watchdog, prohibited-items scanner) email here
+# in addition to the admin user accounts.
+OFFICE_NOTIFICATION_EMAIL = os.environ.get("BLOCK_NOTIFICATION_EMAIL") or "office@bidvex.com"
+_ADMIN_PANEL_BASE = (os.environ.get("FRONTEND_URL") or "https://bidvex.com").rstrip("/")
+
+GATE_LABELS = {
+    "blocked_at_gate":          "Vehicle dealer gate",
+    "paused_by_ai":             "AI Watchdog",
+    "paused_by_watchdog":       "Safety Watchdog (cron backstop)",
+    "blocked_prohibited_item":  "Prohibited items scanner",
+}
+
 
 async def _admin_recipients(db) -> list[str]:
     """Return list of admin email addresses to notify."""
@@ -34,7 +47,10 @@ async def _admin_recipients(db) -> list[str]:
         {"role": {"$in": ["admin", "super_admin"]}, "email": {"$ne": None}},
         {"_id": 0, "email": 1},
     ).limit(20)
-    return [doc["email"] async for doc in cursor if doc.get("email")]
+    recipients = [doc["email"] async for doc in cursor if doc.get("email")]
+    if OFFICE_NOTIFICATION_EMAIL not in recipients:
+        recipients.append(OFFICE_NOTIFICATION_EMAIL)
+    return recipients
 
 
 async def _send_admin_email(*, recipients: list[str], subject: str, html: str) -> bool:
@@ -79,6 +95,7 @@ async def notify_admins_of_violation(
         "blocked_at_gate": "info",         # gate did its job — informational
         "paused_by_ai":    "warning",      # AI caught a slip-through
         "paused_by_watchdog": "high",      # watchdog backstop fired = something went wrong upstream
+        "blocked_prohibited_item": "warning",  # iter342 — prohibited-items scanner
     }.get(kind, "warning")
 
     notification = {
@@ -97,23 +114,22 @@ async def notify_admins_of_violation(
         "created_at": now,
         **(extra or {}),
     }
-    # iter338 — blocked_at_gate now ALSO emails admins (user request: admins
-    # must be able to review false positives). Deduped: max one email per
-    # seller per 6h window so retry spam doesn't flood the inbox.
+    # iter342 — email dedup applies to ALL block kinds: same seller + same
+    # listing title within 6 hours → do NOT send a second email (retry spam
+    # never floods the inbox). The in-app notification row is always written.
     send_email_for_this = True
-    if kind == "blocked_at_gate":
-        try:
-            from datetime import timedelta
-            cutoff = (datetime.now(timezone.utc) - timedelta(hours=6)).isoformat()
-            recent = await db.admin_notifications.find_one(
-                {"subkind": "blocked_at_gate", "seller_id": seller_id,
-                 "created_at": {"$gte": cutoff}},
-                {"_id": 1},
-            )
-            if recent:
-                send_email_for_this = False
-        except Exception:  # noqa: BLE001
-            pass
+    try:
+        from datetime import timedelta
+        cutoff = (datetime.now(timezone.utc) - timedelta(hours=6)).isoformat()
+        recent = await db.admin_notifications.find_one(
+            {"seller_id": seller_id, "title": title,
+             "created_at": {"$gte": cutoff}},
+            {"_id": 1},
+        )
+        if recent:
+            send_email_for_this = False
+    except Exception:  # noqa: BLE001
+        pass
 
     try:
         await db.admin_notifications.insert_one(notification)
@@ -124,23 +140,47 @@ async def notify_admins_of_violation(
     if send_email_for_this:
         try:
             recipients = await _admin_recipients(db)
+            gate_label = GATE_LABELS.get(kind, kind.replace("_", " "))
+            # iter342 — resolve seller name for the admin email body
+            seller_name = None
+            if seller_id:
+                try:
+                    seller_doc = await db.users.find_one(
+                        {"id": seller_id}, {"_id": 0, "name": 1, "email": 1}
+                    ) or {}
+                    seller_name = seller_doc.get("name")
+                    seller_email = seller_email or seller_doc.get("email")
+                except Exception:  # noqa: BLE001
+                    pass
             if kind == "blocked_at_gate":
                 subject = f"[BidVex Compliance] Listing blocked at gate — review for false positive — {title}"
             else:
-                subject = f"[BidVex Compliance] Vehicle listing {kind.replace('_',' ')} — {title}"
+                subject = f"[BidVex Compliance] Listing {kind.replace('_',' ')} — {title}"
             signal_html = "".join(f"<li><code>{s}</code></li>" for s in signals[:8])
+            admin_link = f"{_ADMIN_PANEL_BASE}/admin?tab=compliance"
+            approve_link = (
+                f"{_ADMIN_PANEL_BASE}/admin?tab=compliance&action=approve-whitelist"
+                f"&seller_id={seller_id or ''}&listing_id={listing_id or ''}"
+            )
+            block_link = (
+                f"{_ADMIN_PANEL_BASE}/admin?tab=compliance&action=confirm-block"
+                f"&seller_id={seller_id or ''}&listing_id={listing_id or ''}"
+            )
             html = f"""
-                <h2>Compliance system action</h2>
-                <p><strong>Kind:</strong> {kind}</p>
-                <p><strong>Listing ID:</strong> {listing_id}</p>
-                <p><strong>Title:</strong> {title}</p>
+                <h2>Listing blocked — action required</h2>
+                <p><strong>Gate:</strong> {gate_label}</p>
+                <p><strong>Seller:</strong> {seller_name or '(unknown name)'} &lt;{seller_email or seller_id or 'unknown'}&gt;</p>
+                <p><strong>Listing title:</strong> {title}</p>
                 <p><strong>Category:</strong> {category or "(none)"}</p>
-                <p><strong>Seller:</strong> {seller_email or seller_id}</p>
-                <p><strong>Detection signals:</strong></p>
-                <ul>{signal_html or '<li>(none)</li>'}</ul>
+                <p><strong>Why it was blocked:</strong></p>
+                <ul>{signal_html or '<li>(no signals recorded)</li>'}</ul>
                 <p><strong>Severity:</strong> {severity}</p>
-                <p>Triage in the admin panel: Vehicles → Compliance Alerts.</p>
-                <p style="color:#64748b;font-size:12px">iter205 — automated by the BidVex Safety Watchdog. Replies are not monitored.</p>
+                <p style="margin:20px 0;">
+                  <a href="{approve_link}" style="background:#059669;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600;margin-right:12px;">✅ Approve &amp; Whitelist</a>
+                  <a href="{block_link}" style="background:#dc2626;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600;">🚫 Confirm Block</a>
+                </p>
+                <p><a href="{admin_link}">Open the seller &amp; listing in the admin panel →</a></p>
+                <p style="color:#64748b;font-size:12px">iter342 — automated by the BidVex compliance system. Replies are not monitored.</p>
             """
             asyncio.create_task(_send_admin_email(recipients=recipients, subject=subject, html=html))
         except Exception as e:

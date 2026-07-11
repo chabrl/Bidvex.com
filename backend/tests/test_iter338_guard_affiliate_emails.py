@@ -257,7 +257,8 @@ def test_affiliate_rate_constants_aligned():
 def test_careers_and_contractor_emails_updated():
     careers_src = Path("/app/backend/services/careers_notifications.py").read_text()
     aid_src = Path("/app/backend/routes/contractor_aid.py").read_text()
-    assert "contractor@bidvex.com" in careers_src
-    assert "support@bidvex.com" not in careers_src
+    # iter342 — careers notifications now route to the dedicated careers inbox
+    assert "careers@bidvex.com" in careers_src
+    assert "service@bidvex.com" not in careers_src
     assert "contractor@bidvex.com" in aid_src
-    assert "support@bidvex.com" not in aid_src
+    assert "service@bidvex.com" not in aid_src

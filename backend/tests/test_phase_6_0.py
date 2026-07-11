@@ -250,7 +250,7 @@ async def test_register_blocks_duplicate_email_with_support_message(db, monkeypa
     assert ei.value.status_code == 400
     msg = str(ei.value.detail)
     assert "already registered in BidVex" in msg
-    assert "support@bidvex.com" in msg
+    assert "service@bidvex.com" in msg
 
 
 @pytest.mark.asyncio
@@ -303,7 +303,7 @@ async def test_register_blocks_duplicate_mobile_with_support_message(db, monkeyp
     assert ei.value.status_code == 400
     msg = str(ei.value.detail)
     assert "already registered in BidVex" in msg
-    assert "support@bidvex.com" in msg
+    assert "service@bidvex.com" in msg
 
 
 @pytest.mark.asyncio

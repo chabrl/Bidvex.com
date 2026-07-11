@@ -182,7 +182,7 @@ class EmailDataBuilder:
             "reset_link": reset_url,
             "expires_in_hours": expires_in_hours,
             "expiry_time": expiry_message,
-            "support_email": "support@bidvex.com",
+            "support_email": "service@bidvex.com",
         }
 
     @staticmethod
@@ -191,7 +191,7 @@ class EmailDataBuilder:
             "first_name": user.get("name", "").split()[0] if user.get("name") else "",
             "email": user.get("email"),
             "change_time": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
-            "support_email": "support@bidvex.com",
+            "support_email": "service@bidvex.com",
             "login_url": "https://bidvex.com/auth",
         }
 
@@ -336,7 +336,7 @@ async def send_password_reset_email(
     <p style="color:#6b7280;font-size:12px;line-height:1.5;margin-top:16px;word-break:break-all;">Lien direct : <a href="{reset_url}" style="color:#1e3a8a;">{reset_url}</a></p>
   </td></tr>
   <tr><td style="background:#f9fafb;padding:16px 32px;text-align:center;">
-    <p style="color:#9ca3af;font-size:12px;margin:0;">&copy; BidVex {data['current_year']} — support@bidvex.com</p>
+    <p style="color:#9ca3af;font-size:12px;margin:0;">&copy; BidVex {data['current_year']} — service@bidvex.com</p>
   </td></tr>
 </table>
 </td></tr></table>
@@ -363,7 +363,7 @@ async def send_password_reset_email(
     <p style="color:#6b7280;font-size:12px;line-height:1.5;margin-top:16px;word-break:break-all;">Direct link: <a href="{reset_url}" style="color:#1e3a8a;">{reset_url}</a></p>
   </td></tr>
   <tr><td style="background:#f9fafb;padding:16px 32px;text-align:center;">
-    <p style="color:#9ca3af;font-size:12px;margin:0;">&copy; BidVex {data['current_year']} — support@bidvex.com</p>
+    <p style="color:#9ca3af;font-size:12px;margin:0;">&copy; BidVex {data['current_year']} — service@bidvex.com</p>
   </td></tr>
 </table>
 </td></tr></table>
@@ -400,12 +400,12 @@ async def send_password_changed_email(
     <p style="color:#374151;font-size:16px;line-height:1.6;">Votre mot de passe BidVex a été modifié avec succès le <strong>{change_time}</strong>.</p>
     <p style="color:#374151;font-size:16px;line-height:1.6;">Si vous n'avez <strong>pas</strong> effectué ce changement, veuillez contacter immédiatement notre équipe de support :</p>
     <table width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0;"><tr><td align="center">
-      <a href="mailto:support@bidvex.com?subject=Changement%20de%20mot%20de%20passe%20non%20autoris%C3%A9%20-%20{user_email}" target="_blank" style="display:inline-block;background:#dc2626;color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:6px;font-size:16px;font-weight:bold;">Contacter le support</a>
+      <a href="mailto:service@bidvex.com?subject=Changement%20de%20mot%20de%20passe%20non%20autoris%C3%A9%20-%20{user_email}" target="_blank" style="display:inline-block;background:#dc2626;color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:6px;font-size:16px;font-weight:bold;">Contacter le support</a>
     </td></tr></table>
-    <p style="color:#6b7280;font-size:14px;line-height:1.5;">Courriel : <a href="mailto:support@bidvex.com" style="color:#1e3a8a;">support@bidvex.com</a></p>
+    <p style="color:#6b7280;font-size:14px;line-height:1.5;">Courriel : <a href="mailto:service@bidvex.com" style="color:#1e3a8a;">service@bidvex.com</a></p>
   </td></tr>
   <tr><td style="background:#f9fafb;padding:16px 32px;text-align:center;">
-    <p style="color:#9ca3af;font-size:12px;margin:0;">&copy; BidVex {current_year} — support@bidvex.com</p>
+    <p style="color:#9ca3af;font-size:12px;margin:0;">&copy; BidVex {current_year} — service@bidvex.com</p>
   </td></tr>
 </table>
 </td></tr></table>
@@ -427,12 +427,12 @@ async def send_password_changed_email(
     <p style="color:#374151;font-size:16px;line-height:1.6;">Your BidVex password was successfully changed on <strong>{change_time}</strong>.</p>
     <p style="color:#374151;font-size:16px;line-height:1.6;">If you did <strong>not</strong> make this change, please contact our support team immediately:</p>
     <table width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0;"><tr><td align="center">
-      <a href="mailto:support@bidvex.com?subject=Unauthorized%20Password%20Change%20-%20{user_email}" target="_blank" style="display:inline-block;background:#dc2626;color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:6px;font-size:16px;font-weight:bold;">Contact Support</a>
+      <a href="mailto:service@bidvex.com?subject=Unauthorized%20Password%20Change%20-%20{user_email}" target="_blank" style="display:inline-block;background:#dc2626;color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:6px;font-size:16px;font-weight:bold;">Contact Support</a>
     </td></tr></table>
-    <p style="color:#6b7280;font-size:14px;line-height:1.5;">Email: <a href="mailto:support@bidvex.com" style="color:#1e3a8a;">support@bidvex.com</a></p>
+    <p style="color:#6b7280;font-size:14px;line-height:1.5;">Email: <a href="mailto:service@bidvex.com" style="color:#1e3a8a;">service@bidvex.com</a></p>
   </td></tr>
   <tr><td style="background:#f9fafb;padding:16px 32px;text-align:center;">
-    <p style="color:#9ca3af;font-size:12px;margin:0;">&copy; BidVex {current_year} — support@bidvex.com</p>
+    <p style="color:#9ca3af;font-size:12px;margin:0;">&copy; BidVex {current_year} — service@bidvex.com</p>
   </td></tr>
 </table>
 </td></tr></table>

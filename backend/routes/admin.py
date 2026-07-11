@@ -1241,7 +1241,7 @@ async def admin_email_preview(
         "report_details": "This is a preview of the admin report email template.",
         "suspension_reason": "Terms of Service violation (preview)",
         # Support
-        "support_email": "support@bidvex.com",
+        "support_email": "service@bidvex.com",
         "ticket_id": "PREV-001",
         # Affiliate
         "commission_amount": "45.00",

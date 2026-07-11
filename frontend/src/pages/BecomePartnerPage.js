@@ -112,7 +112,7 @@ const BecomePartnerPage = () => {
       pending: { icon: Clock, bg: 'bg-amber-50 dark:bg-amber-950/50 border-amber-200 dark:border-amber-700/40', text: 'text-amber-700 dark:text-amber-300', sub: 'text-amber-600 dark:text-slate-400', label: t('partnerPage.statusPendingLabel'), desc: t('partnerPage.statusPendingDesc') },
       pending_review: { icon: Clock, bg: 'bg-amber-50 dark:bg-amber-950/50 border-amber-200 dark:border-amber-700/40', text: 'text-amber-700 dark:text-amber-300', sub: 'text-amber-600 dark:text-slate-400', label: t('partnerPage.statusPendingLabel'), desc: (i18n.language || 'en').toLowerCase().startsWith('fr') ? "Votre nouvelle demande est en cours d'examen. Nous vous contacterons dans les 24 à 48 heures." : "Your resubmission is under review. We'll contact you within 24–48 hours." },
       verified: { icon: Award, bg: 'bg-emerald-50 dark:bg-emerald-950/50 border-emerald-200 dark:border-emerald-700/40', text: 'text-emerald-700 dark:text-emerald-300', sub: 'text-emerald-600 dark:text-slate-400', label: t('partnerPage.statusVerifiedLabel'), desc: t('partnerPage.statusVerifiedDesc') },
-      rejected: { icon: XCircle, bg: 'bg-red-50 dark:bg-red-950/50 border-red-200 dark:border-red-700/40', text: 'text-red-700 dark:text-red-300', sub: 'text-red-600 dark:text-slate-400', label: t('partnerPage.statusRejectedLabel'), desc: partnerStatus.rejection_reason || ((i18n.language || 'en').toLowerCase().startsWith('fr') ? 'Veuillez contacter partners@bidvex.ca pour plus de détails.' : 'Please contact partners@bidvex.ca for details.') },
+      rejected: { icon: XCircle, bg: 'bg-red-50 dark:bg-red-950/50 border-red-200 dark:border-red-700/40', text: 'text-red-700 dark:text-red-300', sub: 'text-red-600 dark:text-slate-400', label: t('partnerPage.statusRejectedLabel'), desc: partnerStatus.rejection_reason || ((i18n.language || 'en').toLowerCase().startsWith('fr') ? 'Veuillez contacter contractor@bidvex.com pour plus de détails.' : 'Please contact contractor@bidvex.com for details.') },
     }[partnerStatus.verification_status];
     if (!config) return null;
     const Icon = config.icon;
@@ -161,7 +161,7 @@ const BecomePartnerPage = () => {
                   {t('partnerPage.ctaApply')} <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               )}
-              <Button variant="outline" size="lg" className="border-slate-300 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 h-11 px-6 text-sm" onClick={() => window.location.href = 'mailto:partners@bidvex.ca'} data-testid="partner-cta-contact">
+              <Button variant="outline" size="lg" className="border-slate-300 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 h-11 px-6 text-sm" onClick={() => window.location.href = 'mailto:contractor@bidvex.com'} data-testid="partner-cta-contact">
                 {t('partnerPage.ctaContact')}
               </Button>
             </div>
@@ -297,7 +297,7 @@ const BecomePartnerPage = () => {
 
                 <div className="rounded-lg bg-slate-50 dark:bg-white/[0.03] border border-slate-100 dark:border-white/5 p-3 text-[11px] text-slate-500 leading-relaxed space-y-1">
                   <p>{t('partnerPage.formDisclaimer1')}</p>
-                  <p>{t('partnerPage.formDisclaimer2')} <span className="text-slate-700 dark:text-slate-300">partners@bidvex.ca</span>.</p>
+                  <p>{t('partnerPage.formDisclaimer2')} <span className="text-slate-700 dark:text-slate-300">contractor@bidvex.com</span>.</p>
                 </div>
 
                 {/* Partner Fee Disclosure — full width, proper padding */}

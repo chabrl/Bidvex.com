@@ -289,15 +289,44 @@ async def scan_listing_for_violations(
         if verdict == "FAIL" and action == "reject":
             update_fields["moderation_status"] = "rejected"
             update_fields["status"] = "rejected"
+            update_fields["block_reason"] = "prohibited_item"
         elif verdict == "UNSURE" or action == "manual_review":
             update_fields["moderation_status"] = "pending_review"
             update_fields["status"] = "pending_review"
+            update_fields["block_reason"] = "ai_review_required"
         else:
             update_fields["moderation_status"] = "passed"
 
         await db[collection].update_one(
             {"id": listing_id}, {"$set": update_fields},
         )
+
+        # iter342 — admin notification (in-app + deduped email) on ANY
+        # moderation block so a human can review it. Best-effort.
+        if update_fields.get("block_reason"):
+            try:
+                from services.compliance_notifier import notify_admins_of_violation
+                seller_id = listing.get("seller_id") or listing.get("facility_id")
+                seller = await db.users.find_one(
+                    {"id": seller_id}, {"_id": 0, "email": 1}
+                ) if seller_id else None
+                await notify_admins_of_violation(
+                    db,
+                    kind=("blocked_prohibited_item"
+                          if update_fields["block_reason"] == "prohibited_item"
+                          else "paused_by_ai"),
+                    listing={
+                        "id": listing_id,
+                        "title": listing.get("title") or listing.get("description_en"),
+                        "category": listing.get("category"),
+                        "seller_id": seller_id,
+                    },
+                    signals=codes or [f"verdict:{verdict}"],
+                    seller_email=(seller or {}).get("email"),
+                    extra={"collection": collection, "gate": "prohibited_items_scanner"},
+                )
+            except Exception as notify_exc:  # noqa: BLE001
+                logger.warning(f"[moderation_scan:{listing_id}] admin notify failed: {notify_exc}")
 
         return {
             "ok": True,

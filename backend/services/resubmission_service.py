@@ -70,8 +70,8 @@ async def _resubmit_partner(db, *, user_id: str, user_email: str | None, payload
         from fastapi import HTTPException
         raise HTTPException(status_code=403, detail={
             "error": "max_resubmissions_reached",
-            "message_en": "Maximum resubmission attempts reached. Please contact partners@bidvex.ca for assistance.",
-            "message_fr": "Nombre maximum de tentatives atteint. Contactez partners@bidvex.ca pour obtenir de l'aide.",
+            "message_en": "Maximum resubmission attempts reached. Please contact contractor@bidvex.com for assistance.",
+            "message_fr": "Nombre maximum de tentatives atteint. Contactez contractor@bidvex.com pour obtenir de l'aide.",
             "max": MAX_RESUBMISSIONS,
         })
 
@@ -149,8 +149,8 @@ async def _resubmit_dealer(db, *, user_id: str, user_email: str | None, payload:
         from fastapi import HTTPException
         raise HTTPException(status_code=403, detail={
             "error": "max_resubmissions_reached",
-            "message_en": "Maximum resubmission attempts reached. Please contact partners@bidvex.ca for assistance.",
-            "message_fr": "Nombre maximum de tentatives atteint. Contactez partners@bidvex.ca pour obtenir de l'aide.",
+            "message_en": "Maximum resubmission attempts reached. Please contact contractor@bidvex.com for assistance.",
+            "message_fr": "Nombre maximum de tentatives atteint. Contactez contractor@bidvex.com pour obtenir de l'aide.",
             "max": MAX_RESUBMISSIONS,
         })
 

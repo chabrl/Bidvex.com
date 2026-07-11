@@ -36,7 +36,7 @@ def test_system_instruction_matches_user_spec():
     assert "licensed brokers to register on the platform" in WATCHDOG_SYSTEM_INSTRUCTION
     assert "Strict Information Adherence" in WATCHDOG_SYSTEM_INSTRUCTION
     assert "Never invent fee numbers" in WATCHDOG_SYSTEM_INSTRUCTION
-    assert "partners@bidvex.ca" in WATCHDOG_SYSTEM_INSTRUCTION  # the banned example must be present
+    assert "contractor@bidvex.com" in WATCHDOG_SYSTEM_INSTRUCTION  # the banned example must be present
     # And the model should NOT be authorised to claim the Master Concierge persona.
     # (lower-cased substring search; if any future edit re-adds it as a positive identity,
     # this check still passes because the banned phrase remains inside the negative rule,

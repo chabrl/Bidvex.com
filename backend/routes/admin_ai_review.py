@@ -380,7 +380,7 @@ async def request_manual_vehicle_review(
     <p><a href="{direct_admin_url}" style="display:inline-block;background:#2186C6;color:#FFF;padding:12px 24px;border-radius:8px;font-weight:bold;text-decoration:none;">Open Admin Panel →</a></p>
     <p style="margin-top:24px;font-size:11px;color:#64748B;">Direct URL: <a href="{direct_admin_url}" style="color:#2186C6;">{direct_admin_url}</a></p>
   </td></tr>
-  <tr><td style="background:#0B2545;color:rgba(255,255,255,0.6);padding:18px 30px;text-align:center;font-size:11px;">BidVex Canada · Sherbrooke, QC · <a href="mailto:support@bidvex.com" style="color:#3FB4CB;">support@bidvex.com</a></td></tr>
+  <tr><td style="background:#0B2545;color:rgba(255,255,255,0.6);padding:18px 30px;text-align:center;font-size:11px;">BidVex Canada · Sherbrooke, QC · <a href="mailto:service@bidvex.com" style="color:#3FB4CB;">service@bidvex.com</a></td></tr>
 </table></body></html>"""
 
             try:
@@ -961,12 +961,12 @@ async def _queue_seller_email(db, kind: str, seller_id: str, context: dict):
             msg_en = (
                 f"Your listing '{listing_title}' was rejected by compliance. "
                 f"Reason: {reason_en}. "
-                f"If you see that it's wrong, please contact support at support@bidvex.com."
+                f"If you see that it's wrong, please contact support at service@bidvex.com."
             )
             msg_fr = (
                 f"Votre annonce « {listing_title} » a été rejetée par notre équipe de conformité. "
                 f"Raison : {reason_fr}. "
-                f"Si vous pensez qu'il s'agit d'une erreur, contactez le support à support@bidvex.com."
+                f"Si vous pensez qu'il s'agit d'une erreur, contactez le support à service@bidvex.com."
             )
         await db.notifications.insert_one({
             "id":              str(uuid.uuid4()),

@@ -144,7 +144,7 @@ def test_iter247_email_html_carries_locked_subject_and_copy():
     assert "your first listing completely free" in html
     assert "risk-free" in html
     assert "real-time bidding infrastructure" in html
-    assert "support@bidvex.com" in html
+    assert "service@bidvex.com" in html
     # Coupon block.
     assert "BIDVEX-PARTNERS" in html
 

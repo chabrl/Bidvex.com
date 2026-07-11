@@ -63,7 +63,7 @@ export default function OnboardingPage() {
         try {
           const r = await fetch(
             `https://nominatim.openstreetmap.org/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&format=json`,
-            { headers: { 'User-Agent': 'BidVex/1.0 (support@bidvex.com)' } },
+            { headers: { 'User-Agent': 'BidVex/1.0 (service@bidvex.com)' } },
           );
           if (r.ok) {
             const data = await r.json();

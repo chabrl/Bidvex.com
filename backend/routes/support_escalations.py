@@ -559,7 +559,7 @@ async def admin_reply_to_escalation(
     """Admin posts a reply on a Live Support ticket. Appends to transcript,
     broadcasts SSE to the user's open tabs + every admin's escalations console
     (so multi-admin scenarios stay in sync), and fires a best-effort SendGrid
-    email with `Reply-To: support@bidvex.com`. Status is auto-set to
+    email with `Reply-To: service@bidvex.com`. Status is auto-set to
     `acknowledged` if it was still `open`."""
     db = get_db()
     ticket = await db.support_escalations.find_one({"id": ticket_id}, {"_id": 0})
@@ -611,13 +611,13 @@ async def admin_reply_to_escalation(
                 "ticket_id":   ticket_id,
                 "message":     reply_msg["content"],
                 "ts":          reply_msg["ts"],
-                "admin_email": "support@bidvex.com",
+                "admin_email": "service@bidvex.com",
                 "status":      new_status,
             })
     except Exception:  # noqa: BLE001
         pass
 
-    # Best-effort email — never blocks the API. Uses Reply-To: support@bidvex.com
+    # Best-effort email — never blocks the API. Uses Reply-To: service@bidvex.com
     # so the user can hit reply and land back in the support inbox.
     try:
         await _email_user_admin_reply(ticket, reply_msg["content"])
@@ -761,7 +761,7 @@ async def user_escalations_stream(
 
 async def _email_user_admin_reply(ticket: Dict[str, Any], admin_message: str) -> None:
     """Fire a 'we replied' email to the ticket's owner with Reply-To set to
-    support@bidvex.com so a forward-email chain doesn't break the loop."""
+    service@bidvex.com so a forward-email chain doesn't break the loop."""
     try:
         from services.email_service import get_email_service
         email_service = get_email_service()
@@ -794,7 +794,7 @@ async def _email_user_admin_reply(ticket: Dict[str, Any], admin_message: str) ->
     <p style="color:#6b7280;font-size:13px;line-height:1.5;">Pour répondre, ouvrez l'application BidVex et continuez la conversation dans votre fenêtre de chat — ou répondez à ce courriel.</p>
   </td></tr>
   <tr><td style="background:#f9fafb;padding:16px 32px;text-align:center;">
-    <p style="color:#9ca3af;font-size:12px;margin:0;">&copy; BidVex — support@bidvex.com</p>
+    <p style="color:#9ca3af;font-size:12px;margin:0;">&copy; BidVex — service@bidvex.com</p>
   </td></tr>
 </table></td></tr></table></body></html>"""
         else:
@@ -817,11 +817,11 @@ async def _email_user_admin_reply(ticket: Dict[str, Any], admin_message: str) ->
     <p style="color:#6b7280;font-size:13px;line-height:1.5;">To respond, open BidVex and continue the conversation in your chat panel — or simply reply to this email.</p>
   </td></tr>
   <tr><td style="background:#f9fafb;padding:16px 32px;text-align:center;">
-    <p style="color:#9ca3af;font-size:12px;margin:0;">&copy; BidVex — support@bidvex.com</p>
+    <p style="color:#9ca3af;font-size:12px;margin:0;">&copy; BidVex — service@bidvex.com</p>
   </td></tr>
 </table></td></tr></table></body></html>"""
         # Send via the existing send_raw_html method. The underlying
-        # email_service already sets `Reply-To: support@bidvex.com` by
+        # email_service already sets `Reply-To: service@bidvex.com` by
         # default (see email_service.py lines 135 + 241).
         await email_service.send_raw_html(
             to=recipient, subject=subject, html_content=html, disable_tracking=True,

@@ -43,7 +43,7 @@ async def run_live_test():
     print(f"  {'PASS' if r else 'FAIL'}\n")
 
     # Test 3 — Admin notification
-    print("TEST 3: Admin notification (raw HTML to info@bidvex.com)...")
+    print("TEST 3: Admin notification (raw HTML to office@bidvex.com)...")
     r = await notify_admin_new_user({"email": TEST_EMAIL, "full_name": "Charbel Test", "language_preference": "en"})
     results["admin_notify"] = r
     print(f"  {'PASS' if r else 'FAIL'}\n")

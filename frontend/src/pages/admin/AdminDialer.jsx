@@ -337,6 +337,20 @@ export default function AdminDialer() {
         </p>
       </header>
 
+      {/* iter342 — Twilio auth-token error banner (hard failure) */}
+      {config?.auth_valid === false && (
+        <div className="bg-red-900 border border-red-500 rounded-xl p-4 mb-6" data-testid="dialer-auth-error-banner">
+          <p className="text-red-200 font-bold">
+            ⚠️ {fr ? "Erreur d'authentification Twilio" : 'Twilio Authentication Error'}
+          </p>
+          <p className="text-red-300 text-sm mt-1">
+            {fr
+              ? "Le composeur est hors ligne. Votre jeton d'authentification Twilio est invalide ou expiré. Allez dans Twilio Console → Account Info → Auth Token, copiez le jeton actuel, mettez à jour TWILIO_AUTH_TOKEN dans les variables d'environnement du déploiement, puis redéployez."
+              : 'The dialer is offline. Your Twilio Auth Token is invalid or expired. Go to Twilio Console → Account Info → Auth Token, copy the current token, update TWILIO_AUTH_TOKEN in the deployment environment variables, then redeploy.'}
+          </p>
+        </div>
+      )}
+
       {/* Config banner */}
       {!config?.configured && (
         <Card className="mb-4 border-2 border-amber-300 bg-amber-50" data-testid="dialer-config-banner">

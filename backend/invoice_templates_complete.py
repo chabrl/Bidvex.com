@@ -167,7 +167,7 @@ def payment_letter_template(data: Dict[str, Any], lang: str = "en") -> str:
             <div class="header-text">
                 <h1>BidVex</h1>
                 <p>{t('online_auction_platform', lang)}</p>
-                <p>www.bidvex.com | support@bidvex.com</p>
+                <p>www.bidvex.com | service@bidvex.com</p>
             </div>
         </div>
 
@@ -244,7 +244,7 @@ def payment_letter_template(data: Dict[str, Any], lang: str = "en") -> str:
 
         <div class="contact-box">
             <h4>{t('need_assistance', lang)}</h4>
-            <p style="margin: 5px 0;">{t('email', lang)}: <strong>support@bidvex.com</strong></p>
+            <p style="margin: 5px 0;">{t('email', lang)}: <strong>service@bidvex.com</strong></p>
             <p style="margin: 5px 0;">{t('phone', lang)}: <strong>{data['buyer']['phone']}</strong></p>
             <p style="margin: 5px 0; font-size: 9pt; color: #666;">
                 {t('business_hours', lang)}
@@ -458,7 +458,7 @@ def seller_statement_template(data: Dict[str, Any], lang: str = "en") -> str:
             <div class="header-text">
                 <h1>BidVex</h1>
                 <p>{t('online_auction_platform', lang)}</p>
-                <p>www.bidvex.com | support@bidvex.com</p>
+                <p>www.bidvex.com | service@bidvex.com</p>
             </div>
         </div>
 
@@ -694,7 +694,7 @@ def seller_receipt_template(data: Dict[str, Any], lang: str = "en") -> str:
             <div class="header-text">
                 <h1>BidVex</h1>
                 <p>{t('online_auction_platform', lang)}</p>
-                <p>www.bidvex.com | support@bidvex.com</p>
+                <p>www.bidvex.com | service@bidvex.com</p>
             </div>
         </div>
 
@@ -944,7 +944,7 @@ def commission_invoice_template(data: Dict[str, Any], lang: str = "en") -> str:
             <div class="header-text">
                 <h1>BidVex</h1>
                 <p>{t('online_auction_platform', lang)}</p>
-                <p>www.bidvex.com | support@bidvex.com</p>
+                <p>www.bidvex.com | service@bidvex.com</p>
             </div>
         </div>
 

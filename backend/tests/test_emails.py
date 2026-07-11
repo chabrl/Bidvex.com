@@ -18,7 +18,7 @@ from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Email, To
 
 API_KEY = os.environ.get("SENDGRID_API_KEY")
-FROM_EMAIL = os.environ.get("SENDGRID_FROM_EMAIL", "info@bidvex.com")
+FROM_EMAIL = os.environ.get("SENDGRID_FROM_EMAIL", "office@bidvex.com")
 FROM_NAME = os.environ.get("SENDGRID_FROM_NAME", "BidVex")
 TEST_RECIPIENT = FROM_EMAIL  # safe: send to ourselves
 

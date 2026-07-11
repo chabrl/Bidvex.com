@@ -1,0 +1,56 @@
+{
+  "summary": "iter342 sprint review — backend + frontend testing complete. Backend: 10/11 pytest passed (1 skipped intentionally). Frontend: careers apply E2E success, contact-us shows all 9 addresses, admin dialer red banner appears, contractor Prospect Finder clean 'not configured' state, contractor dashboard rich, affiliate dashboard renders at /affiliate. Minor gaps: SUMMER2026 code not printed on promo page; 'External Campaigns' tab not visible in admin sidebar (email-marketing section not reachable via visible top nav).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "PromoSummerLaunchPage",
+        "issue": "Promo landing shows 'BidVex Grand Opening', 'First Month FREE' and 'Claim Your Free Month' CTA but the review requires the literal 'SUMMER2026' coupon code to be displayed to the visitor. The code is nowhere in the rendered page body.",
+        "selector": "/promo/summer-launch page body",
+        "priority": "MEDIUM"
+      },
+      {
+        "component": "AdminPanel sidebar",
+        "issue": "'Email Marketing' section and 'External Campaigns' tab are not exposed in the visible admin top-navigation tabs (verified full nav: Marketplace, Vehicles, Dialer & Contractors, Settings, Banners, Analytics, Partners & Finance, Team, Admin Logs, Promotions, Affiliates, Affiliate Payouts, Ad Feeds, Ad Campaigns, Currency Appeals, Messaging Oversight, User Management, Listings Moderation, Flagged Listings (AI Review), Disputed Settlements, Manage All Auctions, Deletion Requests, Listing Change Requests, Tax Verification, Tax Dashboard). Direct URLs /admin/email-marketing, /admin/emails, /admin/marketing, /admin/campaigns, /admin/external-campaigns all 404.",
+        "selector": "text=Email Marketing / text=External Campaigns",
+        "priority": "MEDIUM"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter338_review.py",
+    "/app/test_reports/pytest/iter338_review.xml"
+  ],
+  "action_items": [
+    "Render the SUMMER2026 promo code prominently on /promo/summer-launch (e.g., near the 'Claim Your Free Month' CTA) — currently missing from the visible page.",
+    "Wire up an 'Email Marketing' entry (with External Campaigns sub-tab) in the admin sidebar/top nav — the routes appear un-navigable from the admin UI even though the sprint claims the tab is visible. If it lives inside 'Ad Campaigns' or 'Promotions', the label should reflect that."
+  ],
+  "critical_code_review_comments": [
+    "Vehicle-gate 403 correctly returns detail.block_reason='vehicle_dealer_required' with message_en/message_fr/signals — well-structured typed enum response.",
+    "False-positive fixes for 'Multi-Lot Clearance' and 'Glass Cylinder Vase' titles both correctly bypass the vehicle gate.",
+    "Backend /api/careers/apply endpoint: returns success:true + applicant_id, invalid email returns 422 via Pydantic — good validation.",
+    "GET /api/twilio/config returns both auth_valid and auth_error keys as documented; the frontend AdminDialer renders the red data-testid='dialer-auth-error-banner' when auth is invalid — full-loop working.",
+    "/api/promo/share/summer-launch returns HTML with og:title 'BidVex Grand Opening — First Month FREE' and the /static/og/summer-launch-promo.png image is publicly accessible without auth — social sharing infra is ready.",
+    "Careers apply frontend form has all 7 required data-testids and submits end-to-end to a success state (data-testid='careers-apply-success').",
+    "Contact-us page correctly lists all 9 required email addresses (office/service/vehicles/broker/dispute/payment/privacy/marketing/careers @bidvex.com); no legacy support@/info@/partners@ addresses remain.",
+    "Contractor Dashboard Prospect Finder gracefully shows 'requires a Google Maps Places API key' banner instead of crashing — matches acceptance criteria."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter338_review.py"
+  ],
+  "success_rate": {
+    "backend": "100% (10/10 executed pytest tests passed; 1 correctly skipped)",
+    "frontend": "~91% (10 of 11 health-check pages fully verified; 2 minor issues found — promo code missing, email-marketing tab not exposed)"
+  },
+  "test_credentials": "Admin charbel911@gmail.com / Anderosli123!@# — worked. testseller@bidvex.com / TestSeller2026! — worked (API listing attempt required additional city/region fields; once added, vehicle-gate 403 fires correctly as designed).",
+  "seed_data_creation": "None — inserted 1 job_applicants row (via TestItem5CareersApply::test_apply_success) with TEST_applicant_<uuid>@example.com prefix; also 1 careers row from the UI submission using TEST_pwapply_iter338@example.com. Both are prefixed for easy cleanup.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Sprint iter342 acceptance criteria met at backend layer (100%) and frontend health-check level (11/11 pages load without crashes). Two cosmetic/wiring issues remain: (a) SUMMER2026 coupon code missing from /promo/summer-launch visible body, (b) Email Marketing/External Campaigns tab not visible in admin sidebar (routes 404). Backend unit tests at /app/backend/tests/test_iter342_sprint.py are still authoritative for the vehicle-gate + notifier dedup logic; the new /app/backend/tests/test_iter338_review.py covers the live API contract. Twilio auth token remains INVALID in preview — this is expected and dialer banner correctly reflects it.",
+  "rca of the issue": "For minor issue #1 (SUMMER2026 code missing): the PromoSummerLaunchPage component appears to render the offer headline + CTA button but the code string 'SUMMER2026' was not injected into the visible copy. For minor issue #2 (Email Marketing not in admin nav): the admin sidebar does not include an 'Email Marketing' or 'External Campaigns' entry among the ~25 sections rendered; direct SPA routes /admin/email-marketing /admin/campaigns /admin/external-campaigns all 404 through the client-side router — either the section was removed/renamed or the sprint description misidentified the location. 'Ad Campaigns' sidebar item routes to the Promotions Engine dashboard, not to any Email Marketing view."
+}

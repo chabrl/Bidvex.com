@@ -14,11 +14,8 @@ logger = logging.getLogger(__name__)
 
 
 def _admin_notification_email() -> str:
-    return (
-        os.environ.get("ADMIN_NOTIFICATION_EMAIL")
-        or os.environ.get("ADMIN_EMAIL")
-        or "info@bidvex.com"
-    )
+    # iter342 — career applications route to the dedicated careers inbox.
+    return os.environ.get("CAREERS_NOTIFICATION_EMAIL") or "careers@bidvex.com"
 
 
 def _bilingual_footer() -> str:
@@ -27,9 +24,9 @@ def _bilingual_footer() -> str:
 <p style="font-size:11px;color:#64748b;line-height:1.5;">
   BidVex Inc. · 761 Rue Chalifoux, Sherbrooke (Québec) J1G 0A8, Canada<br />
   EN — You received this email because you applied to a BidVex job opening. Replies go to
-  <a href="mailto:contractor@bidvex.com" style="color:#64748b;">contractor@bidvex.com</a>.<br />
+  <a href="mailto:careers@bidvex.com" style="color:#64748b;">careers@bidvex.com</a>.<br />
   FR — Vous recevez ce courriel parce que vous avez postulé à une offre BidVex. Les réponses sont acheminées à
-  <a href="mailto:contractor@bidvex.com" style="color:#64748b;">contractor@bidvex.com</a>.
+  <a href="mailto:careers@bidvex.com" style="color:#64748b;">careers@bidvex.com</a>.
 </p>
 """.strip()
 
@@ -59,9 +56,9 @@ async def send_applicant_confirmation(
         "Our team will review it and be in touch within 5\u20137 business days."
     )
     contact_para = (
-        'Questions ? Écrivez-nous à <a href="mailto:contractor@bidvex.com" style="color:#0b1a30;">contractor@bidvex.com</a>.'
+        'Questions ? Écrivez-nous à <a href="mailto:careers@bidvex.com" style="color:#0b1a30;">careers@bidvex.com</a>.'
     ) if fr else (
-        'Questions? Reach us at <a href="mailto:contractor@bidvex.com" style="color:#0b1a30;">contractor@bidvex.com</a>.'
+        'Questions? Reach us at <a href="mailto:careers@bidvex.com" style="color:#0b1a30;">careers@bidvex.com</a>.'
     )
     footer = _bilingual_footer()
     body = (
@@ -78,7 +75,7 @@ async def send_applicant_confirmation(
             to_email=to_email,
             subject=subject,
             html_content=body,
-            reply_to="contractor@bidvex.com",
+            reply_to="careers@bidvex.com",
             reply_to_name="BidVex Careers",
             categories=["careers", "application_confirmation"],
         )
@@ -95,7 +92,13 @@ async def send_admin_new_applicant_notification(
 ) -> Dict[str, Any]:
     """Notify admin inbox that a new application landed."""
     to_email = _admin_notification_email()
-    subj = f"New Application: {job_title} — {applicant.get('first_name','?')} {applicant.get('last_name','?')}"
+    subj = f"New Career Application — {job_title} — {applicant.get('first_name','?')} {applicant.get('last_name','?')}"
+    message_txt = (applicant.get("message") or "").strip()
+    message_row = (
+        f'<tr><td style="padding:4px 12px 4px 0;color:#475569;vertical-align:top;">Message:</td>'
+        f"<td>{message_txt[:2000]}</td></tr>"
+        if message_txt else ""
+    )
     link_html = (
         f'<p><a href="{admin_panel_link}" style="color:#0b1a30;font-weight:600;">'
         f"Open in admin panel →</a></p>"
@@ -112,6 +115,7 @@ async def send_admin_new_applicant_notification(
     <tr><td style="padding:4px 12px 4px 0;color:#475569;">Phone:</td><td>{applicant.get('phone','')}</td></tr>
     <tr><td style="padding:4px 12px 4px 0;color:#475569;">Province:</td><td>{applicant.get('province','')}</td></tr>
     <tr><td style="padding:4px 12px 4px 0;color:#475569;">Applied at:</td><td>{applicant.get('applied_at','')}</td></tr>
+    {message_row}
   </table>
   {link_html}
 </div>

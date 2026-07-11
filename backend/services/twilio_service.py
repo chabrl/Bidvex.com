@@ -91,6 +91,44 @@ def verify_twilio_config() -> dict:
     }
 
 
+# iter342 — live REST auth-token verification (cached 10 min)
+_AUTH_STATUS: dict = {"checked_at": None, "valid": None, "error": None}
+
+
+async def verify_twilio_auth(force: bool = False) -> dict:
+    """Live REST check of TWILIO_AUTH_TOKEN. Logs VALID/INVALID with
+    explicit remediation steps. Never raises — returns a status dict."""
+    import asyncio
+    import time
+    now = time.time()
+    if (not force and _AUTH_STATUS["checked_at"]
+            and now - _AUTH_STATUS["checked_at"] < 600):
+        return dict(_AUTH_STATUS)
+    if not (TWILIO_SDK_AVAILABLE and TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN):
+        _AUTH_STATUS.update(
+            checked_at=now, valid=False,
+            error="TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN not configured",
+        )
+        return dict(_AUTH_STATUS)
+
+    def _check():
+        client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+        client.api.accounts(TWILIO_ACCOUNT_SID).fetch()
+
+    try:
+        await asyncio.to_thread(_check)
+        _AUTH_STATUS.update(checked_at=now, valid=True, error=None)
+        logger.info("✅ Twilio Auth Token: VALID")
+    except Exception as e:  # noqa: BLE001
+        _AUTH_STATUS.update(checked_at=now, valid=False, error=str(e)[:300])
+        logger.error(f"❌ Twilio Auth Token INVALID — dialer will not work: {e}")
+        logger.error(
+            "ACTION REQUIRED: Go to Twilio Console → Account Info → Auth Token → "
+            "update TWILIO_AUTH_TOKEN env var in the deployment environment → redeploy"
+        )
+    return dict(_AUTH_STATUS)
+
+
 def _require_can_mint() -> None:
     s = verify_twilio_config()
     if not s["can_mint_tokens"]:

@@ -125,7 +125,7 @@ async def ai_chat_message(
         _record_error("route", e, latency_ms)
         return AIChatResponse(
             success=False,
-            message="I apologize, but I'm experiencing technical difficulties. Please try again or contact support@bidvex.com.",
+            message="I apologize, but I'm experiencing technical difficulties. Please try again or contact service@bidvex.com.",
             language=request.language or "en",
             error=str(e)
         )

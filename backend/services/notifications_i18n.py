@@ -256,9 +256,9 @@ _TEMPLATES = {
     ),
     "bidding_suspended": (
         lambda p: "Bidding Privileges Suspended",
-        lambda p: f"After 3 failed payment attempts for '{p.get('title','an item')}', your bidding privileges have been suspended. Contact support@bidvex.com to resolve.",
+        lambda p: f"After 3 failed payment attempts for '{p.get('title','an item')}', your bidding privileges have been suspended. Contact service@bidvex.com to resolve.",
         lambda p: "Privilèges d'enchères suspendus",
-        lambda p: f"Après 3 tentatives de paiement échouées pour « {p.get('title','un article')} », vos privilèges d'enchères ont été suspendus. Contactez support@bidvex.com pour résoudre.",
+        lambda p: f"Après 3 tentatives de paiement échouées pour « {p.get('title','un article')} », vos privilèges d'enchères ont été suspendus. Contactez service@bidvex.com pour résoudre.",
     ),
     "bidding_suspension_lifted": (
         lambda p: "Bidding Privileges Restored",

@@ -136,6 +136,80 @@ class ApplicantStatusUpdate(BaseModel):
 # PUBLIC ENDPOINTS
 # ═══════════════════════════════════════════════════════════════════════
 
+# ─── iter342 — General application (POST /api/careers/apply) ────────────
+
+class GeneralApplication(BaseModel):
+    first_name: str = Field(..., min_length=1, max_length=120)
+    last_name: str = Field(..., min_length=1, max_length=120)
+    email: EmailStr
+    phone: str = Field(..., min_length=5, max_length=40)
+    position: str = Field(..., min_length=1, max_length=200)
+    message: Optional[str] = Field(None, max_length=5000)
+    locale: Optional[str] = "en"
+
+
+@router.post("/careers/apply")
+async def general_apply(
+    body: GeneralApplication,
+    request: Request,
+    background_tasks: BackgroundTasks,
+):
+    """Minimal general-application form (no job_id, no file uploads).
+    Triggers the careers@bidvex.com admin alert + bilingual applicant
+    auto-confirmation."""
+    db = get_db()
+    applicant_id = str(uuid.uuid4())
+    client_ip = (
+        request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+        or (request.client.host if request.client else "")
+        or ""
+    )
+    row = {
+        "id":                 applicant_id,
+        "job_offer_id":       "general",
+        "first_name":         body.first_name.strip(),
+        "last_name":          body.last_name.strip(),
+        "email":              body.email.strip().lower(),
+        "phone":              body.phone.strip(),
+        "position":           body.position.strip(),
+        "message":            (body.message or "").strip(),
+        "country":            "",
+        "province":           "",
+        "state":              "",
+        "preferred_language": "fr" if (body.locale or "").lower().startswith("fr") else "en",
+        "custom_responses":   {},
+        "attachments":        {"cv_url": None, "cover_letter_url": None, "photos": [], "certifications": []},
+        "status":             "applied",
+        "admin_notes":        None,
+        "screening":          {"status": "skipped", "reason": "general_application"},
+        "applied_at":         _now_iso(),
+        "ip_address":         client_ip,
+        "user_agent":         request.headers.get("user-agent", "")[:500],
+    }
+    await db.job_applicants.insert_one(row)
+    row.pop("_id", None)
+
+    background_tasks.add_task(
+        send_applicant_confirmation,
+        to_email=row["email"],
+        first_name=row["first_name"],
+        job_title=row["position"],
+        locale=row["preferred_language"],
+    )
+    background_tasks.add_task(
+        send_admin_new_applicant_notification,
+        applicant=row,
+        job_title=row["position"],
+        admin_panel_link=None,
+    )
+    return {
+        "success":      True,
+        "applicant_id": applicant_id,
+        "message_en":   "Application submitted. We'll be in touch within 5–7 business days.",
+        "message_fr":   "Candidature soumise. Nous vous contacterons dans les 5 à 7 jours ouvrables.",
+    }
+
+
 @router.get("/careers/jobs")
 async def list_active_jobs(response: Response) -> Dict[str, Any]:
     """Public: returns ONLY active jobs. Cache-Control: 5 minutes."""

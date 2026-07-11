@@ -142,7 +142,7 @@ async def create_checkout_session_for_payment_request(payment_request_id: str):
         return {
             "checkout_url": None,
             "manual_instructions": (
-                "Please contact support@bidvex.com to arrange payment. "
+                "Please contact service@bidvex.com to arrange payment. "
                 f"Reference ID: {payment_request_id}"
             ),
         }

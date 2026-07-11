@@ -61,7 +61,7 @@ class TestDirective1AccountTypes:
 
 class TestDirective2EmailRouting:
     def test_from_address_restored_to_partners_bidvex_ca(self):
-        assert CONTRACTOR_SENDER_EMAIL == "partners@bidvex.ca"
+        assert CONTRACTOR_SENDER_EMAIL == "contractor@bidvex.com"
         assert CONTRACTOR_SENDER_NAME == "BidVex Partners"
 
     def test_reply_to_domain_is_safe_subdomain(self):

@@ -346,7 +346,7 @@ async def register(user_data: UserCreate, request: Request, background_tasks: Ba
     # vs "514..." vs "(514) 555-..." cannot bypass the check.
     DUPLICATE_MSG = (
         "Your email or mobile phone is already registered in BidVex. "
-        "If you believe this is an error, please contact support immediately at support@bidvex.com"
+        "If you believe this is an error, please contact support immediately at service@bidvex.com"
     )
 
     normalized_email = user_data.email.strip().lower()
