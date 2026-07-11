@@ -219,7 +219,7 @@ const ListingDetailPage = () => {
 
     // iter212 — Storage Facility users may browse but may not bid on non-storage
     // listings. Show a single inline toast only on click (no banner while browsing).
-    const isStorageFacility = !!(user && (user.account_type === 'storage_facility' || user.is_storage_facility === true) && user.role !== 'admin' && user.role !== 'superadmin');
+    const isStorageFacility = !!(user && (user.account_type === 'storage_facility' || user.is_storage_facility === true) && user.role !== 'admin' && user.role !== 'super_admin');
     if (isStorageFacility) {
       toast.error(
         i18n.language === 'fr'

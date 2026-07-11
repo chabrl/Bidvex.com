@@ -269,7 +269,7 @@ const BlockForStorageFacility = ({ children, redirectTo = '/storage-dashboard' }
     user
     && (user.account_type === 'storage_facility' || user.is_storage_facility === true)
     && user.role !== 'admin'
-    && user.role !== 'superadmin'
+    && user.role !== 'super_admin'
   );
   if (isStorageOnly) {
     return <Navigate to={redirectTo} replace />;

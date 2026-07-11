@@ -52,7 +52,7 @@ const _isFacilityOrAdmin = (user) => !!user && (
   || user.account_type === 'storage_facility'
   || user.is_storage_facility === true
   || user.role === 'admin'
-  || user.role === 'superadmin'
+  || user.role === 'super_admin'
   || user.is_admin === true
 );
 

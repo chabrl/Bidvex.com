@@ -71,7 +71,7 @@ const Navbar = () => {
     user
     && (user.account_type === 'storage_facility' || user.is_storage_facility === true)
     && user.role !== 'admin'
-    && user.role !== 'superadmin'
+    && user.role !== 'super_admin'
   );
 
   // iter176 — surface "SOON · BIENTÔT" badge when the feature flag is off
@@ -289,7 +289,7 @@ const Navbar = () => {
                         </DropdownMenuItem>
                       )}
                     </div>
-                    {(user.is_partner || user.role === 'admin' || user.role === 'superadmin') && (
+                    {(user.is_partner || user.role === 'admin' || user.role === 'super_admin') && (
                       <>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => navigate('/partner/dashboard')} data-testid="partner-dashboard-link" className="cursor-pointer text-blue-600 font-semibold">
@@ -318,7 +318,7 @@ const Navbar = () => {
                       || user.account_type === 'storage_facility'
                       || user.is_storage_facility === true
                       || user.role === 'admin'
-                      || user.role === 'superadmin'
+                      || user.role === 'super_admin'
                     ) && (
                       <>
                         <DropdownMenuSeparator />
@@ -340,7 +340,7 @@ const Navbar = () => {
                         </DropdownMenuItem>
                       </>
                     )}
-                    {(user.role === 'admin' || user.role === 'superadmin' || user.account_type === 'admin' || user.email?.endsWith('@admin.bazario.com')) && (
+                    {(user.role === 'admin' || user.role === 'super_admin' || user.account_type === 'admin' || user.email?.endsWith('@admin.bazario.com')) && (
                       <>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => navigate('/admin')} data-testid="admin-dashboard-link" className="cursor-pointer text-primary font-semibold">
@@ -353,7 +353,7 @@ const Navbar = () => {
                         Without these, a freshly promoted dialer_contractor lands
                         on the buyer/seller home and has no way to reach their
                         own tools. Admins also see these (useful for testing). */}
-                    {(user.role === 'dialer_contractor' || user.role === 'admin' || user.role === 'superadmin') && (
+                    {(user.role === 'dialer_contractor' || user.role === 'admin' || user.role === 'super_admin') && (
                       <>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
@@ -465,7 +465,7 @@ const Navbar = () => {
                 || user.account_type === 'storage_facility'
                 || user.is_storage_facility === true
                 || user.role === 'admin'
-                || user.role === 'superadmin'
+                || user.role === 'super_admin'
               ) && (
                 <>
                   <Link

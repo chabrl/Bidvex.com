@@ -58,7 +58,7 @@ export default function PartnerDashboard() {
   }, [token, navigate]);
 
   useEffect(() => {
-    if (!user?.is_partner && user?.role !== 'admin' && user?.role !== 'superadmin') {
+    if (!user?.is_partner && user?.role !== 'admin' && user?.role !== 'super_admin') {
       navigate('/');
       return;
     }
@@ -69,7 +69,7 @@ export default function PartnerDashboard() {
   // "Annual Payment Required" banner disappears the moment admin manual-
   // settles, without a hard refresh. Same pattern as iter215 dealer banner.
   useEffect(() => {
-    if (!user?.is_partner && user?.role !== 'admin' && user?.role !== 'superadmin') return undefined;
+    if (!user?.is_partner && user?.role !== 'admin' && user?.role !== 'super_admin') return undefined;
     const onVisible = () => { if (!document.hidden) fetchDashboard(); };
     const onFocus = () => fetchDashboard();
     document.addEventListener('visibilitychange', onVisible);

@@ -38,7 +38,7 @@ import { toast } from 'sonner';
 import API_BASE from '../../config';
 import { useAuth } from '../../contexts/AuthContext';
 
-const ADMIN_ROLES = new Set(['admin', 'super_admin', 'superadmin']);
+const ADMIN_ROLES = new Set(['admin', 'super_admin', 'super_admin']);
 
 const EscalationAlertContext = createContext({
   openCount: 0,

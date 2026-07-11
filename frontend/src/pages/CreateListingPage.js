@@ -147,8 +147,8 @@ const CreateListingPage = () => {
   const [buyersPremiumPercent, setBuyersPremiumPercent] = useState('');
   const isOpcCertified = user?.is_opc_certified === true;
   const isPartner = user?.is_partner === true || user?.role === 'partner' || user?.role === 'admin';
-  // Phase 6.0 hotfix — Admin / superadmin bypass for storage validation
-  const isAdminUser = user?.role === 'admin' || user?.role === 'superadmin' || user?.is_admin === true;
+  // Phase 6.0 hotfix — Admin / super_admin bypass for storage validation
+  const isAdminUser = user?.role === 'admin' || user?.role === 'super_admin' || user?.is_admin === true;
   // Phase 6.2 hotfix — Approved storage facilities can list units; everyone
   // else is gated (backend returns 403 on submit). Used to (a) auto-toggle
   // the storage_locker card when the URL specifies `?type=storage_locker`

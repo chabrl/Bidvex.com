@@ -407,7 +407,6 @@ const AdminDashboard = () => {
     }
 
     const isAdmin = user.role === 'admin' || 
-                    user.role === 'superadmin' || 
                     user.role === 'super_admin' ||
                     user.account_type === 'admin' || 
                     user.email?.endsWith('@admin.bazario.com');
@@ -729,7 +728,7 @@ const AdminDashboard = () => {
             </div>
             <div className="flex items-center gap-3">
               <Badge className="gradient-bg text-white border-0 px-4 py-1.5">
-                {user.role === 'superadmin' ? '👑 Super Admin' : '⚡ Admin'}
+                {user.role === 'super_admin' ? '👑 Super Admin' : '⚡ Admin'}
               </Badge>
               <Button 
                 variant={liveControlsOpen ? "default" : "outline"}

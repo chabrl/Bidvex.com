@@ -6,7 +6,7 @@
 ## Admin (email/password)
 - Email: charbel911@gmail.com
 - Password: Anderosli123!@#
-- Role: Admin (full access)
+- Role: **super_admin** (canonical since iter344, 2026-07-11 — was `admin`; all backend AND frontend role checks normalized from `"superadmin"` → `"super_admin"`; a startup migration in server.py auto-converts any legacy `superadmin` DB rows)
 - Note (iter212, 2026-05-14): Auto-flagged `is_storage_facility=True` + `account_type=storage_facility` because they own the legacy "Bidvex Inc." storage facility. The `role=admin` override keeps the navbar/route restrictions disabled for them.
 - Note (iter226, 2026-02-24): Confirmed permanent sole admin for the platform.
 
