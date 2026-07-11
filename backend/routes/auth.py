@@ -83,6 +83,9 @@ class UserCreate(BaseModel):
     # short-circuits the annual partner-fee gate and activates a
     # 30/45/60-day partner trial in one round trip.
     promo_code: Optional[str] = None
+    # iter341 — full referrer URL captured on promo deep-link arrival, stored
+    # on the user document for marketing attribution.
+    promo_source_url: Optional[str] = None
 
 
 class SessionCreate(BaseModel):
@@ -523,27 +526,29 @@ async def register(user_data: UserCreate, request: Request, background_tasks: Ba
         except Exception as _coupon_exc:  # noqa: BLE001
             logger.warning(f"[iter274 coupon-redemption] non-fatal: {_coupon_exc}")
 
-    # iter340 — Canada-Day campaign promo (?promo=canada-day). Flags are
-    # applied only within the validity window (through 2026-07-31). After
-    # expiry registration still succeeds — flags are simply not applied.
+    # iter340/341 — campaign promo codes (?promo=SUMMER2026, retired canada-day).
+    # Flags applied only within the code's validity window; after expiry the
+    # registration still succeeds — flags simply aren't applied (graceful).
     try:
         _promo_raw = (user_data.promo_code or "").strip().lower()
-        if _promo_raw == "canada-day":
-            from services.fee_calculator import canada_day_promo_active
-            if canada_day_promo_active(now):
-                _cd_flags = {
-                    "first_listing_free": True,
-                    "first_month_free": True,
-                    "promo_code_used": "canada-day",
-                    "promo_applied_at": now.isoformat(),
-                }
-                await db.users.update_one({"id": user_id}, {"$set": _cd_flags})
-                user_doc.update(_cd_flags)
-                logger.info(f"[iter340] canada-day promo applied user={user_id}")
+        from services.fee_calculator import get_promo_definition, promo_code_active
+        _updates = {}
+        _promo_def = get_promo_definition(_promo_raw)
+        if _promo_def:
+            if promo_code_active(_promo_raw, now):
+                _updates.update(_promo_def["flags"])
+                _updates["promo_code_used"] = _promo_raw
+                _updates["promo_applied_at"] = now.isoformat()
+                logger.info(f"[iter341] promo '{_promo_raw}' applied user={user_id}")
             else:
-                logger.info(f"[iter340] canada-day promo EXPIRED — no flags applied (user={user_id})")
+                logger.info(f"[iter341] promo '{_promo_raw}' EXPIRED — no flags applied (user={user_id})")
+        if user_data.promo_source_url:
+            _updates["promo_source_url"] = str(user_data.promo_source_url)[:500]
+        if _updates:
+            await db.users.update_one({"id": user_id}, {"$set": _updates})
+            user_doc.update(_updates)
     except Exception as _promo_exc:  # noqa: BLE001
-        logger.warning(f"[iter340 canada-day promo] non-fatal: {_promo_exc}")
+        logger.warning(f"[iter341 campaign promo] non-fatal: {_promo_exc}")
 
     # ── Affiliate Referral Tracking ──
     # iter307 — Fall back to the `bidvex_ref` cookie set by /r/{code}

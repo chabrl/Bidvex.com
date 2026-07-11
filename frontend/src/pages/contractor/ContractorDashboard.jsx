@@ -29,6 +29,7 @@ import {
 import ContractorAgreementModal from './ContractorAgreementModal';
 import ContractorIter323Panel from './ContractorIter323Panel';
 import ContractorNudgesPanel from './ContractorNudgesPanel';
+import ProspectFinder from '../../components/contractor/ProspectFinder';
 
 const POLL_INTERVAL_MS = 60000; // 60s refresh per spec
 
@@ -64,6 +65,7 @@ export default function ContractorDashboard() {
   const [payoutReadiness, setPayoutReadiness] = useState(null);
   const [permissions, setPermissions] = useState([]);
   const [addClientOpen, setAddClientOpen] = useState(false);
+  const [addClientPrefill, setAddClientPrefill] = useState(null);
 
   // Server-enforced via 403; the client-side gate avoids needless calls.
   const isContractor = user && (user.role === 'dialer_contractor');
@@ -668,14 +670,29 @@ export default function ContractorDashboard() {
         </CardContent>
       </Card>
 
+      {/* iter341 — Google Maps B2B Prospect Finder */}
+      {(isContractor || isAdmin) && (
+        <ProspectFinder
+          token={token}
+          fr={fr}
+          isAdmin={isAdmin}
+          onAddAsClient={(p) => {
+            setAddClientPrefill(p);
+            setAddClientOpen(true);
+          }}
+        />
+      )}
+
       {/* iter316-D — Add Client modal (rendered when permission granted) */}
       {addClientOpen && (
         <AddClientDialog
           token={token}
           fr={fr}
-          onClose={() => setAddClientOpen(false)}
+          initial={addClientPrefill}
+          onClose={() => { setAddClientOpen(false); setAddClientPrefill(null); }}
           onCreated={() => {
             setAddClientOpen(false);
+            setAddClientPrefill(null);
             fetchDashboard();
           }}
         />
@@ -686,10 +703,10 @@ export default function ContractorDashboard() {
 
 // ─── Sub-component: Add Client Dialog (permission-gated) ────────────
 
-function AddClientDialog({ token, fr, onClose, onCreated }) {
-  const [email, setEmail] = useState('');
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
+function AddClientDialog({ token, fr, onClose, onCreated, initial }) {
+  const [email, setEmail] = useState(initial?.email || '');
+  const [name, setName] = useState(initial?.name || '');
+  const [phone, setPhone] = useState(initial?.phone || '');
   const [province, setProvince] = useState('QC');
   const [accountType, setAccountType] = useState('individual_seller');
   const [busy, setBusy] = useState(false);

@@ -52,18 +52,30 @@ const AuthPage = () => {
   // also pre-stashed in formData so the register POST carries it.
   const [trialCoupon, setTrialCoupon] = useState(null);
   const [trialCouponError, setTrialCouponError] = useState('');
-  // iter340 — Canada-Day campaign promo (?promo=canada-day)
-  const [canadaDayPromo, setCanadaDayPromo] = useState(false);
+  // iter341 — campaign promos ({code, active}|null): SUMMER2026 live,
+  // canada-day retired (graceful expired message).
+  const [campaignPromo, setCampaignPromo] = useState(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const promo = (params.get('promo') || '').toUpperCase().trim();
     if (!promo) return;
-    // iter340 — Canada-Day campaign code: not a BVX coupon — pre-fill the
-    // promo_code and show the promo welcome banner, skip coupon validation.
-    if (promo === 'CANADA-DAY') {
-      setCanadaDayPromo(true);
-      setFormData((prev) => ({ ...prev, promo_code: 'canada-day' }));
+    // iter341 — campaign codes (SUMMER2026 / retired canada-day): not BVX
+    // coupons — pre-fill promo_code + attribution URL, show the banner.
+    if (promo === 'SUMMER2026' || promo === 'CANADA-DAY') {
+      const code = promo.toLowerCase();
+      const expiries = {
+        summer2026: Date.UTC(2026, 7, 31, 23, 59, 59),   // Aug 31, 2026
+        'canada-day': Date.UTC(2026, 6, 1, 23, 59, 59),  // retired Jul 1, 2026
+      };
+      const active = Date.now() <= expiries[code];
+      setCampaignPromo({ code, active });
+      const sourceUrl = (document.referrer || window.location.href).slice(0, 500);
+      setFormData((prev) => ({
+        ...prev,
+        ...(active ? { promo_code: code } : {}),
+        promo_source_url: sourceUrl,
+      }));
       return;
     }
     let cancelled = false;
@@ -342,21 +354,34 @@ const AuthPage = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* iter340 — Canada-Day promo welcome banner */}
-          {canadaDayPromo && !isLogin && (
-            <div
-              className="rounded-lg border-2 border-red-300 bg-red-50 px-4 py-3"
-              data-testid="canada-day-promo-banner"
-            >
-              <p className="text-sm font-bold text-red-900">
-                🇨🇦 {i18n.language?.startsWith('fr') ? 'Spécial fête du Canada débloqué !' : 'Canada Day Special unlocked!'}
-              </p>
-              <p className="text-xs text-red-700 mt-1">
-                {i18n.language?.startsWith('fr')
-                  ? 'Inscrivez-vous maintenant — votre première annonce et votre premier mois sont 100 % GRATUITS.'
-                  : 'Register now — your first listing and first month are 100% FREE.'}
-              </p>
-            </div>
+          {/* iter341 — campaign promo banner (active = green, expired = graceful) */}
+          {campaignPromo && !isLogin && (
+            campaignPromo.active ? (
+              <div
+                className="rounded-lg border-2 border-emerald-400 bg-emerald-50 px-4 py-3"
+                data-testid="campaign-promo-banner"
+              >
+                <p className="text-sm font-bold text-emerald-900">
+                  🚀 {i18n.language?.startsWith('fr') ? 'Offre de grand lancement appliquée !' : 'Grand Opening Offer Applied!'}
+                </p>
+                <p className="text-xs text-emerald-700 mt-1">
+                  {i18n.language?.startsWith('fr')
+                    ? 'Votre première annonce et votre premier mois sont GRATUITS.'
+                    : 'Your first listing and first month are FREE.'}
+                </p>
+              </div>
+            ) : (
+              <div
+                className="rounded-lg border border-slate-300 bg-slate-50 px-4 py-3"
+                data-testid="campaign-promo-expired-banner"
+              >
+                <p className="text-xs text-slate-600">
+                  {i18n.language?.startsWith('fr')
+                    ? 'Cette promotion est terminée, mais vous pouvez toujours vous inscrire gratuitement et explorer BidVex.'
+                    : 'This promotion has ended, but you can still register for free and explore BidVex.'}
+                </p>
+              </div>
+            )
           )}
           {/* iter274 — Trial coupon unlock banner / error */}
           {trialCoupon && (

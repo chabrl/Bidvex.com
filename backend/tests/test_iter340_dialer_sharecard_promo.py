@@ -31,7 +31,7 @@ import routes.twilio as tw_routes
 from services.twilio_service import build_outbound_twiml, TWILIO_PHONE_NUMBER
 from services.fee_calculator import (
     promo_first_listing_waiver_applies, promo_first_month_waiver_applies,
-    canada_day_promo_active,
+    promo_code_active,
 )
 from services.share_card import build_share_card_png, CARD_W, CARD_H
 
@@ -183,12 +183,13 @@ class TestShareCard:
 class TestCanadaDayPromo:
 
     def test_registration_within_window_applies_flags(self, db):
-        u = _register_user(db, "canadaday", promo_code="canada-day")
+        # iter341 — canada-day retired (expired 2026-07-01); SUMMER2026 is live.
+        u = _register_user(db, "summer", promo_code="SUMMER2026")
         try:
             doc = db.users.find_one({"id": u["user_id"]})
             assert doc.get("first_listing_free") is True
             assert doc.get("first_month_free") is True
-            assert doc.get("promo_code_used") == "canada-day"
+            assert doc.get("promo_code_used") == "summer2026"
             assert doc.get("promo_applied_at")
         finally:
             db.users.delete_one({"id": u["user_id"]})
@@ -203,13 +204,13 @@ class TestCanadaDayPromo:
         finally:
             db.users.delete_one({"id": u["user_id"]})
 
-    def test_expiry_gate_graceful_after_july_31(self):
-        active_now = datetime(2026, 6, 15, tzinfo=timezone.utc)
-        last_day = datetime(2026, 7, 31, 12, 0, tzinfo=timezone.utc)
-        expired = datetime(2026, 8, 1, 0, 0, 1, tzinfo=timezone.utc)
-        assert canada_day_promo_active(active_now) is True
-        assert canada_day_promo_active(last_day) is True
-        assert canada_day_promo_active(expired) is False
+    def test_expiry_gate_graceful_after_expiry(self):
+        # iter341 — canada-day retired with expiry 2026-07-01.
+        before = datetime(2026, 6, 15, tzinfo=timezone.utc)
+        after = datetime(2026, 7, 2, 0, 0, 1, tzinfo=timezone.utc)
+        assert promo_code_active("canada-day", before) is True
+        assert promo_code_active("canada-day", after) is False
+        assert promo_code_active("unknown-code", before) is False
 
     def test_fee_engine_first_listing_guard(self):
         assert promo_first_listing_waiver_applies({"first_listing_free": True}) is True

@@ -55,8 +55,33 @@ STORAGE_FACILITY_RATE   = Decimal("0.050")    # 5% facility commission
 QC_GST_RATE = Decimal("0.05")
 QC_QST_RATE = Decimal("0.09975")
 
-# ─── iter340 — Canada-Day promo guards (registration flag → fee waiver) ───
-CANADA_DAY_PROMO_CODE = "canada-day"
+# ─── iter340/341 — Campaign promo codes (registration flag → fee waiver) ──
+# canada-day was retired 2026-07-01 (kept for graceful-expiry messaging on
+# links already shared). SUMMER2026 is the live Summer Grand Opening code.
+PROMO_CODES: Dict[str, Dict] = {
+    "summer2026": {
+        "expiry": "2026-08-31T23:59:59+00:00",
+        "flags": {"first_listing_free": True, "first_month_free": True},
+    },
+    "canada-day": {
+        "expiry": "2026-07-01T23:59:59+00:00",
+        "flags": {"first_listing_free": True, "first_month_free": True},
+    },
+}
+
+
+def get_promo_definition(code: Optional[str]) -> Optional[Dict]:
+    return PROMO_CODES.get((code or "").strip().lower())
+
+
+def promo_code_active(code: Optional[str], now) -> bool:
+    """Graceful expiry gate — after expiry, registration with the code still
+    succeeds but the promo flags are not applied."""
+    d = get_promo_definition(code)
+    if not d:
+        return False
+    from datetime import datetime as _dt
+    return now <= _dt.fromisoformat(d["expiry"])
 
 
 def promo_first_listing_waiver_applies(user_doc: Optional[dict]) -> bool:
@@ -75,16 +100,6 @@ def promo_first_month_waiver_applies(user_doc: Optional[dict]) -> bool:
     if not user_doc:
         return False
     return bool(user_doc.get("first_month_free")) and not bool(user_doc.get("trial_redeemed_at"))
-
-
-CANADA_DAY_PROMO_EXPIRY_ISO = "2026-07-31T23:59:59+00:00"
-
-
-def canada_day_promo_active(now) -> bool:
-    """Graceful expiry gate — after 2026-07-31 registration with the code
-    still succeeds, but the promo flags are not applied."""
-    from datetime import datetime as _dt
-    return now <= _dt.fromisoformat(CANADA_DAY_PROMO_EXPIRY_ISO)
 
 STRIPE_RATES: Dict[str, Decimal] = {
     "domestic":      Decimal("0.029"),

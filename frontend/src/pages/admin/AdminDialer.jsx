@@ -93,6 +93,16 @@ export default function AdminDialer() {
   // Outbound form
   const [phone, setPhone] = useState('+1');
   const [clientName, setClientName] = useState('');
+
+  // iter341 — Prospect Finder deep link: /admin/dialer?phone=+1...&name=...
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const p = params.get('phone');
+    const n = params.get('name');
+    if (p) setPhone(p.startsWith('+') ? p : `+1${p.replace(/\D/g, '')}`);
+    if (n) setClientName(n);
+  }, []);
+
   const [clientType, setClientType] = useState('lead');
   const [callPurpose, setCallPurpose] = useState('');
   const [preNotes, setPreNotes] = useState('');

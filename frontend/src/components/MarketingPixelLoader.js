@@ -13,21 +13,15 @@
 import { useEffect } from 'react';
 import axios from 'axios';
 import API_BASE from '../config';
+import { initMetaPixel } from '../utils/metaPixel';
 
 const injectFbPixel = (id) => {
   if (!id || window.__bv_fb_loaded) return;
   window.__bv_fb_loaded = true;
-  /* eslint-disable */
-  !function(f,b,e,v,n,t,s)
-  {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-  n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-  if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-  n.queue=[];t=b.createElement(e);t.async=!0;
-  t.src=v;s=b.getElementsByTagName(e)[0];
-  s.parentNode.insertBefore(t,s)}(window, document,'script',
-  'https://connect.facebook.net/en_US/fbevents.js');
-  /* eslint-enable */
-  try { if (id) { window.fbq('init', id); window.fbq('track', 'PageView'); } } catch (_) {}
+  // iter341 — SINGLE injection point: utils/metaPixel owns the fbq bootstrap
+  // (consent-gated, CAPI-deduped). Re-initializing here with the same ID was
+  // the source of Meta's "Duplicate Pixel ID" console warning.
+  initMetaPixel();
 };
 
 const injectGtm = (id) => {

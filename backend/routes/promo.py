@@ -40,6 +40,32 @@ def _get_db():
     return _db
 
 
+@router.get("/promo/share/summer-launch")
+async def summer_launch_share_page():
+    """iter341 — Crawler-friendly share URL. Social crawlers (Facebook, X,
+    LinkedIn) don't execute JS, so the SPA's Helmet tags are invisible to
+    them; this endpoint serves the OG tags in raw HTML and meta-redirects
+    humans to the real landing page."""
+    from fastapi.responses import HTMLResponse
+    html = (
+        '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+        '<title>BidVex Grand Opening — First Month FREE</title>'
+        '<meta property="og:title" content="BidVex Grand Opening — First Month FREE">'
+        '<meta property="og:description" content="Canada\'s new bilingual auction marketplace is live. '
+        'List free, bid free, sell smarter. Vehicles, Marketplace, Lots &amp; Storage.">'
+        '<meta property="og:image" content="https://bidvex.com/static/og/summer-launch-promo.png">'
+        '<meta property="og:image:width" content="1200">'
+        '<meta property="og:image:height" content="628">'
+        '<meta property="og:url" content="https://bidvex.com/promo/summer-launch">'
+        '<meta property="og:type" content="website">'
+        '<meta name="twitter:card" content="summary_large_image">'
+        '<meta http-equiv="refresh" content="0;url=https://bidvex.com/promo/summer-launch">'
+        '</head><body>Redirecting to <a href="https://bidvex.com/promo/summer-launch">'
+        'bidvex.com/promo/summer-launch</a>…</body></html>'
+    )
+    return HTMLResponse(content=html)
+
+
 @router.get("/promo/state")
 async def get_my_promo_state(current_user=Depends(get_current_user_from_token)):
     """Returns the calling user's trial + first-listing-free state."""

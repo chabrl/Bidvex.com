@@ -1058,6 +1058,18 @@ async def _initial_sitemap_regen():
 async def _iter307_startup_sitemap():
     await _initial_sitemap_regen()
 
+
+# iter341 — Summer Grand Opening OG card: generated once at startup and
+# served statically from frontend/public (public, no auth — social crawlers).
+@app.on_event("startup")
+async def _iter341_startup_og_card():
+    try:
+        import asyncio as _aio
+        from services.og_card import ensure_summer_og_card
+        await _aio.to_thread(ensure_summer_og_card)
+    except Exception as e:
+        logger.warning(f"[iter341] OG card generation failed: {e}")
+
 # iter241 Mission 1 — Sweep expired listing promotions every hour.
 async def run_promotion_expiry_sweep():
     try:
@@ -1582,11 +1594,13 @@ try:
         from routes.ai_voice import router as ai_voice_router  # iter334 — AI Voice Assistant (Gemini Live)
         from routes.ai_coach import router as ai_coach_router  # iter335 — Silent AI Coach (outbound)
         from routes.ad_campaigns import router as ad_campaigns_router  # iter337 — Ad Campaigns admin + Gemini copy
+        from routes.contractor_prospects import router as contractor_prospects_router  # iter341 — Prospect Finder
         api_router.include_router(blogs_router)
         api_router.include_router(contractor_aid_router)
         api_router.include_router(ai_voice_router)
         api_router.include_router(ai_coach_router)
         api_router.include_router(ad_campaigns_router)
+        api_router.include_router(contractor_prospects_router)
         logger.info("iter331 — Blogs CRUD + Contractor Aid AI mounted")
         logger.info("iter334 — AI Voice Assistant (Gemini Live + Twilio Media Streams) mounted")
         logger.info("iter335 — Silent AI Coach (outbound Gemini eavesdrop) mounted")
