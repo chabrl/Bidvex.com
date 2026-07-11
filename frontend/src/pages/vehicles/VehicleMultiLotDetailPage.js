@@ -36,9 +36,11 @@ const StatusBadge = ({ status }) => {
     sold:      'bg-purple-100 text-purple-700 border-purple-300',
     cancelled: 'bg-red-100 text-red-700 border-red-300',
   };
+  // iter345 — defensive against legacy/partial VML docs that omit `status`.
+  const safe = (status || 'unknown').toString();
   return (
-    <Badge className={`${styles[status] || styles.upcoming} border`} data-testid={`status-badge-${status}`}>
-      {status.toUpperCase()}
+    <Badge className={`${styles[safe] || styles.upcoming} border`} data-testid={`status-badge-${safe}`}>
+      {safe.toUpperCase()}
     </Badge>
   );
 };

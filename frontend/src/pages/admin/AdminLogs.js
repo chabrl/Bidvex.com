@@ -170,8 +170,8 @@ const AdminLogs = ({ searchQuery = '' }) => {
             <CardContent>
               {filteredLogs.length > 0 ? (
                 <div className="space-y-2">
-                  {filteredLogs.map(log => (
-                    <div key={log.id} className="flex justify-between items-start p-3 border rounded-lg hover:bg-gray-50 transition-colors">
+                  {filteredLogs.map((log, idx) => (
+                    <div key={log.id || `${log.created_at || 'log'}-${idx}`} className="flex justify-between items-start p-3 border rounded-lg hover:bg-gray-50 transition-colors">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <Badge>{log.action}</Badge>
@@ -232,8 +232,8 @@ const AdminLogs = ({ searchQuery = '' }) => {
                 <p className="text-center text-muted-foreground py-8">No impersonation sessions yet.</p>
               ) : (
                 <div className="space-y-3">
-                  {impSessions.map((s) => (
-                    <div key={s.session_id} className="border rounded-lg p-3 hover:bg-gray-50 transition-colors" data-testid={`imp-session-${s.session_id}`}>
+                  {impSessions.map((s, sIdx) => (
+                    <div key={s.session_id || `session-${sIdx}`} className="border rounded-lg p-3 hover:bg-gray-50 transition-colors" data-testid={`imp-session-${s.session_id}`}>
                       <div className="flex flex-col sm:flex-row sm:items-center gap-2 justify-between">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 flex-wrap">

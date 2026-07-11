@@ -188,7 +188,12 @@ async def get_impersonation_history(
         # AND whose timestamp falls between started_at & expires_at.
         # NB: not every admin_log row is guaranteed to have that field —
         # the frontend can display the count as "≥N" if provisional.
+        # iter345 refinement — scope tightly to (admin_id AND
+        # target_user_id) AND (this session's window) AND exclude other
+        # `impersonation_started` rows so overlapping sessions don't
+        # bleed into each other's action lists.
         action_query: Dict[str, Any] = {
+            "action": {"$ne": "impersonation_started"},
             "$or": [
                 {"details.impersonated_by": row.get("admin_id")},
                 {"admin_id": row.get("admin_id"), "target_user_id": row.get("target_user_id")},
@@ -196,7 +201,7 @@ async def get_impersonation_history(
         }
         ts_filter: Dict[str, str] = {}
         if started_at:
-            ts_filter["$gte"] = started_at
+            ts_filter["$gt"] = started_at
         if expires_at:
             ts_filter["$lte"] = expires_at
         if ts_filter:
