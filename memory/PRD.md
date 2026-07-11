@@ -1,6 +1,35 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter340 — Dialer Routing Fix + Share Card + Canada-Day Promo + Card Fix (Jun 2026) ✅ COMPLETE — VERIFIED 100%
+
+### P0 — Contractor Dialer: calls must ring the CLIENT, never the BidVex main line
+- **Root cause (reported before fix)**: `/app/backend/routes/twilio.py :: twiml_webhook()` line 326 — `to_number = form.get("To") or form.get("Called")` was direction-blind. Any leg where To/Called resolved to +14506343099 (inbound calls to the main line whose voice handler is the same TwiML App, fallback legs missing the SDK custom To param) returned `<Dial><Number>+14506343099</Number></Dial>` → Twilio dialed the BidVex main line. Verified NOT the cause: frontend `device.connect({params:{To,CallLogId}})` (correct v2 SDK), `build_outbound_twiml()` (verified correct output), iter335 coach `<Start><Stream>` (non-terminal, `<Dial>` intact).
+- **Fix**: direction-aware guard in `twiml_webhook` — SDK legs (`From` starts with `client:`) require valid E.164 `To` ≠ TWILIO_PHONE_NUMBER (self-dial → 400); inbound legs get bilingual `<Say>` greeting + hangup (never Dial). Defense-in-depth ValueError guard in `build_outbound_twiml()`. Outbound bridge logged.
+- **⚠️ PRODUCTION CONFIG (user action)**: preview `TWILIO_AUTH_TOKEN` fails Twilio REST auth (HTTP 401 — likely rotated). If production shares it, ALL webhook signature checks fail (403) → Twilio uses the TwiML App **Voice Fallback URL**. User must verify in Twilio Console: auth token current, TwiML App Voice URL = `https://bidvex.com/api/twilio/twiml`, fallback URL empty/same. Real-call QA ("client's phone rings") requires valid prod creds — pending user verification.
+
+### P1 — "Share My Projection" social card
+- `GET /api/affiliate/share-card?lang=en|fr` → 600×315 PNG (Pillow, reuses iter297 pipeline conventions + `qrcode` lib already installed). Navy #0B2545 bg, CDN logo (iter314 URL, cached, wordmark fallback), tagline EN/FR, projected $/month in #2B8FD0, 3%-commission sub-text, referral link + QR (`bidvex.com/r/{code}`). On-demand, never stored in S3.
+- Rate limit: 10/day per user via `share_card_generations` Mongo counter → 11th call 429 (tested).
+- Widget buttons: "Share My Projection" (blob download) + "Copy Link" (clipboard via /affiliate/my-referral-link). Bilingual, toasts.
+
+### P2 — VehicleListingCard button-nesting fix
+- Outer image `<button>` → `<div role="button" tabIndex={0}>` with keyboard handler (`components/vehicles/VehicleListingCard.js`); inner quick-view stays a real button. Console warning GONE (verified), visuals identical. Note: preview has 0 live vehicle listings, so visual check was console+source based.
+
+### P2 — Canada-Day promo landing + deep links
+- `/promo/canada-day` bilingual landing (hero, headline 100% FREE, 4 feature blocks, trust badges, CTA) → `/auth?promo=canada-day` (register tab + welcome banner, promo_code pre-filled). `/register` redirects to `/auth` preserving query.
+- Registration with `promo_code=canada-day` within window (≤ 2026-07-31, gate: `fee_calculator.canada_day_promo_active()`) sets `first_listing_free`, `first_month_free`, `promo_code_used`, `promo_applied_at` on the user (verified in Mongo E2E). After expiry: graceful, flags simply not applied.
+- Fee engine guards in `services/fee_calculator.py`: `promo_first_listing_waiver_applies()` (wired into BOTH settlement paths in `services/auction_settlement.py` — waives first-listing seller commission, atomic consume via iter330 `try_consume_first_listing_free`) + `promo_first_month_waiver_applies()` (honored via iter330 trial gate → Stripe `trial_period_days=30`).
+
+### Deployment
+- `.gitignore` env-blocking patterns removed; CORS_ORIGINS extended. **deployment_agent: PASS — READY TO DEPLOY** (user triggers Deploy; ships iter338+339+340 together).
+
+### Tests
+- `tests/test_iter340_dialer_sharecard_promo.py` — **16/16 PASS** (TwiML: client number dialed + callerId +14506343099 + main line NEVER destination + inbound greeting + coach stream intact; share card 600×315 + 429 on 11th; promo flags + expiry gate + fee guards).
+- Regression iter338+339: 51/51 PASS. Testing agent E2E: 100% backend + frontend, zero issues (`/app/test_reports/iteration_336.json`).
+- Known pre-existing (non-blocking): duplicate Meta Pixel warning on all pages; testbuyer creds drift on preview (fix: run `scripts/iter308_reseed_test_fixtures.py`).
+
+
 ## iter339 — Ads Direct Publishing + Affiliate Earnings Widget + SEO Fixes (Jun 2026) ✅ COMPLETE — VERIFIED 100%
 
 ### 1. P0 — Meta / Google Ads Direct API Publishing (feature-flagged)
