@@ -1,5 +1,16 @@
 # BidVex — Auction Marketplace PRD
 
+## iter342 — SPRINT: P0 Fixes + Platform Polish + Health Check (Jul 11, 2026) ✅ COMPLETE — TESTED (backend 59 unit tests + testing agent iteration_338.json + console verification)
+- **Meta Pixel dedupe FIXED & VERIFIED**: duplicate `fbq('init')` came from the admin's **GTM container GTM-MQ34GTF4** (its own Meta Pixel tag fires twice), not our JS. `utils/metaPixel.js` now installs a guarded fbq stub at module import that swallows repeat inits for the same pixel ID (works against GTM/any snippet). PageView is path-deduped via `trackPageView()`; FbPixelTracker is a thin route listener. Console verified: 0 "Duplicate Pixel ID" warnings, 1 duplicate init swallowed. ⚠️ Admin should ALSO remove the duplicate Meta Pixel tag inside the GTM container (we can only suppress it client-side).
+- **Vehicle gate false positives FIXED**: (a) production still runs pre-iter338 code (Jul 10 `model:rio` blocks prove it) — **USER MUST REDEPLOY**; (b) NEW bug found: `cylinder` was a standalone auto-flag token and blocked Alex's "Glass Cylinder Floor Vase" on Jul 11 — removed; only numeric engine phrasing (`4-cylinder`) flags now; (c) ambiguous models ("ninja") flag only with brand OR conservative vehicle-noun context ("Ninja motorcycle 2019"=True, "Ninja blender"=False). Alex emailed via send_unified_email (SendGrid 202).
+- **Admin block notifications**: every gate (vehicle/AI watchdog/prohibited scanner/storage scan) → in-app row + email to office@bidvex.com + admins with seller info, gate reason, Approve & Whitelist / Confirm Block links; 6h dedup per (seller+title) across all kinds.
+- **Typed block reasons**: `services/block_messages.py` enum → 403 detail carries block_reason/message_en/message_fr; shared `ListingBlockDialog.jsx` shows ONLY the matching message (dealer text never shown to non-vehicle sellers), "Request Manual Review" CTA on all types; wired into CreateListingPage + CreateMultiItemListing.
+- **Careers**: POST /api/careers/apply + /careers/apply form page; admin email → careers@bidvex.com ("New Career Application — [Position] — [Name]"); bilingual applicant confirmation (Reply-To careers@).
+- **Email map applied platform-wide** (283 refs): support@→service@, info@→office@, partners@bidvex.ca→contractor@bidvex.com (contractor hub FROM changed). Contact Us lists 9 labeled addresses. ⚠️ contractor@bidvex.com must be a VERIFIED SENDER in SendGrid; the 9 public addresses need real inboxes to receive mail.
+- **Twilio**: startup + /api/twilio/config live auth validation (auth_valid/auth_error); AdminDialer red error banner. Token still INVALID in preview — **USER ACTION: Twilio Console → Account Info → Auth Token → update env → redeploy**.
+- **Health check**: 14/14 pages pass. Marketplace/lots/storage lists are EMPTY because preview DB has zero listings (data state, not bug). SUMMER2026 code chip added to /promo/summer-launch.
+- Tests: `tests/test_iter342_sprint.py` (24), iter338/340/341 suites all pass. test_iter318_careers_live module-skips (its seed job was archived by admin in live data).
+
 
 ## iter340 — Dialer Routing Fix + Share Card + Canada-Day Promo + Card Fix (Jun 2026) ✅ COMPLETE — VERIFIED 100%
 

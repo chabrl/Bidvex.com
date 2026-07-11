@@ -91,6 +91,23 @@ export default function PromoSummerLaunchPage() {
           {fr ? 'Réclamer votre mois gratuit' : 'Claim Your Free Month'}
           <ArrowRight className="ml-2 h-5 w-5" />
         </Button>
+        {/* iter342 — visible promo code chip */}
+        <div className="mt-5 flex items-center justify-center gap-2" data-testid="promo-code-chip">
+          <span className="text-sm text-slate-300">
+            {fr ? 'Code promo :' : 'Promo code:'}
+          </span>
+          <button
+            type="button"
+            data-testid="promo-code-copy-btn"
+            onClick={() => {
+              try { navigator.clipboard.writeText('SUMMER2026'); } catch (e) { /* noop */ }
+            }}
+            className="font-mono text-base font-bold tracking-widest bg-white/10 border border-dashed border-[#3FB4CB] text-[#3FB4CB] rounded-lg px-4 py-1.5 hover:bg-white/20 transition-colors"
+            title={fr ? 'Cliquer pour copier' : 'Click to copy'}
+          >
+            SUMMER2026
+          </button>
+        </div>
       </div>
 
       {/* Feature blocks */}
