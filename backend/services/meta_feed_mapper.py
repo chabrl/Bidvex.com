@@ -160,7 +160,52 @@ _BANNED_HOST_FRAGMENTS = (
 )
 
 
+# iter347 — Presigned-URL blocklist. Meta/Google crawlers cache
+# `image_link` — but AWS S3 pre-signed URLs expire in minutes/hours
+# (Signature Version 4). Once expired, the crawler returns 403 and
+# eventually removes the product from the catalog. Never emit these.
+_PRESIGNED_MARKERS = (
+    "x-amz-signature=",   # AWS SigV4 canonical param name
+    "x-amz-security-token=",
+    "x-goog-signature=",  # Google Cloud Storage signed URLs
+    "x-goog-credential=",
+)
+
+# iter347 — Allowed public-image extensions in the URL path (after
+# stripping ?query and #fragment). Note we now ALSO admit URLs whose
+# path has NO extension (common on modern CDNs like CloudFront,
+# imgix, Cloudflare Images, Sirv) — those crawlers fetch the URL
+# and use the returned Content-Type header. See `_is_valid_image_url`.
+_ALLOWED_IMAGE_EXT = (".jpg", ".jpeg", ".png", ".gif")
+# Explicitly banned extensions Meta+Google both reject at the ingestion
+# stage regardless of Content-Type.
+_BANNED_IMAGE_EXT = (".webp", ".svg", ".heic", ".heif", ".bmp", ".tiff", ".ico")
+
+
 def _is_valid_image_url(url: Any) -> bool:
+    """iter347 — Relaxed catalog image validation.
+
+    Previous iter291 rule required the URL path to end in a known
+    JPEG/PNG/GIF extension. That was over-strict — modern S3+CDN URLs
+    often carry no extension (route-based transformations, opaque IDs,
+    Cloudinary/CloudFront transforms) but return proper `image/jpeg`
+    or `image/png` from the crawler's fetch. The old rule
+    silently rejected them → the mapper fell through to the branded
+    placeholder logo, which is exactly the production bug reported in
+    iter347.
+
+    New rule (in order):
+      1. Must be a non-empty https:// string.
+      2. Must NOT match a banned host fragment (Facebook redirect,
+         fbcdn, scontent.facebook.*).
+      3. Must NOT be an AWS/GCS presigned URL — those expire.
+      4. Path (after ?query and #fragment stripping) must NOT end in
+         an explicitly banned extension (.webp/.svg/.heic/.heif/etc.).
+      5. If the path DOES end in an allowed extension, admit.
+      6. If the path has NO recognisable extension, ADMIT anyway —
+         modern CDN convention. The crawler resolves Content-Type at
+         fetch time. This is the material change from iter291.
+    """
     if not isinstance(url, str):
         return False
     u = url.strip()
@@ -170,18 +215,22 @@ def _is_valid_image_url(url: Any) -> bool:
     for frag in _BANNED_HOST_FRAGMENTS:
         if frag in lower:
             return False
-    # Also reject Facebook scontent CDN (subdomain-encoded session tokens
-    # expire within hours of generation; Meta's crawler returns 404 once
-    # the token is invalidated).
+    # scontent + .facebook is banned regardless of extension.
     if "scontent" in lower and ".facebook" in lower:
         return False
-    # iter291 — Reject .webp and any extension Meta/Google don't honour.
-    # Catalog ingestion fails with "Unsupported image type [image_link]"
-    # when the URL points to webp / svg / heic. Validate against the
-    # path (strip ?query and #fragment) so `image.jpg?w=800` still passes.
+    # iter347 — presigned URLs cannot be crawled by external catalogs.
+    for marker in _PRESIGNED_MARKERS:
+        if marker in lower:
+            return False
     path = lower.split("#", 1)[0].split("?", 1)[0]
-    if not path.endswith((".jpg", ".jpeg", ".png", ".gif")):
+    # Explicit reject on banned extensions.
+    if path.endswith(_BANNED_IMAGE_EXT):
         return False
+    # Admit any URL whose path ends in an allowed extension.
+    if path.endswith(_ALLOWED_IMAGE_EXT):
+        return True
+    # iter347 — Admit extension-less CDN URLs (was the primary miss
+    # on production).
     return True
 
 

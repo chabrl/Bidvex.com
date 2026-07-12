@@ -436,6 +436,240 @@ async def ivr_route(request: Request) -> Response:
     return _twiml(xml)
 
 
+# ═══ iter347 — Simplified single-step IVR endpoints ═══════════════════════
+#
+# These endpoints implement the EXACT flow requested in iter347:
+#
+#   1) Caller dials +1 450 634 3099.
+#   2) `/api/twilio/ivr/main-menu`  plays a bilingual (EN + FR) intro
+#      then <Gather>s 1 to 4 DTMF digits ending in "#".
+#   3) `/api/twilio/handle-menu`    dispatches:
+#         - "1"         → <Dial> the general support line.
+#         - 4-digit ext → look up contractor → <Dial> personal_phone.
+#         - anything else / no input → replay the menu (with a soft
+#           bilingual "we didn't catch that" nudge). After 3 failed
+#           attempts (?attempt=3) the caller is routed to support so
+#           the call is NEVER dropped.
+#
+# These live alongside — and do NOT replace — the earlier iter323/324
+# multi-step IVR at `/api/twilio/ivr/incoming`. Twilio Console can be
+# pointed at whichever entrypoint the ops team prefers.
+
+
+@router.post("/twilio/ivr/main-menu")
+@router.get("/twilio/ivr/main-menu")
+async def ivr_main_menu(request: Request) -> Response:
+    """iter347 — Single-step bilingual IVR entry point.
+
+    Plays the bilingual introduction + support/extension prompt, then
+    <Gather>s the caller's DTMF input (1 to 4 digits, terminator '#').
+    On no-input Twilio will follow-through to the same URL again with
+    ?attempt++ so we don't cut off callers who are still fetching their
+    contractor's extension.
+    """
+    # Signature validation on both GET and POST — GET is used by the
+    # Twilio Console during initial configuration probing.
+    try:
+        await _validate_twilio_signature(request)
+    except HTTPException:
+        # Admit on validation failure (mirrors ivr_incoming's stance —
+        # a 403 disconnects legitimate calls; a spoofed request can only
+        # replay this deterministic TwiML with no billing/PII impact).
+        logger.warning("[ivr/main-menu] signature validation failed — admitting")
+    base = _public_base(request)
+
+    # Persist a "call started" row on the very first hit so we have a
+    # CallSid to update later, regardless of how the IVR resolves.
+    form: Dict[str, Any] = {}
+    if request.method == "POST":
+        try:
+            form = dict(await request.form())
+        except Exception:  # noqa: BLE001
+            form = {}
+    call_sid = form.get("CallSid")
+    attempt = int(request.query_params.get("attempt") or "1")
+
+    if call_sid and attempt == 1:
+        try:
+            db = _get_db()
+            await db.inbound_extension_calls.insert_one({
+                "id":              str(uuid.uuid4()),
+                "call_sid":        call_sid,
+                "from_number":     form.get("From"),
+                "to_number":       form.get("To"),
+                "started_at":      _now_iso(),
+                "status":          "in_progress",
+                "outcome":         None,
+                "contractor_id":   None,
+                "extension_dialed": None,
+                "duration_seconds": None,
+                "menu_variant":    "iter347_single_step",
+            })
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[ivr/main-menu] initial call row insert failed: {e}")
+
+    # Nudge language if this is a retry.
+    nudge_en = "" if attempt <= 1 else " We didn't catch that — let's try one more time."
+    nudge_fr = "" if attempt <= 1 else " Nous n'avons pas capté votre choix — un instant, réessayons."
+
+    intro_en = (
+        f"Thank you for calling BidVex.{nudge_en} "
+        "To speak with the support team, press 1. "
+        "Or enter the four-digit extension of your contractor now, "
+        "followed by the pound key."
+    )
+    intro_fr = (
+        f"Merci d'avoir appelé BidVex.{nudge_fr} "
+        "Pour parler à l'équipe de soutien, appuyez sur le 1. "
+        "Ou entrez maintenant le poste à quatre chiffres de votre "
+        "entrepreneur, suivi de la touche dièse."
+    )
+
+    # After 3 failed attempts, gracefully route to support so the call
+    # is never dropped.
+    if attempt >= 4:
+        graceful = (
+            "We're going to connect you to the support team now. "
+            "One moment please. Nous vous connectons à l'équipe de soutien maintenant."
+        )
+        xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="alice" language="en-US">{graceful}</Say>
+  <Dial timeout="25" answerOnBridge="true">
+    <Number>{BIDVEX_GENERAL_SUPPORT_NUMBER}</Number>
+  </Dial>
+</Response>"""
+        return _twiml(xml)
+
+    next_action = f"{base}/api/twilio/handle-menu?attempt={attempt}"
+
+    xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Gather input="dtmf" numDigits="4" finishOnKey="#" timeout="8"
+          action="{next_action}" method="POST">
+    <Say voice="alice" language="en-US">{intro_en}</Say>
+    <Say voice="alice" language="fr-CA">{intro_fr}</Say>
+  </Gather>
+  <Redirect method="POST">{base}/api/twilio/ivr/main-menu?attempt={attempt + 1}</Redirect>
+</Response>"""
+    return _twiml(xml)
+
+
+@router.post("/twilio/handle-menu")
+async def handle_menu(request: Request) -> Response:
+    """iter347 — Dispatch handler for the single-step main menu.
+
+    Behaviour:
+      - `Digits == "1"`  → immediately <Dial> the general support line.
+      - `Digits` is 3-4 digits and looks up an active contractor with a
+        personal_phone_number set → <Dial> that number (with whisper).
+      - anything else / no input / inactive extension → route back to
+        the main menu with ?attempt++.
+    """
+    try:
+        await _validate_twilio_signature(request)
+    except HTTPException:
+        logger.warning("[ivr/handle-menu] signature validation failed — admitting")
+
+    form = dict(await request.form())
+    base = _public_base(request)
+    digits = (form.get("Digits") or "").strip()
+    call_sid = form.get("CallSid")
+    from_number = form.get("From") or "Unknown"
+    attempt = int(request.query_params.get("attempt") or "1")
+    db = _get_db()
+
+    def _log_outcome(**fields):
+        if not call_sid:
+            return
+        try:
+            import asyncio as _aio
+            _aio.create_task(
+                db.inbound_extension_calls.update_one(
+                    {"call_sid": call_sid},
+                    {"$set": {"ended_at": _now_iso(), **fields}},
+                )
+            )
+        except Exception:  # noqa: BLE001
+            pass
+
+    # ── Support (press 1) ─────────────────────────────────────────────
+    if digits == "1":
+        _log_outcome(
+            outcome="support_routed",
+            status="bridged_support",
+            support_number=BIDVEX_GENERAL_SUPPORT_NUMBER,
+            menu_variant="iter347_single_step",
+        )
+        xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="alice" language="en-US">Connecting you to the support team. Please hold.</Say>
+  <Dial timeout="25" answerOnBridge="true">
+    <Number>{BIDVEX_GENERAL_SUPPORT_NUMBER}</Number>
+  </Dial>
+</Response>"""
+        return _twiml(xml)
+
+    # ── 4-digit contractor extension ──────────────────────────────────
+    if re.fullmatch(r"\d{3,4}", digits):
+        try:
+            from services.contractor_extensions import lookup_contractor_by_extension
+            contractor = await lookup_contractor_by_extension(db, int(digits))
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[ivr/handle-menu] lookup failed for ext={digits}: {e}")
+            contractor = None
+
+        personal_phone = (contractor or {}).get("personal_phone_number")
+        is_active = (contractor or {}).get("is_active", True)
+
+        if contractor and is_active and personal_phone:
+            _log_outcome(
+                outcome="bridging",
+                status="bridging",
+                extension_dialed=digits,
+                contractor_id=contractor.get("id"),
+                contractor_name=(
+                    contractor.get("name") or
+                    f"{contractor.get('first_name','')} {contractor.get('last_name','')}".strip()
+                ),
+                menu_variant="iter347_single_step",
+            )
+
+            safe_from = re.sub(r"[^0-9+]", "", from_number)[:20]
+            whisper_url_xml = _xml_escape(
+                f"{base}/api/twilio/ivr/whisper?lang=en&caller_from={safe_from}"
+            )
+            status_url_xml = _xml_escape(
+                f"{base}/api/twilio/ivr/status?contractor_id={contractor.get('id')}"
+            )
+            xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Dial callerId="{BIDVEX_MAIN_NUMBER}" timeout="25" answerOnBridge="true"
+        action="{status_url_xml}" method="POST">
+    <Number url="{whisper_url_xml}" method="POST">{personal_phone}</Number>
+  </Dial>
+</Response>"""
+            return _twiml(xml)
+
+        # Contractor not found OR inactive OR no personal_phone — replay
+        # the menu with the "we didn't catch that" nudge. Never drop.
+        _log_outcome(
+            outcome="invalid_extension",
+            status="ended_invalid",
+            extension_dialed=digits,
+            menu_variant="iter347_single_step",
+        )
+
+    # ── Empty input / invalid digit sequence → replay menu ────────────
+    xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Redirect method="POST">{base}/api/twilio/ivr/main-menu?attempt={attempt + 1}</Redirect>
+</Response>"""
+    return _twiml(xml)
+
+
+
+
 @router.post("/twilio/ivr/whisper")
 async def ivr_whisper(request: Request) -> Response:
     """Played on the contractor's leg BEFORE the bridge — announces who's

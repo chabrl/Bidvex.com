@@ -629,3 +629,68 @@ async def meta_catalog_json(
         "limit":        limit,
         "items":        paged,
     }
+
+
+
+# ═══ iter347 — Feed Refresh / "Fetch Now" trigger ═════════════════════
+#
+# Admin-only endpoint used AFTER a bulk image regeneration or fix to
+# invalidate the in-process feed cache AND expose the canonical public
+# feed URLs so an admin can click straight into Google Merchant Center's
+# "Fetch Now" flow.
+#
+# The endpoint is intentionally idempotent and side-effect-safe: it
+# clears the cache, warms the primary feed (JSON path) once so the
+# next external crawl gets a hot response, and returns the two public
+# URLs Google + Meta subscribe to.
+
+
+@router.post("/refresh")
+async def refresh_feeds(
+    warm: bool = Query(True, description="Warm the JSON feed after invalidation"),
+    current_user=Depends(require_admin),
+):
+    """iter347 — Invalidate the feed cache and (optionally) pre-warm
+    the JSON feed so the next external crawl by Meta / Google is served
+    from a hot cache. Returns the public URLs the admin can paste into
+    Google Merchant Center's "Fetch Now" and Meta Commerce Manager's
+    "Fetch Feed Now" flows.
+
+    Response:
+      {
+        "invalidated_keys": int,
+        "warmed": bool,
+        "feed_urls": {
+            "meta_csv":    "https://…/api/feeds/facebook-local",
+            "meta_json":   "https://…/api/feeds/facebook-local?format=json",
+            "google_xml":  "https://…/api/feeds/google",
+        },
+        "generated_at": iso8601
+      }
+    """
+    invalidated = invalidate_feed_cache()
+
+    warmed = False
+    if warm:
+        try:
+            # Trigger a rebuild-and-cache pass so the next external
+            # crawl gets a hot response. We call the same code path
+            # the JSON feed uses.
+            key = make_cache_key(None, None, None, 5000, 0)
+            items, exclusions = await _build_feed_items(None, None, None, 5000, 0)
+            cache_set(key, items, exclusions)
+            warmed = True
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[feeds.refresh] warm-up failed (invalidation still applied): {e}")
+
+    base_url = os.environ.get("BIDVEX_BASE_URL", "https://bidvex.com").rstrip("/")
+    return {
+        "invalidated_keys": invalidated,
+        "warmed":           warmed,
+        "feed_urls": {
+            "meta_csv":     f"{base_url}/api/feeds/facebook-local",
+            "meta_json":    f"{base_url}/api/feeds/facebook-local?format=json",
+            "google_xml":   f"{base_url}/api/feeds/google",
+        },
+        "generated_at":     datetime.now(timezone.utc).isoformat(),
+    }

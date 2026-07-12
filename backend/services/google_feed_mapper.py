@@ -90,32 +90,58 @@ def _split_meta_price(meta_price: str) -> str:
 # Content-Type: image/jpeg, image/png, or image/gif. webp + signed URLs
 # + backend-proxied URLs all fail with `Unsupported image type
 # [image_link]`. Strip query strings (e.g. `?w=800&format=webp`) and
-# drop any URL whose extension isn't in the whitelist.
+# iter347 — Google Merchant is stricter than Meta on the URL shape.
+# Google requires `image_link` to be a stable, crawlable HTTPS URL that
+# returns image/jpeg|png|gif from the crawler's fetch. Modern CDN URLs
+# without an explicit extension (CloudFront/Cloudinary/imgix) ARE fine
+# because Google respects Content-Type — the old iter291 whitelist
+# regressed real S3 URLs into the branded fallback path.
 _GOOGLE_OK_IMG_EXT = (".jpg", ".jpeg", ".png", ".gif")
+_GOOGLE_BAD_IMG_EXT = (".webp", ".svg", ".heic", ".heif", ".bmp", ".tiff", ".ico")
+_PRESIGNED_MARKERS = (
+    "x-amz-signature=",
+    "x-amz-security-token=",
+    "x-goog-signature=",
+    "x-goog-credential=",
+)
 
 
 def _sanitize_google_image_url(url: str) -> str:
-    """Return a Google-Merchant-safe URL, or empty string if it can't be
-    rescued.
+    """Return a Google-Merchant-safe URL, or empty string if it can't
+    be rescued.
 
-    Stripping rules:
+    Rules (iter347):
+      • Must be non-empty HTTPS.
+      • Reject presigned URLs (expire → crawler 403 → catalog removal).
       • Strip URL query parameters (Google's crawler resolves the bare
-        path; ?w=… or ?format=webp causes Content-Type drift).
-      • Drop the URL outright if its extension isn't in the JPEG / PNG
-        / GIF whitelist (including .webp).
-      • Pass through the per-section S3 placeholders untouched —
-        they're already JPEG.
+        path; `?w=…` or `?format=webp` causes Content-Type drift).
+      • Reject the URL outright if its path ends in an explicitly
+        banned image extension (.webp / .svg / .heic / …).
+      • Pass through both:
+          - Paths ending in .jpg/.jpeg/.png/.gif (traditional).
+          - Extension-less CDN paths (modern) — the crawler resolves
+            Content-Type at fetch time.
     """
     if not isinstance(url, str) or not url:
         return ""
     u = url.strip()
     if not u:
         return ""
+    if not u.startswith("https://"):
+        return ""
+    lower = u.lower()
+    for marker in _PRESIGNED_MARKERS:
+        if marker in lower:
+            return ""
     # Strip query string AND hash fragment.
     base = u.split("#", 1)[0].split("?", 1)[0]
-    lower = base.lower()
-    if not lower.endswith(_GOOGLE_OK_IMG_EXT):
+    base_lower = base.lower()
+    if base_lower.endswith(_GOOGLE_BAD_IMG_EXT):
         return ""
+    # Extension-present → admit as-is.
+    if base_lower.endswith(_GOOGLE_OK_IMG_EXT):
+        return base
+    # Extension-less CDN URLs — admit. Google respects Content-Type.
     return base
 
 
