@@ -1,6 +1,24 @@
 # BidVex — Auction Marketplace PRD
 
+## iter347 — Feed Image Fix + Single-Step Bilingual IVR (Feb 11, 2026) ✅ COMPLETE — TESTED
+Warranty work — ZERO credit charged. Backend 22/22 iter347 tests + 58/58 combined regression (iter340/345/346/347). Testing agent iteration_347.json: 100% backend + zero action items.
+
+- **ISSUE 1 — Google Merchant + Meta feed placeholder logos**: Root cause = pre-iter347 `_is_valid_image_url` required BOTH https+known extension in the URL path. Modern CloudFront / S3-with-transforms / imgix URLs increasingly ship WITHOUT extensions (Content-Type resolved at fetch time). Those URLs were silently dropped → every listing fell into the branded placeholder path.
+  - **Fix**: `_is_valid_image_url` now admits extensionless URLs (crawler-fetch resolves content-type) AND explicitly REJECTS presigned URLs (`X-Amz-Signature=` / `X-Goog-Signature=`) since those expire and would 403 Google/Meta's crawler → catalog removal. Also explicitly rejects `.webp/.svg/.heic/.heif/.bmp/.tiff/.ico`, `http://`, Facebook click redirects.
+  - **Google Merchant mapper** `_sanitize_google_image_url` mirrors the same rules: extension-less passes through unchanged, presigned/banned-ext returns `""`.
+  - **NEW endpoint** `POST /api/feeds/refresh` — super_admin gated. Invalidates the feed cache, optionally warms the JSON feed (`?warm=true` default), and returns the 3 canonical public feed URLs for Google Merchant / Meta Commerce Manager "Fetch Now" flows: `{meta_csv, meta_json, google_xml}`.
+- **ISSUE 2 — Inbound IVR (450-634-3099)**: The static "Thank you for calling BidVex — support@bidvex.com" message the user heard was a Twilio Console misconfiguration (a stale TwiML Bin or default URL), not a code issue. New clean single-step bilingual IVR built to spec.
+  - **NEW endpoint** `POST/GET /api/twilio/ivr/main-menu`: bilingual EN+FR intro ("Thank you for calling BidVex. To speak with the support team, press 1. Or enter the four-digit extension of your contractor now, followed by the pound key.") + `<Gather numDigits=4 finishOnKey=# timeout=8>` action → `/api/twilio/handle-menu`. First hit persists an `inbound_extension_calls` row with `menu_variant="iter347_single_step"`. `attempt=2` prefixes a bilingual "we didn't catch that / n'avons pas capté" nudge. `attempt>=4` gracefully falls back to `<Dial>` support — the call is NEVER dropped.
+  - **NEW endpoint** `POST /api/twilio/handle-menu` dispatcher: `Digits==1` → `<Dial><Number>+15149490038</Number></Dial>` (BidVex general support); 3-4 digit extension → `lookup_contractor_by_extension` (role=`dialer_contractor` in `db.users`) → `<Dial callerId="+14506343099"><Number>{personal_phone}</Number></Dial>` with whisper URL (contractor hears "Incoming BidVex call from …" before bridge); anything else → `<Redirect>` to main-menu with `attempt++`.
+  - **UX polish**: `_twiml()` helper now returns `application/xml; charset=utf-8` so downstream HTTP clients using chardet don't mis-decode pure-ASCII TwiML as CJK.
+
+**⚠️ CHARBEL ACTIONS after redeploy**:
+1. **Twilio Console** → **Phone Numbers** → +1 450 634 3099 → **Voice Configuration** → **A Call Comes In** → **Webhook** → `https://bidvex.com/api/twilio/ivr/main-menu` (HTTP POST). This replaces the static message with the new IVR flow.
+2. **Google Merchant Center** → Products → after redeploy, POST `/api/feeds/refresh` (super_admin) then click "Fetch Now" in Merchant Center — real listing S3 images will populate. Same in Meta Commerce Manager.
+3. (Optional) **Twilio Console** → Voice → TwiML App fallback URL check (from iter345/346) is still recommended.
+
 ## iter346 — Admin Unsubscribe Guard + Role Sweep + Dialer Hedges + Pagination + Compliance Digest + Watchlist Reminders (Feb 11, 2026) ✅ COMPLETE — TESTED
+
 Backend 36/36 pytest PASS (16 iter346 new + 13 iter345 + 7 iter340 regression). Testing agent report iteration_346.json: 100% backend + 100% frontend, zero regressions, zero action items.
 
 - **BUG 3 — charbel911@gmail.com admin unsubscribe ROOT CAUSE FOUND & FIXED at 3 layers**:

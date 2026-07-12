@@ -137,7 +137,10 @@ BIDVEX_GENERAL_SUPPORT_NUMBER = "+15149490038"  # iter333 — human GA line reac
 
 
 def _twiml(xml: str) -> Response:
-    return Response(content=xml, media_type="application/xml")
+    # iter347 — Explicit UTF-8 charset so downstream integrators using
+    # requests.text (or any HTTP client that falls back to chardet)
+    # don't mis-decode pure-ASCII TwiML as CJK.
+    return Response(content=xml, media_type="application/xml; charset=utf-8")
 
 
 def _public_base(request: Request) -> str:
