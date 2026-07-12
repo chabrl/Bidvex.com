@@ -126,12 +126,61 @@ class ConfirmRequest(BaseModel):
     lang: Optional[str] = None
 
 
+# iter346 P0 — Admin unsubscribe guard. Administrative accounts
+# (role=admin | super_admin) must never be able to unsubscribe from
+# platform notifications — a stale unsubscribe click on 2026-07-02
+# for charbel911@gmail.com silently blocked ALL admin alerts platform-wide
+# for a week. Prevention: refuse the token, log with a red flag, and
+# return a bilingual explanatory error.
+async def _is_admin_email(db, email: str) -> bool:
+    """Return True if `email` belongs to a user with role admin/super_admin."""
+    if not email:
+        return False
+    user = await db.users.find_one(
+        {"email": email.strip().lower()}, {"_id": 0, "role": 1},
+    )
+    return bool(user and user.get("role") in ("admin", "super_admin"))
+
+
+ADMIN_UNSUBSCRIBE_REFUSAL = {
+    "error":      "admin_unsubscribe_blocked",
+    "message_en": ("Administrative accounts cannot be unsubscribed from "
+                   "platform notifications. Contact IT if you believe this "
+                   "is an error."),
+    "message_fr": ("Les comptes administratifs ne peuvent pas être désabonnés "
+                   "des notifications de la plateforme. Contactez le service "
+                   "informatique si vous croyez qu'il s'agit d'une erreur."),
+}
+
+
 @unsubscribe_router.post("/confirm")
 async def confirm_unsubscribe(payload: ConfirmRequest, request: Request):
     """Mark the recipient as unsubscribed in MongoDB + SendGrid global suppressions."""
     email = _decode_unsubscribe_token(payload.token)
     db = get_db()
     now = datetime.now(timezone.utc)
+
+    # iter346 P0 — hard-block admin unsubscribe attempts.
+    if await _is_admin_email(db, email):
+        logger.warning(
+            f"[UNSUBSCRIBE] BLOCKED admin unsubscribe attempt for {email} "
+            f"from ip={request.client.host if request.client else 'n/a'}"
+        )
+        # Best-effort audit row so ops can see the attempts.
+        try:
+            await db.unsubscribe_events.insert_one({
+                "id":              str(uuid.uuid4()),
+                "email":           email,
+                "event":           "blocked_admin_attempt",
+                "source":          "platform",
+                "token_type":      "itsdangerous",
+                "unsubscribed_at": now,
+                "ip":              (request.client.host if request.client else None),
+                "user_agent":      (request.headers.get("user-agent") if hasattr(request, "headers") else None),
+            })
+        except Exception:  # noqa: BLE001
+            pass
+        raise HTTPException(status_code=403, detail=ADMIN_UNSUBSCRIBE_REFUSAL)
 
     # Check current state
     existing = await db.users.find_one({"email": email}, {"_id": 0, "marketing_unsubscribed": 1})
@@ -371,6 +420,29 @@ async def auto_confirm_unsubscribe(payload: ConfirmRequest, request: Request):
     source = decoded["source"]
     db = get_db()
     now = datetime.now(timezone.utc)
+
+    # iter346 P0 — hard-block admin unsubscribe attempts (see /confirm).
+    if await _is_admin_email(db, email):
+        logger.warning(
+            f"[UNSUBSCRIBE auto] BLOCKED admin unsubscribe attempt for {email} "
+            f"(source={source}, campaign_id={campaign_id}) "
+            f"from ip={request.client.host if request.client else 'n/a'}"
+        )
+        try:
+            await db.unsubscribe_events.insert_one({
+                "id":              str(uuid.uuid4()),
+                "email":           email,
+                "campaign_id":     campaign_id,
+                "event":           "blocked_admin_attempt",
+                "source":          source,
+                "token_type":      "itsdangerous" if source == "platform" else "jwt",
+                "unsubscribed_at": now,
+                "ip":              (request.client.host if request.client else None),
+                "user_agent":      (request.headers.get("user-agent") if hasattr(request, "headers") else None),
+            })
+        except Exception:  # noqa: BLE001
+            pass
+        raise HTTPException(status_code=403, detail=ADMIN_UNSUBSCRIBE_REFUSAL)
 
     # Short-circuit if already unsubscribed.
     user = await db.users.find_one(

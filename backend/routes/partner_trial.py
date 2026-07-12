@@ -59,7 +59,7 @@ async def activate_partner_trial(
     # iter259 — Admin-only. The public landing page is gone; partner
     # trials are now activated exclusively from the Admin Promotions
     # Engine by a privileged operator (one user_id at a time).
-    is_admin = getattr(current_user, "role", None) == "admin" or getattr(current_user, "is_admin", False)
+    is_admin = getattr(current_user, "role", None) in ("admin", "super_admin") or getattr(current_user, "is_admin", False)
     if not is_admin:
         raise HTTPException(
             status_code=403,
@@ -154,7 +154,8 @@ async def activate_partner_trial(
 
 
 def _require_admin(user: User) -> None:
-    if getattr(user, "role", None) != "admin" and not getattr(user, "is_admin", False):
+    # iter346 — canonical admin+super_admin check.
+    if getattr(user, "role", None) not in ("admin", "super_admin") and not getattr(user, "is_admin", False):
         raise HTTPException(status_code=403, detail="Admin only")
 
 

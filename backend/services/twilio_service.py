@@ -211,9 +211,20 @@ def build_outbound_twiml(client_phone_number: str,
     response = VoiceResponse()
 
     if coach_stream_url and coach_nonce:
-        start = response.start()
-        stream = start.stream(url=coach_stream_url, track="both_tracks")
-        stream.parameter(name="nonce", value=coach_nonce)
+        # iter346 P0 — Wrap stream setup in try/except so that a broken
+        # WebSocket URL, missing param, or ANY exception during stream
+        # construction cannot short-circuit the <Dial> below. The
+        # <Dial> is the load-bearing verb; the stream is best-effort AI
+        # coaching audio mirroring.
+        try:
+            start = response.start()
+            stream = start.stream(url=coach_stream_url, track="both_tracks")
+            stream.parameter(name="nonce", value=coach_nonce)
+        except Exception as e:  # noqa: BLE001
+            logger.error(
+                f"[twiml_build] Coach stream setup failed — "
+                f"proceeding to <Dial> without stream: {e!r}"
+            )
 
     dial = Dial(
         caller_id=TWILIO_PHONE_NUMBER,

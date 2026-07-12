@@ -1856,7 +1856,7 @@ async def update_multi_listing_translations(
 @listings_router.post("/admin/backfill-translations")
 async def admin_backfill_translations(current_user: User = Depends(get_current_user)):
     """Admin-only: backfill translations for all existing listings."""
-    if current_user.role != "admin":
+    if current_user.role not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Admin access required")
 
     db = get_db()

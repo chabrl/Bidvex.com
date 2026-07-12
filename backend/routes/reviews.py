@@ -352,7 +352,7 @@ async def get_buyer_reviews(
     """iter301 — Admin-only: reviews a user received AS A BUYER
     (seller→buyer direction). Soft-deleted reviews included, marked."""
     user = await _get_current_user(credentials)
-    if user.get("role") != "admin":
+    if user.get("role") not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Admin access required")
 
     db = get_db()
@@ -695,7 +695,7 @@ async def admin_remove_review(
 ):
     """Admin: Permanently remove a review."""
     user = await _get_current_user(credentials)
-    if user.get("role") != "admin":
+    if user.get("role") not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Admin access required")
 
     db = get_db()
@@ -724,7 +724,7 @@ async def admin_flag_review(
 ):
     """Admin: Flag a review (hidden pending decision)."""
     user = await _get_current_user(credentials)
-    if user.get("role") != "admin":
+    if user.get("role") not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Admin access required")
 
     db = get_db()
@@ -753,7 +753,7 @@ async def admin_unflag_review(
 ):
     """Admin: Restore a flagged review."""
     user = await _get_current_user(credentials)
-    if user.get("role") != "admin":
+    if user.get("role") not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Admin access required")
 
     db = get_db()
@@ -779,7 +779,7 @@ async def get_flagged_reviews(
 ):
     """Admin: List all flagged reviews for moderation."""
     user = await _get_current_user(credentials)
-    if user.get("role") != "admin":
+    if user.get("role") not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Admin access required")
 
     db = get_db()

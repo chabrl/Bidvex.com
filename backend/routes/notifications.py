@@ -27,7 +27,8 @@ DEFAULT_MAX_MB = 5.0
 
 
 def _is_admin(user: User) -> bool:
-    return bool(getattr(user, "is_admin", False)) or getattr(user, "role", None) == "admin"
+    # iter346 — canonical admin+super_admin check.
+    return bool(getattr(user, "is_admin", False)) or getattr(user, "role", None) in ("admin", "super_admin")
 
 
 # ─── iter267 Mission 4 — Notification WebSocket bus ──────────────────
@@ -285,7 +286,7 @@ async def admin_send_notification(
         "attachment_max_mb": 1.0
       }
     """
-    if not getattr(current_user, "is_admin", False) and getattr(current_user, "role", None) != "admin":
+    if not getattr(current_user, "is_admin", False) and getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Admin only")
     db = get_db()
     user_id = (payload.get("user_id") or "").strip()

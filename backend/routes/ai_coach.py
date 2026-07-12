@@ -61,7 +61,14 @@ STT_MODEL_DEFAULT = "gemini-2.5-flash-native-audio-latest"
 # Analysis model — regular chat with strict JSON schema.
 ANALYSIS_MODEL_DEFAULT = "gemini-2.5-flash"
 
-NONCE_TTL_SECONDS = 120           # 2 min from call-init to WS open.
+NONCE_TTL_SECONDS = 300           # iter346 P0 — bumped from 120s to 300s.
+                                  # 2 min was too tight when the TwiML
+                                  # webhook hits several seconds after
+                                  # session-init on a cold pod, causing
+                                  # premature expiry → nonce lookup miss
+                                  # → coach stream degraded. 5 min gives
+                                  # ample runway with negligible attack
+                                  # surface (nonce is single-use anyway).
 ANALYSIS_INTERVAL_SECONDS = 7.0   # push a hint every ~7 s.
 MIN_TRANSCRIPT_CHARS = 12         # skip if transcript too short.
 HARD_CALL_LIMIT_SECONDS = 10 * 60

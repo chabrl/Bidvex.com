@@ -591,14 +591,81 @@ async def admin_create_log(data: Dict[str, Any], current_user: User = Depends(re
 
 
 @admin_config_router.get("/admin/logs")
-async def admin_get_logs(action_type: str = None, limit: int = 100, current_user: User = Depends(require_admin)):
+async def admin_get_logs(
+    action_type: str = None,
+    page: int = 1,
+    limit: int = 50,
+    current_user: User = Depends(require_admin),
+):
+    """iter346 P0 — Paginated admin action logs.
+
+    Params:
+      • action_type — optional exact match on the `action` field.
+      • page       — 1-based page number (default 1).
+      • limit      — page size (default 50, max 100).
+
+    Returns:
+      {
+        "items":       [ ...logs sorted by created_at desc... ],
+        "total_count": int,   # total docs matching the filter
+        "page":        int,   # echoed back
+        "pages":       int,   # ceil(total_count / limit)
+        "limit":       int,   # echoed back
+      }
+
+    Legacy pre-iter346 callers that read a bare `logs` array will now
+    receive the envelope; frontend was updated in the same iteration.
+    Also strips the heavy `details` payload to a compact preview so a
+    100-row page stays well under 1 MB (was ~115 MB before).
+    """
     db = get_db()
     query = {}
     if action_type:
         query["action"] = action_type
-    
-    logs = await db.admin_logs.find(query, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
-    return logs
+
+    page = max(1, int(page or 1))
+    limit = max(1, min(100, int(limit or 50)))
+    total_count = await db.admin_logs.count_documents(query)
+    cursor = (
+        db.admin_logs.find(query, {"_id": 0})
+        .sort("created_at", -1)
+        .skip((page - 1) * limit)
+        .limit(limit)
+    )
+    logs = await cursor.to_list(limit)
+
+    # iter346 — Compact the `details` payload so 100 rows stay under
+    # 1 MB. Preserve full detail on a dedicated /admin/logs/{id} endpoint
+    # if the frontend ever needs to expand a single row (not built in
+    # this iteration — the paginated list has always shown snippets).
+    for row in logs:
+        det = row.get("details")
+        if isinstance(det, dict):
+            # Only keep the top 6 keys; stringify long values.
+            trimmed = {}
+            for i, (k, v) in enumerate(list(det.items())[:6]):
+                if isinstance(v, (dict, list)):
+                    trimmed[k] = f"[{type(v).__name__}, {len(v)} items]"
+                elif isinstance(v, str) and len(v) > 200:
+                    trimmed[k] = v[:200] + "…"
+                else:
+                    trimmed[k] = v
+            if len(det) > 6:
+                trimmed["…"] = f"+{len(det) - 6} more keys"
+            row["details"] = trimmed
+        elif isinstance(det, str) and len(det) > 500:
+            row["details"] = det[:500] + "…"
+
+    return {
+        "items":       logs,
+        "total_count": total_count,
+        "page":        page,
+        "pages":       (total_count + limit - 1) // limit,
+        "limit":       limit,
+        # iter346 — Backwards-compat alias for frontends not yet
+        # updated to read `items`.
+        "logs":        logs,
+    }
 
 # PLATFORM ANNOUNCEMENTS
 

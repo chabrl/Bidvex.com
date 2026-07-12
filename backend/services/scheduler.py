@@ -733,6 +733,48 @@ def init_scheduler(database):
         replace_existing=True,
     )
 
+    # iter346 P0 — Watchlist / Last-Chance nudges.
+    # process_last_chance_nudges() has existed since iter299 P1 but was
+    # never actually wired into the scheduler → watchlist "ends in 1
+    # hour" reminders never fired. Every 10 minutes we scan all 5
+    # active collections (marketplace listings, multi_item_listings,
+    # vehicle_listings, storage_auctions, vehicle_multi_lot_auctions +
+    # PER-LOT within VML events) for auctions ending within the next
+    # hour and notify every watcher + every non-leading bidder.
+    # Dedup key: (user_id, listing_id[, lot_id]) via `last_chance_log`
+    # + a `last_chance_sent=true` flag on the listing/lot doc so a pod
+    # restart cannot re-fire.
+    from services.last_chance import process_last_chance_nudges
+
+    async def _last_chance_wrapper():
+        global db_instance
+        if db_instance is None:
+            logger.warning("[last-chance] db not ready — skipping tick")
+            return
+        return await process_last_chance_nudges(db_instance)
+
+    scheduler.add_job(
+        _tracked("last_chance_nudges", _last_chance_wrapper),
+        IntervalTrigger(minutes=10),
+        id="last_chance_nudges",
+        name="Watchlist Last-Chance Nudges (iter346)",
+        replace_existing=True,
+    )
+
+    # iter346 P0 — Weekly Impersonation Compliance Digest.
+    # Monday at 09:00 America/Toronto = 13:00 UTC (winter) / 13:00 UTC (summer).
+    # We use UTC 13:00 to sidestep DST complexity — the digest is a low-
+    # frequency operational summary; a 1-hour timing drift twice a year is
+    # acceptable and clearer than TZ-native scheduling on APScheduler.
+    from services.compliance_digest import weekly_impersonation_digest_job
+    scheduler.add_job(
+        _tracked("compliance_digest", weekly_impersonation_digest_job),
+        CronTrigger(day_of_week="mon", hour=13, minute=0),
+        id="compliance_digest",
+        name="Weekly Impersonation Compliance Digest (iter346)",
+        replace_existing=True,
+    )
+
     # Job 6c (iter210) — Vehicle dealer 7-day grace-period enforcement — daily at 02:30 UTC
     scheduler.add_job(
         _tracked("enforce_dealer_grace_period", enforce_dealer_grace_period_job),

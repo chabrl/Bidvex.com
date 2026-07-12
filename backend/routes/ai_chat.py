@@ -211,7 +211,7 @@ async def reload_knowledge_base(
     try:
         payload = jwt.decode(credentials.credentials, jwt_secret, algorithms=["HS256"])
         user_doc = await db.users.find_one({"id": payload.get("sub")})
-        if not user_doc or user_doc.get("role") != "admin":
+        if not user_doc or user_doc.get("role") not in ("admin", "super_admin"):
             raise HTTPException(status_code=403, detail="Admin access required")
 
         from services.ai_knowledge_base_v2 import get_knowledge_base
@@ -257,7 +257,7 @@ async def ai_chat_diagnostics(
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid token")
     user_doc = await db.users.find_one({"id": payload.get("sub")})
-    if not user_doc or user_doc.get("role") != "admin":
+    if not user_doc or user_doc.get("role") not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Admin access required")
 
     def _mask(v: str) -> str:

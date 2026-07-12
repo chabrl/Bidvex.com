@@ -99,7 +99,8 @@ MAX_FACILITY_DOC_BYTES = 10 * 1024 * 1024  # 10 MB
 # ─────────────────────────────────────────────────────────────
 
 async def _require_admin(current_user: User = Depends(get_current_user)):
-    if current_user.role != "admin":
+    # iter346 — canonical admin+super_admin check.
+    if current_user.role not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
 
@@ -2581,7 +2582,7 @@ async def get_pickup_qr(
 
     # Authorization
     is_winner = auction.get("winning_bidder_id") == current_user.id
-    is_admin = current_user.role == "admin"
+    is_admin = current_user.role in ("admin", "super_admin")
     is_facility_owner = False
     if not is_winner and not is_admin:
         fac = await db.storage_facilities.find_one(

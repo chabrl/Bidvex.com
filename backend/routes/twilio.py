@@ -390,6 +390,27 @@ async def twiml_webhook(request: Request) -> Response:
     silently mirrored to the AI Coach analysis endpoint. The added
     stream is non-terminal — the <Dial> still bridges normally."""
     form = dict((await request.form()))
+
+    # iter346 P0 — First-line webhook logging. If this line does NOT
+    # appear in production logs when a contractor places a call, then
+    # the request is not reaching us at all — meaning either Twilio's
+    # Primary URL is misconfigured, or an ingress/TLS layer is dropping
+    # the request. If it DOES appear, we can see exactly what Twilio
+    # sent us (To/From/Direction/CallSid/URL/Host) and route the
+    # investigation from there.
+    logger.info(
+        f"[TWIML] webhook received | "
+        f"To={form.get('To', 'MISSING')} | "
+        f"From={form.get('From', 'MISSING')} | "
+        f"CallSid={form.get('CallSid', 'MISSING')} | "
+        f"Direction={form.get('Direction', 'MISSING')} | "
+        f"CallLogId={form.get('CallLogId', 'MISSING')} | "
+        f"RequestURL={request.url} | "
+        f"Host={request.headers.get('host', 'MISSING')} | "
+        f"XFHost={request.headers.get('x-forwarded-host', 'MISSING')} | "
+        f"XFProto={request.headers.get('x-forwarded-proto', 'MISSING')}"
+    )
+
     await _verify_twilio_signature(request, form)
 
     # iter340 P0 — direction-aware routing guard.
@@ -427,6 +448,12 @@ async def twiml_webhook(request: Request) -> Response:
     base  = f"{proto}://{host}"
 
     coach_stream_url: Optional[str] = None
+    # iter346 P0 — Coach-stream circuit breaker + explicit nonce
+    # failure logging. If ANYTHING fails during nonce lookup or stream
+    # URL construction, we MUST still return TwiML with <Dial> so the
+    # call bridges to the client. A 3-second hangup on production
+    # (reported in iter346) matched exactly the failure mode where the
+    # coach stream setup silently aborted the whole TwiML build.
     coach_nonce: Optional[str] = None
     call_log_id = form.get("CallLogId") or ""
     if call_log_id:
@@ -442,16 +469,44 @@ async def twiml_webhook(request: Request) -> Response:
                 coach_nonce = candidates[0][0]
                 ws_base = base.replace("https://", "wss://").replace("http://", "ws://")
                 coach_stream_url = f"{ws_base}/api/twilio/coach-stream"
+            else:
+                logger.warning(
+                    f"[TWIML] Nonce lookup found no unused nonce for CallLogId={call_log_id} — "
+                    f"proceeding to <Dial> WITHOUT coach stream"
+                )
         except Exception as e:  # noqa: BLE001
-            logger.warning(f"[twiml] coach nonce lookup failed: {e}")
+            logger.warning(
+                f"[TWIML] Coach nonce lookup failed for CallLogId={call_log_id}: {e} — "
+                f"proceeding to <Dial> WITHOUT coach stream"
+            )
+            # Defensive: clear so build_outbound_twiml skips the <Start><Stream>.
+            coach_nonce = None
+            coach_stream_url = None
 
-    twiml = build_outbound_twiml(
-        client_phone_number=to_number,
-        status_callback=f"{base}/api/twilio/call-status-callback",
-        recording_callback=f"{base}/api/twilio/recording-callback",
-        coach_stream_url=coach_stream_url,
-        coach_nonce=coach_nonce,
-    )
+    # iter346 P0 — Build TwiML behind a try/except. If the coach stream
+    # (or anything else) breaks TwiML construction, fall back to a
+    # <Dial>-only TwiML so the call still bridges. NEVER return a
+    # non-<Dial> response for an SDK-outbound leg.
+    try:
+        twiml = build_outbound_twiml(
+            client_phone_number=to_number,
+            status_callback=f"{base}/api/twilio/call-status-callback",
+            recording_callback=f"{base}/api/twilio/recording-callback",
+            coach_stream_url=coach_stream_url,
+            coach_nonce=coach_nonce,
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.error(
+            f"[TWIML] TwiML build failed for To={to_number} CallSid={form.get('CallSid')}: {e!r} — "
+            f"falling back to <Dial>-only TwiML (NO coach stream)"
+        )
+        twiml = build_outbound_twiml(
+            client_phone_number=to_number,
+            status_callback=f"{base}/api/twilio/call-status-callback",
+            recording_callback=f"{base}/api/twilio/recording-callback",
+            coach_stream_url=None,
+            coach_nonce=None,
+        )
     logger.info(f"[twiml] outbound bridge → {to_number} "
                 f"(from={from_field}, callerId={TWILIO_PHONE_NUMBER}, coach={'on' if coach_nonce else 'off'})")
     return Response(content=twiml, media_type="application/xml")

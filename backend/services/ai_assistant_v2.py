@@ -190,7 +190,7 @@ Please answer the user's question using the context provided above. If the conte
             from services.word_match import has_any_word
             if user_id and has_any_word(user_message.lower(), ["bid", "bids", "bidding", "sell", "selling", "create listing", "enchérir", "vendre"]):
                 user_doc = await self.db.users.find_one({"id": user_id})
-                if user_doc and user_doc.get("role") != "admin":
+                if user_doc and user_doc.get("role") not in ("admin", "super_admin"):
                     phone_verified = user_doc.get("phone_verified", False)
                     has_payment = user_doc.get("has_payment_method", False)
                     needs_verification = not (phone_verified and has_payment)

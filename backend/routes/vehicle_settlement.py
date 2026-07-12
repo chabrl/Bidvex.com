@@ -239,7 +239,7 @@ class AdminResolvePayload(BaseModel):
 
 
 async def _require_admin(current_user: User = Depends(get_current_user)):
-    if current_user.role != "admin":
+    if current_user.role not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
 
@@ -492,7 +492,7 @@ async def download_settlement_proof(vehicle_id: str, current_user: User = Depend
     authorized = (
         current_user.id == settlement.get("seller_id")
         or current_user.id == settlement.get("buyer_id")
-        or current_user.role == "admin"
+        or current_user.role in ("admin", "super_admin")
     )
     if not authorized:
         raise HTTPException(status_code=403, detail="Not authorized to view this proof")

@@ -961,7 +961,7 @@ async def create_vehicle_listing(
     # for these trusted accounts. Same trust model the rest of the
     # platform uses (db.listings).
     _trusted = (
-        user.get("role") == "admin"
+        user.get("role") in ("admin", "super_admin")
         or user.get("is_partner") is True
         or (user.get("partner_verification_status") or "").lower() == "verified"
         or user.get("is_vehicle_dealer") is True
@@ -1478,7 +1478,7 @@ async def get_vehicle_carfax(
     if not listing:
         raise HTTPException(status_code=404, detail="Vehicle not found")
 
-    is_admin   = (user.get("role") == "admin") or bool(user.get("is_admin"))
+    is_admin   = (user.get("role") in ("admin", "super_admin")) or bool(user.get("is_admin"))
     is_seller  = (user.get("id") == listing.get("seller_id"))
     is_broker  = bool(
         user.get("is_broker_partner")

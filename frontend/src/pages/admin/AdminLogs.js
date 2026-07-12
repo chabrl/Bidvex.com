@@ -19,6 +19,12 @@ const AdminLogs = ({ searchQuery = '' }) => {
   const [loading, setLoading] = useState(true);
   const [subTab, setSubTab] = useState('actions');
 
+  // iter346 — pagination state for /admin/logs (backend now serves 50/page).
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [pages, setPages] = useState(1);
+  const LIMIT = 50;
+
   // Impersonation history state
   const [impSessions, setImpSessions] = useState([]);
   const [impLoading, setImpLoading] = useState(false);
@@ -26,7 +32,9 @@ const AdminLogs = ({ searchQuery = '' }) => {
   const [expandedSession, setExpandedSession] = useState(null);
 
   useEffect(() => {
-    fetchLogs();
+    // Any filter change resets to page 1.
+    setPage(1);
+    fetchLogs(1, true);
   }, [filter]);
 
   // Filter action logs based on search query from parent
@@ -42,17 +50,37 @@ const AdminLogs = ({ searchQuery = '' }) => {
       })
     : logs;
 
-  const fetchLogs = async () => {
+  const fetchLogs = async (pageArg = 1, reset = false) => {
     try {
-      const endpoint = filter ? `/admin/logs?action_type=${filter}` : '/admin/logs';
-      const response = await axios.get(`${API}${endpoint}`);
+      setLoading(true);
+      const params = new URLSearchParams();
+      if (filter) params.set('action_type', filter);
+      params.set('page', String(pageArg));
+      params.set('limit', String(LIMIT));
+      const response = await axios.get(`${API}/admin/logs?${params.toString()}`);
       const d = response.data;
-      setLogs(Array.isArray(d) ? d : d.logs || []);
+      // Backend envelope { items, total_count, page, pages, logs (alias) }
+      // — support the legacy bare-array shape defensively so an older
+      // backend deployment still renders (never crash the tab).
+      const items = Array.isArray(d)
+        ? d
+        : (d.items || d.logs || []);
+      const total = d.total_count ?? items.length;
+      const totalPages = d.pages ?? 1;
+      setLogs(reset ? items : (prev) => [...prev, ...items]);
+      setTotalCount(total);
+      setPages(totalPages);
     } catch (error) {
       toast.error('Failed to load logs');
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadMoreLogs = async () => {
+    const next = page + 1;
+    setPage(next);
+    await fetchLogs(next, false);
   };
 
   const fetchImpersonationHistory = useCallback(async () => {
@@ -159,7 +187,7 @@ const AdminLogs = ({ searchQuery = '' }) => {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
-                <span>Action History ({filteredLogs.length})</span>
+                <span>Action History ({totalCount})</span>
                 {searchQuery && (
                   <Badge variant="secondary" className="font-normal">
                     Showing results for &quot;{searchQuery}&quot;
@@ -189,6 +217,14 @@ const AdminLogs = ({ searchQuery = '' }) => {
                       <span className="text-xs text-muted-foreground whitespace-nowrap">{log.created_at ? new Date(log.created_at).toLocaleString() : 'N/A'}</span>
                     </div>
                   ))}
+                  {/* iter346 — Load More pagination */}
+                  {page < pages && (
+                    <div className="pt-4 flex justify-center">
+                      <Button variant="outline" onClick={loadMoreLogs} disabled={loading} data-testid="admin-logs-load-more">
+                        {loading ? 'Loading…' : `Load more (${logs.length} / ${totalCount})`}
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <p className="text-center text-muted-foreground py-8">

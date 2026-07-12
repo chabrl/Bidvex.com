@@ -302,7 +302,7 @@ class BidVexAssistant:
             
             phone_verified = user.get("phone_verified", False)
             has_payment = user.get("has_payment_method", False)
-            is_admin = user.get("role") == "admin"
+            is_admin = user.get("role") in ("admin", "super_admin")
             
             return {
                 "user_id": user_id,

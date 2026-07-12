@@ -57,7 +57,9 @@ VALID_STATUSES = {"draft", "scheduled", "sending", "sent", "failed", "paused"}
 
 
 def _require_admin(user: User) -> None:
-    if not (getattr(user, "is_admin", False) or getattr(user, "role", None) == "admin"):
+    # iter346 — canonical admin+super_admin check.
+    role = getattr(user, "role", None)
+    if not (getattr(user, "is_admin", False) or role in ("admin", "super_admin")):
         raise HTTPException(status_code=403, detail="Admin only")
 
 
@@ -225,7 +227,44 @@ async def list_campaigns(
     limit = max(1, min(200, int(limit)))
     cursor = db.external_email_campaigns.find(q, {"_id": 0}) \
         .sort("created_at", -1).skip((page - 1) * limit).limit(limit)
-    items: List[Dict[str, Any]] = await cursor.to_list(length=limit)
+    raw_items: List[Dict[str, Any]] = await cursor.to_list(length=limit)
+
+    # iter346 P0 — Defensive normalization. Older campaign documents
+    # created before newer fields (followup_emails_generated, auto_paused,
+    # bounce_rate, attach_trial_coupon…) were introduced may be missing
+    # them, or may carry legacy shapes that serialize non-JSON types.
+    # Instead of assuming every doc has every field, coerce the response
+    # through a defensive mapping so the endpoint never 500s on schema
+    # drift and the admin list ALWAYS renders.
+    items: List[Dict[str, Any]] = []
+    for doc in raw_items:
+        try:
+            items.append({
+                "id":                doc.get("id"),
+                "name":              doc.get("name") or "(untitled)",
+                "subject_en":        doc.get("subject_en") or "",
+                "subject_fr":        doc.get("subject_fr") or doc.get("subject_en") or "",
+                "status":            doc.get("status") or "draft",
+                "recipient_count":   int(doc.get("recipient_count") or 0),
+                "scheduled_at":      doc.get("scheduled_at"),
+                "sent_at":           doc.get("sent_at"),
+                "created_at":        doc.get("created_at"),
+                "updated_at":        doc.get("updated_at"),
+                "created_by":        doc.get("created_by"),
+                "auto_paused":       bool(doc.get("auto_paused", False)),
+                "followup_emails_generated": bool(doc.get("followup_emails_generated", False)),
+                "attach_trial_coupon":       bool(doc.get("attach_trial_coupon", False)),
+                "analytics":         doc.get("analytics") or _empty_analytics(),
+                "from_email":        doc.get("from_email"),
+                "reply_to_email":    doc.get("reply_to_email"),
+                "utm_campaign":      doc.get("utm_campaign"),
+                "cta_url":           doc.get("cta_url"),
+            })
+        except Exception as _e:  # noqa: BLE001
+            # Never let a single malformed row nuke the whole list.
+            logger.warning(f"[campaigns.list] skipping malformed row id={doc.get('id')}: {_e}")
+            continue
+
     return {
         "campaigns": items,
         "total":     total,

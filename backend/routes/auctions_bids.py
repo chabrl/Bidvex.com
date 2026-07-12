@@ -114,7 +114,7 @@ async def place_bid(request: Request, bid_data: BidCreate, current_user: User = 
     # stamped as legally executed under the broker's license, with
     # full compliance metadata stored alongside the standard bid doc.
     proxy_compliance_stamps = None
-    if current_user.role != "admin":
+    if current_user.role not in ("admin", "super_admin"):
         from services.category_rules import assert_broker_eligible
         bidder_account_type = (current_user.account_type or "individual")
         rel = await db.broker_buyer_relationships.find_one(

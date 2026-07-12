@@ -37,7 +37,8 @@ public_disputes_router = APIRouter(tags=["Disputes (public)"])
 
 
 def _require_admin(user: User) -> None:
-    if getattr(user, "role", None) != "admin" and not getattr(user, "is_admin", False):
+    # iter346 — canonical admin+super_admin check.
+    if getattr(user, "role", None) not in ("admin", "super_admin") and not getattr(user, "is_admin", False):
         raise HTTPException(status_code=403, detail="Admin only")
 
 

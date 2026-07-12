@@ -1757,6 +1757,77 @@ async def create_critical_indexes(database):
     except Exception as e:
         logger.warning(f"[role-normalize] failed: {e}")
 
+    # iter346 P0 — Admin unsubscribe self-heal. If any user with role
+    # admin/super_admin is currently in a suppressed state, revert it +
+    # delete from local suppression collections. This runs on every boot
+    # so a stale unsubscribe click on production is auto-repaired before
+    # the first email of the day gets silently dropped.
+    #
+    # ⚠️ SendGrid-side global suppressions must be removed manually via
+    # the Dashboard (or via the DELETE API we now trigger below best-effort)
+    # because SendGrid is the ultimate silent dropper regardless of DB state.
+    try:
+        admin_emails = [u["email"] async for u in database.users.find(
+            {"role": {"$in": ["admin", "super_admin"]},
+             "$or": [
+                 {"marketing_unsubscribed": True},
+                 {"email_unsubscribed": True},
+             ]},
+            {"_id": 0, "email": 1},
+        )]
+        if not admin_emails:
+            # Also check dedicated suppression collections for admin emails.
+            admin_only = [u["email"] async for u in database.users.find(
+                {"role": {"$in": ["admin", "super_admin"]}}, {"_id": 0, "email": 1},
+            )]
+            admin_emails = admin_only
+
+        if admin_emails:
+            # Flip user-doc flags back.
+            await database.users.update_many(
+                {"email": {"$in": admin_emails}},
+                {"$set": {
+                    "marketing_unsubscribed": False,
+                    "email_unsubscribed": False,
+                    "marketing_resubscribed_at": datetime.now(timezone.utc),
+                    "marketing_resubscribed_source": "iter346_admin_selfheal",
+                }},
+            )
+            # Remove from local suppression collections.
+            r1 = await database.email_suppressions.delete_many({"email": {"$in": admin_emails}})
+            r2 = await database.external_email_suppressions.delete_many({"email": {"$in": admin_emails}})
+            if r1.deleted_count or r2.deleted_count:
+                logger.warning(
+                    f"[iter346-admin-unsuppress] cleared local suppressions for "
+                    f"admin/super_admin: {admin_emails} "
+                    f"(email_suppressions={r1.deleted_count}, "
+                    f"external={r2.deleted_count}) — reminder: also clear "
+                    f"SendGrid Dashboard suppressions"
+                )
+
+            # Best-effort DELETE from SendGrid global suppressions.
+            sg_key = os.environ.get("SENDGRID_API_KEY", "")
+            if sg_key:
+                import httpx as _httpx
+                async with _httpx.AsyncClient(timeout=10) as _http:
+                    for _em in admin_emails:
+                        try:
+                            _r = await _http.delete(
+                                f"https://api.sendgrid.com/v3/asm/suppressions/global/{_em}",
+                                headers={"Authorization": f"Bearer {sg_key}"},
+                            )
+                            if _r.status_code in (204, 200, 404):
+                                logger.info(f"[iter346-admin-unsuppress] SendGrid DELETE {_em} → {_r.status_code}")
+                            else:
+                                logger.warning(
+                                    f"[iter346-admin-unsuppress] SendGrid DELETE {_em} → "
+                                    f"{_r.status_code} {_r.text[:200]}"
+                                )
+                        except Exception as _e:  # noqa: BLE001
+                            logger.warning(f"[iter346-admin-unsuppress] SendGrid API call failed for {_em}: {_e}")
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[iter346-admin-unsuppress] failed: {e}")
+
 
 # ─── Static Frontend & SPA Catch-All (MUST be last) ───
 import os

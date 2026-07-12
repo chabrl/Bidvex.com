@@ -206,7 +206,7 @@ async def resolve_listing_status(db, current_user: User, settings: Dict) -> str:
     - Admins always bypass moderation.
     - Otherwise status = 'active'.
     """
-    if current_user.role == "admin":
+    if current_user.role in ("admin", "super_admin"):
         return "active"
     if not settings.get("require_approval_new_sellers", False):
         return "active"
@@ -238,7 +238,7 @@ async def resolve_multi_item_status(db, current_user: User, listing_data, settin
     """
     status = "active"
     is_trusted = (
-        current_user.role == "admin"
+        current_user.role in ("admin", "super_admin")
         or (
             (await db.listings.count_documents({
                 "seller_id": current_user.id, "status": "completed",
