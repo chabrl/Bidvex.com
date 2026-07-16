@@ -135,7 +135,7 @@ def build_placeholder_bytes(*, title: str, category: str = "") -> bytes:
 
 
 async def generate_and_upload_placeholder(*, listing_id: str, title: str, category: str = "") -> Optional[str]:
-    """Render → upload → return CloudFront URL. Returns None on failure
+    """Render → upload → return the public S3 URL. Returns None on failure
     so callers can fall back to the static `placeholder-ad.jpg`."""
     try:
         data = build_placeholder_bytes(title=title, category=category)
@@ -144,11 +144,15 @@ async def generate_and_upload_placeholder(*, listing_id: str, title: str, catego
         return None
     key = f"placeholders/{listing_id}.jpg"
     try:
-        from services.s3_service import s3_client, S3_BUCKET, get_cloudfront_url
-        if not s3_client or not S3_BUCKET:
+        # iter351 — fix broken imports. Use the s3_service public helpers
+        # (`_get_client`, `S3_BUCKET`, `_key_to_url`) instead of the
+        # non-existent `s3_client`/`get_cloudfront_url` exports.
+        from services.s3_service import _get_client, S3_BUCKET, _key_to_url
+        client = _get_client()
+        if not client or not S3_BUCKET:
             logger.warning("[feed_placeholder] S3 not configured")
             return None
-        s3_client.put_object(
+        client.put_object(
             Bucket=S3_BUCKET,
             Key=key,
             Body=data,
@@ -156,7 +160,7 @@ async def generate_and_upload_placeholder(*, listing_id: str, title: str, catego
             ACL="public-read",
             CacheControl="public, max-age=86400",
         )
-        return get_cloudfront_url(key)
+        return _key_to_url(key)
     except Exception as e:
         logger.warning(f"[feed_placeholder] s3 upload failed for {listing_id}: {e}")
         return None
