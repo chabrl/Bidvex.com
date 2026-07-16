@@ -1,6 +1,22 @@
 # BidVex — Auction Marketplace PRD
 
+## iter349 — Business-Hours-Aware Bilingual IVR (Feb 11, 2026) ✅ COMPLETE — TESTED
+Warranty work — ZERO credit charged. Backend 11/11 iter349 tests + 78/78 combined regression PASS. Testing agent iteration_349.json: 100% backend PASS, zero action items.
+
+- **What changed**: `/api/twilio/ivr/main-menu` now dynamically branches on Montreal (`America/Toronto`) local time using `zoneinfo.ZoneInfo` (DST-safe).
+- **Business hours** (Mon-Fri 08:00-19:00 America/Toronto):
+  - Interactive `<Gather numDigits=4>` with bilingual prompt: EN "Hello, thank you for calling BidVex. If you know your contractor's extension, please dial it now, press 1 for support, or press 0 for general inquiries." + FR "Bonjour, merci d'avoir appelé BidVex. Si vous connaissez le poste de votre entrepreneur, veuillez le composer maintenant, appuyez sur 1 pour le support, ou appuyez sur 0 pour les demandes générales."
+  - `handle-menu` now accepts BOTH `0` (general inquiries) AND `1` (support) → both dial `+15149490038`. 4-digit extension → dial contractor's `personal_phone_number` (iter347 regression preserved). Unknown → replay menu (attempt++); ≥4 attempts → graceful support fallback (call never dropped).
+- **After hours** (weekend OR weekday <08:00 OR ≥19:00):
+  - Bilingual `<Say>` + `<Hangup>` — no keypress offered. EN: "Thank you for calling BidVex. Our office is currently closed. You can reach us Monday to Friday, from 8:00 AM to 7:00 PM, or send us an email at support@bidvex.com. Thank you." + FR equivalent.
+  - Persists `outcome=after_hours_hangup`, `status=ended_after_hours` on `inbound_extension_calls` so ops can audit.
+- **Testability**: `_current_montreal_time()` is a module-level function so unit tests can monkey-patch it and cover both branches deterministically. 7 boundary tests (Mon 08:00 edge, Fri 18:59, Fri 19:00 upper edge, Mon 07:59, Sat noon, Sunday all-day) + 4 integration tests all green.
+- **Metadata**: every row on `inbound_extension_calls` now carries `menu_variant='iter349_time_aware'`, `business_hours: bool`, `montreal_time: ISO`, `montreal_weekday: str` for retro-audit.
+
+**Charbel actions**: no config change needed if the phone number is already pointing to `/api/twilio/ivr/main-menu` (per iter347). The time-based branching is automatic.
+
 ## iter348 — Google Merchant Placeholder Fix: Crawler-Health Gate (Feb 11, 2026) ✅ COMPLETE — TESTED
+
 Follow-up warranty fix — ZERO credit charged. Backend 9/9 iter348 tests + 67/67 combined regression PASS (iter340/345/346/347/348).
 
 - **Root cause of persistent placeholder logos in Google Merchant Center**: Even after iter347 relaxed image validation to admit our S3 URLs into the feed, Google's crawler was STILL rejecting them at fetch time (403 Forbidden / 401 Unauthorized / wrong Content-Type). Our feed was truthfully advertising URLs that failed the anonymous-crawler HEAD → Google fell back to the branded `placeholder-ad.jpg` per Merchant Center policy.

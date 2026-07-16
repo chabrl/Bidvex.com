@@ -218,7 +218,7 @@ class TestSingleStepIVR:
             assert r.status_code == 200
             row = db.inbound_extension_calls.find_one({"call_sid": call_sid})
             assert row is not None
-            assert row.get("menu_variant") == "iter347_single_step"
+            assert row.get("menu_variant") == "iter349_time_aware"
             assert row.get("status") == "in_progress"
         finally:
             db.inbound_extension_calls.delete_many({"call_sid": call_sid})
