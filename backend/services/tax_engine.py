@@ -685,41 +685,73 @@ def calculate_gst_qst(subtotal: float, currency: str = "CAD") -> Dict[str, Any]:
     """
     Simple GST/QST calculator for invoices and templates.
 
-    Returns a flat dict with rounded-to-2-decimal values suitable for
-    SendGrid template variables ({{gst_amount}}, {{qst_amount}}, etc.)
-    and Stripe reconciliation.
-
-    For non-CAD currencies, returns zero tax.
+    LEGACY (iter350): This helper hardcoded QC rates before iter350. It is
+    kept as a thin wrapper around `calculate_taxes_for_recipient()` with
+    province='QC' for back-compat with older SendGrid templates. New code
+    MUST call `calculate_taxes_for_recipient(subtotal, province, currency)`
+    so each subscriber is taxed at THEIR own province (CRA §142.1).
     """
+    return calculate_taxes_for_recipient(subtotal, "QC", currency)
+
+
+def calculate_taxes_for_recipient(
+    subtotal: float,
+    province: str,
+    currency: str = "CAD",
+) -> Dict[str, Any]:
+    """iter350 — CRA Place-of-Supply-compliant tax calculation for a supply
+    to a recipient in `province`. Reads rates from db.tax_rate_config (via
+    the tax_rate_config synchronous cache) so a legislative change requires
+    ZERO code changes — just an admin edit at /api/admin/pricing/tax-rates.
+
+    Returns the same shape as legacy `calculate_gst_qst()` for drop-in
+    compatibility with SendGrid templates ({{gst_amount}}, {{qst_amount}}).
+    """
+    from services.tax_rate_config import get_tax_rate_sync, normalize_province
+    prov_code = normalize_province(province)
+    row = get_tax_rate_sync(prov_code)
+    gst_rate = Decimal(str(row["gst"]))
+    qst_rate = Decimal(str(row["qst"]))
+    hst_rate = Decimal(str(row["hst"]))
+    combined = Decimal(str(row["combined"]))
+    tax_label = str(row["label"])
+
     if currency != "CAD":
         return {
             "subtotal": round(subtotal, 2),
-            "gst_rate": 0.0,
-            "gst_amount": 0.0,
-            "qst_rate": 0.0,
-            "qst_amount": 0.0,
+            "province": prov_code,
+            "gst_rate": 0.0, "gst_amount": 0.0,
+            "qst_rate": 0.0, "qst_amount": 0.0,
+            "hst_rate": 0.0, "hst_amount": 0.0,
             "total_tax": 0.0,
             "total_with_tax": round(subtotal, 2),
             "currency": currency,
+            "tax_label": "N/A (non-CAD)",
             "gst_registration": BIDVEX_GST_NUMBER,
             "qst_registration": BIDVEX_QST_NUMBER,
         }
 
     amt = Decimal(str(subtotal))
-    gst = _round_currency(amt * GST_RATE)
-    qst = _round_currency(amt * QST_RATE)
-    total_tax = gst + qst
+    gst = _round_currency(amt * gst_rate)
+    qst = _round_currency(amt * qst_rate)
+    hst = _round_currency(amt * hst_rate)
+    total_tax = gst + qst + hst
     total_with_tax = _round_currency(amt + total_tax)
 
     return {
         "subtotal": float(_round_currency(amt)),
-        "gst_rate": float(GST_RATE),
+        "province": prov_code,
+        "gst_rate": float(gst_rate),
         "gst_amount": float(gst),
-        "qst_rate": float(QST_RATE),
+        "qst_rate": float(qst_rate),
         "qst_amount": float(qst),
+        "hst_rate": float(hst_rate),
+        "hst_amount": float(hst),
+        "combined_rate": float(combined),
         "total_tax": float(total_tax),
         "total_with_tax": float(total_with_tax),
         "currency": "CAD",
+        "tax_label": tax_label,
         "gst_registration": BIDVEX_GST_NUMBER,
         "qst_registration": BIDVEX_QST_NUMBER,
     }
@@ -771,6 +803,7 @@ __all__ = [
     "GeneralPaymentResult",
     "calculate_tax",
     "calculate_gst_qst",
+    "calculate_taxes_for_recipient",
     "get_tax_rates_for_currency",
     "invoice_tax_lines",
     "calculate_vehicle_payment",

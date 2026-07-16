@@ -1238,7 +1238,50 @@ def init_scheduler(database):
         replace_existing=True,
     )
 
-    logger.info("Scheduler initialized with 21 jobs")
+    # ─── iter350 — Monthly contractor payouts via Stripe Connect Transfer.
+    # Runs 02:00 UTC on the 1st of every month, aggregating each contractor's
+    # commissions from the trailing 30 days and pushing the net via
+    # stripe.Transfer.create to their connected Stripe account.
+    async def contractor_monthly_payouts_job():
+        if db_instance is None:
+            return
+        try:
+            from services.contractor_commission import run_monthly_contractor_payouts
+            result = await run_monthly_contractor_payouts(db_instance)
+            logger.info(f"[iter350 contractor-payouts] {result}")
+            return result
+        except Exception as exc:  # noqa: BLE001
+            logger.error(f"[iter350 contractor-payouts] failed: {exc}")
+
+    scheduler.add_job(
+        _tracked("contractor_monthly_payouts", contractor_monthly_payouts_job),
+        CronTrigger(day=1, hour=2, minute=0),
+        id="contractor_monthly_payouts",
+        name="iter350 — Contractor Monthly Payouts via Stripe Connect (1st of month, 02:00 UTC)",
+        replace_existing=True,
+    )
+
+    # ─── iter350 — Tax rate cache refresh (every 15 min).
+    # Ensures rate updates from /api/admin/pricing/tax-rates propagate to all
+    # gunicorn workers within a quarter-hour without requiring a restart.
+    async def tax_rate_cache_refresh_job():
+        if db_instance is None:
+            return
+        try:
+            from services.tax_rate_config import refresh_cache_from_db
+            await refresh_cache_from_db(db_instance)
+        except Exception as exc:  # noqa: BLE001
+            logger.error(f"[iter350 tax-rate-refresh] failed: {exc}")
+
+    scheduler.add_job(
+        _tracked("tax_rate_cache_refresh", tax_rate_cache_refresh_job),
+        IntervalTrigger(minutes=15),
+        id="tax_rate_cache_refresh",
+        name="iter350 — Tax Rate Cache Refresh (every 15 min)",
+        replace_existing=True,
+    )
+
+    logger.info("Scheduler initialized with 23 jobs")
     return scheduler
 
 

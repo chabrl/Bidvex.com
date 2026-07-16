@@ -26,15 +26,19 @@ async def fees_v2_preview(
     seller_tier: Optional[str] = Query(None, description="standard | premium | vip_elite — only for individual"),
     buyer_tier: str = Query("standard", description="standard | premium | vip_elite — buyer's own tier"),
     seller_user_id: Optional[str] = Query(None, description="when given, the seller's account_type + tier + partner_bp_rate are resolved server-side"),
+    buyer_user_id: Optional[str] = Query(None, description="iter350 — buyer's user id, used to look up their province for CRA Place-of-Supply"),
     partner_bp_rate: Optional[float] = Query(None, ge=0, le=1, description="0..1 (e.g. 0.15 for 15%) — used when seller is partner"),
     payment_method: str = Query("stripe", description="stripe | cash | e_transfer"),
     card_type: str = Query("domestic", description="domestic | international | conversion"),
-    seller_province: Optional[str] = Query(None, description="iter211 Step 2 — partner's registered province (QC|ON|NB|NS|PE|NL|AB|BC|SK|MB|NT|NU|YT). Falls back to seller_user_id lookup or QC."),
+    buyer_province: Optional[str] = Query(None, description="iter350 — CRA Place-of-Supply: buyer's province (falls back to buyer_user_id lookup or INTL)"),
+    seller_province: Optional[str] = Query(None, description="iter350 — CRA Place-of-Supply: seller/partner/facility province (falls back to seller_user_id lookup or INTL)"),
 ):
-    """Live cost-breakdown preview using the iter209 `calculate_fee()` single source of truth.
+    """Live cost-breakdown preview using the iter350 `calculate_fee()` single source of truth.
 
-    When `seller_user_id` is provided, the seller's account_type, tier and saved
-    partner BP rate are read from MongoDB, so callers can stay declarative.
+    iter350 CRA Place-of-Supply routing:
+      - buyer_province determines tax on buyer premium
+      - seller_province determines tax on seller commission / partner 3% / facility 5%
+      - When user IDs are provided, provinces are auto-resolved from the users collection.
     """
     from services.fee_calculator import calculate_fee
 
@@ -51,13 +55,10 @@ async def fees_v2_preview(
             ) or {}
             if doc.get("is_partner") or doc.get("partner_verification_status") == "verified":
                 seller_account_type = "partner"
-                # iter211 Step 2 — pick partner's registered province for tax routing,
-                # but ALWAYS prefer the explicit `seller_province` query param if given.
                 if not seller_province:
                     seller_province = (
                         doc.get("partner_province") or doc.get("business_province") or doc.get("province") or "QC"
                     )
-                # Honor explicit partner_bp_rate query param; else seller's saved default
                 if partner_bp_rate is None and doc.get("custom_premium_rate") is not None:
                     partner_bp_rate = float(doc.get("custom_premium_rate"))
             elif doc.get("is_vehicle_dealer") or (doc.get("account_type") == "vehicle_dealer"):
@@ -68,8 +69,25 @@ async def fees_v2_preview(
                 seller_account_type = "individual"
                 if not seller_tier and doc.get("subscription_tier"):
                     seller_tier = doc.get("subscription_tier")
+            # iter350 — pick up seller's province if not explicitly provided
+            if not seller_province:
+                seller_province = doc.get("business_province") or doc.get("province")
         except Exception as exc:
-            logger.warning(f"[iter209] fees v2 seller lookup failed: {exc}")
+            logger.warning(f"[iter350] fees v2 seller lookup failed: {exc}")
+
+    # iter350 — pick up buyer's province if not explicitly provided
+    if buyer_user_id and not buyer_province:
+        try:
+            db = get_db()
+            buyer_doc = await db.users.find_one(
+                {"id": buyer_user_id},
+                {"_id": 0, "province": 1, "business_province": 1, "subscription_tier": 1},
+            ) or {}
+            buyer_province = buyer_doc.get("business_province") or buyer_doc.get("province")
+            if not buyer_tier and buyer_doc.get("subscription_tier"):
+                buyer_tier = buyer_doc.get("subscription_tier")
+        except Exception as exc:
+            logger.warning(f"[iter350] fees v2 buyer lookup failed: {exc}")
 
     fee = calculate_fee(
         hammer_price=hammer_price,
@@ -81,7 +99,10 @@ async def fees_v2_preview(
         partner_bp_rate=float(partner_bp_rate) if partner_bp_rate is not None else 0.0,
         payment_method=payment_method,
         card_type=card_type,
+        buyer_province=buyer_province,
         seller_province=seller_province,
+        partner_province=seller_province if seller_account_type == "partner" else None,
+        facility_province=seller_province if seller_account_type == "storage_facility" else None,
     )
     return fee
 
@@ -294,25 +315,27 @@ async def estimate_full_transaction(
     region: str = "QC",
     current_user: User = Depends(get_current_user)
 ):
-    """Estimate complete transaction costs for both buyer and seller"""
+    """Estimate complete transaction costs for both buyer and seller (iter350 CRA-compliant)."""
     try:
         from services.fee_calculator import calculate_fee
         db = get_db()
         buyer_tier = "free"
         seller_tier = "free"
-        seller_is_business = False
+        buyer_province = region
+        seller_province = region
 
         if buyer_id:
             buyer = await db.users.find_one({"id": buyer_id})
             if buyer:
                 buyer_tier = buyer.get("subscription_tier", "free")
+                buyer_province = buyer.get("business_province") or buyer.get("province") or region
         if seller_id:
             seller = await db.users.find_one({"id": seller_id})
             if seller:
                 seller_tier = seller.get("subscription_tier", "free")
-                seller_is_business = seller.get("is_tax_registered", False)
+                seller_province = seller.get("business_province") or seller.get("province") or region
 
-        # iter210 Step 7 — Route through `calculate_fee()` single source of truth
+        # iter350 — Route through `calculate_fee()` single source of truth with CRA Place-of-Supply.
         fee = calculate_fee(
             hammer_price=float(hammer_price),
             auction_type="lots",
@@ -322,6 +345,8 @@ async def estimate_full_transaction(
             buyer_tier=buyer_tier,
             payment_method="stripe",
             card_type="domestic",
+            buyer_province=buyer_province,
+            seller_province=seller_province,
         )
         return {"success": True, **fee}
     except Exception as e:

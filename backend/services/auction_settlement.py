@@ -249,8 +249,10 @@ async def settle_cash_or_etransfer(
     buyer_tier = (buyer or {}).get("subscription_tier", "free")
     seller = await db.users.find_one({"id": seller_id})
     seller_tier = (seller or {}).get("subscription_tier", "free")
+    buyer_prov = (buyer or {}).get("province") or (buyer or {}).get("business_province") or "QC"
+    seller_prov = (seller or {}).get("province") or (seller or {}).get("business_province") or "QC"
 
-    # iter210 Step 7 — Single source of truth: calculate_fee()
+    # iter350 — Single source of truth: calculate_fee() with per-user Place-of-Supply
     fee = calculate_fee(
         hammer_price=float(hammer_price),
         auction_type="lots",
@@ -260,18 +262,27 @@ async def settle_cash_or_etransfer(
         buyer_tier=buyer_tier,
         payment_method="stripe",
         card_type="domestic",
+        buyer_province=buyer_prov,
+        seller_province=seller_prov,
     )
-    buyer_commission = float(fee["buyer_premium"]) + float(fee["buyer_taxes"])
-    seller_commission = float(fee["seller_commission"])
+    buyer_commission = float(fee["buyer_premium"]) + float(fee["buyer_taxes"]) + float(fee["buyer_stripe_recovery"])
+    seller_commission = float(fee["seller_commission_total"])
 
     # iter298 BUG 3/4 — expose the fee breakdown for receipts/statements.
     result["fee_breakdown"] = {
+        "fee_model_version": fee.get("fee_model_version", "iter350"),
         "hammer_price": float(hammer_price),
         "buyer_premium": float(fee["buyer_premium"]),
+        "buyer_stripe_recovery": float(fee.get("buyer_stripe_recovery", fee.get("buyer_stripe_fee", 0))),
         "buyer_taxes": float(fee["buyer_taxes"]),
-        "buyer_stripe_fee": float(fee["buyer_stripe_fee"]),
+        "buyer_tax_label": fee.get("buyer_tax_label", ""),
+        "buyer_tax_province": fee.get("buyer_tax_province", buyer_prov),
         "buyer_total_charged": buyer_commission,
-        "seller_commission": seller_commission,
+        "seller_commission": float(fee["seller_commission"]),
+        "seller_stripe_recovery": float(fee.get("seller_stripe_recovery", 0)),
+        "seller_taxes": float(fee.get("seller_taxes", 0)),
+        "seller_tax_label": fee.get("seller_tax_label", ""),
+        "seller_tax_province": fee.get("seller_tax_province", seller_prov),
         "seller_payout": float(fee["seller_payout"]),
     }
 
@@ -533,8 +544,10 @@ async def settle_stripe_full(
     seller = await db.users.find_one({"id": seller_id})
     buyer_tier = (buyer or {}).get("subscription_tier", "free")
     seller_tier = (seller or {}).get("subscription_tier", "free")
+    buyer_prov = (buyer or {}).get("province") or (buyer or {}).get("business_province") or "QC"
+    seller_prov = (seller or {}).get("province") or (seller or {}).get("business_province") or "QC"
 
-    # iter210 Step 7 — Single source of truth: calculate_fee()
+    # iter350 — Single source of truth: calculate_fee() with per-user Place-of-Supply
     fee = calculate_fee(
         hammer_price=float(hammer_price),
         auction_type="lots",
@@ -544,6 +557,8 @@ async def settle_stripe_full(
         buyer_tier=buyer_tier,
         payment_method="stripe",
         card_type="domestic",
+        buyer_province=buyer_prov,
+        seller_province=seller_prov,
     )
     buyer_total = float(fee["buyer_total_charged"])
     seller_payout = float(fee["seller_payout"])
@@ -574,12 +589,19 @@ async def settle_stripe_full(
     # payment-collection layer can stamp `net_payout_amount` and issue
     # itemized receipts without re-running the fee engine.
     result["fee_breakdown"] = {
+        "fee_model_version": fee.get("fee_model_version", "iter350"),
         "hammer_price": float(hammer_price),
         "buyer_premium": float(fee["buyer_premium"]),
+        "buyer_stripe_recovery": float(fee.get("buyer_stripe_recovery", fee.get("buyer_stripe_fee", 0))),
         "buyer_taxes": float(fee["buyer_taxes"]),
-        "buyer_stripe_fee": float(fee["buyer_stripe_fee"]),
+        "buyer_tax_label": fee.get("buyer_tax_label", ""),
+        "buyer_tax_province": fee.get("buyer_tax_province", buyer_prov),
         "buyer_total_charged": buyer_total,
         "seller_commission": float(fee["seller_commission"]),
+        "seller_stripe_recovery": float(fee.get("seller_stripe_recovery", 0)),
+        "seller_taxes": float(fee.get("seller_taxes", 0)),
+        "seller_tax_label": fee.get("seller_tax_label", ""),
+        "seller_tax_province": fee.get("seller_tax_province", seller_prov),
         "seller_payout": seller_payout,
         "promo_first_listing_waiver": promo_meta.get("first_listing_waiver", 0.0),
     }

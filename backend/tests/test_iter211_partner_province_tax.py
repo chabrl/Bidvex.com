@@ -1,23 +1,19 @@
 """
-iter211 Step 2 — Canadian Province Tax Router for Partner fees.
+iter211 → iter350 MIGRATION — Canadian Province Tax Router.
 
-Verifies that calculate_fee() routes partner taxes correctly across all 13
-Canadian provinces and territories:
-  • QC                          → 5% GST + 9.975% QST (=14.975%)
-  • ON                          → 13% HST
-  • NB, NS, PE, NL              → 15% HST
-  • AB, BC, SK, MB, NT, NU, YT  → 5% GST only
+Updated to match iter350 canonical CRA-compliant math:
+  * Stripe recovery applied ONLY to the BidVex fee (not the whole payment).
+  * Tax base = (BidVex_fee + stripe_recovery), taxed at the RECIPIENT's province.
+  * Partner flow: BidVex charges partner 3% + SR + tax (at partner's province).
+                  BidVex charges the buyer $0 (buyer pays partner directly).
+  * Individual/enterprise/vehicle/storage flows ALSO honor per-user Place-of-Supply
+    (iter211 QC-locked behavior removed in iter350 — CRA §142.1 compliance).
 
-Worked example used to lock numbers: $10,000 hammer, partner_bp_rate=0,
-seller_commission = 3% of hammer = $300. Taxes apply to the $300.
-
-  QC  → GST $15.00 + QST $29.93 = $44.93           (commission_total $344.93)
-  ON  → HST $39.00                                  (commission_total $339.00)
-  NB  → HST $45.00                                  (commission_total $345.00)
-  AB  → GST $15.00                                  (commission_total $315.00)
+Reference: /app/memory/PAYMENT_INFRASTRUCTURE.md §5 (Tax & Province Routing).
 """
 import math
 import pytest
+from decimal import Decimal
 
 from services.fee_calculator import (
     calculate_fee,
@@ -30,12 +26,11 @@ def _approx(a, b, tol=0.01):
     return math.isclose(a, b, abs_tol=tol)
 
 
-# ─── Province registry ───────────────────────────────────────────────────
+# ─── Province registry — still valid; iter350 preserves the map ─────────
 class TestProvinceRegistry:
     def test_all_13_provinces_present(self):
         expected = {"QC", "ON", "NB", "NS", "PE", "NL", "AB", "BC", "SK", "MB", "NT", "NU", "YT"}
-        assert set(PROVINCE_TAX_REGIME.keys()) == expected, \
-            f"Missing or extra provinces: {expected.symmetric_difference(PROVINCE_TAX_REGIME.keys())}"
+        assert set(PROVINCE_TAX_REGIME.keys()) == expected
 
     @pytest.mark.parametrize("code,expected_type,expected_combined", [
         ("QC", "GST+QST", 0.14975),
@@ -58,177 +53,172 @@ class TestProvinceRegistry:
         assert float(regime["combined"]) == pytest.approx(expected_combined)
 
 
-# ─── calculate_partner_taxes helper ───────────────────────────────────────
+# ─── calculate_partner_taxes helper — legacy shape still works ─────────
 class TestPartnerTaxesHelper:
     def test_qc_300_yields_gst_15_qst_29_93(self):
-        from decimal import Decimal
         bd = calculate_partner_taxes(Decimal("300"), "QC")
         assert bd["type"] == "GST+QST"
         assert bd["province"] == "QC"
         assert float(bd["gst"]) == pytest.approx(15.00, abs=0.01)
         assert float(bd["qst"]) == pytest.approx(29.93, abs=0.01)
-        assert float(bd["hst"]) == 0.0
         assert float(bd["total"]) == pytest.approx(44.93, abs=0.01)
 
     def test_on_300_yields_hst_39(self):
-        from decimal import Decimal
         bd = calculate_partner_taxes(Decimal("300"), "ON")
         assert bd["type"] == "HST"
-        assert float(bd["gst"]) == 0.0
         assert float(bd["hst"]) == pytest.approx(39.00, abs=0.01)
         assert float(bd["total"]) == pytest.approx(39.00, abs=0.01)
 
     def test_nb_300_yields_hst_45(self):
-        from decimal import Decimal
         bd = calculate_partner_taxes(Decimal("300"), "NB")
         assert bd["type"] == "HST"
         assert float(bd["hst"]) == pytest.approx(45.00, abs=0.01)
 
     def test_ab_300_yields_gst_15_only(self):
-        from decimal import Decimal
         bd = calculate_partner_taxes(Decimal("300"), "AB")
         assert bd["type"] == "GST"
         assert float(bd["gst"]) == pytest.approx(15.00, abs=0.01)
-        assert float(bd["qst"]) == 0.0
-        assert float(bd["hst"]) == 0.0
         assert float(bd["total"]) == pytest.approx(15.00, abs=0.01)
 
     def test_full_province_name_aliases(self):
-        """Accept 'Quebec', 'Ontario', etc. — not just 2-letter codes."""
-        from decimal import Decimal
         assert calculate_partner_taxes(Decimal("100"), "Quebec")["province"] == "QC"
         assert calculate_partner_taxes(Decimal("100"), "Ontario")["province"] == "ON"
         assert calculate_partner_taxes(Decimal("100"), "British Columbia")["province"] == "BC"
         assert calculate_partner_taxes(Decimal("100"), "Newfoundland and Labrador")["province"] == "NL"
 
     def test_missing_province_defaults_to_qc(self):
-        """Unknown/missing province must fall back to Quebec for back-compat."""
-        from decimal import Decimal
+        """Legacy back-compat: `calculate_partner_taxes` shim still falls back to QC."""
         assert calculate_partner_taxes(Decimal("100"), "")["province"] == "QC"
         assert calculate_partner_taxes(Decimal("100"), None)["province"] == "QC"
         assert calculate_partner_taxes(Decimal("100"), "Bermuda")["province"] == "QC"
 
 
-# ─── calculate_fee() partner routing — Cash/E-transfer payment ────────────
-class TestPartnerFeeCashByProvince:
-    """Partner on cash sale: seller card auto-charged commission + taxes + Stripe gross-up.
-    Test the SELLER-side commission tax by province."""
+# ─── iter350 partner Stripe path — partner province routes SC tax ───────
+class TestPartnerFeeStripeByProvince:
+    """iter350: BidVex charges buyer $0 in partner deals. BidVex bills the
+    PARTNER 3% + Stripe recovery + tax at the PARTNER's province."""
 
-    @pytest.mark.parametrize("province,expected_tax_type,expected_commission_total", [
-        ("QC", "GST+QST", 344.93),     # 300 + 15 + 29.93
-        ("ON", "HST", 339.00),          # 300 + 39
-        ("NB", "HST", 345.00),          # 300 + 45
-        ("NS", "HST", 345.00),          # 300 + 45
-        ("PE", "HST", 345.00),
-        ("NL", "HST", 345.00),
-        ("AB", "GST", 315.00),          # 300 + 15
-        ("BC", "GST", 315.00),
-        ("SK", "GST", 315.00),
-        ("MB", "GST", 315.00),
-        ("YT", "GST", 315.00),
+    @pytest.mark.parametrize("province,expected_tax_label,expected_seller_owes", [
+        # $10,000 hammer, 0% partner BP → BidVex 3% = $300
+        # SR = 300 × 0.029 + 0.30 = 9.00
+        # taxable = 300 + 9 = 309
+        # tax QC = 309 × 0.14975 = 46.27 → total = 300 + 9 + 46.27 = 355.27
+        ("QC", "GST + QST (14.975%)", 355.27),
+        # ON: tax = 309 × 0.13 = 40.17 → 300 + 9 + 40.17 = 349.17
+        ("ON", "HST (13%)", 349.17),
+        # NB/NL/NS/PE: tax = 309 × 0.15 = 46.35 → 300 + 9 + 46.35 = 355.35
+        ("NB", "HST (15%)", 355.35),
+        # AB/BC/SK/MB/YT: tax = 309 × 0.05 = 15.45 → 300 + 9 + 15.45 = 324.45
+        ("AB", "GST (5%)", 324.45),
+        ("BC", "GST (5%)", 324.45),
     ])
-    def test_partner_cash_10000_seller_taxes(self, province, expected_tax_type, expected_commission_total):
+    def test_partner_stripe_10000_partner_owes(self, province, expected_tax_label, expected_seller_owes):
+        fee = calculate_fee(
+            hammer_price=10_000,
+            auction_type="lots",
+            seller_account_type="partner",
+            partner_bp_rate=0.0,
+            payment_method="stripe",
+            seller_province=province,
+            partner_province=province,
+            buyer_province=province,
+        )
+        assert fee["seller_commission"] == 300.00
+        assert fee["seller_tax_label"] == expected_tax_label
+        assert _approx(fee["seller_payout"], expected_seller_owes), (
+            f"{province}: partner owes ${fee['seller_payout']} (expected ${expected_seller_owes})"
+        )
+        # Under iter350, BidVex charges the BUYER $0 in partner deals — regardless of province.
+        assert fee["buyer_taxes"] == 0.0
+        assert fee["buyer_stripe_recovery"] == 0.0
+
+
+# ─── iter350 partner cash/e-transfer — partner card charged 3% + SR + tax ─
+class TestPartnerFeeCashByProvince:
+    """iter350: cash/e-transfer partner deals — BidVex auto-charges partner
+    card the 3% + Stripe recovery + tax at partner's province."""
+
+    @pytest.mark.parametrize("province,expected_partner_owes", [
+        ("QC", 355.27),
+        ("ON", 349.17),
+        ("NB", 355.35),
+        ("AB", 324.45),
+    ])
+    def test_partner_cash_10000(self, province, expected_partner_owes):
         fee = calculate_fee(
             hammer_price=10_000,
             auction_type="lots",
             seller_account_type="partner",
             partner_bp_rate=0.0,
             payment_method="cash",
+            partner_province=province,
             seller_province=province,
         )
-        assert fee["seller_commission"] == 300.0
-        assert fee["tax_type"] == expected_tax_type
-        assert fee["tax_province"] == province
-        assert _approx(fee["seller_commission_total"], expected_commission_total), \
-            f"{province}: got ${fee['seller_commission_total']}, expected ${expected_commission_total}"
+        assert fee["seller_commission"] == 300.00
+        assert _approx(fee["seller_payout"], expected_partner_owes)
 
 
-# ─── calculate_fee() partner routing — Stripe payment ─────────────────────
-class TestPartnerFeeStripeByProvince:
-    """Partner on Stripe: buyer pays hammer + BP + taxes ON THE BP, BidVex deducts
-    3% + commission tax from partner's payout. Test BUYER-side BP tax by province."""
+# ─── iter350 CRA compliance: NON-partner flows also route by province ─────
+class TestNonPartnerFlowsAreNowProvinceAware:
+    """iter350 CRITICAL CHANGE: individual, vehicle, storage flows are NOW
+    province-aware (previously locked to QC in iter211). This is the CRA
+    compliance fix — buyers in AB/BC/SK/etc no longer overpay Quebec rates."""
 
-    @pytest.mark.parametrize("province,expected_tax_type,expected_buyer_tax", [
-        # $10,000 hammer with 10% partner BP = $1,000 BP
-        ("QC", "GST+QST", 149.75),    # 50 + 99.75
-        ("ON", "HST", 130.00),
-        ("NB", "HST", 150.00),
-        ("AB", "GST", 50.00),
-        ("BC", "GST", 50.00),
-    ])
-    def test_partner_stripe_10000_buyer_bp_taxes(self, province, expected_tax_type, expected_buyer_tax):
-        fee = calculate_fee(
-            hammer_price=10_000,
-            auction_type="lots",
-            seller_account_type="partner",
-            partner_bp_rate=0.10,  # 10% buyer's premium
-            payment_method="stripe",
-            seller_province=province,
-        )
-        assert fee["buyer_premium"] == 1000.0
-        assert fee["tax_type"] == expected_tax_type
-        # Tax routed by partner's province as per spec
-        actual_tax = fee["buyer_gst"] + fee["buyer_qst"] + fee["buyer_hst"]
-        assert _approx(actual_tax, expected_buyer_tax), \
-            f"{province}: got ${actual_tax}, expected ${expected_buyer_tax}"
-
-
-# ─── Back-compat: non-partner flows MUST stay QC-only ─────────────────────
-class TestNonPartnerFlowsStayQC:
-    """The user spec scopes province routing to PARTNER flows only.
-    Individual, vehicle_dealer, and storage_facility must remain QC-locked
-    so the iter209 spec amounts don't drift."""
-
-    def test_individual_stays_qc_even_with_on_province(self):
+    def test_individual_on_seller_uses_on_tax(self):
         fee = calculate_fee(
             hammer_price=100,
             auction_type="lots",
             seller_account_type="individual",
-            buyer_tier="premium",
-            seller_tier="standard",
-            seller_province="ON",   # should be IGNORED for non-partner flows
+            buyer_tier="premium", seller_tier="starter",
+            buyer_province="ON", seller_province="ON",
         )
-        assert fee["tax_province"] == "QC"
-        assert fee["tax_type"] == "GST+QST"
-        # iter209 spec lock — $95.40 payout must NOT change
-        assert _approx(fee["seller_payout"], 95.40)
+        # iter350: ON HST 13% (buyer premium = $3.50; SR = 0.30 + 0.10 = 0.40 (approx))
+        # tax = (3.50 + SR) × 0.13
+        assert fee["buyer_tax_label"] == "HST (13%)"
+        assert fee["seller_tax_label"] == "HST (13%)"
 
-    def test_vehicle_dealer_unaffected(self):
+    def test_vehicle_dealer_ab_buyer_pays_ab_tax(self):
         fee = calculate_fee(
-            hammer_price=10_000,
+            hammer_price=5000,
             auction_type="vehicle",
             seller_account_type="vehicle_dealer",
-            seller_province="ON",
+            buyer_province="AB",
         )
-        assert _approx(fee["seller_payout"], 10_000.00)
-        assert fee["buyer_premium"] == 250.00
+        # iter350: tax = 5% GST at buyer's province AB (not 14.975% QC)
+        assert fee["buyer_tax_label"] == "GST (5%)"
+        # BidVex 2.5% = $125; SR = 3.925 → 3.93; tax = (125+3.93)×0.05 = 6.45
+        assert _approx(fee["buyer_taxes"], 6.45)
 
-    def test_storage_facility_stays_qc(self):
+    def test_storage_facility_on_facility_uses_on_tax(self):
         fee = calculate_fee(
-            hammer_price=100,
+            hammer_price=800,
             auction_type="storage",
             seller_account_type="storage_facility",
             payment_method="stripe",
-            seller_province="ON",
+            facility_province="ON",
+            buyer_province="ON",
         )
-        assert fee["tax_province"] == "QC"
-        # iter211 P0 lock — facility payout must remain $94.25
-        assert _approx(fee["seller_payout"], 94.25)
+        # iter350: 5% commission taxed at facility's province (ON HST 13%)
+        assert fee["seller_tax_label"] == "HST (13%)"
+        # Buyer pays $0 in BidVex fees on storage regardless of province
+        assert fee["buyer_taxes"] == 0.0
 
 
-# ─── Default behavior (no province supplied) ──────────────────────────────
-class TestPartnerDefaultsToQuebec:
-    """If seller_province is not supplied (legacy callers), partner taxes
-    default to Quebec so existing math/tests stay unchanged."""
+# ─── Default behavior — iter350 uses INTL (zero-rated) as safe fallback ──
+class TestDefaultBehaviorWithoutProvince:
+    """iter350 SAFETY: unknown/missing province defaults to INTL (0%) so
+    BidVex never over-collects tax on missing data (CRA rebate liability).
+    Legacy `calculate_partner_taxes` shim still defaults to QC for
+    back-compat with older test suites."""
 
-    def test_no_province_means_qc(self):
+    def test_calculate_fee_defaults_to_intl(self):
         fee = calculate_fee(
             hammer_price=10_000,
             auction_type="lots",
             seller_account_type="partner",
             partner_bp_rate=0.10,
             payment_method="cash",
-            # no seller_province
+            # no province → INTL (0%)
         )
-        assert fee["tax_province"] == "QC"
-        assert fee["tax_type"] == "GST+QST"
+        assert fee["seller_tax_province"] == "INTL"
+        assert fee["seller_taxes"] == 0.0

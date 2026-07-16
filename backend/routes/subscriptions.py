@@ -45,6 +45,12 @@ def _calculate_stripe_fee(amount):
 
 
 async def _generate_subscription_invoice(db, user, plan_id, amount, subscription_id, fee):
+    """iter350 — subscription invoice with CRA Place-of-Supply tax breakdown.
+    Stamps `fee_model_version="iter350"` and the tax jurisdiction snapshot
+    so historical invoices remain audit-traceable if rates change later."""
+    from services.tax_engine import calculate_taxes_for_recipient
+    u_prov = getattr(user, "province", None) or getattr(user, "business_province", None) or "QC"
+    tax = calculate_taxes_for_recipient(amount or 0.0, u_prov)
     invoice = {
         "id": str(uuid.uuid4()),
         "user_id": user.id,
@@ -54,6 +60,15 @@ async def _generate_subscription_invoice(db, user, plan_id, amount, subscription
         "subscription_id": str(subscription_id) if subscription_id else None,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "status": "paid",
+        # iter350 — audit-traceable tax snapshot per CRA Place-of-Supply
+        "province": tax.get("province", u_prov),
+        "tax_label": tax.get("tax_label", ""),
+        "gst": tax.get("gst_amount", 0.0),
+        "qst": tax.get("qst_amount", 0.0),
+        "hst": tax.get("hst_amount", 0.0),
+        "combined_rate": tax.get("combined_rate", 0.0),
+        "total_with_tax": tax.get("total_with_tax", amount),
+        "fee_model_version": "iter350",
     }
     await db.subscription_invoices.insert_one(invoice)
 
@@ -263,15 +278,21 @@ async def validate_coupon_code(data: Dict[str, Any]):
 
 
 @subscriptions_router.get("/subscriptions/price-breakdown")
-async def get_price_breakdown(plan_id: str):
-    """Get full price breakdown including taxes and processing fee for a plan."""
+async def get_price_breakdown(plan_id: str, province: str = "QC"):
+    """Get full price breakdown including taxes and processing fee for a plan.
+
+    iter350 — `province` param routes tax by CRA Place-of-Supply. Defaults
+    to QC for callers that haven't upgraded yet (legacy behavior).
+    Frontend now passes the logged-in user's province.
+    """
     pricing_service = get_pricing_service(get_db())
     plan = await pricing_service.get_plan(plan_id)
     if not plan:
         raise HTTPException(status_code=404, detail="Plan not found")
 
     subtotal = plan.get("price_yearly", 0)
-    tax = calculate_gst_qst(subtotal)
+    from services.tax_engine import calculate_taxes_for_recipient
+    tax = calculate_taxes_for_recipient(subtotal, province)
     amount_after_tax = tax["total_with_tax"]
     processing_fee = _calculate_stripe_fee(amount_after_tax) if subtotal > 0 else 0
     total = round(amount_after_tax + processing_fee, 2)
@@ -280,11 +301,15 @@ async def get_price_breakdown(plan_id: str):
         "plan_id": plan_id,
         "plan_name": plan.get("name", plan_id.title()),
         "subtotal": subtotal,
+        "province": tax.get("province", province),
+        "tax_label": tax.get("tax_label", ""),
         "gst": tax["gst_amount"],
         "qst": tax["qst_amount"],
+        "hst": tax.get("hst_amount", 0.0),
         "processing_fee": processing_fee,
         "total": total,
-        "currency": "CAD"
+        "currency": "CAD",
+        "fee_model_version": "iter350",
     }
 
 
@@ -374,9 +399,11 @@ async def create_subscription(
                     
                     logger.info(f"Subscription upgraded: {updated_sub.id} for user {current_user.id}, new tier={plan_id}")
 
-                    # Generate invoice for the upgrade
+                    # Generate invoice for the upgrade — iter350 uses subscriber's province
                     price_amount = plan.get("price_yearly", 0)
-                    fee = _calculate_stripe_fee(calculate_gst_qst(price_amount)["total_with_tax"]) if price_amount > 0 else 0
+                    from services.tax_engine import calculate_taxes_for_recipient
+                    _u_prov = (user.province if hasattr(user, "province") else None) or (user.business_province if hasattr(user, "business_province") else None) or "QC"
+                    fee = _calculate_stripe_fee(calculate_taxes_for_recipient(price_amount, _u_prov)["total_with_tax"]) if price_amount > 0 else 0
                     try:
                         await _generate_subscription_invoice(get_db(), user, plan_id, price_amount, updated_sub.id, fee)
                     except Exception as inv_err:
@@ -461,9 +488,11 @@ async def create_subscription(
 
         logger.info(f"Subscription created: {subscription.id} for user {current_user.id}, tier={plan_id}")
 
-        # Generate invoice
+        # Generate invoice — iter350 uses subscriber's province
         price_amount = plan.get("price_yearly", 0)
-        fee = _calculate_stripe_fee(calculate_gst_qst(price_amount)["total_with_tax"]) if price_amount > 0 else 0
+        from services.tax_engine import calculate_taxes_for_recipient
+        _u_prov = (user.province if hasattr(user, "province") else None) or (user.business_province if hasattr(user, "business_province") else None) or "QC"
+        fee = _calculate_stripe_fee(calculate_taxes_for_recipient(price_amount, _u_prov)["total_with_tax"]) if price_amount > 0 else 0
         try:
             await _generate_subscription_invoice(get_db(), user, plan_id, price_amount, subscription.id, fee)
         except Exception as inv_err:

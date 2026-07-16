@@ -266,6 +266,15 @@ async def lifespan(app):
         await ensure_payment_charges_indexes(db)
         await ensure_refund_queue_indexes(db)
         await ensure_email_blast_queue_indexes(db)
+        # iter350 — Bootstrap the CRA-compliant tax_rate_config collection
+        # (idempotent). Rates are then hot-reloadable via
+        # /api/admin/pricing/tax-rates without a redeploy.
+        try:
+            from services.tax_rate_config import seed_bootstrap_rates, refresh_cache_from_db
+            await seed_bootstrap_rates(db)
+            await refresh_cache_from_db(db)
+        except Exception as _te:
+            logger.warning(f"[iter350] tax_rate_config bootstrap failed (non-fatal): {_te}")
         # iter236 Mission 2 — 2dsphere index on listings.location.coordinates
         from routes.geo_search import ensure_2dsphere_index
         await ensure_2dsphere_index()

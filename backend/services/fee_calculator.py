@@ -1,27 +1,38 @@
 """
-BidVex Fee & Cost Calculation Engine — iter209 SINGLE SOURCE OF TRUTH
+BidVex Fee & Cost Calculation Engine — iter350 CANONICAL SOURCE OF TRUTH
 
-The entry point for ALL fee math is `calculate_fee()` at the top of this file.
+Per the /app/memory/PAYMENT_INFRASTRUCTURE.md v2 specification (CRA-compliant).
+
+Three universal rules (enforced by this module):
+
+1. **Stripe recovery is on BidVex fees only.**
+   Formula: `stripe_recovery = (bidvex_fee × 0.029) + $0.30`.
+   Never applied to hammer price, subscription base, or deposit amount.
+
+2. **Taxes follow the recipient of each service (CRA Place-of-Supply rule).**
+   Each BidVex fee is a distinct "supply of a service" under ETA §142.1:
+     - Buyer premium         → taxed at BUYER's province
+     - Seller commission     → taxed at SELLER's province
+     - Partner 3% fee        → taxed at PARTNER's province
+     - Vehicle 2.5% fee      → taxed at BUYER's province (buyer pays it)
+     - Storage 5% commission → taxed at FACILITY's province
+     - Broker's BidVex 2.5%  → taxed at BUYER's province
+     - International recipient → 0% (Sched. VI Part V §7 zero-rated)
+
+3. **Every calculation flows through `calculate_fee()`.**
+   No caller anywhere in the codebase may compute rates inline.
+   Tax rates come from `services.tax_rate_config` (DB-backed, admin editable).
+
 Account-type routing:
-    individual         → buyer-tier BP + seller-tier commission
-    partner            → partner-set BP (buyer) + 3% commission (seller)
-    vehicle_dealer     → 2.5% buyer fee, $0 to seller (annual sub charged separately)
-    storage_facility   → $0 buyer fee, 5% facility commission (buyer pays facility direct)
+    individual/enterprise → buyer-tier BP + seller-tier commission
+    partner               → partner-set BP (buyer) + 3% platform fee (partner pays)
+    vehicle_dealer        → 2.5% buyer fee, $0 to dealer per transaction
+    storage_facility      → $0 buyer fee, 5% facility commission (facility pays)
+    broker                → 2.5% BidVex fee + broker's own fee (both buyer-paid)
 
-Taxes (Quebec / QC) per iter209 spec:
-    GST = 5%  applied to the BidVex platform charge (BP or commission)
-    QST = 9.975% applied to the BidVex platform charge (NOT compounded on GST)
-    Taxes are NEVER applied to the hammer price (handled by seller-of-record).
-
-Stripe gross-up (per spec 2C):
-    domestic       2.9% + $0.30
-    international  3.9% + $0.30
-    conversion     5.9% + $0.30
-    Formula: gross_up = (subtotal + 0.30) / (1 - rate) - subtotal
-    Default to `domestic` when card type is unknown at checkout time.
-
-Legacy `FeeCalculator` class below is preserved for now; older callers will be
-migrated to `calculate_fee()` in iter209 Step 2+.
+Every result carries `fee_model_version="iter350"` for audit reproducibility.
+Legacy `FeeCalculator` class + `PricingManager` class remain below for the
+non-fee helpers still consumed by tax_engine / vehicle_invoice / vehicle_pricing.
 """
 from __future__ import annotations
 
@@ -29,35 +40,68 @@ from dataclasses import dataclass, asdict
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Dict, Optional
 
+from services.tax_rate_config import (
+    get_tax_rate_sync,
+    normalize_province,
+    BOOTSTRAP_RATES,
+)
 
-# ─── iter209 spec constants ────────────────────────────────────────────────
+
+# ═══════════════════════════════════════════════════════════════════════════
+# iter350 — Canonical constants (admin-configurable via Pricing Engine)
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Buyer premium (% of hammer) — Individual & Enterprise sellers, by BUYER tier
 INDIVIDUAL_BUYER_RATES: Dict[str, Decimal] = {
     "standard":  Decimal("0.050"),
     "premium":   Decimal("0.035"),
     "vip_elite": Decimal("0.030"),
 }
+# Seller commission (% of hammer) — Individual & Enterprise, by SELLER tier
 INDIVIDUAL_SELLER_RATES: Dict[str, Decimal] = {
     "standard":  Decimal("0.040"),
     "premium":   Decimal("0.025"),
     "vip_elite": Decimal("0.020"),
 }
-# Legacy → spec tier aliases (back-compat: existing users may still carry "free"/"vip")
+# Legacy tier aliases — kept for back-compat as existing users carry these
 TIER_ALIASES: Dict[str, str] = {
     "free":     "standard",
     "starter":  "standard",
+    "basic":    "standard",
     "vip":      "vip_elite",
+    "partner":  "standard",         # partner accounts default to standard for
+                                    # buyer premium display only (partners pay
+                                    # a flat 3% platform fee, not tier-based)
 }
 
-PARTNER_PLATFORM_RATE   = Decimal("0.030")    # 3% of hammer to BidVex
-VEHICLE_DEALER_BUYER_RATE = Decimal("0.025")  # 2.5% buyer fee
-STORAGE_FACILITY_RATE   = Decimal("0.050")    # 5% facility commission
+PARTNER_PLATFORM_RATE     = Decimal("0.030")   # 3% of hammer → BidVex
+VEHICLE_DEALER_BUYER_RATE = Decimal("0.025")   # 2.5% of hammer → BidVex (buyer pays)
+STORAGE_FACILITY_RATE     = Decimal("0.050")   # 5% of hammer → BidVex (facility pays)
+BROKER_PLATFORM_RATE      = Decimal("0.025")   # 2.5% of hammer → BidVex (buyer pays)
 
+# Stripe processing — Stripe recovery = (fee × 2.9%) + $0.30 on BidVex fee ONLY
+STRIPE_PROCESSING_RATE  = Decimal("0.029")
+STRIPE_FIXED_FEE        = Decimal("0.30")
+
+# Contractor / Affiliate
+CONTRACTOR_RATE_MIN     = Decimal("0.05")
+CONTRACTOR_RATE_MAX     = Decimal("0.20")
+AFFILIATE_DEFAULT_RATE  = Decimal("0.10")
+
+# Vehicle deposit — pre-authorized on Stripe with capture_method="manual"
+VEHICLE_DEPOSIT_CAD     = Decimal("500.00")
+
+# QC-specific for invoice line breakout (GST + QST reported separately per RQ IN-203-V)
 QC_GST_RATE = Decimal("0.05")
 QC_QST_RATE = Decimal("0.09975")
 
-# ─── iter340/341 — Campaign promo codes (registration flag → fee waiver) ──
-# canada-day was retired 2026-07-01 (kept for graceful-expiry messaging on
-# links already shared). SUMMER2026 is the live Summer Grand Opening code.
+# Iter350 model version — stamped on every result for audit reproducibility
+FEE_MODEL_VERSION = "iter350"
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# iter340/341 — Campaign promo codes (kept from legacy — do not touch)
+# ═══════════════════════════════════════════════════════════════════════════
 PROMO_CODES: Dict[str, Dict] = {
     "summer2026": {
         "expiry": "2026-08-31T23:59:59+00:00",
@@ -75,8 +119,6 @@ def get_promo_definition(code: Optional[str]) -> Optional[Dict]:
 
 
 def promo_code_active(code: Optional[str], now) -> bool:
-    """Graceful expiry gate — after expiry, registration with the code still
-    succeeds but the promo flags are not applied."""
     d = get_promo_definition(code)
     if not d:
         return False
@@ -85,34 +127,43 @@ def promo_code_active(code: Optional[str], now) -> bool:
 
 
 def promo_first_listing_waiver_applies(user_doc: Optional[dict]) -> bool:
-    """True iff the account carries the `first_listing_free` promo flag
-    (canada-day registration) and hasn't consumed it. Atomic consumption
-    lives in services.trial_promo.try_consume_first_listing_free."""
     if not user_doc:
         return False
     return bool(user_doc.get("first_listing_free")) and not bool(user_doc.get("first_listing_free_used"))
 
 
 def promo_first_month_waiver_applies(user_doc: Optional[dict]) -> bool:
-    """True iff the account carries `first_month_free` (canada-day) and has
-    never redeemed a subscription trial. Honored via Stripe
-    trial_period_days=30 in the subscription checkout path (iter330 gate)."""
     if not user_doc:
         return False
     return bool(user_doc.get("first_month_free")) and not bool(user_doc.get("trial_redeemed_at"))
 
+
+# ═══════════════════════════════════════════════════════════════════════════
+# iter350 legacy STRIPE_RATES — kept for LEGACY `_stripe_gross_up()` callers
+# only (vehicle_invoice / tax_engine flows). The canonical iter350 formula
+# is `calculate_stripe_recovery()` below and it MUST be used by any new code.
+# ═══════════════════════════════════════════════════════════════════════════
 STRIPE_RATES: Dict[str, Decimal] = {
     "domestic":      Decimal("0.029"),
     "international": Decimal("0.039"),
     "conversion":    Decimal("0.059"),
 }
-STRIPE_FIXED_FEE = Decimal("0.30")
 
 
-# ─── Rounding helper (banker-safe to cents) ────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════
+# Rounding helpers
+# ═══════════════════════════════════════════════════════════════════════════
+_CENT = Decimal("0.01")
+
+
+def _q(x: Decimal) -> Decimal:
+    """Round Decimal → 2dp Decimal (bankers' rounding half-up per CRA)."""
+    return x.quantize(_CENT, rounding=ROUND_HALF_UP)
+
+
 def _r(value: Decimal) -> float:
     """Round Decimal → 2dp → float (consumer-facing presentation)."""
-    return float(value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+    return float(_q(value))
 
 
 def _normalize_tier(tier: Optional[str]) -> str:
@@ -122,153 +173,154 @@ def _normalize_tier(tier: Optional[str]) -> str:
     return TIER_ALIASES.get(t, t)
 
 
+# ═══════════════════════════════════════════════════════════════════════════
+# iter350 CANONICAL FORMULA #1 — Stripe recovery on BidVex fee ONLY
+# ═══════════════════════════════════════════════════════════════════════════
+def calculate_stripe_recovery(fee_amount) -> Decimal:
+    """
+    Compute Stripe processing-cost recovery on a BidVex fee amount.
+
+        stripe_recovery = (fee × 2.9%) + $0.30
+
+    Applied ONLY on BidVex fees. NEVER on hammer price, subscription
+    base, or deposit amount.
+
+    Returns a Decimal quantized to 2dp.
+    """
+    fee = Decimal(str(fee_amount))
+    if fee <= 0:
+        return Decimal("0.00")
+    return _q(fee * STRIPE_PROCESSING_RATE + STRIPE_FIXED_FEE)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# iter350 CANONICAL FORMULA #2 — Tax on (fee + stripe_recovery) using
+# Place-of-Supply routing (DB-backed rates via tax_rate_config)
+# ═══════════════════════════════════════════════════════════════════════════
+def tax_on(amount, province: str) -> Dict[str, Decimal | str]:
+    """Compute Canadian tax on `amount` for a recipient in `province`.
+
+    Returns a dict:
+        {
+          "province": "QC" | ... | "INTL",
+          "gst": Decimal, "qst": Decimal, "hst": Decimal,
+          "combined_rate": Decimal, "total": Decimal, "label": str,
+        }
+
+    Rates come from db.tax_rate_config (bootstrap fallback if DB empty).
+    """
+    amt = Decimal(str(amount))
+    code = normalize_province(province)
+    row = get_tax_rate_sync(code)
+    gst_rate = Decimal(str(row["gst"]))
+    qst_rate = Decimal(str(row["qst"]))
+    hst_rate = Decimal(str(row["hst"]))
+    combined_rate = Decimal(str(row["combined"]))
+    gst = _q(amt * gst_rate)
+    qst = _q(amt * qst_rate)
+    hst = _q(amt * hst_rate)
+    total = _q(amt * combined_rate)
+    return {
+        "province": code,
+        "gst": gst,
+        "qst": qst,
+        "hst": hst,
+        "combined_rate": combined_rate,
+        "total": total,
+        "label": str(row["label"]),
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# iter350 CANONICAL FORMULA #3 — Contractor commission (% of BidVex fee)
+# ═══════════════════════════════════════════════════════════════════════════
+def calculate_contractor_commission(bidvex_fee_collected, contractor_rate) -> Decimal:
+    """Contractor commission = BidVex fee × contractor's rate.
+    Rate MUST be clamped to [CONTRACTOR_RATE_MIN, CONTRACTOR_RATE_MAX] by
+    the caller before invoking this — this function performs no clamp.
+    """
+    fee = Decimal(str(bidvex_fee_collected))
+    rate = Decimal(str(contractor_rate))
+    return _q(fee * rate)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# iter350 legacy Stripe gross-up — kept ONLY for legacy vehicle_invoice /
+# tax_engine flows that haven't migrated yet. NEW CODE MUST NOT USE THIS.
+# ═══════════════════════════════════════════════════════════════════════════
 def _stripe_gross_up(subtotal: Decimal, card_type: str) -> Decimal:
-    """`(subtotal + 0.30) / (1 - rate) - subtotal` — exact spec formula."""
+    """LEGACY exact gross-up: (subtotal + 0.30) / (1 - rate) - subtotal.
+    Under iter350 spec, use `calculate_stripe_recovery(fee)` instead."""
     rate = STRIPE_RATES.get((card_type or "domestic").lower(), STRIPE_RATES["domestic"])
     if subtotal <= 0:
         return Decimal("0")
     return ((subtotal + STRIPE_FIXED_FEE) / (Decimal("1") - rate)) - subtotal
 
 
-# ─── FeeResult dataclass ───────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════
+# FeeResult dataclass — shape of every `calculate_fee()` return
+# ═══════════════════════════════════════════════════════════════════════════
 @dataclass
 class FeeResult:
     auction_type: str
+    seller_type: str
     hammer_price: float
 
-    # Buyer side
+    # ── Buyer side (buyer premium + buyer's Stripe recovery + buyer tax) ──
     buyer_premium: float
     buyer_premium_rate: float
+    buyer_stripe_recovery: float
     buyer_gst: float
     buyer_qst: float
+    buyer_hst: float
     buyer_taxes: float
-    buyer_subtotal: float
-    buyer_stripe_fee: float
-    buyer_total_charged: float
+    buyer_tax_label: str
+    buyer_tax_province: str
+    buyer_subtotal: float          # hammer + BP + tax + Stripe recovery
+    buyer_total_charged: float     # what BidVex charges the buyer's card
     buyer_stripe_cents: int
 
-    # Seller side
+    # ── Seller side (seller commission + seller's Stripe rec + seller tax) ──
     seller_commission: float
     seller_commission_rate: float
+    seller_stripe_recovery: float
     seller_gst: float
     seller_qst: float
-    seller_commission_total: float
-    seller_stripe_fee: float
-    seller_payout: float
+    seller_hst: float
+    seller_taxes: float
+    seller_tax_label: str
+    seller_tax_province: str
+    seller_payout: float           # hammer − commission − recovery − tax
 
-    # Platform
-    bidvex_revenue: float
+    # ── Platform metrics ──
+    bidvex_revenue: float          # buyer_premium + seller_commission (pre-tax)
 
-    # Routing flags
+    # ── Routing flags ──
     charge_buyer_via_stripe: bool
     charge_seller_via_stripe: bool
     charge_seller_card_separately: bool
 
-    # Meta
+    # ── Meta ──
+    fee_model_version: str = FEE_MODEL_VERSION
     notes: str = ""
 
-    # iter211 Step 2 — Tax breakdown (province-aware for partner; QC-locked elsewhere)
+    # ── Legacy fields kept for back-compat with existing consumers ──
     tax_province: str = ""
-    tax_type: str = ""             # "GST+QST" | "HST" | "GST"
-    tax_rate: float = 0.0          # combined rate for display (e.g. 0.13 for HST-ON)
-    buyer_hst: float = 0.0
-    seller_hst: float = 0.0
+    tax_type: str = ""
+    tax_rate: float = 0.0
+    # legacy stripe-fee gross-up field name (kept so downstream consumers
+    # don't break — populated with buyer_stripe_recovery)
+    buyer_stripe_fee: float = 0.0
+    seller_stripe_fee: float = 0.0
+    seller_commission_total: float = 0.0
 
     def to_dict(self) -> dict:
         return asdict(self)
 
 
-# ─── iter211 Step 2 — Canadian Province Tax Router (partner flows) ─────────
-#
-# Maps each Canadian jurisdiction → its tax regime when BidVex bills/charges
-# a partner. Currently invoked only by the partner branch of calculate_fee().
-# Sources:
-#   • CRA — HST rates by province (ON 13%, NB/NS/PE/NL 15%)
-#   • Revenu Québec — QST 9.975% + federal GST 5%
-#   • Other provinces — GST 5% only (PST is the partner's local obligation)
-#
-# Why partner-only? The other seller flows (individual/storage/vehicle_dealer)
-# have their amounts locked by the iter209 spec and are tested bit-by-bit.
-# Re-routing them on province would break those locked tests. The user's
-# Step 2 request scopes this to "Partner fees" specifically.
-_PROVINCE_TAX_REGIME = {
-    # GST + QST
-    "QC": {"type": "GST+QST", "gst": Decimal("0.05"), "qst": Decimal("0.09975"), "hst": Decimal("0"), "combined": Decimal("0.14975")},
-    # HST 13%
-    "ON": {"type": "HST", "gst": Decimal("0"), "qst": Decimal("0"), "hst": Decimal("0.13"), "combined": Decimal("0.13")},
-    # HST 15%
-    "NB": {"type": "HST", "gst": Decimal("0"), "qst": Decimal("0"), "hst": Decimal("0.15"), "combined": Decimal("0.15")},
-    "NS": {"type": "HST", "gst": Decimal("0"), "qst": Decimal("0"), "hst": Decimal("0.15"), "combined": Decimal("0.15")},
-    "PE": {"type": "HST", "gst": Decimal("0"), "qst": Decimal("0"), "hst": Decimal("0.15"), "combined": Decimal("0.15")},
-    "NL": {"type": "HST", "gst": Decimal("0"), "qst": Decimal("0"), "hst": Decimal("0.15"), "combined": Decimal("0.15")},
-    # GST only (PST handled by partner locally if applicable)
-    "AB": {"type": "GST", "gst": Decimal("0.05"), "qst": Decimal("0"), "hst": Decimal("0"), "combined": Decimal("0.05")},
-    "BC": {"type": "GST", "gst": Decimal("0.05"), "qst": Decimal("0"), "hst": Decimal("0"), "combined": Decimal("0.05")},
-    "SK": {"type": "GST", "gst": Decimal("0.05"), "qst": Decimal("0"), "hst": Decimal("0"), "combined": Decimal("0.05")},
-    "MB": {"type": "GST", "gst": Decimal("0.05"), "qst": Decimal("0"), "hst": Decimal("0"), "combined": Decimal("0.05")},
-    "NT": {"type": "GST", "gst": Decimal("0.05"), "qst": Decimal("0"), "hst": Decimal("0"), "combined": Decimal("0.05")},
-    "NU": {"type": "GST", "gst": Decimal("0.05"), "qst": Decimal("0"), "hst": Decimal("0"), "combined": Decimal("0.05")},
-    "YT": {"type": "GST", "gst": Decimal("0.05"), "qst": Decimal("0"), "hst": Decimal("0"), "combined": Decimal("0.05")},
-}
-PROVINCE_TAX_REGIME = _PROVINCE_TAX_REGIME  # re-exported for callers/tests
-
-
-def _resolve_province(prov: Optional[str], fallback: str = "QC") -> str:
-    """Normalise an input string to a 2-letter Canadian province code.
-    Accepts: 'QC', 'Quebec', 'Québec', 'Ontario' / 'ON', etc.
-    Falls back to `fallback` (default Quebec) for unknown inputs."""
-    if not prov:
-        return fallback
-    p = prov.strip().upper().replace("É", "E")
-    # Already a 2-letter code?
-    if p in _PROVINCE_TAX_REGIME:
-        return p
-    aliases = {
-        "QUEBEC": "QC", "QU EBEC": "QC", "QC.": "QC",
-        "ONTARIO": "ON", "ON.": "ON",
-        "ALBERTA": "AB", "BRITISH COLUMBIA": "BC", "BC.": "BC",
-        "SASKATCHEWAN": "SK", "MANITOBA": "MB",
-        "NEW BRUNSWICK": "NB", "NOVA SCOTIA": "NS",
-        "PRINCE EDWARD ISLAND": "PE", "NEWFOUNDLAND": "NL",
-        "NEWFOUNDLAND AND LABRADOR": "NL",
-        "YUKON": "YT", "NORTHWEST TERRITORIES": "NT", "NUNAVUT": "NU",
-    }
-    return aliases.get(p, fallback)
-
-
-def calculate_partner_taxes(amount: Decimal, province: str) -> Dict[str, Decimal]:
-    """Province-aware tax on a base (CAD) amount for the PARTNER flow.
-
-    Returns:
-      {
-        "province": "QC"|"ON"|...,
-        "type": "GST+QST"|"HST"|"GST",
-        "gst": Decimal,
-        "qst": Decimal,
-        "hst": Decimal,
-        "combined_rate": Decimal,
-        "total": Decimal,
-      }
-    """
-    code = _resolve_province(province)
-    regime = _PROVINCE_TAX_REGIME[code]
-    _D_CENT = Decimal("0.01")
-
-    def q(x: Decimal) -> Decimal:
-        return x.quantize(_D_CENT, rounding=ROUND_HALF_UP)
-
-    return {
-        "province": code,
-        "type": regime["type"],
-        "gst": q(amount * regime["gst"]),
-        "qst": q(amount * regime["qst"]),
-        "hst": q(amount * regime["hst"]),
-        "combined_rate": regime["combined"],
-        "total": q(amount * regime["combined"]),
-    }
-
-
-# ─── PUBLIC API: calculate_fee ─────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════
+# iter350 PUBLIC API — calculate_fee()
+# ═══════════════════════════════════════════════════════════════════════════
 def calculate_fee(
     hammer_price: float,
     auction_type: str,
@@ -279,228 +331,424 @@ def calculate_fee(
     partner_bp_rate: float = 0.0,
     payment_method: str = "stripe",
     card_type: str = "domestic",
+    # ── iter350 new params for CRA Place-of-Supply ──
+    buyer_province: Optional[str] = None,
     seller_province: Optional[str] = None,
+    partner_province: Optional[str] = None,
+    facility_province: Optional[str] = None,
 ) -> dict:
-    """Compute the full fee breakdown for a single auction transaction.
+    """iter350 canonical fee calculation — dispatcher by seller_account_type.
 
-    See module docstring for routing logic. Returns a plain dict (FeeResult.to_dict()).
+    All province params default to the caller's or 'INTL' (zero-rated) if
+    absent — never to the highest rate (avoids CRA over-collection risk).
 
-    iter211 Step 2: `seller_province` (a 2-letter Canadian code or full name)
-    is used to route PARTNER taxes correctly. Falls back to "QC" for back-compat.
-    Other flows (individual / storage / vehicle_dealer) remain QC-only.
+    Returns a dict (FeeResult.to_dict()) with `fee_model_version="iter350"`.
     """
     hammer = Decimal(str(hammer_price))
     if hammer < 0:
         raise ValueError("hammer_price must be >= 0")
 
     seller_type = (seller_account_type or "").strip().lower()
-    buyer_tier_norm = _normalize_tier(buyer_tier)
-    seller_tier_norm = _normalize_tier(seller_tier)
+    buyer_tier_n = _normalize_tier(buyer_tier)
+    seller_tier_n = _normalize_tier(seller_tier)
     payment = (payment_method or "stripe").strip().lower()
 
-    # Defaults — every code path overwrites what it needs
-    buyer_premium = Decimal("0")
-    buyer_premium_rate = Decimal("0")
-    seller_commission = Decimal("0")
-    seller_commission_rate = Decimal("0")
-    charge_buyer_via_stripe = False
-    charge_seller_via_stripe = False
-    charge_seller_card_separately = False
-    notes = ""
+    # ── Province routing per CRA Place-of-Supply ──
+    b_prov = normalize_province(buyer_province)
+    s_prov = normalize_province(seller_province)
+    p_prov = normalize_province(partner_province or seller_province)
+    f_prov = normalize_province(facility_province or seller_province)
 
-    # ── Route 1: PARTNER seller ──────────────────────────────────────────
+    if seller_type in ("individual", "enterprise"):
+        return _iter350_individual(
+            hammer, buyer_tier_n, seller_tier_n, b_prov, s_prov,
+            payment, auction_type, seller_type
+        )
     if seller_type == "partner":
-        rate = Decimal(str(partner_bp_rate or 0))
-        if rate < 0:
-            raise ValueError("partner_bp_rate must be >= 0")
-        buyer_premium_rate = rate
-        buyer_premium = (hammer * rate)
-        seller_commission_rate = PARTNER_PLATFORM_RATE
-        seller_commission = hammer * PARTNER_PLATFORM_RATE
+        return _iter350_partner(
+            hammer, Decimal(str(partner_bp_rate or 0)), p_prov, b_prov,
+            payment, auction_type
+        )
+    if seller_type == "vehicle_dealer":
+        return _iter350_vehicle(hammer, b_prov, auction_type)
+    if seller_type == "storage_facility":
+        return _iter350_storage(hammer, f_prov, b_prov, payment, auction_type)
 
-        if payment in ("cash", "e_transfer", "etransfer"):
-            charge_buyer_via_stripe = False
-            charge_seller_card_separately = True
-            notes = "Partner cash/e-transfer: buyer pays partner directly; BidVex auto-charges 3% to partner card on file."
-        else:
-            charge_buyer_via_stripe = True
-            charge_seller_via_stripe = False  # deducted from buyer payment in escrow split
-            notes = "Partner Stripe: buyer charged hammer + partner BP + taxes; 3% deducted from partner payout."
+    raise ValueError(f"Unsupported seller_account_type: {seller_account_type!r}")
 
-    # ── Route 2: VEHICLE DEALER seller ───────────────────────────────────
-    elif seller_type == "vehicle_dealer":
-        buyer_premium_rate = VEHICLE_DEALER_BUYER_RATE
-        buyer_premium = hammer * VEHICLE_DEALER_BUYER_RATE
-        seller_commission = Decimal("0")
-        seller_commission_rate = Decimal("0")
-        charge_buyer_via_stripe = True
-        charge_seller_card_separately = False
-        notes = "Vehicle dealer: 2.5% buyer fee. Dealer pays $0 per transaction (annual $100 platform fee billed separately)."
 
-    # ── Route 3: STORAGE FACILITY seller ─────────────────────────────────
-    # iter211 P0 fix: payment_method routes WHO pays the BidVex fee.
-    #   cash / e_transfer → buyer pays hammer to facility direct; BidVex
-    #     auto-charges facility card 5% + GST/QST + Stripe gross-up.
-    #   stripe           → buyer pays HAMMER ONLY via Stripe (no buyer BP,
-    #     no buyer tax); BidVex deducts 5% + GST/QST from facility payout.
-    # In BOTH scenarios the BUYER NEVER pays a BidVex fee.
-    elif seller_type == "storage_facility":
-        buyer_premium = Decimal("0")
-        buyer_premium_rate = Decimal("0")
-        seller_commission_rate = STORAGE_FACILITY_RATE
-        seller_commission = hammer * STORAGE_FACILITY_RATE
-        if payment in ("cash", "e_transfer", "etransfer"):
-            charge_buyer_via_stripe = False  # buyer pays facility directly
-            charge_seller_card_separately = True
-            notes = "Storage cash/e-transfer: buyer pays facility direct. BidVex auto-charges 5% + GST/QST + Stripe gross-up to facility card."
-        else:
-            # Stripe payment → buyer pays hammer only via Stripe; facility receives
-            # hammer minus (5% + GST + QST) from BidVex.
-            charge_buyer_via_stripe = True
-            charge_seller_card_separately = False
-            notes = "Storage Stripe: buyer pays hammer via Stripe (no BP, no buyer fees). 5% commission + GST/QST deducted from facility payout."
+# ─── iter350 route: individual / enterprise seller ──────────────────────
+def _iter350_individual(
+    hammer: Decimal,
+    buyer_tier: str,
+    seller_tier: str,
+    buyer_prov: str,
+    seller_prov: str,
+    payment: str,
+    auction_type: str,
+    seller_type: str,
+) -> dict:
+    """Buyer premium taxed at BUYER's province.
+    Seller commission taxed at SELLER's province.
+    Two separate Stripe recovery calcs (one per fee)."""
+    bp_rate = INDIVIDUAL_BUYER_RATES.get(buyer_tier, INDIVIDUAL_BUYER_RATES["standard"])
+    sc_rate = INDIVIDUAL_SELLER_RATES.get(seller_tier, INDIVIDUAL_SELLER_RATES["standard"])
 
-    # ── Route 4: INDIVIDUAL seller ───────────────────────────────────────
-    elif seller_type == "individual":
-        buyer_premium_rate = INDIVIDUAL_BUYER_RATES.get(buyer_tier_norm, INDIVIDUAL_BUYER_RATES["standard"])
-        buyer_premium = hammer * buyer_premium_rate
-        seller_commission_rate = INDIVIDUAL_SELLER_RATES.get(seller_tier_norm, INDIVIDUAL_SELLER_RATES["standard"])
-        seller_commission = hammer * seller_commission_rate
-        charge_buyer_via_stripe = True
-        charge_seller_card_separately = False  # commission deducted from payout
-        notes = f"Individual: buyer={buyer_tier_norm} ({float(buyer_premium_rate)*100:.1f}% BP), seller={seller_tier_norm} ({float(seller_commission_rate)*100:.1f}% comm)."
+    # ── Buyer side (taxed at buyer's province) ──
+    buyer_premium = _q(hammer * bp_rate)
+    buyer_sr      = calculate_stripe_recovery(buyer_premium)
+    buyer_tax_bd  = tax_on(buyer_premium + buyer_sr, buyer_prov)
+    buyer_total   = _q(hammer + buyer_premium + buyer_sr + buyer_tax_bd["total"])
 
-    else:
-        raise ValueError(f"Unsupported seller_account_type: {seller_account_type!r}")
+    # ── Seller side (taxed at seller's province) ──
+    seller_commission = _q(hammer * sc_rate)
+    seller_sr         = calculate_stripe_recovery(seller_commission)
+    seller_tax_bd     = tax_on(seller_commission + seller_sr, seller_prov)
+    seller_payout     = _q(hammer - seller_commission - seller_sr - seller_tax_bd["total"])
 
-    # ── Taxes — GST + QST on platform-side amounts only (per spec) ──────
-    # iter209: round each tax to the cent BEFORE summing so the buyer's
-    # displayed invoice lines (BP / GST / QST) always sum to the subtotal.
-    # Spec worked example: $3.50 BP → GST $0.18 + QST $0.35 = $0.53 → total $104.03.
-    _D_CENT = Decimal("0.01")
-
-    def _q(x: Decimal) -> Decimal:
-        return x.quantize(_D_CENT, rounding=ROUND_HALF_UP)
-
-    buyer_premium = _q(buyer_premium)
-
-    # iter211 Step 2 — partner flows route taxes by partner's province.
-    # Other seller types stay QC-locked (iter209 spec).
-    partner_prov = _resolve_province(seller_province) if seller_type == "partner" else "QC"
-    is_partner = (seller_type == "partner")
-    if is_partner:
-        buyer_tax_bd = calculate_partner_taxes(buyer_premium, partner_prov)
-        buyer_gst = buyer_tax_bd["gst"]
-        buyer_qst = buyer_tax_bd["qst"]
-        buyer_hst = buyer_tax_bd["hst"]
-        buyer_taxes = buyer_tax_bd["total"]
-        tax_type_label = buyer_tax_bd["type"]
-        tax_rate_combined = buyer_tax_bd["combined_rate"]
-    else:
-        buyer_gst = _q(buyer_premium * QC_GST_RATE)
-        buyer_qst = _q(buyer_premium * QC_QST_RATE)
-        buyer_hst = Decimal("0")
-        buyer_taxes = buyer_gst + buyer_qst
-        tax_type_label = "GST+QST"
-        tax_rate_combined = QC_GST_RATE + QC_QST_RATE
-
-    # iter211 P0 fix: storage_facility on Stripe payment → buyer pays hammer
-    # ONLY (no BP, no buyer tax, no buyer Stripe gross-up). All BidVex revenue
-    # flows from the seller-side commission deduction.
-    is_storage_stripe = (seller_type == "storage_facility" and charge_buyer_via_stripe)
-    if is_storage_stripe:
-        buyer_subtotal = hammer  # exactly hammer
-    else:
-        buyer_subtotal = (hammer + buyer_premium + buyer_taxes) if charge_buyer_via_stripe else Decimal("0")
-
-    seller_commission = _q(seller_commission)
-    # iter211 Step 2 — partner seller commission tax also uses partner's province
-    if is_partner:
-        seller_tax_bd = calculate_partner_taxes(seller_commission, partner_prov)
-        seller_gst = seller_tax_bd["gst"]
-        seller_qst = seller_tax_bd["qst"]
-        seller_hst = seller_tax_bd["hst"]
-    else:
-        seller_gst = _q(seller_commission * QC_GST_RATE)
-        seller_qst = _q(seller_commission * QC_QST_RATE)
-        seller_hst = Decimal("0")
-    seller_commission_total = seller_commission + seller_gst + seller_qst + seller_hst
-
-    # ── Stripe gross-up routing ──────────────────────────────────────────
-    # iter211 P0 fix: storage-Stripe → buyer pays exactly hammer, NO gross-up.
-    if is_storage_stripe:
-        buyer_stripe_fee = Decimal("0")
-    else:
-        buyer_stripe_fee = _stripe_gross_up(buyer_subtotal, card_type) if charge_buyer_via_stripe else Decimal("0")
-    buyer_total_charged = buyer_subtotal + buyer_stripe_fee
-    buyer_stripe_cents = int((buyer_total_charged * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
-
-    seller_stripe_fee = _stripe_gross_up(seller_commission_total, card_type) if charge_seller_card_separately else Decimal("0")
-
-    # ── Seller payout (only meaningful when charge_buyer_via_stripe) ────
-    if seller_type == "partner" and charge_buyer_via_stripe:
-        # Buyer pays hammer + partner BP via Stripe → escrow → partner gets hammer + BP - 3% - taxes
-        seller_payout = (hammer + buyer_premium) - seller_commission_total
-    elif seller_type == "individual" and charge_buyer_via_stripe:
-        seller_payout = hammer - seller_commission_total
-    elif seller_type == "vehicle_dealer":
-        seller_payout = hammer  # dealer always gets full hammer
-    elif seller_type == "storage_facility":
-        # iter211 P0 fix: payment_method determines payout shape.
-        #   cash/e-transfer → buyer paid facility direct, BidVex collects from
-        #     facility card → no BidVex-side payout owed.
-        #   stripe → buyer paid hammer via BidVex Stripe → facility net is
-        #     hammer minus (5% + GST + QST on commission).
-        if is_storage_stripe:
-            seller_payout = hammer - seller_commission_total
-        else:
-            seller_payout = Decimal("0")  # buyer pays facility directly outside Stripe
-    elif seller_type == "partner" and charge_seller_card_separately:
-        seller_payout = Decimal("0")  # buyer paid partner directly, BidVex only charges commission
-    else:
-        seller_payout = hammer
-
-    # ── BidVex revenue (net, pre-tax) ───────────────────────────────────
-    bidvex_revenue = buyer_premium + seller_commission
+    # Routing flags
+    charge_buyer_via_stripe = payment == "stripe"
+    charge_seller_card_separately = payment in ("cash", "e_transfer", "etransfer")
 
     result = FeeResult(
         auction_type=auction_type,
+        seller_type=seller_type,
         hammer_price=_r(hammer),
         buyer_premium=_r(buyer_premium),
-        buyer_premium_rate=float(buyer_premium_rate),
-        buyer_gst=_r(buyer_gst),
-        buyer_qst=_r(buyer_qst),
-        buyer_taxes=_r(buyer_taxes),
-        buyer_subtotal=_r(buyer_subtotal),
-        buyer_stripe_fee=_r(buyer_stripe_fee),
-        buyer_total_charged=_r(buyer_total_charged),
-        buyer_stripe_cents=buyer_stripe_cents,
+        buyer_premium_rate=float(bp_rate),
+        buyer_stripe_recovery=_r(buyer_sr),
+        buyer_gst=_r(buyer_tax_bd["gst"]),
+        buyer_qst=_r(buyer_tax_bd["qst"]),
+        buyer_hst=_r(buyer_tax_bd["hst"]),
+        buyer_taxes=_r(buyer_tax_bd["total"]),
+        buyer_tax_label=str(buyer_tax_bd["label"]),
+        buyer_tax_province=str(buyer_tax_bd["province"]),
+        buyer_subtotal=_r(buyer_total if charge_buyer_via_stripe else buyer_premium + buyer_sr + buyer_tax_bd["total"]),
+        buyer_total_charged=_r(buyer_total if charge_buyer_via_stripe else buyer_premium + buyer_sr + buyer_tax_bd["total"]),
+        buyer_stripe_cents=int(((buyer_total if charge_buyer_via_stripe else buyer_premium + buyer_sr + buyer_tax_bd["total"]) * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP)),
         seller_commission=_r(seller_commission),
-        seller_commission_rate=float(seller_commission_rate),
-        seller_gst=_r(seller_gst),
-        seller_qst=_r(seller_qst),
-        seller_commission_total=_r(seller_commission_total),
-        seller_stripe_fee=_r(seller_stripe_fee),
+        seller_commission_rate=float(sc_rate),
+        seller_stripe_recovery=_r(seller_sr),
+        seller_gst=_r(seller_tax_bd["gst"]),
+        seller_qst=_r(seller_tax_bd["qst"]),
+        seller_hst=_r(seller_tax_bd["hst"]),
+        seller_taxes=_r(seller_tax_bd["total"]),
+        seller_tax_label=str(seller_tax_bd["label"]),
+        seller_tax_province=str(seller_tax_bd["province"]),
         seller_payout=_r(seller_payout),
-        bidvex_revenue=_r(bidvex_revenue),
+        bidvex_revenue=_r(buyer_premium + seller_commission),
         charge_buyer_via_stripe=charge_buyer_via_stripe,
-        charge_seller_via_stripe=charge_seller_via_stripe,
+        charge_seller_via_stripe=False,
         charge_seller_card_separately=charge_seller_card_separately,
-        notes=notes,
-        # iter211 Step 2 — Canadian Province Tax Router surface
-        tax_province=partner_prov if is_partner else "QC",
-        tax_type=tax_type_label,
-        tax_rate=float(tax_rate_combined),
-        buyer_hst=_r(buyer_hst) if is_partner else 0.0,
-        seller_hst=_r(seller_hst) if is_partner else 0.0,
+        notes=(
+            f"{seller_type.capitalize()} — buyer_tier={buyer_tier} ({float(bp_rate)*100:.1f}% BP @ {buyer_prov}), "
+            f"seller_tier={seller_tier} ({float(sc_rate)*100:.1f}% SC @ {seller_prov})."
+        ),
+        # Legacy compat
+        tax_province=buyer_prov,
+        tax_type=("GST+QST" if buyer_prov == "QC" else ("HST" if buyer_tax_bd["hst"] > 0 else ("GST" if buyer_tax_bd["gst"] > 0 else "ZERO"))),
+        tax_rate=float(buyer_tax_bd["combined_rate"]),
+        buyer_stripe_fee=_r(buyer_sr),
+        seller_stripe_fee=_r(seller_sr),
+        seller_commission_total=_r(seller_commission + seller_sr + seller_tax_bd["total"]),
     )
     return result.to_dict()
 
 
-# ──────────────────────────────────────────────────────────────────────────
-# Legacy FeeCalculator class — preserved for back-compat. iter209 Step 2+
-# will migrate every caller to `calculate_fee()` and remove this section.
-# ──────────────────────────────────────────────────────────────────────────
+# ─── iter350 route: partner seller ──────────────────────────────────────
+def _iter350_partner(
+    hammer: Decimal,
+    partner_bp_rate: Decimal,
+    partner_prov: str,
+    buyer_prov: str,
+    payment: str,
+    auction_type: str,
+) -> dict:
+    """Partner is the recipient of BidVex's 3% platform fee → taxed at PARTNER's province.
+    BidVex charges the buyer $0 in partner transactions."""
+    if partner_bp_rate < 0:
+        raise ValueError("partner_bp_rate must be >= 0")
+
+    partner_bp_revenue = _q(hammer * partner_bp_rate)  # → to partner
+    bidvex_fee         = _q(hammer * PARTNER_PLATFORM_RATE)  # → to BidVex
+    stripe_recovery    = calculate_stripe_recovery(bidvex_fee)
+    tax_bd             = tax_on(bidvex_fee + stripe_recovery, partner_prov)
+    partner_owes       = _q(bidvex_fee + stripe_recovery + tax_bd["total"])
+
+    result = FeeResult(
+        auction_type=auction_type,
+        seller_type="partner",
+        hammer_price=_r(hammer),
+        buyer_premium=_r(partner_bp_revenue),  # what buyer pays partner (100% → partner)
+        buyer_premium_rate=float(partner_bp_rate),
+        buyer_stripe_recovery=0.0,             # buyer pays BidVex $0
+        buyer_gst=0.0, buyer_qst=0.0, buyer_hst=0.0, buyer_taxes=0.0,
+        buyer_tax_label="N/A — Partner charges directly",
+        buyer_tax_province=buyer_prov,
+        buyer_subtotal=_r(hammer + partner_bp_revenue),
+        buyer_total_charged=_r(hammer + partner_bp_revenue),
+        buyer_stripe_cents=int(((hammer + partner_bp_revenue) * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP)),
+        seller_commission=_r(bidvex_fee),
+        seller_commission_rate=float(PARTNER_PLATFORM_RATE),
+        seller_stripe_recovery=_r(stripe_recovery),
+        seller_gst=_r(tax_bd["gst"]), seller_qst=_r(tax_bd["qst"]), seller_hst=_r(tax_bd["hst"]),
+        seller_taxes=_r(tax_bd["total"]),
+        seller_tax_label=str(tax_bd["label"]),
+        seller_tax_province=str(tax_bd["province"]),
+        seller_payout=_r(partner_owes),   # note: this is what the PARTNER OWES BidVex
+        bidvex_revenue=_r(bidvex_fee),
+        charge_buyer_via_stripe=(payment == "stripe"),
+        charge_seller_via_stripe=False,
+        charge_seller_card_separately=payment in ("cash", "e_transfer", "etransfer"),
+        notes=(
+            "Partner Stripe: buyer pays partner directly (hammer + partner BP). "
+            f"BidVex charges partner {float(PARTNER_PLATFORM_RATE)*100:.1f}% + Stripe recovery + tax "
+            f"({tax_bd['label']} @ {partner_prov})."
+        ),
+        tax_province=partner_prov,
+        tax_type=("GST+QST" if partner_prov == "QC" else ("HST" if tax_bd["hst"] > 0 else ("GST" if tax_bd["gst"] > 0 else "ZERO"))),
+        tax_rate=float(tax_bd["combined_rate"]),
+        buyer_stripe_fee=0.0,
+        seller_stripe_fee=_r(stripe_recovery),
+        seller_commission_total=_r(partner_owes),
+    )
+    return result.to_dict()
+
+
+# ─── iter350 route: vehicle dealer (non-custodial) ──────────────────────
+def _iter350_vehicle(
+    hammer: Decimal,
+    buyer_prov: str,
+    auction_type: str,
+) -> dict:
+    """Buyer pays BidVex 2.5% + Stripe recovery + tax on buyer's province.
+    Dealer pays $0 per transaction — hammer goes directly dealer↔buyer.
+    A separate deposit is pre-authorized on Stripe with capture_method="manual"."""
+    platform_fee    = _q(hammer * VEHICLE_DEALER_BUYER_RATE)
+    stripe_recovery = calculate_stripe_recovery(platform_fee)
+    tax_bd          = tax_on(platform_fee + stripe_recovery, buyer_prov)
+    buyer_pays      = _q(platform_fee + stripe_recovery + tax_bd["total"])
+
+    result = FeeResult(
+        auction_type=auction_type,
+        seller_type="vehicle_dealer",
+        hammer_price=_r(hammer),
+        buyer_premium=_r(platform_fee),
+        buyer_premium_rate=float(VEHICLE_DEALER_BUYER_RATE),
+        buyer_stripe_recovery=_r(stripe_recovery),
+        buyer_gst=_r(tax_bd["gst"]), buyer_qst=_r(tax_bd["qst"]), buyer_hst=_r(tax_bd["hst"]),
+        buyer_taxes=_r(tax_bd["total"]),
+        buyer_tax_label=str(tax_bd["label"]),
+        buyer_tax_province=str(tax_bd["province"]),
+        buyer_subtotal=_r(buyer_pays),
+        buyer_total_charged=_r(buyer_pays),
+        buyer_stripe_cents=int((buyer_pays * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP)),
+        seller_commission=0.0,
+        seller_commission_rate=0.0,
+        seller_stripe_recovery=0.0,
+        seller_gst=0.0, seller_qst=0.0, seller_hst=0.0, seller_taxes=0.0,
+        seller_tax_label="N/A",
+        seller_tax_province=str(tax_bd["province"]),
+        seller_payout=_r(hammer),  # dealer collects full hammer directly
+        bidvex_revenue=_r(platform_fee),
+        charge_buyer_via_stripe=True,
+        charge_seller_via_stripe=False,
+        charge_seller_card_separately=False,
+        notes=(
+            f"Vehicle dealer: buyer pays {float(VEHICLE_DEALER_BUYER_RATE)*100:.1f}% platform fee + Stripe recovery + tax "
+            f"({tax_bd['label']} @ {buyer_prov}). Hammer paid directly dealer↔buyer. "
+            "$500 refundable deposit pre-authorized via Stripe PaymentIntent(capture_method='manual')."
+        ),
+        tax_province=buyer_prov,
+        tax_type=("GST+QST" if buyer_prov == "QC" else ("HST" if tax_bd["hst"] > 0 else ("GST" if tax_bd["gst"] > 0 else "ZERO"))),
+        tax_rate=float(tax_bd["combined_rate"]),
+        buyer_stripe_fee=_r(stripe_recovery),
+        seller_stripe_fee=0.0,
+        seller_commission_total=0.0,
+    )
+    return result.to_dict()
+
+
+# ─── iter350 route: storage facility ────────────────────────────────────
+def _iter350_storage(
+    hammer: Decimal,
+    facility_prov: str,
+    buyer_prov: str,
+    payment: str,
+    auction_type: str,
+) -> dict:
+    """Facility pays BidVex 5% + Stripe recovery + tax on FACILITY's province.
+    Buyer pays $0 BidVex fees regardless of payment path.
+    On Stripe path: buyer pays hammer only via Stripe; facility receives
+    hammer - 5% commission - Stripe recovery - facility tax."""
+    commission        = _q(hammer * STORAGE_FACILITY_RATE)
+    stripe_recovery   = calculate_stripe_recovery(commission)
+    tax_bd            = tax_on(commission + stripe_recovery, facility_prov)
+    facility_owes     = _q(commission + stripe_recovery + tax_bd["total"])
+
+    is_stripe = payment == "stripe"
+    if is_stripe:
+        # Buyer pays hammer only via Stripe; facility receives hammer - (5% + recovery + tax)
+        facility_payout = _q(hammer - commission - stripe_recovery - tax_bd["total"])
+        buyer_total     = hammer
+    else:
+        # Cash/e-transfer: buyer pays facility directly. BidVex bills the facility card.
+        facility_payout = Decimal("0")
+        buyer_total     = Decimal("0")
+
+    result = FeeResult(
+        auction_type=auction_type,
+        seller_type="storage_facility",
+        hammer_price=_r(hammer),
+        buyer_premium=0.0, buyer_premium_rate=0.0,
+        buyer_stripe_recovery=0.0,
+        buyer_gst=0.0, buyer_qst=0.0, buyer_hst=0.0, buyer_taxes=0.0,
+        buyer_tax_label="N/A — Buyer pays no BidVex fees on storage",
+        buyer_tax_province=buyer_prov,
+        buyer_subtotal=_r(buyer_total),
+        buyer_total_charged=_r(buyer_total),
+        buyer_stripe_cents=int((buyer_total * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP)),
+        seller_commission=_r(commission),
+        seller_commission_rate=float(STORAGE_FACILITY_RATE),
+        seller_stripe_recovery=_r(stripe_recovery),
+        seller_gst=_r(tax_bd["gst"]), seller_qst=_r(tax_bd["qst"]), seller_hst=_r(tax_bd["hst"]),
+        seller_taxes=_r(tax_bd["total"]),
+        seller_tax_label=str(tax_bd["label"]),
+        seller_tax_province=str(tax_bd["province"]),
+        seller_payout=_r(facility_payout if is_stripe else facility_owes),
+        bidvex_revenue=_r(commission),
+        charge_buyer_via_stripe=is_stripe,
+        charge_seller_via_stripe=False,
+        charge_seller_card_separately=not is_stripe,
+        notes=(
+            f"Storage facility: BidVex charges facility {float(STORAGE_FACILITY_RATE)*100:.1f}% commission "
+            f"+ Stripe recovery + tax ({tax_bd['label']} @ {facility_prov}). Buyer pays no BidVex fee."
+        ),
+        tax_province=facility_prov,
+        tax_type=("GST+QST" if facility_prov == "QC" else ("HST" if tax_bd["hst"] > 0 else ("GST" if tax_bd["gst"] > 0 else "ZERO"))),
+        tax_rate=float(tax_bd["combined_rate"]),
+        buyer_stripe_fee=0.0,
+        seller_stripe_fee=_r(stripe_recovery),
+        seller_commission_total=_r(facility_owes),
+    )
+    return result.to_dict()
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# iter350 — Broker transaction (buyer pays BidVex 2.5% + broker's own fee)
+# ═══════════════════════════════════════════════════════════════════════════
+def calculate_broker_transaction(
+    hammer_price,
+    broker_fee_structure: Dict,
+    buyer_province: str,
+) -> Dict:
+    """Broker deal — buyer pays hammer + BidVex 2.5% + broker's own fee.
+    Both BidVex-fee and broker-fee are taxed at the BUYER's province
+    (both are B2C supplies to the buyer under CRA Place-of-Supply).
+
+    broker_fee_structure = {
+      "type": "fixed" | "percentage",
+      "fixed_amount_cad": Decimal,   # if type == "fixed"
+      "percentage_rate":  Decimal,   # if type == "percentage" (0..1)
+      "min_fee_cad":      Decimal,   # optional floor
+      "max_fee_cad":      Decimal,   # optional ceiling
+    }
+    """
+    hammer = Decimal(str(hammer_price))
+    if hammer < 0:
+        raise ValueError("hammer_price must be >= 0")
+
+    bidvex_fee = _q(hammer * BROKER_PLATFORM_RATE)
+
+    fs = broker_fee_structure or {}
+    ftype = (fs.get("type") or "percentage").lower()
+    if ftype == "fixed":
+        broker_fee = _q(Decimal(str(fs.get("fixed_amount_cad", 0))))
+    else:
+        broker_fee = _q(hammer * Decimal(str(fs.get("percentage_rate", 0))))
+
+    if "min_fee_cad" in fs:
+        broker_fee = max(broker_fee, _q(Decimal(str(fs["min_fee_cad"]))))
+    if "max_fee_cad" in fs:
+        broker_fee = min(broker_fee, _q(Decimal(str(fs["max_fee_cad"]))))
+
+    combined_fees   = _q(bidvex_fee + broker_fee)
+    stripe_recovery = calculate_stripe_recovery(combined_fees)
+    tax_bd          = tax_on(combined_fees + stripe_recovery, buyer_province)
+    total_due       = _q(hammer + combined_fees + stripe_recovery + tax_bd["total"])
+    buyer_pays_bidvex_only = _q(combined_fees + stripe_recovery + tax_bd["total"])
+
+    return {
+        "fee_model_version":         FEE_MODEL_VERSION,
+        "seller_type":               "broker",
+        "buyer_province":            str(tax_bd["province"]),
+        "hammer_price":              _r(hammer),
+        "bidvex_platform_fee":       _r(bidvex_fee),
+        "bidvex_platform_rate":      float(BROKER_PLATFORM_RATE),
+        "broker_fee":                _r(broker_fee),
+        "combined_fees":             _r(combined_fees),
+        "stripe_recovery":           _r(stripe_recovery),
+        "gst":                       _r(tax_bd["gst"]),
+        "qst":                       _r(tax_bd["qst"]),
+        "hst":                       _r(tax_bd["hst"]),
+        "tax_total":                 _r(tax_bd["total"]),
+        "tax_label":                 str(tax_bd["label"]),
+        "total_due_from_buyer":      _r(total_due),
+        "buyer_pays_bidvex_only":    _r(buyer_pays_bidvex_only),
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# LEGACY BACK-COMPAT SHIMS — kept so older tests / imports still resolve.
+# iter350 canonical code SHOULD NOT use these.
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _resolve_province(prov: Optional[str], fallback: str = "QC") -> str:
+    """Legacy shim — iter350 code uses `tax_rate_config.normalize_province`."""
+    code = normalize_province(prov)
+    if code == "INTL":
+        return fallback  # legacy contract defaulted unknown → QC
+    return code
+
+
+# Legacy PROVINCE_TAX_REGIME map kept as a static snapshot of the iter211
+# constants for callers that read from it (older tests). New code MUST NOT
+# import from here — use `tax_rate_config.get_tax_rate_sync()` instead.
+_PROVINCE_TAX_REGIME = {
+    "QC": {"type": "GST+QST", "gst": Decimal("0.05"), "qst": Decimal("0.09975"), "hst": Decimal("0"), "combined": Decimal("0.14975")},
+    "ON": {"type": "HST", "gst": Decimal("0"), "qst": Decimal("0"), "hst": Decimal("0.13"), "combined": Decimal("0.13")},
+    "NB": {"type": "HST", "gst": Decimal("0"), "qst": Decimal("0"), "hst": Decimal("0.15"), "combined": Decimal("0.15")},
+    "NS": {"type": "HST", "gst": Decimal("0"), "qst": Decimal("0"), "hst": Decimal("0.15"), "combined": Decimal("0.15")},
+    "PE": {"type": "HST", "gst": Decimal("0"), "qst": Decimal("0"), "hst": Decimal("0.15"), "combined": Decimal("0.15")},
+    "NL": {"type": "HST", "gst": Decimal("0"), "qst": Decimal("0"), "hst": Decimal("0.15"), "combined": Decimal("0.15")},
+    "AB": {"type": "GST", "gst": Decimal("0.05"), "qst": Decimal("0"), "hst": Decimal("0"), "combined": Decimal("0.05")},
+    "BC": {"type": "GST", "gst": Decimal("0.05"), "qst": Decimal("0"), "hst": Decimal("0"), "combined": Decimal("0.05")},
+    "SK": {"type": "GST", "gst": Decimal("0.05"), "qst": Decimal("0"), "hst": Decimal("0"), "combined": Decimal("0.05")},
+    "MB": {"type": "GST", "gst": Decimal("0.05"), "qst": Decimal("0"), "hst": Decimal("0"), "combined": Decimal("0.05")},
+    "NT": {"type": "GST", "gst": Decimal("0.05"), "qst": Decimal("0"), "hst": Decimal("0"), "combined": Decimal("0.05")},
+    "NU": {"type": "GST", "gst": Decimal("0.05"), "qst": Decimal("0"), "hst": Decimal("0"), "combined": Decimal("0.05")},
+    "YT": {"type": "GST", "gst": Decimal("0.05"), "qst": Decimal("0"), "hst": Decimal("0"), "combined": Decimal("0.05")},
+}
+PROVINCE_TAX_REGIME = _PROVINCE_TAX_REGIME
+
+
+def calculate_partner_taxes(amount: Decimal, province: str) -> Dict[str, Decimal]:
+    """Legacy shim — kept so iter211 tests still pass under iter350 semantics.
+    Returns the OLD-format dict for back-compat. New code uses `tax_on()`."""
+    code = _resolve_province(province)  # legacy fallback → QC
+    regime = _PROVINCE_TAX_REGIME[code]
+    return {
+        "province": code,
+        "type": regime["type"],
+        "gst": _q(Decimal(str(amount)) * regime["gst"]),
+        "qst": _q(Decimal(str(amount)) * regime["qst"]),
+        "hst": _q(Decimal(str(amount)) * regime["hst"]),
+        "combined_rate": regime["combined"],
+        "total": _q(Decimal(str(amount)) * regime["combined"]),
+    }
+
+
+
 
 # Global fee constants - No cap, percentage-based
 DEFAULT_BUYER_PREMIUM = Decimal("0.05")  # 5%
