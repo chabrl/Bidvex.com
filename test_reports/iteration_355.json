@@ -1,0 +1,54 @@
+{
+  "summary": "iter355 H-1 (Bidder KYC via Stripe Identity + Pre-Auth Bid Holds) tested end-to-end. Backend: 18/18 iter355 unit tests PASS. 8/8 new live-endpoint tests PASS (auth gate, session create/reuse, real Stripe VerificationSession client_secret returned, KYC gate envelope, admin bypass, non-regression buyer login). Regression: 73/77 prior tests PASS (4 skips, 0 failures). Frontend: /verify-identity ProtectedRoute redirect works, all 4 primary data-testids visible (verification-page, verify-state-idle, verify-start-btn, verify-skip-btn), Stripe publishable key loads with zero console errors, Skip button navigates away as designed.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "POST /api/identity/verify",
+        "issue": "Requires JSON body (VerifyRequest{return_url}). Docstring/spec examples that show calling without a body will get 400 validation_error. Consider marking body Optional or accepting empty POST for maximum ergonomics."
+      },
+      {
+        "endpoint": "POST /api/identity/verify",
+        "issue": "Real Stripe VerificationSession client_secret format is `vs_<id>_secret_live_...` (not `vs_client_secret_...` as stated in review spec). Endpoint returns real, valid Stripe live secret — spec expectation on prefix was inaccurate; endpoint behavior is CORRECT."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Skip-for-now on /verify-identity",
+        "issue": "For admin user, navigates to /admin (Admin auto-redirect kicks in from /dashboard). For a fresh buyer w/o phone verification, navigates to /verify-phone (phone-verification global guard from /dashboard). This is expected downstream behavior — the Skip button itself correctly navigates away from /verify-identity to its default returnTo=/dashboard, but /dashboard has separate auth-flow guards.",
+        "affected_selectors": ["[data-testid=verify-skip-btn]"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter355_identity_bidhold.py",
+    "/app/backend/tests/test_iter355_live_endpoints.py"
+  ],
+  "action_items": [
+    "None blocking. Feature ready to ship. Optionally: mark POST /api/identity/verify body as Optional so callers can POST without JSON payload (frontend already sends {}, this is cosmetic)."
+  ],
+  "critical_code_review_comments": [
+    "KYC soft-gate order-of-checks is correct: listing/settlement lookup runs FIRST (404 on missing), then KYC gate (403 IDENTITY_VERIFICATION_REQUIRED with bilingual envelope). Admin bypass path present at both /settle/{listing_id} and /vehicles/{vehicle_id}/buyer-acknowledge.",
+    "BidConfirmationDialog hold logic at line 373: `!isVehicle && bidAmount > 500` — matches backend should_require_hold() semantics exactly. Hold amount clamped to [50, 500] CAD which mirrors compute_hold_amount() (10% of bid, floor $50, ceiling $500).",
+    "VerificationPage.js: loadStripe guarded by presence of REACT_APP_STRIPE_PUBLISHABLE_KEY (null if missing) — good defensive posture.",
+    "Stripe VerificationSession reuse logic verified working live: same session id returned on 2nd call with reused=true.",
+    "Live 8/8 endpoint tests all pass (auth, status, verify create+reuse, settle KYC gate, admin bypass, buyer-acknowledge KYC gate, non-regression login)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter355_live_endpoints.py (NEW — 8 live endpoint tests against preview URL)"
+  ],
+  "success_rate": {
+    "backend": "100% (26/26 = 18 unit + 8 live)",
+    "frontend": "100% (4/4 primary testids visible, Stripe loads, Skip navigates)"
+  },
+  "test_credentials": "Registered fresh test user iter355_tester@bidvex.com / Iter355Test!@# (unverified) because seeded testbuyer@bidvex.com / TestBuyer2026! now returns 401 (password rotated on preview env). Admin charbel911@gmail.com / Anderosli123!@# works.",
+  "seed_data_creation": "Created new test user via POST /api/auth/register: email=iter355_tester@bidvex.com, password=Iter355Test!@#, no identity verification (perfect fixture for KYC-gate tests).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "The seeded testbuyer@bidvex.com / TestBuyer2026! login returns 401 on preview URL. If iter356 needs a non-admin buyer, use iter355_tester@bidvex.com / Iter355Test!@# (created 2026-07-16) OR call /api/auth/register with terms_agreed:true + ai_disclosure_consent:true + phone. Repeated failed login attempts trigger 429 rate limiting for ~60s.",
+  "rca of the issue": "No blocking bugs found. The endpoint POST /api/identity/verify requires a JSON body ({} is fine); calling with no body returns 400 validation_error. Backend correctly issues a live Stripe Identity VerificationSession and reuses it on subsequent calls. KYC gate envelope { error, message_en, message_fr, verification_endpoint } fires at proper depth (after listing/settlement existence check), which is by design. Admin (super_admin) bypasses the KYC gate — confirmed via live endpoint test."
+}

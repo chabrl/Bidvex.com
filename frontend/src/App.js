@@ -48,6 +48,8 @@ const BuyerDashboard = lazy(() => import('./pages/BuyerDashboard'));
 const CreateListingPage = lazy(() => import('./pages/CreateListingPage'));
 const PaymentSuccessPage = lazy(() => import('./pages/PaymentSuccessPage'));
 const ProfileSettingsPage = lazy(() => import('./pages/ProfileSettingsPage'));
+// iter355 H-1 — Stripe Identity (KYC) verification page.
+const VerificationPage = lazy(() => import('./pages/VerificationPage'));
 const AffiliateDashboard = lazy(() => import('./pages/AffiliateDashboard'));
 const MessagesPage = lazy(() => import('./pages/MessagesPage'));
 const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
@@ -473,6 +475,10 @@ const App = () => {
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/verify-phone" element={
             <PhoneVerificationRoute><PhoneVerificationPage /></PhoneVerificationRoute>
+          } />
+          {/* iter355 H-1 — Stripe Identity (KYC) soft-gate at checkout/win. */}
+          <Route path="/verify-identity" element={
+            <ProtectedRoute><VerificationPage /></ProtectedRoute>
           } />
           <Route path="/how-it-works" element={<HowItWorksPage />} />
           <Route path="/blogs" element={<ErrorBoundary scope="blogs"><BlogsPage /></ErrorBoundary>} />

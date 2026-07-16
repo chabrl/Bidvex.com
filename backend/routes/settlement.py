@@ -432,6 +432,31 @@ async def settle_payment(listing_id: str, current_user: User = Depends(get_curre
         return {"success": True, "already_paid": True,
                 "pickup_code": doc.get("pickup_code")}
 
+    # ─── iter355 H-1: Stripe Identity soft-gate at checkout/win ───
+    # Winning bidder MUST have `is_identity_verified=True` before we
+    # capture the payment. Admin/super_admin bypass. Bidding itself is
+    # NOT gated — this is a forward-only, at-checkout-only enforcement.
+    if getattr(current_user, "role", None) not in ("admin", "super_admin"):
+        buyer_doc = await db.users.find_one(
+            {"id": current_user.id},
+            {"_id": 0, "is_identity_verified": 1, "stripe_identity_status": 1},
+        )
+        if not (buyer_doc or {}).get("is_identity_verified"):
+            raise HTTPException(status_code=403, detail={
+                "error": "IDENTITY_VERIFICATION_REQUIRED",
+                "stripe_identity_status": (buyer_doc or {}).get("stripe_identity_status"),
+                "message_en": (
+                    "Identity verification is required before we can complete your "
+                    "purchase. Please verify your identity to claim this auction."
+                ),
+                "message_fr": (
+                    "La vérification d'identité est requise avant de finaliser "
+                    "votre achat. Veuillez vérifier votre identité pour réclamer "
+                    "cette enchère."
+                ),
+                "verification_endpoint": "/api/identity/verify",
+            })
+
     from services.payment_collection import finalize_auction_payment
     from services.auction_settlement import _get_default_pm, _charge_card, _to_cents
 

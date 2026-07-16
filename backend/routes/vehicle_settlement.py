@@ -548,6 +548,30 @@ async def buyer_acknowledge_settlement(
             detail=f"Cannot acknowledge — current status: {settlement.get('settlement_status')}"
         )
 
+    # ─── iter355 H-1: Stripe Identity soft-gate at vehicle claim ───
+    # Vehicle buyer must complete KYC before finalizing the transfer
+    # (this is the vehicle-flow equivalent of the /settle checkout gate).
+    if getattr(current_user, "role", None) not in ("admin", "super_admin"):
+        buyer_doc = await db.users.find_one(
+            {"id": current_user.id},
+            {"_id": 0, "is_identity_verified": 1, "stripe_identity_status": 1},
+        )
+        if not (buyer_doc or {}).get("is_identity_verified"):
+            raise HTTPException(status_code=403, detail={
+                "error": "IDENTITY_VERIFICATION_REQUIRED",
+                "stripe_identity_status": (buyer_doc or {}).get("stripe_identity_status"),
+                "message_en": (
+                    "Identity verification is required before acknowledging "
+                    "this vehicle. Please verify your identity to claim the vehicle."
+                ),
+                "message_fr": (
+                    "La vérification d'identité est requise avant d'accuser "
+                    "réception de ce véhicule. Veuillez vérifier votre identité "
+                    "pour réclamer le véhicule."
+                ),
+                "verification_endpoint": "/api/identity/verify",
+            })
+
     now = datetime.now(timezone.utc).isoformat()
     await db.vehicle_settlements.update_one(
         {"auction_id": vehicle_id},

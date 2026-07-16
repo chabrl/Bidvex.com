@@ -368,6 +368,44 @@ const BidConfirmationDialog = ({
               </p>
             )}
           </div>
+
+          {/* iter355 H-1 — Refundable pre-authorization hold notice */}
+          {!isVehicle && bidAmount > 500 && (() => {
+            const holdRaw = bidAmount * 0.10;
+            const holdCad = Math.max(50, Math.min(500, holdRaw));
+            return (
+              <div
+                className="mt-2 bg-blue-50 border border-blue-200 rounded-md p-3 text-xs leading-relaxed"
+                data-testid="bid-preauth-hold-notice"
+              >
+                <div className="flex items-start gap-2">
+                  <ShieldCheck className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="font-semibold text-blue-900 mb-1">
+                      Refundable Hold · Dépôt de garantie remboursable
+                    </p>
+                    <p className="text-blue-800">
+                      <strong>EN:</strong> A fully-refundable hold of{' '}
+                      <strong data-testid="bid-preauth-hold-amount">
+                        ${holdCad.toFixed(0)} CAD
+                      </strong>{' '}
+                      will be temporarily placed on your card while your bid leads.
+                      Released instantly if you are outbid. If you win, the hold
+                      transfers toward final payment at checkout.
+                    </p>
+                    <p className="text-blue-800 mt-1">
+                      <strong>FR:</strong> Un dépôt de garantie entièrement
+                      remboursable de{' '}
+                      <strong>${holdCad.toFixed(0)} CAD</strong>{' '}
+                      sera temporairement bloqué sur votre carte pendant que votre
+                      enchère est en tête. Libéré instantanément si vous êtes surenchéri.
+                      Si vous gagnez, le dépôt est appliqué au paiement final.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         <DialogFooter className="flex flex-col sm:flex-row gap-2 sticky bottom-0 -mx-6 -mb-6 px-6 py-3 bg-background border-t z-10" data-testid="bid-confirmation-footer">

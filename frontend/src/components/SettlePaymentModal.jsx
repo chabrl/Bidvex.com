@@ -66,6 +66,18 @@ const SettlePaymentModal = ({ listingId, open, onOpenChange, onPaid }) => {
       if (onPaid) onPaid();
     } catch (e) {
       const d = e?.response?.data?.detail;
+      // iter355 H-1 — Identity verification soft-gate at checkout.
+      if (e?.response?.status === 403 && typeof d === 'object' && d?.error === 'IDENTITY_VERIFICATION_REQUIRED') {
+        toast.warning(
+          fr
+            ? "Vérification d'identité requise avant de finaliser."
+            : 'Identity verification is required before finalizing.',
+          { duration: 4000 },
+        );
+        onOpenChange(false);
+        navigate(`/verify-identity?return_to=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+        return;
+      }
       const msg = (typeof d === 'object' && d) ? (fr ? d.message_fr : d.message_en) : d;
       toast.error(msg || (fr ? 'Le paiement a échoué. Veuillez réessayer.' : 'Payment failed. Please retry.'));
     } finally {

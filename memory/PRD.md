@@ -1,5 +1,100 @@
 # BidVex — Auction Marketplace PRD
 
+## iter355 — Tier 2 H-1: Bidder KYC (Stripe Identity) + Bid Pre-Auth Holds (Feb 17, 2026) ✅ COMPLETE — VERIFIED
+
+**Scope**: Tier 2 (H-1) of the "100/100 audit". Ships the two anti-shill/anti-non-payer guardrails: (1) Stripe Identity soft-gate at Checkout/Win, (2) Smart Pre-Authorization Holds on non-vehicle bids > $500 CAD. **Vehicle listings untouched** (they continue on the existing $500 flat deposit path from `services/vehicle_payment.py`).
+
+### Product decisions locked with user (Feb 17, 2026):
+1. **Bid Hold Threshold**: Applies STRICTLY to non-vehicle auctions where the incoming bid exceeds $500 CAD (10% of bid, bounded [$50, $500]).
+2. **Identity Gate Timing**: SOFT-GATE at Checkout/Win. Users bid freely. Winners must complete Stripe Identity KYC to finalize.
+3. **Grandfathering**: FORWARD-ONLY. Existing users bid without interruption; the wall fires only upon winning.
+4. **Vehicle claim**: `POST /api/vehicles/{id}/buyer-acknowledge` ALSO gated (vehicle-flow equivalent of `/settle`).
+
+### Module 1 — Stripe Identity (KYC) — Backend
+
+- **NEW `backend/services/stripe_identity.py`** (~250 lines):
+  - `create_or_get_session(db, user, return_url=None)` — creates a Stripe `VerificationSession` (`type="document"`, `require_matching_selfie=True`, `require_live_capture=True`, `allowed_types=[driving_license, id_card, passport]`). Reuses in-flight sessions in `requires_input` / `processing` states (idempotency).
+  - `refresh_status_from_stripe(db, user)` — poll-friendly live status fetch. Never mutates `is_identity_verified` (webhook is the single source of truth).
+  - `apply_webhook_event(db, event_type, data)` — handles `identity.verification_session.{verified,requires_input,processing,canceled}`. On `verified`, extracts `verified_outputs.first_name/last_name/dob` and stores as `identity_legal_name` + `identity_dob` on the user doc.
+- **NEW `backend/routes/identity.py`**:
+  - `POST /api/identity/verify {return_url?}` — creates/reuses session, returns `{verification_session_id, client_secret, status, url, reused}`. Returns `{already_verified: true}` early if the user is already KYC'd.
+  - `GET /api/identity/status` — bilingual status envelope for the frontend to poll after the Stripe modal closes.
+- **Extended `backend/routes/webhooks.py::handle_stripe_webhook`** — new branch `event_type.startswith("identity.verification_session.")` routes to `services.stripe_identity.apply_webhook_event`. Wrapped in try/except so webhook failures never poison other Stripe event processing (payment_intents, subscriptions, refunds).
+- **Extended `backend/deps.py::User`** — added `is_identity_verified: bool = False`, `stripe_identity_status`, `stripe_verification_session_id`, `identity_legal_name`, `identity_dob`. Forward-only default `False` means every legacy user reads as "not verified" (grandfathering rule).
+- **Registered** in `server.py` alongside prerender + identity_router injected via `set_identity_db(db)`.
+
+### Module 2 — Smart Pre-Authorization Holds
+
+- **NEW `backend/services/bid_authorization_service.py`** (~310 lines):
+  - Constants: `HOLD_THRESHOLD_CAD=500`, `HOLD_PERCENT=0.10`, `HOLD_MIN_CAD=50`, `HOLD_MAX_CAD=500`.
+  - `compute_hold_amount(bid) → CAD` — pure function, clamped [$50, $500].
+  - `should_require_hold(bid, auction_type) → bool` — excludes `"vehicle"` categorically; requires strict `>$500` bid.
+  - `create_bid_hold(db, user, listing_id, bid_amount, auction_type, listing_title?, lot_number?) → row` — validates saved PM (400 `PAYMENT_METHOD_REQUIRED`), creates `stripe.PaymentIntent(capture_method="manual", confirm=True, off_session=True)`, persists to new `db.bid_authorizations` collection with `(listing_id, bidder_id, lot_number)` invariant. Auto-releases any prior self-hold on raise-your-own-bid. Card decline → 402 `PAYMENT_HOLD_FAILED` bilingual. Stripe outage → 502 (no lockout for verified bidders).
+  - `release_bid_hold(db, listing_id, bidder_id, lot_number?, reason)` — cancels the Stripe PI, transitions row → `status="released"`. Best-effort: outbid path never fails a bid because of a release miss.
+- **Wired into `backend/routes/auctions_bids.py`**:
+  - **`place_bid`** (single-item listings): after `_auction_type` resolution, calls `should_require_hold + create_bid_hold` for non-vehicle bids >$500. When outbidding previous leader, calls `release_bid_hold(..., reason="outbid")`.
+  - **`bid_on_lot`** (multi-item auction lots): same pattern, `auction_type="lots"`, `lot_number` scopes the hold.
+- **Bilingual disclaimer** rendered in `BidConfirmationDialog.js` when `!isVehicle && bidAmount > 500` — `data-testid="bid-preauth-hold-notice"` + `bid-preauth-hold-amount`. Shows precomputed EN/FR copy: "A fully-refundable hold of $X CAD will be temporarily placed on your card while your bid leads. Released instantly if you are outbid."
+
+### Module 3 — Checkout Soft-Gate
+
+- **`backend/routes/settlement.py::settle_payment`** (line 421+) — inserted immediately after the winner check + already-paid short-circuit. Non-admin winners without `is_identity_verified=True` receive 403 `{error: "IDENTITY_VERIFICATION_REQUIRED", verification_endpoint: "/api/identity/verify", stripe_identity_status, message_en, message_fr}`.
+- **`backend/routes/vehicle_settlement.py::buyer_acknowledge_settlement`** — same gate on vehicle claim (vehicles use off-platform payment but still need a verified buyer to claim delivery).
+- **Frontend `SettlePaymentModal.jsx`** — on 403 `IDENTITY_VERIFICATION_REQUIRED`, toasts a warning and redirects the user to `/verify-identity?return_to=<current-path>`. Bilingual toast copy.
+
+### Frontend (React)
+
+- **NEW `frontend/src/pages/VerificationPage.js`** — mounted at `/verify-identity` (ProtectedRoute). Three states: `idle` (checklist + "Start verification" CTA), `processing` (spinner + polling `/api/identity/status` every 4s up to 3min), `verified` (emerald success card with auto-redirect to `return_to`).
+  - Uses `loadStripe(REACT_APP_STRIPE_PUBLISHABLE_KEY)` → `stripe.verifyIdentity(client_secret)` for the embedded Stripe modal.
+  - After the modal closes, polls the backend for `is_identity_verified === true` (webhook eventual-consistency safety net).
+  - Full bilingual copy (EN pill + FR pill inline).
+  - `data-testid`s: `verification-page`, `verify-state-idle`, `verify-state-processing`, `verify-state-verified`, `verify-start-btn`, `verify-continue-btn`, `verify-skip-btn`, `verify-error`.
+- **NEW `frontend/src/components/VerifiedBadge.jsx`** — reusable `✓ ID Verified` pill (emerald), size sm/md/lg. `data-testid="verified-badge"`. Silent no-op if `isVerified === false`.
+- **Route wired** in `App.js` at `/verify-identity` behind `<ProtectedRoute>`.
+
+### Database schema additions
+
+- **New collection `bid_authorizations`**: `{id, listing_id, lot_number, bidder_id, bid_amount_cad, hold_amount_cad, auction_type, currency, stripe_payment_intent_id, stripe_customer_id, stripe_payment_method_id, payment_method_last4, status[held|released|captured], stripe_status_raw, created_at, released_at, captured_at, release_reason}`.
+- **`users` collection extended**: `is_identity_verified`, `stripe_identity_status`, `stripe_verification_session_id`, `stripe_identity_started_at`, `stripe_identity_verified_at`, `stripe_identity_status_refreshed_at`, `stripe_identity_last_error_code`, `stripe_identity_last_error_reason`, `identity_legal_name`, `identity_dob`.
+
+### Tests & verification
+
+- **`backend/tests/test_iter355_identity_bidhold.py`** — **18/18 PASS**. Coverage:
+  - Pure logic: `compute_hold_amount` boundaries (below/at/above threshold, min-floor, max-ceiling), `should_require_hold` exclusion of vehicles.
+  - Bid hold create: missing PM → 400 `PAYMENT_METHOD_REQUIRED`, missing Stripe customer → 400, success → persisted row with correct capture_method + off_session + cents-conversion, boundary clamp at $10k → $500 max, card decline → 402 `PAYMENT_HOLD_FAILED` bilingual.
+  - Bid hold release: cancels Stripe PI + row transitions to `released` with reason; no active hold → graceful `{released: false}`.
+  - Stripe Identity: create new session + persists metadata + does NOT flip `is_identity_verified`; reuses `requires_input` sessions (idempotency); webhook `verified` flips flag + extracts legal name + DOB; webhook `requires_input` records error code; missing identifier → skipped gracefully.
+  - Settlement gate: unverified buyer → 403 `IDENTITY_VERIFICATION_REQUIRED` with `verification_endpoint`; admin/super_admin bypasses entirely.
+- **Regression**: iter350–iter354 baseline **91 passed, 4 skipped, 0 failures** (7 iter354 prerender + 74 iter350 CRA + 4 skipped). No regressions.
+- **Live smoke** (preview): `GET /api/identity/status` with admin token returns `{"is_identity_verified":false,"stripe_identity_status":null,...}` in 45ms. Unauthenticated → 401. Frontend `/verify-identity` renders correctly (screenshot verified).
+
+### Phase 1 — Tier 1 Production Smoke Test (executed Feb 17, 2026)
+
+Command: `curl -Iv -A "Googlebot" https://www.bidvex.com/faq`
+
+**Result: FAILED. The Cloudflare Worker prerender is NOT deployed to production.**
+
+Findings:
+1. `www.bidvex.com` returns HTTP 308 → redirect to `bidvex.com` (opposite of iter354 canonical direction).
+2. Both hosts serve the plain React SPA shell to Googlebot — **no `x-prerender-version` header**, **zero `<script type="application/ld+json">` tags** in the response body.
+3. Chrome + Googlebot get identical responses — the CF Worker is not routing bot traffic to `/api/prerender/*`.
+
+**Required user action for Charbel** (unblocks all future SEO wins):
+1. Cloudflare Dashboard → `bidvex.com` zone → Workers Routes → add route `www.bidvex.com/*` → deploy `/app/docs/CLOUDFLARE_BOT_WORKER.md` script.
+2. Cloudflare Rules → 301 `bidvex.com/*` → `https://www.bidvex.com/*` (INVERT the current www→apex Page Rule).
+3. Verify with `curl -A "Googlebot" https://www.bidvex.com/faq | grep 'x-prerender-version'` — should return the version marker.
+
+Tier 2 (H-1) code work is **completely deploy-independent from Tier 1** — it ships regardless of when Charbel deploys the CF Worker.
+
+### Deferred to future iterations
+
+- **H-2** — Trustpilot / BBB / Google Business claiming + Social Proof widget → Tier 2 marketing pass.
+- **M-1 → M-6** — Sticky Card 72hr grace, 48hr dispute window, `/en/` + `/fr/` subdirectory routing, Core Web Vitals (Protobuf WS + explicit CSS sizes), Off-Platform Escrow API for vehicles, Tiered Security Deposits.
+- **L-1 → L-4** — QR pickup PWA, Contractor Signature Templates, Touch Target Audit, Meta tag enhancements.
+- Write-side `phone_last10` denormalization in `auth::register` + `profile::update` (currently populated by the boot scan + 30min heartbeat).
+- API-boundary 422 blocker for POST /api/listings containing base64 images.
+- Unified `/admin/feeds` + `TaxRatesPanel.jsx` diagnostics UI.
+
 ## iter354 — Tier 1 Remediation: Escrow copy + SSR prerender (Feb 17, 2026) ✅ COMPLETE — VERIFIED
 
 **Scope**: Tier 1 (C-1 + C-2) of the "100/100 audit" remediation directive. Fixes the escrow-logic legal contradiction across the codebase AND ships a self-hosted SSR prerender pipeline for crawlers — WITHOUT migrating away from React + FastAPI + MongoDB (per user's constraint).

@@ -75,6 +75,12 @@ class User(BaseModel):
     personalized_recommendations: bool = True
     platform_fee_paid: bool = False
     partner_subscription_id: Optional[str] = None
+    # iter355 — Stripe Identity (KYC) soft-gate at checkout/win.
+    is_identity_verified: bool = False
+    stripe_identity_status: Optional[str] = None  # requires_input|processing|verified|canceled|requires_action
+    stripe_verification_session_id: Optional[str] = None
+    identity_legal_name: Optional[str] = None
+    identity_dob: Optional[str] = None
 
 
 # ─── Auth Dependencies ───

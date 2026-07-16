@@ -486,6 +486,18 @@ async def handle_stripe_webhook(request: Request):
                         f"Refund webhook for non-strict charge: pi={pi_id} charge={charge_id} status={refund_status}"
                     )
 
+        elif event_type.startswith("identity.verification_session."):
+            # iter355 — Stripe Identity webhooks (KYC).
+            # Handles: verified / requires_input / processing / canceled.
+            try:
+                from services.stripe_identity import apply_webhook_event
+                result = await apply_webhook_event(db, event_type, data)
+                logger.info(f"[iter355] identity webhook processed: {result}")
+            except Exception as exc:  # noqa: BLE001
+                logger.exception(
+                    f"[iter355] identity webhook handler failed for {event_type}: {exc}"
+                )
+
         else:
             logger.info(f"Unhandled Stripe event: {event_type}")
 

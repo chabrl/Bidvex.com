@@ -221,6 +221,38 @@ async def place_bid(request: Request, bid_data: BidCreate, current_user: User = 
                     },
                 )
 
+    # ========== iter355 H-1: SMART PRE-AUTHORIZATION HOLD ==========
+    # Non-vehicle auctions where the incoming bid EXCEEDS $500 CAD trigger
+    # a Stripe manual-capture hold (10% of bid, bounded [$50, $500]).
+    # Vehicles are excluded — they continue using the flat $500 flow.
+    # Admins bypass entirely.
+    from services.bid_authorization_service import (
+        should_require_hold as _should_require_hold,
+        create_bid_hold as _create_bid_hold,
+    )
+    _bid_hold_row = None
+    if current_user.role not in ("admin", "super_admin") and _should_require_hold(
+        bid_amount=float(bid_data.amount),
+        auction_type=_auction_type,
+    ):
+        # `create_bid_hold` raises HTTPException on card decline (402) /
+        # missing payment method (400) / stripe outage (502). Bubble those
+        # up untouched so the frontend can display the bilingual reason.
+        _bid_user_dict = current_user.model_dump()
+        # `stripe_customer_id` isn't on the User model — pull it fresh.
+        _u_extra = await db.users.find_one(
+            {"id": current_user.id}, {"_id": 0, "stripe_customer_id": 1},
+        ) or {}
+        _bid_user_dict["stripe_customer_id"] = _u_extra.get("stripe_customer_id")
+        _bid_hold_row = await _create_bid_hold(
+            db,
+            user=_bid_user_dict,
+            listing_id=bid_data.listing_id,
+            bid_amount=float(bid_data.amount),
+            auction_type=_auction_type,
+            listing_title=listing.get("title"),
+        )
+
     now = datetime.now(timezone.utc)
 
     # ========== ANTI-SNIPING LOGIC ==========
@@ -344,6 +376,20 @@ async def place_bid(request: Request, bid_data: BidCreate, current_user: User = 
     previous_highest_bid = listing.get("current_price", 0)
 
     if previous_highest_bidder and previous_highest_bidder != current_user.id:
+        # iter355 H-1: auto-release the previous top bidder's hold (if any).
+        try:
+            from services.bid_authorization_service import (
+                release_bid_hold as _release_bid_hold,
+            )
+            await _release_bid_hold(
+                db,
+                listing_id=bid_data.listing_id,
+                bidder_id=previous_highest_bidder,
+                reason="outbid",
+            )
+        except Exception as _rel_err:  # noqa: BLE001
+            logger.warning(f"Bid-hold outbid release failed: {_rel_err}")
+
         outbid_notification = {
             "id": str(uuid_mod.uuid4()),
             "user_id": previous_highest_bidder,
@@ -914,6 +960,40 @@ async def bid_on_lot(request: Request, listing_id: str, lot_number: int, data: D
 
     previous_highest_bidder = lot.get("highest_bidder_id")
 
+    # ========== iter355 H-1: SMART PRE-AUTHORIZATION HOLD (lot bid) ==========
+    # Multi-item listings are non-vehicle (category enforced by the
+    # listing type), so any lot bid > $500 falls under the hold rule.
+    _lot_auction_type = "lots"
+    from services.bid_authorization_service import (
+        should_require_hold as _should_require_hold,
+        create_bid_hold as _create_bid_hold,
+        release_bid_hold as _release_bid_hold,
+    )
+    if current_user.role not in ("admin", "super_admin") and _should_require_hold(
+        bid_amount=float(amount),
+        auction_type=_lot_auction_type,
+    ):
+        _pm_count = await db.payment_methods.count_documents({"user_id": current_user.id})
+        if _pm_count == 0:
+            raise HTTPException(
+                status_code=403,
+                detail="Payment method required. Please add a payment card before placing bids.",
+            )
+        _bid_user_dict = current_user.model_dump()
+        _u_extra = await db.users.find_one(
+            {"id": current_user.id}, {"_id": 0, "stripe_customer_id": 1},
+        ) or {}
+        _bid_user_dict["stripe_customer_id"] = _u_extra.get("stripe_customer_id")
+        await _create_bid_hold(
+            db,
+            user=_bid_user_dict,
+            listing_id=listing_id,
+            bid_amount=float(amount),
+            auction_type=_lot_auction_type,
+            listing_title=listing.get("title"),
+            lot_number=lot_number,
+        )
+
     lots[lot_index]["current_price"] = amount
     lots[lot_index]["highest_bidder_id"] = current_user.id
 
@@ -976,6 +1056,18 @@ async def bid_on_lot(request: Request, listing_id: str, lot_number: int, data: D
 
     # ========== OUTBID NOTIFICATION ==========
     if previous_highest_bidder and previous_highest_bidder != current_user.id:
+        # iter355 H-1: release the previous lot leader's hold (if any).
+        try:
+            await _release_bid_hold(
+                db,
+                listing_id=listing_id,
+                bidder_id=previous_highest_bidder,
+                lot_number=lot_number,
+                reason="outbid_lot",
+            )
+        except Exception as _rel_err:  # noqa: BLE001
+            logger.warning(f"Lot bid-hold outbid release failed: {_rel_err}")
+
         outbid_notification = {
             "id": str(uuid_mod.uuid4()),
             "user_id": previous_highest_bidder,
