@@ -1,5 +1,22 @@
 # BidVex — Auction Marketplace PRD
 
+## iter352 — Nightly Base64 Sweep Alerts (Feb 16, 2026) ✅ COMPLETE — VERIFIED
+
+- `services/admin_notifications.py::notify_admin_base64_sweep()` — SendGrid amber-header HTML alert. Per-collection breakdown, up to 50 dedup'd listing IDs each, skipped/failed counts, CTA → `/admin/feeds`.
+- `scripts/migrate_base64_images_to_s3.py::_migrate_doc()` refactored to 4-tuple return (adds `migrated_rows` list of `{collection, listing_id, path, url}`).
+- `services/scheduler.py::nightly_base64_sweep_job` fires the alert only when `grand["migrated"] > 0`. Alert failure never poisons the migration.
+- End-to-end verified: injected base64 JPEG → sweep migrated to S3 → SendGrid `status_code=202` to `charbel911@gmail.com` → subject `iter351 — Nightly Base64 Sweep migrated 1 image(s)` → affected listing ID in body → state restored.
+- Cooldown/dedup logic deferred to the `/admin/feeds` UI sprint (daily rhythm acceptable for now).
+
+## iter351 — Feed Placeholder Fix (Feb 16, 2026) ✅ COMPLETE — VERIFIED
+
+- Fixed broken imports at `services/feed_placeholder_image.py:147` — `s3_client` → `_get_client()`, `get_cloudfront_url(key)` → `_key_to_url(key)`. Placeholder generator now uploads to S3 successfully.
+- Ran `scripts/migrate_base64_images_to_s3.py` — migrated 46 base64 images across 20 lots in `multi_item_listings` to `bidvex-marketplace-images/listings/{id}/{idx:02d}-{hex8}.jpg`. Zero base64 remaining across all 4 image-bearing collections.
+- Region confirmed `us-east-2` (matches bucket provisioning); no client-region change made.
+- New `nightly_base64_sweep` cron at 04:00 UTC — total scheduler jobs now **24**.
+- Google feed `/api/feeds/google` post-migration: 20 real S3 URLs + 14 items with legitimately no source photos (user will back-populate manually).
+- Backlog: API-boundary 422 on base64 payloads, unified `/admin/feeds` + `TaxRatesPanel.jsx` diagnostic UI.
+
 ## iter350 — Payment Infrastructure Sprint (Parts B+C+D+E) (Feb 16, 2026) ✅ COMPLETE — TESTED
 
 Big-bang migration to a CRA-compliant, DB-configurable payment engine. Backend regression: **134/134 tests PASS**, 0 failures. Testing agent iteration_350.json: 100% backend PASS, zero critical issues.
