@@ -1,17 +1,35 @@
-# BidVex Payment Infrastructure — End-to-End Analysis (v1 / iter350)
+# BidVex Payment Infrastructure — End-to-End Analysis (v2 / iter350 — CRA-Compliant)
 
-**Status:** Authoritative specification for the target-state fee engine.
+**Status:** Authoritative, legally rigorous specification for the
+target-state fee engine. Version 2 supersedes v1 with corrected tax
+routing per CRA and Revenu Québec Place-of-Supply rules for B2B services.
 **Effective:** Feb 2026 onward.
 **Audit basis:** Live inspection of `/app/backend/services/fee_calculator.py`
 (1299 lines, matured across iter139/165/210/211/243) + all 15 downstream
 fee-related modules under `/app/backend/services/*fee*.py` and
 `*pricing*.py`.
+**Legal basis:**
+- Excise Tax Act, R.S.C. 1985, c. E-15, Part IX (GST/HST)
+- CRA GST/HST Technical Information Bulletin B-103 —
+  *Harmonized Sales Tax — Place of Supply Rules for Determining Whether
+  a Supply Is Made in a Province*
+- CRA Memorandum 3.3 — *Place of Supply* (services)
+- Act respecting the Québec sales tax, R.S.Q., c. T-0.1 (QST)
+- Revenu Québec IN-203-V — *General Information Concerning the QST and
+  the GST/HST*
 
 This document supersedes every earlier fee spec. It is the single source
 of truth used to (a) redesign `calculate_fee()`, (b) drive the Admin
 Pricing Engine, and (c) generate every invoice / receipt / dashboard
 displayed to buyers, sellers, partners, brokers, contractors, and
 compliance auditors.
+
+**Disclaimer:** This document reflects our reasonable understanding of
+CRA and Revenu Québec guidance as of the effective date. It is NOT
+legal advice. Charbel — before applying this to production billing,
+please have this reviewed by a licensed Canadian tax accountant or the
+firm's regular CPA. Corrections from a review MUST supersede this
+document.
 
 ---
 
@@ -21,7 +39,8 @@ compliance auditors.
 2.  Actors & Account Types
 3.  Annual Subscription Fees (Stripe Subscriptions)
 4.  Stripe Recovery — Canonical Formula
-5.  Tax & Province Routing (Buyer-Location Rule)
+5.  Tax & Province Routing (Per-User Place-of-Supply Rule)
+5A. CRA & Revenu Québec Compliance Framework
 6.  Transaction Fee Structures
     - 6.1 Individual Seller (Marketplace + Lots)
     - 6.2 Partner Seller
@@ -42,6 +61,7 @@ compliance auditors.
 17. Reference Formulas — Ready-to-Implement Pseudocode
 18. Appendix A — Worked Numerical Examples
 19. Appendix B — Glossary
+20. Appendix C — Legal & Regulatory References
 
 ---
 
@@ -57,18 +77,32 @@ parallel revenue streams**:
 | **C — Deposits** | Pre-authorization holds on vehicle & storage bids | Stripe PaymentIntent with `capture_method="manual"` |
 | **D — Promoted listings** | One-time boost purchases | Fixed CAD, Stripe Checkout one-time |
 
-**Two universal rules govern every transaction:**
+**Three universal rules govern every transaction:**
 
 1. **Stripe recovery is on BidVex fees only.** BidVex never adds a
    Stripe gross-up to the hammer price itself — only to the fees BidVex
    itself collects. Formula: `stripe_recovery = (bidvex_fee × 0.029) + $0.30`.
-2. **Taxes follow the buyer's province.** GST/HST/QST rates are looked
-   up by the buyer's shipping/billing province — NOT the seller's, NOT
-   the platform's. International buyers pay $0 Canadian tax.
 
-Every calculation flows through **one** function: `calculate_fee()`.
-No caller anywhere in the codebase may compute a rate inline; all
-callers pass parameters in and read the returned dict.
+2. **Taxes follow the recipient of each service (Place-of-Supply rule).**
+   Every BidVex fee is a distinct **supply of a service** under Excise
+   Tax Act §142.1. The tax rate is determined by the province of the
+   **person to whom BidVex renders that specific service**:
+   - Buyer premium → taxed by the **buyer's** province
+   - Seller commission → taxed by the **seller's** province
+   - Partner 3% fee → taxed by the **partner's** province
+   - Vehicle 2.5% fee (charged to buyer) → taxed by the **buyer's** province
+   - Storage 5% commission (charged to facility) → taxed by the
+     **facility's** province
+   - Broker's BidVex 2.5% fee (charged to buyer) → taxed by the
+     **buyer's** province
+   - International recipient (address outside Canada) → 0% (**zero-rated
+     as an "exported service"** under Sched. VI, Part V, §7 of the
+     Excise Tax Act; §179 for zero-rating conditions).
+
+3. **Every calculation flows through one function: `calculate_fee()`.**
+   No caller anywhere in the codebase may compute a rate inline; all
+   callers pass parameters in and read the returned dict. This
+   single-source-of-truth is required for CRA audit reproducibility.
 
 ---
 
@@ -221,21 +255,51 @@ The delta is exactly the difference between grossing up the hammer
 
 ---
 
-## 5. Tax & Province Routing (Buyer-Location Rule)
+## 5. Tax & Province Routing (Per-User Place-of-Supply Rule)
 
-### 5.1 The Rule
+### 5.1 The Legal Rule
 
-**Tax is calculated on BidVex fees ONLY, using the BUYER's province.**
+**Every BidVex fee is a separate "supply of a service" for GST/HST/QST
+purposes.** Under CRA's Place-of-Supply rules (B-103, HST Regulations),
+the tax rate applied to each fee is determined by the province of the
+**recipient of that specific service** — i.e., the person from whom
+BidVex collects that fee.
 
-- Buyer in QC, Seller in ON → 14.975% QC (GST+QST) applies.
-- Buyer in ON, Seller in QC → 13% HST (ON) applies.
-- Buyer in AB, Seller in QC → 5% GST (AB) applies.
-- Buyer in US or International → 0% Canadian tax.
-- Hammer price itself is **never** subject to BidVex-applied tax.
-  (Sales tax on the actual goods is the seller's own responsibility
-  and is handled outside BidVex.)
+For BidVex this means:
 
-### 5.2 Rate Table
+| Fee | Recipient (who is charged the fee) | Tax based on |
+|---|---|---|
+| Buyer premium (BP) | **Buyer** | Buyer's province |
+| Seller commission (SC) | **Seller** | Seller's province |
+| Partner platform fee (3%) | **Partner** | Partner's province |
+| Vehicle platform fee (2.5%) | **Buyer** | Buyer's province |
+| Storage facility commission (5%) | **Facility** | Facility's province |
+| Broker's BidVex platform fee (2.5%) | **Buyer** | Buyer's province |
+| Broker's own commission | Buyer (paid to broker) | Broker charges tax, not BidVex |
+| Promoted listing fee | **Seller** (purchaser of promo) | Seller's province |
+| Annual subscription fee | **Subscriber** | Subscriber's province |
+| Contractor commission | Contractor (paid by BidVex) | N/A — inclusive of BidVex's tax cost; contractor invoices BidVex separately if GST/HST-registered |
+
+### 5.2 Concrete Consequences
+
+- **Cross-province transaction (buyer in QC, seller in ON):** buyer's
+  premium is taxed at 14.975% QC (GST + QST); seller's commission is
+  taxed at 13% HST ON. **Two different rates on the same transaction.**
+- **Same-province (both QC):** both fees taxed at 14.975% QC.
+- **International buyer (US), Canadian seller:** buyer's premium
+  zero-rated (0%); seller's commission taxed at seller's Canadian
+  province. **BidVex must retain proof the buyer is outside Canada**
+  to substantiate the zero-rating (billing address on file + Stripe
+  card country).
+- **International seller, Canadian buyer:** buyer's premium taxed at
+  buyer's Canadian province; seller's commission zero-rated (0%).
+- **Both parties international:** entire supply zero-rated. BidVex
+  collects no Canadian tax.
+
+### 5.3 Rate Table
+
+Same as v1 but now used **twice** per transaction — once for each
+service leg:
 
 | Province | Type | Combined Rate | Display Label |
 |---|---|---|---|
@@ -252,41 +316,165 @@ The delta is exactly the difference between grossing up the hammer
 | YT | GST only | 5.00% | `GST (5%)` |
 | NT | GST only | 5.00% | `GST (5%)` |
 | NU | GST only | 5.00% | `GST (5%)` |
-| INTL / US / Any non-CA | Exempt | 0.00% | `Exported Service (0%)` |
+| INTL / US / Non-CA | Zero-rated | 0.00% | `Exported Service (0% — GST/HST/QST zero-rated per ETA Sched. VI Part V §7)` |
 
-### 5.3 Which Amount is Taxed
+### 5.4 Taxable Base for Each Fee
 
-Tax is applied to `(bidvex_fee + stripe_recovery_on_that_fee)`. This is
-because the Stripe recovery IS BidVex revenue that we're passing through
-— Revenue Canada considers it taxable service revenue.
+Tax is applied to `(bidvex_fee + stripe_recovery_on_that_fee)` because
+Stripe recovery is itself a taxable supply of the service — CRA
+considers pass-through processing fees part of the service consideration.
 
 ```python
 taxable_base = bidvex_fee + stripe_recovery
-tax_amount   = taxable_base × tax_rate[buyer_province]["combined"]
+tax_amount   = taxable_base × TAX_RATES[recipient_province]["combined"]
 ```
 
-For QC specifically, the invoice must break out GST and QST separately:
+For QC recipients specifically, invoices must break out GST and QST on
+separate lines (Revenu Québec IN-203-V §5):
 
 ```python
 qc_gst = (bidvex_fee + stripe_recovery) × 0.05
 qc_qst = (bidvex_fee + stripe_recovery) × 0.09975
-qc_tax = qc_gst + qc_qst   # ≡ base × 0.14975
+qc_tax_total = qc_gst + qc_qst   # ≡ base × 0.14975
 ```
 
-### 5.4 Seller-Side Tax (Individual Seller Commission)
+### 5.5 Determining "Recipient's Province" — Data Sources
 
-When BidVex deducts a seller commission from the seller's payout, the
-seller's own commission fee is likewise taxed **using the BUYER's
-province** (the taxable event is the transaction, and the transaction's
-tax situs follows the buyer). This is asymmetric to how most consumer
-sales tax works but is standard in B2B commission-based marketplaces
-in Canada.
+For each fee we need a defensible province determination. BidVex reads
+in this precedence:
 
-```python
-seller_taxable = seller_commission + stripe_recovery_on_seller_fee
-seller_tax     = seller_taxable × tax_rate[BUYER_province]["combined"]
-seller_payout  = hammer_price - seller_commission - stripe_recovery_on_seller_fee - seller_tax
-```
+1. **User's declared address on the profile** (`user.province` field —
+   set at registration and update-verifiable via ID document flow).
+2. **Fallback: Stripe billing address** on the payment method used for
+   this specific transaction.
+3. **Fallback: card country** (from Stripe `PaymentMethod.card.country`)
+   — only for the international/Canadian binary distinction; not enough
+   for provincial resolution.
+4. **Ultimate fallback (should never fire):** treat as international
+   (0%) and flag the transaction for manual review by the compliance
+   officer. Never default to the highest rate — that risks over-
+   collection and CRA rebate liability.
+
+### 5.6 International (Zero-Rated) Substantiation
+
+To defend a 0% rating on audit, BidVex retains for **6 years** (CRA
+retention requirement per ETA §286):
+
+- Recipient's declared address (non-Canadian)
+- Stripe billing address country (non-Canadian)
+- Stripe card country (non-Canadian)
+- IP-based geolocation snapshot at transaction time
+- Explicit checkbox at checkout: "I certify that I am not a Canadian
+  resident for tax purposes."
+
+If any of these disagree, the transaction is flagged for compliance
+review and default to the Canadian province listed. Never zero-rate
+based on card country alone.
+
+---
+
+## 5A. CRA & Revenu Québec Compliance Framework
+
+### 5A.1 BidVex's Registration Posture
+
+BidVex Inc. is:
+- **GST/HST registered** under CRA — remitting all GST/HST collected
+  on services rendered to Canadian recipients.
+- **QST registered** under Revenu Québec — remitting all QST collected
+  from Quebec recipients (BidVex is a Quebec resident supplier, so QST
+  applies to Quebec supplies regardless of the Small-Supplier threshold).
+- **Uses Simplified GST/HST accounting** if annual taxable supplies
+  are < $500,000; otherwise Regular method. (Charbel: confirm current
+  filing method with the CPA — this doc assumes Regular.)
+
+### 5A.2 What BidVex Must Show on Every Invoice
+
+**Per CRA GST/HST Info Sheet GI-060, an invoice ≥ $150 must include:**
+- Supplier legal name (BidVex Inc.)
+- Supplier GST/HST number (format `NNNNNNNNN RT NNNN`)
+- Supplier QST number for QC invoices (format `NNNNNNNNNN TQ NNNN`)
+- Invoice date
+- Recipient legal name
+- Recipient address (province required for rate substantiation)
+- Description of the service supplied
+- Total amount **before** tax
+- Amount of each tax broken out **on separate lines**
+  (GST separate from QST for QC; HST as one line for HST provinces)
+- Grand total
+
+**Invoices < $30** may omit the recipient details but must still show
+supplier name/number/tax breakdown.
+
+### 5A.3 Zero-Rated vs Exempt vs Out-of-Scope
+
+- **Zero-rated (0% GST/HST):** "Exported services" per Sched. VI Part V.
+  Buyer premium charged to a US buyer for the service of "auction
+  bidding platform access" qualifies as zero-rated.
+- **Exempt (no GST/HST):** Financial services, health services, most
+  residential rent. Not applicable to BidVex fees.
+- **Out-of-scope:** the hammer price itself when BidVex is
+  non-custodial (vehicles, broker deals for vehicles). BidVex is not
+  the supplier of the vehicle — the dealer is. BidVex reports only
+  its own service revenue.
+
+### 5A.4 Input Tax Credits (ITCs) — Not Our Problem to Compute, but…
+
+BidVex-registered corporate customers may claim ITCs on the GST/HST/
+QST BidVex charges them. This means:
+- Business customers WILL scrutinize invoice tax lines
+- Every ITC-eligible tax figure must be **exactly reproducible from
+  the invoice math** — no rounding surprises
+- Rounding rule: bankers' rounding to $0.01 at each line, per Revenu
+  Québec convention. Our `_r()` helper uses `ROUND_HALF_UP` per CRA
+  guidance — verify this matches CPA advice.
+
+### 5A.5 Special Handling — Non-Resident Recipients
+
+Per ETA §143, a non-resident who is not registered for GST/HST is
+generally not required to charge GST/HST on supplies to Canada.
+Conversely, **when BidVex supplies a service to a non-resident**, that
+supply is generally zero-rated under Sched. VI Part V, §7 provided:
+1. The service is not primarily consumed in Canada
+2. The service is not related to real property or tangible personal
+   property in Canada
+
+BidVex's auction platform access is a **digital service consumed by
+the recipient wherever they log in from**, satisfying test (1) for
+non-resident buyers/sellers. Test (2) is the risk area: bidding on a
+Canadian vehicle *is* related to tangible personal property in Canada.
+**Conservative position:** zero-rate only the buyer premium (a service
+supplied to the buyer), not the underlying vehicle transaction. Vehicle
+sales tax is the dealer's responsibility.
+
+### 5A.6 QST — Quebec-Specific Rules
+
+Revenu Québec applies QST to any Quebec resident recipient. Because
+BidVex is a Quebec resident supplier:
+- **QC recipient:** BidVex charges QC GST + QST (14.975%)
+- **Non-QC Canadian recipient:** BidVex charges only the applicable
+  federal GST/HST — no QST (Revenu Québec IN-203-V §3.2)
+- **Non-Canadian recipient:** BidVex charges neither GST/HST nor QST
+  (zero-rated)
+
+### 5A.7 Small Supplier Threshold — Not Applicable
+
+BidVex exceeds the $30,000 small-supplier threshold and is a
+mandatory registrant. Registration data (numbers, effective dates)
+should be stored in `db.company_tax_config` with change history for
+audit reproducibility.
+
+### 5A.8 Reconciliation & Reporting
+
+Monthly reconciliation job (cron: 1st of month 03:00 UTC) produces:
+- `gst_hst_collected_by_province` — sum of every taxable line's
+  federal tax, grouped by recipient province, for the previous month
+- `qst_collected` — sum of every QST line for QC recipients
+- `zero_rated_supplies_by_country` — for the periodic zero-rating
+  substantiation
+- `total_taxable_supplies` — required for GST/HST return
+
+These match the fields on Form GST34 and TP-1015. Report is emailed
+to `finance@bidvex.com` and archived in `db.tax_reconciliation`.
 
 ---
 
@@ -310,21 +498,26 @@ seller_payout  = hammer_price - seller_commission - stripe_recovery_on_seller_fe
 | Premium | 2.5% |
 | VIP Elite | 2.0% |
 
-#### 6.1.3 Stripe Payment Path
+#### 6.1.3 Stripe Payment Path (CRA-Compliant Per-User Routing)
 
 ```python
-# ── Buyer side ──
+# ── Buyer side — taxed by BUYER's province ──
 buyer_premium         = hammer × BP_rate[buyer.tier]
 stripe_recovery_buyer = (buyer_premium × 0.029) + 0.30
 tax_on_buyer_fees     = (buyer_premium + stripe_recovery_buyer) × tax_rate[buyer.province]
 total_buyer_pays      = hammer + buyer_premium + stripe_recovery_buyer + tax_on_buyer_fees
 
-# ── Seller side (deducted from payout) ──
-seller_commission     = hammer × SC_rate[seller.tier]
+# ── Seller side — taxed by SELLER's own province (deducted from payout) ──
+seller_commission      = hammer × SC_rate[seller.tier]
 stripe_recovery_seller = (seller_commission × 0.029) + 0.30
-tax_on_seller_fees    = (seller_commission + stripe_recovery_seller) × tax_rate[buyer.province]
-seller_receives       = hammer − seller_commission − stripe_recovery_seller − tax_on_seller_fees
+tax_on_seller_fees     = (seller_commission + stripe_recovery_seller) × tax_rate[seller.province]
+seller_receives        = hammer − seller_commission − stripe_recovery_seller − tax_on_seller_fees
 ```
+
+**Note the cross-province asymmetry:** A QC buyer bidding on an ON
+seller's item generates 14.975% QC tax on the buyer premium AND 13%
+HST ON tax on the seller commission — two different rates on the same
+transaction, remitted to two different revenue authorities.
 
 #### 6.1.4 Cash / E-Transfer Path
 
@@ -335,10 +528,11 @@ buyer_pays_bidvex = (hammer × BP_rate[buyer.tier])
                    + stripe_recovery
                    + tax_on(buyer_premium + stripe_recovery, buyer.province)
 
-# BidVex invoices the seller separately for their commission.
+# BidVex invoices the seller separately for their commission —
+# taxed by the seller's own province (CRA Place-of-Supply rule).
 seller_owes_bidvex = (hammer × SC_rate[seller.tier])
                     + stripe_recovery
-                    + tax_on(seller_commission + stripe_recovery, buyer.province)
+                    + tax_on(seller_commission + stripe_recovery, seller.province)
 ```
 
 ### 6.2 Partner Seller
@@ -362,7 +556,7 @@ BidVex charges partner:       3% flat commission on hammer
 partner_bp_revenue = hammer × partner.bp_rate          # → to partner
 bidvex_platform_fee = hammer × 0.03                    # → to BidVex
 stripe_recovery     = (bidvex_platform_fee × 0.029) + 0.30
-tax                 = (bidvex_platform_fee + stripe_recovery) × tax_rate[buyer.province]
+tax                 = (bidvex_platform_fee + stripe_recovery) × tax_rate[partner.province]
 partner_owes_bidvex = bidvex_platform_fee + stripe_recovery + tax
 
 # Partner's economics on the deal:
@@ -370,6 +564,13 @@ partner_collects_from_buyer   = hammer + partner_bp_revenue
 partner_remits_to_bidvex      = partner_owes_bidvex
 partner_net                   = hammer + partner_bp_revenue - partner_owes_bidvex
 ```
+
+**Legal note:** The recipient of BidVex's 3% platform service is the
+partner, so tax is by the **partner's** province (CRA Place-of-Supply
+rule). The buyer's province is irrelevant here because BidVex charges
+the buyer $0 in partner transactions. Any GST/HST the partner may owe
+on the buyer premium they collect is between the partner and CRA —
+outside BidVex's scope.
 
 ### 6.3 Enterprise Seller
 
@@ -414,12 +615,14 @@ via Stripe (`capture_method="manual"`). See §12 for full flow.
 
 ### 6.5 Storage Facility
 
-**Business rule:** BidVex charges buyers $0. Facility pays 5% commission.
+**Business rule:** BidVex charges buyers $0. Facility pays 5% commission
++ Stripe recovery + tax on **facility's own province** (CRA Place-of-
+Supply rule — facility is the recipient of BidVex's service).
 
 ```python
 bidvex_commission = hammer × 0.05
 stripe_recovery   = (bidvex_commission × 0.029) + 0.30
-tax               = (bidvex_commission + stripe_recovery) × tax_rate[buyer.province]
+tax               = (bidvex_commission + stripe_recovery) × tax_rate[facility.province]
 facility_owes_bidvex = bidvex_commission + stripe_recovery + tax
 ```
 
@@ -1122,117 +1325,142 @@ def calculate_fee(
     seller_tier: str,
     seller_type: str,
     buyer_province: str,
+    seller_province: str,          # iter350 v2 — required for CRA
+                                   # Place-of-Supply on seller commission
     payment_method: str = "stripe",
     partner_bp_rate: Decimal = Decimal("0.0"),
+    partner_province: str = None,  # partner is the recipient of BidVex's 3% fee
+    facility_province: str = None, # facility is the recipient of BidVex's 5% fee
 ) -> dict:
     hammer = Decimal(str(hammer_price))
-    province = (buyer_province or "INTL").upper()
+    b_prov = (buyer_province or "INTL").upper()
+    s_prov = (seller_province or "INTL").upper()
 
     if seller_type == "individual" or seller_type == "enterprise":
         return _individual_or_enterprise(
-            hammer, buyer_tier, seller_tier, province, payment_method)
+            hammer, buyer_tier, seller_tier, b_prov, s_prov, payment_method)
 
     if seller_type == "partner":
-        return _partner(hammer, partner_bp_rate, province, payment_method)
+        p_prov = (partner_province or s_prov or "INTL").upper()
+        return _partner(hammer, partner_bp_rate, p_prov, b_prov, payment_method)
 
     if seller_type == "vehicle_dealer":
-        return _vehicle(hammer, province)
+        # Buyer is the recipient of BidVex's 2.5% service.
+        return _vehicle(hammer, b_prov)
 
     if seller_type == "storage_facility":
-        return _storage(hammer, province, payment_method)
+        f_prov = (facility_province or s_prov or "INTL").upper()
+        return _storage(hammer, f_prov, b_prov, payment_method)
 
     raise ValueError(f"Unknown seller_type={seller_type!r}")
 
 
-def _individual_or_enterprise(hammer, buyer_tier, seller_tier, province, pm):
+def _individual_or_enterprise(hammer, buyer_tier, seller_tier, b_prov, s_prov, pm):
+    """iter350 v2 — CRA-compliant per-user Place-of-Supply routing.
+
+    Buyer premium is a supply of a service to the BUYER  → taxed at
+        the buyer's province.
+    Seller commission is a supply of a service to the SELLER → taxed
+        at the seller's province.
+    """
     bp_rate = BUYER_BP.get(buyer_tier.lower(), BUYER_BP["starter"])
     sc_rate = SELLER_SC.get(seller_tier.lower(), SELLER_SC["starter"])
 
     buyer_premium         = _r(hammer * bp_rate)
     stripe_recovery_buyer = calculate_stripe_recovery(buyer_premium)
-    tax_buyer             = tax_on(buyer_premium + stripe_recovery_buyer, province)
+    tax_buyer             = tax_on(buyer_premium + stripe_recovery_buyer, b_prov)
     total_buyer_pays      = _r(hammer + buyer_premium + stripe_recovery_buyer + tax_buyer)
 
     seller_commission     = _r(hammer * sc_rate)
     stripe_recovery_seller = calculate_stripe_recovery(seller_commission)
-    tax_seller            = tax_on(seller_commission + stripe_recovery_seller, province)
+    tax_seller            = tax_on(seller_commission + stripe_recovery_seller, s_prov)
     seller_receives       = _r(hammer - seller_commission - stripe_recovery_seller - tax_seller)
 
     return {
         "seller_type":            "individual",
         "buyer_tier":             buyer_tier,
         "seller_tier":            seller_tier,
-        "buyer_province":         province,
+        "buyer_province":         b_prov,
+        "seller_province":        s_prov,
         "hammer_price":           float(hammer),
         "buyer_premium":          float(buyer_premium),
         "buyer_premium_rate":     float(bp_rate),
         "stripe_recovery_buyer":  float(stripe_recovery_buyer),
         "tax_on_buyer_fees":      float(tax_buyer),
+        "tax_label_buyer":        TAX_RATES.get(b_prov, TAX_RATES["INTL"])["label"],
         "total_buyer_pays":       float(total_buyer_pays),
         "seller_commission":      float(seller_commission),
         "seller_commission_rate": float(sc_rate),
         "stripe_recovery_seller": float(stripe_recovery_seller),
         "tax_on_seller_fees":     float(tax_seller),
+        "tax_label_seller":       TAX_RATES.get(s_prov, TAX_RATES["INTL"])["label"],
         "seller_receives":        float(seller_receives),
-        "tax_label":              TAX_RATES.get(province, TAX_RATES["INTL"])["label"],
         "bidvex_gross_rev":       float(buyer_premium + seller_commission),
     }
 
 
-def _partner(hammer, partner_bp_rate, province, pm):
+def _partner(hammer, partner_bp_rate, partner_prov, buyer_prov, pm):
+    """iter350 v2 — Partner is the recipient of BidVex's 3% platform fee,
+    so tax is by the PARTNER's province (CRA Place-of-Supply)."""
     partner_bp_revenue    = _r(hammer * Decimal(str(partner_bp_rate)))
     bidvex_platform_fee   = _r(hammer * Decimal("0.03"))
     stripe_recovery       = calculate_stripe_recovery(bidvex_platform_fee)
-    tax                   = tax_on(bidvex_platform_fee + stripe_recovery, province)
+    tax                   = tax_on(bidvex_platform_fee + stripe_recovery, partner_prov)
     partner_owes_bidvex   = _r(bidvex_platform_fee + stripe_recovery + tax)
     return {
         "seller_type":         "partner",
-        "buyer_province":      province,
+        "partner_province":    partner_prov,
+        "buyer_province":      buyer_prov,
         "hammer_price":        float(hammer),
         "partner_bp_rate":     float(partner_bp_rate),
         "partner_bp_revenue":  float(partner_bp_revenue),
         "bidvex_platform_fee": float(bidvex_platform_fee),
         "stripe_recovery":     float(stripe_recovery),
         "tax":                 float(tax),
-        "tax_label":           TAX_RATES.get(province, TAX_RATES["INTL"])["label"],
+        "tax_label":           TAX_RATES.get(partner_prov, TAX_RATES["INTL"])["label"],
         "partner_owes_bidvex": float(partner_owes_bidvex),
         "total_buyer_pays_to_bidvex": 0.0,   # partners: buyer pays partner directly
         "buyer_pays_partner":  float(hammer + partner_bp_revenue),
     }
 
 
-def _vehicle(hammer, province):
+def _vehicle(hammer, buyer_prov):
+    """iter350 v2 — Buyer is the recipient of BidVex's 2.5% platform fee
+    on vehicle transactions, so tax is by the BUYER's province."""
     platform_fee    = _r(hammer * Decimal("0.025"))
     stripe_recovery = calculate_stripe_recovery(platform_fee)
-    tax             = tax_on(platform_fee + stripe_recovery, province)
+    tax             = tax_on(platform_fee + stripe_recovery, buyer_prov)
     total           = _r(platform_fee + stripe_recovery + tax)
     return {
         "seller_type":      "vehicle_dealer",
-        "buyer_province":   province,
+        "buyer_province":   buyer_prov,
         "hammer_price":     float(hammer),
         "platform_fee":     float(platform_fee),
         "stripe_recovery":  float(stripe_recovery),
         "tax":              float(tax),
-        "tax_label":        TAX_RATES.get(province, TAX_RATES["INTL"])["label"],
+        "tax_label":        TAX_RATES.get(buyer_prov, TAX_RATES["INTL"])["label"],
         "buyer_pays_bidvex": float(total),
         "dealer_owes_bidvex_per_transaction": 0.0,
         "hammer_paid_direct_to_dealer": True,
     }
 
 
-def _storage(hammer, province, pm):
+def _storage(hammer, facility_prov, buyer_prov, pm):
+    """iter350 v2 — Facility is the recipient of BidVex's 5% commission,
+    so tax is by the FACILITY's province (CRA Place-of-Supply)."""
     commission      = _r(hammer * Decimal("0.05"))
     stripe_recovery = calculate_stripe_recovery(commission)
-    tax             = tax_on(commission + stripe_recovery, province)
+    tax             = tax_on(commission + stripe_recovery, facility_prov)
     facility_owes   = _r(commission + stripe_recovery + tax)
     return {
         "seller_type":         "storage_facility",
-        "buyer_province":      province,
+        "facility_province":   facility_prov,
+        "buyer_province":      buyer_prov,
         "hammer_price":        float(hammer),
         "bidvex_commission":   float(commission),
         "stripe_recovery":     float(stripe_recovery),
         "tax":                 float(tax),
-        "tax_label":           TAX_RATES.get(province, TAX_RATES["INTL"])["label"],
+        "tax_label":           TAX_RATES.get(facility_prov, TAX_RATES["INTL"])["label"],
         "facility_owes_bidvex": float(facility_owes),
         "buyer_pays_bidvex":   0.0,                # storage: BidVex NEVER charges buyer
     }
