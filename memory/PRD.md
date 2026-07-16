@@ -1,5 +1,45 @@
 # BidVex — Auction Marketplace PRD
 
+## iter353 — Prospect Finder Hardening + Admin Extension View + Sign Alerts (Feb 16, 2026) ✅ COMPLETE — VERIFIED
+
+Fixes a **production Cloudflare "invalid or incomplete response"** popup on `/api/contractor/prospect-finder` + adds admin visibility into contractor extensions + notifies admin on every agreement signing.
+
+**1. Prospect Finder Cloudflare fix** (`routes/contractor_prospects.py` + `services/prospect_finder.py`)
+- **Root cause**: two hidden slow paths could push a single request past Cloudflare's ~30s origin timeout:
+  - `httpx.AsyncClient(timeout=25)` on the Google Places call.
+  - `flag_already_in_bidvex()` fired **N × 3 unindexed regex `$or` queries** in a tight loop (up to 60 scans/search) with no timeout guard.
+- **Fixes**:
+  - Places call now `httpx.Timeout(connect=12, read=15, write=15, pool=15)`.
+  - `flag_already_in_bidvex()` rewritten to **one batched `$or` query with `max_time_ms(3000)`**. Skips regex when the normalized business name is < 6 chars.
+  - Entire endpoint wrapped in `asyncio.wait_for(..., timeout=22)` — well below Cloudflare's ceiling.
+  - Every failure path (`httpx.HTTPStatusError`, `httpx.TimeoutException`, `asyncio.TimeoutError`, unexpected `Exception`) now returns **HTTP 200 with `{items: [], error: "...", error_message_en/fr: "..."}`** so Cloudflare never sees a malformed origin response.
+- **Verified**: direct route invocation with a bogus `GOOGLE_MAPS_API_KEY` → Places returned 400 → route returned `200 OK` with `error: "prospect_finder_upstream_unavailable"` in **170ms**. No `HTTPException` raised.
+
+**2. Admin sees each contractor's extension** (`routes/twilio.py:984` + `AdminContractorsPage.jsx`)
+- Backend `/api/twilio/admin/contractors` projection now includes `extension_number`, `contractor_agreement_signed`, `contractor_agreement_signed_at`.
+- Frontend adds a new **"Extension"** column between "Contractor" and "Stripe":
+  - Assigned → monospace `ext. 1220` in slate-800.
+  - Unassigned → amber `Pending` badge with `AlertTriangle` icon.
+- Live-verified via screenshot: 3 contractors rendering `ext. 1223`, `ext. 1221`, `ext. 1220`.
+
+**3. Admin notified when contractor signs the agreement** (`services/admin_notifications.py` + `routes/twilio.py:1988`)
+- New `notify_admin_contractor_signed()` helper — SendGrid HTML alert.
+  - **First sign** (contractor's extension was `null` at start of sign call): emerald header, subject `[BidVex] Contractor Agreement Signed — Extension Active`.
+  - **Re-sign** (contractor already had an extension): amber header, subject `[BidVex] Contractor Agreement Re-Signed — Extension Active (v1.2.0)` (agreement version in parens).
+- `POST /api/twilio/contractor/agreements/sign` now:
+  - Idempotently calls `assign_extension()` — first-time signers get their extension activated; re-signers get their existing number returned.
+  - Emits the admin alert (wrapped in try/except so email failure never blocks the sign).
+  - Writes an `admin_logs` row `{action:"contractor_agreement_signed", actor_id, actor_email, extension_number, agreement_version, is_first_signing, ip, user_agent, created_at}`.
+  - Returns `{...row, extension_number}` so the frontend can immediately update the UI.
+- **Verified**: SendGrid returned `202` on both first-sign and re-sign paths to `charbel911@gmail.com`. `admin_logs` row inserts + reads correctly.
+
+**Regression:** 117 / 117 backend tests pass. Zero side-effects from iter353.
+
+**Production notes:**
+- Deploying this to production `bidvex.com` will resolve the Cloudflare "invalid or incomplete response" popup users see on the Prospect Finder.
+- The Extension column change is UI-only + a backend projection addition — safe to deploy.
+- The admin sign notification will start firing on the FIRST post-deploy signing (and every subsequent one).
+
 ## iter352 — Nightly Base64 Sweep Alerts (Feb 16, 2026) ✅ COMPLETE — VERIFIED
 
 - `services/admin_notifications.py::notify_admin_base64_sweep()` — SendGrid amber-header HTML alert. Per-collection breakdown, up to 50 dedup'd listing IDs each, skipped/failed counts, CTA → `/admin/feeds`.

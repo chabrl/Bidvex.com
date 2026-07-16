@@ -162,6 +162,7 @@ export default function AdminContractorsPage() {
                 <thead>
                   <tr className="text-xs text-slate-500 border-b bg-slate-50">
                     <th className="text-left py-2 px-3">{fr ? 'Contractant' : 'Contractor'}</th>
+                    <th className="text-left py-2 px-3">{fr ? 'Poste' : 'Extension'}</th>
                     <th className="text-left py-2 px-3">{fr ? 'Stripe' : 'Stripe'}</th>
                     <th className="text-left py-2 px-3">{fr ? 'Code parrainage' : 'Referral'}</th>
                     <th className="text-right py-2 px-3">{fr ? 'Accumulé' : 'Accrued'}</th>
@@ -289,6 +290,18 @@ function ContractorRow({ contractor, token, fr, onEditRates, onRemoveAttribution
         <td className="py-2 px-3">
           <p className="font-medium">{contractor.name || contractor.email}</p>
           <p className="text-xs text-slate-500 font-mono">{contractor.id?.slice(0, 8)}</p>
+        </td>
+        <td className="py-2 px-3" data-testid={`ext-${contractor.id}`}>
+          {contractor.extension_number ? (
+            <span className="font-mono text-sm font-semibold text-slate-800">
+              ext. {contractor.extension_number}
+            </span>
+          ) : (
+            <Badge className="bg-amber-100 text-amber-800" data-testid={`ext-pending-${contractor.id}`}>
+              <AlertTriangle className="h-3 w-3 mr-1" />
+              {fr ? 'En attente' : 'Pending'}
+            </Badge>
+          )}
         </td>
         <td className="py-2 px-3">
           {stripeOk ? (

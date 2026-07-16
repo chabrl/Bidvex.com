@@ -229,3 +229,67 @@ border-radius:8px;text-decoration:none;font-weight:bold;">Review Feed Diagnostic
 BidVex Canada &mdash; Admin Notification System &mdash; iter351 nightly_base64_sweep</td></tr>
 </table></td></tr></table></body></html>"""
     return await _send_admin_raw(subject, html)
+
+
+
+async def notify_admin_contractor_signed(
+    contractor_name: str,
+    contractor_email: str,
+    extension_number: int | None,
+    agreement_version: str,
+    signed_at_iso: str,
+    ip_address: str = "",
+    is_first_signing: bool = True,
+) -> bool:
+    """iter353 — Fires on every contractor agreement signing.
+
+    Subject prefix differs by first-sign vs re-sign per user directive:
+      • First sign  → "[BidVex] Contractor Agreement Signed — Extension Active"
+      • Re-sign     → "[BidVex] Contractor Agreement Re-Signed — Extension Active (vX.Y)"
+    """
+    ext_display = f"ext. {extension_number}" if extension_number else "— pending —"
+    subject = (
+        "[BidVex] Contractor Agreement Signed — Extension Active"
+        if is_first_signing else
+        f"[BidVex] Contractor Agreement Re-Signed — Extension Active ({agreement_version})"
+    )
+    header_label = "Contractor Signed Agreement" if is_first_signing else "Contractor Re-Signed Agreement"
+    header_color = "#059669" if is_first_signing else "#B45309"  # emerald on first, amber on re-sign
+
+    html = f"""<!DOCTYPE html><html><body style="margin:0;padding:0;background:#F0F4F8;font-family:sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:40px 20px;">
+<table width="640" style="background:#fff;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
+<tr><td style="background:{header_color};padding:20px 24px;border-radius:10px 10px 0 0;">
+<h2 style="color:#fff;margin:0;font-size:18px;">
+{'✅' if is_first_signing else '🔄'} BidVex Admin &mdash; {header_label}
+</h2></td></tr>
+<tr><td style="padding:20px 24px;">
+<p style="margin:0 0 12px;color:#1E293B;font-size:14px;">
+A contractor has {'signed' if is_first_signing else 're-signed'} the BidVex Contractor Services
+Agreement. Their dialer extension is now {'active' if extension_number else 'pending assignment (backfill required — see logs)'}.
+</p>
+<table width="100%" style="border-top:1px solid #E2E8F0;margin-top:8px;">
+<tr><td style="padding:8px 0;color:#64748B;font-size:13px;">Contractor</td>
+<td style="padding:8px 0;color:#1E293B;font-size:13px;font-weight:600;">{contractor_name or "(unnamed)"}</td></tr>
+<tr><td style="padding:8px 0;color:#64748B;font-size:13px;">Email</td>
+<td style="padding:8px 0;color:#1E293B;font-size:13px;font-weight:600;">
+<a href="mailto:{contractor_email}" style="color:#0B2545;text-decoration:none;">{contractor_email}</a>
+</td></tr>
+<tr><td style="padding:8px 0;color:#64748B;font-size:13px;">Extension</td>
+<td style="padding:8px 0;color:#0B2545;font-size:14px;font-weight:700;font-family:monospace;">{ext_display}</td></tr>
+<tr><td style="padding:8px 0;color:#64748B;font-size:13px;">Agreement version</td>
+<td style="padding:8px 0;color:#1E293B;font-size:13px;font-weight:600;font-family:monospace;">{agreement_version}</td></tr>
+<tr><td style="padding:8px 0;color:#64748B;font-size:13px;">Signed at (UTC)</td>
+<td style="padding:8px 0;color:#1E293B;font-size:13px;font-weight:600;">{signed_at_iso}</td></tr>
+<tr><td style="padding:8px 0;color:#64748B;font-size:13px;">Client IP</td>
+<td style="padding:8px 0;color:#1E293B;font-size:13px;font-weight:600;font-family:monospace;">{ip_address or '(not captured)'}</td></tr>
+</table>
+</td></tr>
+<tr><td style="padding:0 24px 24px;text-align:center;">
+<a href="https://www.bidvex.com/admin/contractors" style="background:#0B2545;color:white;padding:12px 24px;
+border-radius:8px;text-decoration:none;font-weight:bold;">Open Admin Contractors</a>
+</td></tr>
+<tr><td style="background:#F8FAFC;padding:12px 24px;border-radius:0 0 10px 10px;text-align:center;color:#94A3B8;font-size:11px;">
+BidVex Canada &mdash; Admin Notification System &mdash; iter353 contractor_agreement_signed</td></tr>
+</table></td></tr></table></body></html>"""
+    return await _send_admin_raw(subject, html)

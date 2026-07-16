@@ -986,7 +986,11 @@ async def admin_list_contractors(user: User = Depends(require_admin)) -> Dict[st
     """iter316 Mission B5 — Admin: list all dialer contractors with
     minimal fields for the Contractors admin tab. Earnings + referred
     accounts can be lazy-loaded per-contractor via the existing
-    /twilio/contractor/dashboard?contractor_id=... endpoint."""
+    /twilio/contractor/dashboard?contractor_id=... endpoint.
+
+    iter353 — Now includes `extension_number` + `contractor_agreement_signed`
+    so the admin table can show `ext. 1220` or a "Pending" badge for each
+    contractor without a second round-trip."""
     db = get_db()
     rows = await db.users.find(
         {"role": "dialer_contractor"},
@@ -995,6 +999,9 @@ async def admin_list_contractors(user: User = Depends(require_admin)) -> Dict[st
          "stripe_connect_account_id": 1,
          "stripe_connect_payouts_enabled": 1,
          "stripe_connect_onboarding_complete": 1,
+         "extension_number": 1,
+         "contractor_agreement_signed": 1,
+         "contractor_agreement_signed_at": 1,
          "created_at": 1},
     ).sort("created_at", -1).to_list(length=500)
     return {"items": rows, "count": len(rows)}
@@ -1998,8 +2005,62 @@ async def sign_agreement(body: SignAgreementBody,
             "contractor_agreement_signed_at":       now_iso,
         }},
     )
+
+    # ─── iter353 — extension activation + admin notification ───────────
+    # 1) Assign the contractor's dialer extension if not already present
+    #    (idempotent: returns the existing extension for re-signs).
+    # 2) Emit the admin alert email + admin_logs audit row.
+    # Wrapped so any post-sign failure NEVER blocks the primary sign flow.
+    assigned_ext: Optional[int] = None
+    is_first_signing = False
+    try:
+        from services.contractor_extensions import get_extension_for_contractor, assign_extension
+        pre_ext = await get_extension_for_contractor(db, user.id)
+        is_first_signing = (pre_ext is None)
+        assigned_ext = await assign_extension(db, user.id)
+        if is_first_signing:
+            logger.info(f"[iter353] contractor {user.id} first sign → extension {assigned_ext}")
+    except Exception as _ext_exc:  # noqa: BLE001
+        logger.error(f"[iter353] extension assignment on sign failed for {user.id}: {_ext_exc}")
+
+    try:
+        from services.admin_notifications import notify_admin_contractor_signed
+        contractor_display_name = (
+            (me or {}).get("name")
+            or f"{(me or {}).get('first_name','')} {(me or {}).get('last_name','')}".strip()
+            or (me or {}).get("legal_name")
+            or signed_full_name
+        )
+        await notify_admin_contractor_signed(
+            contractor_name=contractor_display_name,
+            contractor_email=(me or {}).get("email") or "",
+            extension_number=assigned_ext,
+            agreement_version=AGREEMENT_VERSION,
+            signed_at_iso=now_iso,
+            ip_address=client_ip,
+            is_first_signing=is_first_signing,
+        )
+    except Exception as _mail_exc:  # noqa: BLE001
+        logger.error(f"[iter353] admin sign-notification email failed: {_mail_exc}")
+
+    try:
+        await db.admin_logs.insert_one({
+            "id":                    str(uuid.uuid4()),
+            "action":                "contractor_agreement_signed",
+            "actor_id":              user.id,
+            "actor_email":           (me or {}).get("email"),
+            "extension_number":      assigned_ext,
+            "agreement_version":     AGREEMENT_VERSION,
+            "is_first_signing":      is_first_signing,
+            "ip":                    client_ip,
+            "user_agent":            user_agent,
+            "created_at":            now_iso,
+        })
+    except Exception as _log_exc:  # noqa: BLE001
+        logger.error(f"[iter353] admin_logs write failed: {_log_exc}")
+
     row.pop("_id", None)
-    return {**row, "already_signed": False}
+    return {**row, "already_signed": False, "extension_number": assigned_ext}
 
 
 def _require_agreement_signed(db_obj, contractor_id: str):

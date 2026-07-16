@@ -89,7 +89,10 @@ async def search_places(city: str, biz_type: str, max_results: int = 20) -> List
         "X-Goog-Api-Key": os.environ["GOOGLE_MAPS_API_KEY"],
         "X-Goog-FieldMask": FIELD_MASK,
     }
-    async with httpx.AsyncClient(timeout=25) as client:
+    # iter353 — Cloudflare origin timeout is ~30s. Bound Places to 12s connect
+    # / 15s read so a slow response can never push the outer request past 30s.
+    tmo = httpx.Timeout(connect=12.0, read=15.0, write=15.0, pool=15.0)
+    async with httpx.AsyncClient(timeout=tmo) as client:
         resp = await client.post(PLACES_SEARCH_URL, json=body, headers=headers)
     resp.raise_for_status()
     out: List[Dict[str, Any]] = []
@@ -110,22 +113,65 @@ async def search_places(city: str, biz_type: str, max_results: int = 20) -> List
 
 async def flag_already_in_bidvex(db, prospects: List[Dict[str, Any]]) -> None:
     """Data quality — mark prospects whose phone or business name fuzzy-matches
-    an existing BidVex account so contractors don't cold-call customers."""
+    an existing BidVex account so contractors don't cold-call customers.
+
+    iter353 — Batched single-query rewrite. Previously fired N × 3 regex
+    scans in a tight loop with no timeout guard — up to 60 unindexed
+    scans that could blow past Cloudflare's 30s origin ceiling. Now: one
+    `$or` query with .max_time_ms(3000) hard ceiling. Regex on `name`/
+    `company_name` is skipped when the normalized business name is too
+    short (<6 chars) because it produces too many false positives AND is
+    the slowest kind of scan.
+    """
+    # Default every prospect to false; we'll flip matched ones below.
     for p in prospects:
         p["already_in_bidvex"] = False
-        clauses = []
+
+    # Build a batched $or with a bounded number of clauses. Cap at 60
+    # clauses total (20 prospects × 3 clauses) — Mongo handles this in
+    # a single scan and 60 is well below the 100-clause soft limit.
+    clauses: list = []
+    # Track which prospect each clause maps back to.
+    phone_index: Dict[str, int] = {}
+    name_index: Dict[str, int] = {}
+
+    for i, p in enumerate(prospects):
         digits = normalize_phone(p.get("phone"))
         if len(digits) == 10:
-            clauses.append({"phone": {"$regex": f"{digits}$"}})
+            phone_index[digits] = i
+            clauses.append({"phone": {"$regex": f"{re.escape(digits)}$"}})
         core = normalize_business_name(p.get("name"))
         if len(core) >= 6:
+            name_index[core] = i
             pattern = re.escape(core)
             clauses.append({"company_name": {"$regex": pattern, "$options": "i"}})
-            clauses.append({"name": {"$regex": pattern, "$options": "i"}})
-        if not clauses:
-            continue
-        try:
-            hit = await db.users.find_one({"$or": clauses}, {"_id": 0, "id": 1})
-            p["already_in_bidvex"] = bool(hit)
-        except Exception as e:  # noqa: BLE001
-            logger.warning(f"[prospect-finder] already_in_bidvex check failed: {e}")
+            clauses.append({"name":         {"$regex": pattern, "$options": "i"}})
+
+    if not clauses:
+        return
+
+    try:
+        # `max_time_ms` — hard ceiling of 3 s regardless of how slow the
+        # scan turns out. Returns whatever partial matches were found so
+        # far; on true timeout Mongo raises ExecutionTimeout which we
+        # swallow and just leave `already_in_bidvex=False` for everyone.
+        cursor = db.users.find(
+            {"$or": clauses},
+            {"_id": 0, "phone": 1, "company_name": 1, "name": 1, "email": 1},
+        ).max_time_ms(3000).limit(200)
+
+        hits = await cursor.to_list(length=200)
+        for hit in hits:
+            hit_phone = normalize_phone(hit.get("phone"))
+            hit_name  = normalize_business_name(hit.get("company_name") or hit.get("name"))
+            if hit_phone and hit_phone in phone_index:
+                prospects[phone_index[hit_phone]]["already_in_bidvex"] = True
+            for core, idx in name_index.items():
+                if core and (core in hit_name or hit_name in core):
+                    prospects[idx]["already_in_bidvex"] = True
+    except Exception as e:  # noqa: BLE001
+        # Non-fatal — surface the exception in logs and let every
+        # prospect stay flagged False (safe default: contractor may
+        # accidentally re-contact an existing customer, but the search
+        # ITSELF completes and Cloudflare stays happy).
+        logger.warning(f"[prospect-finder] flag_already_in_bidvex bailed: {e}")
