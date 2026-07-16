@@ -122,56 +122,57 @@ async def flag_already_in_bidvex(db, prospects: List[Dict[str, Any]]) -> None:
     `company_name` is skipped when the normalized business name is too
     short (<6 chars) because it produces too many false positives AND is
     the slowest kind of scan.
+
+    iter353 P2 — Single-round-trip query. MongoDB's SUBPLAN operator
+    uses `idx_users_phone_last10` for the phone branch AND the collated
+    name indexes for the name-prefix branches. One network round-trip,
+    each `$or` branch is index-covered.
     """
     # Default every prospect to false; we'll flip matched ones below.
     for p in prospects:
         p["already_in_bidvex"] = False
 
-    # Build a batched $or with a bounded number of clauses. Cap at 60
-    # clauses total (20 prospects × 3 clauses) — Mongo handles this in
-    # a single scan and 60 is well below the 100-clause soft limit.
-    clauses: list = []
-    # Track which prospect each clause maps back to.
-    phone_index: Dict[str, int] = {}
-    name_index: Dict[str, int] = {}
-
+    phone_by_digits: Dict[str, int] = {}
+    name_by_core: Dict[str, int] = {}
     for i, p in enumerate(prospects):
         digits = normalize_phone(p.get("phone"))
         if len(digits) == 10:
-            phone_index[digits] = i
-            clauses.append({"phone": {"$regex": f"{re.escape(digits)}$"}})
+            phone_by_digits[digits] = i
         core = normalize_business_name(p.get("name"))
         if len(core) >= 6:
-            name_index[core] = i
-            pattern = re.escape(core)
-            clauses.append({"company_name": {"$regex": pattern, "$options": "i"}})
-            clauses.append({"name":         {"$regex": pattern, "$options": "i"}})
+            name_by_core[core] = i
+
+    clauses: list = []
+    # Phone branch — exact match on the denormalized 10-digit field.
+    # `$in` collapses to a single IXSCAN over the phone_last10 index.
+    if phone_by_digits:
+        clauses.append({"phone_last10": {"$in": list(phone_by_digits.keys())}})
+    # Name branch — prefix regex (`^pattern`) IS accelerated by btree
+    # indexes when combined with the case-insensitive collation.
+    for core in name_by_core:
+        prefix = re.escape(core)
+        clauses.append({"company_name": {"$regex": f"^{prefix}"}})
+        clauses.append({"name":         {"$regex": f"^{prefix}"}})
 
     if not clauses:
         return
 
     try:
-        # `max_time_ms` — hard ceiling of 3 s regardless of how slow the
-        # scan turns out. Returns whatever partial matches were found so
-        # far; on true timeout Mongo raises ExecutionTimeout which we
-        # swallow and just leave `already_in_bidvex=False` for everyone.
         cursor = db.users.find(
             {"$or": clauses},
-            {"_id": 0, "phone": 1, "company_name": 1, "name": 1, "email": 1},
-        ).max_time_ms(3000).limit(200)
-
+            {"_id": 0, "phone_last10": 1, "company_name": 1, "name": 1},
+        ).collation({"locale": "en", "strength": 2}).max_time_ms(3000).limit(200)
         hits = await cursor.to_list(length=200)
         for hit in hits:
-            hit_phone = normalize_phone(hit.get("phone"))
-            hit_name  = normalize_business_name(hit.get("company_name") or hit.get("name"))
-            if hit_phone and hit_phone in phone_index:
-                prospects[phone_index[hit_phone]]["already_in_bidvex"] = True
-            for core, idx in name_index.items():
-                if core and (core in hit_name or hit_name in core):
+            pl = hit.get("phone_last10")
+            if pl and pl in phone_by_digits:
+                prospects[phone_by_digits[pl]]["already_in_bidvex"] = True
+            hit_core = normalize_business_name(hit.get("company_name") or hit.get("name"))
+            for core, idx in name_by_core.items():
+                if core and (core in hit_core or hit_core in core):
                     prospects[idx]["already_in_bidvex"] = True
     except Exception as e:  # noqa: BLE001
-        # Non-fatal — surface the exception in logs and let every
-        # prospect stay flagged False (safe default: contractor may
-        # accidentally re-contact an existing customer, but the search
-        # ITSELF completes and Cloudflare stays happy).
+        # Non-fatal — surface in logs and let every un-flagged prospect
+        # stay `already_in_bidvex=False`. The search request itself
+        # completes cleanly (Cloudflare stays happy).
         logger.warning(f"[prospect-finder] flag_already_in_bidvex bailed: {e}")

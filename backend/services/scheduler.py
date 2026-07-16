@@ -1336,7 +1336,32 @@ def init_scheduler(database):
         replace_existing=True,
     )
 
-    logger.info("Scheduler initialized with 24 jobs")
+    # ─── iter353 P2 — Keep phone_last10 fresh (cheap idempotent).
+    # Runs every 30 minutes to catch newly-registered users whose write
+    # path doesn't yet populate the denormalized field. Runtime at prod
+    # scale is O(new_users_since_last_run) because the cursor only
+    # touches docs whose stored value != expected value.
+    async def phone_last10_heartbeat_job():
+        if db_instance is None:
+            return
+        try:
+            from services.prospect_finder_indexes import backfill_phone_last10
+            result = await backfill_phone_last10(db_instance)
+            if result.get("updated", 0) > 0:
+                logger.info(f"[iter353 P2 phone_last10-heartbeat] {result}")
+            return result
+        except Exception as exc:  # noqa: BLE001
+            logger.error(f"[iter353 P2 phone_last10-heartbeat] failed: {exc}")
+
+    scheduler.add_job(
+        _tracked("phone_last10_heartbeat", phone_last10_heartbeat_job),
+        IntervalTrigger(minutes=30),
+        id="phone_last10_heartbeat",
+        name="iter353 P2 — phone_last10 backfill heartbeat (every 30 min)",
+        replace_existing=True,
+    )
+
+    logger.info("Scheduler initialized with 25 jobs")
     return scheduler
 
 

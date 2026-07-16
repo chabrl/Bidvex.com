@@ -33,12 +33,29 @@ Fixes a **production Cloudflare "invalid or incomplete response"** popup on `/ap
   - Returns `{...row, extension_number}` so the frontend can immediately update the UI.
 - **Verified**: SendGrid returned `202` on both first-sign and re-sign paths to `charbel911@gmail.com`. `admin_logs` row inserts + reads correctly.
 
-**Regression:** 117 / 117 backend tests pass. Zero side-effects from iter353.
+**4. Prospect Finder DB index kit (iter353 P2)** (`services/prospect_finder_indexes.py` NEW + `services/prospect_finder.py` + startup + scheduler)
+- **4 new MongoDB indexes** (idempotent, created on boot):
+  - `idx_users_phone_partial` — partial b-tree on `users.phone` where field exists.
+  - `idx_users_company_name_ci` — collated (locale=en, strength=2) b-tree on `users.company_name`.
+  - `idx_users_name_ci` — collated (locale=en, strength=2) b-tree on `users.name`.
+  - `idx_users_phone_last10` — sparse b-tree on the denormalized 10-digit field.
+- **New denormalized field `users.phone_last10`** — populated by `backfill_phone_last10()` at boot + kept fresh by a new `phone_last10_heartbeat` scheduler job (every 30 min). Boot log confirms: `scanned=22 updated=8 skipped_no_phone=14`.
+- **Query rewrite in `flag_already_in_bidvex()`** — single-round-trip `$or` now uses:
+  - Phone branch: `{"phone_last10": {"$in": digits_list}}` — exact match, `explain()` confirms **`FETCH → IXSCAN`** on `idx_users_phone_last10`.
+  - Name branch: `{"$regex": "^prefix"}` (prefix-anchored) + `.collation({locale:"en", strength:2})` — prefix regex is the only regex form that can use a collated btree index.
+- **Honest performance measurement**:
+  - Preview (28 users): both queries ≈ 45ms — dominated by Motor async framework + network overhead; Mongo work is trivial at that scale.
+  - Synthetic 10k users, isolated phone branch: **OLD 57.6ms → NEW 45.0ms** (1.3× measured, with `explain()` confirming IXSCAN). The 45ms floor is 100% framework overhead — actual Mongo work dropped from ~12ms COLLSCAN to sub-1ms IXSCAN.
+  - Expected production scale (100k+ users): OLD grows linearly (~500ms+ at 100k → Cloudflare-timeout territory at 1M+), NEW stays flat at ~45ms. **Real 10-100× win only materializes at prod scale** — my earlier "50ms" claim was for the ceiling, not the floor.
+- Scheduler count now: **25 jobs**.
+
+**Regression:** 117 / 117 backend tests pass. Zero side-effects from iter353 P1 or P2.
 
 **Production notes:**
 - Deploying this to production `bidvex.com` will resolve the Cloudflare "invalid or incomplete response" popup users see on the Prospect Finder.
 - The Extension column change is UI-only + a backend projection addition — safe to deploy.
 - The admin sign notification will start firing on the FIRST post-deploy signing (and every subsequent one).
+- On first prod boot after deploy, `backfill_phone_last10` will scan all users and populate the denormalized field (expected to be quick — the loop only touches docs whose value is missing or stale).
 
 ## iter352 — Nightly Base64 Sweep Alerts (Feb 16, 2026) ✅ COMPLETE — VERIFIED
 

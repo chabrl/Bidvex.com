@@ -275,6 +275,20 @@ async def lifespan(app):
             await refresh_cache_from_db(db)
         except Exception as _te:
             logger.warning(f"[iter350] tax_rate_config bootstrap failed (non-fatal): {_te}")
+
+        # iter353 P2 — Prospect Finder DB indexes + phone_last10 backfill.
+        # Idempotent — safe to run on every boot. Turns the batched
+        # already_in_bidvex query into an index-covered lookup so it
+        # stays under 50ms even at prod scale.
+        try:
+            from services.prospect_finder_indexes import (
+                ensure_prospect_finder_indexes, backfill_phone_last10,
+            )
+            await ensure_prospect_finder_indexes(db)
+            result = await backfill_phone_last10(db)
+            logger.info(f"[iter353 P2] prospect finder indexes + backfill: {result}")
+        except Exception as _pfe:
+            logger.warning(f"[iter353 P2] prospect finder index setup failed (non-fatal): {_pfe}")
         # iter236 Mission 2 — 2dsphere index on listings.location.coordinates
         from routes.geo_search import ensure_2dsphere_index
         await ensure_2dsphere_index()
