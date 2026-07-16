@@ -155,7 +155,14 @@ Accounts seeded / reset:
 - Email: `iter331_nonadmin@test.com`
 - Password: `NonAdmin2026!`
 - Role: `user` (regular, no admin)
-- Notes: Created via `/api/auth/register` during iter331 testing to verify 403 on admin-only endpoints (Blogs CRUD + Contractor Aid). Use this when testbuyer@bidvex.com login returns 401 on preview.
+- ⚠️ **iter350 UPDATE**: this account was deleted during a cleanup. Use the replacement below.
+
+## 🆕 iter350 — Non-admin test user (registered by testing agent 2026-07-16)
+- Email: `iter350_nonadmin@test.com`
+- Password: `NonAdmin2026!`
+- Role: `user` (regular, QC individual, no admin)
+- User id: `bca0f438-8aa3-4ed1-b139-8cab24e6b99f`
+- Notes: Replacement for iter331_nonadmin@test.com. Use this account to verify 403 responses on admin-only endpoints (Blogs CRUD, Contractor Aid, `/api/admin/pricing/tax-rates`, etc.).
 
 ## ⚠️ Cookie consent — TWO keys (v1 + v2) — refreshed iter331
 Automation runners must set BOTH localStorage keys before any UI interaction

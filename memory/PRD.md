@@ -1,5 +1,65 @@
 # BidVex — Auction Marketplace PRD
 
+## iter350 — Payment Infrastructure Sprint (Parts B+C+D+E) (Feb 16, 2026) ✅ COMPLETE — TESTED
+
+Big-bang migration to a CRA-compliant, DB-configurable payment engine. Backend regression: **134/134 tests PASS**, 0 failures. Testing agent iteration_350.json: 100% backend PASS, zero critical issues.
+
+- **Two Universal Rules Enforced** (per `/app/memory/PAYMENT_INFRASTRUCTURE.md`):
+  1. **Stripe recovery = `(BidVex_fee × 0.029) + $0.30`** — applied ONLY on the BidVex fee. Never on hammer price, subscription base, or deposit amount.
+  2. **CRA Place-of-Supply routing** — each user's fee is taxed at THEIR own province: buyer premium at buyer's province, seller commission at seller's province, partner 3% at partner's province, vehicle 2.5% at buyer's province, storage 5% at facility's province. International recipients → 0% (Sched. VI Part V §7 zero-rated).
+
+- **NEW `services/tax_rate_config.py`** — DB-backed, admin-configurable rate table:
+  - Bootstrap constants for 14 jurisdictions (QC, ON, NB, NS, PE, NL, AB, BC, SK, MB, YT, NT, NU, INTL).
+  - Auto-seeded into `db.tax_rate_config` on first boot (idempotent).
+  - 5-min in-memory cache; 15-min scheduler heartbeat forces reload across workers.
+  - Every mutation snapshots the prior row into `db.tax_rate_config_history` (immutable CRA audit trail with `effective_from` / `effective_to` / `superseded_by_user_id`).
+
+- **`services/fee_calculator.py` — canonical iter350 API**:
+  - `calculate_fee(hammer_price, auction_type, seller_account_type, seller_tier, buyer_tier, partner_bp_rate, payment_method, buyer_province, seller_province, partner_province, facility_province)` — dispatches into 4 seller-type routes (individual/enterprise, partner, vehicle_dealer, storage_facility).
+  - `calculate_stripe_recovery(fee_amount)` — canonical formula helper.
+  - `tax_on(amount, province)` — reads from `tax_rate_config` cache.
+  - `calculate_broker_transaction(hammer, broker_fee_structure, buyer_province)` — new broker deal calc.
+  - `calculate_contractor_commission(bidvex_fee_collected, contractor_rate)` — helper.
+  - Every result carries `fee_model_version="iter350"` for audit reproducibility.
+  - Legacy shims kept: `calculate_partner_taxes`, `_resolve_province`, `PROVINCE_TAX_REGIME` (for back-compat with pre-iter350 callers).
+
+- **`services/tax_engine.py`** — added `calculate_taxes_for_recipient(subtotal, province, currency)` (province-aware). Legacy `calculate_gst_qst()` kept as QC-default shim for SendGrid templates.
+
+- **Route migrations**:
+  - `GET /api/fees/v2/preview` now accepts `buyer_province` + `seller_province` (auto-resolves from `buyer_user_id` / `seller_user_id` if provided).
+  - `POST /api/fees/estimate-transaction` now looks up both buyer and seller provinces from `db.users`.
+  - `GET /api/subscriptions/price-breakdown` now accepts `&province=` and returns `gst`/`qst`/`hst`/`tax_label`/`fee_model_version`.
+  - `_generate_subscription_invoice` stamps province/tax_label/gst/qst/hst/combined_rate/total_with_tax + `fee_model_version="iter350"` on every row.
+  - `services/auction_settlement.py` passes buyer_province + seller_province from user docs into `calculate_fee()`.
+
+- **NEW Admin Tax-Rate Endpoints** (super_admin auth):
+  - `GET  /api/admin/pricing/tax-rates` — list all 14 rows.
+  - `GET  /api/admin/pricing/tax-rates/{province}` — single row.
+  - `PUT  /api/admin/pricing/tax-rates/{province}` — update GST/QST/HST/label, snapshots prior row to history.
+  - `GET  /api/admin/pricing/tax-rates-history/{province}` — immutable audit trail.
+  - Non-admin users receive 403 on every endpoint.
+
+- **NEW Scheduler Jobs** (total is now 23):
+  - `contractor_monthly_payouts` — cron 1st of month 02:00 UTC → `services.contractor_commission.run_monthly_contractor_payouts` (Stripe Connect Transfer per contractor).
+  - `tax_rate_cache_refresh` — 15-min interval, keeps rate cache fresh across workers.
+
+- **Verified live CRA compliance** (curl on preview URL):
+  - AB buyer + vehicle_dealer + $5,000 hammer → `buyer_tax_label="GST (5%)"`, tax=$6.45 (previously would have been $77.09 at old QC rate — **$70+ per transaction overcharge fixed**).
+  - QC subscriber + Premium $180/yr → GST $9.00 + QST $17.96 = $206.96 subtotal + $6.30 Stripe = $213.26 total.
+  - AB subscriber + Premium $180/yr → GST $9.00 = $189 subtotal + $5.78 Stripe = $194.78 total.
+  - US (INTL) subscriber + Premium $180/yr → zero-rated $185.52 (Exported Service per Sched. VI Part V §7).
+  - QC buyer + ON seller (cross-province) → buyer_tax_label="GST + QST (14.975%)" AND seller_tax_label="HST (13%)" — split correctly per user's own province.
+
+- **8 Appendix-A Proofs** (`/app/memory/PAYMENT_INFRASTRUCTURE.md` §18) all PASS with iter350 canonical numbers. Combined with 29 new tests, 16 subscription-tax tests, and 17 HTTP-level regression tests → 134 backend tests green.
+
+- **Historical invoices** frozen with their pre-iter350 model; every new invoice is stamped `fee_model_version="iter350"`. No data migration performed on historical rows (per big-bang decision).
+
+**Charbel actions**: no config change required. If CRA changes a tax rate in the future:
+```
+PUT /api/admin/pricing/tax-rates/ON  {"hst": 0.14, "label": "HST (14%)"}
+```
+No redeploy needed — cache invalidates within 15 min across all workers.
+
 ## iter349 — Business-Hours-Aware Bilingual IVR (Feb 11, 2026) ✅ COMPLETE — TESTED
 Warranty work — ZERO credit charged. Backend 11/11 iter349 tests + 78/78 combined regression PASS. Testing agent iteration_349.json: 100% backend PASS, zero action items.
 
