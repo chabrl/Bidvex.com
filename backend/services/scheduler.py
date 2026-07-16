@@ -1286,6 +1286,9 @@ def init_scheduler(database):
     # image-bearing collections (listings / multi_item_listings /
     # vehicle_listings / storage_auctions). Idempotent: already-migrated
     # docs are skipped by the adapter's `_needs_migration()` gate.
+    # iter352 — When migrated > 0 (i.e. a client bypassed the S3
+    # pre-signed URL flow), emit an admin email alert listing the
+    # affected listing IDs so the frontend regression can be traced.
     async def nightly_base64_sweep_job():
         if db_instance is None:
             return
@@ -1294,16 +1297,33 @@ def init_scheduler(database):
                 ADAPTERS, _migrate_doc,
             )
             grand = {"migrated": 0, "skipped": 0, "failed": 0, "docs": 0}
+            affected_rows: list = []
             for adapter in ADAPTERS.values():
                 async for doc in db_instance[adapter.collection].find({}, {"_id": 0}):
                     if not doc.get("id"):
                         continue
-                    m, s, f = await _migrate_doc(db_instance, adapter, doc, dry_run=False)
+                    m, s, f, rows = await _migrate_doc(db_instance, adapter, doc, dry_run=False)
                     grand["migrated"] += m
                     grand["skipped"]  += s
                     grand["failed"]   += f
                     grand["docs"]     += 1
+                    if rows:
+                        affected_rows.extend(rows)
             logger.info(f"[iter351 nightly-base64-sweep] {grand}")
+
+            if grand["migrated"] > 0:
+                try:
+                    from services.admin_notifications import notify_admin_base64_sweep
+                    ok = await notify_admin_base64_sweep(
+                        migrated_count=grand["migrated"],
+                        affected_docs=affected_rows,
+                        skipped_count=grand["skipped"],
+                        failed_count=grand["failed"],
+                    )
+                    logger.info(f"[iter352 nightly-sweep-alert] emitted={ok}")
+                except Exception as _alert_exc:  # noqa: BLE001
+                    logger.error(f"[iter352 nightly-sweep-alert] failed: {_alert_exc}")
+
             return grand
         except Exception as exc:  # noqa: BLE001
             logger.error(f"[iter351 nightly-base64-sweep] failed: {exc}")

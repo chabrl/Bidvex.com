@@ -151,10 +151,13 @@ async def _migrate_doc(
     adapter: _Adapter,
     doc: Dict[str, Any],
     dry_run: bool,
-) -> Tuple[int, int, int]:
-    """Migrate one document. Returns (migrated, skipped, failed)."""
+) -> Tuple[int, int, int, List[Dict[str, str]]]:
+    """Migrate one document. Returns (migrated, skipped, failed, migrated_rows).
+    `migrated_rows` is a list of {"collection", "listing_id", "path", "url"}
+    entries — used by the scheduler alert to identify affected docs."""
     images = adapter.get_images(doc)
     migrated = skipped = failed = 0
+    migrated_rows: List[Dict[str, str]] = []
 
     for path_key, value in images:
         if not _needs_migration(value):
@@ -167,6 +170,12 @@ async def _migrate_doc(
                 adapter.collection, doc["id"], len(value),
             )
             migrated += 1
+            migrated_rows.append({
+                "collection": adapter.collection,
+                "listing_id": doc["id"],
+                "path": path_key,
+                "url": "(dry-run)",
+            })
             continue
 
         # Derive an integer index from the path_key for the S3 key suffix
@@ -183,6 +192,12 @@ async def _migrate_doc(
                 adapter.collection, doc["id"], path_key, new_url,
             )
             migrated += 1
+            migrated_rows.append({
+                "collection": adapter.collection,
+                "listing_id": doc["id"],
+                "path": path_key,
+                "url": new_url,
+            })
         except Exception as e:
             logger.warning(
                 "FAILED  %s/%s %s — %s (base64 left intact, will retry next run)",
@@ -190,7 +205,7 @@ async def _migrate_doc(
             )
             failed += 1
 
-    return migrated, skipped, failed
+    return migrated, skipped, failed, migrated_rows
 
 
 async def _run(args) -> int:
@@ -218,7 +233,7 @@ async def _run(args) -> int:
             async for doc in cursor:
                 if not doc.get("id"):
                     continue
-                m, s, f = await _migrate_doc(db, adapter, doc, args.dry_run)
+                m, s, f, _rows = await _migrate_doc(db, adapter, doc, args.dry_run)
                 grand["migrated"] += m
                 grand["skipped"]  += s
                 grand["failed"]   += f
