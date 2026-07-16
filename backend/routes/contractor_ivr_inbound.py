@@ -29,7 +29,7 @@ import logging
 import os
 import re
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, Optional
 from xml.sax.saxutils import escape as _xml_escape
 
@@ -459,13 +459,51 @@ async def ivr_route(request: Request) -> Response:
 # pointed at whichever entrypoint the ops team prefers.
 
 
+# iter349 — Business-hours awareness for the main IVR menu.
+#
+# Mon-Fri 08:00 - 19:00 America/Toronto = business hours → interactive
+# menu. Anything else → informational after-hours message + hangup.
+try:
+    from zoneinfo import ZoneInfo  # Python 3.9+ (backend is 3.11)
+    _MONTREAL_TZ = ZoneInfo("America/Toronto")
+except Exception:  # pragma: no cover — extremely defensive fallback
+    _MONTREAL_TZ = None
+
+
+def _current_montreal_time() -> datetime:
+    """iter349 — Injectable point for time-based IVR routing.
+
+    Kept as a module-level function so unit tests can monkey-patch it
+    to force either working-hours or after-hours behaviour deterministically.
+    """
+    if _MONTREAL_TZ is not None:
+        return datetime.now(_MONTREAL_TZ)
+    # Extreme fallback — approximate ET as UTC-5.
+    return datetime.now(timezone.utc) - timedelta(hours=5)
+
+
+def is_business_hours_now() -> bool:
+    """Return True when the current Montreal time is Mon-Fri 08:00-19:00."""
+    now = _current_montreal_time()
+    # weekday(): Mon=0 … Sun=6. Business days = 0-4.
+    if now.weekday() > 4:
+        return False
+    if now.hour < 8 or now.hour >= 19:
+        return False
+    return True
+
+
 @router.post("/twilio/ivr/main-menu")
 @router.get("/twilio/ivr/main-menu")
 async def ivr_main_menu(request: Request) -> Response:
-    """iter347 — Single-step bilingual IVR entry point.
+    """iter347 + iter349 — Bilingual IVR with business-hours awareness.
 
-    Plays the bilingual introduction + support/extension prompt, then
-    <Gather>s the caller's DTMF input (1 to 4 digits, terminator '#').
+    Business hours (Mon-Fri 08:00-19:00 America/Toronto):
+      - Full interactive <Gather> — dial extension / press 1 support /
+        press 0 general.
+    After hours (weekend, or weekday before 08:00 / after 19:00):
+      - Bilingual informational <Say> + <Hangup>. No keypress prompted.
+
     On no-input Twilio will follow-through to the same URL again with
     ?attempt++ so we don't cut off callers who are still fetching their
     contractor's extension.
@@ -492,40 +530,86 @@ async def ivr_main_menu(request: Request) -> Response:
     call_sid = form.get("CallSid")
     attempt = int(request.query_params.get("attempt") or "1")
 
+    # ── iter349 — Business-hours check ───────────────────────────────
+    business_hours = is_business_hours_now()
+    montreal_now = _current_montreal_time()
+
     if call_sid and attempt == 1:
         try:
             db = _get_db()
             await db.inbound_extension_calls.insert_one({
-                "id":              str(uuid.uuid4()),
-                "call_sid":        call_sid,
-                "from_number":     form.get("From"),
-                "to_number":       form.get("To"),
-                "started_at":      _now_iso(),
-                "status":          "in_progress",
-                "outcome":         None,
-                "contractor_id":   None,
-                "extension_dialed": None,
-                "duration_seconds": None,
-                "menu_variant":    "iter347_single_step",
+                "id":                str(uuid.uuid4()),
+                "call_sid":          call_sid,
+                "from_number":       form.get("From"),
+                "to_number":         form.get("To"),
+                "started_at":        _now_iso(),
+                "status":            "in_progress",
+                "outcome":           None,
+                "contractor_id":     None,
+                "extension_dialed":  None,
+                "duration_seconds":  None,
+                # iter349 — annotate the row with the branch chosen and
+                # the Montreal-time snapshot so ops can retro-audit
+                # after-hours misses without querying Twilio.
+                "menu_variant":      "iter349_time_aware",
+                "business_hours":    business_hours,
+                "montreal_time":     montreal_now.isoformat(),
+                "montreal_weekday":  montreal_now.strftime("%A"),
             })
         except Exception as e:  # noqa: BLE001
             logger.warning(f"[ivr/main-menu] initial call row insert failed: {e}")
 
+    # ── After-hours branch ───────────────────────────────────────────
+    # Informational bilingual message + hangup. No <Gather>, no keypress.
+    if not business_hours:
+        after_hours_en = (
+            "Thank you for calling BidVex. Our office is currently closed. "
+            "You can reach us Monday to Friday, from 8:00 AM to 7:00 PM, "
+            "or send us an email at support at bidvex dot com. Thank you."
+        )
+        after_hours_fr = (
+            "Merci d'avoir appelé BidVex. Nos bureaux sont actuellement "
+            "fermés. Vous pouvez nous joindre du lundi au vendredi, de "
+            "8h00 à 19h00, ou nous envoyer un courriel à support at "
+            "bidvex point com. Merci."
+        )
+        xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="alice" language="en-US">{after_hours_en}</Say>
+  <Say voice="alice" language="fr-CA">{after_hours_fr}</Say>
+  <Hangup/>
+</Response>"""
+        # Best-effort audit update.
+        if call_sid:
+            try:
+                db = _get_db()
+                await db.inbound_extension_calls.update_one(
+                    {"call_sid": call_sid},
+                    {"$set": {
+                        "outcome":  "after_hours_hangup",
+                        "status":   "ended_after_hours",
+                        "ended_at": _now_iso(),
+                    }},
+                )
+            except Exception:  # noqa: BLE001
+                pass
+        return _twiml(xml)
+
+    # ── Working-hours branch ─────────────────────────────────────────
     # Nudge language if this is a retry.
     nudge_en = "" if attempt <= 1 else " We didn't catch that — let's try one more time."
     nudge_fr = "" if attempt <= 1 else " Nous n'avons pas capté votre choix — un instant, réessayons."
 
     intro_en = (
-        f"Thank you for calling BidVex.{nudge_en} "
-        "To speak with the support team, press 1. "
-        "Or enter the four-digit extension of your contractor now, "
-        "followed by the pound key."
+        f"Hello, thank you for calling BidVex.{nudge_en} "
+        "If you know your contractor's extension, please dial it now, "
+        "press 1 for support, or press 0 for general inquiries."
     )
     intro_fr = (
-        f"Merci d'avoir appelé BidVex.{nudge_fr} "
-        "Pour parler à l'équipe de soutien, appuyez sur le 1. "
-        "Ou entrez maintenant le poste à quatre chiffres de votre "
-        "entrepreneur, suivi de la touche dièse."
+        f"Bonjour, merci d'avoir appelé BidVex.{nudge_fr} "
+        "Si vous connaissez le poste de votre entrepreneur, veuillez le "
+        "composer maintenant, appuyez sur 1 pour le support, ou appuyez "
+        "sur 0 pour les demandes générales."
     )
 
     # After 3 failed attempts, gracefully route to support so the call
@@ -596,17 +680,24 @@ async def handle_menu(request: Request) -> Response:
         except Exception:  # noqa: BLE001
             pass
 
-    # ── Support (press 1) ─────────────────────────────────────────────
-    if digits == "1":
+    # ── Support (press 1) OR General inquiries (press 0) ─────────────
+    # iter349 — 0 and 1 both route to the general support line.
+    if digits in ("1", "0"):
         _log_outcome(
-            outcome="support_routed",
+            outcome=("support_routed" if digits == "1" else "general_inquiries_routed"),
             status="bridged_support",
             support_number=BIDVEX_GENERAL_SUPPORT_NUMBER,
-            menu_variant="iter347_single_step",
+            digit_pressed=digits,
+            menu_variant="iter349_time_aware",
+        )
+        greet_en = (
+            "Connecting you to the support team. Please hold."
+            if digits == "1" else
+            "Connecting you to general inquiries. Please hold."
         )
         xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="alice" language="en-US">Connecting you to the support team. Please hold.</Say>
+  <Say voice="alice" language="en-US">{greet_en}</Say>
   <Dial timeout="25" answerOnBridge="true">
     <Number>{BIDVEX_GENERAL_SUPPORT_NUMBER}</Number>
   </Dial>

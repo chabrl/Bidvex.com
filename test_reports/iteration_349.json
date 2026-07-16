@@ -1,0 +1,30 @@
+{
+  "summary": "iter349 backend testing complete — 11/11 tests PASS in /app/backend/tests/test_iter349_ivr_business_hours.py. Business-hours branch, after-hours branch (verified via monkey-patch), handle-menu press-0/press-1 both routing to +15149490038, and iter347 4-digit extension regression all green. The endpoint /api/twilio/ivr/main-menu now dynamically branches on Montreal (America/Toronto) local time using zoneinfo.ZoneInfo (DST-safe). Response content-type is application/xml; charset=utf-8 and tests correctly use response.content.decode('utf-8').",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter349_ivr_business_hours.py",
+    "/app/test_reports/pytest/iter349.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "handle_menu uses asyncio.create_task inside a nested helper (_log_outcome) to fire-and-forget the Mongo update. This is fine but the task is not awaited, so persistence is best-effort and could race against the test's immediate follow-up read (mitigated in tests by NOT relying on the digit_pressed persistence in every assertion). The route returns before the write completes — acceptable trade-off for latency-sensitive TwiML, but flag for future ops audit.",
+    "The business-hours after-hours branch does not return callerId or a fallback support number for the caller — call is intentionally hung up. Aligns with the spec but ensure ops team monitors 'ended_after_hours' outcomes to detect legitimate business calls after hours.",
+    "_current_montreal_time falls back to `datetime.now(utc) - timedelta(hours=5)` if zoneinfo import fails. This ignores DST. Not an issue in practice (Python 3.11 has zoneinfo), but the fallback is technically incorrect for EDT (should be -4). Very defensive-only.",
+    "File /app/backend/routes/contractor_ivr_inbound.py is 963 lines. Consider splitting IVR routes and SendGrid Inbound Parse into separate modules for maintainability (>700-line guideline)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "not tested (backend-only per review)"},
+  "test_credentials": "No credentials needed — IVR endpoints are anonymous. Seeded a dialer_contractor user directly in db.users during test_valid_extension_still_dials_contractor (cleaned up after).",
+  "seed_data_creation": "Test test_valid_extension_still_dials_contractor seeds a dialer_contractor with extension_number=5432 and personal_phone_number=+15145558877, then deletes it in the finally block.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "iter349 backend is stable. Live branch at test time was business-hours (Thursday afternoon Montreal). After-hours branch is covered deterministically via monkey-patching routes.contractor_ivr_inbound._current_montreal_time. Both handle-menu digit_pressed=0 and digit_pressed=1 route to BIDVEX_GENERAL_SUPPORT_NUMBER=+15149490038. attempt>=4 fallback dial still works. TwiML responses use content-type application/xml; charset=utf-8 — tests MUST use response.content.decode('utf-8'). /api/feeds/image-diagnostics requires auth (401 without token) — not a regression."
+}
