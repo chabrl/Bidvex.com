@@ -201,6 +201,59 @@ async def _build_feed_items(
     total_eligible = len(items)
     items = items[offset:offset + limit]
 
+    # iter348 — Crawler-health gate. Google Merchant Center + Meta
+    # Commerce Manager silently remove products whose `image_link`
+    # returns 4xx/5xx or non-image content-type from an anonymous
+    # Googlebot HEAD. HEAD-test each unique image_link with a
+    # Googlebot-Image UA (TTL-cached 1h); replace failures with the
+    # per-listing pre-baked JPEG placeholder we already generate on
+    # our own domain — so the product remains in the catalog with a
+    # branded card instead of getting silently removed.
+    try:
+        from services.feed_image_health import filter_crawlable
+        unique_urls = list({
+            it.get("image_link")
+            for it in items
+            if it.get("image_link") and it["image_link"].startswith("https://")
+        })
+        if unique_urls:
+            health = await filter_crawlable(unique_urls)
+            swapped = 0
+            for it in items:
+                url = it.get("image_link")
+                if not url:
+                    continue
+                ok, ct, status = health.get(url, (True, "", 0))
+                if not ok:
+                    fallback = (
+                        it.get("placeholder_image_url")
+                        or it.get("_placeholder_image_url")
+                        or (BIDVEX_BASE_URL + "/assets/placeholder-ad.jpg")
+                    )
+                    it["image_link"] = fallback
+                    # Also strip broken additional images so Google
+                    # doesn't crawl those and rate the listing lower.
+                    if "additional_image_link" in it:
+                        good_extras = []
+                        for extra in (it.get("additional_image_link") or "").split(","):
+                            extra = extra.strip()
+                            if not extra:
+                                continue
+                            eok, _, _ = health.get(extra, (True, "", 0))
+                            if eok:
+                                good_extras.append(extra)
+                        it["additional_image_link"] = ",".join(good_extras)
+                    swapped += 1
+            if swapped:
+                logger.warning(
+                    f"[feeds] iter348 crawler-health: swapped {swapped}/{len(items)} "
+                    f"image_link URLs to placeholder (unreachable by Googlebot HEAD)"
+                )
+                exclusions["image_link_unreachable_swapped_to_placeholder"] = swapped
+    except Exception as e:  # noqa: BLE001
+        # Health-check must NEVER break the feed. Log and continue.
+        logger.warning(f"[feeds] iter348 crawler-health check failed (non-fatal): {e}")
+
     logger.info(
         "FB feed built: %d included, %d excluded from %d total listings "
         "(exclusions=%s)",
@@ -694,3 +747,92 @@ async def refresh_feeds(
         },
         "generated_at":     datetime.now(timezone.utc).isoformat(),
     }
+
+
+# ═══ iter348 — Image URL crawler-health diagnostics ══════════════════
+#
+# Ops-facing endpoint that HEAD-tests a sample of URLs from the current
+# feed the same way Googlebot does. When Google Merchant Center is
+# showing placeholder logos in production, this endpoint reveals in one
+# call whether the underlying S3/CDN URLs are actually reachable, and
+# for each failure it returns a `probable_cause` string telling Charbel
+# exactly what to fix in the AWS Console.
+
+
+@router.get("/image-diagnostics")
+async def image_diagnostics(
+    limit: int = Query(20, ge=1, le=100),
+    current_user=Depends(require_admin),
+):
+    """iter348 — HEAD-test a sample of feed image URLs with a Googlebot
+    UA and report status/content-type/probable-cause for each.
+
+    Response shape:
+      {
+        "tested":                  int,
+        "would_be_accepted_count": int,
+        "would_be_rejected_count": int,
+        "results": [
+          {
+            "url": "...",
+            "http_status": 403,
+            "content_type": "application/xml",
+            "would_be_accepted": false,
+            "probable_cause": "s3_bucket_policy_blocks_anonymous_get (fix: …)"
+          },
+          …
+        ],
+        "cache_stats": {...},
+        "next_steps": [ human-friendly instructions ]
+      }
+    """
+    from services.feed_image_health import diagnose_sample
+
+    # Pull a sample of unique image URLs from the currently-cached (or
+    # fresh) feed items. Force a fresh build so we're diagnosing what
+    # Google would actually see NOW, not stale.
+    items, _ = await _build_feed_items(None, None, None, limit, 0)
+    urls = [it.get("image_link") for it in items if it.get("image_link")]
+
+    report = await diagnose_sample(urls, limit=limit)
+
+    # Prepend human-friendly next-steps so Charbel can act without
+    # having to read the technical `probable_cause` field.
+    causes = {r["probable_cause"] for r in report["results"] if r.get("probable_cause")}
+    next_steps: List[str] = []
+    if any("bucket_policy" in (c or "") for c in causes):
+        next_steps.append(
+            "AWS Console → S3 → bidvex-marketplace-images → Permissions → "
+            "Bucket Policy: allow `s3:GetObject` for `Principal: *` on "
+            "the `listings/*` prefix. Also verify Block Public Access is "
+            "OFF for that bucket (Amazon S3 → Bucket → Permissions → "
+            "Block public access) — otherwise Bucket Policy is ignored."
+        )
+    if any("wrong_content_type" in (c or "") for c in causes):
+        next_steps.append(
+            "One or more objects were uploaded without ContentType=image/jpeg. "
+            "Re-upload via /api/upload-image OR run the s3 batch tagging job "
+            "to set Content-Type on all objects under listings/."
+        )
+    if any("presigned" in (c or "") for c in causes):
+        next_steps.append(
+            "A presigned URL leaked into the DB. Presigned URLs expire; "
+            "Google will drop the product. Check your image upload code "
+            "isn't storing the response of generate_presigned_url() — "
+            "always store the RAW public URL from _key_to_url()."
+        )
+    if any("object_not_found" in (c or "") for c in causes):
+        next_steps.append(
+            "One or more objects returned 404 — DB has an orphan URL. "
+            "Re-upload the affected listing images from the seller/admin UI."
+        )
+    if not next_steps and report["would_be_rejected_count"] == 0:
+        next_steps.append(
+            "All sampled URLs would be accepted by Googlebot. "
+            "If Merchant Center is still showing placeholder logos, "
+            "the fix is Merchant Center-side: click 'Fetch Now' in the "
+            "Merchant Center admin (Products → Feeds → your feed → Fetch Now) "
+            "OR wait up to 24h for their next scheduled crawl."
+        )
+
+    return {**report, "next_steps": next_steps}

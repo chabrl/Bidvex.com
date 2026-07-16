@@ -1,6 +1,31 @@
 # BidVex — Auction Marketplace PRD
 
+## iter348 — Google Merchant Placeholder Fix: Crawler-Health Gate (Feb 11, 2026) ✅ COMPLETE — TESTED
+Follow-up warranty fix — ZERO credit charged. Backend 9/9 iter348 tests + 67/67 combined regression PASS (iter340/345/346/347/348).
+
+- **Root cause of persistent placeholder logos in Google Merchant Center**: Even after iter347 relaxed image validation to admit our S3 URLs into the feed, Google's crawler was STILL rejecting them at fetch time (403 Forbidden / 401 Unauthorized / wrong Content-Type). Our feed was truthfully advertising URLs that failed the anonymous-crawler HEAD → Google fell back to the branded `placeholder-ad.jpg` per Merchant Center policy.
+- **iter348 fix — Crawler-health gate at feed build time**:
+  - NEW `services/feed_image_health.py`: `is_url_crawlable(url)` HEADs the URL with Googlebot-Image UA, 5s timeout, follow-redirects. Caches (ok, content_type, http_status) for 1 hour in-process. `filter_crawlable(urls)` dedups + parallel HEADs a batch (capped at 400/build to protect feed latency). `diagnose_sample(urls)` returns per-URL `probable_cause` strings (403 → "s3_bucket_policy_blocks_anonymous_get", 401 → "presigned_url_expired", 404 → "object_not_found", non-image Content-Type → "wrong_content_type re-upload with ContentType=image/jpeg").
+  - `routes/feeds.py::_build_feed_items` now runs the health gate on the final `image_link` set: any URL Googlebot would 4xx/5xx or serve non-image gets its `image_link` swapped to the per-listing pre-baked JPEG placeholder we host on our own domain (guaranteed crawlable) — so the product REMAINS in the catalog with a branded card instead of being silently removed. Broken `additional_image_link` entries are also stripped. Exclusions counter records `image_link_unreachable_swapped_to_placeholder: N`.
+  - NEW admin endpoint `GET /api/feeds/image-diagnostics?limit=20`: HEADs a live sample from the current feed as Googlebot, returns a full per-URL report + `next_steps` array with plain-English fix instructions (e.g. "AWS Console → S3 → bidvex-marketplace-images → Permissions → Bucket Policy: allow s3:GetObject for Principal: * on listings/* prefix"). Charbel can call this whenever Merchant Center complains and see exactly which URLs are failing and why.
+- **S3 upload path already correct**: `services/s3_service.py::_upload_bytes_sync` sets `ContentType=image/jpeg`, `ACL=public-read`, `CacheControl=public, max-age=31536000, immutable`. New uploads from any listing/vehicle path are Merchant-compliant. The problem is legacy/orphan objects — which the diagnostic endpoint now surfaces precisely.
+- **Regression**: 67/67 tests pass (9 iter348 + 22 iter347 + 16 iter346 + 13 iter345 + 7 iter340).
+
+**⚠️ CHARBEL ACTIONS after redeploy**:
+1. Call `POST /api/feeds/refresh` (super_admin) to invalidate cache.
+2. Call `GET /api/feeds/image-diagnostics?limit=20` (super_admin) — the `next_steps` array will tell you exactly what to fix (AWS Bucket Policy vs. object re-upload vs. wait for Merchant Center crawl).
+3. If `next_steps` recommends the AWS Bucket Policy fix: AWS Console → S3 → `bidvex-marketplace-images` → **Permissions** → **Block public access**: turn OFF for the bucket, then **Bucket Policy** → add:
+   ```json
+   { "Version": "2012-10-17", "Statement": [{
+       "Sid": "PublicRead-listings", "Effect": "Allow", "Principal": "*",
+       "Action": "s3:GetObject",
+       "Resource": "arn:aws:s3:::bidvex-marketplace-images/listings/*"
+   }]}
+   ```
+4. Once diagnostics returns 0 rejected → Merchant Center → Products → Feeds → **Fetch Now** for the BidVex feed. Wait 10-30 minutes for Merchant reprocess.
+
 ## iter347 — Feed Image Fix + Single-Step Bilingual IVR (Feb 11, 2026) ✅ COMPLETE — TESTED
+
 Warranty work — ZERO credit charged. Backend 22/22 iter347 tests + 58/58 combined regression (iter340/345/346/347). Testing agent iteration_347.json: 100% backend + zero action items.
 
 - **ISSUE 1 — Google Merchant + Meta feed placeholder logos**: Root cause = pre-iter347 `_is_valid_image_url` required BOTH https+known extension in the URL path. Modern CloudFront / S3-with-transforms / imgix URLs increasingly ship WITHOUT extensions (Content-Type resolved at fetch time). Those URLs were silently dropped → every listing fell into the branded placeholder path.
