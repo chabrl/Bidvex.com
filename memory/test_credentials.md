@@ -182,3 +182,11 @@ blog tile anchors, and pricing CTAs.
 ## iter343 note (Jul 11, 2026)
 - `testbuyer@bidvex.com` / `TestBuyer2026!` and `testseller@bidvex.com` / `TestSeller2026!` were RE-SEEDED in this fork's preview DB (they were missing after the fork). Same passwords as documented above.
 - Persistent UI-test listings seeded (do not delete): `ui343-single` (marketplace, qty=10 per-item), `ui343-multi` (multi-lot, featured, 2 lots), `ui343-vehicle` (featured), `ui343-storage`, `ui343-vml` (live vehicle multi-lot event). All geocoded to Montréal.
+
+## 🆕 iter355 — KYC gate test buyer (registered by testing agent 2026-07-16)
+- Email: `iter355_tester@bidvex.com`
+- Password: `Iter355Test!@#`
+- Role: `user` (regular buyer, no admin, `is_identity_verified=false`)
+- Notes: Purpose-built to exercise the Stripe Identity soft-gate at `/api/settlement/settle` and `/api/vehicles/{id}/buyer-acknowledge`. Since `is_identity_verified=false`, hitting settle/acknowledge returns 403 `IDENTITY_VERIFICATION_REQUIRED` — exactly the branch H-1 is designed to guard.
+- ⚠️ **`testbuyer@bidvex.com` password status**: as of 2026-07-16 the testing agent reports the seeded password `TestBuyer2026!` returns 401 on preview. If that account is needed again, re-run `python /app/backend/scripts/iter308_reseed_test_fixtures.py` to restore. Otherwise prefer `iter355_tester@bidvex.com`.
+- Rate limiting: repeated failed logins trigger 429 for ~60s; back off before retrying.

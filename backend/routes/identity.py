@@ -12,7 +12,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Body
 from pydantic import BaseModel
 
 from deps import User, get_current_user
@@ -45,7 +45,7 @@ class VerifyRequest(BaseModel):
 
 @identity_router.post("/verify")
 async def start_verification(
-    body: VerifyRequest,
+    body: Optional[VerifyRequest] = Body(default=None),
     current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """Create (or reuse) a Stripe Identity VerificationSession.
@@ -80,7 +80,7 @@ async def start_verification(
         session = await create_or_get_session(
             db,
             user=user_doc,
-            return_url=body.return_url,
+            return_url=(body.return_url if body else None),
         )
     except RuntimeError as exc:
         # Stripe key not configured — 503, not 500.
