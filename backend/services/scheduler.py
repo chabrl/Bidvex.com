@@ -1281,7 +1281,42 @@ def init_scheduler(database):
         replace_existing=True,
     )
 
-    logger.info("Scheduler initialized with 23 jobs")
+    # ─── iter351 — Nightly base64 → S3 sweep (defense in depth).
+    # Runs 04:00 UTC daily. Re-runs the migration script against all four
+    # image-bearing collections (listings / multi_item_listings /
+    # vehicle_listings / storage_auctions). Idempotent: already-migrated
+    # docs are skipped by the adapter's `_needs_migration()` gate.
+    async def nightly_base64_sweep_job():
+        if db_instance is None:
+            return
+        try:
+            from scripts.migrate_base64_images_to_s3 import (
+                ADAPTERS, _migrate_doc,
+            )
+            grand = {"migrated": 0, "skipped": 0, "failed": 0, "docs": 0}
+            for adapter in ADAPTERS.values():
+                async for doc in db_instance[adapter.collection].find({}, {"_id": 0}):
+                    if not doc.get("id"):
+                        continue
+                    m, s, f = await _migrate_doc(db_instance, adapter, doc, dry_run=False)
+                    grand["migrated"] += m
+                    grand["skipped"]  += s
+                    grand["failed"]   += f
+                    grand["docs"]     += 1
+            logger.info(f"[iter351 nightly-base64-sweep] {grand}")
+            return grand
+        except Exception as exc:  # noqa: BLE001
+            logger.error(f"[iter351 nightly-base64-sweep] failed: {exc}")
+
+    scheduler.add_job(
+        _tracked("nightly_base64_sweep", nightly_base64_sweep_job),
+        CronTrigger(hour=4, minute=0),
+        id="nightly_base64_sweep",
+        name="iter351 — Nightly Base64 → S3 Sweep (04:00 UTC)",
+        replace_existing=True,
+    )
+
+    logger.info("Scheduler initialized with 24 jobs")
     return scheduler
 
 
