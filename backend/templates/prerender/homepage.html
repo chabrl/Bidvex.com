@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block main %}
+  <div style="display:grid;grid-template-columns:1fr;gap:32px;margin-bottom:48px;">
+    <div>
+      <h1 style="color:#0B2545;font-size:36px;line-height:1.15;margin-bottom:16px;">{{ hero_headline }}</h1>
+      <p style="color:#334155;font-size:18px;line-height:1.6;margin-bottom:24px;max-width:640px;">{{ hero_subtitle }}</p>
+      <a href="{{ canonical_host }}/marketplace" style="display:inline-block;background:#0EA5E9;color:#fff;padding:14px 28px;border-radius:10px;text-decoration:none;font-weight:700;">Browse Marketplace</a>
+    </div>
+  </div>
+
+  <section style="border-top:1px solid #e2e8f0;padding-top:32px;">
+    <h2 style="color:#0B2545;font-size:22px;">Why BidVex</h2>
+    <ul style="line-height:1.8;color:#334155;">
+      <li><strong>Bilingual (EN/FR)</strong> auction platform serving all of Canada.</li>
+      <li><strong>Verified sellers</strong> — every vehicle listing requires an OMVIC/AMVIC/VSA/SAAQ dealer license.</li>
+      <li><strong>Two-flow payment model</strong> — non-vehicle items use Stripe escrow with a pickup-code release; vehicle hammer prices settle broker↔buyer off-platform.</li>
+      <li><strong>Fraud protection</strong> — AI-powered detection + Law 25-compliant data handling.</li>
+    </ul>
+  </section>
+
+  <section style="border-top:1px solid #e2e8f0;padding-top:32px;margin-top:32px;">
+    <h2 style="color:#0B2545;font-size:22px;">Popular Categories</h2>
+    <ul style="line-height:1.8;color:#334155;">
+      <li><a href="{{ canonical_host }}/vehicle-auctions">Vehicle Auctions</a> — Cars, trucks, and RVs from licensed dealers.</li>
+      <li><a href="{{ canonical_host }}/storage-auctions">Storage Locker Auctions</a> — Abandoned units from Canadian storage facilities.</li>
+      <li><a href="{{ canonical_host }}/lots-marketplace">Industrial Lots</a> — Equipment, machinery, surplus inventory.</li>
+    </ul>
+  </section>
+{% endblock %}

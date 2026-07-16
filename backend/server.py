@@ -557,16 +557,31 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ─── WWW → non-WWW Redirect Middleware ───
+# ─── iter354 — non-WWW → WWW canonical redirect (aligned with `<link rel="canonical" href="https://www.bidvex.com/...">`) ───
 from starlette.responses import RedirectResponse
 @app.middleware("http")
-async def www_redirect(request: Request, call_next):
-    host = request.headers.get("host", "")
-    if host.startswith("www."):
-        non_www_host = host[4:]
-        url = str(request.url).replace(f"://{host}", f"://{non_www_host}", 1)
+async def www_canonical_redirect(request: Request, call_next):
+    host = (request.headers.get("host") or "").lower()
+    # Only rewrite bare `bidvex.com` → `www.bidvex.com`. Leave any other host
+    # (preview.emergentagent.com, launchapp-*.emergent.host, localhost, etc.)
+    # untouched so preview/staging routing keeps working.
+    if host == "bidvex.com":
+        url = str(request.url).replace("://bidvex.com", "://www.bidvex.com", 1)
         return RedirectResponse(url=url, status_code=301)
     return await call_next(request)
+
+# ─── iter354 — Bot-UA prerender middleware (preview validation layer) ───
+# In preview, this intercepts crawler traffic and serves the SSR HTML instead
+# of the SPA. In production, the Cloudflare Worker does the same at the edge
+# and this middleware is a no-op (bot traffic hits `/api/prerender/...`
+# directly and the middleware sees `X-Prerender-Version` header, skipping).
+try:
+    from routes.prerender import BotPrerenderMiddleware as _BotPrerenderMiddleware
+    _prerender_enabled = os.environ.get("PRERENDER_MIDDLEWARE_ENABLED", "1") == "1"
+    app.add_middleware(_BotPrerenderMiddleware, enabled=_prerender_enabled)
+    logger.info(f"[iter354] BotPrerenderMiddleware enabled={_prerender_enabled}")
+except Exception as _pmw_exc:
+    logger.warning(f"[iter354] BotPrerenderMiddleware failed to register: {_pmw_exc}")
 
 # ─── Response Time Logging Middleware ───
 @app.middleware("http")
@@ -1278,6 +1293,8 @@ try:
     # Self-contained routers (import from deps directly)
     SELF_CONTAINED_ROUTERS = [
         ("routes.team", "team_router", "set_team_db", True),  # True = app-level
+        # iter354 — SEO prerender endpoint (crawler-only HTML rendering)
+        ("routes.prerender", "router", None, False),
         ("routes.ai_chat", "ai_chat_router", "set_ai_chat_db", False),
         # iter234 — Direct google-genai (Gemini 2.5 Flash) streaming chat + watchdog
         ("routes.genai_chat", "genai_chat_router", "set_genai_chat_db", False),

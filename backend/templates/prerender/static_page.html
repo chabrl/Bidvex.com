@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block main %}
+  <article>
+    <nav aria-label="Breadcrumb" style="font-size:13px;color:#64748B;margin-bottom:16px;">
+      <a href="{{ canonical_host }}/">Home</a> &raquo;
+      <span>{{ hero_headline }}</span>
+    </nav>
+    <h1 style="color:#0B2545;font-size:32px;line-height:1.2;margin-bottom:16px;">{{ hero_headline }}</h1>
+    <p style="color:#334155;font-size:16px;line-height:1.7;">{{ hero_subtitle }}</p>
+    <div style="margin-top:32px;padding:20px;background:#F0F9FF;border-left:4px solid #0EA5E9;border-radius:0 8px 8px 0;">
+      <p style="margin:0;color:#0C4A6E;">
+        {% if lang == 'fr' %}
+        Cette page est optimisée pour le web mobile bilingue. Ouvrez BidVex dans votre navigateur pour l'expérience complète d'enchères en temps réel.
+        {% else %}
+        This page is optimized for bilingual mobile web. Open BidVex in your browser for the full real-time bidding experience.
+        {% endif %}
+      </p>
+    </div>
+  </article>
+{% endblock %}

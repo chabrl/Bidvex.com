@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block main %}
+  <article>
+    <nav aria-label="Breadcrumb" style="font-size:13px;color:#64748B;margin-bottom:16px;">
+      <a href="{{ canonical_host }}/">Home</a> &raquo;
+      <a href="{{ canonical_host }}/marketplace">Auctions</a> &raquo;
+      <span>{{ hero_headline }}</span>
+    </nav>
+
+    <div style="display:grid;grid-template-columns:1fr;gap:24px;">
+      <img src="{{ hero_image }}" alt="{{ hero_headline }}" style="width:100%;max-width:720px;border-radius:12px;border:1px solid #e2e8f0;" />
+      <div>
+        <h1 style="color:#0B2545;font-size:28px;line-height:1.2;margin-bottom:12px;">{{ hero_headline }}</h1>
+
+        <div style="display:flex;gap:24px;flex-wrap:wrap;padding:16px;background:#F8FAFC;border-radius:10px;margin-bottom:20px;">
+          <div>
+            <div style="color:#64748B;font-size:12px;text-transform:uppercase;">Current Bid</div>
+            <div style="color:#0B2545;font-size:24px;font-weight:700;">${{ '{:,.2f}'.format(current_price) }} {{ currency }}</div>
+          </div>
+          <div>
+            <div style="color:#64748B;font-size:12px;text-transform:uppercase;">Category</div>
+            <div style="color:#0B2545;font-size:16px;font-weight:600;">{{ category }}</div>
+          </div>
+          <div>
+            <div style="color:#64748B;font-size:12px;text-transform:uppercase;">Seller</div>
+            <div style="color:#0B2545;font-size:16px;font-weight:600;">{{ seller_name }}</div>
+          </div>
+          <div>
+            <div style="color:#64748B;font-size:12px;text-transform:uppercase;">Status</div>
+            <div style="color:{{ '#059669' if availability == 'InStock' else '#B91C1C' }};font-size:16px;font-weight:700;">
+              {{ 'Bidding Open' if availability == 'InStock' else 'Sold / Closed' }}
+            </div>
+          </div>
+        </div>
+
+        {% if hero_subtitle %}
+        <p style="color:#334155;font-size:15px;line-height:1.7;margin-bottom:24px;">{{ hero_subtitle }}</p>
+        {% endif %}
+
+        <a href="{{ canonical }}" style="display:inline-block;background:#0EA5E9;color:#fff;padding:14px 28px;border-radius:10px;text-decoration:none;font-weight:700;">
+          {% if lang == 'fr' %}Enchérir maintenant{% else %}Place a Bid{% endif %}
+        </a>
+      </div>
+    </div>
+  </article>
+{% endblock %}

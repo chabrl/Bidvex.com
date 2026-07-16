@@ -195,22 +195,31 @@ const TermsOfServicePage = () => {
               </ul>
             </BlueBox>
 
-            {/* NEW: 5B Escrow */}
+            {/* NEW: 5B Escrow — iter354 rewrite for legal consistency */}
             <SH id="escrow" n="5B">Escrow &amp; Buyer Protection — Pickup Code System</SH>
             <BlueBox>
-              <p>For all non-vehicle auction items, BidVex operates an escrow system to protect both buyers and sellers.</p>
-              <p className="font-semibold mt-2">How it works:</p>
+              <p className="font-semibold">BidVex operates <u>two distinct</u> payment-holding models depending on the item category. Please read the applicable section below carefully.</p>
+
+              <p className="font-semibold mt-3 text-slate-900">A. Non-vehicle items (lots, storage lockers, industrial equipment, general goods)</p>
               <ol className="list-decimal pl-5 space-y-1 mt-1 text-sm">
-                <li>When a buyer wins an auction, their payment is captured immediately by Stripe and held in escrow on the BidVex platform.</li>
+                <li>When a buyer wins an auction, their payment (hammer price + buyer&apos;s premium + applicable taxes + Stripe processing recovery) is captured immediately by Stripe and <strong>held in escrow on the BidVex platform</strong> via a Stripe PaymentIntent with manual capture.</li>
                 <li>Funds are NOT transferred to the seller at this stage.</li>
                 <li>The buyer receives a unique 6-character alphanumeric pickup code by email.</li>
                 <li>At the time of item pickup, the buyer presents this code to the seller.</li>
                 <li>The seller enters the code in their BidVex seller dashboard to confirm the handoff.</li>
                 <li>Upon successful code entry, funds are released from escrow and transferred to the seller.</li>
               </ol>
-              <p className="mt-2"><strong>Auto-Release Rule:</strong> If the buyer fails to collect the item and the code is not entered within 48 hours of auction close, funds are automatically released to the seller. No refund is issued to the buyer after auto-release.</p>
-              <p><strong>Security:</strong> The pickup code is cryptographically generated and single-use. Five failed entry attempts triggers an automatic admin review.</p>
-              <p className="text-xs text-slate-500 mt-2"><strong>Note:</strong> Vehicle transactions are handled under a separate bilateral agreement between buyer and seller. BidVex does not hold or transfer vehicle purchase funds.</p>
+              <p className="mt-2 text-sm"><strong>Auto-Release Rule:</strong> If the buyer fails to collect the item and the code is not entered within 48 hours of auction close, funds are automatically released to the seller. No refund is issued to the buyer after auto-release.</p>
+
+              <p className="font-semibold mt-4 text-slate-900">B. Vehicle auctions</p>
+              <p className="text-sm">Vehicle transactions do <strong>NOT</strong> use the escrow model above. Instead:</p>
+              <ol className="list-decimal pl-5 space-y-1 mt-1 text-sm">
+                <li>BidVex does <strong>not</strong> hold, route, or receive any portion of the vehicle&apos;s hammer price. The hammer price is settled <strong>directly between the buyer and the licensed selling broker/dealer</strong> off-platform.</li>
+                <li>BidVex charges the buyer <strong>only</strong> the 2.5&#37; platform fee, the buyer&apos;s premium (if any), applicable GST/HST/QST, and the Stripe processing recovery — via a Stripe PaymentIntent processed at auction close.</li>
+                <li>A separate refundable <strong>$500 security deposit</strong> is pre-authorized on the buyer&apos;s card at bid registration via Stripe (<code>capture_method: manual</code>). It is released automatically if the buyer does not win and after successful transfer of ownership if they do.</li>
+              </ol>
+
+              <p className="text-sm mt-2"><strong>Security:</strong> Pickup codes are cryptographically generated and single-use. Five failed entry attempts triggers automatic admin review.</p>
             </BlueBox>
 
             {/* NEW: 6A Cancellation Penalty */}
@@ -233,7 +242,9 @@ const TermsOfServicePage = () => {
             <p>BidVex uses Stripe as its exclusive payment processor. All payments are processed in Canadian Dollars (CAD). GST/HST and QST are applied per applicable law.</p>
 
             <SH id="dispute" n="8">Dispute Resolution</SH>
-            <p>BidVex offers a dispute resolution mechanism. Either the buyer or seller may open a dispute within 48 hours of transaction completion. During a dispute, escrow funds remain held until resolution.</p>
+            <p>BidVex offers a dispute resolution mechanism. Either party may open a dispute within 48 hours of transaction completion.</p>
+            <p className="mt-2 text-sm"><strong>Non-vehicle items:</strong> During a dispute, the buyer&apos;s payment (hammer price + fees) <strong>remains held in escrow</strong> on the BidVex platform via Stripe until resolution.</p>
+            <p className="mt-1 text-sm"><strong>Vehicle auctions:</strong> Because the vehicle hammer price is settled directly between buyer and broker <strong>off-platform</strong>, BidVex has no ability to freeze or reverse the hammer payment. What remains held during a vehicle dispute is <em>only</em> the BidVex-collected portion (platform fee + buyer&apos;s premium + taxes + Stripe recovery) plus the $500 refundable security deposit. Buyer/broker payment reversal must be pursued through the parties&apos; own banking channels.</p>
 
             <SH id="prohibited" n="9">Prohibited Conduct</SH>
             <RedBox>
@@ -416,19 +427,28 @@ const TermsOfServicePage = () => {
 
             <SH id="escrow" n="5B">Séquestre et protection de l'acheteur — Système de code de retrait</SH>
             <BlueBox>
-              <p>Pour tous les articles d'enchères non-véhicules, BidVex opère un système de séquestre pour protéger acheteurs et vendeurs.</p>
-              <p className="font-semibold mt-2">Fonctionnement :</p>
+              <p className="font-semibold">BidVex opère <u>deux modèles distincts</u> de détention de fonds selon la catégorie d&apos;article. Veuillez lire attentivement la section applicable ci-dessous.</p>
+
+              <p className="font-semibold mt-3 text-slate-900">A. Articles non-véhicules (lots, casiers de stockage, équipement industriel, biens divers)</p>
               <ol className="list-decimal pl-5 space-y-1 mt-1 text-sm">
-                <li>Lorsqu'un acheteur remporte une enchère, son paiement est capturé immédiatement par Stripe et conservé en séquestre sur la plateforme BidVex.</li>
+                <li>Lorsqu&apos;un acheteur remporte une enchère, son paiement (prix marteau + prime d&apos;acheteur + taxes applicables + récupération des frais Stripe) est capturé immédiatement par Stripe et <strong>conservé en séquestre sur la plateforme BidVex</strong> via un PaymentIntent Stripe à capture manuelle.</li>
                 <li>Les fonds ne sont PAS transférés au Vendeur à ce stade.</li>
-                <li>L'acheteur reçoit un code de retrait alphanumérique unique de 6 caractères par courriel.</li>
-                <li>Au moment du retrait de l'article, l'acheteur présente ce code au Vendeur.</li>
+                <li>L&apos;acheteur reçoit un code de retrait alphanumérique unique de 6 caractères par courriel.</li>
+                <li>Au moment du retrait, l&apos;acheteur présente ce code au Vendeur.</li>
                 <li>Le Vendeur saisit le code dans son tableau de bord BidVex pour confirmer la remise.</li>
-                <li>Après saisie correcte du code, les fonds sont libérés du séquestre et transférés au Vendeur.</li>
+                <li>Après saisie correcte, les fonds sont libérés du séquestre et transférés au Vendeur.</li>
               </ol>
-              <p className="mt-2"><strong>Règle de libération automatique :</strong> Si l'acheteur ne récupère pas l'article et que le code n'est pas saisi dans les 48 heures suivant la clôture de l'enchère, les fonds sont automatiquement libérés au Vendeur. Aucun remboursement n'est accordé après la libération automatique.</p>
-              <p><strong>Sécurité :</strong> Le code de retrait est généré cryptographiquement et à usage unique. Cinq tentatives échouées déclenchent une révision administrative automatique.</p>
-              <p className="text-xs text-slate-500 mt-2"><strong>Note :</strong> Les transactions de véhicules sont gérées par accord bilatéral entre acheteur et vendeur. BidVex ne détient ni ne transfère les fonds d'achat de véhicules.</p>
+              <p className="mt-2 text-sm"><strong>Règle de libération automatique :</strong> Si l&apos;acheteur ne récupère pas l&apos;article et que le code n&apos;est pas saisi dans les 48 heures suivant la clôture, les fonds sont libérés au Vendeur. Aucun remboursement n&apos;est possible après libération automatique.</p>
+
+              <p className="font-semibold mt-4 text-slate-900">B. Enchères de véhicules</p>
+              <p className="text-sm">Les transactions de véhicules n&apos;utilisent <strong>PAS</strong> le modèle de séquestre ci-dessus :</p>
+              <ol className="list-decimal pl-5 space-y-1 mt-1 text-sm">
+                <li>BidVex ne détient, n&apos;achemine ni ne reçoit aucune portion du prix marteau du véhicule. Le prix marteau est réglé <strong>directement entre l&apos;acheteur et le courtier/concessionnaire licencié</strong> hors plateforme.</li>
+                <li>BidVex prélève <strong>uniquement</strong> les 2,5&#37; de frais de plateforme, la prime d&apos;acheteur (le cas échéant), les taxes applicables (TPS/TVH/TVQ) et la récupération des frais Stripe — via un Stripe PaymentIntent à la clôture de l&apos;enchère.</li>
+                <li>Un dépôt de sécurité remboursable distinct de <strong>500 $</strong> est pré-autorisé sur la carte de l&apos;acheteur à l&apos;inscription à l&apos;enchère (<code>capture_method: manual</code>). Il est libéré automatiquement en cas de non-victoire, ou après transfert de propriété réussi.</li>
+              </ol>
+
+              <p className="text-sm mt-2"><strong>Sécurité :</strong> Les codes de retrait sont générés cryptographiquement et à usage unique. Cinq tentatives échouées déclenchent une révision administrative automatique.</p>
             </BlueBox>
 
             <SH id="penalty" n="6A">Pénalité d'annulation</SH>
@@ -450,7 +470,9 @@ const TermsOfServicePage = () => {
             <p>BidVex utilise Stripe comme processeur de paiement exclusif. Tous les paiements sont en dollars canadiens (CAD). La TPS/TVH et la TVQ sont appliquées conformément à la loi.</p>
 
             <SH id="dispute" n="8">Résolution de litiges</SH>
-            <p>BidVex offre un mécanisme de résolution de litiges. Chaque partie peut ouvrir un litige dans les 48 heures. Les fonds en séquestre restent détenus pendant la résolution.</p>
+            <p>BidVex offre un mécanisme de résolution de litiges. Chaque partie peut ouvrir un litige dans les 48 heures suivant la clôture de la transaction.</p>
+            <p className="mt-2 text-sm"><strong>Articles non-véhicules :</strong> Pendant un litige, le paiement de l&apos;acheteur (prix marteau + frais) <strong>reste détenu en séquestre</strong> sur la plateforme BidVex via Stripe jusqu&apos;à résolution.</p>
+            <p className="mt-1 text-sm"><strong>Enchères de véhicules :</strong> Puisque le prix marteau du véhicule est réglé directement entre l&apos;acheteur et le courtier <strong>hors plateforme</strong>, BidVex n&apos;a aucun moyen de geler ou d&apos;inverser ce paiement. Ce qui reste détenu pendant un litige de véhicule est <em>uniquement</em> la portion prélevée par BidVex (frais de plateforme + prime d&apos;acheteur + taxes + récupération Stripe) ainsi que le dépôt de sécurité de 500 $. Toute inversion du paiement acheteur/courtier doit être poursuivie via les canaux bancaires des parties elles-mêmes.</p>
 
             <SH id="prohibited" n="9">Conduite interdite</SH>
             <RedBox>

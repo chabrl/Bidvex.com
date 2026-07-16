@@ -63,13 +63,13 @@ export default function PlatformPoliciesPage() {
             : "Upon winning a non-vehicle auction, you will receive a unique pickup code via email. You must present this code to the seller at pickup. Only share this code with the seller at the time of handoff."}</p>
           <h3>{fr ? 'Litiges' : 'Dispute Rules'}</h3>
           <p>{fr
-            ? "Si vous avez un problème avec un article reçu (non conforme à la description, endommagé, etc.), vous pouvez ouvrir un litige dans la fenêtre de dépôt de 48 heures. Les fonds seront retenus en attendant la résolution."
-            : "If you have an issue with a received item (not as described, damaged, etc.), you may open a dispute within the 48-hour escrow window. Funds will be held pending resolution."}</p>
+            ? "Vous pouvez ouvrir un litige dans les 48 heures suivant la clôture de la transaction. Pour les articles non-véhicules, les fonds restent détenus en séquestre BidVex jusqu'à résolution. Pour les enchères de véhicules, le prix marteau est déjà réglé hors plateforme entre l'acheteur et le courtier — seuls les frais BidVex (plateforme + prime + taxes) et le dépôt de sécurité de 500 $ restent détenus pendant le litige."
+            : "You may open a dispute within 48 hours of transaction close. For non-vehicle items, funds remain held in BidVex escrow until resolution. For vehicle auctions, the hammer price is already settled off-platform between buyer and broker — only the BidVex-collected fees (platform + premium + taxes) and the $500 security deposit remain held during the dispute."}</p>
           <h3>{fr ? 'Remboursements' : 'Refund Rules'}</h3>
           <p>{fr
-            ? "Les remboursements sont traités uniquement en cas de litige résolu en faveur de l'acheteur. Une fois les fonds libérés (manuellement ou automatiquement), les remboursements ne sont plus possibles via le système de dépôt."
-            : "Refunds are processed only for disputes resolved in the buyer's favor. Once funds are released (manually or automatically), refunds are no longer possible through the escrow system."}</p>
-          <h3>{fr ? 'Délais' : 'Escrow Timelines'}</h3>
+            ? "Les remboursements sont traités uniquement en cas de litige résolu en faveur de l'acheteur. Une fois les fonds libérés (manuellement ou automatiquement), les remboursements ne sont plus possibles via le système de dépôt. Pour les véhicules, tout remboursement du prix marteau doit être poursuivi via les canaux bancaires des parties elles-mêmes."
+            : "Refunds are processed only for disputes resolved in the buyer's favor. Once funds are released (manually or automatically), refunds are no longer possible through the escrow system. For vehicles, any refund of the hammer price must be pursued through the parties' own banking channels."}</p>
+          <h3>{fr ? 'Délais du séquestre (non-véhicules)' : 'Escrow Timelines (non-vehicles)'}</h3>
           <ul>
             <li>{fr ? 'Paiement capturé → dépôt créé : immédiat' : 'Payment captured → escrow created: immediate'}</li>
             <li>{fr ? 'Code de retrait valide : 48 heures' : 'Pickup code valid: 48 hours'}</li>

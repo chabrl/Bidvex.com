@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ title }}</title>
+  <meta name="description" content="{{ description }}" />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+  <link rel="canonical" href="{{ canonical }}" />
+  {% for lang_code, url in hreflang.items() %}
+  <link rel="alternate" hreflang="{{ lang_code }}" href="{{ url }}" />
+  {% endfor %}
+  <!-- Open Graph -->
+  <meta property="og:type" content="{{ og_type }}" />
+  <meta property="og:site_name" content="BidVex" />
+  <meta property="og:title" content="{{ title }}" />
+  <meta property="og:description" content="{{ description }}" />
+  <meta property="og:url" content="{{ canonical }}" />
+  <meta property="og:image" content="{{ og_image }}" />
+  <meta property="og:locale" content="{{ 'fr_CA' if lang == 'fr' else 'en_CA' }}" />
+  <meta property="og:locale:alternate" content="{{ 'en_CA' if lang == 'fr' else 'fr_CA' }}" />
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="{{ title }}" />
+  <meta name="twitter:description" content="{{ description }}" />
+  <meta name="twitter:image" content="{{ og_image }}" />
+  <!-- Schema.org JSON-LD -->
+  {% for block in jsonld_blocks %}
+  {{ block | safe }}
+  {% endfor %}
+  <link rel="icon" type="image/png" href="{{ canonical_host }}/bidvex-icon.png" />
+</head>
+<body>
+  <header style="border-bottom:1px solid #e2e8f0;padding:16px;background:#0B2545;color:#fff;">
+    <nav>
+      <a href="{{ canonical_host }}/" style="color:#fff;text-decoration:none;font-weight:700;font-size:20px;">BidVex</a>
+      <span style="margin:0 12px;color:#94A3B8;">|</span>
+      <a href="{{ canonical_host }}/marketplace" style="color:#cbd5e1;text-decoration:none;">Marketplace</a>
+      <a href="{{ canonical_host }}/vehicle-auctions" style="color:#cbd5e1;text-decoration:none;margin-left:16px;">Vehicles</a>
+      <a href="{{ canonical_host }}/storage-auctions" style="color:#cbd5e1;text-decoration:none;margin-left:16px;">Storage</a>
+      <a href="{{ canonical_host }}/how-it-works" style="color:#cbd5e1;text-decoration:none;margin-left:16px;">How It Works</a>
+    </nav>
+  </header>
+
+  <main style="max-width:960px;margin:32px auto;padding:16px;font-family:system-ui,-apple-system,sans-serif;">
+    {% block main %}
+    <h1 style="color:#0B2545;font-size:32px;line-height:1.2;">{{ hero_headline }}</h1>
+    <p style="color:#334155;font-size:16px;line-height:1.6;">{{ hero_subtitle }}</p>
+    {% endblock %}
+  </main>
+
+  <footer style="border-top:1px solid #e2e8f0;padding:24px 16px;color:#64748B;font-size:13px;text-align:center;">
+    <p>&copy; {{ '2026' }} BidVex Inc. &mdash; Sherbrooke, QC, Canada</p>
+    <p>
+      <a href="{{ canonical_host }}/legal/terms">Terms</a> &middot;
+      <a href="{{ canonical_host }}/legal/privacy">Privacy</a> &middot;
+      <a href="{{ canonical_host }}/legal/refunds">Refunds</a> &middot;
+      <a href="{{ canonical_host }}/contact">Contact</a>
+    </p>
+    <p style="margin-top:8px;font-size:11px;color:#94A3B8;">
+      BidVex is a Canadian auction marketplace. We are <strong>not</strong> affiliated with any cryptocurrency platform.
+    </p>
+  </footer>
+
+  <!-- React SPA hydration entry — real users get the full app, crawlers see the SSR shell above -->
+  <div id="root"></div>
+</body>
+</html>

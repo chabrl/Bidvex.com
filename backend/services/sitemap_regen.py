@@ -25,7 +25,7 @@ from typing import List
 
 logger = logging.getLogger(__name__)
 
-PUBLIC_HOST = os.environ.get("PUBLIC_HOST", "https://bidvex.com").rstrip("/")
+PUBLIC_HOST = os.environ.get("PUBLIC_HOST", "https://www.bidvex.com").rstrip("/")
 
 SITEMAP_PATH = "/app/frontend/public/sitemap.xml"
 ROBOTS_PATH = "/app/frontend/public/robots.txt"

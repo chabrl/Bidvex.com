@@ -14,7 +14,7 @@ const SEO = ({
   noindex = false,
   jsonLd = null,
 }) => {
-  const siteUrl = 'https://bidvex.com';
+  const siteUrl = 'https://www.bidvex.com';
   const fullUrl = `${siteUrl}${path}`;
   const fullTitle = title === 'BidVex' ? title : `${title} | BidVex`;
   

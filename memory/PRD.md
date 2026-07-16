@@ -1,5 +1,67 @@
 # BidVex — Auction Marketplace PRD
 
+## iter354 — Tier 1 Remediation: Escrow copy + SSR prerender (Feb 17, 2026) ✅ COMPLETE — VERIFIED
+
+**Scope**: Tier 1 (C-1 + C-2) of the "100/100 audit" remediation directive. Fixes the escrow-logic legal contradiction across the codebase AND ships a self-hosted SSR prerender pipeline for crawlers — WITHOUT migrating away from React + FastAPI + MongoDB (per user's constraint).
+
+### C-1 — Escrow copy alignment (legal consistency, single canonical narrative)
+
+- **`frontend/src/pages/TermsOfServicePage.js`** — §5B rewritten with explicit **A. Non-vehicle** (Stripe escrow + pickup code) vs **B. Vehicle** (hammer settled broker↔buyer off-platform, BidVex holds only fees) blocks. §8 Dispute Resolution now differentiates the two flows. Both EN + FR mirrors updated.
+- **`frontend/src/pages/PlatformPoliciesPage.js`** — Dispute Rules + Refund Rules + Escrow Timelines copy aligned to the two-flow model (EN + FR).
+- **`frontend/src/pages/HowItWorksPage.js`** — Added a new **"How Your Money Is Protected"** section with a side-by-side emerald/blue tile diagram (`data-testid="escrow-explainer-section"`, `flow-nonvehicle`, `flow-vehicle`). Numbered 4-step flow per tile. Terms link at bottom.
+
+### C-2 — SSR prerender pipeline (crawler-only, SPA untouched for real users)
+
+- **`backend/services/seo_jsonld.py` (NEW)** — Dependency-free Schema.org builders: `organization_ld`, `website_ld`, `product_offer_ld` (AggregateOffer — auction-friendly, doesn't trigger Merchant Center review), `event_ld` (unlocks SERP Events carousel — auctions ARE time-bounded online events), `breadcrumb_ld`, `faqpage_ld`.
+- **`backend/services/prerender_service.py` (NEW)** — Central resolver. Handles: `/`, `/marketplace`, `/lots-marketplace`, `/vehicle-auctions`, `/storage-auctions`, `/broker-directory`, `/auctions/{id}`, `/multi-item-auctions/{id}`, `/vehicles/{id}`, `/storage/{id}`, `/faq`, `/how-it-works`, `/about`, `/about-us`, `/contact`, `/terms`, `/legal/{terms,privacy,refunds}`, `/privacy-policy`. Unknown paths fall back to homepage prerender (safe default). Per-lang copy stanzas in EN + FR.
+- **`backend/templates/prerender/{base,homepage,static_page,auction_detail}.html` (NEW)** — Jinja2 templates. Server-rendered content shell + `<div id="root">` for SPA hydration so real users still get the React app after crawlers get their meta.
+- **`backend/routes/prerender.py` (NEW)** — Two entry points:
+  - `GET /api/prerender/{path:path}?lang=en|fr` — explicit prerender (called by the Cloudflare Worker in prod).
+  - `BotPrerenderMiddleware` — Starlette middleware that intercepts crawler UAs on non-`/api/*` GETs and short-circuits to prerender. Works on preview only when FastAPI is the direct ingress; in prod the Cloudflare Worker handles this at the edge.
+  - Every failure path returns 200 with a minimal fallback HTML so Cloudflare never sees an invalid origin response.
+- **`backend/server.py`** — Registered the router, added the middleware, and **inverted the existing `www→non-www` redirect** (which would have caused a redirect loop against the new canonical). Now redirects `bidvex.com → www.bidvex.com` only, leaves preview/emergent hosts untouched.
+
+### Canonical URL migration to `https://www.bidvex.com` (5 files)
+
+- `frontend/public/index.html` — canonical + og:url + hreflang + Twitter tags.
+- `frontend/public/robots.txt` — Sitemap: line.
+- `frontend/public/sitemap.xml` — all 23 `<loc>` entries.
+- `frontend/src/components/SEO.js` — `siteUrl` constant.
+- `backend/services/sitemap_regen.py` — `PUBLIC_HOST` default.
+
+**⚠️ Required Cloudflare DNS/Rules step (production)**: add a Page Rule or Bulk Redirect to 301 `bidvex.com/* → https://www.bidvex.com/*` (preserving the path). Otherwise `bidvex.com` continues to serve directly and users see two canonical variants. The FastAPI middleware handles this for any request that reaches FastAPI, but Cloudflare should terminate the redirect at the edge for speed.
+
+### `robots.txt` + `sitemap.xml`
+
+- Already present in `frontend/public/`. Both fully migrated to `www.bidvex.com`. Sitemap has 23 URLs. No further action needed for Tier 1.
+
+### Testing & verification
+
+- **`backend/tests/test_iter354_prerender.py` (NEW)** — 15 snapshot tests: per-route JSON-LD block presence, canonical uses www., bilingual hreflang alternates, FAQPage QAs in both languages, C-1 two-flow escrow language in FAQ JSON-LD, unknown-path fallback, SPA hydration div preserved. **15/15 pass.**
+- **`backend/scripts/iter354_prerender_smoke.py` (NEW)** — CLI smoke against any base URL. Curls 15 static + 1 dynamic auction route as Googlebot, validates HTTP 200 + required tags + JSON-LD types + valid JSON parsing. Preview run: **15/15 PASS**.
+- **Dynamic auction snapshot**: `/api/prerender/multi-item-auctions/{id}?lang=en` returned 10,996 bytes with correct `<title>`, real S3 hero image (iter351 pays off), Organization + Product + Event + BreadcrumbList JSON-LD blocks, and correct `availability=SoldOut` because the auction has ended.
+- **Backend regression**: **132 / 132 tests pass** (117 iter350–353 baseline + 15 new iter354).
+- **Live screenshot verified**: two-flow diagram renders correctly on `/how-it-works` in preview — emerald non-vehicle tile + blue vehicle tile, 4 numbered steps each, terms link at the bottom.
+
+### `docs/CLOUDFLARE_BOT_WORKER.md` (NEW)
+
+Copy-pasteable Cloudflare Worker (~55 lines JS). Charbel installs it on the `bidvex.com` zone with the route `www.bidvex.com/*`. Includes deploy/verify/rollback steps + rich-results test checklist.
+
+### Deliberately out of scope (belongs to their own tiers)
+
+- H-1 Stripe Identity — deferred to Tier 2.
+- H-2 Trustpilot / BBB / bitvex disambiguation — deferred to Tier 2 marketing.
+- M-3 Full bilingual subdirectory routing (`/en/... /fr/...`) — Tier 3. Hreflang currently uses `?lang=` variants (Google-accepted).
+- M-4 WebSocket protobuf + Web Worker — Tier 3.
+- L-1 QR pickup codes — Tier 4.
+- L-3 Touch-target audit — Tier 4.
+
+### Deploy safety
+
+- Frontend changes = pure copy + new component in a page that already exists → SPA rebuild, zero backend impact.
+- Backend adds = new modules (`seo_jsonld`, `prerender_service`, `routes/prerender`) + non-destructive changes to `server.py` (inverted redirect + added middleware). No schema changes, no data migration.
+- The prerender middleware is env-flagged via `PRERENDER_MIDDLEWARE_ENABLED=1` (default on) — can be disabled without a redeploy if anything unexpected surfaces.
+
 ## iter353 — Prospect Finder Hardening + Admin Extension View + Sign Alerts (Feb 16, 2026) ✅ COMPLETE — VERIFIED
 
 Fixes a **production Cloudflare "invalid or incomplete response"** popup on `/api/contractor/prospect-finder` + adds admin visibility into contractor extensions + notifies admin on every agreement signing.

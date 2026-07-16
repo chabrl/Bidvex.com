@@ -239,6 +239,87 @@ const HowItWorks = () => {
         </div>
       </section>
 
+      {/* iter354 — How your money is protected (two-flow diagram) */}
+      <section className="py-16 px-4" data-testid="escrow-explainer-section">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-10">
+            <h2 className="text-3xl font-bold mb-2">
+              {fr ? 'Comment votre argent est protégé' : 'How Your Money Is Protected'}
+            </h2>
+            <p className="text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">
+              {fr
+                ? "BidVex opère deux modèles distincts de détention de fonds. Voici comment chacun fonctionne."
+                : "BidVex operates two distinct payment-holding models. Here's exactly how each works."}
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Flow A — Non-vehicle escrow */}
+            <div className="rounded-2xl border-2 border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-900/10 p-6" data-testid="flow-nonvehicle">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center">
+                  <Lock className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-lg">
+                    {fr ? 'A. Articles non-véhicules' : 'A. Non-Vehicle Items'}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    {fr ? 'Lots, casiers, équipement industriel, biens divers' : 'Lots, storage lockers, industrial equipment, general goods'}
+                  </p>
+                </div>
+              </div>
+              <ol className="space-y-3 text-sm">
+                <li className="flex gap-3"><span className="w-6 h-6 rounded-full bg-emerald-600 text-white text-xs font-bold flex items-center justify-center shrink-0">1</span><span>{fr ? "L'acheteur gagne. Stripe capture le paiement complet." : 'Buyer wins. Stripe captures the full payment.'}</span></li>
+                <li className="flex gap-3"><span className="w-6 h-6 rounded-full bg-emerald-600 text-white text-xs font-bold flex items-center justify-center shrink-0">2</span><span>{fr ? 'Les fonds sont conservés en séquestre BidVex — pas encore au vendeur.' : 'Funds are held in BidVex escrow — not yet released to the seller.'}</span></li>
+                <li className="flex gap-3"><span className="w-6 h-6 rounded-full bg-emerald-600 text-white text-xs font-bold flex items-center justify-center shrink-0">3</span><span>{fr ? "L'acheteur reçoit un code de retrait à 6 caractères par courriel." : 'Buyer receives a 6-character pickup code by email.'}</span></li>
+                <li className="flex gap-3"><span className="w-6 h-6 rounded-full bg-emerald-600 text-white text-xs font-bold flex items-center justify-center shrink-0">4</span><span>{fr ? 'Au retrait, le vendeur saisit le code → séquestre libéré.' : 'At pickup, seller enters the code → escrow releases.'}</span></li>
+              </ol>
+              <div className="mt-4 pt-4 border-t border-emerald-200 dark:border-emerald-800 text-xs text-slate-600 dark:text-slate-400">
+                <strong>{fr ? 'Protection acheteur :' : 'Buyer protection:'}</strong>{' '}
+                {fr ? 'litige possible dans les 48 h; fonds gelés jusqu\'à résolution.' : 'dispute available within 48h; funds frozen until resolved.'}
+              </div>
+            </div>
+
+            {/* Flow B — Vehicle broker-direct */}
+            <div className="rounded-2xl border-2 border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-900/10 p-6" data-testid="flow-vehicle">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center">
+                  <Shield className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-lg">
+                    {fr ? 'B. Enchères de véhicules' : 'B. Vehicle Auctions'}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    {fr ? 'Voitures, camions, véhicules récréatifs' : 'Cars, trucks, recreational vehicles'}
+                  </p>
+                </div>
+              </div>
+              <ol className="space-y-3 text-sm">
+                <li className="flex gap-3"><span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center shrink-0">1</span><span>{fr ? "Dépôt de 500 $ pré-autorisé sur la carte de l'acheteur à l'inscription." : 'A $500 refundable deposit is pre-authorized on the buyer\'s card at bid registration.'}</span></li>
+                <li className="flex gap-3"><span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center shrink-0">2</span><span>{fr ? "L'acheteur gagne. BidVex facture UNIQUEMENT 2,5 % de frais + prime + TPS/TVQ via Stripe." : 'Buyer wins. BidVex charges ONLY 2.5% platform fee + premium + GST/QST via Stripe.'}</span></li>
+                <li className="flex gap-3"><span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center shrink-0">3</span><span>{fr ? "Le prix marteau est réglé directement acheteur → courtier (virement bancaire ou chèque certifié)." : 'The hammer price is settled directly buyer → broker (bank wire or certified cheque).'}</span></li>
+                <li className="flex gap-3"><span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center shrink-0">4</span><span>{fr ? "Après transfert de propriété, le dépôt de 500 $ est libéré automatiquement." : 'After ownership transfer, the $500 deposit is released automatically.'}</span></li>
+              </ol>
+              <div className="mt-4 pt-4 border-t border-blue-200 dark:border-blue-800 text-xs text-slate-600 dark:text-slate-400">
+                <strong>{fr ? 'Important :' : 'Important:'}</strong>{' '}
+                {fr ? "BidVex ne détient jamais le prix marteau. Seuls les frais BidVex et le dépôt sont détenus pendant un litige." : "BidVex never holds the hammer price. Only BidVex fees and the deposit are held during a dispute."}
+              </div>
+            </div>
+          </div>
+
+          <p className="text-center text-xs text-slate-500 mt-6">
+            {fr
+              ? "Pour les détails juridiques complets, consultez §5B et §8 de nos "
+              : "For complete legal details, see §5B and §8 of our "}
+            <Link to="/legal/terms" className="text-cyan-600 underline">
+              {fr ? "Conditions d'utilisation" : "Terms of Service"}
+            </Link>.
+          </p>
+        </div>
+      </section>
+
       {/* FAQ Accordion */}
       <section className="py-16 px-4 bg-slate-50 dark:bg-slate-900" data-testid="faq-section">
         <div className="max-w-3xl mx-auto">

@@ -5,4 +5,4 @@ Disallow: /dashboard
 Disallow: /api/
 Allow: /api/feeds/
 
-Sitemap: https://bidvex.com/sitemap.xml
+Sitemap: https://www.bidvex.com/sitemap.xml
