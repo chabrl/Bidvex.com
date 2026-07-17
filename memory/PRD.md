@@ -1,5 +1,107 @@
 # BidVex — Auction Marketplace PRD
 
+## iter356 — Tier 2 Technical SEO Audit + P0/P1 Implementation (Feb 17, 2026) ✅ COMPLETE — VERIFIED
+
+**Scope**: 10-fix technical SEO batch + 3 additional items (AuctionEvent schema, promo canonical, EN/FR Quebec bilingual pair). Ships alongside iter355 without any conflict. **Production impact currently masked by the Cloudflare `crawler-cache` Worker** (a legacy interception service on the CF zone that must be neutralized by ops before Googlebot sees any of iter356's output). Once crawler-cache is disabled, all of iter356 becomes visible to Google in a single crawl cycle — no additional deploys needed.
+
+### Findings that were ALREADY correct (audit false-positives from initial spec)
+- BreadcrumbList JSON-LD was already emitted on every prerender template (iter354 delivered this in `_resolve_static_page`, `_resolve_auction`, and the marketplace list branch).
+- FAQPage JSON-LD was already emitted on `/api/prerender/faq` (iter354).
+- Auction `og:image` was already extracting the first S3 image URL via the `_first_image` walker (iter354).
+
+The iter356 work upgraded these + added the truly missing pieces.
+
+### P0 fixes shipped
+
+1. **PUBLIC_HOST canonical alignment** — `routes/sitemap.py` now defaults to `https://www.bidvex.com` and logs a warning if the env var is missing. This eliminates the silent apex-canonical drift that would trigger 100+ redirect signals per crawl if PUBLIC_HOST ever became unset.
+2. **Vehicle schema.org type** — new `vehicle_ld()` builder in `services/seo_jsonld.py` emits `@type: [Product, Vehicle]` dual-type with VIN, brand/model/year, `mileageFromOdometer` (in km via UN/CEFACT "KMT" unitCode), `bodyType`, `transmission`, `fuelType`, `vehicleModelDate`, condition (New/Used/Refurbished/Damaged). Wired into `_resolve_auction(kind="vehicle")`. Unlocks Google's vehicle-listing rich result carousel.
+3. **AuctionEvent (SaleEvent) schema** — renamed `event_ld` to emit `@type: [Event, SaleEvent]` dual-type so auction pages qualify for BOTH the Events carousel AND the Google Shopping Sale-price snippet. Alias `auction_sale_event_ld` exported for semantic clarity.
+4. **og:image = first S3 photo confirmed** — already present but now covered by regression test.
+5. **BreadcrumbList JSON-LD delivered on every page** — already present, now covered by regression test.
+
+### P1 fixes shipped
+
+6. **Sitemap index architecture** (`/sitemap_index.xml` + 6 sub-sitemaps):
+   - `/sitemap-static.xml` (30 URLs — all static pages + 12 regional landings + `<lastmod>` on every entry)
+   - `/sitemap-listings.xml` (up to 5,000 marketplace listings, `xmlns:image` extension)
+   - `/sitemap-vehicles.xml` (up to 5,000 vehicle listings, image ext)
+   - `/sitemap-storage.xml` (up to 5,000 storage auctions, image ext)
+   - `/sitemap-lots.xml` (up to 5,000 multi-item lots, image ext)
+   - `/sitemap-sellers.xml` (up to 20,000 seller/dealer/broker/prospect profiles: 5,000 per collection)
+   - Legacy `/sitemap.xml` kept for backward compat with the SC entry already submitted at iter268.
+7. **Seller/dealer/broker/prospect profiles indexed** — new `/sitemap-sellers.xml` walks `sellers`, `dealers`, `brokers`, `prospects` collections and emits `/storefront/{slug}`, `/dealer/{slug}`, `/broker/{slug}`, `/prospect/{slug}` URLs.
+8. **10 regional SEO landing pages + 2 FR Quebec twins = 12 pages**:
+   - EN Canada-wide: `/car-auctions-canada`, `/vehicle-auctions-canada`, `/equipment-auctions-canada`
+   - EN Provincial: `/vehicle-auctions-{quebec,ontario,british-columbia,alberta}`, `/storage-auctions-{quebec,ontario,british-columbia}`
+   - FR Quebec twins: `/encheres-vehicules-quebec`, `/encheres-entreposage-quebec`
+   - Each page: unique H1, unique meta description (bilingual where applicable), Organization + BreadcrumbList JSON-LD, `regional_landing.html` Jinja2 template with EN/FR conditional content
+   - FR twins render with `<html lang="fr">` and full French copy
+9. **Bilingual hreflang cross-references** — EN Quebec page emits `<link rel="alternate" hreflang="fr-CA" href="/encheres-vehicules-quebec">`, FR twin emits reverse. This is the FIRST legitimate bilingual URL pair on BidVex, ahead of the full `/en/*` `/fr/*` subpath rollout planned for iter357+.
+10. **Image sitemap extension + `<lastmod>`** — every dynamic sub-sitemap declares `xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"` and emits `<image:image>` blocks with `<image:loc>` + `<image:title>` per listing. Every static entry now has `<lastmod>`.
+
+### Additional items shipped
+
+11. **AuctionEvent equivalent** (SaleEvent dual-type) — covered above in P0.3.
+12. **`/promo/share/summer-launch` canonical fix** — replaced all 5 `https://bidvex.com/*` URLs with `https://www.bidvex.com/*` in the OG-focused share-page. Added `<link rel="canonical">` + `twitter:image` for LinkedIn/Twitter unfurl parity. The og:image PNG at `/static/og/summer-launch-promo.png` verified publicly accessible (HTTP 200, content-type image/png, 53 KB).
+
+### robots.txt hardened
+```
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /auth
+Disallow: /api/
+Allow: /api/feeds/
+
+Sitemap: https://www.bidvex.com/sitemap_index.xml   ← NEW, listed FIRST
+Sitemap: https://www.bidvex.com/sitemap.xml         ← legacy, kept for SC
+Sitemap: https://www.bidvex.com/api/feeds/google
+Sitemap: https://www.bidvex.com/api/feeds/meta-catalog.json
+```
+
+### Test suite — `tests/test_iter356_seo_audit.py`
+**21/21 tests pass.** Coverage:
+- P0.1: PUBLIC_HOST canonical default
+- P0.2: BreadcrumbList delivered on every prerender template
+- P0.3: FAQPage on `/faq` (both EN and FR)
+- P0.4: og:image = first S3 photo
+- P0.5: Vehicle schema dual-type + all vehicle-specific fields
+- P0.6: AuctionEvent (SaleEvent) dual-type + validThrough
+- P1.1: sitemap_index enumerates 6 sub-sitemaps
+- P1.2: sitemap-static includes all 12 regional pages + `<lastmod>` on every entry
+- P1.3: sitemap-listings has `xmlns:image` + `<image:image>` blocks
+- P1.4: sitemap-sellers includes 4 profile types
+- P1.5: All 12 regional landings prerender-eligible
+- P1.6: EN Quebec hreflang points at FR twin (and vice-versa)
+- P1.7: FR twin prerender renders with `<html lang="fr">`
+- +.1: /api/promo/share/summer-launch uses only www canonical URLs
+- +.2: OG card file exists on disk
+- +.3: robots.txt lists sitemap_index.xml BEFORE legacy sitemap.xml
+- +.4: /api/prerender/faq emits ≥3 JSON-LD blocks
+- +.5: /api/prerender/vehicle-auctions-quebec renders full SSR with correct hreflang
+
+### Regression baseline — iter350 through iter356
+**112 passed, 4 skipped, 0 failed.** Zero regressions.
+
+### Google Search Console launch checklist (ready)
+
+- [x] Sitemap infrastructure ready: submit `https://www.bidvex.com/sitemap_index.xml`
+- [x] robots.txt correct (both sitemap references listed)
+- [x] JSON-LD schema types ready: Organization, WebSite, Product, Vehicle, SaleEvent, Event, Offer, BreadcrumbList, FAQPage
+- [x] Canonical URLs consistent (`www.bidvex.com` everywhere)
+- [x] Bilingual hreflang for Quebec pair (real EN↔FR cross-references)
+- [ ] **BLOCKED**: Cloudflare `crawler-cache` Worker must be disabled (Charbel's action) — until then, Googlebot sees a 270KB SPA snapshot instead of our SSR
+- [ ] After crawler-cache neutralized: verify `curl -s -A "Googlebot" https://www.bidvex.com/faq | grep -c 'application/ld+json'` returns ≥ 3
+- [ ] Submit sitemap_index.xml to Search Console
+- [ ] Request URL inspection on top 10 URLs
+- [ ] Set up rich results monitoring for `/`, `/marketplace`, `/faq`, one vehicle detail, one storage detail
+
+### Backlog after iter356
+- **iter357** — Full `/en/*` + `/fr/*` subpath architecture (M-3 from Tier 3): translate the SPA components, restructure URL routing, migrate hreflang from the Quebec pair pattern to full subpath pattern.
+- **iter358** — H-2 Public Trust Presence: Trustpilot widget, BBB accreditation, Google Business profile claiming, Social Proof widget.
+- **iter359** — Tier 3 (M-1 to M-6): Sticky Card 72hr grace, 48hr dispute window, Core Web Vitals (Protobuf WS + explicit CSS sizes), Off-Platform Escrow API, Tiered Security Deposits.
+
 ## iter355 — Tier 2 H-1: Bidder KYC (Stripe Identity) + Bid Pre-Auth Holds (Feb 17, 2026) ✅ COMPLETE — VERIFIED
 
 **Scope**: Tier 2 (H-1) of the "100/100 audit". Ships the two anti-shill/anti-non-payer guardrails: (1) Stripe Identity soft-gate at Checkout/Win, (2) Smart Pre-Authorization Holds on non-vehicle bids > $500 CAD. **Vehicle listings untouched** (they continue on the existing $500 flat deposit path from `services/vehicle_payment.py`).

@@ -72,6 +72,20 @@ _PRERENDER_ROUTE_PREFIXES = (
     "/terms",
     "/legal/",
     "/privacy-policy",
+    # iter356 — Regional SEO landing pages
+    "/car-auctions-canada",
+    "/vehicle-auctions-canada",
+    "/vehicle-auctions-quebec",
+    "/vehicle-auctions-ontario",
+    "/vehicle-auctions-british-columbia",
+    "/vehicle-auctions-alberta",
+    "/storage-auctions-quebec",
+    "/storage-auctions-ontario",
+    "/storage-auctions-british-columbia",
+    "/equipment-auctions-canada",
+    # French Quebec twins
+    "/encheres-vehicules-quebec",
+    "/encheres-entreposage-quebec",
 )
 
 

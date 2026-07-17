@@ -45,7 +45,11 @@ async def summer_launch_share_page():
     """iter341 — Crawler-friendly share URL. Social crawlers (Facebook, X,
     LinkedIn) don't execute JS, so the SPA's Helmet tags are invisible to
     them; this endpoint serves the OG tags in raw HTML and meta-redirects
-    humans to the real landing page."""
+    humans to the real landing page.
+
+    iter356 — Aligned all URLs to canonical `https://www.bidvex.com` (was
+    apex `https://bidvex.com`, which the apex→www 308 rule immediately
+    redirected — a wasted round trip and a duplicate-content signal)."""
     from fastapi.responses import HTMLResponse
     html = (
         '<!doctype html><html lang="en"><head><meta charset="utf-8">'
@@ -53,15 +57,17 @@ async def summer_launch_share_page():
         '<meta property="og:title" content="BidVex Grand Opening — First Month FREE">'
         '<meta property="og:description" content="Canada\'s new bilingual auction marketplace is live. '
         'List free, bid free, sell smarter. Vehicles, Marketplace, Lots &amp; Storage.">'
-        '<meta property="og:image" content="https://bidvex.com/static/og/summer-launch-promo.png">'
+        '<meta property="og:image" content="https://www.bidvex.com/static/og/summer-launch-promo.png">'
         '<meta property="og:image:width" content="1200">'
         '<meta property="og:image:height" content="628">'
-        '<meta property="og:url" content="https://bidvex.com/promo/summer-launch">'
+        '<meta property="og:url" content="https://www.bidvex.com/promo/summer-launch">'
         '<meta property="og:type" content="website">'
         '<meta name="twitter:card" content="summary_large_image">'
-        '<meta http-equiv="refresh" content="0;url=https://bidvex.com/promo/summer-launch">'
-        '</head><body>Redirecting to <a href="https://bidvex.com/promo/summer-launch">'
-        'bidvex.com/promo/summer-launch</a>…</body></html>'
+        '<meta name="twitter:image" content="https://www.bidvex.com/static/og/summer-launch-promo.png">'
+        '<link rel="canonical" href="https://www.bidvex.com/promo/summer-launch">'
+        '<meta http-equiv="refresh" content="0;url=https://www.bidvex.com/promo/summer-launch">'
+        '</head><body>Redirecting to <a href="https://www.bidvex.com/promo/summer-launch">'
+        'www.bidvex.com/promo/summer-launch</a>…</body></html>'
     )
     return HTMLResponse(content=html)
 

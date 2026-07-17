@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block main %}
+<article>
+  <h1 style="color:#0B2545;font-size:36px;line-height:1.2;margin-bottom:12px;">{{ hero_headline }}</h1>
+  <p style="color:#334155;font-size:18px;line-height:1.6;margin-bottom:24px;">{{ hero_subtitle }}</p>
+
+  <section style="background:#F8FAFC;border:1px solid #e2e8f0;border-radius:8px;padding:20px 24px;margin-bottom:24px;">
+    <h2 style="color:#0B2545;font-size:22px;margin-bottom:12px;">
+      {% if lang == 'fr' %}Pourquoi enchérir sur BidVex ?{% else %}Why bid on BidVex?{% endif %}
+    </h2>
+    <ul style="color:#334155;font-size:15px;line-height:1.8;padding-left:22px;">
+      {% if lang == 'fr' %}
+      <li>Concessionnaires et courtiers licenciés vérifiés province par province.</li>
+      <li>Séquestre Stripe sécurisé — les fonds ne sont libérés qu'à la livraison confirmée.</li>
+      <li>Vérification d'identité obligatoire pour les gagnants (KYC via Stripe Identity).</li>
+      <li>Plateforme entièrement bilingue EN / FR.</li>
+      <li>Conformité fiscale complète : TPS, TVQ, HST calculées automatiquement selon la province.</li>
+      {% else %}
+      <li>Verified licensed dealers &amp; brokers province-by-province.</li>
+      <li>Secure Stripe escrow — funds released only on confirmed pickup.</li>
+      <li>Winner identity verification (KYC via Stripe Identity).</li>
+      <li>Fully bilingual English / French platform.</li>
+      <li>Full CRA tax compliance: GST, QST, HST calculated per-province automatically.</li>
+      {% endif %}
+    </ul>
+    <p style="margin-top:20px;">
+      <a href="{{ canonical_host }}{{ cta_target }}"
+         style="display:inline-block;background:linear-gradient(135deg,#1E3A8A,#06B6D4);color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;">
+        {% if lang == 'fr' %}Voir les enchères en cours →{% else %}View live auctions →{% endif %}
+      </a>
+    </p>
+  </section>
+
+  <section>
+    <h2 style="color:#0B2545;font-size:22px;margin-bottom:12px;">
+      {% if lang == 'fr' %}Comment participer ?{% else %}How to participate{% endif %}
+    </h2>
+    <ol style="color:#334155;font-size:15px;line-height:1.8;padding-left:22px;">
+      {% if lang == 'fr' %}
+      <li><a href="{{ canonical_host }}/auth" style="color:#1E3A8A;">Créez un compte BidVex</a> — gratuit, prend 60 secondes.</li>
+      <li>Ajoutez un moyen de paiement (carte de crédit valide).</li>
+      <li>Enchérissez sur les articles qui vous intéressent — nous plaçons un dépôt de garantie remboursable pour les enchères &gt; 500 $.</li>
+      <li>Si vous gagnez, complétez la vérification d'identité KYC (une fois seulement).</li>
+      <li>Réglez et organisez le retrait — code de retrait à 6 caractères pour les non-véhicules, coordination avec le courtier pour les véhicules.</li>
+      {% else %}
+      <li><a href="{{ canonical_host }}/auth" style="color:#1E3A8A;">Create a BidVex account</a> — free, 60 seconds.</li>
+      <li>Add a payment method (valid credit card).</li>
+      <li>Bid on items you're interested in — we place a refundable hold for bids &gt; $500.</li>
+      <li>If you win, complete one-time identity verification (KYC).</li>
+      <li>Settle and arrange pickup — 6-character pickup code for non-vehicle items, direct broker coordination for vehicles.</li>
+      {% endif %}
+    </ol>
+  </section>
+</article>
+{% endblock %}

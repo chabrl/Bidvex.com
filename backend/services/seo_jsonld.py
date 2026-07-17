@@ -136,11 +136,15 @@ def event_ld(
     currency: str = "CAD",
     location_name: str = "BidVex Online Marketplace",
 ) -> Dict[str, Any]:
-    """Event schema — auctions are online time-bounded events per schema.org.
-    Unlocks the SERP Events carousel."""
+    """SaleEvent schema — an online, time-bounded auction is a SaleEvent
+    per Google's rich-results spec (a Product-owning subclass of Event).
+    Emits both the base Event fields AND the SaleEvent-specific fields
+    so we're eligible for the Events carousel AND the Sale-price snippet
+    in Google Shopping tabs. Renamed from `event_ld` in iter354 →
+    `auction_sale_event_ld` alias below for backwards-compat callers."""
     return {
         "@context": "https://schema.org",
-        "@type":    "Event",
+        "@type":    ["Event", "SaleEvent"],
         "name":     name,
         "description": description,
         "url":      canonical_url,
@@ -165,8 +169,94 @@ def event_ld(
             "availability":  "https://schema.org/InStock",
             "url":           canonical_url,
             "validFrom":     starts_at_iso,
+            "validThrough":  ends_at_iso,
         },
     }
+
+
+# iter356 alias — semantic name matching Google's auction rich-results docs.
+auction_sale_event_ld = event_ld
+
+
+def vehicle_ld(
+    *,
+    name: str,
+    description: str,
+    canonical_url: str,
+    image_url: str,
+    current_price: float,
+    currency: str = "CAD",
+    vin: Optional[str] = None,
+    make: Optional[str] = None,
+    model: Optional[str] = None,
+    year: Optional[int] = None,
+    mileage_km: Optional[float] = None,
+    body_type: Optional[str] = None,
+    transmission: Optional[str] = None,
+    fuel_type: Optional[str] = None,
+    seller_name: Optional[str] = None,
+    availability: str = "InStock",
+    condition: str = "UsedCondition",
+) -> Dict[str, Any]:
+    """iter356 — Vehicle rich result schema (Google's vehicle-listing carousel).
+
+    Emits `@type: [Product, Vehicle]` — dual-type so we retain generic
+    Product eligibility AND unlock the Vehicle-specific rich result which
+    surfaces make/model/year/mileage in the SERP tile.
+    """
+    availability_map = {
+        "InStock":   "https://schema.org/InStock",
+        "SoldOut":   "https://schema.org/SoldOut",
+        "PreOrder":  "https://schema.org/PreOrder",
+        "Discontinued": "https://schema.org/Discontinued",
+    }
+    condition_map = {
+        "NewCondition":         "https://schema.org/NewCondition",
+        "UsedCondition":        "https://schema.org/UsedCondition",
+        "RefurbishedCondition": "https://schema.org/RefurbishedCondition",
+        "DamagedCondition":     "https://schema.org/DamagedCondition",
+    }
+    payload: Dict[str, Any] = {
+        "@context": "https://schema.org",
+        "@type":    ["Product", "Vehicle"],
+        "name":     name,
+        "description": description,
+        "url":      canonical_url,
+        "image":    [image_url] if image_url else [],
+        "offers": {
+            "@type": "Offer",
+            "price": round(float(current_price), 2),
+            "priceCurrency": currency,
+            "availability": availability_map.get(availability, availability_map["InStock"]),
+            "itemCondition": condition_map.get(condition, condition_map["UsedCondition"]),
+            "url": canonical_url,
+        },
+    }
+    if seller_name:
+        payload["offers"]["seller"] = {"@type": "Organization", "name": seller_name}
+    if vin:
+        payload["vehicleIdentificationNumber"] = vin
+    if make:
+        payload["brand"] = {"@type": "Brand", "name": make}
+        payload["manufacturer"] = {"@type": "Organization", "name": make}
+    if model:
+        payload["model"] = model
+    if year:
+        payload["vehicleModelDate"] = str(year)
+        payload["productionDate"] = f"{year}-01-01"
+    if mileage_km is not None:
+        payload["mileageFromOdometer"] = {
+            "@type":    "QuantitativeValue",
+            "value":    round(float(mileage_km), 1),
+            "unitCode": "KMT",  # UN/CEFACT code for kilometres
+        }
+    if body_type:
+        payload["bodyType"] = body_type
+    if transmission:
+        payload["vehicleTransmission"] = transmission
+    if fuel_type:
+        payload["fuelType"] = fuel_type
+    return payload
 
 
 def breadcrumb_ld(items: List[Dict[str, str]]) -> Dict[str, Any]:
@@ -229,6 +319,8 @@ __all__ = [
     "website_ld",
     "product_offer_ld",
     "event_ld",
+    "auction_sale_event_ld",
+    "vehicle_ld",
     "breadcrumb_ld",
     "faqpage_ld",
 ]

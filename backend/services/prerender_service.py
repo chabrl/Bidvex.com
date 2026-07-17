@@ -28,6 +28,7 @@ from services.seo_jsonld import (
     faqpage_ld,
     organization_ld,
     product_offer_ld,
+    vehicle_ld,
     website_ld,
 )
 
@@ -284,9 +285,31 @@ async def _resolve_auction(db, listing_id: str, path: str, lang: str, kind: str)
 
     canonical = _canonical(path, lang)
 
-    jsonld_blocks = [
-        _jsonld_script(organization_ld()),
-        _jsonld_script(product_offer_ld(
+    # iter356 — Emit Vehicle schema (Product+Vehicle dual-type) for vehicle
+    # auctions so Google unlocks the vehicle-listing rich result. Non-vehicle
+    # auctions keep the classic Product/AggregateOffer path.
+    if kind in ("vehicle",):
+        primary_schema = vehicle_ld(
+            name=title,
+            description=description or title,
+            canonical_url=canonical,
+            image_url=img,
+            current_price=current_price,
+            currency="CAD",
+            seller_name=seller_name,
+            availability=availability,
+            condition=doc.get("condition") or "UsedCondition",
+            vin=doc.get("vin"),
+            make=doc.get("make") or doc.get("brand"),
+            model=doc.get("model"),
+            year=int(doc["year"]) if str(doc.get("year") or "").isdigit() else None,
+            mileage_km=(float(doc["mileage"]) if str(doc.get("mileage") or "").replace(".", "").isdigit() else None),
+            body_type=doc.get("body_type") or doc.get("bodyStyle"),
+            transmission=doc.get("transmission"),
+            fuel_type=doc.get("fuel_type"),
+        )
+    else:
+        primary_schema = product_offer_ld(
             name=title,
             description=description or title,
             image_url=img,
@@ -296,7 +319,11 @@ async def _resolve_auction(db, listing_id: str, path: str, lang: str, kind: str)
             seller_name=seller_name,
             availability=availability,
             category=category,
-        )),
+        )
+
+    jsonld_blocks = [
+        _jsonld_script(organization_ld()),
+        _jsonld_script(primary_schema),
         _jsonld_script(event_ld(
             name=title,
             description=description or title,
@@ -398,7 +425,201 @@ async def resolve_route(db, path: str, lang: str = "en") -> Dict[str, Any]:
             "canonical_host": CANONICAL_HOST,
         }
 
+    # iter356 — Regional SEO landing pages (P1 fix H3).
+    # 10 EN + 2 FR Quebec pages. Each is a bilingual pair with real hreflang
+    # cross-references — this is the first legitimate bilingual URL pair on
+    # BidVex, ahead of the full /en/* /fr/* subpath rollout in iter357+.
+    regional = _resolve_regional_landing(path, lang)
+    if regional:
+        return regional
+
     return await _resolve_static_page(db, path, lang)
+
+
+# ─── iter356 · Regional SEO landing pages ─────────────────────────────
+
+def _regional_pair(en_path: str, fr_path: str) -> Dict[str, str]:
+    """Return hreflang alternates pointing at the EN + FR twin pages."""
+    return {
+        "en-CA":     f"{CANONICAL_HOST}{en_path}",
+        "fr-CA":     f"{CANONICAL_HOST}{fr_path}",
+        "x-default": f"{CANONICAL_HOST}{en_path}",
+    }
+
+
+# Definition table: EN slug → {title, description, hero_h1, keywords,
+# canonical province code, marketplace filter URL, twin FR slug (or None)}.
+_REGIONAL_LANDINGS: Dict[str, Dict[str, Any]] = {
+    # ── Broad Canada-wide ────────────────────────────────────────
+    "/car-auctions-canada": {
+        "title_en": "Car Auctions Canada — Bid Online on Vehicles | BidVex",
+        "desc_en":  "Browse and bid on Canadian car auctions online. Verified dealers, "
+                    "transparent bidding, bilingual EN/FR platform. Live vehicle "
+                    "auctions from Quebec, Ontario, Alberta, and British Columbia.",
+        "h1_en":    "Online Car Auctions Across Canada",
+        "cta_target": "/vehicle-auctions",
+        "twin_fr": None,
+    },
+    "/vehicle-auctions-canada": {
+        "title_en": "Vehicle Auctions Canada — Cars, Trucks, SUVs | BidVex",
+        "desc_en":  "Bid on Canadian vehicle auctions online. Cars, pickup trucks, "
+                    "SUVs, motorcycles from licensed dealers nationwide.",
+        "h1_en":    "Vehicle Auctions — Canada-Wide",
+        "cta_target": "/vehicle-auctions",
+        "twin_fr": None,
+    },
+    "/equipment-auctions-canada": {
+        "title_en": "Industrial Equipment Auctions Canada | BidVex",
+        "desc_en":  "Bid online on Canadian industrial equipment auctions. "
+                    "Heavy machinery, tools, restaurant equipment, IT gear.",
+        "h1_en":    "Industrial Equipment Auctions — Canada",
+        "cta_target": "/marketplace?category=equipment",
+        "twin_fr": None,
+    },
+    # ── Provincial ───────────────────────────────────────────────
+    "/vehicle-auctions-quebec": {
+        "title_en": "Vehicle Auctions Quebec — Cars & Trucks Online | BidVex",
+        "desc_en":  "Bid online on Quebec vehicle auctions. Cars, trucks, and SUVs "
+                    "from SAAQ-licensed dealers across Montreal, Quebec City, "
+                    "Sherbrooke, Laval, and Gatineau. Bilingual EN/FR platform.",
+        "h1_en":    "Online Vehicle Auctions in Quebec",
+        "cta_target": "/vehicle-auctions?province=QC",
+        "twin_fr": "/encheres-vehicules-quebec",
+    },
+    "/vehicle-auctions-ontario": {
+        "title_en": "Vehicle Auctions Ontario — Toronto, Ottawa, Hamilton | BidVex",
+        "desc_en":  "Ontario online vehicle auctions from OMVIC-licensed dealers. "
+                    "Cars, trucks, and SUVs shipped or picked up in Toronto, "
+                    "Ottawa, Mississauga, Hamilton, and London.",
+        "h1_en":    "Online Vehicle Auctions in Ontario",
+        "cta_target": "/vehicle-auctions?province=ON",
+        "twin_fr": None,
+    },
+    "/vehicle-auctions-british-columbia": {
+        "title_en": "Vehicle Auctions British Columbia — Vancouver, Victoria | BidVex",
+        "desc_en":  "British Columbia online vehicle auctions from VSA-licensed dealers. "
+                    "Cars, trucks, and SUVs from Vancouver, Victoria, Surrey, and Kelowna.",
+        "h1_en":    "Online Vehicle Auctions in British Columbia",
+        "cta_target": "/vehicle-auctions?province=BC",
+        "twin_fr": None,
+    },
+    "/vehicle-auctions-alberta": {
+        "title_en": "Vehicle Auctions Alberta — Calgary, Edmonton | BidVex",
+        "desc_en":  "Alberta online vehicle auctions from AMVIC-licensed dealers. "
+                    "Cars, trucks, SUVs from Calgary, Edmonton, Red Deer, Lethbridge.",
+        "h1_en":    "Online Vehicle Auctions in Alberta",
+        "cta_target": "/vehicle-auctions?province=AB",
+        "twin_fr": None,
+    },
+    "/storage-auctions-ontario": {
+        "title_en": "Storage Unit Auctions Ontario — Online Bidding | BidVex",
+        "desc_en":  "Bid online on abandoned storage unit auctions in Ontario. "
+                    "Verified facilities in Toronto, Mississauga, Ottawa, Hamilton.",
+        "h1_en":    "Storage Unit Auctions in Ontario",
+        "cta_target": "/storage-auctions?province=ON",
+        "twin_fr": None,
+    },
+    "/storage-auctions-quebec": {
+        "title_en": "Storage Unit Auctions Quebec — Locker Bidding | BidVex",
+        "desc_en":  "Bid online on abandoned storage unit auctions in Quebec. "
+                    "Verified facilities in Montreal, Quebec City, Sherbrooke, and Laval. "
+                    "Bilingual EN/FR platform.",
+        "h1_en":    "Storage Unit Auctions in Quebec",
+        "cta_target": "/storage-auctions?province=QC",
+        "twin_fr": "/encheres-entreposage-quebec",
+    },
+    "/storage-auctions-british-columbia": {
+        "title_en": "Storage Unit Auctions British Columbia | BidVex",
+        "desc_en":  "British Columbia storage unit auctions online — Vancouver, "
+                    "Victoria, Surrey. Bid on abandoned lockers from verified facilities.",
+        "h1_en":    "Storage Unit Auctions in British Columbia",
+        "cta_target": "/storage-auctions?province=BC",
+        "twin_fr": None,
+    },
+    # ── FR-only Quebec twins ─────────────────────────────────────
+    "/encheres-vehicules-quebec": {
+        "title_fr": "Enchères de véhicules au Québec — Voitures et camions | BidVex",
+        "desc_fr":  "Enchérissez en ligne sur des véhicules du Québec. Voitures, "
+                    "camions et VUS de concessionnaires licenciés SAAQ à Montréal, "
+                    "Québec, Sherbrooke, Laval et Gatineau. Plateforme bilingue EN/FR.",
+        "h1_fr":    "Enchères de véhicules en ligne au Québec",
+        "cta_target": "/vehicle-auctions?province=QC",
+        "twin_en": "/vehicle-auctions-quebec",
+        "lang_only": "fr",
+    },
+    "/encheres-entreposage-quebec": {
+        "title_fr": "Enchères d'entreposage au Québec — Casiers en ligne | BidVex",
+        "desc_fr":  "Enchérissez en ligne sur des casiers d'entreposage abandonnés "
+                    "au Québec. Installations vérifiées à Montréal, Québec, "
+                    "Sherbrooke et Laval. Plateforme bilingue EN/FR.",
+        "h1_fr":    "Enchères de casiers d'entreposage au Québec",
+        "cta_target": "/storage-auctions?province=QC",
+        "twin_en": "/storage-auctions-quebec",
+        "lang_only": "fr",
+    },
+}
+
+
+def _resolve_regional_landing(path: str, lang: str) -> Optional[Dict[str, Any]]:
+    """Build a prerender context for a regional SEO landing page, or None
+    if `path` isn't one of the known regional slugs. Bilingual pairs get
+    correct hreflang cross-references."""
+    entry = _REGIONAL_LANDINGS.get(path)
+    if not entry:
+        return None
+
+    # FR-only page → force lang=fr, twin points to EN counterpart.
+    lang_only = entry.get("lang_only")
+    if lang_only == "fr":
+        title = entry["title_fr"]
+        desc  = entry["desc_fr"]
+        h1    = entry["h1_fr"]
+        hreflang = _regional_pair(entry["twin_en"], path)
+        page_lang = "fr"
+        canonical = f"{CANONICAL_HOST}{path}"
+    elif lang == "fr" and entry.get("title_fr"):
+        title = entry["title_fr"]
+        desc  = entry["desc_fr"]
+        h1    = entry["h1_fr"]
+        twin_fr = entry.get("twin_fr")
+        hreflang = _regional_pair(path, twin_fr) if twin_fr else _hreflang_alternates(path)
+        page_lang = "fr"
+        canonical = f"{CANONICAL_HOST}{path}?lang=fr"
+    else:
+        title = entry["title_en"]
+        desc  = entry["desc_en"]
+        h1    = entry["h1_en"]
+        twin_fr = entry.get("twin_fr")
+        hreflang = _regional_pair(path, twin_fr) if twin_fr else _hreflang_alternates(path)
+        page_lang = "en"
+        canonical = f"{CANONICAL_HOST}{path}"
+
+    return {
+        "template": "regional_landing.html",
+        "title": title,
+        "description": desc,
+        "canonical": canonical,
+        "og_type": "website",
+        "og_image": f"{CANONICAL_HOST}/bidvex-icon.png",
+        "hreflang": hreflang,
+        "jsonld_blocks": [
+            _jsonld_script(organization_ld()),
+            _jsonld_script(breadcrumb_ld([
+                {"name": "BidVex" if page_lang == "en" else "Accueil",
+                 "url":  CANONICAL_HOST + "/"},
+                {"name": ("Vehicle Auctions" if "vehicle" in path or "encheres-veh" in path
+                          else "Storage Auctions" if "storage" in path or "entreposage" in path
+                          else "Auctions"),
+                 "url":  CANONICAL_HOST + entry["cta_target"]},
+                {"name": title, "url": canonical},
+            ])),
+        ],
+        "lang": page_lang,
+        "hero_headline": h1,
+        "hero_subtitle": desc,
+        "cta_target": entry["cta_target"],
+        "canonical_host": CANONICAL_HOST,
+    }
 
 
 def render_html(context: Dict[str, Any]) -> str:
