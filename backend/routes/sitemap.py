@@ -107,6 +107,9 @@ STATIC_PAGES: List[tuple] = [
     ("/encheres-entreposage-quebec-ville", "weekly", 0.8),
     ("/encheres-entreposage-sherbrooke", "weekly", 0.8),
     ("/encheres-entreposage-laval", "weekly", 0.8),
+    # iter358 — Quebec launch press release pages (EN + FR).
+    ("/press/quebec-launch", "monthly", 0.8),
+    ("/presse/lancement-quebec", "monthly", 0.8),
 ]
 
 

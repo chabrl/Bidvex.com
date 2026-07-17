@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import { 
   Moon, Sun, User, LogOut, LayoutDashboard, 
   MessageCircle, DollarSign, Shield, Lock, Menu, X,
@@ -24,6 +25,8 @@ const Navbar = () => {
   const { t, i18n } = useTranslation();
   const { user, logout, updateUserPreferences } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  // iter358 — bilingual URL switching (real navigation, not just i18n state).
+  const { switchLang: switchUrlLang, lang: activeLang } = useLanguage();
   // iter256 — Live banner height from PromoBannerContext. The fixed
   // nav binds `top` to this so the red promo banner always sits ABOVE
   // the nav (banner z-[80] > nav z-[70]) and the spacer below the nav
@@ -46,7 +49,16 @@ const Navbar = () => {
   }, [location.pathname]);
 
   const changeLanguage = async (lng) => {
-    i18n.changeLanguage(lng);
+    // iter358 — Language toggle MUST trigger a real URL navigation so Google
+    // can crawl /en/vehicle-auctions and /fr/encheres-vehicules as distinct
+    // canonical URLs. `switchUrlLang` handles i18n change + navigate() + the
+    // FR-slug remap via urlMap.js.
+    if (lng !== activeLang) {
+      switchUrlLang(lng);
+    } else {
+      // Fallback: same-lang click (no-op nav but still persist prefs).
+      i18n.changeLanguage(lng);
+    }
     if (user) {
       try {
         await updateUserPreferences({ preferred_language: lng });

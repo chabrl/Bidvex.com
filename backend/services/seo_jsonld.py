@@ -335,6 +335,60 @@ def website_ld() -> Dict[str, Any]:
     }
 
 
+def news_article_ld(
+    *,
+    headline: str,
+    description: str,
+    date_published: str,
+    canonical_url: str,
+    lang: str = "en",
+    author_name: str = "BidVex Editorial",
+    author_role: Optional[str] = None,
+    image_url: Optional[str] = None,
+    date_modified: Optional[str] = None,
+) -> Dict[str, Any]:
+    """iter358 — NewsArticle rich-result schema.
+
+    Used by press-release pages so Google eligibility for Top Stories +
+    News tab is unlocked. The publisher block is BidVex Inc. with the
+    canonical logo per Google's `NewsArticle.publisher.logo` spec.
+    """
+    payload: Dict[str, Any] = {
+        "@context": "https://schema.org",
+        "@type":    "NewsArticle",
+        "headline": headline[:110],  # Google caps headline at 110 chars
+        "description": description,
+        "datePublished": date_published,
+        "dateModified":  date_modified or date_published,
+        "inLanguage":    "fr-CA" if lang == "fr" else "en-CA",
+        "url":           canonical_url,
+        "mainEntityOfPage": {
+            "@type": "WebPage",
+            "@id":   canonical_url,
+        },
+        "author": {
+            "@type": "Person",
+            "name":  author_name,
+        },
+        "publisher": {
+            "@type": "Organization",
+            "name":  "BidVex Inc.",
+            "url":   CANONICAL_HOST,
+            "logo": {
+                "@type": "ImageObject",
+                "url":   f"{CANONICAL_HOST}/bidvex-icon.png",
+                "width":  512,
+                "height": 512,
+            },
+        },
+    }
+    if author_role:
+        payload["author"]["jobTitle"] = author_role
+    if image_url:
+        payload["image"] = [image_url]
+    return payload
+
+
 __all__ = [
     "CANONICAL_HOST",
     "organization_ld",
@@ -346,6 +400,7 @@ __all__ = [
     "vehicle_ld",
     "breadcrumb_ld",
     "faqpage_ld",
+    "news_article_ld",
 ]
 
 

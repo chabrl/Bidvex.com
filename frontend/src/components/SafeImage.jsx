@@ -42,7 +42,7 @@ const _isSafeSrc = (src) => {
   return true;
 };
 
-export const SafeImage = ({ src, alt = '', onError, ...rest }) => {
+export const SafeImage = ({ src, alt = '', onError, decoding, loading, fetchPriority, ...rest }) => {
   const initialSrc = useMemo(() => (_isSafeSrc(src) ? src : PLACEHOLDER_IMAGE), [src]);
   const [currentSrc, setCurrentSrc] = useState(initialSrc);
 
@@ -65,6 +65,13 @@ export const SafeImage = ({ src, alt = '', onError, ...rest }) => {
       {...rest}
       src={currentSrc}
       alt={alt}
+      // iter358 CWV — default `decoding="async"` so image decode never
+      // blocks the main thread. `loading` and `fetchPriority` are passed
+      // through unchanged (caller decides — usually `lazy` on grids +
+      // `eager`/`high` on hero LCP images).
+      decoding={decoding || 'async'}
+      loading={loading}
+      fetchpriority={fetchPriority || undefined}
       onError={handleError}
       data-testid={rest['data-testid'] || 'safe-image'}
     />

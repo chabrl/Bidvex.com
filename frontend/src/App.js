@@ -35,6 +35,12 @@ import MessageNotificationListener from './components/MessageNotificationListene
 import { registerServiceWorker } from './utils/pushNotifications';
 import './App.css';
 
+// iter358 — Bilingual URL infrastructure. LanguageProvider reads the
+// active lang from the URL prefix (/en/... /fr/...), syncs i18n +
+// <html lang>, and exposes `switchLang` for real navigation on toggle.
+import { LanguageProvider } from './contexts/LanguageContext';
+import { EN_TO_FR } from './i18n/urlMap';
+
 // ─── Lazy-loaded pages (route-level code splitting) ───────────────
 const HomePage = lazy(() => import('./pages/HomePage'));
 // iter307 — public /r/{code} referral landing page
@@ -427,6 +433,7 @@ const App = () => {
     <HelmetProvider>
     <I18nextProvider i18n={i18n}>
       <BrowserRouter>
+        <LanguageProvider>
         <SiteConfigProvider>
           <CurrencyProvider>
           <FeatureFlagsProvider>
@@ -452,11 +459,132 @@ const App = () => {
           <Navbar />
           <Suspense fallback={<PageLoader />}>
           <Routes>
+          {/* ═════════════════════════════════════════════════════════
+              iter358 — Bilingual /en/* and /fr/* SPA routes.
+              These are the SEO-critical index + landing pages, mounted
+              at their lang-prefixed canonical URLs. Both languages point
+              to the same React page component; the FR slugs match the
+              backend prerender + sitemap so bots + humans + Google all
+              resolve the same content.
+              Legacy paths (below) are preserved via 302 client redirects
+              to the /en/* equivalent so bookmarks + share links still work.
+              ═════════════════════════════════════════════════════════ */}
+          <Route path="/en" element={<Navigate to="/en/" replace />} />
+          <Route path="/fr" element={<Navigate to="/fr/" replace />} />
+
+          {/* Homepage — bilingual */}
+          <Route path="/en/" element={<ErrorBoundary scope="home"><HomePage /></ErrorBoundary>} />
+          <Route path="/fr/" element={<ErrorBoundary scope="home"><HomePage /></ErrorBoundary>} />
+
+          {/* Marketplace */}
+          <Route path="/en/marketplace" element={<ErrorBoundary scope="marketplace"><MarketplacePage /></ErrorBoundary>} />
+          <Route path="/fr/marche" element={<ErrorBoundary scope="marketplace"><MarketplacePage /></ErrorBoundary>} />
+          <Route path="/en/items" element={<ErrorBoundary scope="items"><ItemsMarketplacePage /></ErrorBoundary>} />
+          <Route path="/fr/items" element={<ErrorBoundary scope="items"><ItemsMarketplacePage /></ErrorBoundary>} />
+          <Route path="/en/lots" element={<ErrorBoundary scope="lots"><LotsMarketplacePage /></ErrorBoundary>} />
+          <Route path="/fr/lots" element={<ErrorBoundary scope="lots"><LotsMarketplacePage /></ErrorBoundary>} />
+          <Route path="/en/lots/:id" element={<ErrorBoundary scope="lot-detail"><MultiItemListingDetailPage /></ErrorBoundary>} />
+          <Route path="/fr/lots/:id" element={<ErrorBoundary scope="lot-detail"><MultiItemListingDetailPage /></ErrorBoundary>} />
+          <Route path="/en/listing/:id" element={<ErrorBoundary scope="listing-detail"><ListingDetailPage /></ErrorBoundary>} />
+          <Route path="/fr/listing/:id" element={<ErrorBoundary scope="listing-detail"><ListingDetailPage /></ErrorBoundary>} />
+
+          {/* Vehicle Auctions */}
+          <Route path="/en/vehicle-auctions" element={<ErrorBoundary scope="vehicle-auctions"><VehicleAuctionsRoute /></ErrorBoundary>} />
+          <Route path="/fr/encheres-vehicules" element={<ErrorBoundary scope="vehicle-auctions"><VehicleAuctionsRoute /></ErrorBoundary>} />
+          <Route path="/en/vehicle-auctions/:id" element={<ErrorBoundary scope="vehicle-detail"><VehicleDetailPage /></ErrorBoundary>} />
+          <Route path="/fr/encheres-vehicules/:id" element={<ErrorBoundary scope="vehicle-detail"><VehicleDetailPage /></ErrorBoundary>} />
+
+          {/* Storage Auctions */}
+          <Route path="/en/storage-auctions" element={<ErrorBoundary scope="storage-auctions"><StorageAuctionsBrowse /></ErrorBoundary>} />
+          <Route path="/fr/encheres-entreposage" element={<ErrorBoundary scope="storage-auctions"><StorageAuctionsBrowse /></ErrorBoundary>} />
+          <Route path="/en/storage-auctions/:id" element={<StorageAuctionDetail />} />
+          <Route path="/fr/encheres-entreposage/:id" element={<StorageAuctionDetail />} />
+
+          {/* Static / SEO pages */}
+          <Route path="/en/how-it-works" element={<HowItWorksPage />} />
+          <Route path="/fr/comment-ca-marche" element={<HowItWorksPage />} />
+          <Route path="/en/how-brokers-work" element={<HowBrokersWorkPage />} />
+          <Route path="/fr/comment-fonctionnent-les-courtiers" element={<HowBrokersWorkPage />} />
+          <Route path="/en/about" element={<AboutUsPage />} />
+          <Route path="/fr/a-propos" element={<AboutUsPage />} />
+          <Route path="/en/contact" element={<ContactUsPage />} />
+          <Route path="/fr/contact" element={<ContactUsPage />} />
+          <Route path="/en/pricing" element={<SubscriptionPricingPage />} />
+          <Route path="/fr/tarifs" element={<SubscriptionPricingPage />} />
+          <Route path="/en/faq" element={<HowItWorksPage />} />
+          <Route path="/fr/faq" element={<HowItWorksPage />} />
+          <Route path="/en/blogs" element={<ErrorBoundary scope="blogs"><BlogsPage /></ErrorBoundary>} />
+          <Route path="/fr/blogues" element={<ErrorBoundary scope="blogs"><BlogsPage /></ErrorBoundary>} />
+          <Route path="/en/blogs/:slug" element={<ErrorBoundary scope="blog-article"><BlogArticlePage /></ErrorBoundary>} />
+          <Route path="/fr/blogues/:slug" element={<ErrorBoundary scope="blog-article"><BlogArticlePage /></ErrorBoundary>} />
+          <Route path="/en/careers" element={<ErrorBoundary scope="careers"><CareersPage /></ErrorBoundary>} />
+          <Route path="/fr/carrieres" element={<ErrorBoundary scope="careers"><CareersPage /></ErrorBoundary>} />
+          <Route path="/en/community" element={<CommunityPage />} />
+          <Route path="/fr/communaute" element={<CommunityPage />} />
+          <Route path="/en/terms-of-service" element={<TermsOfServicePage />} />
+          <Route path="/fr/conditions-utilisation" element={<TermsOfServicePage />} />
+          <Route path="/en/privacy-policy" element={<PrivacyPolicyPage />} />
+          <Route path="/fr/politique-confidentialite" element={<PrivacyPolicyPage />} />
+          <Route path="/en/refund-policy" element={<RefundPolicyPage />} />
+          <Route path="/fr/politique-remboursement" element={<RefundPolicyPage />} />
+          <Route path="/en/prohibited-items" element={<ProhibitedItemsPage />} />
+          <Route path="/fr/articles-interdits" element={<ProhibitedItemsPage />} />
+          <Route path="/en/broker-directory" element={<BrokerDirectoryPage />} />
+          <Route path="/fr/annuaire-courtiers" element={<BrokerDirectoryPage />} />
+          <Route path="/en/brokers" element={<BrokerDirectoryPage />} />
+          <Route path="/fr/courtiers" element={<BrokerDirectoryPage />} />
+          <Route path="/en/become-a-broker" element={<ProtectedRoute><BecomeABrokerPage /></ProtectedRoute>} />
+          <Route path="/fr/devenir-courtier" element={<ProtectedRoute><BecomeABrokerPage /></ProtectedRoute>} />
+          <Route path="/en/become-a-partner" element={<BlockForStorageFacility><BecomePartnerPage /></BlockForStorageFacility>} />
+          <Route path="/fr/devenir-partenaire" element={<BlockForStorageFacility><BecomePartnerPage /></BlockForStorageFacility>} />
+          <Route path="/en/auth" element={<AuthPage />} />
+          <Route path="/fr/auth" element={<AuthPage />} />
+
+          {/* iter358 — Quebec Launch press release (fully indexable) */}
+          {/* Note: /presse/lancement-quebec is the FR canonical (with or without /fr/ prefix) */}
+
           <Route path="/" element={<ErrorBoundary scope="home"><HomePage /></ErrorBoundary>} />
           {/* iter307 — Public referral landing: drops bidvex_ref cookie and redirects to / */}
           <Route path="/r/:code" element={<ReferralLanding />} />
-          <Route path="/marketplace" element={<ErrorBoundary scope="marketplace"><MarketplacePage /></ErrorBoundary>} />
-          <Route path="/items" element={<ErrorBoundary scope="items"><ItemsMarketplacePage /></ErrorBoundary>} />
+
+          {/* iter358 — 302 legacy → /en/* redirects for the top SEO-critical URLs.
+              Google will pick up the new canonical fast; users with old bookmarks
+              land on the correct localized URL. Non-Latin FR paths preserved. */}
+          <Route path="/marketplace" element={<Navigate to="/en/marketplace" replace />} />
+          <Route path="/marche" element={<Navigate to="/fr/marche" replace />} />
+          <Route path="/vehicle-auctions" element={<Navigate to="/en/vehicle-auctions" replace />} />
+          <Route path="/encheres-vehicules" element={<Navigate to="/fr/encheres-vehicules" replace />} />
+          <Route path="/encheres-de-vehicules" element={<Navigate to="/fr/encheres-vehicules" replace />} />
+          <Route path="/storage-auctions" element={<Navigate to="/en/storage-auctions" replace />} />
+          <Route path="/encheres-entreposage" element={<Navigate to="/fr/encheres-entreposage" replace />} />
+          <Route path="/how-it-works" element={<Navigate to="/en/how-it-works" replace />} />
+          <Route path="/comment-ca-marche" element={<Navigate to="/fr/comment-ca-marche" replace />} />
+          <Route path="/about" element={<Navigate to="/en/about" replace />} />
+          <Route path="/about-us" element={<Navigate to="/en/about" replace />} />
+          <Route path="/a-propos" element={<Navigate to="/fr/a-propos" replace />} />
+          <Route path="/pricing" element={<Navigate to="/en/pricing" replace />} />
+          <Route path="/tarifs" element={<Navigate to="/fr/tarifs" replace />} />
+          <Route path="/terms-of-service" element={<Navigate to="/en/terms-of-service" replace />} />
+          <Route path="/conditions-utilisation" element={<Navigate to="/fr/conditions-utilisation" replace />} />
+          <Route path="/privacy-policy" element={<Navigate to="/en/privacy-policy" replace />} />
+          <Route path="/politique-confidentialite" element={<Navigate to="/fr/politique-confidentialite" replace />} />
+          <Route path="/refund-policy" element={<Navigate to="/en/refund-policy" replace />} />
+          <Route path="/politique-remboursement" element={<Navigate to="/fr/politique-remboursement" replace />} />
+          <Route path="/careers" element={<Navigate to="/en/careers" replace />} />
+          <Route path="/carrieres" element={<Navigate to="/fr/carrieres" replace />} />
+          <Route path="/community" element={<Navigate to="/en/community" replace />} />
+          <Route path="/communaute" element={<Navigate to="/fr/communaute" replace />} />
+          <Route path="/blogs" element={<Navigate to="/en/blogs" replace />} />
+          <Route path="/blogues" element={<Navigate to="/fr/blogues" replace />} />
+          <Route path="/prohibited-items" element={<Navigate to="/en/prohibited-items" replace />} />
+          <Route path="/articles-interdits" element={<Navigate to="/fr/articles-interdits" replace />} />
+
+          {/* Press releases live at legacy + lang-prefixed URLs (SEO). */}
+          <Route path="/press/quebec-launch" element={<ErrorBoundary scope="press-quebec-launch"><HomePage /></ErrorBoundary>} />
+          <Route path="/en/press/quebec-launch" element={<ErrorBoundary scope="press-quebec-launch"><HomePage /></ErrorBoundary>} />
+          <Route path="/presse/lancement-quebec" element={<ErrorBoundary scope="press-quebec-launch"><HomePage /></ErrorBoundary>} />
+          <Route path="/fr/presse/lancement-quebec" element={<ErrorBoundary scope="press-quebec-launch"><HomePage /></ErrorBoundary>} />
+
           <Route path="/lots" element={<ErrorBoundary scope="lots"><LotsMarketplacePage /></ErrorBoundary>} />
           <Route path="/lots/:id" element={<ErrorBoundary scope="lot-detail"><MultiItemListingDetailPage /></ErrorBoundary>} />
           <Route path="/listing/:id" element={<ErrorBoundary scope="listing-detail"><ListingDetailPage /></ErrorBoundary>} />
@@ -480,15 +608,14 @@ const App = () => {
           <Route path="/verify-identity" element={
             <ProtectedRoute><VerificationPage /></ProtectedRoute>
           } />
-          <Route path="/how-it-works" element={<HowItWorksPage />} />
-          <Route path="/blogs" element={<ErrorBoundary scope="blogs"><BlogsPage /></ErrorBoundary>} />
+          <Route path="/how-it-works" element={<Navigate to="/en/how-it-works" replace />} />
           <Route path="/blogs/:slug" element={<ErrorBoundary scope="blog-article"><BlogArticlePage /></ErrorBoundary>} />
           {/* iter261 — Public payment page (no auth) for admin-issued payment requests. */}
           <Route path="/pay/:payment_request_id" element={<PaymentPage />} />
           <Route path="/pay/:payment_request_id/success" element={<PayRequestSuccessPage />} />
-          <Route path="/community" element={<CommunityPage />} />
-          <Route path="/about" element={<AboutUsPage />} />
-          <Route path="/about-us" element={<AboutUsPage />} />
+          <Route path="/community" element={<Navigate to="/en/community" replace />} />
+          <Route path="/about" element={<Navigate to="/en/about" replace />} />
+          <Route path="/about-us" element={<Navigate to="/en/about" replace />} />
           <Route path="/unsubscribe" element={<UnsubscribePage />} />
           <Route path="/desabonnement" element={<UnsubscribePage />} />
           <Route path="/email-preferences" element={<EmailPreferencesPage />} />
@@ -826,7 +953,8 @@ const App = () => {
         </FeatureFlagsProvider>
         </CurrencyProvider>
       </SiteConfigProvider>
-    </BrowserRouter>
+        </LanguageProvider>
+      </BrowserRouter>
     </I18nextProvider>
     </HelmetProvider>
   );

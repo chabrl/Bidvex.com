@@ -425,7 +425,9 @@ def test_p1_all_10_regional_pages_are_prerender_eligible():
     for path in _REGIONAL_LANDINGS:
         ctx = _resolve_regional_landing(path, "en")
         assert ctx is not None
-        assert ctx["template"] == "regional_landing.html"
+        # iter358 — Press release pages use a dedicated template; other
+        # regional pages continue to use regional_landing.html.
+        assert ctx["template"] in ("regional_landing.html", "press_release.html")
         # Every landing has BreadcrumbList JSON-LD
         assert any("BreadcrumbList" in b for b in ctx["jsonld_blocks"]), \
             f"{path} missing BreadcrumbList"

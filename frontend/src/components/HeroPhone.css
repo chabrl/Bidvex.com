@@ -40,6 +40,11 @@
   animation: phoneFloat 6s ease-in-out infinite;
   transform-origin: center bottom;
   will-change: transform;
+  /* iter358 CWV — reserve container size to prevent CLS while the phone
+     image is still decoding. Aspect ratio matches the real PNG (475×975). */
+  aspect-ratio: 475 / 975;
+  width: 100%;
+  max-width: 460px;
 }
 
 /* PHONE IMAGE */
@@ -52,6 +57,9 @@
   filter: drop-shadow(0 24px 48px rgba(11, 37, 69, 0.45));
   user-select: none;
   -webkit-user-drag: none;
+  /* iter358 CWV — explicit aspect-ratio prevents layout shift once the
+     PNG's intrinsic dimensions are known. */
+  aspect-ratio: 475 / 975;
 }
 
 /* FLOATING BADGES */

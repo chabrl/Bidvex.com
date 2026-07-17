@@ -61,7 +61,10 @@
       <a href="{{ canonical_host }}/legal/terms">Terms</a> &middot;
       <a href="{{ canonical_host }}/legal/privacy">Privacy</a> &middot;
       <a href="{{ canonical_host }}/legal/refunds">Refunds</a> &middot;
-      <a href="{{ canonical_host }}/contact">Contact</a>
+      <a href="{{ canonical_host }}/contact">Contact</a> &middot;
+      <a href="{{ canonical_host }}{{ '/presse/lancement-quebec' if lang == 'fr' else '/press/quebec-launch' }}">
+        {% if lang == 'fr' %}Presse{% else %}Press{% endif %}
+      </a>
     </p>
     <p style="margin-top:8px;font-size:11px;color:#94A3B8;">
       BidVex is a Canadian auction marketplace. We are <strong>not</strong> affiliated with any cryptocurrency platform.

@@ -1,5 +1,96 @@
 # BidVex — Auction Marketplace PRD
 
+## iter358 — Quebec Press Release + Bilingual SPA Routes + CWV Audit (Feb 17, 2026 — Jul 17, 2026) ✅ COMPLETE — VERIFIED
+
+**Scope**: Three P0 tracks executed in sequence: (T1) Quebec launch press release page with `NewsArticle` JSON-LD + bilingual PDF fiche, (T2) full SPA React Router `/en/*` `/fr/*` bilingual URL architecture with real-navigation language toggle, (T3) Core Web Vitals Lighthouse audit + top-impact CWV fixes.
+
+### Track 1 — Quebec Press Release Page ✅ SHIPPED
+
+- **New `services/press_release.py`** (300 LoC): full bilingual copy for `/press/quebec-launch` (EN) and `/presse/lancement-quebec` (FR). Founder attribution: Charbel Lichaa, `Founder & CEO` / `Fondateur et PDG` (locked constants). `datePublished` fixed at `2026-07-17` per user directive.
+- **`news_article_ld_for(lang)`** builder emits `@type: NewsArticle` with headline, datePublished, dateModified, inLanguage (fr-CA/en-CA), author (Person with jobTitle + worksFor Organization), publisher (BidVex Inc. with logo ImageObject), mainEntityOfPage, isPartOf WebSite, and translationOfWork cross-link on the FR version.
+- **New `services/seo_jsonld.news_article_ld()`** — generic builder for future press use (headline capped at 110 chars per Google spec).
+- **New `templates/prerender/press_release.html`** — dedicated Jinja2 template with EN/FR press-release layout: breadcrumb, header with press-release eyebrow, safe HTML body (`body_copy | safe`), PDF download CTA (bilingual copy), language-toggle cross-link aside, NAP footer.
+- **`services/prerender_service.py`** — new resolver branch: press-release pages get `template=press_release.html` + `NewsArticle` JSON-LD injected + skip `attach_social_proof()` (they have their own layout).
+- **Both paths added** to `_PRERENDER_ROUTE_PREFIXES`, `STATIC_PAGES` (sitemap, priority 0.8), and to the base template footer as "Presse / Press" bilingual link.
+- **PDF generation** — new `scripts/generate_press_pdf.py` (~330 LoC ReportLab). Produces 2-page LETTER-size PDF at `/app/frontend/public/static/press/bidvex-quebec-launch.pdf` (7.8 KB). Palette: dark navy #0B2545 header banner, BidVex blue #2B8FD0 accents, clean white body. Page 1 EN, Page 2 FR. Contains: 4 verticals overview, 2.5% platform fee callout, technology bullets, compliance bullets, coverage, SUMMER2026 launch offer, contact block. Served publicly at `/static/press/bidvex-quebec-launch.pdf` (verified HTTP 200, Content-Type application/pdf).
+- **`.pdf`, `.woff`, `.woff2`, `.ttf`** added to `is_prerender_eligible` exclusion list so binary assets are never intercepted by the bot middleware.
+
+### Track 2 — Full SPA React Router `/en/*` `/fr/*` Refactor ✅ SHIPPED
+
+- **New `src/i18n/urlMap.js`** — canonical EN↔FR slug map (40 route pairs), with helpers: `stripLangPrefix()`, `detectLangFromPath()`, `translatePath()`, `toLangPath()`. Deep IDs pass through unchanged (e.g., `/vehicle-auctions/abc123` translates to `/fr/encheres-vehicules/abc123`).
+- **New `src/contexts/LanguageContext.js`** — `LanguageProvider` reads active lang from URL prefix, syncs to i18next + `document.documentElement.lang`, exposes `switchLang(target)`, `buildLangPath(path)`, and `buildAlternateUrls()` (returns absolute en/fr/xDefault URLs for hreflang emission).
+- **New `src/components/LangLink.jsx`** — drop-in wrapper around React Router's `<Link>` that auto-prefixes with the active language. External URLs, mailto:/tel:, and already-prefixed paths pass through.
+- **New `src/components/PageHead.jsx`** — Helmet wrapper that emits `<title>`, `<meta description>`, `<link rel="canonical">`, three `<link rel="alternate" hreflang>` tags (en-CA, fr-CA, x-default), `<html lang>`, and og:locale/og:locale:alternate. Consumed by client-rendered pages so React-hydrated pages also carry the correct SEO signals.
+- **`App.js` overhaul**:
+  - Wrapped entire route tree in `<LanguageProvider>` inside `<BrowserRouter>`.
+  - **Added 40+ explicit `/en/*` and `/fr/*` route registrations** at the top of the `<Routes>` block for the top-priority SEO-critical pages: homepage, marketplace (`/marche`), vehicle-auctions (`/encheres-vehicules`), storage-auctions (`/encheres-entreposage`), how-it-works (`/comment-ca-marche`), how-brokers-work (`/comment-fonctionnent-les-courtiers`), about (`/a-propos`), pricing (`/tarifs`), contact, terms-of-service (`/conditions-utilisation`), privacy-policy (`/politique-confidentialite`), refund-policy (`/politique-remboursement`), careers (`/carrieres`), community (`/communaute`), blogs (`/blogues`), broker-directory (`/annuaire-courtiers`), become-a-broker (`/devenir-courtier`), prohibited-items (`/articles-interdits`), press releases, auth, faq, plus detail routes (`/listing/:id`, `/lots/:id`, `/vehicle-auctions/:id`, `/storage-auctions/:id`).
+  - **20+ legacy → `/en/*` 302 client redirects** for all top-level index URLs (via React Router `<Navigate replace>`). Bookmarks and share links resolve correctly to their language-prefixed canonical URL. Detail pages retain their legacy paths (IDs stable) alongside new `/en/*` `/fr/*` twins.
+- **Navbar `changeLanguage`** — refactored to call `switchLang(target)` from `LanguageContext`, which performs a **real `navigate()` call** to the FR/EN twin URL. This is what makes `/en/vehicle-auctions` and `/fr/encheres-vehicules` two distinct crawlable URLs (verified via screenshot: clicking FR from `/en/vehicle-auctions` navigates to `/fr/encheres-vehicules` with `<html lang="fr">` and full French content).
+- **Backend `prerender_service.resolve_route()`** — added FR-slug → EN-slug normalization table (18 entries) so `/fr/marche`, `/fr/encheres-vehicules`, `/fr/comment-ca-marche` etc. all resolve to the correct SSR content pipeline with FR titles. Verified: `curl /api/prerender/fr/marche` returns `<html lang="fr"><title>Marketplace BidVex — Toutes les enchères</title>`.
+
+### Track 3 — Core Web Vitals Lighthouse Audit + Fixes ✅ SHIPPED
+
+- **BEFORE baseline** captured against preview `yarn start` dev server (4 URLs): homepage, /marketplace, /vehicle-auctions, /storage-auctions. Reports at `/app/test_reports/lighthouse_iter358/before/*.json`.
+- **AFTER baseline** captured post-fixes. Homepage CLS improved 31 % (0.759 → 0.523). Other metrics ±var due to dev-server variance; see `/app/test_reports/lighthouse_iter358.md` for the full comparison and reasoning.
+- **Fixes shipped**:
+  1. Hero LCP preload: `<link rel="preload" as="image" href="/assets/hero-phone-mockup.png" fetchpriority="high">` in `index.html`. Kicks off the fetch during HTML parse before React boots.
+  2. `HeroPhone.css` — added `aspect-ratio: 475 / 975` to `.hero-phone-wrapper` + `.hero-phone-image`. Prevents CLS from the PNG decode landing (root cause of the 0.759 CLS on home).
+  3. `SafeImage.jsx` — default `decoding="async"` on every image; passthrough `loading` and `fetchPriority` props so callers can opt-in to eager/high for LCP images. Reduces main-thread image-decode blocking.
+  4. `App.css` — added `.grid-card-image` / `.aspect-listing-card` utility classes with 4:3 aspect-ratio + object-fit:cover for future adoption on card grids. Added `contain: layout style` on promotional/announcement/dealer-fee banners so their post-hydration mounting doesn't cascade layout shifts. Global `img:not([width]):not([height]) { max-width: 100%; height: auto }` for defensive sizing without overriding explicit dimensions.
+  5. Font-display: swap — Google Fonts URL already carries `&display=swap`. Added `@font-face` fallback declarations in `App.css` for `Outfit` and `DM Sans` with explicit `font-display: swap` in case any third-party bundle registers inline `@font-face` without swap.
+  6. Admin bundle splitting VERIFIED — every admin page (`AdminDashboard`, `AdminBrokersPage`, `AdminSubscriptionsPage`, `AdminDialer`, `AdminCareersConsole`, etc.) is already `React.lazy()` imported in `App.js`. Admin bundles never load on public pages.
+- **Preview lighthouse variance disclaimer**: dev-mode React server has ±40 % perf variance run-to-run. Production `yarn build` with minification + gzip + HTTP/2 will show substantially better numbers. Charbel to re-audit against `www.bidvex.com` post-deployment.
+
+### Testing — `tests/test_iter358_press_release.py`
+
+**18/18 tests pass.** Coverage:
+- Both EN + FR paths registered in `_REGIONAL_LANDINGS` with `kind == "press_release"`
+- Both paths in `_PRERENDER_ROUTE_PREFIXES`
+- `.pdf` URLs excluded from `is_prerender_eligible`
+- Both paths in `sitemap-static.xml` with priority 0.8
+- PDF file exists at `/app/frontend/public/static/press/bidvex-quebec-launch.pdf` (>3KB)
+- `news_article_ld_for("en")` returns NewsArticle with datePublished=2026-07-17 + jobTitle="Founder & CEO"
+- `news_article_ld_for("fr")` returns NewsArticle with datePublished=2026-07-17 + jobTitle="Fondateur et PDG"
+- Founder titles locked to constants (regression protection)
+- EN page renders `<html lang="en">` + NewsArticle JSON-LD + reciprocal fr-CA hreflang + PDF link + SUMMER2026
+- FR page renders `<html lang="fr">` + reciprocal en-CA hreflang + "Fondateur et PDG" + "Loi 96"
+- Footer contains `/press/quebec-launch` (EN) or `/presse/lancement-quebec` (FR)
+- Press releases carry ≥3 JSON-LD blocks (Organization + BreadcrumbList + NewsArticle)
+- Press releases do NOT emit LocalBusiness (that's for cities/homepage only)
+- Canonical uses `www.bidvex.com`
+- iter357 regression: QC Montréal + FAQ pages still render correctly
+
+### Regression baseline — iter350 through iter358
+
+**150 passed, 4 skipped, 0 failed.** Zero regressions across the entire iter350–iter358 test suite (Payment infra, Feed placeholders, Nightly sweep, Prerender, KYC + Bid Holds, Technical SEO Audit, QC Cities, Press Release).
+
+### Live verification (executed 2026-07-17)
+
+1. `GET /api/prerender/press/quebec-launch` → 200, NewsArticle JSON-LD present, datePublished=2026-07-17, PDF URL in body. ✅
+2. `GET /api/prerender/presse/lancement-quebec` → 200, `<html lang="fr">`, reciprocal `hreflang="en-CA"` cross-reference. ✅
+3. `HEAD /static/press/bidvex-quebec-launch.pdf` → 200, Content-Type: application/pdf, 7803 bytes. ✅
+4. `curl /sitemap-static.xml` → both press URLs listed with priority 0.80. ✅
+5. Screenshot: `/fr/marche` renders MarketplacePage with `<html lang="fr">`. ✅
+6. Screenshot: `/marketplace` client-redirects to `/en/marketplace`. ✅
+7. Screenshot: Clicking **FR** from `/en/vehicle-auctions` navigates to `/fr/encheres-vehicules` with `<html lang="fr">` + full French content ("Marché", "Enchères par lots", "Autos, camions et équipement"). ✅
+8. Backend prerender FR-slug normalization: `/api/prerender/fr/marche` → FR marketplace title. ✅
+
+### Deferred to iter359
+
+- **Adoption sweep** — apply `.grid-card-image` aspect-ratio class to `MarketplaceCard`, `VehicleCard`, `StorageCard`, `LotCard` components (single-file edits, low-risk, expected CLS drop on all four grid pages).
+- **Root `/` browser-Accept-Language 302** — currently root `/` still renders HomePage without lang prefix. Adding a redirect based on `Accept-Language` header is a nice-to-have for iter359.
+- **`<LangLink>` migration** — 100+ existing `<Link to="/marketplace">` calls scattered across ~50 files could be migrated to `<LangLink>` so inline navigation respects the active language. Currently, clicking a legacy `<Link to="/marketplace">` triggers the /marketplace → /en/marketplace client redirect (works, but adds one extra navigation frame). Deferred to iter359 as a bulk sed sweep.
+- **Sitemap dual-URL emission** — `sitemap-static.xml` currently emits ONE URL per page. Once the SPA `<LangLink>` migration is complete, we can emit BOTH `/en/*` and `/fr/*` variants for every static page, dropping xdefault → EN.
+- **Trustpilot API** — populate the `aggregateRating` gap left in iter357 Organization schema.
+- **Production Lighthouse re-audit** — run against `www.bidvex.com` post-Cloudflare-deploy to measure real production CWV numbers (dev-server variance too noisy).
+
+### Deferred to iter360+ (backlog)
+
+- BBB accreditation + Google Business Profile claiming (Charbel action + GSC verification meta tag)
+- M-1 Sticky Card 72hr grace period
+- M-2 48-hour dispute window extension
+- L-1 QR pickup PWA verification
+
 ## iter357 — QC City Landing Pages + LocalBusiness Trust + Backend Subpath (Feb 17, 2026) ✅ COMPLETE — VERIFIED
 
 **Scope**: iter357 ships (a) the FR Quebec AdWords copy + 24 city landing pages, (b) full LocalBusiness NAP + `sameAs` trust presence, (c) social-proof widget with SSR rendering + public stats endpoint, (d) backend-side `/en/*` `/fr/*` subpath acceptance in the prerender pipeline. **Front-end SPA React Router refactor is deferred to iter358** (bounded scope — 50+ pages, all `<Link>` components, i18n copy translations — that iteration alone). Core Web Vitals audit deferred to iter359.

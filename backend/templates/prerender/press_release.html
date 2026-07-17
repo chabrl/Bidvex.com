@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block main %}
+<article style="max-width:820px;margin:0 auto;">
+  <nav aria-label="Breadcrumb" style="font-size:13px;color:#64748B;margin-bottom:16px;">
+    <a href="{{ canonical_host }}/" style="color:#2B8FD0;text-decoration:none;">
+      {% if lang == 'fr' %}Accueil{% else %}Home{% endif %}
+    </a>
+    &raquo;
+    <a href="{{ canonical_host }}{{ '/presse' if lang == 'fr' else '/press' }}" style="color:#2B8FD0;text-decoration:none;">
+      {% if lang == 'fr' %}Presse{% else %}Press{% endif %}
+    </a>
+    &raquo;
+    <span>{% if lang == 'fr' %}Lancement Québec{% else %}Quebec Launch{% endif %}</span>
+  </nav>
+
+  <header style="border-bottom:2px solid #0B2545;padding-bottom:20px;margin-bottom:28px;">
+    <p style="text-transform:uppercase;color:#2B8FD0;font-size:12px;font-weight:700;letter-spacing:1.5px;margin-bottom:8px;">
+      {% if lang == 'fr' %}Communiqué de presse{% else %}Press Release{% endif %}
+    </p>
+    <h1 style="color:#0B2545;font-size:32px;line-height:1.25;margin:0 0 12px 0;">{{ hero_headline }}</h1>
+    <p style="color:#475569;font-size:16px;line-height:1.6;margin:0;">{{ hero_subtitle }}</p>
+  </header>
+
+  {# ─── Body HTML (already trusted from services/press_release.py) ─── #}
+  <section class="press-body" style="color:#1e293b;font-size:16px;line-height:1.75;">
+    {{ body_copy | safe }}
+  </section>
+
+  {# ─── PDF Download CTA ─────────────────────────────────────────── #}
+  <aside style="margin-top:36px;padding:20px 24px;background:#F0F9FF;border:1px solid #2B8FD0;border-radius:8px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;">
+    <div>
+      <p style="margin:0 0 4px 0;font-weight:600;color:#0B2545;font-size:15px;">
+        {% if lang == 'fr' %}Fiche produit — PDF bilingue{% else %}Product one-pager — Bilingual PDF{% endif %}
+      </p>
+      <p style="margin:0;color:#475569;font-size:14px;">
+        {% if lang == 'fr' %}
+        Téléchargez la fiche BidVex — aperçu de la plateforme en une page.
+        {% else %}
+        Download the BidVex product overview — one-page fiche in English &amp; French.
+        {% endif %}
+      </p>
+    </div>
+    <a href="{{ canonical_host }}{{ press_pdf_url }}"
+       download="bidvex-quebec-launch.pdf"
+       style="display:inline-block;background:#0B2545;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;white-space:nowrap;">
+      {% if lang == 'fr' %}Télécharger le PDF ↓{% else %}Download PDF ↓{% endif %}
+    </a>
+  </aside>
+
+  {# ─── Language toggle (both press pages cross-linked) ─────────── #}
+  <aside style="margin-top:24px;padding:16px 20px;background:#F8FAFC;border:1px solid #cbd5e1;border-radius:8px;">
+    <p style="margin:0;font-size:14px;color:#475569;">
+      {% if lang == 'fr' %}
+      This press release is also available in <a href="{{ hreflang['en-CA'] }}" style="color:#2B8FD0;font-weight:600;">English</a>.
+      {% else %}
+      Ce communiqué est également disponible en <a href="{{ hreflang['fr-CA'] }}" style="color:#2B8FD0;font-weight:600;">français</a>.
+      {% endif %}
+    </p>
+  </aside>
+
+  {# ─── NAP footer (identical text on every page for GMB consistency) ── #}
+  <footer style="margin-top:32px;padding-top:20px;border-top:1px solid #e2e8f0;font-size:13px;color:#64748b;">
+    <strong>BidVex Inc.</strong> · 701 Rue Chalifoux, Sherbrooke, Québec, J1G 0A8, Canada
+    · <a href="tel:+14506343099" style="color:#2B8FD0;">+1 (450) 634-3099</a>
+    · <a href="mailto:marketing@bidvex.com" style="color:#2B8FD0;">marketing@bidvex.com</a>
+  </footer>
+</article>
+{% endblock %}

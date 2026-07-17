@@ -111,6 +111,9 @@ _PRERENDER_ROUTE_PREFIXES = (
     "/encheres-entreposage-quebec-ville",
     "/encheres-entreposage-sherbrooke",
     "/encheres-entreposage-laval",
+    # iter358 — Quebec launch press release pages (EN + FR).
+    "/press/quebec-launch",
+    "/presse/lancement-quebec",
 )
 
 
@@ -118,7 +121,7 @@ def is_prerender_eligible(path: str) -> bool:
     """True if the given path should be prerendered for crawlers."""
     if path.startswith("/api/") or path.startswith("/static/") or path.startswith("/build/"):
         return False
-    if any(path.endswith(ext) for ext in (".js", ".css", ".png", ".jpg", ".jpeg", ".webp", ".svg", ".ico", ".map", ".txt", ".xml", ".json")):
+    if any(path.endswith(ext) for ext in (".js", ".css", ".png", ".jpg", ".jpeg", ".webp", ".svg", ".ico", ".map", ".txt", ".xml", ".json", ".pdf", ".woff", ".woff2", ".ttf")):
         return False
     if path in ("/", ""):
         return True

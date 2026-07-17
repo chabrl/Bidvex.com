@@ -38,6 +38,12 @@ from services.qc_city_pages import (
     qc_province_city_grid_for,
 )
 from services.platform_stats import get_platform_stats
+from services.press_release import (
+    build_press_release_entries,
+    news_article_ld_for,
+    press_release_paths,
+    PRESS_RELEASE_PDF_URL,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -401,6 +407,32 @@ async def resolve_route(db, path: str, lang: str = "en") -> Dict[str, Any]:
         lang = path[1:]
         path = "/"
 
+    # iter358 — FR-slug → EN-slug backend normalization so /fr/marche resolves
+    # to the marketplace page's SSR context (with FR title). The frontend
+    # canonical URL keeps the FR slug via hreflang alternates.
+    _FR_TO_EN_SLUGS = {
+        "/marche":                      "/marketplace",
+        "/encheres-vehicules":          "/vehicle-auctions",
+        "/encheres-entreposage":        "/storage-auctions",
+        "/comment-ca-marche":           "/how-it-works",
+        "/comment-fonctionnent-les-courtiers": "/how-brokers-work",
+        "/a-propos":                    "/about",
+        "/tarifs":                      "/pricing",
+        "/conditions-utilisation":      "/terms-of-service",
+        "/politique-confidentialite":   "/privacy-policy",
+        "/politique-remboursement":     "/refund-policy",
+        "/carrieres":                   "/careers",
+        "/communaute":                  "/community",
+        "/blogues":                     "/blogs",
+        "/annuaire-courtiers":          "/broker-directory",
+        "/courtiers":                   "/broker-directory",
+        "/devenir-courtier":            "/become-a-broker",
+        "/devenir-partenaire":          "/become-a-partner",
+        "/articles-interdits":          "/prohibited-items",
+    }
+    if lang == "fr" and path in _FR_TO_EN_SLUGS:
+        path = _FR_TO_EN_SLUGS[path]
+
     if path in ("/", ""):
         return await _resolve_homepage(db, lang)
 
@@ -456,11 +488,13 @@ async def resolve_route(db, path: str, lang: str = "en") -> Dict[str, Any]:
         }
 
     # iter356 — Regional SEO landing pages (P1 fix H3).
-    # 10 EN + 2 FR Quebec pages + iter357 24 QC city pages.
+    # 10 EN + 2 FR Quebec pages + iter357 24 QC city pages + iter358 press-release pages.
     regional = _resolve_regional_landing(path, lang)
     if regional:
         # iter357 — Attach social-proof widget stats (5-min cached).
-        await attach_social_proof(regional, db)
+        # Skip for press-release pages (they have their own layout).
+        if not regional.get("is_press_release"):
+            await attach_social_proof(regional, db)
         return regional
 
     return await _resolve_static_page(db, path, lang)
@@ -600,6 +634,12 @@ _REGIONAL_LANDINGS: Dict[str, Dict[str, Any]] = {
 _REGIONAL_LANDINGS.update(build_qc_vehicle_city_entries())
 _REGIONAL_LANDINGS.update(build_qc_storage_city_entries())
 
+# iter358 — Press release pages (EN + FR) merged into the same regional-landing
+# dispatch table so they benefit from the existing hreflang/breadcrumb/social
+# proof plumbing. Distinguished by `kind == "press_release"` for template routing
+# + NewsArticle JSON-LD injection.
+_REGIONAL_LANDINGS.update(build_press_release_entries())
+
 
 # ─── Also mark the QC province pages as province-level for the Adwords
 #     city grid; we already labelled them with `province_page: True` above.
@@ -679,6 +719,7 @@ def _resolve_regional_landing(path: str, lang: str) -> Optional[Dict[str, Any]]:
     # QC city / province page → emit LocalBusiness with the city in the name.
     is_qc_city = entry.get("kind") in ("qc_city_vehicle", "qc_city_storage")
     is_qc_province = entry.get("province_page", False)
+    is_press_release = entry.get("kind") == "press_release"
     if is_qc_city or is_qc_province:
         city_name = None
         if is_qc_city:
@@ -686,6 +727,13 @@ def _resolve_regional_landing(path: str, lang: str) -> Optional[Dict[str, Any]]:
         jsonld_blocks.append(_jsonld_script(local_business_ld(
             city_name=city_name, lang=page_lang,
         )))
+
+    # iter358 — Press release pages get a NewsArticle JSON-LD block.
+    if is_press_release:
+        news_ld = news_article_ld_for(page_lang)
+        # Strip null translationOfWork field for EN version (Google is strict).
+        news_ld = {k: v for k, v in news_ld.items() if v is not None}
+        jsonld_blocks.append(_jsonld_script(news_ld))
 
     # Adwords city grid for QC province pages.
     city_grid: List[Dict[str, str]] = []
@@ -695,11 +743,11 @@ def _resolve_regional_landing(path: str, lang: str) -> Optional[Dict[str, Any]]:
         )
 
     return {
-        "template": "regional_landing.html",
+        "template": "press_release.html" if is_press_release else "regional_landing.html",
         "title": title,
         "description": desc,
         "canonical": canonical,
-        "og_type": "website",
+        "og_type": "article" if is_press_release else "website",
         "og_image": f"{CANONICAL_HOST}/bidvex-icon.png",
         "hreflang": hreflang,
         "jsonld_blocks": jsonld_blocks,
@@ -711,6 +759,8 @@ def _resolve_regional_landing(path: str, lang: str) -> Optional[Dict[str, Any]]:
         "city_grid": city_grid,
         "is_qc_province": bool(is_qc_province),
         "is_qc_city": bool(is_qc_city),
+        "is_press_release": bool(is_press_release),
+        "press_pdf_url": PRESS_RELEASE_PDF_URL,
         "canonical_host": CANONICAL_HOST,
         # `social_proof` gets attached later, once the resolver caller
         # (which has the db handle) awaits `attach_social_proof(ctx, db)`.
