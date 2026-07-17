@@ -1,4 +1,6 @@
-# Cloudflare Bot-Prerender Worker — iter354
+# Cloudflare Bot-Prerender Worker — iter355 (hardened)
+
+**File**: [`bidvex-bot-prerender.worker.js`](./cloudflare/bidvex-bot-prerender.worker.js) — copy-paste this file's contents into the Cloudflare Quick Editor.
 
 Route bot User-Agent traffic on `www.bidvex.com` to our SSR prerender endpoint
 so search crawlers, Facebook, LinkedIn, Slack, and WhatsApp see fully-rendered
