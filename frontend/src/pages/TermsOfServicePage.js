@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollText, ArrowLeft } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { LangLink } from '../components/LangLink';
 
 const tocEN = [
   { id: 'intro', label: '1. Introduction & Acceptance' },
@@ -109,9 +109,9 @@ const TermsOfServicePage = () => {
       {/* Hero */}
       <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 py-10 px-4">
         <div className="max-w-5xl mx-auto">
-          <Link to="/" className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-blue-600 mb-4">
+          <LangLink to="/" className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-blue-600 mb-4">
             <ArrowLeft className="h-4 w-4" /> {fr ? 'Retour à l\'accueil' : 'Back to Home'}
-          </Link>
+          </LangLink>
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg"><ScrollText className="h-6 w-6 text-blue-600" /></div>
             <h1 className="text-3xl font-bold" style={{ color: '#0B2545' }}>{fr ? 'Conditions d\'utilisation de BidVex' : 'BidVex Terms & Conditions'}</h1>

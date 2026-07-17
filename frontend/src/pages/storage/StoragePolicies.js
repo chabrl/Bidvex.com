@@ -1,9 +1,10 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+
 import { useTranslation } from 'react-i18next';
 import { Card } from '../../components/ui/card';
 import { ArrowLeft } from 'lucide-react';
 import StorageFooterBanner from './StorageFooterBanner';
+import { LangLink } from '../../components/LangLink';
 
 // Generic bilingual section — renders only the active language based on i18n.
 const Section = ({ title_en, title_fr, body_en, body_fr, isFr }) => (
@@ -20,9 +21,9 @@ const PageHeader = ({ titleEn, titleFr, isFr }) => (
 );
 
 const BackLink = ({ isFr }) => (
-  <Link to="/storage-auctions/browse" className="inline-flex items-center text-sm text-blue-600 hover:underline mb-3">
+  <LangLink to="/storage-auctions/browse" className="inline-flex items-center text-sm text-blue-600 hover:underline mb-3">
     <ArrowLeft className="h-3.5 w-3.5 mr-1" /> {isFr ? 'Retour aux enchères' : 'Back to auctions'}
-  </Link>
+  </LangLink>
 );
 
 

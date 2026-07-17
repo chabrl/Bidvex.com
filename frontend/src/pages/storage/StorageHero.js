@@ -1,8 +1,9 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import './StorageHero.css';
+import { LangLink } from '../../components/LangLink';
 
 /**
  * StorageHero — iter193 single-language rendering.
@@ -79,38 +80,38 @@ const StorageHero = () => {
         </p>
 
         <div className="storage-hero__ctas">
-          <Link
+          <LangLink
             to="/storage-auctions/browse"
             className="storage-hero__cta storage-hero__cta--primary"
             data-testid="storage-hero-browse-btn"
           >
             {t('storage.hero.ctaBrowse')}
-          </Link>
+          </LangLink>
           {isFacilityOrAdmin ? (
             <>
-              <Link
+              <LangLink
                 to="/facility/dashboard"
                 className="storage-hero__cta storage-hero__cta--secondary"
                 data-testid="storage-hero-facility-dashboard-btn"
               >
                 📊 {isFr ? 'Tableau de bord' : 'Facility Dashboard'}
-              </Link>
-              <Link
+              </LangLink>
+              <LangLink
                 to="/create-listing?type=storage_locker"
                 className="storage-hero__cta storage-hero__cta--secondary"
                 data-testid="storage-hero-create-unit-btn"
               >
                 ➕ {isFr ? 'Créer une enchère' : 'Create Unit Auction'}
-              </Link>
+              </LangLink>
             </>
           ) : (
-            <Link
+            <LangLink
               to="/storage-auctions/register-facility"
               className="storage-hero__cta storage-hero__cta--secondary"
               data-testid="storage-hero-register-btn"
             >
               {t('storage.hero.ctaRegister')}
-            </Link>
+            </LangLink>
           )}
         </div>
 

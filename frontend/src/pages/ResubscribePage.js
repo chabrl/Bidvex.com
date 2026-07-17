@@ -1,8 +1,9 @@
 import API_BASE from '../config';
 import React, { useEffect, useState } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { Loader2, CheckCircle2, AlertCircle, Mail } from 'lucide-react';
+import { LangLink } from '../components/LangLink';
 
 /**
  * BidVex resubscribe page (bilingual EN/FR).
@@ -126,9 +127,9 @@ const ResubscribePage = () => {
           ) : (fr ? 'Confirmer le réabonnement' : 'Confirm Resubscribe')}
         </button>
         <div className="text-center mt-6">
-          <Link to="/" className="text-sm" style={{ color: '#2563eb', textDecoration: 'underline' }} data-testid="resubscribe-cancel-link">
+          <LangLink to="/" className="text-sm" style={{ color: '#2563eb', textDecoration: 'underline' }} data-testid="resubscribe-cancel-link">
             {fr ? 'Annuler, me ramener' : 'Never mind, take me back'}
-          </Link>
+          </LangLink>
         </div>
       </Shell>
     );
@@ -156,12 +157,12 @@ const ResubscribePage = () => {
             : 'You can unsubscribe at any time from any email.'}
         </p>
         <div className="text-center">
-          <Link to="/"
+          <LangLink to="/"
                 className="inline-block py-3 px-6 rounded-xl font-semibold text-white"
                 style={{ background: 'linear-gradient(135deg, #2563eb 0%, #06b6d4 100%)' }}
                 data-testid="resubscribe-home-link">
             {fr ? 'Retour à BidVex' : 'Back to BidVex'}
-          </Link>
+          </LangLink>
         </div>
       </Shell>
     );

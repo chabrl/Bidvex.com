@@ -2,7 +2,7 @@ import API_BASE from '../config';
 import ErrorBoundary from '../components/ErrorBoundary';
 import SafeImage from '../components/SafeImage';
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { extractErrorMessage } from '../utils/errorHandler';
@@ -52,6 +52,7 @@ import ListingLogisticsDetails from '../components/ListingLogisticsDetails';
 import { useRealtimeBidding } from '../hooks/useRealtimeBidding';
 // iter302 Directive 1 — Winner & Settlement Panel (seller view, ended listings)
 import SettlementPanel from '../components/SettlementPanel';
+import { LangLink } from '../components/LangLink';
 
 const API = API_BASE;
 
@@ -1166,13 +1167,13 @@ const ListingDetailPage = () => {
                   <SellerReviewsList sellerId={listing.seller_id} />
 
                   {/* View all reviews link */}
-                  <Link
+                  <LangLink
                     to={`/store/${listing.seller_id}`}
                     className="block text-center text-sm font-medium text-cyan-600 dark:text-cyan-400 hover:underline pt-1"
                     data-testid="view-all-reviews-link"
                   >
                     View all reviews &rarr;
-                  </Link>
+                  </LangLink>
                 </CardContent>
               </Card>
             )}

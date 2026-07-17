@@ -1,6 +1,6 @@
 import API_BASE from '../config';
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import { Card, CardContent } from './ui/card';
@@ -9,6 +9,7 @@ import { TopSellerBadge } from './TopSellerBadge';
 import { Store, BellOff, Loader2, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
+import { LangLink } from './LangLink';
 
 const API = API_BASE;
 
@@ -71,9 +72,9 @@ export const FollowedSellersList = () => {
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <Link to={`/store/${s.seller_id}`} className="font-semibold hover:underline truncate">
+                  <LangLink to={`/store/${s.seller_id}`} className="font-semibold hover:underline truncate">
                     {s.name}
-                  </Link>
+                  </LangLink>
                   {s.is_top_seller && <TopSellerBadge size="xs" />}
                 </div>
                 <p className="text-xs text-muted-foreground">
@@ -85,10 +86,10 @@ export const FollowedSellersList = () => {
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <Button asChild size="sm" variant="outline">
-                <Link to={`/store/${s.seller_id}`} data-testid={`view-store-${s.seller_id}`}>
+                <LangLink to={`/store/${s.seller_id}`} data-testid={`view-store-${s.seller_id}`}>
                   <Store className="h-3.5 w-3.5 mr-1.5" />
                   {isFrench ? 'Vitrine' : 'Store'}
-                </Link>
+                </LangLink>
               </Button>
               <Button size="sm" variant="ghost" className="text-red-600 hover:bg-red-50"
                 onClick={() => unfollow(s.seller_id)} data-testid={`unfollow-${s.seller_id}`}>

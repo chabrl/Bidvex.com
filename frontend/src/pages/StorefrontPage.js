@@ -1,6 +1,6 @@
 import API_BASE from '../config';
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import { Card, CardContent } from '../components/ui/card';

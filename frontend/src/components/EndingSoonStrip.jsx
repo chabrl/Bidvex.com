@@ -1,10 +1,11 @@
 import API_BASE from '../config';
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import { Clock } from 'lucide-react';
 import { formatCurrency } from '../utils/currencyFormatter';
+import { LangLink } from './LangLink';
 
 const API = API_BASE;
 
@@ -86,7 +87,7 @@ const EndingSoonStrip = () => {
       >
         <div className="flex gap-3" style={{ minWidth: 'min-content', paddingBottom: 6 }}>
           {items.map((item) => (
-            <Link
+            <LangLink
               key={item.id}
               to={getDetailLink(item)}
               className="flex-shrink-0 w-[200px] bg-white dark:bg-slate-900 border border-red-200 dark:border-red-900/60 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow"
@@ -115,7 +116,7 @@ const EndingSoonStrip = () => {
                   ⏰ {timeLeftLabel(item.auction_end_date, isFrench)}
                 </p>
               </div>
-            </Link>
+            </LangLink>
           ))}
         </div>
       </div>

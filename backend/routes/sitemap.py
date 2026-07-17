@@ -25,7 +25,7 @@ from typing import Any, Dict, List, Optional
 import logging
 
 from fastapi import APIRouter, Request
-from fastapi.responses import Response
+from fastapi.responses import Response, RedirectResponse
 
 from deps import get_db
 
@@ -117,6 +117,66 @@ STATIC_PAGES: List[tuple] = [
 _SUBSITEMAP_LIMIT = 5000
 
 
+# iter359 — EN↔FR slug map (mirrors frontend/src/i18n/urlMap.js).
+# The sitemap emits BOTH sides of every pair with reciprocal
+# <xhtml:link rel="alternate"> tags — Google requires each variant to
+# self-declare its alternates for canonical clustering.
+EN_TO_FR_SLUGS: Dict[str, str] = {
+    "/":                                    "/",
+    "/marketplace":                         "/marche",
+    "/lots":                                "/lots",
+    "/lots-auction":                        "/lots",
+    "/vehicle-auctions":                    "/encheres-vehicules",
+    "/storage-auctions":                    "/encheres-entreposage",
+    "/how-it-works":                        "/comment-ca-marche",
+    "/how-brokers-work":                    "/comment-fonctionnent-les-courtiers",
+    "/about":                               "/a-propos",
+    "/about-us":                            "/a-propos",
+    "/contact":                             "/contact",
+    "/faq":                                 "/faq",
+    "/pricing":                             "/tarifs",
+    "/terms-of-service":                    "/conditions-utilisation",
+    "/privacy-policy":                      "/politique-confidentialite",
+    "/careers":                             "/carrieres",
+    "/community":                           "/communaute",
+    "/blogs":                               "/blogues",
+    "/prohibited-items":                    "/articles-interdits",
+    "/broker-directory":                    "/annuaire-courtiers",
+    "/become-a-broker":                     "/devenir-courtier",
+    "/become-a-partner":                    "/devenir-partenaire",
+    "/press/quebec-launch":                 "/presse/lancement-quebec",
+    # Regional cities
+    "/vehicle-auctions-quebec":             "/encheres-vehicules-quebec",
+    "/storage-auctions-quebec":             "/encheres-entreposage-quebec",
+    "/vehicle-auctions-montreal":           "/encheres-vehicules-montreal",
+    "/vehicle-auctions-quebec-city":        "/encheres-vehicules-quebec-ville",
+    "/vehicle-auctions-sherbrooke":         "/encheres-vehicules-sherbrooke",
+    "/vehicle-auctions-laval":              "/encheres-vehicules-laval",
+    "/vehicle-auctions-gatineau":           "/encheres-vehicules-gatineau",
+    "/vehicle-auctions-saguenay":           "/encheres-vehicules-saguenay",
+    "/vehicle-auctions-trois-rivieres":     "/encheres-vehicules-trois-rivieres",
+    "/vehicle-auctions-longueuil":          "/encheres-vehicules-longueuil",
+    "/storage-auctions-montreal":           "/encheres-entreposage-montreal",
+    "/storage-auctions-quebec-city":        "/encheres-entreposage-quebec-ville",
+    "/storage-auctions-sherbrooke":         "/encheres-entreposage-sherbrooke",
+    "/storage-auctions-laval":              "/encheres-entreposage-laval",
+}
+FR_TO_EN_SLUGS: Dict[str, str] = {v: k for k, v in EN_TO_FR_SLUGS.items()}
+
+
+def _lang_pair_for(bare_path: str) -> Optional[tuple]:
+    """
+    Given a bare (no lang prefix) EN or FR path, return the tuple
+    `(en_bare, fr_bare)`. Returns None if the path has no known FR twin
+    (in which case we can't emit a hreflang alternate cluster).
+    """
+    if bare_path in EN_TO_FR_SLUGS:
+        return (bare_path, EN_TO_FR_SLUGS[bare_path])
+    if bare_path in FR_TO_EN_SLUGS:
+        return (FR_TO_EN_SLUGS[bare_path], bare_path)
+    return None
+
+
 def _now_iso_date() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
@@ -165,9 +225,23 @@ def _xml_url(
     priority: float = 0.5,
     image_url: Optional[str] = None,
     image_title: Optional[str] = None,
+    hreflang_alternates: Optional[List[tuple]] = None,
 ) -> str:
-    """Emit a single <url> block, optionally with an image:image extension."""
+    """Emit a single <url> block, optionally with an image:image extension.
+
+    iter359 — `hreflang_alternates` is a list of `(hreflang_code, full_url)`
+    tuples emitted as `<xhtml:link rel="alternate" hreflang="X" href="Y"/>`
+    inside the `<url>` block. Every FR/EN twin gets an `x-default` entry
+    pointing at the EN variant per Google's recommended pattern.
+    """
     parts = ["  <url>", f"    <loc>{_xml_escape(loc)}</loc>"]
+    # iter359 — hreflang cross-references FIRST (Google convention).
+    if hreflang_alternates:
+        for hreflang, href in hreflang_alternates:
+            parts.append(
+                f'    <xhtml:link rel="alternate" hreflang="{hreflang}" '
+                f'href="{_xml_escape(href)}"/>'
+            )
     if lastmod:
         parts.append(f"    <lastmod>{lastmod}</lastmod>")
     parts.append(f"    <changefreq>{changefreq}</changefreq>")
@@ -182,12 +256,17 @@ def _xml_url(
     return "\n".join(parts)
 
 
-def _wrap_urlset(urls: List[str], with_image_ns: bool = False) -> str:
-    """Wrap a list of <url> blocks in a valid urlset envelope."""
-    xmlns_extra = (
-        ' xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"'
-        if with_image_ns else ""
-    )
+def _wrap_urlset(urls: List[str], with_image_ns: bool = False, with_xhtml_ns: bool = False) -> str:
+    """Wrap a list of <url> blocks in a valid urlset envelope.
+
+    iter359 — `with_xhtml_ns=True` adds the `xmlns:xhtml` namespace needed
+    for `<xhtml:link rel="alternate">` hreflang blocks in sitemap-static.
+    """
+    xmlns_extra = ""
+    if with_image_ns:
+        xmlns_extra += ' xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"'
+    if with_xhtml_ns:
+        xmlns_extra += ' xmlns:xhtml="http://www.w3.org/1999/xhtml"'
     return (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
         f'<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"{xmlns_extra}>\n'
@@ -239,14 +318,105 @@ async def sitemap_index(request: Request):
 
 @sitemap_router.get("/sitemap-static.xml", include_in_schema=False)
 async def sitemap_static(request: Request):
-    """Static pages + regional landings. lastmod = deploy date (best-effort)."""
+    """Static pages + regional landings — iter359 emits DUAL EN + FR URLs
+    with reciprocal `<xhtml:link rel="alternate">` hreflang blocks.
+
+    Every page in `STATIC_PAGES` that has a known FR twin (per
+    `EN_TO_FR_SLUGS`) gets:
+      • Its EN `/en/<slug>` variant with alternates → en-CA, fr-CA, x-default
+      • Its FR `/fr/<slug>` variant with alternates → en-CA, fr-CA, x-default
+
+    Google recommends every URL in a hreflang cluster self-declare its
+    alternates + include an x-default (fallback for other languages) —
+    that's exactly what we emit here.
+
+    Pages without a FR twin (e.g., `/lots-auction`) are emitted once at
+    their bare path, unchanged (backward compat for legacy indexed URLs).
+    """
     base = PUBLIC_HOST or f"{request.url.scheme}://{request.url.netloc}"
-    today = _now_iso_date()  # iter356 M1 — lastmod on static entries
-    urls = [
-        _xml_url(f"{base}{path}", lastmod=today, changefreq=cf, priority=pr)
-        for path, cf, pr in STATIC_PAGES
-    ]
-    return _sitemap_response(_wrap_urlset(urls))
+    today = _now_iso_date()
+
+    urls: List[str] = []
+    seen_pairs: set = set()  # Dedup: emit each EN/FR pair only once.
+
+    for path, cf, pr in STATIC_PAGES:
+        pair = _lang_pair_for(path)
+
+        # Pages without a known FR twin — emit as-is (single URL, no alternates).
+        if pair is None:
+            urls.append(_xml_url(f"{base}{path}", lastmod=today, changefreq=cf, priority=pr))
+            continue
+
+        en_bare, fr_bare = pair
+        if (en_bare, fr_bare) in seen_pairs:
+            continue
+        seen_pairs.add((en_bare, fr_bare))
+
+        # Build the EN + FR absolute URLs, then the shared hreflang cluster.
+        en_url = f"{base}/en{en_bare if en_bare != '/' else ''}"
+        fr_url = f"{base}/fr{fr_bare if fr_bare != '/' else ''}"
+        # Root case — /en/ and /fr/ have trailing slash for clarity.
+        if en_bare == "/":
+            en_url = f"{base}/en/"
+            fr_url = f"{base}/fr/"
+
+        alternates = [
+            ("en-CA",      en_url),
+            ("fr-CA",      fr_url),
+            ("x-default",  en_url),  # EN is the default fallback per iter358 spec
+        ]
+
+        urls.append(_xml_url(en_url, lastmod=today, changefreq=cf, priority=pr,
+                             hreflang_alternates=alternates))
+        urls.append(_xml_url(fr_url, lastmod=today, changefreq=cf, priority=pr,
+                             hreflang_alternates=alternates))
+
+    return _sitemap_response(_wrap_urlset(urls, with_xhtml_ns=True))
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  iter359 — Root `/` Accept-Language 302 redirect
+#  Bots + browsers landing at bare `/` get redirected to `/en/` or `/fr/`
+#  based on the `Accept-Language` request header. This is what makes the
+#  root URL indexable as a language-neutral entry point that fans out to
+#  the correct localized canonical.
+#
+#  Executed at the FastAPI layer BEFORE any SPA rendering — the browser
+#  receives a real HTTP 302 with a `Location:` header, not a JS redirect.
+#  In production (`bidvex.com`), FastAPI serves the SPA build directly,
+#  so this handler intercepts every naked root request.
+# ═══════════════════════════════════════════════════════════════════════
+
+def _detect_lang_from_accept_language(header: str) -> str:
+    """
+    Parse an `Accept-Language` header and return 'fr' if the first
+    preferred locale is French, else 'en'. Empty/absent header → 'en'.
+
+    Examples:
+      "fr-CA,fr;q=0.9,en;q=0.8"    → 'fr'
+      "en-US,en;q=0.9"             → 'en'
+      "fr,en"                      → 'fr'
+      "en-CA,fr-CA;q=0.9"          → 'en'
+      "" or None                   → 'en'
+    """
+    if not header:
+        return "en"
+    # Take the first (highest-priority) locale token.
+    first = header.split(",")[0].strip().lower()
+    if first.startswith("fr"):
+        return "fr"
+    return "en"
+
+
+@sitemap_router.get("/", include_in_schema=False)
+async def root_lang_redirect(request: Request):
+    """iter359 — 302 redirect from `/` to `/en/` or `/fr/` based on
+    Accept-Language. This handler is registered on the main app via
+    `include_router(sitemap_router)` and takes priority over the SPA
+    catch-all (registered LAST in server.py)."""
+    lang = _detect_lang_from_accept_language(request.headers.get("accept-language", ""))
+    target = "/fr/" if lang == "fr" else "/en/"
+    return RedirectResponse(url=target, status_code=302)
 
 
 @sitemap_router.get("/sitemap-listings.xml", include_in_schema=False)

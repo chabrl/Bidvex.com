@@ -7,12 +7,13 @@
  * results grid. Falls back to `null` silently when no items are returned.
  */
 import React, { useEffect, useState, useRef } from 'react';
-import { Link } from 'react-router-dom';
+
 import { useTranslation } from 'react-i18next';
 import { Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
 import SafeImage from './SafeImage';
 import { formatCurrency } from '../utils/currencyFormatter';
 import API_BASE from '../config';
+import { LangLink } from './LangLink';
 
 const FeaturedListingsBanner = ({ section = 'marketplace', limit = 8 }) => {
   const { i18n } = useTranslation();
@@ -90,7 +91,7 @@ const FeaturedListingsBanner = ({ section = 'marketplace', limit = 8 }) => {
         data-testid="featured-scroller"
       >
         {items.map((item) => (
-          <Link
+          <LangLink
             key={item.id}
             to={targetForId(item)}
             className="snap-start flex-shrink-0 w-[240px] sm:w-[260px] bg-white rounded-lg border border-slate-200 hover:border-amber-400 hover:shadow-md transition-all overflow-hidden"
@@ -128,7 +129,7 @@ const FeaturedListingsBanner = ({ section = 'marketplace', limit = 8 }) => {
                 </span>
               </div>
             </div>
-          </Link>
+          </LangLink>
         ))}
       </div>
     </section>

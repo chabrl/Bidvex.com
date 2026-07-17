@@ -1,8 +1,9 @@
 import API_BASE from '../config';
 import React, { useEffect, useState } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { LangLink } from '../components/LangLink';
 
 /**
  * BidVex custom unsubscribe page (bilingual EN/FR).
@@ -126,9 +127,9 @@ const UnsubscribePage = () => {
           ) : (fr ? 'Confirmer le désabonnement' : 'Confirm Unsubscribe')}
         </button>
         <div className="text-center mt-6">
-          <Link to="/" className="text-sm" style={{ color: '#2563eb', textDecoration: 'underline' }} data-testid="unsubscribe-cancel-link">
+          <LangLink to="/" className="text-sm" style={{ color: '#2563eb', textDecoration: 'underline' }} data-testid="unsubscribe-cancel-link">
             {fr ? 'Annuler, me ramener' : 'Never mind, take me back'}
-          </Link>
+          </LangLink>
         </div>
       </Shell>
     );
@@ -156,22 +157,22 @@ const UnsubscribePage = () => {
             : 'Transactional emails (bids, payments, account alerts) are not affected.'}
         </p>
         <div className="text-center mb-4">
-          <Link
+          <LangLink
             to={`/resubscribe?token=${encodeURIComponent(token)}&lang=${lang}`}
             data-testid="resubscribe-cta-link"
             className="text-sm font-medium"
             style={{ color: '#2563eb', textDecoration: 'underline' }}
           >
             {fr ? "Changé d'avis ? Se réabonner ici." : 'Changed your mind? Resubscribe here.'}
-          </Link>
+          </LangLink>
         </div>
         <div className="text-center">
-          <Link to="/"
+          <LangLink to="/"
                 className="inline-block py-3 px-6 rounded-xl font-semibold text-white"
                 style={{ background: 'linear-gradient(135deg, #2563eb 0%, #06b6d4 100%)' }}
                 data-testid="unsubscribe-home-link">
             {fr ? 'Retour à BidVex' : 'Back to BidVex'}
-          </Link>
+          </LangLink>
         </div>
       </Shell>
     );

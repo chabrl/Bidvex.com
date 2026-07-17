@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { Card, CardContent } from '../components/ui/card';
 import { ScrollText, Shield, ArrowLeft, CreditCard, Lock, Key, Clock, AlertTriangle, Database, Globe } from 'lucide-react';
-import { Link } from 'react-router-dom';
+
 import { useTranslation } from 'react-i18next';
 import { AIDisclosureLegalSection, VehicleAuctionLegalSection, CrossBorderLegalSection } from '../components/legal/LegalComplianceSections';
+import { LangLink } from '../components/LangLink';
 
 const LegalPage = ({ documentType = 'both' }) => {
   const { t, i18n } = useTranslation();
@@ -30,9 +31,9 @@ const LegalPage = ({ documentType = 'both' }) => {
       <div className="max-w-4xl mx-auto space-y-10">
         {/* Header */}
         <div className="text-center space-y-3">
-          <Link to="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary mb-4" data-testid="legal-back-link">
+          <LangLink to="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary mb-4" data-testid="legal-back-link">
             <ArrowLeft className="h-4 w-4" /> {fr ? 'Retour à l\'accueil' : 'Back to Home'}
-          </Link>
+          </LangLink>
           <h1 className="text-4xl font-bold tracking-tight" data-testid="legal-page-title">{pageTitle}</h1>
           <p className="text-muted-foreground">{pageSubtitle}</p>
 

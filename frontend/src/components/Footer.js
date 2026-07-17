@@ -1,9 +1,10 @@
 import API_BASE from '../config';
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useCookieConsent } from '../hooks/useCookieConsent';
 import axios from 'axios';
+import { LangLink } from './LangLink';
 
 const API = API_BASE;
 
@@ -127,12 +128,12 @@ const Footer = () => {
       );
     } else {
       return (
-        <Link 
+        <LangLink 
           to={linkValue} 
           className="hover:text-white transition-colors text-sm"
         >
           {title}
-        </Link>
+        </LangLink>
       );
     }
   };
@@ -156,15 +157,15 @@ const Footer = () => {
               Canada
             </address>
             <ul className="space-y-1.5 text-sm">
-              <li><Link to="/contact-us" className="hover:text-white transition-colors" data-testid="footer-contact-us">
+              <li><LangLink to="/contact-us" className="hover:text-white transition-colors" data-testid="footer-contact-us">
                 {language === 'fr' ? 'Nous joindre' : 'Contact Us'}
-              </Link></li>
+              </LangLink></li>
               <li>{renderLink('about', language === 'fr' ? 'À propos' : 'About Us', '/about')}</li>
               <li>{renderLink('careers', language === 'fr' ? 'Carrières' : 'Careers', '/careers')}</li>
               <li>{renderLink('community', language === 'fr' ? 'Communauté' : 'Community', '/community')}</li>
-              <li><Link to="/blogs" className="hover:text-white transition-colors text-sm" data-testid="footer-press-blogs-link">
+              <li><LangLink to="/blogs" className="hover:text-white transition-colors text-sm" data-testid="footer-press-blogs-link">
                 {language === 'fr' ? 'Presse' : 'Press'}
-              </Link></li>
+              </LangLink></li>
             </ul>
           </div>
 
@@ -176,9 +177,9 @@ const Footer = () => {
             <ul className="space-y-1.5 text-sm">
               <li>{renderLink('terms_of_service', language === 'fr' ? 'Conditions générales' : 'Terms of Service', '/terms-of-service')}</li>
               <li>{renderLink('privacy_policy', language === 'fr' ? 'Politique de confidentialité' : 'Privacy Policy', '/privacy-policy')}</li>
-              <li><Link to="/refund-policy" className="hover:text-white transition-colors text-sm" data-testid="footer-refund-policy">
+              <li><LangLink to="/refund-policy" className="hover:text-white transition-colors text-sm" data-testid="footer-refund-policy">
                 {language === 'fr' ? 'Politique de remboursement' : 'Refund & Return Policy'}
-              </Link></li>
+              </LangLink></li>
               <li>{renderLink(
                 'prohibited_items',
                 language === 'fr' ? 'Articles interdits' : 'Prohibited Items',
@@ -197,18 +198,18 @@ const Footer = () => {
             </h3>
             <ul className="space-y-1.5 text-sm">
               <li>{renderLink('how_it_works', language === 'fr' ? 'Comment ça marche' : 'How It Works', '/how-it-works')}</li>
-              <li><Link to={language === 'fr' ? '/devenir-courtier' : '/become-a-broker'} className="hover:text-white transition-colors text-sm" data-testid="footer-become-a-broker">
+              <li><LangLink to={language === 'fr' ? '/devenir-courtier' : '/become-a-broker'} className="hover:text-white transition-colors text-sm" data-testid="footer-become-a-broker">
                 {language === 'fr' ? 'Devenir courtier' : 'Become a Broker'}
-              </Link></li>
-              <li><Link to={language === 'fr' ? '/courtiers' : '/brokers'} className="hover:text-white transition-colors text-sm" data-testid="footer-broker-directory">
+              </LangLink></li>
+              <li><LangLink to={language === 'fr' ? '/courtiers' : '/brokers'} className="hover:text-white transition-colors text-sm" data-testid="footer-broker-directory">
                 {language === 'fr' ? 'Répertoire des courtiers' : 'Broker Directory'}
-              </Link></li>
-              <li><Link to="/vehicle-auctions" className="hover:text-white transition-colors text-sm" data-testid="footer-vehicles-link">
+              </LangLink></li>
+              <li><LangLink to="/vehicle-auctions" className="hover:text-white transition-colors text-sm" data-testid="footer-vehicles-link">
                 {language === 'fr' ? 'Encans de véhicules' : 'Vehicle Auctions'}
-              </Link></li>
-              <li><Link to="/storage-auctions" className="hover:text-white transition-colors text-sm" data-testid="footer-storage-link">
+              </LangLink></li>
+              <li><LangLink to="/storage-auctions" className="hover:text-white transition-colors text-sm" data-testid="footer-storage-link">
                 {language === 'fr' ? 'Encans d\'entreposage' : 'Storage Auctions'}
-              </Link></li>
+              </LangLink></li>
             </ul>
           </div>
 

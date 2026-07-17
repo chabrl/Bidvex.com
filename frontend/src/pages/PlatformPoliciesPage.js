@@ -2,7 +2,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card, CardContent } from '../components/ui/card';
 import { ArrowLeft, ShieldCheck, ShoppingBag, Users, Gavel, MessageCircle } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { LangLink } from '../components/LangLink';
 
 const Section = ({ icon, title, children }) => (
   <Card className="mb-6">
@@ -23,9 +23,9 @@ export default function PlatformPoliciesPage() {
   return (
     <div className="min-h-screen bg-background py-12 px-4" data-testid="policies-page">
       <div className="max-w-4xl mx-auto">
-        <Link to="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary mb-6">
+        <LangLink to="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary mb-6">
           <ArrowLeft className="h-4 w-4" /> {fr ? 'Retour' : 'Back'}
-        </Link>
+        </LangLink>
         <h1 className="text-3xl font-bold mb-2">{fr ? 'Politiques de la plateforme' : 'Platform Policies'}</h1>
         <p className="text-muted-foreground mb-8">{fr ? 'Dernière mise à jour : 15 avril 2026' : 'Last Updated: April 15, 2026'}</p>
 

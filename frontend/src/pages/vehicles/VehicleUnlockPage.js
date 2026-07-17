@@ -7,7 +7,7 @@
 import API_BASE from '../../config';
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { loadStripe } from '@stripe/stripe-js';
@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Button } from '../../components/ui/button';
 import { Loader2, Lock, CheckCircle2, ArrowLeft, CreditCard, Phone, Mail, MapPin, Building2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
+import { LangLink } from '../../components/LangLink';
 
 const API = API_BASE;
 const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
@@ -229,13 +230,13 @@ const VehicleUnlockPage = () => {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 py-10" data-testid="vehicle-unlock-page">
       <div className="max-w-2xl mx-auto px-4">
-        <Link
+        <LangLink
           to={`/vehicle-auctions/${id}`}
           className="inline-flex items-center text-sm text-blue-600 hover:underline mb-3"
           data-testid="unlock-back-link"
         >
           <ArrowLeft className="h-3.5 w-3.5 mr-1" /> Back to listing
-        </Link>
+        </LangLink>
 
         {contact ? (
           <ContactReveal contact={contact} />

@@ -18,7 +18,7 @@
 import API_BASE from '../config';
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Switch } from '../components/ui/switch';
@@ -26,6 +26,7 @@ import { Badge } from '../components/ui/badge';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { toast } from 'sonner';
 import { Loader2, Mail, Lock, ShieldCheck, AlertTriangle, Save, ArrowLeft } from 'lucide-react';
+import { LangLink } from '../components/LangLink';
 
 const API = API_BASE;
 
@@ -113,10 +114,10 @@ const EmailPreferencesPage = () => {
             </div>
             <p className="text-sm leading-snug">{error.en}</p>
             <p className="text-sm leading-snug italic text-muted-foreground">{error.fr}</p>
-            <Link to="/" className="text-sm text-blue-600 hover:underline inline-flex items-center gap-1">
+            <LangLink to="/" className="text-sm text-blue-600 hover:underline inline-flex items-center gap-1">
               <ArrowLeft className="h-3 w-3" />
               Back home · Retour à l'accueil
-            </Link>
+            </LangLink>
           </CardContent>
         </Card>
       </div>
@@ -208,10 +209,10 @@ const EmailPreferencesPage = () => {
           variant="outline"
           data-testid="email-prefs-back-btn"
         >
-          <Link to="/">
+          <LangLink to="/">
             <ArrowLeft className="h-4 w-4 mr-1" />
             Back · Retour
-          </Link>
+          </LangLink>
         </Button>
         <Button
           onClick={handleSave}

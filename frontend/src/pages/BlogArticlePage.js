@@ -7,11 +7,12 @@
  */
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Link, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useTranslation } from 'react-i18next';
 import { ChevronLeft, Loader2, Newspaper, Calendar } from 'lucide-react';
 import API_BASE from '../config';
+import { LangLink } from '../components/LangLink';
 
 function renderMarkdown(text) {
   if (!text) return null;
@@ -120,14 +121,14 @@ export default function BlogArticlePage() {
               ? 'L\'article que vous cherchez n\'existe pas ou a été retiré.'
               : 'The article you\'re looking for doesn\'t exist or was unpublished.'}
           </p>
-          <Link
+          <LangLink
             to="/blogs"
             className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700"
             data-testid="back-to-blogs-link"
           >
             <ChevronLeft className="w-4 h-4" />
             {fr ? 'Retour au blog' : 'Back to blog'}
-          </Link>
+          </LangLink>
         </div>
       </div>
     );
@@ -152,14 +153,14 @@ export default function BlogArticlePage() {
         style={{ background: 'linear-gradient(135deg, #0B2545 0%, #1B3D6F 60%, #2186C6 100%)' }}
       >
         <div className="max-w-3xl mx-auto text-white">
-          <Link
+          <LangLink
             to="/blogs"
             className="inline-flex items-center gap-1 text-sm text-cyan-200 hover:text-white mb-4"
             data-testid="article-back-link"
           >
             <ChevronLeft className="w-4 h-4" />
             {fr ? 'Retour au blog' : 'Back to blog'}
-          </Link>
+          </LangLink>
           <h1
             className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold leading-tight mb-3"
             data-testid="article-title"

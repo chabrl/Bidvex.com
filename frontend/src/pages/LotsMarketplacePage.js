@@ -1,7 +1,7 @@
 import API_BASE from '../config';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+
 import axios from 'axios';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardFooter } from '../components/ui/card';
@@ -26,6 +26,7 @@ import FilterBar from '../components/FilterBar/FilterBar';
 import FeaturedListingsBanner from '../components/FeaturedListingsBanner';
 // iter268 Mission 4 — SEO meta tags
 import SEO from '../components/SEO';
+import { LangLink } from '../components/LangLink';
 // iter236 Mission 2 — Map & radius search panel (lazy so Leaflet's chunk
 // only loads when the user actually clicks "Search by Map").
 const MapSearchPanel = React.lazy(() => import('../components/MapSearchPanel'));
@@ -145,10 +146,10 @@ const LotsMarketplacePage = () => {
         className="group overflow-hidden flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-[0_2px_12px_rgba(0,0,0,0.08)] hover:shadow-[0_10px_28px_rgba(0,0,0,0.14)] transition-all duration-150 hover:-translate-y-[3px] min-h-[420px]"
         data-testid="listing-card"
       >
-        <Link to={`/lots/${listing.id}`} className="block relative">
-          <div className="h-[200px] overflow-hidden bg-slate-100 dark:bg-slate-800">
+        <LangLink to={`/lots/${listing.id}`} className="block relative">
+          <div className="grid-card-image bg-slate-100 dark:bg-slate-800" data-testid="lot-card-image">
             {imageUrl ? (
-              <SafeImage src={imageUrl} alt={getLocalized(listing, "title")} width={400} height={200} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+              <SafeImage src={imageUrl} alt={getLocalized(listing, "title")} width={400} height={300} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
                 <Package className="h-16 w-16" style={{ color: '#94a3b8' }} />
@@ -186,14 +187,14 @@ const LotsMarketplacePage = () => {
               )}
             />
           </div>
-        </Link>
+        </LangLink>
 
         <CardContent className="px-4 py-[14px] flex flex-col flex-1 gap-2" data-testid="listing-content">
-          <Link to={`/lots/${listing.id}`}>
+          <LangLink to={`/lots/${listing.id}`}>
             <h3 className="text-[14px] font-semibold leading-[1.35] line-clamp-2 hover:text-cyan-600 transition-colors mb-1" style={{ color: '#1a1a1a' }}>
               {getLocalized(listing, "title")}
             </h3>
-          </Link>
+          </LangLink>
           <div className="flex items-center text-[12px] gap-2" style={{ color: '#6b7280' }}>
             <SellerRatingInline sellerId={listing.seller_id} reputation={sellerReps[listing.seller_id]} />
             <span className="inline-flex items-center gap-1 truncate">
@@ -233,7 +234,7 @@ const LotsMarketplacePage = () => {
         </CardContent>
 
         <CardFooter className="px-4 pb-[14px] pt-0 flex items-center w-full">
-          <Link to={`/lots/${listing.id}`} className="flex-1 min-w-0">
+          <LangLink to={`/lots/${listing.id}`} className="flex-1 min-w-0">
             <Button
               className="w-full h-[40px] rounded-lg text-white font-bold text-[13px]"
               style={{ background: 'linear-gradient(135deg, #2d6be4, #1a4fc4)', border: 'none' }}
@@ -241,7 +242,7 @@ const LotsMarketplacePage = () => {
             >
               <Eye className="h-4 w-4 mr-2" /> {t('marketplace.viewAuction', 'View Auction')}
             </Button>
-          </Link>
+          </LangLink>
           <div className="ml-2 flex-shrink-0">
             <WishlistHeartButton auctionId={listing.id} wishlistCount={listing.wishlist_count || 0} />
           </div>
@@ -262,9 +263,9 @@ const LotsMarketplacePage = () => {
            data-testid="lots-marketplace-crosslink">
         🛒 {t('lotsMarketplace.alsoInMarketplace',
             'All these listings are also available in the')}{' '}
-        <Link to="/marketplace" className="underline hover:no-underline font-medium text-slate-700 dark:text-slate-200">
+        <LangLink to="/marketplace" className="underline hover:no-underline font-medium text-slate-700 dark:text-slate-200">
           {t('lotsMarketplace.marketplaceLink', 'Marketplace →')}
-        </Link>
+        </LangLink>
       </div>
       {/* Hero Header */}
       <div className="relative overflow-hidden">

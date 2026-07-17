@@ -9,13 +9,14 @@
  */
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Link } from 'react-router-dom';
+
 import { Loader2, Briefcase, MapPin, DollarSign, ArrowRight } from 'lucide-react';
 
 import API_BASE from '../config';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
+import { LangLink } from '../components/LangLink';
 
 export default function CareersPage() {
   const [jobs, setJobs] = useState(null);
@@ -108,7 +109,7 @@ export default function CareersPage() {
         {jobs && jobs.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5" data-testid="openings-grid">
             {jobs.map((job) => (
-              <Link
+              <LangLink
                 to={`/careers/${job.id}`}
                 key={job.id}
                 className="block"
@@ -155,7 +156,7 @@ export default function CareersPage() {
                     </div>
                   </CardContent>
                 </Card>
-              </Link>
+              </LangLink>
             ))}
           </div>
         )}

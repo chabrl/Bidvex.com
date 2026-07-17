@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import {
@@ -9,6 +9,7 @@ import {
   Search, CreditCard, Truck, Bell, TrendingUp, Users, CheckCircle2,
   HelpCircle, Star, Lock, Eye
 } from 'lucide-react';
+import { LangLink } from '../components/LangLink';
 
 const HowItWorks = () => {
   const { i18n } = useTranslation();
@@ -159,17 +160,17 @@ const HowItWorks = () => {
               : 'Buy, sell, and bid with confidence. Secure payments, verified sellers, and full regulatory compliance.'}
           </p>
           <div className="flex flex-wrap justify-center gap-3">
-            <Link to="/auth">
+            <LangLink to="/auth">
               <Button size="lg" className="bg-cyan-500 hover:bg-cyan-600 text-white font-semibold gap-2" data-testid="hero-signup-cta">
                 {fr ? 'Créer un compte gratuit' : 'Create Free Account'}
                 <ArrowRight className="h-4 w-4" />
               </Button>
-            </Link>
-            <Link to="/marketplace">
+            </LangLink>
+            <LangLink to="/marketplace">
               <Button size="lg" variant="outline" className="border-white/30 text-white hover:bg-white/10 gap-2" data-testid="hero-browse-cta">
                 {fr ? 'Parcourir le marché' : 'Browse Marketplace'}
               </Button>
-            </Link>
+            </LangLink>
           </div>
         </div>
       </section>
@@ -225,12 +226,12 @@ const HowItWorks = () => {
                 </div>
                 {section.cta && (
                   <div className="mt-6 pt-4 border-t">
-                    <Link to={section.cta.href}>
+                    <LangLink to={section.cta.href}>
                       <Button className={`bg-gradient-to-r ${section.color} text-white border-0 gap-2`} data-testid={`cta-${section.id}`}>
                         {section.cta.label}
                         <ArrowRight className="h-4 w-4" />
                       </Button>
-                    </Link>
+                    </LangLink>
                   </div>
                 )}
               </CardContent>
@@ -313,9 +314,9 @@ const HowItWorks = () => {
             {fr
               ? "Pour les détails juridiques complets, consultez §5B et §8 de nos "
               : "For complete legal details, see §5B and §8 of our "}
-            <Link to="/legal/terms" className="text-cyan-600 underline">
+            <LangLink to="/legal/terms" className="text-cyan-600 underline">
               {fr ? "Conditions d'utilisation" : "Terms of Service"}
-            </Link>.
+            </LangLink>.
           </p>
         </div>
       </section>
@@ -357,22 +358,22 @@ const HowItWorks = () => {
           <h2 className="text-2xl font-bold mb-3">{fr ? 'Prêt à commencer?' : 'Ready to Get Started?'}</h2>
           <p className="text-slate-300 mb-8">{fr ? 'Rejoignez des milliers d\'acheteurs et vendeurs au Canada.' : 'Join thousands of buyers and sellers across Canada.'}</p>
           <div className="flex flex-wrap justify-center gap-3">
-            <Link to="/create-listing">
+            <LangLink to="/create-listing">
               <Button size="lg" className="bg-cyan-500 hover:bg-cyan-600 text-white font-semibold gap-2" data-testid="final-cta-sell">
                 {fr ? 'Commencer à vendre' : 'Start Selling'}
                 <ArrowRight className="h-4 w-4" />
               </Button>
-            </Link>
-            <Link to="/marketplace">
+            </LangLink>
+            <LangLink to="/marketplace">
               <Button size="lg" className="bg-white text-slate-900 hover:bg-slate-100 font-semibold gap-2" data-testid="final-cta-bid">
                 {fr ? 'Commencer à enchérir' : 'Start Bidding'}
               </Button>
-            </Link>
-            <Link to="/become-a-partner">
+            </LangLink>
+            <LangLink to="/become-a-partner">
               <Button size="lg" variant="outline" className="border-white/30 text-white hover:bg-white/10 gap-2" data-testid="final-cta-partner">
                 {fr ? 'Devenir partenaire' : 'Apply as Partner'}
               </Button>
-            </Link>
+            </LangLink>
           </div>
         </div>
       </section>

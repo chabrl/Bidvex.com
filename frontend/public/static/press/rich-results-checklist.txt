@@ -1,0 +1,121 @@
+BidVex — iter359 Google Rich Results & Search Console Submission Checklist
+============================================================================
+
+Generated 2026-07-17. Public URL: /static/press/rich-results-checklist.txt
+
+
+── 1. Google Rich Results Test (post-Cloudflare-deploy) ───────────────────
+
+Validate the NewsArticle JSON-LD on both press-release pages by pasting
+these URLs into https://search.google.com/test/rich-results:
+
+  EN: https://search.google.com/test/rich-results?url=https://www.bidvex.com/press/quebec-launch
+  FR: https://search.google.com/test/rich-results?url=https://www.bidvex.com/presse/lancement-quebec
+
+Expected result: 1 valid "News article" enhancement + 3 additional
+JSON-LD types (Organization, BreadcrumbList, WebSite) — no warnings.
+
+If the tool reports "URL not indexable" the Cloudflare crawler-cache
+Worker is still active — see item 4 below.
+
+
+── 2. Google Search Console — Submit for Indexing ──────────────────────────
+
+Log in at https://search.google.com/search-console/ (bidvex.com property).
+For each URL below, paste it into the "URL Inspection" search box, then
+click "Request Indexing":
+
+  https://www.bidvex.com/en/marketplace
+  https://www.bidvex.com/fr/marche
+  https://www.bidvex.com/en/vehicle-auctions
+  https://www.bidvex.com/fr/encheres-vehicules
+  https://www.bidvex.com/en/storage-auctions
+  https://www.bidvex.com/fr/encheres-entreposage
+  https://www.bidvex.com/press/quebec-launch
+  https://www.bidvex.com/presse/lancement-quebec
+
+Also submit the sitemap index:
+
+  https://www.bidvex.com/sitemap_index.xml
+
+Google will discover every sub-sitemap automatically (static, listings,
+vehicles, storage, lots, sellers).
+
+
+── 3. Bing Webmaster Tools ─────────────────────────────────────────────────
+
+Repeat the sitemap submission at https://www.bing.com/webmasters:
+
+  https://www.bidvex.com/sitemap_index.xml
+
+Bing typically indexes 3-5 days after submission. Not as fast as Google
+but worth the 30 seconds of copy-paste.
+
+
+── 4. Cloudflare — Charbel action required ─────────────────────────────────
+
+BLOCKER: An active Cloudflare "crawler-cache" Worker on the bidvex.com
+zone intercepts Googlebot requests BEFORE they reach the origin. Until
+this Worker is neutralized, none of the SEO work in iter354-iter359
+becomes visible to Google.
+
+Action:
+  1. Log in to https://dash.cloudflare.com
+  2. Select `bidvex.com` zone → Workers Routes
+  3. Delete or disable the `crawler-cache` route
+  4. Purge the Cloudflare cache (Caching → Configuration → Purge Everything)
+  5. Wait 5 minutes for propagation
+  6. Test: curl -A "Googlebot" https://www.bidvex.com/en/marketplace
+     Expected: full SSR HTML with JSON-LD blocks visible in the response.
+
+After the Worker is disabled, submit the sitemap index to GSC (step 2
+above) — Google typically issues its first crawl within 24-48 hours.
+
+
+── 5. Expected Indexation Timeline ─────────────────────────────────────────
+
+  T+0  hr: Cloudflare Worker disabled + sitemap resubmitted
+  T+6  hr: Googlebot first crawl of sitemap_index.xml
+  T+24 hr: Sub-sitemaps crawled (~10-50 URLs/day per site trust)
+  T+7  d:  Press releases visible in site:www.bidvex.com search
+  T+14 d:  Quebec city landing pages begin ranking for long-tail queries
+  T+30 d:  Full sitemap crawled + indexed
+
+
+── 6. Post-Deploy Verification (curl commands) ─────────────────────────────
+
+Test each URL AFTER Cloudflare Worker is disabled:
+
+  # NewsArticle JSON-LD present
+  curl -s https://www.bidvex.com/press/quebec-launch | grep -c NewsArticle
+  # Expected: 1 (or higher)
+
+  # French page returns FR content
+  curl -s https://www.bidvex.com/presse/lancement-quebec | grep -c "Fondateur"
+  # Expected: >= 2
+
+  # Sitemap-static contains hreflang alternates
+  curl -s https://www.bidvex.com/sitemap-static.xml | grep -c 'xhtml:link'
+  # Expected: >= 60 (30 EN + 30 FR pages * 3 alternates each = 180+ tags)
+
+  # Root Accept-Language redirect works for FR
+  curl -sI -H "Accept-Language: fr-CA" https://www.bidvex.com/
+  # Expected: HTTP/2 302 + Location: /fr/
+
+  # Root Accept-Language redirect works for EN
+  curl -sI -H "Accept-Language: en-US" https://www.bidvex.com/
+  # Expected: HTTP/2 302 + Location: /en/
+
+
+── 7. PDF Product Overview (fiche produit) ─────────────────────────────────
+
+The 2-page bilingual PDF is available at:
+
+  https://www.bidvex.com/static/press/bidvex-quebec-launch.pdf
+
+Link this from press outreach emails, journalist briefings, and paid
+Adwords landing pages.
+
+
+── End of checklist ────────────────────────────────────────────────────────
+Contact for questions: marketing@bidvex.com

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -20,6 +20,7 @@ import SellOptionsModal from './SellOptionsModal';
 import NotificationCenter from './NotificationCenter';
 import useFeatureFlag from '../hooks/useFeatureFlag';
 import { useBannerHeight } from '../contexts/PromoBannerContext';
+import { LangLink } from './LangLink';
 
 const Navbar = () => {
   const { t, i18n } = useTranslation();
@@ -116,7 +117,7 @@ const Navbar = () => {
         <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-3 xl:px-6 2xl:px-8">
           <div className="flex justify-between items-center h-14 sm:h-16">
             {/* Logo */}
-            <Link 
+            <LangLink 
               to="/" 
               className="flex items-center space-x-2 group flex-shrink-0" 
               data-testid="nav-logo"
@@ -129,12 +130,12 @@ const Navbar = () => {
                 className="h-8 sm:h-9 w-auto transform group-hover:scale-105 transition-transform duration-200"
                 fetchPriority="high"
               />
-            </Link>
+            </LangLink>
 
             {/* Desktop Navigation — visible at lg+ to avoid tablet overflow */}
             <div className="hidden lg:flex items-center space-x-0 xl:space-x-1 mr-2 lg:mr-3 xl:mr-4 2xl:mr-6">
               {navLinks.map((link) => (
-                <Link key={link.path} to={link.path} data-testid={`nav-${link.path.replace('/', '') || 'home'}-link`}>
+                <LangLink key={link.path} to={link.path} data-testid={`nav-${link.path.replace('/', '') || 'home'}-link`}>
                   <Button 
                     variant="ghost" 
                     size="sm"
@@ -158,7 +159,7 @@ const Navbar = () => {
                       </span>
                     )}
                   </Button>
-                </Link>
+                </LangLink>
               ))}
               {user && !isStorageFacilityOnly && (
                 <Button 
@@ -178,7 +179,7 @@ const Navbar = () => {
             <div className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
               {/* Messages — hide on small mobile, available in nav at lg+ */}
               {user && (
-                <Link to="/messages" data-testid="messages-link" className="hidden lg:block">
+                <LangLink to="/messages" data-testid="messages-link" className="hidden lg:block">
                   <Button 
                     variant="ghost" 
                     size="icon" 
@@ -186,7 +187,7 @@ const Navbar = () => {
                   >
                     <MessageCircle className="h-4 w-4 sm:h-5 sm:w-5 navbar-icon text-slate-900 dark:text-slate-100" />
                   </Button>
-                </Link>
+                </LangLink>
               )}
 
               {/* Theme Toggle — hide on small mobile, available in nav at lg+ */}
@@ -413,11 +414,11 @@ const Navbar = () => {
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : (
-                <Link to="/auth" data-testid="login-link">
+                <LangLink to="/auth" data-testid="login-link">
                   <Button className="gradient-button text-white border-0 h-9 sm:h-10 min-h-[44px] px-3 sm:px-4 text-sm">
                     {t('nav.login')}
                   </Button>
-                </Link>
+                </LangLink>
               )}
 
               {/* Mobile Menu Toggle — visible below lg */}
@@ -444,7 +445,7 @@ const Navbar = () => {
           <div className="lg:hidden bg-card border-t border-border animate-slideUp">
             <div className="px-4 py-3 space-y-1 max-w-7xl mx-auto">
               {navLinks.map((link) => (
-                <Link 
+                <LangLink 
                   key={link.path} 
                   to={link.path}
                   className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all min-h-[44px] ${
@@ -455,7 +456,7 @@ const Navbar = () => {
                 >
                   <link.icon className="w-5 h-5 shrink-0" />
                   <span className="truncate">{link.label}</span>
-                </Link>
+                </LangLink>
               ))}
               {user && !isStorageFacilityOnly && (
                 <button 
@@ -480,7 +481,7 @@ const Navbar = () => {
                 || user.role === 'super_admin'
               ) && (
                 <>
-                  <Link
+                  <LangLink
                     to="/facility/dashboard"
                     onClick={() => setMobileMenuOpen(false)}
                     className="flex items-center gap-3 px-4 py-3 rounded-xl text-emerald-600 hover:bg-accent min-h-[44px] font-semibold"
@@ -488,8 +489,8 @@ const Navbar = () => {
                   >
                     <BarChart3 className="w-5 h-5 shrink-0" />
                     <span>{i18n?.language?.startsWith('fr') ? 'Tableau de bord' : 'Facility Dashboard'}</span>
-                  </Link>
-                  <Link
+                  </LangLink>
+                  <LangLink
                     to="/create-listing?type=storage_locker"
                     onClick={() => setMobileMenuOpen(false)}
                     className="flex items-center gap-3 px-4 py-3 rounded-xl text-emerald-700 hover:bg-accent min-h-[44px]"
@@ -497,7 +498,7 @@ const Navbar = () => {
                   >
                     <Plus className="w-5 h-5 shrink-0" />
                     <span>{i18n?.language?.startsWith('fr') ? 'Créer une enchère' : 'Create Unit Auction'}</span>
-                  </Link>
+                  </LangLink>
                 </>
               )}
             </div>

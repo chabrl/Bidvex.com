@@ -1,7 +1,7 @@
 import API_BASE from '../config';
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -9,6 +9,7 @@ import { Label } from '../components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { toast } from 'sonner';
 import { Loader2, Lock, CheckCircle, XCircle, Eye, EyeOff } from 'lucide-react';
+import { LangLink } from '../components/LangLink';
 
 const ResetPasswordPage = () => {
   const { t } = useTranslation();
@@ -157,17 +158,17 @@ const ResetPasswordPage = () => {
               </ul>
             </div>
             
-            <Link to="/forgot-password">
+            <LangLink to="/forgot-password">
               <Button className="w-full gradient-button text-white border-0">
                 {t('auth.requestNewLink') || 'Request New Reset Link'}
               </Button>
-            </Link>
+            </LangLink>
             
-            <Link to="/auth">
+            <LangLink to="/auth">
               <Button variant="outline" className="w-full">
                 {t('auth.backToLogin') || 'Back to Login'}
               </Button>
-            </Link>
+            </LangLink>
           </CardContent>
         </Card>
       </div>
@@ -197,11 +198,11 @@ const ResetPasswordPage = () => {
               </p>
             </div>
             
-            <Link to="/auth">
+            <LangLink to="/auth">
               <Button className="w-full gradient-button text-white border-0">
                 {t('auth.goToLogin') || 'Go to Login'}
               </Button>
-            </Link>
+            </LangLink>
           </CardContent>
         </Card>
       </div>
@@ -345,11 +346,11 @@ const ResetPasswordPage = () => {
             </div>
           </div>
           
-          <Link to="/auth">
+          <LangLink to="/auth">
             <Button variant="ghost" className="w-full">
               {t('auth.backToLogin') || 'Back to Login'}
             </Button>
-          </Link>
+          </LangLink>
         </CardContent>
       </Card>
     </div>

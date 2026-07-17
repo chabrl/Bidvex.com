@@ -17,8 +17,9 @@
 import React from 'react';
 import { CheckCircle2, Clock, FileUp, ShieldCheck, XCircle, Loader2 } from 'lucide-react';
 import { Card } from '../../components/ui/card';
-import { Link } from 'react-router-dom';
+
 import { Button } from '../../components/ui/button';
+import { LangLink } from '../../components/LangLink';
 
 const Step = ({ index, label_en, label_fr, status, isFr }) => {
   // status: 'complete' | 'active' | 'pending' | 'rejected'
@@ -151,7 +152,7 @@ const StorageVerificationBanner = ({ facility, isFr }) => {
           <p className="text-sm text-rose-800 dark:text-rose-200 whitespace-pre-line">
             {facility.company_registration_rejection_reason}
           </p>
-          <Link to="/storage-auctions/register-facility?resubmit=1">
+          <LangLink to="/storage-auctions/register-facility?resubmit=1">
             <Button
               size="sm"
               className="mt-3 bg-rose-600 hover:bg-rose-700 text-white"
@@ -160,7 +161,7 @@ const StorageVerificationBanner = ({ facility, isFr }) => {
               <FileUp className="h-3 w-3 mr-1" />
               {isFr ? 'Soumettre un nouveau document' : 'Resubmit document'}
             </Button>
-          </Link>
+          </LangLink>
         </div>
       )}
 

@@ -1,7 +1,7 @@
 import API_BASE from '../config';
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+
 import axios from 'axios';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -9,6 +9,7 @@ import { Label } from '../components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { toast } from 'sonner';
 import { Loader2, ArrowLeft, Mail, CheckCircle } from 'lucide-react';
+import { LangLink } from '../components/LangLink';
 
 const ForgotPasswordPage = () => {
   const { t } = useTranslation();
@@ -162,7 +163,7 @@ const ForgotPasswordPage = () => {
             </div>
           </div>
           
-          <Link to="/auth">
+          <LangLink to="/auth">
             <Button
               variant="ghost"
               className="w-full"
@@ -171,15 +172,15 @@ const ForgotPasswordPage = () => {
               <ArrowLeft className="mr-2 h-4 w-4" />
               {t('auth.backToLogin') || 'Back to Login'}
             </Button>
-          </Link>
+          </LangLink>
           
           {!emailSent && (
             <div className="text-center text-sm text-muted-foreground">
               <p>
                 {t('auth.noAccount') || "Don't have an account?"}{' '}
-                <Link to="/auth" className="text-primary hover:underline">
+                <LangLink to="/auth" className="text-primary hover:underline">
                   {t('auth.signUp') || 'Sign up'}
-                </Link>
+                </LangLink>
               </p>
             </div>
           )}

@@ -8,11 +8,12 @@
  * for already-authenticated users).
  */
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Helmet } from 'react-helmet-async';
 import { Button } from '../components/ui/button';
 import { Sparkles, Car, Award, Warehouse, Check, X } from 'lucide-react';
+import { LangLink } from '../components/LangLink';
 
 const PartnerPromotionsPage = () => {
   const { i18n } = useTranslation();
@@ -263,14 +264,14 @@ const PartnerPromotionsPage = () => {
           <p className="text-sm text-slate-600 mb-5">
             {t('Partner slots fill quickly. Reserve your free trial today.', 'Les places se remplissent vite. Réservez votre essai gratuit aujourd\'hui.')}
           </p>
-          <Link
+          <LangLink
             to="/auth?mode=register&ref=partner"
             className="inline-flex items-center gap-2 px-6 py-3 bg-[#0055FF] hover:opacity-90 text-white font-bold rounded-lg text-base"
             data-testid="partner-final-cta-btn"
           >
             <Sparkles className="h-4 w-4" />
             {t('Get Started Free', 'Démarrer gratuitement')}
-          </Link>
+          </LangLink>
         </div>
       </section>
     </div>

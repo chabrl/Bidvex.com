@@ -9,7 +9,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Link } from 'react-router-dom';
+
 import { Helmet } from 'react-helmet-async';
 import { useTranslation } from 'react-i18next';
 import {
@@ -17,6 +17,7 @@ import {
   Warehouse, Sparkles, FileText, Loader2,
 } from 'lucide-react';
 import API_BASE from '../config';
+import { LangLink } from '../components/LangLink';
 
 const ICON_MAP = {
   Gavel,
@@ -117,7 +118,7 @@ export default function BlogsPage() {
               const Icon = ICON_MAP[a.icon] || BookOpen;
               const tagLabel = (TAG_LABELS[a.tag] || {})[fr ? 'fr' : 'en'] || a.tag;
               return (
-                <Link
+                <LangLink
                   key={a.id || a.slug}
                   to={`/blogs/${a.slug}`}
                   data-testid={`blogs-article-${a.slug}`}
@@ -158,7 +159,7 @@ export default function BlogsPage() {
                       </span>
                     </div>
                   </div>
-                </Link>
+                </LangLink>
               );
             })}
           </div>
@@ -175,14 +176,14 @@ export default function BlogsPage() {
               ? 'Notre équipe éditoriale publie chaque semaine. Soumettez vos idées et nous y répondrons par un article ou un guide.'
               : 'Our editorial team publishes weekly. Submit topic ideas and we\'ll respond with an article or how-to guide.'}
           </p>
-          <Link
+          <LangLink
             to="/contact-us"
             data-testid="blogs-suggest-topic-link"
             className="inline-flex items-center gap-2 px-5 sm:px-6 py-3 bg-cyan-400 text-slate-900 font-semibold rounded-lg hover:bg-cyan-300 transition-colors"
           >
             {fr ? 'Proposer un sujet' : 'Suggest a Topic'}
             <ArrowRight className="w-4 h-4" />
-          </Link>
+          </LangLink>
         </div>
       </section>
     </div>

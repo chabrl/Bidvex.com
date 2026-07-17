@@ -1,7 +1,8 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
+import { LangLink } from '../../components/LangLink';
 
 /**
  * Contextual footer banner — rendered ONLY on /storage-auctions/* routes.
@@ -67,47 +68,47 @@ const StorageFooterBanner = () => {
         </p>
         {isFacilityOrAdmin ? (
           <div className="flex flex-wrap gap-3 justify-center" data-testid="storage-footer-facility-ctas">
-            <Link
+            <LangLink
               to="/facility/dashboard"
               className="inline-flex items-center gap-2 bg-[#3FB4CB] hover:bg-[#2FA0BA] text-[#0B2545] font-bold rounded-full px-7 py-3 transition-all hover:-translate-y-0.5 hover:shadow-lg"
               data-testid="storage-footer-dashboard-cta"
             >
               {t.approved_cta_dashboard}
-            </Link>
-            <Link
+            </LangLink>
+            <LangLink
               to="/create-listing?type=storage_locker"
               className="inline-flex items-center gap-2 border-2 border-[#3FB4CB] text-[#0B2545] dark:text-[#3FB4CB] font-bold rounded-full px-7 py-3 transition-all hover:-translate-y-0.5 hover:bg-[#3FB4CB]/10"
               data-testid="storage-footer-create-cta"
             >
               {t.approved_cta_create}
-            </Link>
+            </LangLink>
           </div>
         ) : (
-          <Link
+          <LangLink
             to="/storage-auctions/register-facility"
             className="inline-flex items-center gap-2 bg-[#3FB4CB] hover:bg-[#2FA0BA] text-[#0B2545] font-bold rounded-full px-7 py-3 transition-all hover:-translate-y-0.5 hover:shadow-lg"
             data-testid="storage-footer-register-cta"
           >
             {t.cta}
-          </Link>
+          </LangLink>
         )}
 
         <div className="mt-8 flex flex-wrap justify-center items-center gap-x-5 gap-y-2 text-sm text-slate-500 dark:text-slate-400">
-          <Link to="/storage-auctions/browse" className="hover:text-slate-900 dark:hover:text-white transition-colors">
+          <LangLink to="/storage-auctions/browse" className="hover:text-slate-900 dark:hover:text-white transition-colors">
             {t.nav_browse}
-          </Link>
+          </LangLink>
           <span>·</span>
-          <Link to="/storage-auctions/how-it-works" className="hover:text-slate-900 dark:hover:text-white transition-colors">
+          <LangLink to="/storage-auctions/how-it-works" className="hover:text-slate-900 dark:hover:text-white transition-colors">
             {t.nav_how}
-          </Link>
+          </LangLink>
           <span>·</span>
-          <Link to="/storage-auctions/terms" className="hover:text-slate-900 dark:hover:text-white transition-colors">
+          <LangLink to="/storage-auctions/terms" className="hover:text-slate-900 dark:hover:text-white transition-colors">
             {t.nav_terms}
-          </Link>
+          </LangLink>
           <span>·</span>
-          <Link to="/storage-auctions/for-facilities" className="hover:text-slate-900 dark:hover:text-white transition-colors">
+          <LangLink to="/storage-auctions/for-facilities" className="hover:text-slate-900 dark:hover:text-white transition-colors">
             {t.nav_for}
-          </Link>
+          </LangLink>
         </div>
       </div>
     </div>

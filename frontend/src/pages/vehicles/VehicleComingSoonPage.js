@@ -8,7 +8,7 @@
  * Fully responsive (centered max-w-2xl, inputs stack on mobile).
  */
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+
 import axios from 'axios';
 import API_BASE from '../../config';
 import { Button } from '../../components/ui/button';
@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import {
   Loader2, Mail, CheckCircle2, Car, ShieldCheck, Zap, ArrowLeft,
 } from 'lucide-react';
+import { LangLink } from '../../components/LangLink';
 
 const API = API_BASE;
 
@@ -59,11 +60,11 @@ const VehicleComingSoonPage = () => {
 
       <div className="relative z-10 w-full max-w-2xl text-center text-white">
         {/* Logo */}
-        <Link to="/" className="inline-block mb-8" data-testid="vehicle-coming-soon-logo-link">
+        <LangLink to="/" className="inline-block mb-8" data-testid="vehicle-coming-soon-logo-link">
           <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur rounded-xl px-4 py-2 border border-white/20">
             <span className="text-2xl font-black tracking-tight bg-gradient-to-r from-cyan-300 to-blue-300 bg-clip-text text-transparent">BidVex</span>
           </div>
-        </Link>
+        </LangLink>
 
         {/* Floating car illustration */}
         <div className="mb-8 flex justify-center" aria-hidden>
@@ -177,10 +178,10 @@ const VehicleComingSoonPage = () => {
 
         {/* Back link */}
         <div className="mt-10 text-xs text-blue-200/70">
-          <Link to="/" className="inline-flex items-center gap-1 hover:text-white transition" data-testid="vehicle-coming-soon-back-home">
+          <LangLink to="/" className="inline-flex items-center gap-1 hover:text-white transition" data-testid="vehicle-coming-soon-back-home">
             <ArrowLeft className="h-3 w-3" />
             Back to BidVex · Retour à BidVex
-          </Link>
+          </LangLink>
         </div>
       </div>
 

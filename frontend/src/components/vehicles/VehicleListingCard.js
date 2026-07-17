@@ -89,8 +89,9 @@ const VehicleListingCard = ({ vehicle, countdown, onClick, onQuickView, compact 
         <button
           type="button"
           onClick={onClick}
-          className="relative block aspect-[4/3] w-full bg-slate-100 dark:bg-slate-800 overflow-hidden text-left"
+          className="grid-card-image w-full bg-slate-100 dark:bg-slate-800 text-left"
           aria-label={cardTitle}
+          data-testid={`vehicle-card-image-compact-${vehicle.id}`}
         >
           {mainImage && !imgError ? (
             <SafeImage

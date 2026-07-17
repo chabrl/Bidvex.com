@@ -1,6 +1,6 @@
 import API_BASE from '../config';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
@@ -60,6 +60,7 @@ import { useMarketplaceItems } from '../hooks/useMarketplaceItems';
 import { SellerRatingInline } from './SellerReputation';
 import { useInsightsTracker } from '../hooks/useInsightsTracker';
 import useMarketplaceSync from '../hooks/useMarketplaceSync';
+import { LangLink } from './LangLink';
 
 const API = API_BASE;
 
@@ -943,18 +944,18 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
       data-testid={item._is_promoted_inline ? 'marketplace-item-card-promoted' : 'marketplace-item-card'}
     >
       {/* Image Container — fixed 200px height per iter236 spec */}
-      <Link
+      <LangLink
         to={detailLink}
         onClick={() => trackClick(item.id)}
         className="block"
       >
-        <div className="relative h-[200px] bg-slate-100 dark:bg-slate-800 overflow-hidden">
+        <div className="grid-card-image bg-slate-100 dark:bg-slate-800" data-testid="marketplace-card-image">
           {item.images?.[0] ? (
             <SafeImage
               src={item.images[0]}
               alt={getLocalized(item, 'title')}
               width={400}
-              height={208}
+              height={300}
               loading="lazy"
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             />
@@ -1084,11 +1085,11 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
             )}
           </div>
         </div>
-      </Link>
+      </LangLink>
 
       <CardContent className="px-4 py-[14px] flex flex-col flex-1 gap-2" data-testid="item-card">
         {/* Title — 14px / 600 / 2-line clamp per iter236 spec */}
-        <Link
+        <LangLink
           to={detailLink}
           onClick={() => trackClick(item.id)}
           className="block"
@@ -1099,7 +1100,7 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
           >
             {getLocalized(item, 'title')}
           </h3>
-        </Link>
+        </LangLink>
 
         {/* Seller + location single line */}
         <div className="flex items-center text-[12px] text-slate-500 dark:text-slate-400 gap-2">
@@ -1218,13 +1219,13 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
         {item.auction_id && item.lot_number && (
           <div className="text-xs text-slate-500 dark:text-slate-400 pt-1 border-t border-slate-200 dark:border-slate-700">
             Lot #{item.lot_number} of{' '}
-            <Link
+            <LangLink
               to={`/lots/${item.auction_id}`}
               className="text-cyan-600 dark:text-cyan-400 hover:underline inline-flex items-center gap-1"
             >
               {getLocalized(item, 'parent_auction_title') || t('marketplace.viewAuction')}
               <ExternalLink className="h-3 w-3" />
-            </Link>
+            </LangLink>
           </div>
         )}
 
@@ -1243,7 +1244,7 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
             <Zap className="h-3.5 w-3.5 mr-1 flex-shrink-0" />
             <span className="truncate">{t('marketplace.quickBid')}</span>
           </Button>
-          <Link
+          <LangLink
             to={detailLink}
             aria-label={t('common.view')}
             title={t('common.view')}
@@ -1252,7 +1253,7 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
             data-testid="view-item-btn"
           >
             <Eye className="h-4 w-4" />
-          </Link>
+          </LangLink>
         </div>
       </CardContent>
     </Card>

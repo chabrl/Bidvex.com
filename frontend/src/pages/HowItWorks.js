@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import {
@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import axios from 'axios';
 import API_BASE from '../config';
+import { LangLink } from '../components/LangLink';
 
 /** Lightweight CTA analytics — fires async POST, never blocks navigation */
 const trackCTA = (action, section, label) => {
@@ -174,17 +175,17 @@ const HowItWorks = () => {
               : 'Buy, sell, and bid with confidence. Secure payments, verified sellers, and full regulatory compliance.'}
           </p>
           <div className="flex flex-wrap justify-center gap-3">
-            <Link to="/auth" onClick={() => trackCTA('hero_signup', 'hero', 'Create Free Account')}>
+            <LangLink to="/auth" onClick={() => trackCTA('hero_signup', 'hero', 'Create Free Account')}>
               <Button size="lg" className="bg-cyan-500 hover:bg-cyan-600 text-white font-semibold gap-2" data-testid="hero-signup-cta">
                 {fr ? 'Créer un compte gratuit' : 'Create Free Account'}
                 <ArrowRight className="h-4 w-4" />
               </Button>
-            </Link>
-            <Link to="/marketplace" onClick={() => trackCTA('hero_browse', 'hero', 'Browse Marketplace')}>
+            </LangLink>
+            <LangLink to="/marketplace" onClick={() => trackCTA('hero_browse', 'hero', 'Browse Marketplace')}>
               <Button size="lg" variant="outline" className="border-white/30 text-white hover:bg-white/10 gap-2" data-testid="hero-browse-cta">
                 {fr ? 'Parcourir le marché' : 'Browse Marketplace'}
               </Button>
-            </Link>
+            </LangLink>
           </div>
         </div>
       </section>
@@ -240,12 +241,12 @@ const HowItWorks = () => {
                 </div>
                 {section.cta && (
                   <div className="mt-6 pt-4 border-t">
-                    <Link to={section.cta.href} onClick={() => trackCTA('section_cta_click', section.id, section.cta.label)}>
+                    <LangLink to={section.cta.href} onClick={() => trackCTA('section_cta_click', section.id, section.cta.label)}>
                       <Button className={`bg-gradient-to-r ${section.color} text-white border-0 gap-2`} data-testid={`cta-${section.id}`}>
                         {section.cta.label}
                         <ArrowRight className="h-4 w-4" />
                       </Button>
-                    </Link>
+                    </LangLink>
                   </div>
                 )}
               </CardContent>
@@ -291,22 +292,22 @@ const HowItWorks = () => {
           <h2 className="text-2xl font-bold mb-3">{fr ? 'Prêt à commencer?' : 'Ready to Get Started?'}</h2>
           <p className="text-slate-300 mb-8">{fr ? 'Rejoignez des milliers d\'acheteurs et vendeurs au Canada.' : 'Join thousands of buyers and sellers across Canada.'}</p>
           <div className="flex flex-wrap justify-center gap-3">
-            <Link to="/create-listing" onClick={() => trackCTA('final_sell', 'final_cta', 'Start Selling')}>
+            <LangLink to="/create-listing" onClick={() => trackCTA('final_sell', 'final_cta', 'Start Selling')}>
               <Button size="lg" className="bg-cyan-500 hover:bg-cyan-600 text-white font-semibold gap-2" data-testid="final-cta-sell">
                 {fr ? 'Commencer à vendre' : 'Start Selling'}
                 <ArrowRight className="h-4 w-4" />
               </Button>
-            </Link>
-            <Link to="/marketplace" onClick={() => trackCTA('final_bid', 'final_cta', 'Start Bidding')}>
+            </LangLink>
+            <LangLink to="/marketplace" onClick={() => trackCTA('final_bid', 'final_cta', 'Start Bidding')}>
               <Button size="lg" className="bg-white text-slate-900 hover:bg-slate-100 font-semibold gap-2" data-testid="final-cta-bid">
                 {fr ? 'Commencer à enchérir' : 'Start Bidding'}
               </Button>
-            </Link>
-            <Link to="/become-a-partner" onClick={() => trackCTA('final_partner', 'final_cta', 'Apply as Partner')}>
+            </LangLink>
+            <LangLink to="/become-a-partner" onClick={() => trackCTA('final_partner', 'final_cta', 'Apply as Partner')}>
               <Button size="lg" variant="outline" className="border-white/30 text-white hover:bg-white/10 gap-2" data-testid="final-cta-partner">
                 {fr ? 'Devenir partenaire' : 'Apply as Partner'}
               </Button>
-            </Link>
+            </LangLink>
           </div>
         </div>
       </section>

@@ -1,10 +1,11 @@
 import React from 'react';
 import SafeImage from '../../components/SafeImage';
-import { Link } from 'react-router-dom';
+
 import { Badge } from '../../components/ui/badge';
 import { Gavel, MapPin, Layers, Clock } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import StorageCountdown from './StorageCountdown';
+import { LangLink } from '../../components/LangLink';
 
 const PROVINCE_FLAG = '🇨🇦';
 
@@ -37,16 +38,18 @@ const StorageAuctionCard = ({ auction }) => {
   const promotionTier = auction.promotion_tier; // 'basic' | 'featured' | 'premium' | null
 
   return (
-    <Link
+    <LangLink
       to={`/storage-auctions/${auction.id}`}
       className="group relative block bg-white dark:bg-slate-800 rounded-2xl overflow-hidden shadow-md border border-slate-100 dark:border-slate-700 transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 hover:border-blue-200 dark:hover:border-blue-700"
       data-testid={`storage-auction-card-${auction.id}`}
     >
-      <div className="relative h-44 overflow-hidden bg-slate-200 dark:bg-slate-700">
+      <div className="grid-card-image bg-slate-200 dark:bg-slate-700" data-testid="storage-card-image">
         {photo ? (
           <SafeImage
             src={photo}
             alt={`Unit ${auction.unit_number}`}
+            width="400"
+            height="300"
             loading="lazy"
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           />
@@ -161,7 +164,7 @@ const StorageAuctionCard = ({ auction }) => {
           Bid Now / Enchérir
         </div>
       </div>
-    </Link>
+    </LangLink>
   );
 };
 

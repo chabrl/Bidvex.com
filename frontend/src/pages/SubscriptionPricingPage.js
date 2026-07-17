@@ -4,7 +4,7 @@ import API_BASE from '../config';
  */
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { formatCurrency } from '../utils/currencyFormatter';
 import PromoBanner from '../components/PromoBanner';
+import { LangLink } from '../components/LangLink';
 
 const API = API_BASE;
 
@@ -355,9 +356,9 @@ const SubscriptionPricingPage = () => {
                     {subStatus.has_payment_method ? t('pricingPage.cardOnFile') : t('pricingPage.noCard')}
                   </p>
                 </div>
-                <Link to="/settings" className="text-xs text-primary hover:underline mt-1 inline-block" data-testid="manage-settings-link">
+                <LangLink to="/settings" className="text-xs text-primary hover:underline mt-1 inline-block" data-testid="manage-settings-link">
                   {t('pricingPage.manageSettings')}
-                </Link>
+                </LangLink>
               </div>
             </div>
           </div>

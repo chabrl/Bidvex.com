@@ -1,7 +1,7 @@
 import API_BASE from '../../config';
 import React, { useEffect, useState, useCallback } from 'react';
 import axios from 'axios';
-import { Link } from 'react-router-dom';
+
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { Card } from '../../components/ui/card';
@@ -16,6 +16,7 @@ import StorageFooterBanner from './StorageFooterBanner';
 import PromoteAuctionModal from './PromoteAuctionModal';
 import StorageVerificationBanner from './StorageVerificationBanner';
 import B2BCouponActivationCard from '../../components/B2BCouponActivationCard';
+import { LangLink } from '../../components/LangLink';
 
 const API = API_BASE;
 
@@ -67,9 +68,9 @@ const StorageDashboard = () => {
           <p className="text-sm text-muted-foreground mb-5">
             {t('storage.dashboard.registerYourStorageFacilityToStartListin')}
           </p>
-          <Link to="/storage-auctions/register-facility">
+          <LangLink to="/storage-auctions/register-facility">
             <Button className="bg-blue-600 hover:bg-blue-700 text-white">{t('storage.dashboard.registerNow')}</Button>
-          </Link>
+          </LangLink>
         </Card>
       </div>
     );
@@ -101,11 +102,11 @@ const StorageDashboard = () => {
             </h1>
             <p className="text-sm text-muted-foreground">{d.facility?.city}, {d.facility?.province}</p>
           </div>
-          <Link to="/storage-auctions/create">
+          <LangLink to="/storage-auctions/create">
             <Button className="bg-blue-600 hover:bg-blue-700 text-white" data-testid="create-auction-btn">
               <Plus className="h-4 w-4 mr-1" /> {t('storage.dashboard.createNewAuction')}
             </Button>
-          </Link>
+          </LangLink>
         </div>
 
         {/* iter254 Mission 1 — B2B Partner Program coupon activation card. */}

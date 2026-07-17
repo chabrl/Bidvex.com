@@ -71,7 +71,7 @@ export const SafeImage = ({ src, alt = '', onError, decoding, loading, fetchPrio
       // `eager`/`high` on hero LCP images).
       decoding={decoding || 'async'}
       loading={loading}
-      fetchpriority={fetchPriority || undefined}
+      fetchPriority={fetchPriority || undefined}
       onError={handleError}
       data-testid={rest['data-testid'] || 'safe-image'}
     />

@@ -13,7 +13,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
   Loader2, MapPin, DollarSign, Briefcase, FileUp, ArrowLeft, ArrowRight,
   CheckCircle2, AlertTriangle,
@@ -27,6 +27,7 @@ import { Textarea } from '../components/ui/textarea';
 import { Label } from '../components/ui/label';
 import { Badge } from '../components/ui/badge';
 import { COUNTRIES, CA_PROVINCES, US_STATES } from '../lib/countries';
+import { LangLink } from '../components/LangLink';
 
 const PROVINCES = CA_PROVINCES.map((p) => p.code);
 
@@ -223,12 +224,12 @@ export default function CareersJobDetailPage() {
           </CardContent>
         </Card>
         <div className="mt-4">
-          <Link to="/careers">
+          <LangLink to="/careers">
             <Button variant="outline" data-testid="back-to-careers-btn">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Careers / Retour aux carrières
             </Button>
-          </Link>
+          </LangLink>
         </div>
       </div>
     );
@@ -268,9 +269,9 @@ export default function CareersJobDetailPage() {
 
   return (
     <div className="container mx-auto max-w-4xl py-10 px-4" data-testid="job-detail-page">
-      <Link to="/careers" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-sky-600 mb-4">
+      <LangLink to="/careers" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-sky-600 mb-4">
         <ArrowLeft className="h-4 w-4" /> Back to Careers / Retour
-      </Link>
+      </LangLink>
 
       <header className="mb-8">
         <h1 className="text-3xl font-bold text-slate-900" data-testid="detail-title">{job.title}</h1>

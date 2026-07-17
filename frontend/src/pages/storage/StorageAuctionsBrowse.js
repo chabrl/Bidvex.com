@@ -9,12 +9,13 @@ import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from '../../components/ui/select';
 import { Loader2, Filter, MapPin, Layers, RefreshCw, ShieldCheck, Search, X } from 'lucide-react';
-import { Link } from 'react-router-dom';
+
 import StorageHero from './StorageHero';
 import StorageAuctionCard from './StorageAuctionCard';
 import StorageFooterBanner from './StorageFooterBanner';
 import SEO from '../../components/SEO';
 import { useAuth } from '../../contexts/AuthContext';
+import { LangLink } from '../../components/LangLink';
 
 const API = API_BASE;
 
@@ -177,7 +178,7 @@ const StorageAuctionsBrowse = () => {
         💰 <strong>{t('storage.browse.transparentFees')}</strong>{' '}
         {t('storage.browse.transparentFeesBody')}
         {' • '}
-        <Link to="/storage-auctions/how-it-works" className="underline hover:no-underline">{t('storage.browse.howItWorksLink')}</Link>
+        <LangLink to="/storage-auctions/how-it-works" className="underline hover:no-underline">{t('storage.browse.howItWorksLink')}</LangLink>
       </div>
 
       {/* iter283 — Cross-link to Marketplace per dual-visibility spec. */}
@@ -185,9 +186,9 @@ const StorageAuctionsBrowse = () => {
            data-testid="storage-marketplace-crosslink">
         🛒 {t('storage.browse.alsoInMarketplace',
             'All these listings are also available in the')}{' '}
-        <Link to="/marketplace" className="underline hover:no-underline font-medium text-slate-700 dark:text-slate-200">
+        <LangLink to="/marketplace" className="underline hover:no-underline font-medium text-slate-700 dark:text-slate-200">
           {t('storage.browse.marketplaceLink', 'Marketplace →')}
-        </Link>
+        </LangLink>
       </div>
 
       {/* iter219 — Buyer keyword search + visible-content tag pills.
@@ -375,7 +376,7 @@ const StorageAuctionsBrowse = () => {
               <ShieldCheck className="h-3.5 w-3.5 text-blue-600 shrink-0 mt-0.5" />
               <p>
                 {t('storage.browse.bidvexIsATechnologyPlatformTheStorageFac')}
-                {' '}<Link to="/storage-auctions/terms" className="underline">{t('storage.browse.terms')}</Link>
+                {' '}<LangLink to="/storage-auctions/terms" className="underline">{t('storage.browse.terms')}</LangLink>
               </p>
             </div>
           </Card>
@@ -409,21 +410,21 @@ const StorageAuctionsBrowse = () => {
               <div className="mt-5">
                 {isFacilityOrAdmin ? (
                   <div className="flex gap-2 justify-center flex-wrap" data-testid="storage-facility-portal-cta">
-                    <Link to="/facility/dashboard">
+                    <LangLink to="/facility/dashboard">
                       <Button data-testid="empty-state-facility-dashboard-btn">
                         📊 {isFr ? 'Tableau de bord' : 'Facility Dashboard'}
                       </Button>
-                    </Link>
-                    <Link to="/create-listing?type=storage_locker">
+                    </LangLink>
+                    <LangLink to="/create-listing?type=storage_locker">
                       <Button variant="outline" data-testid="empty-state-create-unit-btn">
                         ➕ {isFr ? 'Créer une enchère' : 'Create Unit Auction'}
                       </Button>
-                    </Link>
+                    </LangLink>
                   </div>
                 ) : (
-                  <Link to="/storage-auctions/register-facility">
+                  <LangLink to="/storage-auctions/register-facility">
                     <Button>{t('storage.browse.areYouAStorageFacility')}</Button>
-                  </Link>
+                  </LangLink>
                 )}
               </div>
             </Card>

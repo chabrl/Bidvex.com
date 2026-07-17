@@ -10,10 +10,11 @@
  */
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Link } from 'react-router-dom';
+
 import { useTranslation } from 'react-i18next';
 import { Sparkles, BadgePercent, Clock, Gift, ArrowRight, Rocket } from 'lucide-react';
 import API_BASE from '../config';
+import { LangLink } from './LangLink';
 
 const API = API_BASE;
 
@@ -146,7 +147,7 @@ export default function PromoBanner({ token = null }) {
               </p>
             </div>
           </div>
-          <Link
+          <LangLink
             to="/auth?redirect=/pricing"
             data-testid="promo-banner-signup-cta"
             className="inline-flex items-center gap-2 px-5 py-3 bg-cyan-400 text-slate-900 font-semibold rounded-xl hover:bg-cyan-300 transition-colors shadow-lg whitespace-nowrap"
@@ -154,7 +155,7 @@ export default function PromoBanner({ token = null }) {
             <Rocket className="w-4 h-4" />
             {fr ? "S'inscrire" : 'Sign up free'}
             <ArrowRight className="w-4 h-4" />
-          </Link>
+          </LangLink>
         </div>
       </div>
     );

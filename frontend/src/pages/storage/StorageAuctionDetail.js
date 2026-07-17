@@ -3,7 +3,7 @@ import ErrorBoundary from '../../components/ErrorBoundary';
 import React, { useEffect, useState, useCallback } from 'react';
 import SafeImage from '../../components/SafeImage';
 import axios from 'axios';
-import { useParams, Link } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { authHeaders } from '../../utils/authToken';
@@ -32,6 +32,7 @@ import SEO from '../../components/SEO';
 import WatchlistButton from '../../components/WatchlistButton';
 import { useMetaPixelTracking } from '../../hooks/useMetaPixelTracking';
 import { TrendingUp } from 'lucide-react';
+import { LangLink } from '../../components/LangLink';
 
 const API = API_BASE;
 
@@ -159,9 +160,9 @@ const StorageAuctionDetail = () => {
       />
       <ListingJsonLd listing={auction} canonicalUrl={`https://bidvex.com/storage-auctions/${auction.id}`} />
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <Link to="/storage-auctions/browse" className="text-sm text-blue-600 hover:underline">
+        <LangLink to="/storage-auctions/browse" className="text-sm text-blue-600 hover:underline">
           ← {t('storage.detail.backToAuctions')}
-        </Link>
+        </LangLink>
 
         {/* Facility-owner-only "Boost Your Auction" CTA */}
         {user && (auction.facility_owner_id === user.id || user.role === 'admin' || user.role === 'super_admin') && auction.status !== 'ended' && (
@@ -480,9 +481,9 @@ const StorageAuctionDetail = () => {
             </Card>
 
             <div className="text-[10px] text-center text-muted-foreground">
-              <Link to="/storage-auctions/terms" className="underline">{t('storage.detail.terms')}</Link>
+              <LangLink to="/storage-auctions/terms" className="underline">{t('storage.detail.terms')}</LangLink>
               {' • '}
-              <Link to="/storage-auctions/how-it-works" className="underline">{t('storage.detail.howItWorks')}</Link>
+              <LangLink to="/storage-auctions/how-it-works" className="underline">{t('storage.detail.howItWorks')}</LangLink>
             </div>
 
             {/* iter285 — Duplicate `<StorageBiddingPanel>` removed. The

@@ -1,6 +1,6 @@
 import API_BASE from '../config';
 import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+
 import axios from 'axios';
 import { Badge } from './ui/badge';
 import { Card, CardContent } from './ui/card';
@@ -23,6 +23,7 @@ import { formatCurrency } from '../utils/currencyFormatter';
 import CurrencyBadge from './CurrencyBadge';
 import { useMarketplaceItems } from '../hooks/useMarketplaceItems';
 import { useTranslation } from 'react-i18next';
+import { LangLink } from './LangLink';
 
 /**
  * Decomposed Marketplace - Item-Centric Discovery
@@ -224,7 +225,7 @@ const DecomposedMarketplace = () => {
               </div>
 
               {/* Image */}
-              <Link
+              <LangLink
                 to={`/multi-item-auction/${item.auction_id}`}
                 onClick={() => trackClick(item.id)}
               >
@@ -249,18 +250,18 @@ const DecomposedMarketplace = () => {
                     </Badge>
                   )}
                 </div>
-              </Link>
+              </LangLink>
 
               <CardContent className="p-4 space-y-3">
                 {/* Title */}
-                <Link
+                <LangLink
                   to={`/multi-item-auction/${item.auction_id}`}
                   onClick={() => trackClick(item.id)}
                 >
                   <h3 className="font-semibold text-lg line-clamp-2 hover:text-primary">
                     {item.title}
                   </h3>
-                </Link>
+                </LangLink>
 
                 {/* Location */}
                 {item.city && (
@@ -310,12 +311,12 @@ const DecomposedMarketplace = () => {
 
                 {/* Parent Lot Info */}
                 <div className="text-xs text-muted-foreground">
-                  Part of: <Link
+                  Part of: <LangLink
                     to={`/multi-item-auction/${item.auction_id}`}
                     className="text-primary hover:underline"
                   >
                     {item.parent_auction_title}
-                  </Link>
+                  </LangLink>
                   {' '}(Lot #{item.lot_number}/{item.total_lots_in_auction})
                 </div>
 
@@ -327,7 +328,7 @@ const DecomposedMarketplace = () => {
                     onPurchaseComplete={() => fetchItems()}
                   />
                   
-                  <Link to={`/multi-item-auction/${item.auction_id}`}>
+                  <LangLink to={`/multi-item-auction/${item.auction_id}`}>
                     <Button
                       variant="outline"
                       className="w-full"
@@ -336,7 +337,7 @@ const DecomposedMarketplace = () => {
                       <Gavel className="h-4 w-4 mr-2" />
                       {t('decomposed.viewAndBid')}
                     </Button>
-                  </Link>
+                  </LangLink>
                 </div>
               </CardContent>
             </Card>

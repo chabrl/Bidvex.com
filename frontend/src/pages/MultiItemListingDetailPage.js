@@ -1,7 +1,7 @@
 import API_BASE from '../config';
 import React, { useState, useEffect, useRef } from 'react';
 import SafeImage from '../components/SafeImage';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
@@ -48,6 +48,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '../c
 import { extractErrorMessage } from '../utils/errorHandler';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { getLocalized, getBuyerPremiumText } from '../utils/localization';
+import { LangLink } from '../components/LangLink';
 
 const API = API_BASE;
 
@@ -568,13 +569,13 @@ const MultiItemListingDetailPage = () => {
                         </div>
 
                         {/* View all reviews link */}
-                        <Link
+                        <LangLink
                           to={`/store/${listing.seller_id}`}
                           className="block text-center text-sm font-medium text-cyan-600 dark:text-cyan-400 hover:underline mt-3"
                           data-testid="view-all-reviews-link"
                         >
                           {t('listingDetail.viewAllReviews', 'View all reviews')} &rarr;
-                        </Link>
+                        </LangLink>
 
                         {/* iter189 Feature 2 — Lots Promote Button (owner-only, unpromoted only) */}
                         {user && user.id === listing.seller_id && !listing.is_promoted && (

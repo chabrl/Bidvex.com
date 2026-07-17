@@ -1,7 +1,7 @@
 import API_BASE from '../config';
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { extractErrorMessage } from '../utils/errorHandler';
 import { Button } from '../components/ui/button';
@@ -13,6 +13,7 @@ import { Loader2, Lock, Eye, EyeOff, AlertTriangle, CheckCircle, Square, CheckSq
 import axios from 'axios';
 // iter272 — Read + consume the captured campaign attribution at signup.
 import { consumeCampaignTracking } from '../lib/campaignTracking';
+import { LangLink } from '../components/LangLink';
 
 const API = API_BASE;
 
@@ -454,13 +455,13 @@ const AuthPage = () => {
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">{t('auth.password')}</Label>
                 {isLogin && (
-                  <Link 
+                  <LangLink 
                     to="/forgot-password" 
                     className="text-sm text-primary hover:underline"
                     data-testid="forgot-password-link"
                   >
                     {t('auth.forgotPassword') || 'Forgot password?'}
-                  </Link>
+                  </LangLink>
                 )}
               </div>
               <Input

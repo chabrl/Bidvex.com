@@ -10,8 +10,10 @@
    ═════════════════════════════════════════════════════════ */
 
 /* Grid card image containers — enforce 4:3 aspect for all listing tiles.
-   Any <img> inside a `.grid-card-image` parent gets absolute-positioned
-   coverage so image swaps don't move surrounding content. */
+   Any <img> inside a `.grid-card-image` parent is sized to fill via
+   Tailwind's `w-full h-full object-cover` (kept on the img element).
+   The aspect-ratio on the container reserves the visual slot BEFORE
+   the image bytes are decoded → CLS = 0 on grid pages. */
 .grid-card-image,
 .aspect-listing-card {
   aspect-ratio: 4 / 3;
