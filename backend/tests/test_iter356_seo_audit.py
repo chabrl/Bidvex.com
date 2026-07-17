@@ -414,11 +414,13 @@ def test_p1_regional_landing_fr_twin_has_reverse_hreflang():
 
 
 def test_p1_all_10_regional_pages_are_prerender_eligible():
-    """P1-H3 — /car-auctions-canada + 9 provincial variants + 2 FR twins = 12."""
+    """P1-H3 — /car-auctions-canada + 9 provincial variants + 2 FR twins = 12
+    (iter357 added 24 QC city pages on top → total >= 12)."""
     from services.prerender_service import _REGIONAL_LANDINGS, _resolve_regional_landing
-    # Confirm we have 12 (10 EN + 2 FR)
-    assert len(_REGIONAL_LANDINGS) == 12, (
-        f"expected 12 regional pages (10 EN + 2 FR), got {len(_REGIONAL_LANDINGS)}"
+    # iter356 introduced 12 pages; iter357 grew to 36 (12 provincial + 24 city).
+    # The assertion is that we have AT LEAST the 12 iter356 pages present.
+    assert len(_REGIONAL_LANDINGS) >= 12, (
+        f"expected at least 12 regional pages, got {len(_REGIONAL_LANDINGS)}"
     )
     for path in _REGIONAL_LANDINGS:
         ctx = _resolve_regional_landing(path, "en")

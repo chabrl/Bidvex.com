@@ -4,6 +4,71 @@
   <h1 style="color:#0B2545;font-size:36px;line-height:1.2;margin-bottom:12px;">{{ hero_headline }}</h1>
   <p style="color:#334155;font-size:18px;line-height:1.6;margin-bottom:24px;">{{ hero_subtitle }}</p>
 
+  {# ─── iter357 · Social proof widget (SSR-rendered, bilingual) ────── #}
+  {% if social_proof %}
+  <section class="social-proof-bar" style="background:#0B2545;color:#fff;padding:14px 20px;border-radius:8px;margin-bottom:24px;display:flex;flex-wrap:wrap;gap:20px;justify-content:space-around;font-size:14px;">
+    <div><strong style="font-size:20px;color:#06B6D4;">{{ social_proof.dealers }}</strong>
+      <div style="opacity:0.85;">{% if lang == 'fr' %}Concessionnaires vérifiés{% else %}Verified dealers{% endif %}</div></div>
+    <div><strong style="font-size:20px;color:#06B6D4;">{{ social_proof.auctions_completed }}</strong>
+      <div style="opacity:0.85;">{% if lang == 'fr' %}Enchères réalisées{% else %}Auctions completed{% endif %}</div></div>
+    <div><strong style="font-size:20px;color:#06B6D4;">{{ social_proof.provinces }}</strong>
+      <div style="opacity:0.85;">{% if lang == 'fr' %}Provinces desservies{% else %}Provinces covered{% endif %}</div></div>
+    <div><strong style="font-size:20px;color:#06B6D4;">★</strong>
+      <div style="opacity:0.85;">{% if lang == 'fr' %}Bilingue FR/EN{% else %}Bilingual EN/FR{% endif %}</div></div>
+  </section>
+  {% endif %}
+
+  {# ─── City-specific body copy (unique 130-180 words per QC city) ── #}
+  {% if body_copy %}
+  <section style="margin-bottom:24px;">
+    <p style="color:#334155;font-size:15px;line-height:1.7;">{{ body_copy }}</p>
+  </section>
+  {% endif %}
+
+  {# ─── iter357 · Regional Adwords copy block on QC province pages ── #}
+  {% if is_qc_province and lang == 'fr' %}
+  <section class="regional-coverage-qc" style="background:#F1F5F9;border:1px solid #cbd5e1;border-radius:8px;padding:20px 24px;margin-bottom:24px;">
+    <h2 style="color:#0B2545;font-size:24px;margin-bottom:8px;">Enchères en ligne partout au Québec</h2>
+    <p style="color:#475569;font-size:15px;line-height:1.6;margin-bottom:16px;">
+      BidVex dessert l'ensemble des régions du Québec avec des enchères en ligne
+      sécurisées, bilingues et conformes aux lois provinciales.
+    </p>
+    <div class="city-grid" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px;">
+      {% for c in city_grid %}
+      <a href="{{ canonical_host }}{{ c.href }}"
+         style="display:inline-block;background:#fff;border:1px solid #cbd5e1;color:#0B2545;padding:8px 14px;border-radius:20px;text-decoration:none;font-size:14px;font-weight:500;">
+        {{ c.label }}
+      </a>
+      {% endfor %}
+    </div>
+    <h3 style="color:#0B2545;font-size:18px;margin-bottom:8px;">Pourquoi choisir BidVex pour vos enchères au Québec ?</h3>
+    <ul style="color:#334155;font-size:14px;line-height:1.75;padding-left:22px;">
+      <li>Plateforme d'enchères bilingue (français et anglais) — conforme à la Loi 96</li>
+      <li>Concessionnaires vérifiés par la SAAQ et les organismes provinciaux</li>
+      <li>Processus 100 % en ligne — aucun déplacement requis</li>
+      <li>Frais de plateforme parmi les plus bas au Canada — seulement 2,5 %</li>
+      <li>Protection acheteur : fermeture progressive (anti-snipe) et dépôts sécurisés</li>
+      <li>Inscrivez votre premier véhicule gratuitement avec le code <strong>SUMMER2026</strong></li>
+    </ul>
+  </section>
+  {% elif is_qc_province and lang == 'en' %}
+  <section class="regional-coverage-qc" style="background:#F1F5F9;border:1px solid #cbd5e1;border-radius:8px;padding:20px 24px;margin-bottom:24px;">
+    <h2 style="color:#0B2545;font-size:24px;margin-bottom:8px;">Online Auctions Across Quebec</h2>
+    <p style="color:#475569;font-size:15px;line-height:1.6;margin-bottom:16px;">
+      BidVex serves every region of Quebec with secure, bilingual online auctions
+      compliant with provincial law.
+    </p>
+    <div class="city-grid" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px;">
+      {% for c in city_grid %}
+      <a href="{{ canonical_host }}{{ c.href }}"
+         style="display:inline-block;background:#fff;border:1px solid #cbd5e1;color:#0B2545;padding:8px 14px;border-radius:20px;text-decoration:none;font-size:14px;font-weight:500;">
+        {{ c.label }}
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
   <section style="background:#F8FAFC;border:1px solid #e2e8f0;border-radius:8px;padding:20px 24px;margin-bottom:24px;">
     <h2 style="color:#0B2545;font-size:22px;margin-bottom:12px;">
       {% if lang == 'fr' %}Pourquoi enchérir sur BidVex ?{% else %}Why bid on BidVex?{% endif %}
@@ -51,5 +116,12 @@
       {% endif %}
     </ol>
   </section>
+
+  {# ─── iter357 · NAP footer (identical text on every page — GMB verification) ── #}
+  <footer style="margin-top:32px;padding-top:20px;border-top:1px solid #e2e8f0;font-size:13px;color:#64748b;">
+    <strong>BidVex Inc.</strong> · 701 Rue Chalifoux, Sherbrooke, Québec, J1G 0A8, Canada
+    · <a href="tel:+14506343099" style="color:#1E3A8A;">+1 (450) 634-3099</a>
+    · <a href="mailto:support@bidvex.com" style="color:#1E3A8A;">support@bidvex.com</a>
+  </footer>
 </article>
 {% endblock %}

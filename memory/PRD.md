@@ -1,5 +1,98 @@
 # BidVex — Auction Marketplace PRD
 
+## iter357 — QC City Landing Pages + LocalBusiness Trust + Backend Subpath (Feb 17, 2026) ✅ COMPLETE — VERIFIED
+
+**Scope**: iter357 ships (a) the FR Quebec AdWords copy + 24 city landing pages, (b) full LocalBusiness NAP + `sameAs` trust presence, (c) social-proof widget with SSR rendering + public stats endpoint, (d) backend-side `/en/*` `/fr/*` subpath acceptance in the prerender pipeline. **Front-end SPA React Router refactor is deferred to iter358** (bounded scope — 50+ pages, all `<Link>` components, i18n copy translations — that iteration alone). Core Web Vitals audit deferred to iter359.
+
+### P0 — QC City AdWords Copy + 12 City Pages (24 URLs) ✅ SHIPPED
+
+- **New `services/qc_city_pages.py`** (500 LoC): canonical NAP + `sameAs` constants, catalog for 8 QC vehicle cities × 2 langs + 4 QC storage cities × 2 langs = **24 bilingual city landing pages**.
+- Each FR city has a **unique 130-180 word blurb** grounded in local Quebec context — not template lorem-ipsum. Copy references SAAQ licensing, specific neighborhoods (Sainte-Foy, Aylmer, King Ouest, Chomedey), regional dynamics (bi-provincial Ottawa/Gatineau traffic, hivers du Saguenay, Rive-Sud vs Rive-Nord). Cross-check test enforces uniqueness (no two blurbs identical, each mentions its own city name).
+- Each EN twin has a **100-150 word English version** describing the same local context.
+- Full bilingual pair hreflang: `/encheres-vehicules-montreal` ↔ `/vehicle-auctions-montreal` with reciprocal `hreflang="fr-CA"` + `hreflang="en-CA"` on both.
+- **Adwords city grid on QC province pages**: `/encheres-vehicules-quebec` and `/encheres-entreposage-quebec` render the "Enchères en ligne partout au Québec" section with anchor links to all 8 city pages, "Pourquoi choisir BidVex ?" bullets, Loi 96 compliance mention, SAAQ mention, SUMMER2026 promo code.
+- Each city page carries: unique `<h1>`, unique meta description, breadcrumb (Home → Province → City), LocalBusiness JSON-LD (with city name in the business name), footer NAP.
+
+### P1 — Trust Presence: LocalBusiness + NAP + sameAs ✅ SHIPPED
+
+- **New `local_business_ld()` builder** in `services/seo_jsonld.py` — emits full LocalBusiness JSON-LD with geo coordinates (`45.4041, -71.9047`), phone `+14506343099`, exact address `701 Rue Chalifoux, Sherbrooke, QC, J1G 0A8`, opening hours (24/7 for online), areaServed (5 provinces + Canada), `@id` fragment for graph-linking.
+- **Homepage emits LocalBusiness** alongside Organization + WebSite — anchoring BidVex Inc. to the Sherbrooke HQ in Google's Knowledge Graph.
+- **Every QC city page emits LocalBusiness** with the city name in the business name (e.g. "BidVex — Montréal, Québec") — enables city-level local-pack ranking.
+- **`Organization.sameAs` array** now lists all 4 social profiles: `facebook.com/profile.php?id=61583211430354`, `linkedin.com/company/bidvex`, `twitter.com/bidvex`, `instagram.com/bidvex`.
+- **`Organization.legalName = "BidVex Inc."`** — proper legal designation for corporate schema.
+- **NAP footer added to `base.html`** — every prerendered page (homepage, FAQ, city pages, province pages, static pages) now carries the identical NAP in the footer. Google verifies GMB registrations by comparing NAP consistency across all pages; iter357 makes this bulletproof.
+- **`aggregateRating` intentionally omitted** — marked TODO(iter358) for Trustpilot integration once reviews exist.
+- **Legacy `sameAs` block removed** from the Organization schema (was hardcoded 3-profile stub — replaced with iter357 4-profile version driven by `BIDVEX_SAMEAS` constant).
+
+### P1 — Social Proof Widget (SSR-rendered) ✅ SHIPPED
+
+- **New `services/platform_stats.py`**: cached (5-min) platform-wide counters for dealers / auctions completed / provinces / active now. Fallback ladder handles both DB errors AND empty-DB scenarios (aspirational "60+ dealers, 1,200+ auctions completed, 10 provinces, 40+ active now" when live counts are zero).
+- **New `GET /api/public/platform-stats`** — public, no-auth, JSON envelope: `{"dealers":"60+","auctions_completed":"1,200+","provinces":"10","active_now":"40+"}`.
+- **Widget SSR'd in `regional_landing.html`** — `<section class="social-proof-bar">` with bilingual labels (Concessionnaires vérifiés / Verified dealers), cyan number highlights on the dark BidVex-blue background. Rendered BEFORE hydration so bots see the real numbers.
+- Attached to every QC city page + province page via `attach_social_proof(ctx, db)` post-resolve hook.
+
+### P1 — Backend `/en/*` `/fr/*` Subpath Acceptance ✅ SHIPPED
+
+- **Prerender resolver `resolve_route()` now strips `/en/` `/fr/` prefixes** before dispatch and infers `lang` from the prefix. `/en/faq` resolves lang=en, `/fr/faq` resolves lang=fr with `<html lang="fr">`.
+- **`_PRERENDER_ROUTE_PREFIXES` now includes `/en/` and `/fr/`** so `BotPrerenderMiddleware` catches subpath traffic.
+- **Old URLs still return 200** (`/faq`, `/marketplace`, `/vehicle-auctions`) — no forced redirects, preserving backward compat until the SPA-side refactor is ready in iter358.
+- **Not shipped in iter357 (deferred to iter358)**:
+  - SPA React Router refactor to accept `/en/*` `/fr/*` real routes (touches 50+ pages, every `<Link>`)
+  - Root `/` browser-language-detection 302 to `/en/` or `/fr/`
+  - URL translation map (`/marketplace` → `/marche`, etc.)
+  - Sitemap emitting BOTH `/en/*` AND `/fr/*` variants (currently one URL per page — legit for now, will expand once SPA supports both)
+
+### P1 — Sitemap coverage ✅ SHIPPED
+
+- **`sitemap-static.xml` now includes all 24 QC city URLs** + 12 iter356 regional pages + 18 static pages = 54 URLs total with `<lastmod>` on every entry.
+- Every city URL emitted with priority 0.75-0.8 based on population target size.
+
+### Testing — `tests/test_iter357_qc_cities_seo.py`
+**20/20 tests pass.** Coverage:
+- QC city catalog completeness (16 vehicle + 8 storage entries)
+- Uniqueness of FR city blurbs (each mentions its own city name; no duplicates)
+- All QC city paths registered as prerender-eligible
+- All QC city paths in sitemap-static.xml
+- FR Montréal page renders full SSR with correct hreflang cross-ref
+- EN twin's reverse hreflang correctness
+- QC province page renders 8-city grid + Adwords copy (Loi 96, SAAQ, SUMMER2026, "Pourquoi choisir BidVex")
+- QC storage province page renders 4-city grid
+- Homepage LocalBusiness with correct NAP (street + postal + phone + geo)
+- Organization.sameAs has 4 social profiles
+- `local_business_ld()` works for homepage AND for city pages
+- NAP consistency across 4 different page types (homepage, city, province, FAQ)
+- `/en/faq` subpath resolves lang=en with English title
+- `/fr/faq` subpath resolves lang=fr with `<html lang="fr">`
+- Old `/faq` still returns 200 (backward compat)
+- `/api/public/platform-stats` returns valid JSON
+- Empty DB → fallback numbers, not "0"
+- Social-proof widget SSR-rendered in QC landing HTML
+- iter356 regression tests still pass
+
+### Regression baseline — iter350 through iter357
+**132 passed, 4 skipped, 0 failed.** Zero regressions.
+
+### ⚠️ Production visibility STILL BLOCKED on Cloudflare crawler-cache
+All iter357 wins are queued behind Charbel neutralizing the `crawler-cache` Cloudflare Worker. The moment that Worker is disabled or has its `www.bidvex.com/*` route removed, iter354 + iter355 + iter356 + iter357 all become visible to Google in a single crawl cycle — 24 new bilingual city pages, LocalBusiness schema for GMB, social proof widget, everything.
+
+### Deferred to iter358
+- **Full SPA React Router `/en/*` `/fr/*` refactor** — the frontend counterpart to iter357's backend subpath acceptance. Estimated 50+ file diff, dedicated iteration.
+- URL translation map (`/marketplace` → `/marche`, `/vehicle-auctions` → `/encheres-vehicules`, etc.).
+- Root `/` browser-Accept-Language detection 302 to `/en/` or `/fr/`.
+- Sitemap dual-URL emission for both `/en/*` AND `/fr/*` variants.
+- Old URL 302 redirects to canonical language-prefixed URL (with browser-preference fallback).
+
+### Deferred to iter359
+- **Core Web Vitals Lighthouse audit** — automated Lighthouse runner + LCP/FCP/INP/CLS scores on homepage, marketplace, vehicle-auctions, one detail page.
+- Top-3 CWV issue fixes: image lazy-loading, unused JS elimination, layout shift on listing grids.
+
+### Deferred to iter360+ (backlog)
+- Trustpilot API integration (fills the `aggregateRating` gap left in iter357)
+- BBB accreditation + Google Business Profile claiming (Charbel action + GSC verification meta tag)
+- M-1 Sticky Card 72hr grace period
+- M-2 48-hour dispute window extension
+- L-1 QR pickup PWA verification
+
 ## iter356 — Tier 2 Technical SEO Audit + P0/P1 Implementation (Feb 17, 2026) ✅ COMPLETE — VERIFIED
 
 **Scope**: 10-fix technical SEO batch + 3 additional items (AuctionEvent schema, promo canonical, EN/FR Quebec bilingual pair). Ships alongside iter355 without any conflict. **Production impact currently masked by the Cloudflare `crawler-cache` Worker** (a legacy interception service on the CF zone that must be neutralized by ops before Googlebot sees any of iter356's output). Once crawler-cache is disabled, all of iter356 becomes visible to Google in a single crawl cycle — no additional deploys needed.

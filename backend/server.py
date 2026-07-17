@@ -1297,6 +1297,8 @@ try:
         ("routes.prerender", "router", None, False),
         # iter355 — H-1 Bidder Identity (Stripe Identity KYC soft-gate)
         ("routes.identity", "identity_router", "set_identity_db", False),
+        # iter357 — Public platform stats (no auth) — social proof widget
+        ("routes.public_stats", "public_stats_router", None, False),
         ("routes.ai_chat", "ai_chat_router", "set_ai_chat_db", False),
         # iter234 — Direct google-genai (Gemini 2.5 Flash) streaming chat + watchdog
         ("routes.genai_chat", "genai_chat_router", "set_genai_chat_db", False),

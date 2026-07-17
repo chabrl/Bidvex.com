@@ -55,6 +55,7 @@ def is_crawler_ua(user_agent: Optional[str]) -> bool:
 # ─── Public routes eligible for SSR prerender ──────────────────────────
 _PRERENDER_ROUTE_PREFIXES = (
     "/",
+    "/en/", "/fr/",         # iter357 — bilingual subpaths (backend only for now)
     "/marketplace",
     "/lots-marketplace",
     "/vehicle-auctions",
@@ -83,9 +84,33 @@ _PRERENDER_ROUTE_PREFIXES = (
     "/storage-auctions-ontario",
     "/storage-auctions-british-columbia",
     "/equipment-auctions-canada",
-    # French Quebec twins
     "/encheres-vehicules-quebec",
     "/encheres-entreposage-quebec",
+    # iter357 — 24 QC city landing pages (12 cities × 2 languages)
+    "/vehicle-auctions-montreal",
+    "/vehicle-auctions-quebec-city",
+    "/vehicle-auctions-sherbrooke",
+    "/vehicle-auctions-laval",
+    "/vehicle-auctions-gatineau",
+    "/vehicle-auctions-saguenay",
+    "/vehicle-auctions-trois-rivieres",
+    "/vehicle-auctions-longueuil",
+    "/encheres-vehicules-montreal",
+    "/encheres-vehicules-quebec-ville",
+    "/encheres-vehicules-sherbrooke",
+    "/encheres-vehicules-laval",
+    "/encheres-vehicules-gatineau",
+    "/encheres-vehicules-saguenay",
+    "/encheres-vehicules-trois-rivieres",
+    "/encheres-vehicules-longueuil",
+    "/storage-auctions-montreal",
+    "/storage-auctions-quebec-city",
+    "/storage-auctions-sherbrooke",
+    "/storage-auctions-laval",
+    "/encheres-entreposage-montreal",
+    "/encheres-entreposage-quebec-ville",
+    "/encheres-entreposage-sherbrooke",
+    "/encheres-entreposage-laval",
 )
 
 

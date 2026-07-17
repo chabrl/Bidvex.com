@@ -23,11 +23,32 @@ CANONICAL_HOST = "https://www.bidvex.com"
 
 
 def organization_ld() -> Dict[str, Any]:
-    """Emit BidVex Organization schema — homepage + any generic prerender page."""
+    """Emit BidVex Organization schema — homepage + any generic prerender page.
+
+    iter357 additions:
+      • `sameAs` array with all 4 social profiles (per iter357 spec)
+      • Full LocalBusiness NAP (matches BIDVEX_NAP constant, single source of truth)
+      • `aggregateRating` intentionally OMITTED for now — TODO(iter358):
+        populate from Trustpilot API integration once BidVex has reviews.
+    """
+    # Late import to avoid a circular dep between services.
+    try:
+        from services.qc_city_pages import BIDVEX_SAMEAS, BIDVEX_NAP
+        sameas = list(BIDVEX_SAMEAS)
+        street  = BIDVEX_NAP["street"]
+        postal  = BIDVEX_NAP["postal"]
+        phone_e164 = BIDVEX_NAP["phone"]
+    except ImportError:
+        sameas = []
+        street = "701 Rue Chalifoux"
+        postal = "J1G 0A8"
+        phone_e164 = "+14506343099"
+
     return {
         "@context": "https://schema.org",
         "@type": "Organization",
         "name": "BidVex",
+        "legalName": "BidVex Inc.",
         "alternateName": ["BidVex Canada", "BidVex Auctions"],
         "url": CANONICAL_HOST,
         "logo": f"{CANONICAL_HOST}/bidvex-icon.png",
@@ -36,34 +57,35 @@ def organization_ld() -> Dict[str, Any]:
             "Vehicles, storage lockers, industrial equipment, and lots. "
             "Sherbrooke, Quebec."
         ),
+        "sameAs": sameas,
+        # aggregateRating: TODO(iter358) — populate from Trustpilot integration.
         "foundingLocation": {
             "@type": "Place",
             "address": {
                 "@type": "PostalAddress",
+                "streetAddress":   street,
                 "addressLocality": "Sherbrooke",
-                "addressRegion": "QC",
-                "addressCountry": "CA",
+                "addressRegion":   "QC",
+                "postalCode":      postal,
+                "addressCountry":  "CA",
             },
         },
         "address": {
-            "@type": "PostalAddress",
+            "@type":           "PostalAddress",
+            "streetAddress":   street,
             "addressLocality": "Sherbrooke",
-            "addressRegion": "QC",
-            "addressCountry": "CA",
+            "addressRegion":   "QC",
+            "postalCode":      postal,
+            "addressCountry":  "CA",
         },
         "contactPoint": [
             {
                 "@type": "ContactPoint",
-                "telephone": "+1-450-634-3099",
+                "telephone": phone_e164,
                 "contactType": "Customer Service",
                 "areaServed": "CA",
                 "availableLanguage": ["English", "French"],
             }
-        ],
-        "sameAs": [
-            "https://www.facebook.com/bidvex",
-            "https://www.linkedin.com/company/bidvex",
-            "https://x.com/bidvex",
         ],
     }
 
@@ -316,6 +338,7 @@ def website_ld() -> Dict[str, Any]:
 __all__ = [
     "CANONICAL_HOST",
     "organization_ld",
+    "local_business_ld",
     "website_ld",
     "product_offer_ld",
     "event_ld",
@@ -324,3 +347,75 @@ __all__ = [
     "breadcrumb_ld",
     "faqpage_ld",
 ]
+
+
+def local_business_ld(
+    *,
+    city_name: Optional[str] = None,
+    lang: str = "en",
+) -> Dict[str, Any]:
+    """iter357 — LocalBusiness schema for GMB verification + local-pack ranking.
+
+    Emitted on the homepage AND on every QC city landing page (with
+    `city_name` set). All fields draw from `BIDVEX_NAP` — the single
+    source of truth for the NAP (Name, Address, Phone) consistency
+    that Google requires for local-business ranking.
+    """
+    try:
+        from services.qc_city_pages import BIDVEX_NAP, BIDVEX_SAMEAS
+    except ImportError:
+        return {}
+
+    business_name = (
+        f"BidVex — {city_name}, Québec" if (city_name and lang == "fr")
+        else f"BidVex — {city_name}, Quebec" if city_name
+        else "BidVex Inc."
+    )
+    return {
+        "@context": "https://schema.org",
+        "@type":    "LocalBusiness",
+        "@id":      f"{CANONICAL_HOST}/#localbusiness",
+        "name":     business_name,
+        "legalName": BIDVEX_NAP["name"],
+        "url":      CANONICAL_HOST,
+        "image":    f"{CANONICAL_HOST}/bidvex-icon.png",
+        "logo":     f"{CANONICAL_HOST}/bidvex-icon.png",
+        "description": (
+            "BidVex Inc. — Canada's bilingual online auction marketplace, "
+            "headquartered in Sherbrooke, Québec. Vehicles, marketplace listings, "
+            "multi-item lots, and storage auctions across Canada."
+        ),
+        "telephone":  BIDVEX_NAP["phone"],
+        "email":      BIDVEX_NAP["email"],
+        "priceRange": "$$",
+        "address": {
+            "@type":           "PostalAddress",
+            "streetAddress":   BIDVEX_NAP["street"],
+            "addressLocality": BIDVEX_NAP["city"],
+            "addressRegion":   BIDVEX_NAP["region"],
+            "postalCode":      BIDVEX_NAP["postal"],
+            "addressCountry":  BIDVEX_NAP["country"],
+        },
+        "geo": {
+            "@type":    "GeoCoordinates",
+            "latitude":  BIDVEX_NAP["lat"],
+            "longitude": BIDVEX_NAP["lng"],
+        },
+        "areaServed": [
+            {"@type": "State",   "name": "Québec"},
+            {"@type": "State",   "name": "Ontario"},
+            {"@type": "State",   "name": "British Columbia"},
+            {"@type": "State",   "name": "Alberta"},
+            {"@type": "Country", "name": "Canada"},
+        ],
+        "openingHoursSpecification": [{
+            "@type": "OpeningHoursSpecification",
+            "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday",
+                          "Friday", "Saturday", "Sunday"],
+            "opens":  "00:00",
+            "closes": "23:59",
+            "description": "Online auctions available 24/7",
+        }],
+        "sameAs":     list(BIDVEX_SAMEAS),
+        # aggregateRating: TODO(iter358) — Trustpilot integration.
+    }

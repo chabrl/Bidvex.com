@@ -82,6 +82,31 @@ STATIC_PAGES: List[tuple] = [
     # French Quebec twins
     ("/encheres-vehicules-quebec", "weekly", 0.85),
     ("/encheres-entreposage-quebec", "weekly", 0.85),
+    # iter357 — 24 QC city landing pages (12 cities × 2 languages)
+    ("/vehicle-auctions-montreal", "weekly", 0.8),
+    ("/vehicle-auctions-quebec-city", "weekly", 0.8),
+    ("/vehicle-auctions-sherbrooke", "weekly", 0.8),
+    ("/vehicle-auctions-laval", "weekly", 0.8),
+    ("/vehicle-auctions-gatineau", "weekly", 0.8),
+    ("/vehicle-auctions-saguenay", "weekly", 0.75),
+    ("/vehicle-auctions-trois-rivieres", "weekly", 0.75),
+    ("/vehicle-auctions-longueuil", "weekly", 0.8),
+    ("/encheres-vehicules-montreal", "weekly", 0.8),
+    ("/encheres-vehicules-quebec-ville", "weekly", 0.8),
+    ("/encheres-vehicules-sherbrooke", "weekly", 0.8),
+    ("/encheres-vehicules-laval", "weekly", 0.8),
+    ("/encheres-vehicules-gatineau", "weekly", 0.8),
+    ("/encheres-vehicules-saguenay", "weekly", 0.75),
+    ("/encheres-vehicules-trois-rivieres", "weekly", 0.75),
+    ("/encheres-vehicules-longueuil", "weekly", 0.8),
+    ("/storage-auctions-montreal", "weekly", 0.8),
+    ("/storage-auctions-quebec-city", "weekly", 0.8),
+    ("/storage-auctions-sherbrooke", "weekly", 0.8),
+    ("/storage-auctions-laval", "weekly", 0.8),
+    ("/encheres-entreposage-montreal", "weekly", 0.8),
+    ("/encheres-entreposage-quebec-ville", "weekly", 0.8),
+    ("/encheres-entreposage-sherbrooke", "weekly", 0.8),
+    ("/encheres-entreposage-laval", "weekly", 0.8),
 ]
 
 

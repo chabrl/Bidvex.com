@@ -17,7 +17,7 @@ import json
 import logging
 import os
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
@@ -26,11 +26,18 @@ from services.seo_jsonld import (
     breadcrumb_ld,
     event_ld,
     faqpage_ld,
+    local_business_ld,
     organization_ld,
     product_offer_ld,
     vehicle_ld,
     website_ld,
 )
+from services.qc_city_pages import (
+    build_qc_vehicle_city_entries,
+    build_qc_storage_city_entries,
+    qc_province_city_grid_for,
+)
+from services.platform_stats import get_platform_stats
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +106,10 @@ async def _resolve_homepage(db, lang: str) -> Dict[str, Any]:
         "jsonld_blocks": [
             _jsonld_script(organization_ld()),
             _jsonld_script(website_ld()),
+            # iter357 — LocalBusiness on the homepage so Google links
+            # BidVex Inc. to the physical Sherbrooke address in the
+            # local-pack + Knowledge Graph.
+            _jsonld_script(local_business_ld(lang=lang)),
         ],
         "lang": lang,
         "hero_headline": title,
@@ -364,12 +375,31 @@ async def _resolve_auction(db, listing_id: str, path: str, lang: str, kind: str)
 
 
 async def resolve_route(db, path: str, lang: str = "en") -> Dict[str, Any]:
-    """Central dispatch — returns a template-ready context dict."""
+    """Central dispatch — returns a template-ready context dict.
+
+    iter357 subpath handling:
+      • `/en/<path>` and `/fr/<path>` are stripped to `/<path>` before dispatch
+      • `lang` is inferred from the prefix (overrides caller-provided lang)
+      • The stripped result is what we resolve — old URLs and new URLs
+        share the same content pipeline
+    """
     if not path.startswith("/"):
         path = "/" + path
     # Normalize trailing slashes except for root
     if len(path) > 1 and path.endswith("/"):
         path = path.rstrip("/")
+
+    # iter357 — Language subpath handling (backend acceptance only; SPA
+    # frontend refactor lands in iter358).
+    if path.startswith("/en/"):
+        lang = "en"
+        path = path[3:] or "/"
+    elif path.startswith("/fr/"):
+        lang = "fr"
+        path = path[3:] or "/"
+    elif path in ("/en", "/fr"):
+        lang = path[1:]
+        path = "/"
 
     if path in ("/", ""):
         return await _resolve_homepage(db, lang)
@@ -426,11 +456,11 @@ async def resolve_route(db, path: str, lang: str = "en") -> Dict[str, Any]:
         }
 
     # iter356 — Regional SEO landing pages (P1 fix H3).
-    # 10 EN + 2 FR Quebec pages. Each is a bilingual pair with real hreflang
-    # cross-references — this is the first legitimate bilingual URL pair on
-    # BidVex, ahead of the full /en/* /fr/* subpath rollout in iter357+.
+    # 10 EN + 2 FR Quebec pages + iter357 24 QC city pages.
     regional = _resolve_regional_landing(path, lang)
     if regional:
+        # iter357 — Attach social-proof widget stats (5-min cached).
+        await attach_social_proof(regional, db)
         return regional
 
     return await _resolve_static_page(db, path, lang)
@@ -546,6 +576,8 @@ _REGIONAL_LANDINGS: Dict[str, Dict[str, Any]] = {
         "cta_target": "/vehicle-auctions?province=QC",
         "twin_en": "/vehicle-auctions-quebec",
         "lang_only": "fr",
+        "province_page": True,
+        "province_kind": "vehicle",
     },
     "/encheres-entreposage-quebec": {
         "title_fr": "Enchères d'entreposage au Québec — Casiers en ligne | BidVex",
@@ -556,14 +588,37 @@ _REGIONAL_LANDINGS: Dict[str, Dict[str, Any]] = {
         "cta_target": "/storage-auctions?province=QC",
         "twin_en": "/storage-auctions-quebec",
         "lang_only": "fr",
+        "province_page": True,
+        "province_kind": "storage",
     },
 }
+
+
+# iter357 — Merge in the 24 QC city landing pages (12 cities × 2 langs).
+# QC vehicle cities are also linked from `/encheres-vehicules-quebec` via
+# the Adwords city-grid section rendered by regional_landing.html.
+_REGIONAL_LANDINGS.update(build_qc_vehicle_city_entries())
+_REGIONAL_LANDINGS.update(build_qc_storage_city_entries())
+
+
+# ─── Also mark the QC province pages as province-level for the Adwords
+#     city grid; we already labelled them with `province_page: True` above.
+_REGIONAL_LANDINGS["/vehicle-auctions-quebec"]["province_page"] = True
+_REGIONAL_LANDINGS["/vehicle-auctions-quebec"]["province_kind"] = "vehicle"
+_REGIONAL_LANDINGS["/storage-auctions-quebec"]["province_page"] = True
+_REGIONAL_LANDINGS["/storage-auctions-quebec"]["province_kind"] = "storage"
 
 
 def _resolve_regional_landing(path: str, lang: str) -> Optional[Dict[str, Any]]:
     """Build a prerender context for a regional SEO landing page, or None
     if `path` isn't one of the known regional slugs. Bilingual pairs get
-    correct hreflang cross-references."""
+    correct hreflang cross-references.
+
+    iter357 additions:
+      • QC city + province pages get a LocalBusiness JSON-LD block
+      • QC province pages render a city-grid Adwords copy section
+      • City pages render the city-specific body blurb (`body_fr`/`body_en`)
+    """
     entry = _REGIONAL_LANDINGS.get(path)
     if not entry:
         return None
@@ -574,6 +629,7 @@ def _resolve_regional_landing(path: str, lang: str) -> Optional[Dict[str, Any]]:
         title = entry["title_fr"]
         desc  = entry["desc_fr"]
         h1    = entry["h1_fr"]
+        body  = entry.get("body_fr", "")
         hreflang = _regional_pair(entry["twin_en"], path)
         page_lang = "fr"
         canonical = f"{CANONICAL_HOST}{path}"
@@ -581,6 +637,7 @@ def _resolve_regional_landing(path: str, lang: str) -> Optional[Dict[str, Any]]:
         title = entry["title_fr"]
         desc  = entry["desc_fr"]
         h1    = entry["h1_fr"]
+        body  = entry.get("body_fr", "")
         twin_fr = entry.get("twin_fr")
         hreflang = _regional_pair(path, twin_fr) if twin_fr else _hreflang_alternates(path)
         page_lang = "fr"
@@ -589,10 +646,53 @@ def _resolve_regional_landing(path: str, lang: str) -> Optional[Dict[str, Any]]:
         title = entry["title_en"]
         desc  = entry["desc_en"]
         h1    = entry["h1_en"]
+        body  = entry.get("body_en", "")
         twin_fr = entry.get("twin_fr")
         hreflang = _regional_pair(path, twin_fr) if twin_fr else _hreflang_alternates(path)
         page_lang = "en"
         canonical = f"{CANONICAL_HOST}{path}"
+
+    # Breadcrumb ancestry: Home → (Province page) → Current
+    breadcrumb_items = [
+        {"name": "BidVex" if page_lang == "en" else "Accueil",
+         "url":  CANONICAL_HOST + "/"},
+    ]
+    if entry.get("kind") in ("qc_city_vehicle", "qc_city_storage"):
+        breadcrumb_items.append({
+            "name": entry.get("province_page_name", "Québec"),
+            "url":  CANONICAL_HOST + entry.get("province_page", "/"),
+        })
+    else:
+        breadcrumb_items.append({
+            "name": ("Vehicle Auctions" if "vehicle" in path or "encheres-veh" in path
+                     else "Storage Auctions" if "storage" in path or "entreposage" in path
+                     else "Auctions"),
+            "url":  CANONICAL_HOST + entry["cta_target"],
+        })
+    breadcrumb_items.append({"name": title, "url": canonical})
+
+    jsonld_blocks = [
+        _jsonld_script(organization_ld()),
+        _jsonld_script(breadcrumb_ld(breadcrumb_items)),
+    ]
+
+    # QC city / province page → emit LocalBusiness with the city in the name.
+    is_qc_city = entry.get("kind") in ("qc_city_vehicle", "qc_city_storage")
+    is_qc_province = entry.get("province_page", False)
+    if is_qc_city or is_qc_province:
+        city_name = None
+        if is_qc_city:
+            city_name = entry.get("city_fr" if page_lang == "fr" else "city_en")
+        jsonld_blocks.append(_jsonld_script(local_business_ld(
+            city_name=city_name, lang=page_lang,
+        )))
+
+    # Adwords city grid for QC province pages.
+    city_grid: List[Dict[str, str]] = []
+    if is_qc_province and entry.get("province_kind"):
+        city_grid = qc_province_city_grid_for(
+            kind=entry["province_kind"], lang=page_lang,
+        )
 
     return {
         "template": "regional_landing.html",
@@ -602,24 +702,29 @@ def _resolve_regional_landing(path: str, lang: str) -> Optional[Dict[str, Any]]:
         "og_type": "website",
         "og_image": f"{CANONICAL_HOST}/bidvex-icon.png",
         "hreflang": hreflang,
-        "jsonld_blocks": [
-            _jsonld_script(organization_ld()),
-            _jsonld_script(breadcrumb_ld([
-                {"name": "BidVex" if page_lang == "en" else "Accueil",
-                 "url":  CANONICAL_HOST + "/"},
-                {"name": ("Vehicle Auctions" if "vehicle" in path or "encheres-veh" in path
-                          else "Storage Auctions" if "storage" in path or "entreposage" in path
-                          else "Auctions"),
-                 "url":  CANONICAL_HOST + entry["cta_target"]},
-                {"name": title, "url": canonical},
-            ])),
-        ],
+        "jsonld_blocks": jsonld_blocks,
         "lang": page_lang,
         "hero_headline": h1,
         "hero_subtitle": desc,
+        "body_copy": body,
         "cta_target": entry["cta_target"],
+        "city_grid": city_grid,
+        "is_qc_province": bool(is_qc_province),
+        "is_qc_city": bool(is_qc_city),
         "canonical_host": CANONICAL_HOST,
+        # `social_proof` gets attached later, once the resolver caller
+        # (which has the db handle) awaits `attach_social_proof(ctx, db)`.
+        "social_proof": None,
     }
+
+
+async def attach_social_proof(ctx: Dict[str, Any], db) -> Dict[str, Any]:
+    """Enrich a regional-landing context with the social-proof widget stats."""
+    try:
+        ctx["social_proof"] = await get_platform_stats(db)
+    except Exception:
+        ctx["social_proof"] = None
+    return ctx
 
 
 def render_html(context: Dict[str, Any]) -> str:
