@@ -580,6 +580,14 @@ try:
     _prerender_enabled = os.environ.get("PRERENDER_MIDDLEWARE_ENABLED", "1") == "1"
     app.add_middleware(_BotPrerenderMiddleware, enabled=_prerender_enabled)
     logger.info(f"[iter354] BotPrerenderMiddleware enabled={_prerender_enabled}")
+
+    # iter361 — Cache-Control layer. Sets immutable cache on static assets
+    # (JS/CSS/PNG/WOFF, 1-year TTL) and forces bots to receive no-store
+    # responses (defensive hedge against the crawler-cache layer sitting
+    # in front of production).
+    from routes.seo_admin import CacheHeadersMiddleware as _CacheHeadersMiddleware
+    app.add_middleware(_CacheHeadersMiddleware)
+    logger.info("[iter361] CacheHeadersMiddleware enabled")
 except Exception as _pmw_exc:
     logger.warning(f"[iter354] BotPrerenderMiddleware failed to register: {_pmw_exc}")
 
@@ -1605,6 +1613,11 @@ try:
     # SEO: Dynamic sitemap.xml + robots.txt (app-level, not /api)
     from routes.sitemap import sitemap_router
     app.include_router(sitemap_router, tags=["SEO"])
+
+    # iter361 — Admin SEO probe (sitemap health, robots.txt reachability).
+    from routes.seo_admin import seo_router as _seo_admin_router
+    app.include_router(_seo_admin_router)
+    logger.info("[iter361] seo_admin router mounted at /api/admin/seo/*")
 
     # iter318 BidVex Careers module — public + admin job/applicant API
     try:

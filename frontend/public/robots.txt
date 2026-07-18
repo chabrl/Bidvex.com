@@ -5,4 +5,8 @@ Disallow: /dashboard
 Disallow: /api/
 Allow: /api/feeds/
 
+# iter361 — Both sitemap variants declared for GSC + Bing Webmaster discovery.
+# `sitemap_index.xml` is the canonical entry; `sitemap.xml` kept as fallback
+# for legacy crawlers that don't follow sitemap indexes.
+Sitemap: https://www.bidvex.com/sitemap_index.xml
 Sitemap: https://www.bidvex.com/sitemap.xml

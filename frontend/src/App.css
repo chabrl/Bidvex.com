@@ -65,6 +65,82 @@ img:not([width]):not([height]) {
 }
 
 
+/* ═════════════════════════════════════════════════════════
+   iter361 — Skeleton loaders, tap-targets, contrast (WCAG AA)
+   ═════════════════════════════════════════════════════════ */
+
+/* Skeleton grid placeholders — displayed while listing data loads.
+   Reserves the exact layout slot so mounting real cards causes zero shift. */
+.listing-grid-skeleton {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+.skeleton-card {
+  aspect-ratio: 3 / 4;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 8px;
+}
+@keyframes shimmer {
+  0%   { background-position:  200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Hero container — reserved height prevents CLS while phone image
+   mounts and animates in. Matches the min-height already set by
+   HomePage's hero grid, but declared here for defensive coverage. */
+.hero-section,
+[data-testid="hero-section"] {
+  min-height: 500px;
+}
+@media (max-width: 640px) {
+  .hero-section,
+  [data-testid="hero-section"] {
+    min-height: 620px; /* Mobile stacks text + phone vertically → taller */
+  }
+}
+
+/* Universal minimum tap target — WCAG 2.5.5 requires 44×44px for touch.
+   Applied to interactive elements globally, but scoped so we don't
+   over-inflate small icon-only inline links. */
+button:not([data-inline]):not(.no-min-tap),
+a[role="button"]:not([data-inline]):not(.no-min-tap),
+input[type="submit"],
+input[type="button"],
+.btn:not([data-inline]):not(.no-min-tap) {
+  min-height: 44px;
+  min-width: 44px;
+}
+/* Mobile nav / listing card CTAs get the same rule via link tag. */
+@media (max-width: 767px) {
+  a.nav-link,
+  a.mobile-menu-item,
+  a.listing-card-cta {
+    min-height: 44px;
+  }
+}
+
+/* Text contrast — WCAG 2.1 AA requires 4.5:1 for body text on light bg.
+   Tighten our default "muted" grey (#94A3B8 ≈ 3.4:1 fails) to a shade
+   that meets AA (#4B5563 ≈ 7.4:1 passes).                       */
+.text-muted,
+.text-secondary,
+.listing-meta,
+.text-slate-400 {
+  color: #4B5563 !important;
+}
+/* Dark-mode variant unchanged — dark bg + light muted text passes AA. */
+.dark .text-muted,
+.dark .text-secondary,
+.dark .listing-meta,
+.dark .text-slate-400 {
+  color: #94A3B8 !important;
+}
+
+
+
 
 /* ===== Countdown Timer ===== */
 .countdown-timer {
