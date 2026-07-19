@@ -1,5 +1,81 @@
 # BidVex — Auction Marketplace PRD
 
+## iter364 — Client Phone Mockups, Compare Listings, AdSense, Notification Bell (Jul 19, 2026) ✅ COMPLETE — VERIFIED
+
+**Scope**: 6 launch-critical items shipped in one fork pass. 35/35 iter363+iter364 static tests pass. 21/21 live-API tests pass. Full browser E2E verified for every user-visible flow. Testing-agent iter364 report: 100% success.
+
+### P0.1 — Hero Phone Mockup: Client-provided assets ✅ SHIPPED
+- Uploaded client renders now live at `/app/frontend/public/assets/hero-phone-en.png` (717KB) and `hero-phone-fr.png` (721KB). Aspect ratio 1295×1215.
+- `HeroPhone.js` reads `useTranslation()` and serves the correct asset per language: EN → "Discover. Bid. Win.", FR → "Découvrez. Misez. Gagnez."
+- `HeroPhone.css` updated: aspect-ratio 1295/1215, `overflow: visible` so the hand extends outside the frame, mobile max-width 280px per iter364 spec.
+- Floating badges removed — the new mockups are self-contained with "Live Auctions Happening Now" pill already on the phone screen.
+
+### P0.2 — Fix Broken Listing Card Images ✅ SHIPPED
+- Deleted 1 iter309 test-data pollution listing from DB (was the source of "grey placeholder boxes" reported by user).
+- New reusable helper `/app/frontend/src/utils/listingImage.js` with `getListingImage()` field-priority chain: `images[0] → image_url → photos[0] → thumbnail_url → photo_url → placeholder.png`.
+- `/static/placeholder.png` returns HTTP 200 publicly (verified on preview + prod).
+- Post-fix: 20/20 marketplace img tags load correctly (naturalWidth > 0).
+
+### P1.1 — Compare Listings feature ✅ SHIPPED
+- `CompareContext.jsx` — sessionStorage-persisted selection with `MAX_ITEMS = 4` cap.
+- `CompareCheckbox` component rendered on **all 4 card types**: marketplace (FlattenedMarketplace.js), lots (LotsMarketplacePage.js), storage (StorageAuctionCard.js), vehicle (VehicleListingCard.js). Bottom-left of each card, unobtrusive pill design.
+- `CompareBar` (sticky bottom) — thumbnails + count + "Compare Now" CTA (disabled until 2+, "Select 1 more" hint at 1).
+- `/compare` (EN) + `/fr/comparer` (FR) routes → ComparePage renders full comparison table.
+- Table columns: Photo, Current bid, Time remaining, Starting price, Condition, Location, Seller, Section, Bids placed. **Vehicle mode**: if any selected item has section='vehicle', extra rows: VIN, Year, Make, Model, Mileage.
+- "Bid Now" button per column navigates to the correct detail path.
+- Fully bilingual: all labels + column headers + CTAs translated.
+- **Regression cleanup**: removed old `/compare → CompareListingsPage.js` route that took URL query params — the new ComparePage + CompareContext replaces it entirely.
+
+### P1.2 — Google AdSense Integration ✅ SHIPPED
+- `AdUnit` component: env-aware — on `PROD_HOSTS = [www.bidvex.com, bidvex.com, launchapp-4-r-1774886029.emergent.host]` + configured publisher ID emits real `<ins class="adsbygoogle">`; on preview/dev emits a labelled placeholder box (`'ADVERTISEMENT · AD ZONE #<slot>'`).
+- `index.html` conditionally injects `pagead2.googlesyndication.com` script gated on hostname allowlist + non-placeholder publisher ID. **On preview**, `window.adsbygoogle === undefined` — no wasted impressions, no console errors, no AdSense errors before Charbel's approval.
+- Ad zones placed on **4 pages** with 2 slots each: Marketplace (top+bottom), Lots (top+bottom), Vehicles (top+mid), Storage (top+bottom).
+- All slots parameterized via env vars (`REACT_APP_ADSENSE_SLOT_*`), so Charbel can rotate/A-B test without redeploy.
+- **Charbel action**: sign up at adsense.google.com, replace placeholder `ca-pub-XXXXXXXXXXXXXXXX` in `index.html` with real Publisher ID, populate the 8 slot env vars in production `.env`.
+
+### P1.3 — Admin Notification Bell ✅ SHIPPED
+- New backend route: `GET /api/admin/notifications/summary` aggregates 4 counters (flagged listings, dealer licence reviews, open disputes, payment failures) into one response. `admin` + `super_admin` roles accepted. Fallback collections handled (dealer_licenses → users.dealer_license_status; disputes → disputed_settlements).
+- `NotificationBell.jsx` — bell icon in admin header, red badge shows `total_unread`, polls every 60s, dropdown lists all 4 categories with per-category icons (AlertTriangle, ShieldCheck, Gavel, CreditCard), clicking a row navigates to the correct primary/secondary admin tab.
+- Empty state: "You are all caught up 🎉" (EN) / "Vous êtes à jour 🎉" (FR).
+- Verified: 0 unread across all 4 categories in preview DB → no badge (correct).
+
+### P2 — MultiLotImageCarousel extended to Vehicle cards ✅ SHIPPED
+- `VehicleListingCard.js` now aggregates `media[].url + photos[] + image_url` into `vehicleImages[]` (deduped, capped at 10).
+- If `vehicleImages.length >= 2`: renders `<MultiLotImageCarousel>` with 2.5s auto-slide + IntersectionObserver + prefers-reduced-motion fallback.
+- Single-photo vehicles fall back to static `<SafeImage>`.
+
+### Files Modified/Created (iter364)
+**Created:**
+- `/app/frontend/public/assets/hero-phone-en.png` (717KB client asset)
+- `/app/frontend/public/assets/hero-phone-fr.png` (721KB client asset)
+- `/app/frontend/src/utils/listingImage.js`
+- `/app/frontend/src/contexts/CompareContext.jsx`
+- `/app/frontend/src/components/CompareBar.jsx`
+- `/app/frontend/src/pages/ComparePage.jsx`
+- `/app/frontend/src/components/AdUnit.jsx`
+- `/app/frontend/src/components/admin/NotificationBell.jsx`
+- `/app/backend/routes/admin_notifications.py`
+- `/app/backend/tests/test_iter364_launch_gate.py` (15 tests)
+
+**Modified:**
+- `/app/frontend/src/components/HeroPhone.js` (rewrote for client assets)
+- `/app/frontend/src/components/HeroPhone.css` (aspect 1295/1215, overflow visible, mobile 280px)
+- `/app/frontend/src/App.js` (CompareProvider wrap, /compare + /fr/comparer routes, removed legacy CompareListingsPage route, ComparePage lazy import)
+- `/app/frontend/src/components/FlattenedMarketplace.js` (CompareCheckbox)
+- `/app/frontend/src/pages/LotsMarketplacePage.js` (CompareCheckbox + AdUnit)
+- `/app/frontend/src/pages/storage/StorageAuctionCard.js` (CompareCheckbox)
+- `/app/frontend/src/components/vehicles/VehicleListingCard.js` (CompareCheckbox + MultiLotImageCarousel)
+- `/app/frontend/src/pages/MarketplacePage.js` (AdUnit top+bottom)
+- `/app/frontend/src/pages/vehicles/VehicleAuctionsPage.js` (AdUnit top+mid)
+- `/app/frontend/src/pages/storage/StorageAuctionsBrowse.js` (AdUnit top+bottom)
+- `/app/frontend/public/index.html` (Gated AdSense script)
+- `/app/frontend/src/pages/AdminDashboard.js` (NotificationBell in header)
+- `/app/backend/server.py` (register admin_notifications_router)
+- `/app/backend/tests/test_iter363_launch_gate.py` (updated hero-phone tests for iter364 paths)
+
+---
+
+
 ## iter363 — Language Toggle 404, Admin API Repair, Sidebar Overhaul, MultiLotImageCarousel, Payment Infra Report (Jul 19, 2026) ✅ COMPLETE — VERIFIED
 
 **Scope**: 5 P0 launch-critical items landed in one fork pass. 28/28 iter363 tests pass (19 static + 9 live admin API); full E2E browser flows green under super_admin auth.
