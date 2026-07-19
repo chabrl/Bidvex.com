@@ -31,17 +31,39 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/prerender", tags=["seo-prerender"])
 
 # ─── Known-crawler UA regex ────────────────────────────────────────────
-# We match by substring against the lower-cased User-Agent. Sourced from
-# https://developers.google.com/search/docs/crawling-indexing/overview-google-crawlers
-# and https://developers.facebook.com/docs/sharing/webmasters/crawler
+# Match by substring against the lower-cased User-Agent. Sourced from:
+#   https://developers.google.com/search/docs/crawling-indexing/overview-google-crawlers
+#   https://developers.facebook.com/docs/sharing/webmasters/crawler
+#   https://www.bing.com/webmasters/help/which-crawlers-does-bing-use-8c184ec0
+# iter362 — expanded to cover ALL Google testing tools (GSC Live Test uses
+# `google-inspectiontool`, Rich Results Test uses `developers.google.com`)
+# plus every AI/social crawler that consumes structured data.
 _CRAWLER_UA_PATTERNS = [
-    "googlebot", "bingbot", "slurp",  # google/bing/yahoo
-    "duckduckbot", "baiduspider", "yandexbot",
-    "sogou", "exabot", "facebot", "facebookexternalhit",
-    "linkedinbot", "twitterbot", "slackbot", "discordbot",
-    "whatsapp", "telegrambot", "vkshare", "w3c_validator",
-    "redditbot", "applebot", "mj12bot", "semrushbot", "ahrefsbot",
-    "yeti", "petalbot", "bytespider",
+    # ── Google (including SEO testing tools — CRITICAL for GSC verification) ──
+    "googlebot", "google-inspectiontool", "google-structured-data-testing-tool",
+    "adsbot-google", "mediapartners-google", "apis-google",
+    "developers.google.com",  # Rich Results Test / URL Inspection Live UA
+    # ── Microsoft / Bing / Yahoo ──
+    "bingbot", "msnbot", "bingpreview", "slurp", "yahoo",
+    # ── Other search engines ──
+    "duckduckbot", "duckduckgo",
+    "baiduspider", "yandex", "yeti", "naverbot",
+    "sogou", "exabot", "seznambot",
+    # ── Social unfurlers ──
+    "facebot", "facebookexternalhit", "meta-externalagent",
+    "linkedinbot", "twitterbot", "x-clientua",
+    "slackbot", "slack-imgproxy", "discordbot",
+    "whatsapp", "telegrambot", "vkshare",
+    "redditbot", "applebot",
+    # ── SEO / audit crawlers ──
+    "mj12bot", "semrushbot", "ahrefsbot", "dotbot", "petalbot",
+    "bytespider", "chrome-lighthouse",
+    "w3c_validator", "validator.w3.org",
+    # ── Preview cards + link scanners ──
+    "embedly", "quora link preview", "showyoubot", "outbrain",
+    "pinterest", "rogerbot",
+    # ── Generic bot markers (last-line-of-defense) ──
+    "headlesschrome",
 ]
 _CRAWLER_UA_RE = re.compile("|".join(re.escape(p) for p in _CRAWLER_UA_PATTERNS), re.IGNORECASE)
 
@@ -57,6 +79,9 @@ _PRERENDER_ROUTE_PREFIXES = (
     "/",
     "/en/", "/fr/",         # iter357 — bilingual subpaths (backend only for now)
     "/marketplace",
+    "/marche",
+    "/lots",
+    "/lots-auction",
     "/lots-marketplace",
     "/vehicle-auctions",
     "/storage-auctions",
@@ -167,20 +192,22 @@ async def prerender_endpoint(
                         headers={"X-Prerender-Version": "iter354-fallback"})
 
 
-# ─── Ingress middleware (preview environment) ──────────────────────────
+# ─── Ingress middleware ────────────────────────────────────────────────
 class BotPrerenderMiddleware(BaseHTTPMiddleware):
-    """Preview-side ingress override.
+    """iter362 — SOLE bot-prerender path (FastAPI-only architecture).
 
     When a request:
       • is a GET,
       • has a crawler User-Agent (or `?_ssr=1` debug flag),
       • targets a prerender-eligible path,
-    we short-circuit the SPA response with prerendered HTML.
+    we short-circuit the SPA response with prerendered HTML inline —
+    NO redirect to `/api/prerender/*` (bots must receive the HTML at the
+    ORIGINAL URL so canonical URLs match what Google indexes).
 
-    Real users continue to hit the SPA build served by the frontend container.
-    In production, this middleware is redundant — the Cloudflare Worker does
-    the same routing at the edge — but keeping it here lets us validate the
-    prerender output end-to-end on preview.bidvex.com before touching CF.
+    Real users continue to hit the SPA build served by the frontend
+    container. Every response includes `X-Prerender-Version` +
+    `X-Prerender-UA-Match` headers for production diagnosis, plus a
+    structured `[PRERENDER]` log line at INFO level.
     """
 
     def __init__(self, app: ASGIApp, enabled: bool = True) -> None:
@@ -207,8 +234,14 @@ class BotPrerenderMiddleware(BaseHTTPMiddleware):
             accept = (request.headers.get("accept-language") or "").lower()
             lang = "fr" if accept.startswith("fr") else "en"
 
+        # iter362 — Production diagnostic log. This line is what Charbel
+        # greps for in Emergent logs to confirm middleware fires on prod.
+        logger.info(
+            f"[PRERENDER] Bot detected: ua='{ua[:80]}' path='{path}' lang='{lang}' "
+            f"force_ssr={force_ssr} → serving SSR inline"
+        )
+
         try:
-            # Grab a db handle via the app state — fall back to deps.get_db
             from deps import get_db
             db = get_db()
             async def _run():
@@ -217,12 +250,26 @@ class BotPrerenderMiddleware(BaseHTTPMiddleware):
             html = await asyncio.wait_for(_run(), timeout=8.0)
             return HTMLResponse(
                 content=html,
+                status_code=200,
                 headers={
+                    # Explicit media type + charset (belt & suspenders for
+                    # crawlers that check Content-Type before parsing HTML).
+                    "Content-Type": "text/html; charset=utf-8",
                     "Cache-Control": "public, max-age=60, s-maxage=300",
-                    "X-Prerender-Version": "iter354",
+                    "X-Prerender-Version": "iter362",
                     "X-Prerender-UA-Match": "1",
+                    # Vary tells intermediate caches the response depends
+                    # on the request UA — protects human SPA cache from
+                    # being served bot HTML (and vice versa).
+                    "Vary": "User-Agent, Accept-Language",
                 },
             )
+        except asyncio.TimeoutError:
+            logger.error(f"[PRERENDER] budget exceeded 8s path={path!r} ua={ua[:80]!r}")
+            return await call_next(request)
         except Exception as exc:  # noqa: BLE001
-            logger.warning(f"[prerender-middleware] failed for path={path!r}: {exc} — falling back to SPA")
+            logger.warning(
+                f"[PRERENDER] failed for path={path!r} ua={ua[:80]!r}: {exc} — "
+                f"falling back to SPA"
+            )
             return await call_next(request)

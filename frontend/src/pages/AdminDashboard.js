@@ -889,10 +889,14 @@ const AdminDashboard = () => {
         </div>
       </div>
 
-      {/* PRIMARY NAVIGATION ROW */}
-      <div className="bg-white border-b">
+      {/* PRIMARY NAVIGATION ROW — iter362 fix: wrap instead of overflow.
+          The old `overflow-x-auto` truncated 15+ tabs into a horizontal
+          scroll strip that overlapped and was unusable. `flex-wrap` lets
+          them break to multiple rows, and the marketing/financial groups
+          are visually offset with border-l/pl-3 so the grouping is clear. */}
+      <div className="bg-white border-b" data-testid="admin-primary-nav">
         <div className="max-w-7xl mx-auto px-4">
-          <div className="flex items-center gap-2 py-2 overflow-x-auto">
+          <div className="flex flex-wrap items-center gap-2 py-2">
             {PRIMARY_TABS.map((tab) => {
               const Icon = tab.lucideIcon;
               const isActive = primaryTab === tab.id;
@@ -901,7 +905,7 @@ const AdminDashboard = () => {
                 <button
                   key={tab.id}
                   onClick={() => handlePrimaryTabClick(tab.id)}
-                  className={`relative flex items-center gap-2 px-4 py-2.5 rounded-full font-medium transition-all whitespace-nowrap ${
+                  className={`relative flex items-center gap-2 px-4 py-2.5 rounded-full font-medium transition-all whitespace-nowrap min-h-[44px] ${
                     isActive 
                       ? 'bg-primary text-white shadow-lg' 
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -922,46 +926,50 @@ const AdminDashboard = () => {
                 </button>
               );
             })}
-            
-            {/* Separator */}
-            <div className="h-8 w-px bg-gray-300 mx-2" />
-            
-            {/* Marketing Tools */}
+          </div>
+
+          {/* MARKETING + FINANCIAL cross-cutting groups on their OWN row —
+              iter362 fix: visually separated with an amber/emerald label so
+              admins can tell these are cross-primary tools, not part of the
+              currently-active primary section. */}
+          <div className="flex flex-wrap items-center gap-2 py-2 border-t border-slate-100" data-testid="admin-crosscutting-nav">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-amber-700 flex-shrink-0 mr-1">
+              Marketing:
+            </span>
             {MARKETING_TABS.map((tab) => {
-              const Icon = tab.lucideIcon;
               const isActive = secondaryTab === tab.id;
               return (
                 <button
                   key={tab.id}
                   data-testid={`admin-tab-${tab.id}`}
                   onClick={() => setSecondaryTab(tab.id)}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-full font-medium transition-all whitespace-nowrap ${
+                  className={`flex items-center gap-2 px-3 py-2 rounded-full font-medium text-sm transition-all whitespace-nowrap min-h-[44px] ${
                     isActive 
                       ? 'bg-amber-500 text-white shadow-lg' 
                       : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
                   }`}
                 >
-                  <span className="text-lg">{tab.icon}</span>
+                  <span className="text-base">{tab.icon}</span>
                   <span>{tab.label}</span>
                 </button>
               );
             })}
-            
-            {/* Financial Tools */}
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700 flex-shrink-0 ml-3 mr-1 border-l border-slate-200 pl-3">
+              Finance & Safety:
+            </span>
             {FINANCIAL_TABS.map((tab) => {
-              const Icon = tab.lucideIcon;
               const isActive = secondaryTab === tab.id;
               return (
                 <button
                   key={tab.id}
                   onClick={() => setSecondaryTab(tab.id)}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-full font-medium transition-all whitespace-nowrap ${
+                  className={`flex items-center gap-2 px-3 py-2 rounded-full font-medium text-sm transition-all whitespace-nowrap min-h-[44px] ${
                     isActive 
                       ? 'bg-emerald-500 text-white shadow-lg' 
                       : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
                   }`}
                 >
-                  <span className="text-lg">{tab.icon}</span>
+                  <span className="text-base">{tab.icon}</span>
                   <span>{tab.label}</span>
                 </button>
               );
@@ -970,10 +978,12 @@ const AdminDashboard = () => {
         </div>
       </div>
 
-      {/* SECONDARY NAVIGATION ROW */}
+      {/* SECONDARY NAVIGATION ROW — iter362: flex-wrap so long secondary
+          lists (like Marketplace's 15+ items) wrap cleanly instead of
+          disappearing behind an overflow-x scroll strip. */}
       <div className="bg-gray-100 border-b">
         <div className="max-w-7xl mx-auto px-4">
-          <div className="flex items-center gap-2 py-2 overflow-x-auto">
+          <div className="flex flex-wrap items-center gap-2 py-2">
             <ChevronRight className="h-4 w-4 text-gray-400 flex-shrink-0" />
             {SECONDARY_TABS[primaryTab]?.map((tab) => {
               const Icon = tab.lucideIcon;

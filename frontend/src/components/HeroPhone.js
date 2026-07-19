@@ -34,12 +34,27 @@ const HeroPhone = () => {
       {/* Phone image (floating wrapper) */}
       <div className="hero-phone-wrapper">
         <img
-          src="/assets/hero-phone-mockup.png"
+          // iter362 — Serve language-variant when available; fall back to
+          // the original mockup if the FR variant hasn't been dropped in yet.
+          // Designer: add `hero-phone-mockup-fr.png` to /public/assets/ to
+          // remove the recursive-mirror effect on the French homepage.
+          src={fr ? "/assets/hero-phone-mockup-fr.png" : "/assets/hero-phone-mockup.png"}
+          onError={(e) => {
+            // Fallback: if the language-specific PNG 404s, use the base PNG.
+            if (!e.currentTarget.dataset.fellBack) {
+              e.currentTarget.dataset.fellBack = "1";
+              e.currentTarget.src = "/assets/hero-phone-mockup.png";
+            }
+          }}
           alt={fr ? "Application mobile BidVex" : "BidVex mobile app"}
           className="hero-phone-image"
           loading="eager"
           fetchPriority="high"
           draggable={false}
+          // Explicit intrinsic dimensions prevent CLS during load (WCAG +
+          // Lighthouse best practice). Matches PNG native size 475×975.
+          width="460"
+          height="945"
         />
       </div>
 
