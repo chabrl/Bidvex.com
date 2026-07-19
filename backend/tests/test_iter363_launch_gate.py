@@ -166,21 +166,28 @@ def test_heroPhone_css_uses_object_fit_contain():
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# Contact page: POSTs to backend (not just mailto)
+# Contact page: POSTs to backend (mailto: removed from form flow in iter363)
 # ═══════════════════════════════════════════════════════════════════════
 
 def test_contact_page_posts_to_backend_endpoint():
     text = open("/app/frontend/src/pages/ContactUsPage.jsx", "r", encoding="utf-8").read()
     assert "/api/contact/submit" in text
     assert "axios" in text
-    # Fallback still exists — mailto is graceful degradation, not primary path.
-    assert "mailto:" in text
+    # iter363: mailto: fallback removed from the form submission flow.
+    # The mailto:{team.email} direct-email links on each team card
+    # remain — they are a separate feature, not part of the form.
+    # Assert the buildMailtoFallback function is gone.
+    assert "buildMailtoFallback" not in text
+    assert "window.location.href = " not in text  # no mailto redirect
 
 
-def test_contact_page_shows_success_state():
+def test_contact_page_shows_success_and_error_states():
     text = open("/app/frontend/src/pages/ContactUsPage.jsx", "r", encoding="utf-8").read()
     assert "contact-form-success" in text
-    assert "contact-form-fallback" in text
+    # iter363: fallback state replaced by explicit error state after
+    # the mailto: fallback was removed from the submission flow.
+    assert "contact-form-error" in text
+    assert "contact-form-fallback" not in text
 
 
 # ═══════════════════════════════════════════════════════════════════════

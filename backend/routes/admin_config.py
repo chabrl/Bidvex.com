@@ -729,7 +729,7 @@ async def admin_delete_announcement(announcement_id: str, current_user: User = D
 async def get_admin_banners(current_user: User = Depends(require_admin)):
     """Get all banners (admin only)"""
     db = get_db()
-    if current_user.role != 'admin':
+    if current_user.role not in ('admin', 'super_admin'):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     banners = await db.banners.find({}, {"_id": 0}).sort("priority", -1).to_list(100)
@@ -741,7 +741,7 @@ async def get_admin_banners(current_user: User = Depends(require_admin)):
 async def create_admin_banner(banner_data: BannerCreate, current_user: User = Depends(require_admin)):
     """Create a new banner (admin only)"""
     db = get_db()
-    if current_user.role != 'admin':
+    if current_user.role not in ('admin', 'super_admin'):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     banner = {
@@ -768,7 +768,7 @@ async def create_admin_banner(banner_data: BannerCreate, current_user: User = De
 async def update_admin_banner(banner_id: str, banner_data: dict, current_user: User = Depends(require_admin)):
     """Update a banner (admin only)"""
     db = get_db()
-    if current_user.role != 'admin':
+    if current_user.role not in ('admin', 'super_admin'):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     existing = await db.banners.find_one({"id": banner_id})
@@ -790,7 +790,7 @@ async def update_admin_banner(banner_id: str, banner_data: dict, current_user: U
 async def delete_admin_banner(banner_id: str, current_user: User = Depends(require_admin)):
     """Delete a banner (admin only)"""
     db = get_db()
-    if current_user.role != 'admin':
+    if current_user.role not in ('admin', 'super_admin'):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     result = await db.banners.delete_one({"id": banner_id})

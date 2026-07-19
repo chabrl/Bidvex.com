@@ -12,6 +12,9 @@ import {
 } from 'lucide-react';
 import Countdown from 'react-countdown';
 import SafeImage from '../components/SafeImage';
+// iter363 — Auto-sliding multi-lot image carousel (only used on cards
+// where lots contribute ≥2 images).
+import MultiLotImageCarousel from '../components/MultiLotImageCarousel';
 import WishlistHeartButton from '../components/WishlistHeartButton';
 import MarketplaceSidebar from '../components/MarketplaceSidebar';
 import { VerifiedBadge } from '../components/VerifiedBadge';
@@ -139,6 +142,20 @@ const LotsMarketplacePage = () => {
     const isPrivateSale = acctType === 'individual';
     const firstLot = listing.lots?.[0];
     const imageUrl = firstLot?.images?.[0] || listing.lots?.find(l => l.images?.length > 0)?.images?.[0];
+    // iter363 — Gather up to 10 images across all lots for the auto-carousel.
+    // Plain function (not useMemo) because this helper runs inside a .map()
+    // callback — hooks can't be called conditionally per row.
+    const lotImages = (() => {
+      const out = [];
+      for (const lot of (listing.lots || [])) {
+        for (const img of (lot.images || [])) {
+          if (img && !out.includes(img)) out.push(img);
+          if (out.length >= 10) break;
+        }
+        if (out.length >= 10) break;
+      }
+      return out;
+    })();
 
     return (
       <Card
@@ -148,7 +165,14 @@ const LotsMarketplacePage = () => {
       >
         <LangLink to={`/lots/${listing.id}`} className="block relative">
           <div className="grid-card-image bg-slate-100 dark:bg-slate-800" data-testid="lot-card-image">
-            {imageUrl ? (
+            {lotImages.length >= 2 ? (
+              <MultiLotImageCarousel
+                images={lotImages}
+                alt={getLocalized(listing, 'title')}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                testId={`lot-carousel-${listing.id}`}
+              />
+            ) : imageUrl ? (
               <SafeImage src={imageUrl} alt={getLocalized(listing, "title")} width={400} height={300} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
             ) : (
               <div className="w-full h-full flex items-center justify-center">

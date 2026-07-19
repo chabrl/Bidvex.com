@@ -129,6 +129,9 @@ import AdminContractorsPage from './admin/AdminContractorsPage';
 import AdminContractorsLeaderboard from './admin/AdminContractorsLeaderboard';
 import AdminDialer from './admin/AdminDialer';
 import SchedulerStatusCard from '../components/SchedulerStatusCard';
+// iter363 — Admin left sidebar (replaces horizontal PRIMARY/SECONDARY tabs).
+import AdminSidebar from '../components/admin/AdminSidebar';
+import { Menu as MenuIcon } from 'lucide-react';
 import { 
   Users, Package, Gavel, Shield, TrendingUp, Bell, Settings, FileText, 
   MessageSquare, DollarSign, Search, Image, CreditCard, Megaphone, 
@@ -276,6 +279,8 @@ const AdminDashboard = () => {
   const [primaryTab, setPrimaryTab] = useState('marketplace');
   const [secondaryTab, setSecondaryTab] = useState('users');
   const [searchQuery, setSearchQuery] = useState('');
+  // iter363 — mobile sidebar visibility (drawer on <lg screens).
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Phase 6.0 / Repair 2 — read ?tab= from URL on mount + activate the
   // matching secondary tab (incl. cross-primary-section routing). Also
@@ -715,9 +720,19 @@ const AdminDashboard = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 py-4">
+        <div className="max-w-full mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
+              {/* iter363 — mobile hamburger to open the sidebar drawer */}
+              <button
+                type="button"
+                onClick={() => setSidebarOpen(true)}
+                className="lg:hidden p-2 -ml-2 rounded-lg hover:bg-slate-100"
+                aria-label="Open admin menu"
+                data-testid="admin-sidebar-open"
+              >
+                <MenuIcon className="h-6 w-6 text-slate-700" />
+              </button>
               <div className="p-2 bg-gradient-to-br from-primary to-accent rounded-lg">
                 <Shield className="h-6 w-6 text-white" />
               </div>
@@ -889,137 +904,36 @@ const AdminDashboard = () => {
         </div>
       </div>
 
-      {/* PRIMARY NAVIGATION ROW — iter362 fix: wrap instead of overflow.
-          The old `overflow-x-auto` truncated 15+ tabs into a horizontal
-          scroll strip that overlapped and was unusable. `flex-wrap` lets
-          them break to multiple rows, and the marketing/financial groups
-          are visually offset with border-l/pl-3 so the grouping is clear. */}
-      <div className="bg-white border-b" data-testid="admin-primary-nav">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex flex-wrap items-center gap-2 py-2">
-            {PRIMARY_TABS.map((tab) => {
-              const Icon = tab.lucideIcon;
-              const isActive = primaryTab === tab.id;
-              const showDot = tab.id === 'vehicles' && pendingDealerLicenses > 0;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => handlePrimaryTabClick(tab.id)}
-                  className={`relative flex items-center gap-2 px-4 py-2.5 rounded-full font-medium transition-all whitespace-nowrap min-h-[44px] ${
-                    isActive 
-                      ? 'bg-primary text-white shadow-lg' 
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                  data-testid={`admin-primary-tab-${tab.id}`}
-                >
-                  <span className="text-lg">{tab.icon}</span>
-                  <span>{tab.label}</span>
-                  {showDot && (
-                    <span
-                      className="absolute -top-1 -right-1 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-red-600 text-white text-[10px] font-bold ring-2 ring-white animate-pulse"
-                      data-testid="admin-vehicles-pending-dot"
-                      title={`${pendingDealerLicenses} pending dealer license review${pendingDealerLicenses === 1 ? '' : 's'}`}
-                    >
-                      {pendingDealerLicenses > 99 ? '99+' : pendingDealerLicenses}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+      {/* iter363 — Sidebar layout replaces the old horizontal PRIMARY /
+          CROSS-CUTTING / SECONDARY tab strips. The AdminSidebar keeps
+          the same 4 groupings (primary sections, per-primary secondary,
+          marketing cross-cutting, finance & safety cross-cutting) but
+          renders them as a professional left rail with a mobile drawer. */}
+      <div className="flex" data-testid="admin-shell">
+        <AdminSidebar
+          primaryTabs={PRIMARY_TABS}
+          secondaryTabs={SECONDARY_TABS}
+          marketingTabs={MARKETING_TABS}
+          financialTabs={FINANCIAL_TABS}
+          primaryTab={primaryTab}
+          secondaryTab={secondaryTab}
+          onPrimaryClick={(id) => { handlePrimaryTabClick(id); setSidebarOpen(false); }}
+          onSecondaryClick={(id) => { setSecondaryTab(id); setSidebarOpen(false); }}
+          pendingDealerLicenses={pendingDealerLicenses}
+          open={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+        />
 
-          {/* MARKETING + FINANCIAL cross-cutting groups on their OWN row —
-              iter362 fix: visually separated with an amber/emerald label so
-              admins can tell these are cross-primary tools, not part of the
-              currently-active primary section. */}
-          <div className="flex flex-wrap items-center gap-2 py-2 border-t border-slate-100" data-testid="admin-crosscutting-nav">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-amber-700 flex-shrink-0 mr-1">
-              Marketing:
-            </span>
-            {MARKETING_TABS.map((tab) => {
-              const isActive = secondaryTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  data-testid={`admin-tab-${tab.id}`}
-                  onClick={() => setSecondaryTab(tab.id)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-full font-medium text-sm transition-all whitespace-nowrap min-h-[44px] ${
-                    isActive 
-                      ? 'bg-amber-500 text-white shadow-lg' 
-                      : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
-                  }`}
-                >
-                  <span className="text-base">{tab.icon}</span>
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700 flex-shrink-0 ml-3 mr-1 border-l border-slate-200 pl-3">
-              Finance & Safety:
-            </span>
-            {FINANCIAL_TABS.map((tab) => {
-              const isActive = secondaryTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setSecondaryTab(tab.id)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-full font-medium text-sm transition-all whitespace-nowrap min-h-[44px] ${
-                    isActive 
-                      ? 'bg-emerald-500 text-white shadow-lg' 
-                      : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                  }`}
-                >
-                  <span className="text-base">{tab.icon}</span>
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* SECONDARY NAVIGATION ROW — iter362: flex-wrap so long secondary
-          lists (like Marketplace's 15+ items) wrap cleanly instead of
-          disappearing behind an overflow-x scroll strip. */}
-      <div className="bg-gray-100 border-b">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex flex-wrap items-center gap-2 py-2">
-            <ChevronRight className="h-4 w-4 text-gray-400 flex-shrink-0" />
-            {SECONDARY_TABS[primaryTab]?.map((tab) => {
-              const Icon = tab.lucideIcon;
-              const isActive = secondaryTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setSecondaryTab(tab.id)}
-                  data-testid={`admin-tab-${tab.id}`}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg font-medium text-sm transition-all whitespace-nowrap ${
-                    isActive 
-                      ? 'bg-white text-primary shadow border border-primary/20' 
-                      : 'text-gray-600 hover:bg-white hover:shadow-sm'
-                  }`}
-                >
-                  <span>{tab.icon}</span>
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content Area */}
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="flex gap-6">
-          {/* Main Content */}
-          <div className={`flex-1 ${liveControlsOpen ? 'mr-80' : ''}`}>
+        {/* Main Content Area */}
+        <main className="flex-1 min-w-0 px-4 lg:px-6 py-6">
+          <div className={`${liveControlsOpen ? 'mr-80' : ''}`}>
             {/* Scheduler Status — production health card */}
             <div className="mb-6">
               <SchedulerStatusCard token={token} />
             </div>
             {renderContent()}
           </div>
-        </div>
+        </main>
       </div>
 
       {/* LIVE CONTROLS PANEL (Fixed Right Sidebar) */}

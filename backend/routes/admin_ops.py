@@ -2728,7 +2728,7 @@ async def admin_cleanup_preview(current_user: User = Depends(require_admin)):
 
     # Find IDs of test users
     test_user_docs = await db.users.find(safe_filter, {"_id": 0, "id": 1}).to_list(5000)
-    test_user_ids = [u["id"] for u in test_user_docs]
+    test_user_ids = [u["id"] for u in test_user_docs if u.get("id")]
 
     # Count related data
     preview = {
@@ -2763,7 +2763,7 @@ async def admin_platform_cleanup(current_user: User = Depends(require_admin)):
     ]}
 
     test_user_docs = await db.users.find(safe_filter, {"_id": 0, "id": 1, "email": 1}).to_list(5000)
-    test_user_ids = [u["id"] for u in test_user_docs]
+    test_user_ids = [u["id"] for u in test_user_docs if u.get("id")]
 
     if not test_user_ids:
         return {"success": True, "message": "No test data found. Platform is clean.", "deleted": {}}

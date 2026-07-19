@@ -153,6 +153,19 @@ const PromoSummerLaunchPage = lazy(() => import('./pages/PromoSummerLaunchPage')
 // iter340 — /register deep links (promo campaigns) redirect to /auth
 // preserving the query string (?promo=canada-day etc.).
 const RegisterRedirect = () => <Navigate to={`/auth${window.location.search}`} replace />;
+
+// iter363 — Language toggle 404 fix.
+// Fallback route for /en/* and /fr/* paths that don't have an explicit
+// language-prefixed route. Strips the lang prefix and redirects to the
+// legacy (non-prefixed) route so authenticated / utility pages
+// (/settings, /watchlist, /vehicle-auctions/create, etc.) work when the
+// user clicks the FR/EN toggle. Placed AFTER all explicit /en/* /fr/*
+// routes so those take precedence.
+const StripLangRedirect = () => {
+  const location = useLocation();
+  const stripped = location.pathname.replace(/^\/(en|fr)/, '') || '/';
+  return <Navigate to={`${stripped}${location.search}${location.hash}`} replace />;
+};
 const ContractorDashboard = lazy(() => import('./pages/contractor/ContractorDashboard'));
 // iter317 Directive 3 — Contractor Email Hub
 const ContractorEmailHub = lazy(() => import('./pages/contractor/ContractorEmailHub'));
@@ -542,6 +555,16 @@ const App = () => {
 
           {/* iter358 — Quebec Launch press release (fully indexable) */}
           {/* Note: /presse/lancement-quebec is the FR canonical (with or without /fr/ prefix) */}
+
+          {/* iter363 — Fallback for any /en/* or /fr/* path without an
+              explicit language-prefixed route. Strips the prefix and
+              redirects to the legacy (non-prefixed) URL so authenticated
+              pages (/settings, /watchlist, /admin, /vehicle-auctions/create)
+              work when the user clicks the language toggle. React Router v6
+              prefers static > dynamic > catch-all, so all specific /en/*
+              /fr/* routes above take precedence. */}
+          <Route path="/en/*" element={<StripLangRedirect />} />
+          <Route path="/fr/*" element={<StripLangRedirect />} />
 
           <Route path="/" element={<ErrorBoundary scope="home"><HomePage /></ErrorBoundary>} />
           {/* iter307 — Public referral landing: drops bidvex_ref cookie and redirects to / */}

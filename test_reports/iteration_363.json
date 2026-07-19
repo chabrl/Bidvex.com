@@ -1,0 +1,64 @@
+{
+  "summary": "iter363 launch-gate testing complete: 5 launch-critical items verified end-to-end against preview host. 19/19 pre-existing test_iter363_launch_gate.py tests pass. New /app/backend/tests/test_iter363_live_admin.py (9 tests) verifies all 6 admin endpoints return 200 under super_admin auth. E2E browser tests verified language toggle deep-ID, StripLangRedirect, non-eligible path preservation, contact form (SendGrid delivered=true), admin sidebar desktop/mobile, and MultiLotImageCarousel auto-advance.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_results": {
+    "backend_live_api": {
+      "GET /api/admin/ai-guard/stats (super_admin)": "200 OK - success:true, stats present",
+      "GET /api/admin/ai-guard/flags (super_admin)": "200 OK - success:true, flags:[]",
+      "GET /api/admin/risk-monitoring (super_admin)": "200 OK - no KeyError:'id'",
+      "GET /api/admin/pricing-engine (super_admin)": "200 OK - partner_annual_fee + vehicle_dealer_annual_fee present",
+      "GET /api/admin/coupons (super_admin)": "200 OK",
+      "GET /api/admin/platform-cleanup/preview (super_admin)": "200 OK - no KeyError:'id'",
+      "POST /api/contact/submit (support team)": "200 OK - {ok:true, delivered:true, routed_to:'service@bidvex.com', submission_id:...}",
+      "role_check_normalization_grep": "PASS - zero occurrences of `role != 'admin'` in /app/backend/routes/"
+    },
+    "frontend_e2e": {
+      "language_toggle_deep_id_preserved": "PASS - /en/vehicle-auctions/testid123 -> /fr/encheres-vehicules/testid123, html.lang=fr",
+      "strip_lang_en_settings": "PASS - /en/settings redirected to /settings",
+      "strip_lang_fr_settings": "PASS - /fr/settings redirected to /settings",
+      "non_eligible_path_preserved": "PASS - /settings + FR toggle kept URL at /settings",
+      "contact_form_e2e": "PASS - form filled + submitted -> 200, success banner '✓ Message routed to service@bidvex.com', delivered=true, no mailto redirect",
+      "admin_sidebar_desktop": "PASS - left rail visible with PRIMARY SECTIONS header and all nav items (Marketplace, User Management, Listings Moderation, Flagged Listings, Disputed Settlements, Manage All Auctions, Deletion Requests, Listing Change Requests, Tax Verification, Tax Dashboard, Auction Control, Storage Deposits, Storage Auctions, Facilities, Categories, Partner Applications, ...)",
+      "admin_sidebar_mobile_hamburger": "PASS - [data-testid=admin-sidebar-open] hamburger visible on 390px viewport",
+      "multilot_carousel_present": "PASS - [data-testid=lot-carousel-179b62b9-...] rendered on /en/lots (multi-lot listing with 10 images)",
+      "multilot_carousel_auto_advance": "PASS - data-active-index cycled 2 -> 4 -> 5 over ~5.5s (≈ every 2.5s)",
+      "multilot_carousel_intersection_observer": "CODE VERIFIED - code correctly uses IntersectionObserver with threshold 0.1 + setInterval gated on visible=true. Runtime pause test was inconclusive because /en/lots page is too short to fully scroll carousel out of the 10% visibility threshold (not a real bug)."
+    }
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter363_launch_gate.py",
+    "/app/backend/tests/test_iter363_live_admin.py",
+    "/app/test_reports/pytest/iter363_relaunch.xml",
+    "/app/test_reports/pytest/iter363_live_admin.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "role-check normalization audit (grep `role != 'admin'` across /app/backend/routes/): 0 hits — the sed sweep from iter363 is complete. No other routes still refuse super_admin.",
+    "Contact form buildMailtoFallback removal is complete (static grep + runtime confirmation that success state fires on 200 without any window.location.href mailto redirect).",
+    "MultiLotImageCarousel: implementation is correct (IntersectionObserver + threshold 0.1 + setInterval gated on visible). Single-image lots correctly fall back to static SafeImage rendering (uniqueImages.length === 1 early return).",
+    "Admin sidebar renders correctly with data-testid=admin-shell wrapper and PRIMARY SECTIONS group visible on desktop; hamburger [data-testid=admin-sidebar-open] visible on <1024px viewports.",
+    "SendGrid delivery pipeline verified live — 3 test POSTs all returned delivered:true from preview host."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter363_live_admin.py (NEW - 9 tests, all passing)"
+  ],
+  "success_rate": {
+    "backend": "100% (19/19 static + 9/9 live admin API = 28/28)",
+    "frontend": "100% (all launch-critical E2E flows verified)"
+  },
+  "test_credentials": {
+    "super_admin": "charbel911@gmail.com / Anderosli123!@# (verified working — token issued by /api/auth/login)"
+  },
+  "seed_data_creation": "None - only sent 3 contact form POSTs (submission_ids: d4d5cce8..., 29a4235b..., plus fixtures) which are legitimate SendGrid deliveries per user's instruction that 2-3 verification POSTs are acceptable.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "iter363 is fully green. All 5 launch-critical items verified: (1) language toggle deep-ID + StripLangRedirect + non-eligible path, (2) Contact form -> SendGrid with delivered=true, (3) admin API role-check normalization complete (grep confirms zero `role != 'admin'` residuals), (4) Admin sidebar with left rail + mobile hamburger works, (5) MultiLotImageCarousel auto-advances every 2.5s with active-index cycling on the seeded multi-lot 179b62b9. Preview URL https://prod-verify-2.preview.emergentagent.com. Admin login is rate-limited to 5 failed attempts, so re-use the API token from POST /api/auth/login when writing new Playwright tests instead of typing credentials into the UI."
+}

@@ -41,7 +41,7 @@ trust_safety_router = APIRouter(tags=["Trust & Safety"])
 @trust_safety_router.get("/admin/blocked-ips")
 async def get_blocked_ips_list(current_user: User = Depends(get_current_user)):
     """List all IPs currently blocked by brute-force protection."""
-    if current_user.role != 'admin':
+    if current_user.role not in ('admin', 'super_admin'):
         raise HTTPException(status_code=403, detail="Admin access required")
     from services.brute_force import get_blocked_ips
     blocked = await get_blocked_ips()
@@ -51,7 +51,7 @@ async def get_blocked_ips_list(current_user: User = Depends(get_current_user)):
 @trust_safety_router.post("/admin/blocked-ips/{ip}/unblock")
 async def admin_unblock_ip(ip: str, current_user: User = Depends(get_current_user)):
     """Manually unblock an IP address."""
-    if current_user.role != 'admin':
+    if current_user.role not in ('admin', 'super_admin'):
         raise HTTPException(status_code=403, detail="Admin access required")
     from services.brute_force import unblock_ip
     removed = await unblock_ip(ip)
@@ -241,7 +241,7 @@ async def get_fraud_flags(
     current_user: User = Depends(get_current_user)
 ):
     """Get all fraud flags with optional filters."""
-    if current_user.role != 'admin':
+    if current_user.role not in ('admin', 'super_admin'):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     fraud_service = get_fraud_detection_service(get_db())
@@ -262,7 +262,7 @@ async def scan_for_fraud(
     current_user: User = Depends(get_current_user)
 ):
     """Run fraud detection scan on all recent auctions."""
-    if current_user.role != 'admin':
+    if current_user.role not in ('admin', 'super_admin'):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     fraud_service = get_fraud_detection_service(get_db())
@@ -295,7 +295,7 @@ async def analyze_single_auction(
     current_user: User = Depends(get_current_user)
 ):
     """Analyze a specific auction for fraud."""
-    if current_user.role != 'admin':
+    if current_user.role not in ('admin', 'super_admin'):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     fraud_service = get_fraud_detection_service(get_db())
@@ -321,7 +321,7 @@ async def update_flag_status(
     current_user: User = Depends(get_current_user)
 ):
     """Update the status of a fraud flag."""
-    if current_user.role != 'admin':
+    if current_user.role not in ('admin', 'super_admin'):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     new_status = data.get("status")
@@ -356,7 +356,7 @@ async def suspend_auction(
     current_user: User = Depends(get_current_user)
 ):
     """Suspend an auction due to fraud concerns."""
-    if current_user.role != 'admin':
+    if current_user.role not in ('admin', 'super_admin'):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     reason = data.get("reason", "Suspended for fraud investigation")
@@ -386,7 +386,7 @@ async def generate_flag_summary(
     current_user: User = Depends(get_current_user)
 ):
     """Generate AI-powered fraud summary for a flag."""
-    if current_user.role != 'admin':
+    if current_user.role not in ('admin', 'super_admin'):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     db = get_db()
@@ -416,7 +416,7 @@ async def generate_flag_summary(
 async def get_fraud_stats(current_user: User = Depends(get_current_user)):
     """Get fraud detection statistics."""
     db = get_db()
-    if current_user.role != 'admin':
+    if current_user.role not in ('admin', 'super_admin'):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     # Get counts by status
@@ -451,7 +451,7 @@ async def get_risk_monitoring(
 ):
     """Risk Monitoring Dashboard — returns high-risk flags, users, and aggregate stats."""
     db = get_db()
-    if current_user.role != 'admin':
+    if current_user.role not in ('admin', 'super_admin'):
         raise HTTPException(status_code=403, detail="Admin access required")
 
     threshold = min_risk / 100.0
@@ -467,11 +467,18 @@ async def get_risk_monitoring(
     all_users = await users_cursor
     high_risk_users = []
     for u in all_users:
-        ts = await calculate_trust_score(u["id"])
+        uid = u.get("id")
+        if not uid:
+            continue  # skip malformed users without a stable id
+        try:
+            ts = await calculate_trust_score(uid)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"[risk-monitoring] trust score failed for {uid}: {exc}")
+            continue
         risk_score = 100 - ts
         if risk_score >= min_risk:
             high_risk_users.append({
-                "user_id": u["id"],
+                "user_id": uid,
                 "name": u.get("name", "Unknown"),
                 "email": u.get("email", ""),
                 "trust_score": ts,
@@ -517,7 +524,7 @@ async def risk_monitoring_clear_flag(
 ):
     """Quick-clear a high-risk flag (false positive) with admin notes."""
     db = get_db()
-    if current_user.role != 'admin':
+    if current_user.role not in ('admin', 'super_admin'):
         raise HTTPException(status_code=403, detail="Admin access required")
 
     notes = data.get("notes", "Cleared via Risk Monitoring Dashboard")

@@ -52,7 +52,7 @@ async def place_bid(request: Request, bid_data: BidCreate, current_user: User = 
     await ensure_bidding_allowed(db, current_user.id)
 
     # ========== HIGH-TRUST GATEKEEPING ==========
-    if current_user.role != 'admin':
+    if current_user.role not in ('admin', 'super_admin'):
         if not current_user.phone_verified:
             raise HTTPException(
                 status_code=403,
@@ -180,7 +180,7 @@ async def place_bid(request: Request, bid_data: BidCreate, current_user: User = 
     # ========== HIGH-VALUE DEPOSIT CHECK ($1k hold for >$10k auctions) ==========
     from services.pricing_config import DEPOSIT_THRESHOLD_CAD, DEPOSIT_AMOUNT_DOLLARS
     starting_price = listing.get("starting_price", 0)
-    if starting_price >= DEPOSIT_THRESHOLD_CAD and current_user.role != 'admin':
+    if starting_price >= DEPOSIT_THRESHOLD_CAD and current_user.role not in ('admin', 'super_admin'):
         active_deposit = await db.bidding_deposits.find_one({
             "user_id": current_user.id,
             "listing_id": bid_data.listing_id,
@@ -198,7 +198,7 @@ async def place_bid(request: Request, bid_data: BidCreate, current_user: User = 
 
     # ========== STRICT BIDDER DEPOSIT (Spec Feature 1) ==========
     # Listing-level requires_deposit (partner-defined). Charged on FIRST bid only.
-    if listing.get("requires_deposit") and current_user.role != 'admin':
+    if listing.get("requires_deposit") and current_user.role not in ('admin', 'super_admin'):
         existing_dep = await db.bidding_deposits.find_one({
             "auction_id": bid_data.listing_id,
             "user_id": current_user.id,

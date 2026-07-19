@@ -55,6 +55,28 @@ export function LanguageProvider({ children }) {
     if (targetLang !== 'en' && targetLang !== 'fr') return;
     if (targetLang === lang && urlHasLangPrefix) return;
 
+    // iter363 — Language toggle 404 fix.
+    // Only navigate when the current path is language-prefix-eligible.
+    // Otherwise (authenticated/utility pages like /settings, /messages,
+    // /admin, /watchlist, /vehicle-auctions/create), just change the
+    // i18n language without navigation — no need to rewrite the URL,
+    // no risk of hitting a missing /en/* /fr/* route.
+    const bare = stripLangPrefix(location.pathname);
+    const isPrefixEligible = urlHasLangPrefix
+      || bare === '/'
+      || bare in EN_TO_FR
+      || bare in FR_TO_EN
+      // Deep-ID routes on prefix-eligible parents (e.g. /vehicle-auctions/abc123, /listing/abc, /lots/xyz)
+      || Object.keys(EN_TO_FR).some((k) => k !== '/' && bare.startsWith(k + '/'))
+      || Object.keys(FR_TO_EN).some((k) => k !== '/' && bare.startsWith(k + '/'));
+
+    if (!isPrefixEligible) {
+      // Just change the language; keep the URL as-is.
+      if (i18n.language !== targetLang) i18n.changeLanguage(targetLang);
+      if (typeof document !== 'undefined') document.documentElement.lang = targetLang;
+      return;
+    }
+
     // Build the new URL: same page in the target language.
     // If the current URL has NO lang prefix, we still add one AND translate.
     const newPath = toLangPath(location.pathname + location.search + location.hash, targetLang);
@@ -62,7 +84,7 @@ export function LanguageProvider({ children }) {
     // Trigger a real navigation event — this is what makes Google index
     // /fr/encheres-vehicules as a distinct URL with French content.
     navigate(newPath);
-  }, [lang, urlHasLangPrefix, location.pathname, location.search, location.hash, navigate]);
+  }, [lang, urlHasLangPrefix, location.pathname, location.search, location.hash, navigate, i18n]);
 
   const buildLangPath = useCallback((path) => {
     if (!path || typeof path !== 'string') return path;

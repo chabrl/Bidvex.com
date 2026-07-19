@@ -175,13 +175,14 @@ export default function ContactUsPage() {
 
 
 /**
- * ContactForm — Backend POST with mailto: graceful fallback.
+ * ContactForm — Direct backend POST (no mailto: fallback).
  *
  * iter363: submits to `POST /api/contact/submit` via axios. SendGrid
  * routes the message to the correct team email server-side. Client
- * receives a proper success/error response. If the POST fails (offline,
- * SendGrid outage, etc.), the fallback link opens the user's mail
- * client with a pre-filled mailto: envelope so no message is ever lost.
+ * receives a proper success/error response. The mailto: fallback was
+ * removed per user directive — if the POST fails, an explicit error
+ * message is shown and the user can retry or click the team's direct
+ * email link elsewhere on the page.
  */
 function ContactForm({ lang, teams, copy }) {
   const [name, setName]       = useState('');
@@ -197,20 +198,6 @@ function ContactForm({ lang, teams, copy }) {
 
   const canSubmit = name.trim() && email.trim() && message.trim().length >= 10 &&
                     status.kind !== 'sending';
-
-  const buildMailtoFallback = () => {
-    const subject = `[${selectedTeam.subjectLine || selectedTeam.title}] ${name.trim()}`;
-    const body = [
-      `${copy.formName}: ${name}`,
-      `${copy.formEmail}: ${email}`,
-      '',
-      `${copy.formMessage}:`,
-      message,
-      '',
-      '— Sent via bidvex.com contact form',
-    ].join('\n');
-    return `mailto:${selectedTeam.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -243,14 +230,19 @@ function ContactForm({ lang, teams, copy }) {
         throw new Error('Backend returned ok=false');
       }
     } catch (err) {
-      // Graceful fallback: open the user's mail client. No message is lost.
+      // iter363 — mailto: fallback removed per user directive.
+      // Show an explicit error so users retry or use the direct team
+      // email link visible on the same page.
+      const detail = err?.response?.data?.detail;
+      const backendMsg = typeof detail === 'string'
+        ? detail
+        : (detail?.[`message_${lang}`] || detail?.message_en);
       setStatus({
-        kind: 'fallback',
-        detail: lang === 'fr'
-          ? 'Envoi automatique indisponible — ouverture de votre logiciel de courriel…'
-          : 'Direct send unavailable — opening your mail client…',
+        kind: 'error',
+        detail: backendMsg || (lang === 'fr'
+          ? "Envoi impossible pour le moment. Merci de réessayer dans quelques minutes ou de cliquer sur l'adresse courriel de l'équipe ci-dessus."
+          : 'Unable to send right now. Please retry in a few minutes or click the team email address above.'),
       });
-      window.location.href = buildMailtoFallback();
     }
   };
 
@@ -332,8 +324,8 @@ function ContactForm({ lang, teams, copy }) {
               ✓ {status.detail}
             </div>
           )}
-          {status.kind === 'fallback' && (
-            <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded p-2" data-testid="contact-form-fallback">
+          {status.kind === 'error' && (
+            <div className="text-sm text-rose-700 bg-rose-50 border border-rose-200 rounded p-2" data-testid="contact-form-error">
               {status.detail}
             </div>
           )}
