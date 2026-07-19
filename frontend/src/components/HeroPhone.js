@@ -34,25 +34,24 @@ const HeroPhone = () => {
       {/* Phone image (floating wrapper) */}
       <div className="hero-phone-wrapper">
         <img
-          // iter362 — Serve language-variant when available; fall back to
-          // the original mockup if the FR variant hasn't been dropped in yet.
-          // Designer: add `hero-phone-mockup-fr.png` to /public/assets/ to
-          // remove the recursive-mirror effect on the French homepage.
-          src={fr ? "/assets/hero-phone-mockup-fr.png" : "/assets/hero-phone-mockup.png"}
+          // iter363 — Pillow-generated neutral auction mockup (not the
+          // BidVex homepage) so there's no recursive-mirror effect. Both
+          // EN + FR variants exist at /static/hero-phone-{lang}.png.
+          // Content: sample vehicle auction card in the current language.
+          src={fr ? "/static/hero-phone-fr.png" : "/static/hero-phone-en.png"}
           onError={(e) => {
-            // Fallback: if the language-specific PNG 404s, use the base PNG.
             if (!e.currentTarget.dataset.fellBack) {
               e.currentTarget.dataset.fellBack = "1";
+              // Fallback: use the original mockup PNG if the new static
+              // assets haven't been served yet (e.g., during first deploy).
               e.currentTarget.src = "/assets/hero-phone-mockup.png";
             }
           }}
-          alt={fr ? "Application mobile BidVex" : "BidVex mobile app"}
+          alt={fr ? "Aperçu de l'application mobile BidVex" : "BidVex mobile app preview"}
           className="hero-phone-image"
           loading="eager"
           fetchPriority="high"
           draggable={false}
-          // Explicit intrinsic dimensions prevent CLS during load (WCAG +
-          // Lighthouse best practice). Matches PNG native size 475×975.
           width="460"
           height="945"
         />

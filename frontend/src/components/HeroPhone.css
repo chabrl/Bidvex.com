@@ -45,6 +45,10 @@
   aspect-ratio: 475 / 975;
   width: 100%;
   max-width: 460px;
+  /* iter363 — never allow the phone mockup to dominate mobile viewports.
+     70vh cap prevents the phone from pushing all headline text below
+     the fold on 390px iPhones. */
+  max-height: 70vh;
 }
 
 /* PHONE IMAGE */
@@ -60,6 +64,33 @@
   /* iter358 CWV — explicit aspect-ratio prevents layout shift once the
      PNG's intrinsic dimensions are known. */
   aspect-ratio: 475 / 975;
+  /* iter363 — object-fit: contain preserves the mockup ratio without
+     cropping or stretching. Combined with the wrapper's max-height cap,
+     this eliminates the "phone takes over the entire mobile screen" bug. */
+  object-fit: contain;
+  object-position: center;
+}
+
+/* iter363 — Mobile-only sizing rules. On <=768px the phone must NOT
+   dominate the hero — headline text ("Discover. Bid. Win.") must stay
+   above the fold on 390px iPhones and 360px Androids. */
+@media (max-width: 768px) {
+  .hero-phone-wrapper {
+    max-width: 60%;
+    max-height: 50vh;
+  }
+  .hero-phone-image {
+    max-height: 50vh;
+  }
+}
+@media (max-width: 480px) {
+  .hero-phone-wrapper {
+    max-width: 55%;
+    max-height: 42vh;
+  }
+  .hero-phone-image {
+    max-height: 42vh;
+  }
 }
 
 /* FLOATING BADGES */

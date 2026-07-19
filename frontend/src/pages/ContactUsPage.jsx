@@ -175,43 +175,83 @@ export default function ContactUsPage() {
 
 
 /**
- * ContactForm — Subject-routed mailto: form.
+ * ContactForm — Backend POST with mailto: graceful fallback.
  *
- * When the user picks a Subject from the dropdown, we route the message
- * to the correct team's email via a `mailto:` link. This is deliberately
- * client-side: no backend outage can prevent Charbel's inbox from
- * receiving it, and it avoids the spam/bounce complexity of a backend
- * SMTP handoff. Google Merchant Center accepts mailto forms.
+ * iter363: submits to `POST /api/contact/submit` via axios. SendGrid
+ * routes the message to the correct team email server-side. Client
+ * receives a proper success/error response. If the POST fails (offline,
+ * SendGrid outage, etc.), the fallback link opens the user's mail
+ * client with a pre-filled mailto: envelope so no message is ever lost.
  */
 function ContactForm({ lang, teams, copy }) {
   const [name, setName]       = useState('');
   const [email, setEmail]     = useState('');
   const [teamId, setTeamId]   = useState(teams[0].id);
   const [message, setMessage] = useState('');
+  const [status, setStatus]   = useState({ kind: 'idle', detail: '' });
 
   const selectedTeam = useMemo(
     () => teams.find(t => t.id === teamId) || teams[0],
     [teamId, teams],
   );
 
-  const canSubmit = name.trim() && email.trim() && message.trim();
+  const canSubmit = name.trim() && email.trim() && message.trim().length >= 10 &&
+                    status.kind !== 'sending';
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const buildMailtoFallback = () => {
     const subject = `[${selectedTeam.subjectLine || selectedTeam.title}] ${name.trim()}`;
     const body = [
       `${copy.formName}: ${name}`,
       `${copy.formEmail}: ${email}`,
       '',
-      copy.formMessage + ':',
+      `${copy.formMessage}:`,
       message,
       '',
       '— Sent via bidvex.com contact form',
     ].join('\n');
-    const mailto = `mailto:${selectedTeam.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    // Trigger the user's default mail client. If none is configured, this
-    // is a no-op (the user will manually copy the email address instead).
-    window.location.href = mailto;
+    return `mailto:${selectedTeam.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!canSubmit) return;
+    setStatus({ kind: 'sending', detail: '' });
+
+    // Late-import axios so the initial page bundle stays small (Contact is
+    // rarely on the critical path — a saved 30KB gz for first-page hits).
+    const axios = (await import('axios')).default;
+    const API = process.env.REACT_APP_BACKEND_URL || '';
+
+    try {
+      const res = await axios.post(`${API}/api/contact/submit`, {
+        name:    name.trim(),
+        email:   email.trim(),
+        team_id: teamId,
+        message: message.trim(),
+        lang,
+      }, { timeout: 12000 });
+
+      if (res.data?.ok) {
+        setStatus({
+          kind: 'success',
+          detail: lang === 'fr'
+            ? `Message envoyé à ${res.data.routed_to}`
+            : `Message routed to ${res.data.routed_to}`,
+        });
+        setName(''); setEmail(''); setMessage('');
+      } else {
+        throw new Error('Backend returned ok=false');
+      }
+    } catch (err) {
+      // Graceful fallback: open the user's mail client. No message is lost.
+      setStatus({
+        kind: 'fallback',
+        detail: lang === 'fr'
+          ? 'Envoi automatique indisponible — ouverture de votre logiciel de courriel…'
+          : 'Direct send unavailable — opening your mail client…',
+      });
+      window.location.href = buildMailtoFallback();
+    }
   };
 
   return (
@@ -283,8 +323,20 @@ function ContactForm({ lang, teams, copy }) {
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               required
+              minLength={10}
             />
           </div>
+
+          {status.kind === 'success' && (
+            <div className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded p-2" data-testid="contact-form-success">
+              ✓ {status.detail}
+            </div>
+          )}
+          {status.kind === 'fallback' && (
+            <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded p-2" data-testid="contact-form-fallback">
+              {status.detail}
+            </div>
+          )}
 
           <Button
             type="submit"
@@ -293,7 +345,9 @@ function ContactForm({ lang, teams, copy }) {
             className="w-full sm:w-auto"
           >
             <Send className="w-4 h-4 mr-2" />
-            {copy.formSubmit}
+            {status.kind === 'sending'
+              ? (lang === 'fr' ? 'Envoi…' : 'Sending…')
+              : copy.formSubmit}
           </Button>
         </form>
       </CardContent>

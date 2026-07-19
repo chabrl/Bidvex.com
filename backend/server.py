@@ -1619,6 +1619,11 @@ try:
     app.include_router(_seo_admin_router)
     logger.info("[iter361] seo_admin router mounted at /api/admin/seo/*")
 
+    # iter363 — Public contact form endpoint (routes to team inbox via SendGrid).
+    from routes.contact import contact_router as _contact_router
+    app.include_router(_contact_router)
+    logger.info("[iter363] contact router mounted at /api/contact/submit")
+
     # iter318 BidVex Careers module — public + admin job/applicant API
     try:
         from routes.careers import router as careers_router
