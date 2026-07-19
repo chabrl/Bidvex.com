@@ -132,6 +132,8 @@ import SchedulerStatusCard from '../components/SchedulerStatusCard';
 // iter363 — Admin left sidebar (replaces horizontal PRIMARY/SECONDARY tabs).
 import AdminSidebar from '../components/admin/AdminSidebar';
 import { Menu as MenuIcon } from 'lucide-react';
+// iter364 — Admin notification bell.
+import NotificationBell from '../components/admin/NotificationBell';
 import { 
   Users, Package, Gavel, Shield, TrendingUp, Bell, Settings, FileText, 
   MessageSquare, DollarSign, Search, Image, CreditCard, Megaphone, 
@@ -745,6 +747,15 @@ const AdminDashboard = () => {
               <Badge className="gradient-bg text-white border-0 px-4 py-1.5">
                 {user.role === 'super_admin' ? '👑 Super Admin' : '⚡ Admin'}
               </Badge>
+              {/* iter364 — Notification bell (60s poll, dropdown with category counts) */}
+              <NotificationBell
+                token={token}
+                lang={typeof navigator !== 'undefined' && navigator.language?.startsWith('fr') ? 'fr' : 'en'}
+                onNavigate={(dest) => {
+                  handlePrimaryTabClick(dest.primary);
+                  if (dest.secondary) setSecondaryTab(dest.secondary);
+                }}
+              />
               <Button 
                 variant={liveControlsOpen ? "default" : "outline"}
                 onClick={() => setLiveControlsOpen(!liveControlsOpen)}

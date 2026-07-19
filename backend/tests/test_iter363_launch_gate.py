@@ -141,23 +141,33 @@ def test_hero_phone_fr_asset_exists():
     assert os.path.getsize(p) > 5000
 
 
-def test_heroPhone_js_references_new_static_paths():
+def test_heroPhone_js_references_new_client_assets():
+    """iter364: hero mockup now uses client-provided /assets/hero-phone-{lang}.png."""
     text = open("/app/frontend/src/components/HeroPhone.js", "r", encoding="utf-8").read()
-    # iter363: PNG served from /static/hero-phone-{lang}.png
-    assert "/static/hero-phone-en.png" in text
-    assert "/static/hero-phone-fr.png" in text
+    # iter364: PNGs served from /assets/hero-phone-{lang}.png
+    assert "/assets/hero-phone-en.png" in text
+    assert "/assets/hero-phone-fr.png" in text
     # Fallback path still present
     assert "hero-phone-mockup.png" in text
 
 
-def test_heroPhone_css_has_mobile_max_height_caps():
-    """CLS + UX fix: phone must never exceed viewport-height caps on mobile."""
+def test_heroPhone_client_assets_exist():
+    import os
+    for lang in ("en", "fr"):
+        p = f"/app/frontend/public/assets/hero-phone-{lang}.png"
+        assert os.path.isfile(p), f"Missing {p}"
+        assert os.path.getsize(p) > 100_000, f"{p} looks too small (<100KB)"
+
+
+def test_heroPhone_css_uses_client_asset_aspect_and_overflow():
+    """iter364: aspect-ratio + overflow: visible (hand extends outside frame)."""
     text = open("/app/frontend/src/components/HeroPhone.css", "r", encoding="utf-8").read()
-    # Desktop cap
-    assert "70vh" in text
-    # Mobile caps
-    assert "50vh" in text  # < 768px
-    assert "42vh" in text  # < 480px
+    # New aspect ratio matches the 1295×1215 client render
+    assert "1295 / 1215" in text
+    # `overflow: visible` MUST be present so the hand isn't cropped
+    assert "overflow: visible" in text
+    # Mobile: <=768px uses 280px max-width per iter364 spec
+    assert "max-width: 280px" in text
 
 
 def test_heroPhone_css_uses_object_fit_contain():

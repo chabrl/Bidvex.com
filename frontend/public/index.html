@@ -129,6 +129,25 @@
           gtag('js', new Date());
           gtag('config', 'AW-18140095337');
         </script>
+
+        <!-- iter364 — Google AdSense (loads only on prod hosts + when a valid
+             publisher ID is configured; the AdUnit component gates rendering
+             so no wasted impressions or console errors on preview / dev). -->
+        <script>
+          (function() {
+            var host = window.location.hostname;
+            var PROD_HOSTS = ['www.bidvex.com','bidvex.com','launchapp-4-r-1774886029.emergent.host'];
+            // Placeholder publisher ID — replace when AdSense is approved.
+            var PUBLISHER = 'ca-pub-XXXXXXXXXXXXXXXX';
+            if (PROD_HOSTS.indexOf(host) !== -1 && PUBLISHER.indexOf('X') === -1) {
+              var s = document.createElement('script');
+              s.async = true;
+              s.crossOrigin = 'anonymous';
+              s.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=' + PUBLISHER;
+              document.head.appendChild(s);
+            }
+          })();
+        </script>
     </head>
     <body>
         <noscript>You need to enable JavaScript to run this app.</noscript>

@@ -23,6 +23,10 @@ import {
 } from 'lucide-react';
 import PartnerBadge from '../PartnerBadge';
 import SafeImage from '../SafeImage';
+// iter364 — Multi-image auto-carousel for vehicle cards with 2+ photos.
+import MultiLotImageCarousel from '../MultiLotImageCarousel';
+// iter364 — Compare-listings checkbox.
+import { CompareCheckbox } from '../CompareBar';
 import { formatListingPrice } from '../../utils/currencyFormatter';
 // iter286 — Bug 5 — Carfax badge needs viewer's broker status.
 import { useAuth } from '../../contexts/AuthContext';
@@ -53,6 +57,19 @@ const VehicleListingCard = ({ vehicle, countdown, onClick, onQuickView, compact 
   const mainImage = (vehicle.media && (
     vehicle.media.find((m) => m.category === 'front')?.url || vehicle.media[0]?.url
   )) || vehicle.image_url || (vehicle.photos && vehicle.photos[0]) || null;
+
+  // iter364 — Aggregate up to 10 image URLs for the auto-carousel.
+  const vehicleImages = (() => {
+    const out = [];
+    const push = (u) => {
+      if (u && typeof u === 'string' && !out.includes(u)) out.push(u);
+    };
+    for (const m of (vehicle.media || [])) push(m?.url);
+    for (const p of (vehicle.photos || [])) push(p);
+    push(vehicle.image_url);
+    return out.slice(0, 10);
+  })();
+  const useCarousel = vehicleImages.length >= 2 && !imgError;
 
   const titleEn = vehicle.title_en || vehicle.title || '';
   const titleFr = vehicle.title_fr || titleEn;
@@ -185,7 +202,14 @@ const VehicleListingCard = ({ vehicle, countdown, onClick, onQuickView, compact 
         aria-label={cardTitle}
         data-testid={`vehicle-card-image-${vehicle.id}`}
       >
-        {mainImage && !imgError ? (
+        {useCarousel ? (
+          <MultiLotImageCarousel
+            images={vehicleImages}
+            alt={cardTitle}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            testId={`vehicle-carousel-${vehicle.id}`}
+          />
+        ) : mainImage && !imgError ? (
           <SafeImage
             src={mainImage}
             alt={cardTitle}
@@ -201,6 +225,11 @@ const VehicleListingCard = ({ vehicle, countdown, onClick, onQuickView, compact 
             <Car className="h-16 w-16 text-slate-300 dark:text-slate-700" />
           </div>
         )}
+
+        {/* iter364 — Compare checkbox */}
+        <div className="absolute bottom-2 left-2 z-30" onClick={(e) => { e.stopPropagation(); }}>
+          <CompareCheckbox item={vehicle} section="vehicle" />
+        </div>
 
         {/* Top-left badges */}
         <div className="absolute top-2 left-2 flex flex-col gap-1.5 max-w-[60%]">

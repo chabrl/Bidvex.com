@@ -1,6 +1,10 @@
 /* ─────────────────────────────────────────────────────────────
- * Homepage Hero — Phone Mockup
- * Floating animation + ambient glow + live activity badges
+ * iter364 — Homepage Hero — Phone Mockup (client-provided assets).
+ *
+ * Two premium renders (EN + FR) sized 1295×1215 (aspect ratio ≈ 1.066).
+ * The hand extends BELOW and to the RIGHT of the phone frame, so
+ * `overflow: visible` is required so the hand isn't cropped by any
+ * ancestor container.
  * ───────────────────────────────────────────────────────────── */
 
 /* CONTAINER */
@@ -10,21 +14,21 @@
   align-items: center;
   justify-content: center;
   width: 100%;
-  max-width: 480px;
+  max-width: 460px;
   margin: 0 auto;
+  overflow: visible;
   animation: phoneEntry 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
-  /* Stagger entry slightly behind the text content */
   animation-delay: 0.5s;
 }
 
 /* AMBIENT GLOW behind phone */
 .hero-phone-glow {
   position: absolute;
-  bottom: -40px;
+  bottom: 4%;
   left: 50%;
-  width: 60%;
-  height: 70px;
-  background: radial-gradient(ellipse, rgba(34, 211, 238, 0.55) 0%, rgba(33, 134, 198, 0.25) 50%, transparent 75%);
+  width: 55%;
+  height: 60px;
+  background: radial-gradient(ellipse, rgba(34, 211, 238, 0.35) 0%, rgba(33, 134, 198, 0.15) 55%, transparent 80%);
   border-radius: 50%;
   filter: blur(22px);
   animation: glowPulse 4s ease-in-out infinite;
@@ -34,159 +38,35 @@
 }
 
 /* PHONE WRAPPER (the float lives here) */
-.hero-phone-wrapper {
+.hero-phone-wrapper,
+.hero-phone-section {
   position: relative;
   z-index: 2;
   animation: phoneFloat 6s ease-in-out infinite;
   transform-origin: center bottom;
   will-change: transform;
-  /* iter358 CWV — reserve container size to prevent CLS while the phone
-     image is still decoding. Aspect ratio matches the real PNG (475×975). */
-  aspect-ratio: 475 / 975;
+  /* iter364 — aspect ratio matches the new hand+phone render (1295×1215). */
+  aspect-ratio: 1295 / 1215;
   width: 100%;
-  max-width: 460px;
-  /* iter363 — never allow the phone mockup to dominate mobile viewports.
-     70vh cap prevents the phone from pushing all headline text below
-     the fold on 390px iPhones. */
-  max-height: 70vh;
+  max-width: 420px;
+  overflow: visible;
 }
 
 /* PHONE IMAGE */
-.hero-phone-image {
+.hero-phone-image,
+.hero-phone-mockup {
   width: 100%;
-  max-width: 460px;
+  max-width: 420px;
   height: auto;
   display: block;
   background: transparent;
-  filter: drop-shadow(0 24px 48px rgba(11, 37, 69, 0.45));
+  filter: drop-shadow(0 24px 48px rgba(11, 37, 69, 0.35));
   user-select: none;
   -webkit-user-drag: none;
-  /* iter358 CWV — explicit aspect-ratio prevents layout shift once the
-     PNG's intrinsic dimensions are known. */
-  aspect-ratio: 475 / 975;
-  /* iter363 — object-fit: contain preserves the mockup ratio without
-     cropping or stretching. Combined with the wrapper's max-height cap,
-     this eliminates the "phone takes over the entire mobile screen" bug. */
+  aspect-ratio: 1295 / 1215;
   object-fit: contain;
   object-position: center;
-}
-
-/* iter363 — Mobile-only sizing rules. On <=768px the phone must NOT
-   dominate the hero — headline text ("Discover. Bid. Win.") must stay
-   above the fold on 390px iPhones and 360px Androids. */
-@media (max-width: 768px) {
-  .hero-phone-wrapper {
-    max-width: 60%;
-    max-height: 50vh;
-  }
-  .hero-phone-image {
-    max-height: 50vh;
-  }
-}
-@media (max-width: 480px) {
-  .hero-phone-wrapper {
-    max-width: 55%;
-    max-height: 42vh;
-  }
-  .hero-phone-image {
-    max-height: 42vh;
-  }
-}
-
-/* FLOATING BADGES */
-.hero-badge {
-  position: absolute;
-  z-index: 4;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background: rgba(255, 255, 255, 0.96);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  border-radius: 24px;
-  padding: 8px 14px;
-  box-shadow: 0 12px 28px rgba(11, 37, 69, 0.28);
-  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-  font-size: 12px;
-  font-weight: 600;
-  color: #0B2545;
-  white-space: nowrap;
-  pointer-events: none;
-}
-
-.hero-badge--top-left {
-  top: 14%;
-  /* Desktop default — badges sit close to the visible phone bezel.
-     The phone PNG has transparent lateral padding, so anchoring by the
-     badge's RIGHT edge with a percentage that reaches INTO the container
-     places it just outside the actual visible bezel (~10–14px gap),
-     while longer FR text grows OUTWARD (left), never into the phone. */
-  right: calc(100% - 70px);
-  left: auto;
-  animation: badgeFloat1 5s ease-in-out infinite;
-}
-
-.hero-badge--top-right {
-  top: 8%;
-  /* Mirror of top-left: anchor by LEFT edge inside container so badge
-     sits right next to the visible bezel; longer FR text grows OUTWARD (right). */
-  left: calc(100% - 70px);
-  right: auto;
-  animation: badgeFloat2 5.5s ease-in-out infinite 0.8s;
-}
-
-.hero-badge--bottom {
-  bottom: 14%;
-  left: -16%;
-  animation: badgeFloat3 4.8s ease-in-out infinite 1.4s;
-  padding: 10px 14px;
-  border-radius: 16px;
-}
-
-/* STATUS DOTS */
-.hero-badge__dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.hero-badge__dot--green {
-  background: #059669;
-  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.25);
-  animation: dotPulse 2s ease-in-out infinite;
-}
-
-.hero-badge__dot--blue {
-  background: #2186C6;
-  box-shadow: 0 0 0 3px rgba(33, 134, 198, 0.25);
-  animation: dotPulse 2s ease-in-out infinite 0.5s;
-}
-
-/* BOTTOM BADGE INFO */
-.hero-badge__icon {
-  font-size: 16px;
-}
-
-.hero-badge__info {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.hero-badge__label {
-  font-size: 10px;
-  font-weight: 700;
-  color: #059669;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.hero-badge__value {
-  font-size: 12px;
-  font-weight: 600;
-  color: #0B2545;
+  overflow: visible;
 }
 
 /* KEYFRAMES */
@@ -196,11 +76,9 @@
 }
 
 @keyframes phoneFloat {
-  0%   { transform: translateY(0) rotate(-2deg); }
-  25%  { transform: translateY(-10px) rotate(-1.2deg); }
-  50%  { transform: translateY(-16px) rotate(-0.5deg); }
-  75%  { transform: translateY(-8px) rotate(-1.2deg); }
-  100% { transform: translateY(0) rotate(-2deg); }
+  0%   { transform: translateY(0) rotate(-1deg); }
+  50%  { transform: translateY(-14px) rotate(-0.2deg); }
+  100% { transform: translateY(0) rotate(-1deg); }
 }
 
 @keyframes glowPulse {
@@ -208,115 +86,57 @@
   50%      { opacity: 0.8; transform: translateX(-50%) scale(1.1); }
 }
 
-@keyframes dotPulse {
-  0%, 100% { box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.3); }
-  50%      { box-shadow: 0 0 0 6px rgba(5, 150, 105, 0.1); }
-}
-
-@keyframes badgeFloat1 {
-  0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(-8px); }
-}
-
-@keyframes badgeFloat2 {
-  0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(-6px); }
-}
-
-@keyframes badgeFloat3 {
-  0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(-10px); }
-}
-
-/* RESPONSIVE
- * ─────────────────────────────────────────────────────────────
- * Positioning rules:
- *  • top-left  badge — anchored by its RIGHT edge → grows OUTWARD (left)
- *  • top-right badge — anchored by its LEFT  edge → grows OUTWARD (right)
- *  • bottom    badge — centered below phone using `left:0;right:0;margin:auto`
- *    (does NOT use transform so the floatY keyframe stays clean)
- *  Longer FR text therefore expands AWAY from the phone, never into it. */
+/* RESPONSIVE — phone stays proportional at every breakpoint. */
 @media (max-width: 1280px) {
-  .hero-phone-image { max-width: 380px; }
-  .hero-badge { font-size: 11px; padding: 7px 12px; }
-  .hero-badge--top-left  { right: calc(100% - 56px); }
-  .hero-badge--top-right { left:  calc(100% - 56px); }
+  .hero-phone-image,
+  .hero-phone-mockup { max-width: 380px; }
+  .hero-phone-wrapper { max-width: 380px; }
 }
 
 @media (max-width: 1024px) {
   .hero-phone-container { max-width: 360px; }
-  .hero-phone-image { max-width: 320px; }
-  .hero-badge--top-left  { top: 12%; right: calc(100% - 48px); }
-  .hero-badge--top-right { top: 6%;  left:  calc(100% - 48px); }
-  .hero-badge--bottom    { left: -10%; }
+  .hero-phone-image,
+  .hero-phone-mockup { max-width: 340px; }
+  .hero-phone-wrapper { max-width: 340px; }
 }
 
-/* Mobile / narrow tablet — stack badges around the phone, never hidden. */
+/* Mobile — headline stacks above phone in HomePage. Phone stays proportional. */
 @media (max-width: 768px) {
-  .hero-phone-container {
-    max-width: 220px;
-    /* Extra vertical room for the two top badges stacked above + bottom badge below */
-    margin: 88px auto 56px;
-    overflow: visible;
+  .hero-phone-section,
+  .hero-phone-wrapper {
+    max-width: 280px;
+    max-height: 380px;
   }
-  .hero-phone-image { max-width: 200px; }
-
-  .hero-badge {
-    font-size: 11px;
-    padding: 6px 11px;
-    border-radius: 18px;
+  .hero-phone-mockup,
+  .hero-phone-image {
+    width: 100%;
+    height: auto;
+    max-height: 380px;
+    max-width: 280px;
   }
-
-  /* "New bid" — sits ABOVE the phone, slightly LEFT of center */
-  .hero-badge--top-left {
-    display: inline-flex;
-    top: -64px;
-    left: -8px;
-    right: auto;
-  }
-
-  /* "14 bidders live" — sits ABOVE the phone, slightly RIGHT, just below the first badge */
-  .hero-badge--top-right {
-    display: inline-flex;
-    top: -32px;
-    right: -8px;
-    left: auto;
-  }
-
-  /* "Item Sold" — centered below the phone (no transform → keyframe floatY stays clean) */
-  .hero-badge--bottom {
-    bottom: -40px;
-    left: 0;
-    right: 0;
-    margin: 0 auto;
-    width: max-content;
-  }
+  .hero-phone-container { max-width: 300px; }
 }
 
-@media (max-width: 414px) {
-  .hero-phone-container { max-width: 200px; margin-top: 80px; }
-  .hero-phone-image { max-width: 180px; }
-  .hero-badge { font-size: 10.5px; padding: 5px 10px; }
-  .hero-badge--top-left  { top: -58px; }
-  .hero-badge--top-right { top: -28px; }
-}
-
-@media (max-width: 375px) {
-  .hero-phone-container { max-width: 180px; margin-top: 76px; }
-  .hero-phone-image { max-width: 160px; }
-  .hero-badge { font-size: 10px; padding: 4px 9px; }
-  .hero-badge--top-left  { top: -54px; left: -4px; }
-  .hero-badge--top-right { top: -26px; right: -4px; }
+@media (max-width: 480px) {
+  .hero-phone-section,
+  .hero-phone-wrapper {
+    max-width: 240px;
+    max-height: 320px;
+  }
+  .hero-phone-mockup,
+  .hero-phone-image {
+    max-width: 240px;
+    max-height: 320px;
+  }
+  .hero-phone-container { max-width: 260px; }
 }
 
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .hero-phone-wrapper,
+  .hero-phone-section,
   .hero-phone-container,
-  .hero-badge,
-  .hero-phone-glow,
-  .hero-badge__dot--green,
-  .hero-badge__dot--blue {
+  .hero-phone-glow {
     animation: none !important;
   }
 }

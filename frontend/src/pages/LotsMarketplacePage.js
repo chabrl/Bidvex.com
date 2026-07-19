@@ -15,6 +15,10 @@ import SafeImage from '../components/SafeImage';
 // iter363 — Auto-sliding multi-lot image carousel (only used on cards
 // where lots contribute ≥2 images).
 import MultiLotImageCarousel from '../components/MultiLotImageCarousel';
+// iter364 — Compare-listings checkbox.
+import { CompareCheckbox } from '../components/CompareBar';
+// iter364 — Google AdSense inline ad zones.
+import AdUnit from '../components/AdUnit';
 import WishlistHeartButton from '../components/WishlistHeartButton';
 import MarketplaceSidebar from '../components/MarketplaceSidebar';
 import { VerifiedBadge } from '../components/VerifiedBadge';
@@ -179,6 +183,10 @@ const LotsMarketplacePage = () => {
                 <Package className="h-16 w-16" style={{ color: '#94a3b8' }} />
               </div>
             )}
+            {/* iter364 — Compare checkbox */}
+            <div className="absolute bottom-2 left-2 z-20" onClick={(e) => e.stopPropagation()}>
+              <CompareCheckbox item={listing} section="lots" />
+            </div>
           </div>
           <div className="absolute top-3 left-3 flex flex-wrap gap-2">
             {listing.is_verified_firm && <VerifiedBadge />}
@@ -436,6 +444,15 @@ const LotsMarketplacePage = () => {
                 </p>
               </Card>
             ) : (
+              <>
+              {/* iter364 — Ad zone above lots grid */}
+              <AdUnit
+                slot={process.env.REACT_APP_ADSENSE_SLOT_LOTS_TOP || 'lots-top'}
+                format="horizontal"
+                style={{ width: '100%', minHeight: 90 }}
+                testId="ad-lots-top"
+                label="Advertisement"
+              />
               <div className={viewMode === 'grid'
                 ? 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 xl:gap-5'
                 : 'flex flex-col gap-4'
@@ -458,6 +475,15 @@ const LotsMarketplacePage = () => {
                   return out;
                 })()}
               </div>
+              {/* iter364 — Ad zone below lots grid */}
+              <AdUnit
+                slot={process.env.REACT_APP_ADSENSE_SLOT_LOTS_BOTTOM || 'lots-bottom'}
+                format="horizontal"
+                style={{ width: '100%', minHeight: 90, marginTop: 24 }}
+                testId="ad-lots-bottom"
+                label="Advertisement"
+              />
+              </>
             )}
           </div>
         </div>

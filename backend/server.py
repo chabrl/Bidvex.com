@@ -1624,6 +1624,11 @@ try:
     app.include_router(_contact_router)
     logger.info("[iter363] contact router mounted at /api/contact/submit")
 
+    # iter364 — Admin notification-bell aggregate counters.
+    from routes.admin_notifications import admin_notifications_router as _adm_notif_router
+    app.include_router(_adm_notif_router)
+    logger.info("[iter364] admin notifications router mounted at /api/admin/notifications/summary")
+
     # iter318 BidVex Careers module — public + admin job/applicant API
     try:
         from routes.careers import router as careers_router

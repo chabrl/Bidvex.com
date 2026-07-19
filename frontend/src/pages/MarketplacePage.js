@@ -7,6 +7,8 @@ import { Badge } from '../components/ui/badge';
 import { ShoppingBag, Sparkles, User, Zap } from 'lucide-react';
 // iter268 Mission 4 — SEO meta tags
 import SEO from '../components/SEO';
+// iter364 — Google AdSense inline ad zones.
+import AdUnit from '../components/AdUnit';
 
 const MarketplacePage = () => {
   const { t } = useTranslation();
@@ -89,6 +91,14 @@ const MarketplacePage = () => {
 
           {/* Main Content */}
           <div className="flex-1 min-w-0">
+            {/* iter364 — Ad zone above listing grid */}
+            <AdUnit
+              slot={process.env.REACT_APP_ADSENSE_SLOT_MARKETPLACE_TOP || 'marketplace-top'}
+              format="horizontal"
+              style={{ width: '100%', minHeight: 90 }}
+              testId="ad-marketplace-top"
+              label="Advertisement"
+            />
             <FlattenedMarketplace
               showFilters={true}
               showHeader={false}
@@ -96,6 +106,14 @@ const MarketplacePage = () => {
               limit={50}
               externalFilters={sidebarFilters}
               onClearSidebarCategory={handleClearSidebarCategory}
+            />
+            {/* iter364 — Ad zone below listing grid */}
+            <AdUnit
+              slot={process.env.REACT_APP_ADSENSE_SLOT_MARKETPLACE_BOTTOM || 'marketplace-bottom'}
+              format="horizontal"
+              style={{ width: '100%', minHeight: 90 }}
+              testId="ad-marketplace-bottom"
+              label="Advertisement"
             />
           </div>
         </div>

@@ -1,5 +1,7 @@
 import React from 'react';
 import SafeImage from '../../components/SafeImage';
+// iter364 — Compare-listings checkbox.
+import { CompareCheckbox } from '../../components/CompareBar';
 
 import { Badge } from '../../components/ui/badge';
 import { Gavel, MapPin, Layers, Clock } from 'lucide-react';
@@ -58,6 +60,11 @@ const StorageAuctionCard = ({ auction }) => {
             <span className="text-5xl">🔒</span>
           </div>
         )}
+
+        {/* iter364 — Compare checkbox */}
+        <div className="absolute bottom-2 left-2 z-20" onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}>
+          <CompareCheckbox item={auction} section="storage" />
+        </div>
 
         {endingSoon && (
           <div

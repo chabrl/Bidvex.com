@@ -48,6 +48,8 @@ import VehicleEmptyState from '../../components/vehicles/VehicleEmptyState';
 import VehicleLegalFooter from '../../components/vehicles/VehicleLegalFooter';
 import VehicleSidebar from '../../components/vehicles/VehicleSidebar';
 import SEO from '../../components/SEO';
+// iter364 — Google AdSense inline ad zones.
+import AdUnit from '../../components/AdUnit';
 import useVehicleCountdown from '../../hooks/useVehicleCountdown';
 // iter294 P1 — Live multi-lot feed widget.
 import LiveMultiLotFeedWidget from '../../components/LiveMultiLotFeedWidget';
@@ -396,6 +398,14 @@ const VehicleAuctionsPage = () => {
 
             {!loading && !error && vehicles.length > 0 && (
               <>
+                {/* iter364 — Leaderboard ad zone below filters, above grid */}
+                <AdUnit
+                  slot={process.env.REACT_APP_ADSENSE_SLOT_VEHICLES_TOP || 'vehicles-top'}
+                  format="horizontal"
+                  style={{ width: '100%', minHeight: 90, marginBottom: 16 }}
+                  testId="ad-vehicles-top"
+                  label="Advertisement"
+                />
                 <div
                   className={`grid gap-4 sm:gap-5 ${viewMode === 'grid' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' : 'grid-cols-1'}`}
                   data-testid="vehicle-grid"
@@ -413,6 +423,15 @@ const VehicleAuctionsPage = () => {
                     );
                   })}
                 </div>
+
+                {/* iter364 — Ad zone between grid and pagination */}
+                <AdUnit
+                  slot={process.env.REACT_APP_ADSENSE_SLOT_VEHICLES_MID || 'vehicles-mid'}
+                  format="horizontal"
+                  style={{ width: '100%', minHeight: 90, marginTop: 16 }}
+                  testId="ad-vehicles-mid"
+                  label="Advertisement"
+                />
 
                 {totalPages > 1 && (
                   <div className="mt-8 flex items-center justify-center gap-2" data-testid="vehicle-pagination">

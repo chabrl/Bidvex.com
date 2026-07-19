@@ -39,6 +39,9 @@ import './App.css';
 // active lang from the URL prefix (/en/... /fr/...), syncs i18n +
 // <html lang>, and exposes `switchLang` for real navigation on toggle.
 import { LanguageProvider } from './contexts/LanguageContext';
+// iter364 — Global compare-listings context + sticky bottom bar.
+import { CompareProvider } from './contexts/CompareContext';
+import CompareBar from './components/CompareBar';
 import { EN_TO_FR } from './i18n/urlMap';
 
 // ─── Lazy-loaded pages (route-level code splitting) ───────────────
@@ -84,6 +87,8 @@ const BlogsPage = lazy(() => import('./pages/BlogsPage'));
 const BlogArticlePage = lazy(() => import('./pages/BlogArticlePage'));
 const SellerProfilePage = lazy(() => import('./pages/SellerProfilePage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
+// iter364 — Compare listings side-by-side page.
+const ComparePage = lazy(() => import('./pages/ComparePage'));
 const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'));
 const TermsOfServicePage = lazy(() => import('./pages/TermsOfServicePage'));
 const RefundPolicyPage = lazy(() => import('./pages/RefundPolicyPage'));
@@ -452,6 +457,7 @@ const App = () => {
           <FeatureFlagsProvider>
           <SiteModeProvider>
           <PromoBannerProvider>
+          <CompareProvider>
             <ScrollToTop />
             <MarketingPixelLoader />
             {/* iter272 — Capture incoming UTM/campaign params on every route change. */}
@@ -611,7 +617,8 @@ const App = () => {
           <Route path="/lots" element={<ErrorBoundary scope="lots"><LotsMarketplacePage /></ErrorBoundary>} />
           <Route path="/lots/:id" element={<ErrorBoundary scope="lot-detail"><MultiItemListingDetailPage /></ErrorBoundary>} />
           <Route path="/listing/:id" element={<ErrorBoundary scope="listing-detail"><ListingDetailPage /></ErrorBoundary>} />
-          <Route path="/compare" element={<CompareListingsPage />} />
+          {/* iter364 — Route removed: replaced by /compare in the language-agnostic
+              route block below, which uses the new ComparePage + CompareContext. */}
           <Route path="/store/:userId" element={<StorefrontPage />} />
           <Route path="/bulk-import" element={<ProtectedRoute><BulkImportPage /></ProtectedRoute>} />
           <Route path="/auth" element={<AuthPage />} />
@@ -959,6 +966,11 @@ const App = () => {
           } />
           <Route path="/storage/facility/:facilityId" element={<FacilityPublicProfile />} />
 
+          {/* iter364 — Compare Listings page (EN + FR routes) */}
+          <Route path="/compare" element={<ErrorBoundary scope="compare"><ComparePage /></ErrorBoundary>} />
+          <Route path="/fr/comparer" element={<ErrorBoundary scope="compare"><ComparePage /></ErrorBoundary>} />
+          <Route path="/en/compare" element={<Navigate to="/compare" replace />} />
+
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
           </Suspense>
@@ -969,8 +981,11 @@ const App = () => {
           <MessageNotificationListener />
           <Toaster position="top-right" />
             <MobileNavWrapper />
+            {/* iter364 — Sticky compare bar (renders only when ≥1 selected) */}
+            <CompareBar />
           </div>
           </MaintenanceGuard>
+          </CompareProvider>
           </PromoBannerProvider>
           </SiteModeProvider>
         </FeatureFlagsProvider>

@@ -3,8 +3,21 @@ import { useTranslation } from 'react-i18next';
 import './HeroPhone.css';
 
 /**
- * Hero phone mockup with floating animation, ambient glow, and 3 live-activity badges.
- * Bilingual badge labels (EN/FR) chosen automatically.
+ * iter364 — Hero phone mockup (client-provided assets).
+ *
+ * Uses the two premium hand+phone renders shipped by the client:
+ *   • EN → /assets/hero-phone-en.png  ("Discover. Bid. Win.")
+ *   • FR → /assets/hero-phone-fr.png  ("Découvrez. Misez. Gagnez.")
+ *
+ * These renders are self-contained (hand, angled phone, on-screen
+ * "Live Auctions Happening Now" pill, translated headline + CTAs) so
+ * the earlier floating-badge overlays were removed to avoid visual
+ * clashes with the hand + off-axis phone bezel.
+ *
+ * Sizing (per iter364 spec):
+ *   • Desktop: width 420px, hand allowed to extend outside container
+ *     (`overflow: visible` on wrapper).
+ *   • Mobile <=768px: max-width 280px, headline stacks above phone.
  */
 const HeroPhone = () => {
   const { i18n } = useTranslation();
@@ -12,58 +25,32 @@ const HeroPhone = () => {
 
   return (
     <div className="hero-phone-container" data-testid="hero-phone-container">
-      {/* Ambient glow */}
+      {/* Ambient glow — kept because the client-provided phone drop-shadow
+          is subtle and the glow adds motion; positioned behind the hand. */}
       <div className="hero-phone-glow" aria-hidden="true" />
 
-      {/* Top-left badge — new bid (hidden on small screens) */}
-      <div className="hero-badge hero-badge--top-left" aria-hidden="true">
-        <span className="hero-badge__dot hero-badge__dot--green" />
-        <span className="hero-badge__text">
-          {fr ? '🔨 Nouvelle enchère — 245 $' : '🔨 New bid — $245'}
-        </span>
-      </div>
-
-      {/* Top-right badge — bidder count */}
-      <div className="hero-badge hero-badge--top-right" aria-hidden="true">
-        <span className="hero-badge__text">
-          {fr ? '👤 14 enchérisseurs en direct' : '👤 14 bidders live'}
-        </span>
-        <span className="hero-badge__dot hero-badge__dot--blue" />
-      </div>
-
-      {/* Phone image (floating wrapper) */}
-      <div className="hero-phone-wrapper">
+      {/* Client-provided phone+hand mockup — language-aware. */}
+      <div className="hero-phone-wrapper hero-phone-section">
         <img
-          // iter363 — Pillow-generated neutral auction mockup (not the
-          // BidVex homepage) so there's no recursive-mirror effect. Both
-          // EN + FR variants exist at /static/hero-phone-{lang}.png.
-          // Content: sample vehicle auction card in the current language.
-          src={fr ? "/static/hero-phone-fr.png" : "/static/hero-phone-en.png"}
+          src={fr ? '/assets/hero-phone-fr.png' : '/assets/hero-phone-en.png'}
           onError={(e) => {
             if (!e.currentTarget.dataset.fellBack) {
-              e.currentTarget.dataset.fellBack = "1";
-              // Fallback: use the original mockup PNG if the new static
-              // assets haven't been served yet (e.g., during first deploy).
-              e.currentTarget.src = "/assets/hero-phone-mockup.png";
+              e.currentTarget.dataset.fellBack = '1';
+              // Legacy Pillow-rendered fallback if the /assets file is
+              // missing on first deploy — better than a broken image.
+              e.currentTarget.src = '/assets/hero-phone-mockup.png';
             }
           }}
-          alt={fr ? "Aperçu de l'application mobile BidVex" : "BidVex mobile app preview"}
-          className="hero-phone-image"
+          alt={fr
+            ? "Aperçu de l'application mobile BidVex — Découvrez. Misez. Gagnez."
+            : 'BidVex mobile app preview — Discover. Bid. Win.'}
+          className="hero-phone-image hero-phone-mockup"
           loading="eager"
           fetchPriority="high"
           draggable={false}
-          width="460"
-          height="945"
+          width="1295"
+          height="1215"
         />
-      </div>
-
-      {/* Bottom badge — sold notification */}
-      <div className="hero-badge hero-badge--bottom" aria-hidden="true">
-        <span className="hero-badge__icon">✅</span>
-        <div className="hero-badge__info">
-          <span className="hero-badge__label">{fr ? 'Article vendu' : 'Item Sold'}</span>
-          <span className="hero-badge__value">{fr ? '1 280 $ · il y a 3 s' : '$1,280 · 3s ago'}</span>
-        </div>
       </div>
     </div>
   );

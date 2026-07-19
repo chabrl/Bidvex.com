@@ -13,6 +13,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Separator } from './ui/separator';
 import BidConfirmationDialog from './BidConfirmationDialog';
 import SafeImage from './SafeImage';
+// iter364 — Compare-listings checkbox.
+import { CompareCheckbox } from './CompareBar';
 import FilterBar from './FilterBar/FilterBar';
 import EndingSoonStrip from './EndingSoonStrip';
 import { 
@@ -964,6 +966,11 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
               <Package className="h-16 w-16 text-gray-300" />
             </div>
           )}
+
+          {/* iter364 — Compare checkbox bottom-left of the image overlay. */}
+          <div className="absolute bottom-2 left-2 z-20" onClick={(e) => e.stopPropagation()}>
+            <CompareCheckbox item={item} section="marketplace" />
+          </div>
 
           {/* Top Left - Badges stack */}
           <div className="absolute top-3 left-3 z-10 flex flex-col gap-1.5">
