@@ -1,5 +1,108 @@
 # BidVex — Auction Marketplace PRD
 
+## iter363 — Language Toggle 404, Admin API Repair, Sidebar Overhaul, MultiLotImageCarousel, Payment Infra Report (Jul 19, 2026) ✅ COMPLETE — VERIFIED
+
+**Scope**: 5 P0 launch-critical items landed in one fork pass. 28/28 iter363 tests pass (19 static + 9 live admin API); full E2E browser flows green under super_admin auth.
+
+### P0.1 — Language Toggle 404 fix ✅ SHIPPED
+
+**Root cause**: `switchLang` in `LanguageContext.js` unconditionally called `toLangPath(...)` → `navigate('/fr/settings')`, but ~40 authenticated / utility routes (`/settings`, `/watchlist`, `/messages`, `/admin`, `/dashboard`, `/vehicle-auctions/create`, etc.) have NO `/en/*` `/fr/*` variants → catch-all `<Route path="*">` → NotFoundPage → 404.
+
+**Fix (two layers)**:
+1. **`App.js`**: Added `<Route path="/en/*" element={<StripLangRedirect />}>` and `<Route path="/fr/*">` fallback AFTER all explicit lang-prefix routes. StripLangRedirect strips the prefix and does `<Navigate to={stripped} replace />`. React Router v6 prefers `static > dynamic > catch-all`, so `/en/marketplace`, `/en/vehicle-auctions/:id`, etc. still take precedence. Handles ALL edge cases: bookmarks, shared links, autocomplete errors — nobody hits 404 on `/en/foo` any more.
+2. **`LanguageContext.js`**: Enhanced `switchLang` to detect non-prefix-eligible paths and only call `i18n.changeLanguage(targetLang)` without navigation. Eligibility = `bare in EN_TO_FR ∨ FR_TO_EN`, or bare starts with any prefix in those maps (for deep-ID routes like `/vehicle-auctions/abc123`). This avoids the redirect flash on `/settings + FR toggle`.
+
+**Live verified**:
+- `/en/vehicle-auctions/testid123` → toggle FR → `/fr/encheres-vehicules/testid123` (deep-ID preserved, html.lang=fr).
+- `/en/settings` and `/fr/settings` → redirect to `/settings` via StripLangRedirect.
+- `/settings` + FR toggle → URL stays `/settings`, i18n language changes.
+
+### P0.2 — Contact page verified E2E; mailto removed from form flow ✅ SHIPPED
+
+- Removed `buildMailtoFallback()` function and `window.location.href = buildMailtoFallback()` fallback branch from `ContactUsPage.jsx`. On POST failure, an explicit error banner (`[data-testid=contact-form-error]`) shows the user; no mailto redirect. Team-card direct-email links (`<a href="mailto:...">`) remain — they are a separate feature, not the form.
+- Docstring updated to reflect: "no mailto fallback per iter363 user directive".
+- `POST /api/contact/submit` verified live: HTTP 200, `{ok:true, delivered:true, routed_to:'service@bidvex.com'}` — SendGrid delivered per backend log `[contact/submit] support → service@bidvex.com delivered=True id=...`.
+
+### P0.3 — Admin API audit + repair ✅ SHIPPED (root-cause fix)
+
+**Root cause**: Per iter344, admin role was normalized DB-side from `admin` → `super_admin`, but 4 route files still contained hardcoded `current_user.role != 'admin'` checks — resulting in 403s across AI Guard, Risk Monitoring, and 24 other admin endpoints.
+
+**Fix**: Global normalization via `sed`: `current_user.role != 'admin'` → `current_user.role not in ('admin', 'super_admin')`. Applied to:
+- `/app/backend/routes/trust_safety.py` (11 occurrences)
+- `/app/backend/routes/subscriptions.py` (8)
+- `/app/backend/routes/admin_config.py` (4)
+- `/app/backend/routes/auctions_bids.py` (3)
+- **Total: 26 fixed.** Post-fix grep confirms zero residuals.
+
+**Secondary KeyError fixes**:
+- `trust_safety.py:470 (Risk Monitoring)` — `u["id"]` KeyError on malformed users → guarded with `u.get("id"); if not uid: continue`.
+- `admin_ops.py:test_user_ids (Platform Cleanup)` — `u["id"]` list-comp KeyError → guarded with `if u.get('id')` filter.
+
+**All 6 admin endpoints verified live** with super_admin token:
+| Endpoint | HTTP | Response |
+|----------|------|----------|
+| GET /api/admin/ai-guard/stats | 200 | success:true, stats populated |
+| GET /api/admin/ai-guard/flags | 200 | success:true, flags:[] |
+| GET /api/admin/risk-monitoring | 200 | no more KeyError |
+| GET /api/admin/pricing-engine | 200 | 2 plans: partner_annual_fee + vehicle_dealer_annual_fee |
+| GET /api/admin/coupons | 200 | 2 active codes: LAUNCH50, LAUNCH25 |
+| GET /api/admin/platform-cleanup/preview | 200 | 1 test user, no more KeyError |
+
+### P0.4 — Admin Panel sidebar overhaul ✅ SHIPPED
+
+**Old**: Horizontal PRIMARY row + Marketing/Finance cross-cutting row + SECONDARY row → 3 rows of pills that wrapped/overflowed on smaller screens.
+
+**New**: Left sidebar (`/app/frontend/src/components/admin/AdminSidebar.jsx`, 200 lines) preserving all 4 groupings:
+- Sticky header ("Admin Console" + Sparkles icon)
+- **Primary Sections** group with active-primary highlight
+- Inline **Secondary** items rendered as a tree under the active primary
+- **Marketing** section (amber accent)
+- **Finance & Safety** section (emerald accent)
+- Footer breadcrumb (Primary › Secondary)
+
+**Mobile**: `<lg` viewport hides sidebar; header shows hamburger `[data-testid=admin-sidebar-open]`; tapping opens sliding drawer with backdrop; tapping backdrop/close closes. All tabs kept the same IDs (`admin-tab-{id}`, `admin-primary-tab-{id}`) so existing E2E tests keep working.
+
+**Admin components NOT rewritten** — only the layout wrapper changed, per user directive.
+
+### P0.5 — Payment Infrastructure Report ✅ DELIVERED
+
+Full report at `/app/memory/payment_infrastructure_report_iter363.md` (215 lines). Every value verified from current production code (fee_calculator.py, stripe_connect_service.py, .env, admin API responses) — no historical summaries or assumptions. Contents:
+- Stripe env-var inventory (7 keys, all set)
+- Fee structure verbatim from fee_calculator.py (buyer/seller tiers, partner/vehicle/storage/broker rates, Stripe recovery, QC tax split, subscription tiers)
+- Payment collection flow per account type
+- Payout flow via Stripe Connect application_fee_amount + transfer_data.destination
+- Universal Rules from fee_calculator.py docstring (Rule #1 Stripe recovery on BidVex fees only, Rule #2 CRA place-of-supply tax routing, Rule #3 all calcs flow through calculate_fee())
+- Launch-readiness verdict: ✅ code side clean. Blocker: none on Emergent code.
+
+### P1 — MultiLotImageCarousel ✅ SHIPPED
+
+`/app/frontend/src/components/MultiLotImageCarousel.jsx` (135 lines).
+- Auto-advances every 2.5s (configurable via `intervalMs`)
+- Up to 10 images (deduped + capped)
+- **IntersectionObserver** with threshold 0.1 pauses interval when card scrolls off-screen (battery/CPU saver)
+- **prefers-reduced-motion** honored — falls back to static first image
+- **No CLS** — absolute-positioned images with opacity transitions; container keeps `.grid-card-image` 4:3 ratio
+- Progress dots at bottom with active-dot expand animation
+- Single-image lots correctly fall back to static SafeImage (early return)
+
+Integrated into `LotsMarketplacePage.js` — carousel only renders when `lotImages.length >= 2`. Live verified on multi-lot listing 179b62b9 (20 lots, 46 images): active index cycled 1 → 2 → 4 → 5 over 5.5s with 10 progress dots visible.
+
+### Files Modified/Created
+- `/app/frontend/src/App.js` — StripLangRedirect + /en/* /fr/* fallback routes
+- `/app/frontend/src/contexts/LanguageContext.js` — Enhanced switchLang
+- `/app/frontend/src/pages/ContactUsPage.jsx` — Removed mailto from form flow
+- `/app/frontend/src/pages/AdminDashboard.js` — Sidebar layout wrapper
+- `/app/frontend/src/pages/LotsMarketplacePage.js` — MultiLotImageCarousel integration
+- `/app/frontend/src/components/admin/AdminSidebar.jsx` — NEW
+- `/app/frontend/src/components/MultiLotImageCarousel.jsx` — NEW
+- `/app/backend/routes/trust_safety.py`, `admin_config.py`, `subscriptions.py`, `auctions_bids.py`, `admin_ops.py` — Role check normalization + KeyError guards
+- `/app/backend/tests/test_iter363_launch_gate.py` — Updated for mailto removal (19 pass)
+- `/app/backend/tests/test_iter363_live_admin.py` — NEW (9 pass) verifying live admin API
+- `/app/memory/payment_infrastructure_report_iter363.md` — NEW
+
+---
+
+
 ## iter362 — Prerender Bulletproof + Admin Overflow Fix + Contact Rebuild + Phone Mockup (Feb 19, 2026 — Jul 19, 2026) ✅ COMPLETE — VERIFIED
 
 **Scope**: Five P0 production hardening items, all landed simultaneously in one pass. 57/57 iter362 tests pass; full regression across iter350–iter362 clean (only pre-existing test-isolation flakiness on iter350 fees tests when run in parallel — pass individually).
