@@ -1,5 +1,61 @@
 # BidVex — Auction Marketplace PRD
 
+## iter365 — Broker Fee, 180-day Windows, Compare De-dup, Buyer Grid (Jul 20, 2026) ✅ COMPLETE — VERIFIED
+
+**Scope**: 4 launch-blockers in one pass. **214 tests pass across touched suites** (well above 176+ requirement). Testing-agent iter365 report: 100% success on all 4 items. 15 pre-existing failures verified via git stash — NOT introduced by this fork.
+
+### Item 1 — Broker Annual Fee ($500 / $250 / 180 days) ✅ SHIPPED
+- **`pricing_engine_service.py`**: added `broker_annual_fee` to `PRODUCT_DEFINITIONS` with `default_base_price_cad=500.0`, `default_launch_discount_percent=50`, `default_launch_window_days=180`, product name "BidVex Broker Annual Membership".
+- **`pricing_engine_routes.py`**: `broker_annual_fee` added to `VALID_KEYS`.
+- **`fee_calculator.py`**: `BROKER_ANNUAL_FEE_CAD = Decimal("500.00")`, `BROKER_ANNUAL_FEE_DISCOUNTED = Decimal("250.00")` constants exposed.
+- **Admin Pricing Engine UI**: `KEY_LABELS.broker_annual_fee` added ("Broker Annual Membership" / "Adhésion annuelle — courtier"). Admin now sees 3 pricing cards side-by-side.
+- **Broker registration page**: pricing card shows `$250.00 CAD` current / `$500.00 CAD` crossed-out / "Launch window: 180 days" (+ FR "180 jours"). Stale $100/$200 removed. Docstring updated.
+- **Live DB**: `broker_annual_fee` seeded via one-shot migration.
+- **Coupon short-key mapping**: extended from 2-key `if/else` to 3-key dict (`VDA`, `PRT`, `BRK`) — versioned Stripe coupon IDs work for all 3 subscription types.
+- Live API verified: `GET /api/admin/pricing-engine` returns 3 keys; `GET /api/pricing-engine/public/broker_annual_fee` returns `effective_price_cad=250.0` with NO Stripe internals leaked.
+
+### Item 2 — All launch windows standardised to 180 days ✅ SHIPPED
+- `PRODUCT_DEFINITIONS` defaults: partner 90 → 180, vehicle_dealer 180 (unchanged), broker 180 (new).
+- Live DB migration recomputed `launch_cutoff_date = launch_start_date + 180d` for all 3 rows.
+- Docstring sample document updated.
+- iter210 tripwire tests updated (2 tests: `test_get_pricing_seeds_defaults_on_first_read` and `test_changing_window_days_recomputes_cutoff` — used 270d as the new "changed" value since 180 is now the default).
+- No hard-coded "90 days" launch-window references anywhere in shipped code (all `90-day` matches are analytics ranges, unrelated).
+
+### Item 3 — Compare button duplicate fix ✅ SHIPPED
+- **Root cause**: `FlattenedMarketplace.js` had TWO compare UIs living together — (a) legacy top-right circular `<Scale/>`-icon button (`data-testid=compare-toggle-${item.id}`) writing to local `compareIds` state + a legacy `compare-floating-bar` at the bottom navigating to `/compare?ids=...`, PLUS (b) the iter364 `<CompareCheckbox>` bottom-left pill writing to the global `CompareContext`.
+- **Fix**: Removed the legacy button + floating bar entirely from `FlattenedMarketplace.js`. iter364 `<CompareCheckbox>` is now the SOLE compare UI on every card.
+- **Verified**: `/en/marketplace` renders 20 cards → 20 CompareCheckbox → 0 legacy compare-toggle → 0 floating bars (1:1 ratio). Compare pill bottom-left of image, no visual overlap with the countdown timer.
+- Also removed legacy route `<Route path="/compare" element={<CompareListingsPage />}` — iter364 `<ComparePage>` at `/compare` + `/fr/comparer` is the sole route.
+
+### Item 4 — Buyer dashboard bids responsive grid ✅ SHIPPED
+- **`BuyerDashboard.js`**: 3 bid-list wrappers (All Bids / Winning / Outbid tabs) converted from `<div className="space-y-4">` (vertical stack) to `<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">`. Each grid tagged with `data-testid="buyer-bids-grid-{all|winning|outbid}"`.
+- At 1440px viewport → 3 cards/row; at 1920px → 4 cards/row; at 768px → 2 cards/row; at mobile → 1 card/row.
+- `WatchlistPage.js` already uses the correct 1/2/3/4 grid — no changes needed.
+- "My Watchlist" tab link in BuyerDashboard still routes to `/watchlist` — no regression.
+
+### Files Modified/Created (iter365)
+**Backend:**
+- `/app/backend/services/pricing_engine_service.py` (broker product def, 3-key coupon short mapping, 180d docstring)
+- `/app/backend/routes/pricing_engine_routes.py` (VALID_KEYS)
+- `/app/backend/services/fee_calculator.py` (broker constants)
+- `/app/backend/tests/test_iter210_step3_pricing_engine.py` (updated 2 tests + 1 assertion for broker key)
+- `/app/backend/tests/test_iter365_launch_gate.py` (NEW — 13 tripwires)
+- `/app/backend/tests/test_iter365_live.py` (NEW by testing agent — 4 live HTTP tests)
+
+**Frontend:**
+- `/app/frontend/src/pages/admin/PricingEnginePage.js` (broker KEY_LABELS entry)
+- `/app/frontend/src/pages/BecomeABrokerPage.jsx` (pricing card + docstring)
+- `/app/frontend/src/components/FlattenedMarketplace.js` (removed legacy Scale-icon + floating bar)
+- `/app/frontend/src/pages/BuyerDashboard.js` (3 tabs → responsive grid)
+
+**DB:**
+- `pricing_settings.partner_annual_fee.launch_window_days`: 90 → 180
+- `pricing_settings.broker_annual_fee`: NEW row seeded
+- All 3 rows: `launch_cutoff_date` recomputed = `launch_start_date + 180d`
+
+---
+
+
 ## iter364 — Client Phone Mockups, Compare Listings, AdSense, Notification Bell (Jul 19, 2026) ✅ COMPLETE — VERIFIED
 
 **Scope**: 6 launch-critical items shipped in one fork pass. 35/35 iter363+iter364 static tests pass. 21/21 live-API tests pass. Full browser E2E verified for every user-visible flow. Testing-agent iter364 report: 100% success.
