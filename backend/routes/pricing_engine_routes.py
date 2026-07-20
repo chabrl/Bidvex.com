@@ -5,7 +5,7 @@ from deps import get_current_user, get_db, User
 
 pricing_engine_router = APIRouter(tags=["Pricing Engine"])
 
-VALID_KEYS = {"vehicle_dealer_annual_fee", "partner_annual_fee"}
+VALID_KEYS = {"vehicle_dealer_annual_fee", "partner_annual_fee", "broker_annual_fee"}
 
 
 async def _require_admin(current_user: User):

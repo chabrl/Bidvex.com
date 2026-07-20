@@ -36,7 +36,7 @@ import {
   Timer,
   ExternalLink,
   Receipt,
-  Scale,
+  Scale, // iter365 — kept for backward-compat with any dev tooling; no longer used in render
   X,
   Flame,
   Warehouse,
@@ -780,24 +780,10 @@ const FlattenedMarketplace = ({
         />
       )}
 
-      {/* Floating Compare Bar */}
-      {compareIds.length > 0 && (
-        <div className="fixed bottom-28 sm:bottom-24 md:bottom-6 left-1/2 -translate-x-1/2 z-[60] bg-slate-900 dark:bg-slate-800 text-white rounded-full shadow-2xl px-5 py-3 flex items-center gap-3 border border-cyan-500/30" data-testid="compare-floating-bar">
-          <Scale className="h-4 w-4 text-cyan-400 shrink-0" />
-          <span className="text-sm font-medium whitespace-nowrap">{compareIds.length} selected</span>
-          <Button
-            size="sm"
-            onClick={() => navigate(`/compare?ids=${compareIds.join(',')}`)}
-            className="bg-cyan-500 hover:bg-cyan-600 text-white rounded-full h-8 px-4 text-xs font-bold"
-            data-testid="compare-go-btn"
-          >
-            Compare
-          </Button>
-          <button onClick={() => setCompareIds([])} className="text-slate-400 hover:text-white" data-testid="compare-clear-btn">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
+      {/* iter365 — Legacy floating compare bar removed. The iter364
+          <CompareBar /> mounted globally in App.js is now the single
+          source of truth (respects the CompareContext + supports up to
+          4 items + bilingual). */}
     </div>
   );
 };
@@ -1051,19 +1037,9 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
             </div>
           )}
 
-          {/* Compare checkbox */}
-          <button
-            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleCompare(item.id); }}
-            className={`absolute ${getPromotionBadge() ? 'top-10' : 'top-3'} right-3 z-20 w-7 h-7 rounded-full flex items-center justify-center transition-all shadow-md ${
-              isComparing
-                ? 'bg-cyan-500 text-white scale-110'
-                : 'bg-white/80 dark:bg-slate-800/80 text-slate-500 opacity-0 group-hover:opacity-100'
-            }`}
-            data-testid={`compare-toggle-${item.id}`}
-            title="Add to compare"
-          >
-            <Scale className="h-3.5 w-3.5" />
-          </button>
+          {/* iter365 — Legacy Scale-icon compare button removed. The
+              iter364 CompareCheckbox (rendered elsewhere on the card)
+              is the single source of truth for the Compare UI. */}
 
           {/* Bottom - Timer + Urgency Badge */}
           <div className="absolute bottom-3 left-3 right-3 flex justify-between items-center">

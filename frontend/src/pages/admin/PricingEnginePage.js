@@ -28,6 +28,11 @@ const KEY_LABELS = {
     en: 'Partner Platform Fee',
     fr: 'Frais de plateforme — partenaire',
   },
+  // iter365 — Broker annual membership.
+  broker_annual_fee: {
+    en: 'Broker Annual Membership',
+    fr: 'Adhésion annuelle — courtier',
+  },
 };
 
 const PricingEnginePage = () => {

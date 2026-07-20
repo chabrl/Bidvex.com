@@ -9,8 +9,8 @@
  *      (PDF/JPG/PNG, max 10 MB each, OPTIONAL — can be added later from dashboard)
  *   3. Fee structure (fixed | percentage + min/max clamps)
  *   4. Pricing + Legal confirmation + submit
- *      Displays the BidVex Broker Annual Plan: $200 CAD/yr regular,
- *      $100 CAD/yr current (Launch Offer — 50% OFF).
+ *      Displays the BidVex Broker Annual Plan: $500 CAD/yr regular,
+ *      $250 CAD/yr current (Launch Offer — 50% OFF, iter365, 180-day window).
  *
  * Submitting POSTs to /api/brokers/apply. Documents (if attached) are
  * uploaded via /api/brokers/upload-documents BEFORE the apply call so
@@ -529,13 +529,18 @@ export default function BecomeABrokerPage() {
                 </p>
                 <div className="flex items-end gap-3 mt-2 flex-wrap">
                   <span className="text-3xl font-bold text-slate-900 dark:text-white" data-testid="broker-price-current">
-                    $100.00 CAD
+                    $250.00 CAD
                   </span>
                   <span className="text-sm text-slate-500 line-through" data-testid="broker-price-original">
-                    $200.00 CAD
+                    $500.00 CAD
                   </span>
                   <span className="text-xs text-slate-500">{lang === 'fr' ? '/ an' : '/ year'}</span>
                 </div>
+                <p className="text-[11px] text-blue-700 dark:text-blue-300 font-semibold mt-1" data-testid="broker-launch-window">
+                  {lang === 'fr'
+                    ? 'Fenêtre de lancement : 180 jours'
+                    : 'Launch window: 180 days'}
+                </p>
                 <p className="text-xs text-slate-600 dark:text-slate-400 mt-3 leading-relaxed">
                   {lang === 'fr'
                     ? 'Tarification de lancement à durée limitée. Le tarif régulier s\'applique au renouvellement, sauf indication contraire de BidVex. Renouvellement automatique avec avis par courriel 30 jours avant la date de renouvellement.'

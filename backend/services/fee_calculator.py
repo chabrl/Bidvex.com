@@ -91,6 +91,10 @@ AFFILIATE_DEFAULT_RATE  = Decimal("0.10")
 # Vehicle deposit — pre-authorized on Stripe with capture_method="manual"
 VEHICLE_DEPOSIT_CAD     = Decimal("500.00")
 
+# iter365 — Broker annual membership (launch 50% discount → $250 for 180 days)
+BROKER_ANNUAL_FEE_CAD         = Decimal("500.00")   # base
+BROKER_ANNUAL_FEE_DISCOUNTED  = Decimal("250.00")   # after 50% launch discount
+
 # QC-specific for invoice line breakout (GST + QST reported separately per RQ IN-203-V)
 QC_GST_RATE = Decimal("0.05")
 QC_QST_RATE = Decimal("0.09975")

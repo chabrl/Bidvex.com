@@ -51,7 +51,8 @@ async def test_get_pricing_seeds_defaults_on_first_read(db):
     doc = await get_pricing(db, "vehicle_dealer_annual_fee")
     assert doc["base_price_cad"] == 200.0
     assert doc["launch_discount_percent"] == 50
-    assert doc["launch_window_days"] == 90
+    # iter365 — standardized 90 → 180-day default across all pricing keys.
+    assert doc["launch_window_days"] == 180
     assert doc["launch_cutoff_date"] > datetime.now(timezone.utc)
 
 
@@ -91,14 +92,18 @@ async def test_changing_window_days_recomputes_cutoff(db):
     await db.pricing_settings.delete_many({"key": "vehicle_dealer_annual_fee"})
     base = await read_pricing(db, "vehicle_dealer_annual_fee")
     start = base["launch_start_date"]
-    updated = await update_pricing(db, "vehicle_dealer_annual_fee", launch_window_days=180)
-    # cutoff = start + 180d
-    expected = (start if isinstance(start, datetime) else datetime.fromisoformat(start.replace("Z", "+00:00"))) + timedelta(days=180)
+    # iter365 — default is now 180d, so use 270 to actually register a change.
+    updated = await update_pricing(db, "vehicle_dealer_annual_fee", launch_window_days=270)
+    # cutoff = start + 270d
+    expected = (start if isinstance(start, datetime) else datetime.fromisoformat(start.replace("Z", "+00:00"))) + timedelta(days=270)
     assert "launch_window_days" in updated["changed_fields"]
     cutoff = updated["launch_cutoff_date"]
     if isinstance(cutoff, str):
         cutoff = datetime.fromisoformat(cutoff.replace("Z", "+00:00"))
     assert abs((cutoff - expected).total_seconds()) < 5
+    # Reset back to the iter365 canonical 180-day window so downstream tests
+    # (and running admins) see the standard config again.
+    await update_pricing(db, "vehicle_dealer_annual_fee", launch_window_days=180)
 
 
 # ─── HTTP layer ───────────────────────────────────────────────────────────
@@ -133,6 +138,8 @@ def test_admin_list_pricing_returns_both_keys():
     data = r.json()
     assert "vehicle_dealer_annual_fee" in data
     assert "partner_annual_fee" in data
+    # iter365 — broker annual fee added as the third account type.
+    assert "broker_annual_fee" in data
     for key, doc in data.items():
         assert "effective_price_cad" in doc
         assert "is_within_launch_window" in doc

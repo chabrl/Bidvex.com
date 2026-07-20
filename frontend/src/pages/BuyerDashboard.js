@@ -164,7 +164,10 @@ const BuyerDashboard = () => {
                   />
                 </div>
                 {dashboard?.bids && dashboard.bids.length > 0 ? (
-                  <div className="space-y-4">
+                  <div
+                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
+                    data-testid="buyer-bids-grid-all"
+                  >
                     {dashboard.bids.map((bid) => {
                       const listing = dashboard.listings.find(l => l.id === bid.listing_id);
                       const isWinning = listing && listing.current_price === bid.amount;
@@ -284,7 +287,10 @@ const BuyerDashboard = () => {
                   const listing = dashboard.listings.find(l => l.id === bid.listing_id);
                   return listing && listing.current_price === bid.amount;
                 }).length > 0 ? (
-                  <div className="space-y-4">
+                  <div
+                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
+                    data-testid="buyer-bids-grid-winning"
+                  >
                     {dashboard.bids.filter(bid => {
                       const listing = dashboard.listings.find(l => l.id === bid.listing_id);
                       return listing && listing.current_price === bid.amount;
@@ -372,7 +378,10 @@ const BuyerDashboard = () => {
                   const listing = dashboard.listings.find(l => l.id === bid.listing_id);
                   return listing && listing.current_price > bid.amount;
                 }).length > 0 ? (
-                  <div className="space-y-4">
+                  <div
+                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
+                    data-testid="buyer-bids-grid-outbid"
+                  >
                     {dashboard.bids.filter(bid => {
                       const listing = dashboard.listings.find(l => l.id === bid.listing_id);
                       return listing && listing.current_price > bid.amount;

@@ -10,7 +10,7 @@ Sample document:
       "key": "vehicle_dealer_annual_fee",
       "base_price_cad": 200.00,
       "launch_discount_percent": 50,
-      "launch_window_days": 90,
+      "launch_window_days": 180,
       "launch_start_date": datetime,
       "launch_cutoff_date": launch_start_date + launch_window_days,
       "stripe_product_id": "prod_xxx",
@@ -50,7 +50,7 @@ PRODUCT_DEFINITIONS = {
         "interval": "year",
         "default_base_price_cad": 200.0,
         "default_launch_discount_percent": 50,
-        "default_launch_window_days": 90,
+        "default_launch_window_days": 180,
     },
     "partner_annual_fee": {
         "product_name": "BidVex Partner Platform Access",
@@ -59,7 +59,18 @@ PRODUCT_DEFINITIONS = {
         "interval": "year",
         "default_base_price_cad": 100.0,
         "default_launch_discount_percent": 50,
-        "default_launch_window_days": 90,
+        # iter365 — standardized 90 → 180 days for all account types.
+        "default_launch_window_days": 180,
+    },
+    # iter365 — Broker annual membership.
+    "broker_annual_fee": {
+        "product_name": "BidVex Broker Annual Membership",
+        "product_metadata_tag": "broker_subscription",
+        "currency": "cad",
+        "interval": "year",
+        "default_base_price_cad": 500.0,
+        "default_launch_discount_percent": 50,
+        "default_launch_window_days": 180,
     },
 }
 
@@ -170,8 +181,13 @@ async def _ensure_coupon(db, key: str, doc: dict) -> str:
         doc["stripe_coupon_id"] = None
         return ""
 
-    # Versioned ID: "LAUNCH50_VDA" / "LAUNCH75_VDA"
-    short_key = "VDA" if key == "vehicle_dealer_annual_fee" else "PRT"
+    # Versioned ID: "LAUNCH50_VDA" / "LAUNCH50_PRT" / "LAUNCH50_BRK"
+    _SHORT_KEYS = {
+        "vehicle_dealer_annual_fee": "VDA",
+        "partner_annual_fee":        "PRT",
+        "broker_annual_fee":         "BRK",
+    }
+    short_key = _SHORT_KEYS.get(key, "GEN")
     coupon_id = f"LAUNCH{int(pct)}_{short_key}"
     try:
         existing = stripe.Coupon.retrieve(coupon_id)
