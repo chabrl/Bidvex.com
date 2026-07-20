@@ -184,7 +184,8 @@ const LotsMarketplacePage = () => {
               </div>
             )}
             {/* iter364 — Compare checkbox */}
-            <div className="absolute bottom-2 left-2 z-20" onClick={(e) => e.stopPropagation()}>
+            {/* iter366 — Compare button raised above the timer/badge strip. */}
+            <div className="absolute bottom-14 right-2 z-20" onClick={(e) => e.stopPropagation()}>
               <CompareCheckbox item={listing} section="lots" />
             </div>
           </div>

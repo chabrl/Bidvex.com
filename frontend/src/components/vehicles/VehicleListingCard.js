@@ -227,7 +227,8 @@ const VehicleListingCard = ({ vehicle, countdown, onClick, onQuickView, compact 
         )}
 
         {/* iter364 — Compare checkbox */}
-        <div className="absolute bottom-2 left-2 z-30" onClick={(e) => { e.stopPropagation(); }}>
+        {/* iter366 — Compare button raised above the timer/badge strip. */}
+        <div className="absolute bottom-14 right-2 z-30" onClick={(e) => { e.stopPropagation(); }}>
           <CompareCheckbox item={vehicle} section="vehicle" />
         </div>
 

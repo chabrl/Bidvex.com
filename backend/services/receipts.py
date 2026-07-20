@@ -83,6 +83,22 @@ async def issue_transaction_records(
     buyer = await db.users.find_one({"id": buyer_id}, {"_id": 0}) if buyer_id else None
     seller = await db.users.find_one({"id": seller_id}, {"_id": 0}) if seller_id else None
 
+    # iter366 — enrich the receipt dict with seller display name + order
+    # number so the redesigned buyer receipt email can render "Item / Seller
+    # / Order / Date" without an extra DB round-trip inside the mailer.
+    def _display_name(u):
+        if not u: return "BidVex Seller"
+        raw = (u.get("name") or u.get("business_name") or u.get("full_name") or "").strip()
+        if raw: return raw
+        email = u.get("email") or ""
+        return email.split("@")[0] if email else "BidVex Seller"
+    base["seller_name"] = _display_name(seller)
+    # Short human-readable order number derived from the listing id — 8 chars
+    # (uppercase, no dashes) prefixed with BVX- (e.g. BVX-179B62B9). Falls
+    # back to a fresh uuid slice if listing_id is missing.
+    _short = (listing_id or str(uuid.uuid4())).replace("-", "")[:8].upper()
+    base["order_number"] = f"BVX-{_short}"
+
     # ── Buyer receipt ──
     try:
         dedup_q = {"listing_id": listing_id, "lot_number": lot_number,

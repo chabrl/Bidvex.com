@@ -954,7 +954,11 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
           )}
 
           {/* iter364 — Compare checkbox bottom-left of the image overlay. */}
-          <div className="absolute bottom-2 left-2 z-20" onClick={(e) => e.stopPropagation()}>
+          {/* iter366 — Compare button repositioned to avoid overlap with the
+              timer strip (`bottom-3`) and bid-count badge (`bottom-3 right-3`).
+              At `bottom-14 right-2` the small circular icon sits well ABOVE
+              the timer, matching the user's ASCII spec. */}
+          <div className="absolute bottom-14 right-2 z-20" onClick={(e) => e.stopPropagation()}>
             <CompareCheckbox item={item} section="marketplace" />
           </div>
 

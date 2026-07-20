@@ -48,24 +48,31 @@ export function CompareCheckbox({ item, section = 'marketplace', className = '' 
     toggle(item, section);
   };
 
+  // iter366 — Circular icon-only compare button (was a pill with "Compare"
+  // label overlapping the auction timer). Small footprint, positioned
+  // bottom-right of the card image via the wrapper's `absolute bottom-2
+  // right-2`. Never covers timer, current-bid, buy-now or seller info.
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      title={disabled ? t.tooltipMax : t.tooltip}
-      className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold transition-all min-h-[28px] ${
+      title={active ? `${t.label} ✓` : (disabled ? t.tooltipMax : t.tooltip)}
+      aria-label={active ? `${t.label} ✓` : t.tooltip}
+      aria-pressed={active}
+      className={`inline-flex items-center justify-center w-8 h-8 rounded-full transition-all shadow-md ring-1 ring-black/5 ${
         active
-          ? 'bg-primary text-white shadow-md'
+          ? 'bg-primary text-white scale-110 ring-primary/40'
           : disabled
-            ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-            : 'bg-white/95 text-slate-700 border border-slate-200 hover:bg-slate-50 hover:border-primary/40'
+            ? 'bg-slate-100/95 text-slate-400 cursor-not-allowed'
+            : 'bg-white/95 text-slate-700 hover:bg-white hover:scale-105 hover:text-primary'
       } ${className}`}
       data-testid={`compare-checkbox-${item?.id || item?._id}`}
     >
-      <GitCompare className="h-3 w-3 flex-shrink-0" />
-      <span>{t.label}</span>
-      {active && <span className="text-[9px] opacity-80">✓</span>}
+      <GitCompare className="h-4 w-4" aria-hidden="true" />
+      {active && (
+        <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-white" aria-hidden="true" />
+      )}
     </button>
   );
 }

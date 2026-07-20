@@ -1,0 +1,61 @@
+{
+  "summary": "iter366 regression testing COMPLETE — all 3 fixes verified end-to-end on preview host (https://prod-verify-2.preview.emergentagent.com). (1) Compare button on /en/marketplace is now a small 44x44 circular icon-only button (aria-label='Add to compare'), 1 per card, ZERO overlap with the '19d 1h' timer strip on all 20 rendered cards. Sticky CompareBar still shows '1 selected'/'2 selected' with 'Compare Now' CTA on ≥2. (2) Buyer receipt email — captured in-process via monkey-patched _send_via_unified — contains ALL 5 required sections (Payment Successful, Purchase Information, Price Breakdown w/ TOTAL PAID, YOUR PICKUP CODE + 'Show this code to the seller', Payment Information + Transaction ID) plus enriched fields (seller_name='Acme Music Store', order_number='BVX-ABCDEF12'). FR variant verified with 'Paiement réussi' + 'TOTAL PAYÉ'. (3) Unsubscribe flow — /api/unsubscribe/verify returns 400 on bad token / 200 with masked email on valid signed token; /confirm returns 200; frontend /unsubscribe?token=... shows masked email + Confirm button → success view 'You've been unsubscribed' + resubscribe link. {{UNSUBSCRIBE_URL}} placeholder is replaced with the per-recipient signed token URL (verified in captured HTML). 9/9 static tripwires + 8/8 new live tests (test_iter366_live.py) = 17/17 PASS.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_results": {
+    "backend_static_tripwires": "9/9 PASS (backend/tests/test_iter366_launch_gate.py) — CompareCheckbox is w-8 h-8 rounded-full icon-only, bottom-14 right-2 across all 4 card types, receipts.py exposes seller_name + order_number BVX-XXXXXXXX, email_system.py has all 5 EN + FR section headings, _email_core.py uses build_unsubscribe_urls() + {UNSUBSCRIBE_URL} placeholder + replacement in _send_via_unified, UnsubscribePage.js reads ?token= from query.",
+    "backend_live_http": {
+      "GET /api/unsubscribe/verify (bad token)": "400 OK (expected)",
+      "GET /api/unsubscribe/verify (signed token)": "200 OK — returns {email_masked: 't***@bidvex.com'}",
+      "POST /api/unsubscribe/confirm (signed token)": "200 OK — user marked as unsubscribed",
+      "POST /api/auth/login (charbel911@gmail.com)": "200 OK — super_admin token OK",
+      "GET /api/unsubscribe/generate-test-link (admin)": "200 OK — returns {url_en, url_fr, expires_in_days}"
+    },
+    "backend_in_process_email_render": {
+      "send_buyer_receipt_email (EN)": "HTML contains 'Payment Successful', 'Purchase Information', 'TOTAL PAID', 'YOUR PICKUP CODE', 'Show this code to the seller', 'Payment Information', 'Acme Music Store', 'BVX-ABCDEF12', 'BVX-1H1J5GC9', 'pi_test_1234567890'",
+      "send_buyer_receipt_email (FR)": "HTML contains 'Paiement r&eacute;ussi', 'TOTAL PAY&Eacute;'",
+      "UNSUBSCRIBE_URL placeholder": "Successfully replaced with '/unsubscribe?token=<signed>' — literal '{{UNSUBSCRIBE_URL}}' NOT in final HTML",
+      "List-Unsubscribe header": "Uses build_unsubscribe_urls() → signed token URL; NOT the old ?email=<addr> scheme"
+    },
+    "frontend_marketplace": {
+      "compare_button_count": "20 item-card ↔ 20 compare-checkbox (1:1 ratio)",
+      "legacy_compare_toggle_count": "0 (removed)",
+      "compare_floating_bar_legacy": "0 (removed)",
+      "compare_button_size": "44x44px, text='', aria-label='Add to compare', title='Add to compare' — icon-only",
+      "compare_button_position": "bottom-right of card image (bottom-14 right-2 wrapper) — visually ABOVE the '19d 1h' timer badge which sits at bottom-left of image",
+      "overlap_with_timer": "0 overlaps observed in screenshots; static test verifies bottom-14 right-2 wrapper on all 4 card type files",
+      "compare_bar_1_selected": "PASS — sticky bar shows '1 selected · Select 1 more to compare'",
+      "compare_bar_2_selected_cta": "PASS — sticky bar shows '2 selected · Compare Now' CTA"
+    },
+    "frontend_unsubscribe": {
+      "GET /unsubscribe?token=<valid>": "Renders masked email 'i***@bidvex.com' + Confirm button + Back to BidVex",
+      "Confirm click": "POST /api/unsubscribe/confirm returns 200 → success view 'You've been unsubscribed' + resubscribe link + 'Transactional emails are not affected' disclaimer"
+    }
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter366_launch_gate.py",
+    "/app/backend/tests/test_iter366_live.py"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Compare button redesign is complete and correct: small 44x44 circular icon-only button (Scale icon), positioned bottom-right of card image, above the timer strip → zero timer/countdown overlap on all 20 marketplace cards. Accessibility preserved via aria-label='Add to compare' + title tooltip.",
+    "Buyer receipt email HTML has been comprehensively redesigned — all 5 sections rendered in the correct order (heading → purchase info → breakdown → pickup → payment info → letterhead) with bilingual EN/FR copy. seller_name + order_number now populated from receipts.py enrichment (BVX-XXXXXXXX format from listing_id).",
+    "Unsubscribe fix is solid: List-Unsubscribe header now points to /unsubscribe?token=<signed>, in-body footer placeholder {{UNSUBSCRIBE_URL}} is replaced per-recipient in _send_via_unified before SendGrid handoff, and frontend page reads ?token= (not ?email=) via auto-verify then /confirm. Full end-to-end verified in browser.",
+    "Compare bar interaction preserved (1 selected → 'Select 1 more', 2 selected → 'Compare Now' CTA) — regression from iter365 not observed."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter366_live.py (NEW — 8 live tests: 3 unsubscribe HTTP + 4 email HTML render + 1 List-Unsubscribe header)"
+  ],
+  "success_rate": {
+    "backend": "100% (9/9 static + 8/8 live = 17/17 PASS)",
+    "frontend": "100% (marketplace Compare button + Unsubscribe page both verified)"
+  },
+  "test_credentials": {
+    "super_admin": "charbel911@gmail.com / Anderosli123!@# — verified working"
+  },
+  "seed_data_creation": "None — only read/GET/POST test tokens with fake email addresses (iter366_frontend@bidvex.com, testbuyer366@bidvex.com) that are not real accounts. No production data modified.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "iter366 fully green. To re-verify: (a) run `pytest backend/tests/test_iter366_launch_gate.py backend/tests/test_iter366_live.py -v` — 17/17 PASS; (b) load /en/marketplace and confirm 20/20 compare-checkbox at 44x44 circular, no visible text label, bottom-14 right-2 position; (c) visit /unsubscribe?token=<from generate-test-link endpoint> and confirm the flow. To generate a valid unsub token in tests use `from routes.unsubscribe import build_unsubscribe_urls; urls = build_unsubscribe_urls('anyemail@example.com')` — requires UNSUBSCRIBE_SECRET env var loaded via load_dotenv('/app/backend/.env'). For receipt HTML capture, monkey-patch `services.emails.email_system._send_via_unified` (NOT _email_core._send_via_unified — email_system has its own imported reference) then call `asyncio.run(send_buyer_receipt_email(buyer, receipt))`. Preview URL: https://prod-verify-2.preview.emergentagent.com. Rate limit: 5 failed logins → 429/60s.",
+  "rca of the issue": "N/A — no issues found. All 3 iter366 items pass regression."
+}

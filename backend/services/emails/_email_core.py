@@ -290,6 +290,22 @@ async def send_email(
         # includes it), this is a no-op.
         html_content = inject_bidvex_logo_header(html_content)
 
+        # iter366 — Replace the {{UNSUBSCRIBE_URL}} placeholder in the
+        # HTML footer with a signed one-click token URL. This makes the
+        # visible unsubscribe link work end-to-end without asking the
+        # user to type their email. Transactional emails still ship the
+        # link because the endpoint gracefully handles both modes
+        # (marketing-only opt-out; transactional emails remain).
+        if "{{UNSUBSCRIBE_URL}}" in html_content:
+            try:
+                from routes.unsubscribe import build_unsubscribe_urls
+                _unsub = build_unsubscribe_urls(to_email).get("en", "")
+            except Exception:
+                _unsub = f"{FRONTEND_URL}/unsubscribe?email={to_email}"
+            if not _unsub:
+                _unsub = f"{FRONTEND_URL}/unsubscribe?email={to_email}"
+            html_content = html_content.replace("{{UNSUBSCRIBE_URL}}", _unsub)
+
         # iter270 — Always send from the unified noreply@bidvex.com so
         # the same DKIM key + SPF record + DMARC policy is used on every
         # message. Callers can pass `from_name` to keep their branded
@@ -336,7 +352,18 @@ async def send_email(
                 message.add_header(_SgHeader("X-Entity-Ref-ID", entity_id))
                 message.add_header(_SgHeader("X-Mailer", "BidVex Email System v2.0"))
                 if is_marketing:
-                    unsub_url = f"https://bidvex.com/unsubscribe?email={to_email}"
+                    # iter366 — Generate a SIGNED token so the frontend
+                    # /unsubscribe page can auto-verify and confirm without
+                    # asking the user for their email. The old `?email=`
+                    # scheme produced a 400 `token_missing` and users saw
+                    # a broken page.
+                    try:
+                        from routes.unsubscribe import build_unsubscribe_urls
+                        unsub_url = build_unsubscribe_urls(to_email).get("en", "")
+                    except Exception:
+                        unsub_url = f"{FRONTEND_URL}/unsubscribe?email={to_email}"
+                    if not unsub_url:
+                        unsub_url = f"{FRONTEND_URL}/unsubscribe?email={to_email}"
                     message.add_header(_SgHeader(
                         "List-Unsubscribe",
                         f"<{unsub_url}>, <mailto:unsubscribe@bidvex.com?subject=unsubscribe>",
@@ -563,10 +590,22 @@ def _base_template(content: str, title: str = "BidVex Notification",
                         <!-- Footer -->
                         <tr>
                             <td style="background-color: #f8fafc; padding: 20px 30px; border-radius: 0 0 12px 12px; border-top: 1px solid #e2e8f0;">
-                                <p style="margin: 0; font-size: 12px; color: #64748b; text-align: center;">
+                                <p style="margin: 0 0 8px; font-size: 12px; color: #64748b; text-align: center;">
                                     © 2026 BidVex Inc. All rights reserved.<br>
                                     <a href="{FRONTEND_URL}/privacy-policy" style="color: #2563eb;">Privacy Policy</a> | 
                                     <a href="{FRONTEND_URL}/terms-of-service" style="color: #2563eb;">Terms of Service</a>
+                                </p>
+                                <!-- iter366 — Visible unsubscribe link. The
+                                     {{UNSUBSCRIBE_URL}} placeholder is filled
+                                     with a signed one-click token in
+                                     _send_via_unified(). If unsubscribe is
+                                     unavailable (transactional-only send),
+                                     the placeholder is stripped by the same
+                                     step and the block hides itself. -->
+                                <p style="margin: 6px 0 0; font-size: 11px; color: #94a3b8; text-align: center;">
+                                    Don&apos;t want marketing emails?
+                                    <a href="{{{{UNSUBSCRIBE_URL}}}}" style="color: #64748b; text-decoration: underline;">Unsubscribe</a>
+                                    · Transactional emails (receipts, security, order updates) are always sent.
                                 </p>
                             </td>
                         </tr>

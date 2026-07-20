@@ -1435,82 +1435,161 @@ def _money_row(label: str, amount: float, bold: bool = False, color: str = "#0f1
 
 
 async def send_buyer_receipt_email(buyer: dict, receipt: dict) -> Dict[str, Any]:
-    """Itemized payment receipt for the winning buyer (EN or FR based on
-    the buyer's platform language)."""
+    """iter366 — Redesigned professional buyer receipt.
+
+    Structure:
+      1. Header (BidVex logo via base template) + "Payment Successful ✓" heading
+      2. Purchase Information card (Item, Seller, Order #, Date)
+      3. Price Breakdown table with prominent TOTAL PAID row
+      4. Pickup Section (large monospace code + instructions)
+      5. Payment Information (card last-4 + transaction id)
+      6. Legal letterhead (BidVex Inc. address + corporation #)
+    """
+    from datetime import datetime
     lang = _detect_language(buyer)
     title = receipt.get("listing_title", "Item")
     last4 = receipt.get("payment_method_last4")
     txn = receipt.get("transaction_id") or receipt.get("id", "")
-
+    seller_name = receipt.get("seller_name") or "BidVex Seller"
+    order_number = receipt.get("order_number") or (receipt.get("id", "")[:8].upper() if receipt.get("id") else "")
+    # Purchase date — formatted per language.
+    try:
+        created = receipt.get("created_at")
+        dt = datetime.fromisoformat(created.replace("Z", "+00:00")) if isinstance(created, str) else datetime.utcnow()
+    except Exception:
+        dt = datetime.utcnow()
     if lang == "fr":
-        heading = "Re&ccedil;u de paiement"
-        intro = (f"Bonjour {buyer.get('name', '')}, voici votre re&ccedil;u pour "
-                 f"<strong>{title}</strong>. Merci d'avoir ench&eacute;ri sur BidVex.")
-        rows = (
-            _money_row("Prix d'adjudication", receipt.get("hammer_price", 0))
-            + _money_row("Frais de plateforme", receipt.get("platform_fee", 0))
-            + _money_row("Taxes", receipt.get("taxes", 0))
-            + _money_row("Frais de traitement", receipt.get("processing_fee", 0))
-            + _money_row("Total factur&eacute;", receipt.get("total_charged", 0), bold=True, color="#0ea5e9")
-        )
-        meta = (
-            (f"<p style='color:#64748b;font-size:13px;'>Carte se terminant par <strong>{last4}</strong></p>" if last4 else "")
-            + f"<p style='color:#64748b;font-size:13px;'>ID de transaction&nbsp;: <strong>{txn}</strong></p>"
-        )
-        subject = f"Re\u00e7u BidVex — {title}"
+        purchase_date = dt.strftime("%d %B %Y")
     else:
-        heading = "Payment Receipt"
-        intro = (f"Hi {buyer.get('name', '')}, here is your receipt for "
-                 f"<strong>{title}</strong>. Thank you for bidding on BidVex.")
-        rows = (
-            _money_row("Hammer price", receipt.get("hammer_price", 0))
-            + _money_row("Platform fee", receipt.get("platform_fee", 0))
-            + _money_row("Taxes", receipt.get("taxes", 0))
-            + _money_row("Payment processing", receipt.get("processing_fee", 0))
-            + _money_row("Total charged", receipt.get("total_charged", 0), bold=True, color="#0ea5e9")
-        )
-        meta = (
-            (f"<p style='color:#64748b;font-size:13px;'>Card ending in <strong>{last4}</strong></p>" if last4 else "")
-            + f"<p style='color:#64748b;font-size:13px;'>Transaction ID: <strong>{txn}</strong></p>"
-        )
-        subject = f"BidVex Receipt — {title}"
+        purchase_date = dt.strftime("%B %d, %Y")
 
-    pickup_code = receipt.get("pickup_code")
+    # ─── Bilingual copy ─────────────────────────────────────────────────
     if lang == "fr":
-        pickup_block = ""
-        if pickup_code:
-            pickup_block = (
-                f"<table role='presentation' width='100%' cellpadding='0' cellspacing='0' "
-                f"style='background:#eff6ff;border:1px dashed #2563eb;border-radius:8px;margin:18px 0;'>"
-                f"<tr><td align='center' style='padding:16px;'>"
-                f"<p style='margin:0;color:#1e3a8a;font-size:13px;'>Votre code de collecte / Your pickup code</p>"
-                f"<p style='margin:6px 0 0 0;font-size:24px;font-weight:bold;letter-spacing:2px;color:#1d4ed8;font-family:monospace;'>{pickup_code}</p>"
-                f"<p style='margin:6px 0 0 0;color:#64748b;font-size:12px;'>Pr&eacute;sentez ce code au vendeur lors de la collecte de votre article.</p>"
-                f"</td></tr></table>"
-            )
+        heading         = "Paiement r&eacute;ussi"
+        subhead         = "Merci pour votre achat&nbsp;!"
+        buyer_greeting  = f"Bonjour {buyer.get('name', '')},"
+        purchase_h      = "Informations d'achat"
+        lbl_item        = "Article"
+        lbl_seller      = "Vendeur"
+        lbl_order       = "Commande"
+        lbl_date        = "Date d'achat"
+        breakdown_h     = "D&eacute;tail du paiement"
+        row_hammer      = "Prix d'adjudication"
+        row_platform    = "Frais acheteur BidVex"
+        row_taxes       = "Taxes"
+        row_processing  = "Traitement du paiement"
+        row_total       = "TOTAL PAY&Eacute;"
+        pickup_h        = "VOTRE CODE DE COLLECTE"
+        pickup_help     = "Pr&eacute;sentez ce code au vendeur lors de la collecte de votre article."
+        payinfo_h       = "Informations de paiement"
+        card_prefix     = "Carte se terminant par"
+        txn_prefix      = "ID de transaction&nbsp;:"
+        subject         = f"BidVex — Paiement re&ccedil;u pour {title}"
     else:
-        pickup_block = ""
-        if pickup_code:
-            pickup_block = (
-                f"<table role='presentation' width='100%' cellpadding='0' cellspacing='0' "
-                f"style='background:#eff6ff;border:1px dashed #2563eb;border-radius:8px;margin:18px 0;'>"
-                f"<tr><td align='center' style='padding:16px;'>"
-                f"<p style='margin:0;color:#1e3a8a;font-size:13px;'>Your pickup code / Votre code de collecte</p>"
-                f"<p style='margin:6px 0 0 0;font-size:24px;font-weight:bold;letter-spacing:2px;color:#1d4ed8;font-family:monospace;'>{pickup_code}</p>"
-                f"<p style='margin:6px 0 0 0;color:#64748b;font-size:12px;'>Present this code to the seller when collecting your item.</p>"
-                f"</td></tr></table>"
-            )
+        heading         = "Payment Successful"
+        subhead         = "Thank you for your purchase!"
+        buyer_greeting  = f"Hi {buyer.get('name', '')},"
+        purchase_h      = "Purchase Information"
+        lbl_item        = "Item"
+        lbl_seller      = "Seller"
+        lbl_order       = "Order"
+        lbl_date        = "Purchase Date"
+        breakdown_h     = "Price Breakdown"
+        row_hammer      = "Hammer Price"
+        row_platform    = "BidVex Buyer Fee"
+        row_taxes       = "Taxes"
+        row_processing  = "Payment Processing"
+        row_total       = "TOTAL PAID"
+        pickup_h        = "YOUR PICKUP CODE"
+        pickup_help     = "Show this code to the seller when collecting your item."
+        payinfo_h       = "Payment Information"
+        card_prefix     = "Card ending in"
+        txn_prefix      = "Transaction ID:"
+        subject         = f"BidVex — Payment received for {title}"
 
-    content = f"""
-    <h2 style="margin: 0 0 20px 0; color: #0f172a;">{heading}</h2>
-    <p style="color: #475569; line-height: 1.6;">{intro}</p>
-    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 20px 0;">
-      {rows}
-    </table>
-    {pickup_block}
-    {meta}
-    {_letterhead()}
+    # ─── Section 1: Success header ──────────────────────────────────────
+    header_block = f"""
+    <div style="text-align:center;padding:18px 0 4px;">
+      <div style="display:inline-block;width:56px;height:56px;border-radius:50%;background:#dcfce7;line-height:56px;text-align:center;font-size:30px;color:#16a34a;">&#10003;</div>
+      <h1 style="margin:14px 0 6px;color:#0f172a;font-size:26px;font-weight:800;">{heading}</h1>
+      <p style="margin:0;color:#475569;font-size:15px;">{subhead}</p>
+    </div>
+    <p style="color:#475569;line-height:1.6;margin:20px 0 12px;">{buyer_greeting}</p>
     """
+
+    # ─── Section 2: Purchase information ────────────────────────────────
+    def _info_row(label, value):
+        return f"""
+        <tr>
+          <td style="padding:8px 0;color:#64748b;font-size:13px;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;width:40%;">{label}</td>
+          <td style="padding:8px 0;color:#0f172a;font-size:15px;font-weight:600;text-align:right;">{value}</td>
+        </tr>
+        """
+    purchase_info = f"""
+    <table role='presentation' width='100%' cellpadding='0' cellspacing='0' border='0'
+           style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:16px 20px;margin:18px 0;">
+      <tr><td>
+        <h3 style="margin:0 0 8px;color:#0f172a;font-size:14px;text-transform:uppercase;letter-spacing:0.08em;font-weight:800;">{purchase_h}</h3>
+        <table role='presentation' width='100%' cellpadding='0' cellspacing='0' border='0'>
+          {_info_row(lbl_item,   title)}
+          {_info_row(lbl_seller, seller_name)}
+          {_info_row(lbl_order,  order_number)}
+          {_info_row(lbl_date,   purchase_date)}
+        </table>
+      </td></tr>
+    </table>
+    """
+
+    # ─── Section 3: Price breakdown ─────────────────────────────────────
+    breakdown_rows = (
+        _money_row(row_hammer,     receipt.get("hammer_price", 0))
+        + _money_row(row_platform, receipt.get("platform_fee", 0))
+        + _money_row(row_taxes,    receipt.get("taxes", 0))
+        + _money_row(row_processing, receipt.get("processing_fee", 0))
+    )
+    total_row = f"""
+    <tr>
+      <td style="padding:14px 0 0;color:#0f172a;font-size:16px;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;border-top:2px solid #0f172a;">{row_total}</td>
+      <td align="right" style="padding:14px 0 0;color:#0ea5e9;font-size:22px;font-weight:800;border-top:2px solid #0f172a;">${receipt.get("total_charged", 0):,.2f} CAD</td>
+    </tr>
+    """
+    breakdown_block = f"""
+    <h3 style="margin:22px 0 10px;color:#0f172a;font-size:14px;text-transform:uppercase;letter-spacing:0.08em;font-weight:800;">{breakdown_h}</h3>
+    <table role='presentation' width='100%' cellpadding='0' cellspacing='0' border='0'>
+      {breakdown_rows}
+      {total_row}
+    </table>
+    """
+
+    # ─── Section 4: Pickup code ─────────────────────────────────────────
+    pickup_code = receipt.get("pickup_code")
+    pickup_block = ""
+    if pickup_code:
+        pickup_block = f"""
+        <table role='presentation' width='100%' cellpadding='0' cellspacing='0'
+               style="background:#eff6ff;border:2px dashed #2563eb;border-radius:12px;margin:22px 0;">
+          <tr><td align='center' style='padding:22px 18px;'>
+            <p style='margin:0 0 6px;color:#1e3a8a;font-size:12px;font-weight:800;letter-spacing:0.12em;'>{pickup_h}</p>
+            <p style='margin:6px 0 8px;font-size:34px;font-weight:800;letter-spacing:4px;color:#1d4ed8;font-family:"Courier New",monospace;'>{pickup_code}</p>
+            <p style='margin:10px 0 0;color:#475569;font-size:13px;line-height:1.5;'>{pickup_help}</p>
+          </td></tr>
+        </table>
+        """
+
+    # ─── Section 5: Payment information ─────────────────────────────────
+    payment_info = f"""
+    <h3 style="margin:22px 0 10px;color:#0f172a;font-size:14px;text-transform:uppercase;letter-spacing:0.08em;font-weight:800;">{payinfo_h}</h3>
+    <table role='presentation' width='100%' cellpadding='0' cellspacing='0' border='0'
+           style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 20px;">
+      <tr><td style='padding:6px 0;'>
+        {("<div style='color:#0f172a;font-size:14px;margin-bottom:6px;'>" + card_prefix + " <strong>&bull;&bull;&bull;&bull; " + last4 + "</strong></div>") if last4 else ""}
+        <div style='color:#64748b;font-size:12px;'>{txn_prefix} <strong style='color:#0f172a;font-family:"Courier New",monospace;'>{txn}</strong></div>
+      </td></tr>
+    </table>
+    """
+
+    content = header_block + purchase_info + breakdown_block + pickup_block + payment_info + _letterhead()
+
     return await _send_via_unified(
         to_email=buyer["email"],
         subject=subject,
