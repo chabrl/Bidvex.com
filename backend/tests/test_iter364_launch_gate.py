@@ -107,12 +107,31 @@ def test_adunit_placed_on_all_4_index_pages():
 
 
 def test_adsense_script_conditionally_loaded():
-    """index.html conditionally loads AdSense JS only on prod hosts."""
+    """index.html conditionally loads AdSense JS only on prod hosts (live publisher ID)."""
     text = open("/app/frontend/public/index.html", "r", encoding="utf-8").read()
     assert "pagead2.googlesyndication.com" in text
     assert "PROD_HOSTS" in text
-    # Must NOT unconditionally load — must be gated on hostname
-    assert "PUBLISHER.indexOf('X') === -1" in text
+    # iter364 follow-up: live publisher ID is now baked in (Charbel provided it).
+    assert "ca-pub-5626625571065443" in text
+    # No placeholder must remain anywhere in the file.
+    assert "ca-pub-XXXX" not in text
+
+
+def test_no_placeholder_publisher_ids_in_repo():
+    """Guardrail: no ca-pub-XXX... placeholders should exist in shipped source."""
+    import subprocess
+    paths_to_scan = [
+        "/app/frontend/src",
+        "/app/frontend/public",
+        "/app/backend/routes",
+        "/app/backend/templates",
+    ]
+    for base in paths_to_scan:
+        r = subprocess.run(
+            ["grep", "-rln", "ca-pub-XXXX", base],
+            capture_output=True, text=True
+        )
+        assert r.stdout.strip() == "", f"Placeholder publisher ID still in: {r.stdout}"
 
 
 # ═══════════════════════════════════════════════════════════════════════

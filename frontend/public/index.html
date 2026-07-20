@@ -130,16 +130,17 @@
           gtag('config', 'AW-18140095337');
         </script>
 
-        <!-- iter364 — Google AdSense (loads only on prod hosts + when a valid
-             publisher ID is configured; the AdUnit component gates rendering
-             so no wasted impressions or console errors on preview / dev). -->
+        <!-- iter364 — Google AdSense.
+             Publisher ID (LIVE): ca-pub-5626625571065443
+             The script is loaded ONLY on production hosts so preview /
+             dev never fires impressions or triggers console errors.
+             The AdUnit component further gates individual ad slots. -->
         <script>
           (function() {
             var host = window.location.hostname;
             var PROD_HOSTS = ['www.bidvex.com','bidvex.com','launchapp-4-r-1774886029.emergent.host'];
-            // Placeholder publisher ID — replace when AdSense is approved.
-            var PUBLISHER = 'ca-pub-XXXXXXXXXXXXXXXX';
-            if (PROD_HOSTS.indexOf(host) !== -1 && PUBLISHER.indexOf('X') === -1) {
+            var PUBLISHER = 'ca-pub-5626625571065443';
+            if (PROD_HOSTS.indexOf(host) !== -1) {
               var s = document.createElement('script');
               s.async = true;
               s.crossOrigin = 'anonymous';

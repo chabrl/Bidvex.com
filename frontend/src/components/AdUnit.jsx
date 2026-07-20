@@ -5,19 +5,12 @@
  * launchapp production host) the real `<ins class="adsbygoogle">` tag is
  * emitted and `(adsbygoogle = window.adsbygoogle || []).push({})` fires;
  * on preview/dev a labelled placeholder box renders instead so the layout
- * gap matches without triggering AdSense errors (or wasting impressions
- * before Charbel's AdSense approval).
+ * gap matches without triggering AdSense errors (or wasting impressions).
  *
- * The Publisher ID + Ad Unit slot IDs come from env vars so Charbel can
- * rotate them without redeploying code:
- *   REACT_APP_ADSENSE_CLIENT   — Publisher ID (e.g. ca-pub-1234567890123456)
- *   REACT_APP_ADSENSE_SLOT_HERO
- *   REACT_APP_ADSENSE_SLOT_INLINE
- *   REACT_APP_ADSENSE_SLOT_FOOTER
- *
- * Once REACT_APP_ADSENSE_CLIENT is set to a real ca-pub-... value AND the
- * host is production, real ads render. Until then, dev placeholders show
- * so the page layout is accurate.
+ * Publisher ID (LIVE): ca-pub-5626625571065443 (Charbel's approved AdSense).
+ * The publisher ID can be overridden via REACT_APP_ADSENSE_CLIENT env var
+ * (useful for staging accounts, sub-brands, or A-B tests). Per-slot IDs
+ * come from REACT_APP_ADSENSE_SLOT_* env vars.
  */
 import React, { useEffect, useRef } from 'react';
 
@@ -32,8 +25,9 @@ const isProdHost = () => {
   return PROD_HOSTS.has(window.location.hostname);
 };
 
-const CLIENT = process.env.REACT_APP_ADSENSE_CLIENT || '';
-const isConfigured = CLIENT.startsWith('ca-pub-');
+// Live publisher ID; env-var override supported.
+const CLIENT = process.env.REACT_APP_ADSENSE_CLIENT || 'ca-pub-5626625571065443';
+const isConfigured = CLIENT.startsWith('ca-pub-') && !CLIENT.includes('X');
 
 export default function AdUnit({
   slot,
