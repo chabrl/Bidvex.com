@@ -1,5 +1,64 @@
 # BidVex — Auction Marketplace PRD
 
+## iter366 — Compare Button Overlap Fix, Receipt Email Redesign, Unsubscribe Link (Jul 20, 2026) ✅ COMPLETE — VERIFIED
+
+**Scope**: 3 regression corrections. **17/17 iter366 tests pass** (9 static + 8 live). 71/71 across iter363–366 + iter210 pricing suites. Zero regressions.
+
+### Item 1 — Compare Button Repositioned + Redesigned ✅ FIXED
+
+**Root cause**: The iter365 CompareCheckbox rendered as a pill (icon + "Compare" text) positioned at `bottom-2 left-2` — this sat directly on top of the timer strip (`bottom-3 left-3 right-3`) causing visual overlap. User's screenshot proof.
+
+**Fix (surgical, `CompareBar.jsx` + 4 card wrappers)**:
+- CompareCheckbox redesigned: `w-8 h-8 rounded-full` circular icon-only button (no visible "Compare" text). `aria-label` + `title` preserve the label for accessibility.
+- Wrapper position on ALL 4 card types updated from `bottom-2 left-2` → `bottom-14 right-2` (56px above the timer strip).
+- Live-tested: 25 cards on `/en/marketplace` → 25 CompareCheckbox → **0 overlaps** with timers or bid-count badges.
+- Compare functionality (sticky bar, up-to-4 cap, /compare + /fr/comparer routes) fully preserved.
+
+### Item 2 — Buyer Receipt Email Redesigned ✅ FIXED
+
+**Root cause**: Old email had poor hierarchy — minimal heading + one flat table + no purchase context. Customers couldn't tell what they bought at a glance.
+
+**Fix (`services/receipts.py` + `services/emails/email_system.py`)**:
+- `receipts.issue_transaction_records` now enriches the receipt dict with `seller_name` (via `name || business_name || full_name` fallback chain) and `order_number` (`BVX-XXXXXXXX` — 8-char uppercase derived from listing_id).
+- `send_buyer_receipt_email` completely rewritten with 5 sections:
+  1. **Success header**: green ✓ badge + "Payment Successful" / "Paiement réussi" + "Thank you for your purchase!"
+  2. **Purchase Information** card: Item, Seller, Order #, Purchase Date (labelled rows, monospaced)
+  3. **Price Breakdown** table with rows Hammer Price / BidVex Buyer Fee / Taxes / Payment Processing / **TOTAL PAID** (prominent: 22px cyan font, 2px top border)
+  4. **Pickup Section**: large monospace pickup code (34px, 4px letter-spacing) with heading "YOUR PICKUP CODE" + instruction "Show this code to the seller when collecting your item."
+  5. **Payment Information**: Card ending in •••• 7723 + Transaction ID
+- Fully bilingual (EN + FR).
+- Existing letterhead footer preserved (BidVex Inc. address + corp #).
+
+### Item 3 — Unsubscribe Link Fixed ✅ FIXED
+
+**Root cause**: Two independent bugs.
+1. The `List-Unsubscribe` HTTP header used `https://bidvex.com/unsubscribe?email=<addr>` — but the frontend `/unsubscribe` page reads `?token=<signed>`. Result: token missing → 400 → user saw a broken page.
+2. No visible in-body unsubscribe link in email HTML → users clicked email-client's unsubscribe menu → landed on the broken page above.
+
+**Fix (`services/emails/_email_core.py`)**:
+- `List-Unsubscribe` header now calls `build_unsubscribe_urls(to_email)` → produces the correct `.../unsubscribe?token=<signed-itsdangerous-token>&lang=en` URL.
+- `_base_template()` footer now contains a visible unsubscribe row: `"Don't want marketing emails? Unsubscribe · Transactional emails (receipts, security, order updates) are always sent."` with `href="{{UNSUBSCRIBE_URL}}"` placeholder.
+- `_send_via_unified()` replaces the placeholder with the per-recipient signed token URL right before SendGrid handoff. Zero-cost for transactional emails (endpoint gracefully preserves them).
+- Live-tested end-to-end: `/api/unsubscribe/verify?token=<valid>` → 200 + `email_masked`. `/api/unsubscribe/confirm` → 200 + user marked unsubscribed. Frontend `/unsubscribe?token=…` renders success view.
+
+### Files Modified (iter366)
+**Backend:**
+- `/app/backend/services/receipts.py` — enrichment (seller_name + order_number)
+- `/app/backend/services/emails/email_system.py` — send_buyer_receipt_email full rewrite (5 sections, EN+FR)
+- `/app/backend/services/emails/_email_core.py` — List-Unsubscribe uses build_unsubscribe_urls; base_template footer has visible unsubscribe link; _send_via_unified replaces placeholder
+- `/app/backend/tests/test_iter366_launch_gate.py` (NEW — 9 tripwires)
+- `/app/backend/tests/test_iter366_live.py` (NEW by testing agent — 8 live tests)
+
+**Frontend:**
+- `/app/frontend/src/components/CompareBar.jsx` — CompareCheckbox redesigned to circular icon-only
+- `/app/frontend/src/components/FlattenedMarketplace.js` — Compare wrapper repositioned bottom-14 right-2
+- `/app/frontend/src/pages/LotsMarketplacePage.js` — same repositioning
+- `/app/frontend/src/pages/storage/StorageAuctionCard.js` — same repositioning
+- `/app/frontend/src/components/vehicles/VehicleListingCard.js` — same repositioning
+
+---
+
+
 ## iter365 — Broker Fee, 180-day Windows, Compare De-dup, Buyer Grid (Jul 20, 2026) ✅ COMPLETE — VERIFIED
 
 **Scope**: 4 launch-blockers in one pass. **214 tests pass across touched suites** (well above 176+ requirement). Testing-agent iter365 report: 100% success on all 4 items. 15 pre-existing failures verified via git stash — NOT introduced by this fork.
