@@ -166,6 +166,9 @@ const Footer = () => {
               <li><LangLink to="/blogs" className="hover:text-white transition-colors text-sm" data-testid="footer-press-blogs-link">
                 {language === 'fr' ? 'Presse' : 'Press'}
               </LangLink></li>
+              <li><LangLink to="/affiliate-program" className="hover:text-white transition-colors text-sm" data-testid="footer-affiliate-program-link">
+                {language === 'fr' ? 'Programme d\'affiliation' : 'Affiliate Program'}
+              </LangLink></li>
             </ul>
           </div>
 

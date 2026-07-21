@@ -60,6 +60,7 @@ const ProfileSettingsPage = lazy(() => import('./pages/ProfileSettingsPage'));
 // iter355 H-1 — Stripe Identity (KYC) verification page.
 const VerificationPage = lazy(() => import('./pages/VerificationPage'));
 const AffiliateDashboard = lazy(() => import('./pages/AffiliateDashboard'));
+const AffiliateProgramPage = lazy(() => import('./pages/AffiliateProgramPage'));
 const MessagesPage = lazy(() => import('./pages/MessagesPage'));
 const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
 const CreateMultiItemListing = lazy(() => import('./pages/CreateMultiItemListing'));
@@ -708,6 +709,10 @@ const App = () => {
           } />
           {/* iter307 — spec-aligned alias */}
           <Route path="/dashboard/affiliate" element={<Navigate to="/affiliate" replace />} />
+          {/* iter367 P1 — Public Affiliate Program marketing page */}
+          <Route path="/affiliate-program" element={<ErrorBoundary scope="affiliate-program"><AffiliateProgramPage /></ErrorBoundary>} />
+          <Route path="/en/affiliate-program" element={<ErrorBoundary scope="affiliate-program"><AffiliateProgramPage /></ErrorBoundary>} />
+          <Route path="/fr/programme-affilies" element={<ErrorBoundary scope="affiliate-program"><AffiliateProgramPage /></ErrorBoundary>} />
           <Route path="/messages" element={
             <ProtectedRoute><MessagesPage /></ProtectedRoute>
           } />

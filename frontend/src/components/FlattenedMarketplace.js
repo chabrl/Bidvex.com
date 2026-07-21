@@ -922,7 +922,16 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
     ) {
       return `/vehicle-auctions/${item.id}`;
     }
-    return item.auction_id ? `/lots/${item.auction_id}` : `/listing/${item.id}`;
+    // iter367 P0 — Multi-lot deep-link fix.
+    // When an item card represents a specific lot (has `auction_id` +
+    // `lot_number`), link to the parent auction with `?lot=` so the
+    // detail page can scroll/focus the target lot. Otherwise fall back
+    // to the auction summary or a single-item detail page.
+    if (item.auction_id) {
+      const lotRef = item.lot_number ?? item.lot_id;
+      return lotRef != null ? `/lots/${item.auction_id}?lot=${lotRef}` : `/lots/${item.auction_id}`;
+    }
+    return `/listing/${item.id}`;
   };
   const detailLink = getDetailLink(item);
 

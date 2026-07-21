@@ -170,24 +170,48 @@ const BuyerDashboard = () => {
                   >
                     {dashboard.bids.map((bid) => {
                       const listing = dashboard.listings.find(l => l.id === bid.listing_id);
-                      const isWinning = listing && listing.current_price === bid.amount;
-                      const auctionEndDate = listing ? new Date(listing.auction_end_date) : null;
-                      const isEnded = auctionEndDate && new Date() > auctionEndDate;
+                      // iter367 P0 — Backend now emits a canonical bid_status
+                      // (winning | outbid | won | lost | ended_no_listing) plus
+                      // enriched fallbacks (_won_auction, _receipt) so cards
+                      // render correctly even when the source listing was
+                      // purged post-settlement. Prevents "OUTBID $0.00" bug.
+                      const bidStatus = bid.bid_status || (listing && listing.current_price === bid.amount ? 'winning' : 'outbid');
+                      const wonAuction = bid._won_auction;
+                      const receipt = bid._receipt;
+                      const isWinning = bidStatus === 'winning';
+                      const isWon = bidStatus === 'won';
+                      const isLost = bidStatus === 'lost' || bidStatus === 'ended_no_listing';
+                      const isOutbid = bidStatus === 'outbid';
+                      const auctionEndDate = listing?.auction_end_date ? new Date(listing.auction_end_date) : null;
+                      const isEnded = !listing || (auctionEndDate && new Date() > auctionEndDate);
                       const timeLeft = auctionEndDate ? auctionEndDate - new Date() : 0;
                       const isUrgent = timeLeft > 0 && timeLeft < 3600000; // Less than 1 hour
+                      const displayTitle = listing?.title || wonAuction?.listing_title || receipt?.listing_title || 'Auction item';
+                      const displayImage = listing?.images?.[0] || wonAuction?.listing_image;
+                      const displayCurrentPrice = listing?.current_price ?? wonAuction?.winning_bid ?? receipt?.hammer_price ?? bid.amount;
+                      const borderColor = isWinning || isWon ? 'border-green-500' : (isLost || isOutbid ? 'border-red-300' : 'border-gray-200 dark:border-gray-700');
 
                       return (
-                        <Card key={bid.id} className={`overflow-hidden ${isWinning ? 'border-2 border-green-500' : 'border-2 border-gray-200 dark:border-gray-700'}`}>
+                        <Card key={bid.id} className={`overflow-hidden border-2 ${borderColor}`} data-testid={`bid-card-${bid.id}`}>
                           {/* Status Badge - Top Left - Larger & More Prominent */}
                           <div className="relative">
                             <div className="absolute top-3 left-3 z-10">
                               {isWinning ? (
-                                <Badge className="bg-green-600 text-white border-0 text-base px-4 py-2 font-bold shadow-lg">
+                                <Badge className="bg-green-600 text-white border-0 text-base px-4 py-2 font-bold shadow-lg" data-testid="bid-status-winning">
                                   <TrendingUp className="h-5 w-5 mr-1.5" />
                                   WINNING
                                 </Badge>
+                              ) : isWon ? (
+                                <Badge className="bg-emerald-600 text-white border-0 text-base px-4 py-2 font-bold shadow-lg" data-testid="bid-status-won">
+                                  <Trophy className="h-5 w-5 mr-1.5" />
+                                  WON
+                                </Badge>
+                              ) : isLost ? (
+                                <Badge className="bg-slate-500 text-white border-0 text-base px-4 py-2 font-bold shadow-lg" data-testid="bid-status-ended">
+                                  ENDED
+                                </Badge>
                               ) : (
-                                <Badge className="bg-red-600 text-white border-0 text-base px-4 py-2 font-bold shadow-lg">
+                                <Badge className="bg-red-600 text-white border-0 text-base px-4 py-2 font-bold shadow-lg" data-testid="bid-status-outbid">
                                   <TrendingDown className="h-5 w-5 mr-1.5" />
                                   OUTBID
                                 </Badge>
@@ -211,8 +235,8 @@ const BuyerDashboard = () => {
 
                             {/* Image */}
                             <div className="w-full h-48 bg-gray-100">
-                              {listing?.images?.[0] ? (
-                                <img src={listing.images[0]} alt={listing.title} className="w-full h-full object-cover" />
+                              {displayImage ? (
+                                <img src={displayImage} alt={displayTitle} className="w-full h-full object-cover" />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center text-6xl">📦</div>
                               )}
@@ -221,17 +245,19 @@ const BuyerDashboard = () => {
 
                           {/* Content Section */}
                           <CardContent className="p-4 space-y-4">
-                            <h3 className="font-bold text-xl line-clamp-2">{listing?.title || 'Listing'}</h3>
+                            <h3 className="font-bold text-xl line-clamp-2">{displayTitle}</h3>
 
                             {/* Bid Comparison - Clear Layout with Better Visual Hierarchy */}
-                            <div className={`grid grid-cols-2 gap-4 p-4 rounded-lg ${isWinning ? 'bg-green-50 dark:bg-green-950/30' : 'bg-red-50 dark:bg-red-950/30'}`}>
+                            <div className={`grid grid-cols-2 gap-4 p-4 rounded-lg ${(isWinning || isWon) ? 'bg-green-50 dark:bg-green-950/30' : 'bg-red-50 dark:bg-red-950/30'}`}>
                               <div>
                                 <p className="text-xs text-muted-foreground uppercase mb-1 font-semibold">{t('dashboard.buyer.yourBid')}</p>
                                 <p className="text-2xl font-bold">{formatCurrency(bid.amount)}</p>
                               </div>
                               <div>
-                                <p className="text-xs text-muted-foreground uppercase mb-1 font-semibold">Current Price</p>
-                                <p className={`text-2xl font-bold ${isWinning ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(listing?.current_price)}</p>
+                                <p className="text-xs text-muted-foreground uppercase mb-1 font-semibold">
+                                  {isWon ? t('dashboard.buyer.finalPrice', 'Won at') : (isLost ? t('dashboard.buyer.finalPriceLost', 'Ended at') : 'Current Price')}
+                                </p>
+                                <p className={`text-2xl font-bold ${(isWinning || isWon) ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(displayCurrentPrice)}</p>
                               </div>
                             </div>
 
@@ -239,21 +265,26 @@ const BuyerDashboard = () => {
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                               <Badge variant="outline">{listing?.bid_count || 0} bids</Badge>
                               {isEnded && <Badge variant="destructive">{t("auction.auctionEnded")}</Badge>}
+                              {isWon && receipt?.pickup_code && (
+                                <Badge className="bg-emerald-100 text-emerald-800">Pickup: {receipt.pickup_code}</Badge>
+                              )}
                             </div>
                           </CardContent>
 
                           {/* Action Buttons - Full Width on Mobile */}
                           <CardFooter className="p-4 pt-0 gap-2 flex-col sm:flex-row">
-                            <Button 
-                              variant="outline" 
-                              className="w-full sm:flex-1" 
+                            <Button
+                              variant="outline"
+                              className="w-full sm:flex-1"
                               onClick={() => navigate(`/listing/${bid.listing_id}`)}
+                              disabled={isEnded && !listing}
+                              title={isEnded && !listing ? 'Listing archived' : ''}
                             >
                               View Listing
                             </Button>
-                            {!isWinning && !isEnded && (
-                              <Button 
-                                className="w-full sm:flex-1 gradient-button text-white border-0 font-semibold" 
+                            {!isWinning && !isWon && !isEnded && (
+                              <Button
+                                className="w-full sm:flex-1 gradient-button text-white border-0 font-semibold"
                                 onClick={() => navigate(`/listing/${bid.listing_id}`)}
                               >
                                 {t('buyerDash.placeHigherBid')}

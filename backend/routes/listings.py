@@ -1582,6 +1582,97 @@ async def get_multi_item_listing(listing_id: str):
     return MultiItemListing(**listing)
 
 
+# iter367 P1 — Live activity ticker for multi-lot auction pages.
+# Returns the newest bid events across all lots in an auction so the
+# redesigned detail page can show a "who bid on what, when" ticker.
+@listings_router.get("/lots/{auction_id}/recent-activity")
+async def get_multi_lot_recent_activity(auction_id: str, limit: int = 10):
+    """Return the last N bid events across all lots in a multi-lot auction.
+
+    Each row includes lot_id, lot_title, amount, bidder_alias (privacy-safe
+    display name — never the full name), timestamp (ISO), and time_ago
+    (human string). Sorted newest first. Frontend polls every 15s.
+    """
+    from datetime import datetime, timezone
+    db = get_db()
+    limit = max(1, min(50, int(limit)))
+    listing = await db.multi_item_listings.find_one({"id": auction_id}, {"_id": 0, "id": 1, "lots": 1})
+    if not listing:
+        raise HTTPException(status_code=404, detail="Auction not found")
+    lots = listing.get("lots") or []
+    lot_titles = {
+        int(lot.get("lot_number", 0)): (lot.get("title") or f"Lot #{lot.get('lot_number')}")
+        for lot in lots
+    }
+
+    # Pull recent bids for this multi-lot auction.
+    bid_docs = await db.bids.find(
+        {"auction_id": auction_id},
+        {"_id": 0},
+    ).sort("created_at", -1).to_list(limit)
+
+    # Enrich with masked bidder aliases (privacy-first: first name +
+    # initial only; fall back to "Bidder ####" derived from the last 4
+    # chars of their id if no name).
+    bidder_ids = list({b.get("bidder_id") for b in bid_docs if b.get("bidder_id")})
+    aliases: dict[str, str] = {}
+    if bidder_ids:
+        async for u in db.users.find(
+            {"id": {"$in": bidder_ids}},
+            {"_id": 0, "id": 1, "name": 1, "first_name": 1},
+        ):
+            uid = u.get("id")
+            name = (u.get("first_name") or (u.get("name") or "").split(" ")[0] or "").strip()
+            if name:
+                aliases[uid] = f"{name[0].upper()}{name[1:2].lower()}{'*' * max(0, len(name) - 2)}"
+            else:
+                aliases[uid] = f"Bidder {uid[-4:].upper()}" if uid else "Bidder"
+
+    now = datetime.now(timezone.utc)
+    events = []
+    for b in bid_docs:
+        lot_num = b.get("lot_number")
+        try:
+            lot_num_int = int(lot_num) if lot_num is not None else None
+        except (TypeError, ValueError):
+            lot_num_int = None
+        ts = b.get("created_at")
+        ts_dt = None
+        if isinstance(ts, str):
+            try:
+                ts_dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            except ValueError:
+                ts_dt = None
+        elif isinstance(ts, datetime):
+            ts_dt = ts if ts.tzinfo else ts.replace(tzinfo=timezone.utc)
+
+        seconds_ago = int((now - ts_dt).total_seconds()) if ts_dt else 0
+        if seconds_ago < 60:
+            time_ago = f"{max(seconds_ago, 1)}s"
+        elif seconds_ago < 3600:
+            time_ago = f"{seconds_ago // 60}m"
+        elif seconds_ago < 86400:
+            time_ago = f"{seconds_ago // 3600}h"
+        else:
+            time_ago = f"{seconds_ago // 86400}d"
+
+        events.append({
+            "lot_id": lot_num_int,
+            "lot_number": lot_num_int,
+            "lot_title": lot_titles.get(lot_num_int, f"Lot #{lot_num_int}" if lot_num_int is not None else "—"),
+            "amount": float(b.get("amount") or 0),
+            "bidder_alias": aliases.get(b.get("bidder_id"), "Bidder"),
+            "timestamp": ts if isinstance(ts, str) else (ts_dt.isoformat() if ts_dt else None),
+            "time_ago": time_ago,
+        })
+
+    return {
+        "auction_id": auction_id,
+        "events": events,
+        "generated_at": now.isoformat(),
+    }
+
+
 @listings_router.get("/multi-item-listings/{listing_id}/terms/pdf")
 async def export_auction_terms_pdf(listing_id: str):
     """Export auction terms as a PDF file."""

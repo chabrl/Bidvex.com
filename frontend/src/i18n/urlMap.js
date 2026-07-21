@@ -41,6 +41,7 @@ export const EN_TO_FR = {
   '/blogs': '/blogues',
   '/prohibited-items': '/articles-interdits',
   '/press/quebec-launch': '/presse/lancement-quebec',
+  '/affiliate-program': '/programme-affilies',
   '/broker-directory': '/annuaire-courtiers',
   '/brokers': '/courtiers',
   '/become-a-broker': '/devenir-courtier',

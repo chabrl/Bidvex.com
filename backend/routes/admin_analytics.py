@@ -142,13 +142,41 @@ async def get_admin_analytics(
     # to the 2.5% estimate over GMV when receipts predate the system. ──
     receipts = await db.receipts.find(
         {"type": "buyer_receipt"},
-        {"_id": 0, "platform_fee": 1, "created_at": 1},
+        {"_id": 0, "platform_fee": 1, "created_at": 1, "hammer_price": 1, "listing_id": 1,
+         "section": 1},
     ).to_list(50000)
     fees_collected_all = round(sum(float(r.get("platform_fee") or 0) for r in receipts), 2)
     fees_collected_range = round(sum(
         float(r.get("platform_fee") or 0) for r in receipts
         if range_from <= (_parse_dt(r.get("created_at")) or now) <= range_to
     ), 2)
+
+    # iter367 P0 — Admin GMV fallback via receipts.
+    # ROOT CAUSE: If listings get purged post-settlement (or in test/preview
+    # DBs) then gmv_all/gmv_range from the listings scan is 0 even though
+    # real completed sales exist. Layer the receipts-based GMV on top so
+    # historical revenue is never lost.
+    receipts_gmv_all = 0.0
+    receipts_gmv_range = 0.0
+    receipts_hammer_by_section: Dict[str, List[float]] = defaultdict(list)
+    for r in receipts:
+        hammer = float(r.get("hammer_price") or 0)
+        if hammer <= 0:
+            continue
+        receipts_gmv_all += hammer
+        r_dt = _parse_dt(r.get("created_at"))
+        if r_dt and range_from <= r_dt <= range_to:
+            receipts_gmv_range += hammer
+            section = (r.get("section") or "marketplace").lower()
+            if section not in ("marketplace", "lots", "vehicles", "storage"):
+                section = "marketplace"
+            receipts_hammer_by_section[section].append(hammer)
+    # Use the LARGER of the two GMV sources so we never regress against a
+    # live-listings-only computation.
+    gmv_all = max(gmv_all, receipts_gmv_all)
+    gmv_range = max(gmv_range, receipts_gmv_range)
+    for section, vals in receipts_hammer_by_section.items():
+        hammer_sums[section].extend(vals)
 
     # ── Users by role ──
     users = await db.users.find(

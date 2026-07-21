@@ -261,20 +261,88 @@ async def auto_release_expired_escrows(db):
 
 
 async def get_buyer_escrow_status(db, buyer_id: str) -> list:
-    """Get all escrow transactions for a buyer."""
+    """Get all escrow transactions for a buyer.
+
+    iter367 P0 — Union with the `transactions` collection which is where
+    `finalize_auction_payment` writes pickup codes. The legacy
+    `escrow_transactions` collection is only populated by the webhook
+    escrow branch (rare in practice); most real escrow-in-progress rows
+    live in `transactions` with `pickup_code_listing_id` set.
+    """
     escrows = await db.escrow_transactions.find(
         {"buyer_id": buyer_id},
         {"_id": 0, "pickup_code": 0},
     ).sort("created_at", -1).to_list(50)
+
+    seen = {e.get("auction_id") for e in escrows if e.get("auction_id")}
+    tx_rows = await db.transactions.find(
+        {"buyer_id": buyer_id, "pickup_code": {"$exists": True, "$ne": None}},
+        {"_id": 0},
+    ).sort("created_at", -1).to_list(50)
+    for t in tx_rows:
+        aid = t.get("pickup_code_listing_id") or t.get("listing_id") or t.get("auction_id")
+        if not aid or aid in seen:
+            continue
+        confirmed_at = t.get("pickup_code_confirmed_at") or t.get("pickup_confirmed_at")
+        # Buyer never sees the raw pickup_code — mask it.
+        escrows.append({
+            "auction_id": aid,
+            "listing_id": t.get("listing_id") or aid,
+            "listing_title": t.get("listing_title") or "Auction item",
+            "buyer_id": buyer_id,
+            "seller_id": t.get("seller_id") or t.get("pickup_code_seller_id"),
+            "hammer_price_cents": int(round(float(t.get("hammer_price") or 0) * 100)),
+            "total_charged_cents": int(round(float(t.get("total_charged") or t.get("hammer_price") or 0) * 100)),
+            "escrow_status": "released" if confirmed_at else "held",
+            "pickup_confirmed_at": confirmed_at,
+            "auto_release_scheduled_at": t.get("auto_release_scheduled_at"),
+            "created_at": t.get("created_at") or t.get("pickup_code_issued_at"),
+            "item_type": "non_vehicle",
+        })
+        seen.add(aid)
     return escrows
 
 
 async def get_seller_escrow_status(db, seller_id: str) -> list:
-    """Get all escrow transactions for a seller (code hidden until held)."""
+    """Get all escrow transactions for a seller (code hidden until held).
+
+    iter367 P0 — Union with `transactions` collection (see buyer variant).
+    Seller CAN see the pickup code once the escrow is held (for confirming
+    pickup with the buyer in person), matching legacy behaviour.
+    """
     escrows = await db.escrow_transactions.find(
         {"seller_id": seller_id},
         {"_id": 0, "pickup_code": 0},
     ).sort("created_at", -1).to_list(50)
+
+    seen = {e.get("auction_id") for e in escrows if e.get("auction_id")}
+    tx_rows = await db.transactions.find(
+        {"$or": [{"seller_id": seller_id}, {"pickup_code_seller_id": seller_id}],
+         "pickup_code": {"$exists": True, "$ne": None}},
+        {"_id": 0},
+    ).sort("created_at", -1).to_list(50)
+    for t in tx_rows:
+        aid = t.get("pickup_code_listing_id") or t.get("listing_id") or t.get("auction_id")
+        if not aid or aid in seen:
+            continue
+        confirmed_at = t.get("pickup_code_confirmed_at") or t.get("pickup_confirmed_at")
+        escrows.append({
+            "auction_id": aid,
+            "listing_id": t.get("listing_id") or aid,
+            "listing_title": t.get("listing_title") or "Auction item",
+            "buyer_id": t.get("buyer_id") or t.get("pickup_code_buyer_id"),
+            "seller_id": seller_id,
+            "hammer_price_cents": int(round(float(t.get("hammer_price") or 0) * 100)),
+            "total_charged_cents": int(round(float(t.get("total_charged") or t.get("hammer_price") or 0) * 100)),
+            "escrow_status": "released" if confirmed_at else "held",
+            # Seller sees the pickup code once escrow is held.
+            "pickup_code": t.get("pickup_code") if not confirmed_at else None,
+            "pickup_confirmed_at": confirmed_at,
+            "auto_release_scheduled_at": t.get("auto_release_scheduled_at"),
+            "created_at": t.get("created_at") or t.get("pickup_code_issued_at"),
+            "item_type": "non_vehicle",
+        })
+        seen.add(aid)
     return escrows
 
 

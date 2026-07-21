@@ -1,7 +1,7 @@
 import API_BASE from '../config';
 import React, { useState, useEffect, useRef } from 'react';
 import SafeImage from '../components/SafeImage';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
@@ -49,11 +49,19 @@ import { extractErrorMessage } from '../utils/errorHandler';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { getLocalized, getBuyerPremiumText } from '../utils/localization';
 import { LangLink } from '../components/LangLink';
+// iter367 P1 — Multi-lot page redesign: live activity ticker + bid
+// increment table + grid sort controls.
+import MultiLotActivityTicker from '../components/MultiLotActivityTicker';
+import BidIncrementTable from '../components/BidIncrementTable';
 
 const API = API_BASE;
 
 const MultiItemListingDetailPage = () => {
   const { id } = useParams();
+  // iter367 P0 — Read ?lot= query param so item-card deep-links open
+  // the correct lot (previously they landed on the parent auction).
+  const [searchParams] = useSearchParams();
+  const targetLotParam = searchParams.get('lot');
   const { user } = useAuth();
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
@@ -87,6 +95,9 @@ const MultiItemListingDetailPage = () => {
   const [termsAcceptedPersistent, setTermsAcceptedPersistent] = useState(false);
   const [sellerInfo, setSellerInfo] = useState(null);
   const [showBidHistory, setShowBidHistory] = useState(false);
+  // iter367 P1 — Lot sorting for the redesigned grid.
+  const [lotSort, setLotSort] = useState('ending_soonest'); // ending_soonest | most_bids | highest_price | lowest_price | newest
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const lotRefs = useRef({});
 
   // Check if user has already accepted terms for this auction
@@ -202,9 +213,21 @@ const MultiItemListingDetailPage = () => {
       
       setListing(response.data);
       if (response.data.lots.length > 0) {
-        setActiveLotId(response.data.lots[0].lot_number);
-        // Auto-select first lot for bid history display
-        setSelectedLot(response.data.lots[0]);
+        // iter367 P0 — Deep-link support: if ?lot=N is present, focus
+        // that lot and scroll to it once refs are mounted. Otherwise
+        // default to the first lot as before.
+        const targetLotNum = targetLotParam != null ? Number(targetLotParam) : null;
+        const matched =
+          (targetLotNum != null && response.data.lots.find(l => l.lot_number === targetLotNum)) ||
+          response.data.lots[0];
+        setActiveLotId(matched.lot_number);
+        setSelectedLot(matched);
+        if (targetLotNum != null && matched.lot_number === targetLotNum) {
+          setTimeout(() => {
+            const ref = lotRefs.current[matched.lot_number];
+            if (ref) ref.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }, 350);
+        }
       }
 
       // Meta Pixel ViewContent — dedupe-safe per (listing, session).
@@ -510,7 +533,30 @@ const MultiItemListingDetailPage = () => {
                       )}
                     </div>
                     <CardTitle className="text-3xl mb-4 text-slate-900 dark:text-white" style={{ fontWeight: 700 }}>{getLocalized(listing, 'title')}</CardTitle>
-                    <p className="mb-4 text-slate-600 dark:text-slate-300">{getLocalized(listing, 'description')}</p>
+                    {/* iter367 P1 — Collapsible description (long copy no
+                        longer pushes the lot grid below the fold). */}
+                    {(() => {
+                      const desc = getLocalized(listing, 'description') || '';
+                      const shouldTruncate = desc.length > 260;
+                      const visible = descriptionExpanded || !shouldTruncate ? desc : desc.slice(0, 260) + '…';
+                      return (
+                        <div className="mb-4 text-slate-600 dark:text-slate-300" data-testid="multi-lot-description">
+                          <p className="whitespace-pre-wrap">{visible}</p>
+                          {shouldTruncate && (
+                            <button
+                              type="button"
+                              onClick={() => setDescriptionExpanded((v) => !v)}
+                              className="text-cyan-600 dark:text-cyan-400 text-xs font-semibold uppercase tracking-wide mt-1 hover:underline"
+                              data-testid="multi-lot-description-toggle"
+                            >
+                              {descriptionExpanded
+                                ? t('common.showLess', 'Show less')
+                                : t('common.readMore', 'Read more')}
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })()}
 
                     {/* iter217 — Seller-type badge (Partner / Dealer / Storage / Private Sale) */}
                     {(() => {
@@ -1146,15 +1192,42 @@ const MultiItemListingDetailPage = () => {
               </CardContent>
             </Card>
 
-            {/* View Mode Toggle */}
-            <div className="flex items-center justify-between mb-6">
+            {/* iter367 P1 — Redesign row: Live Activity Ticker + Bid
+                Increment Table.  Sits above the lot grid so buyers see
+                the freshest activity + know the exact next-bid amount. */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+              <MultiLotActivityTicker
+                auctionId={id}
+                onLotClick={(lotNum) => scrollToLot(lotNum)}
+              />
+              <BidIncrementTable defaultOpen={false} />
+            </div>
+
+            {/* View Mode Toggle + iter367 sort controls */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
               <h2 className="text-2xl font-bold" style={{ color: '#1a1a1a' }}>{t('listingDetail.availableLots', 'Available Lots')}</h2>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide mr-1">
+                  {t('listingDetail.sortBy', 'Sort:')}
+                </label>
+                <select
+                  value={lotSort}
+                  onChange={(e) => setLotSort(e.target.value)}
+                  className="h-9 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 text-sm font-medium focus:ring-2 focus:ring-cyan-500 focus:outline-none"
+                  data-testid="lot-sort-select"
+                >
+                  <option value="ending_soonest">{t('listingDetail.sort.endingSoonest', 'Ending soonest')}</option>
+                  <option value="most_bids">{t('listingDetail.sort.mostBids', 'Most active')}</option>
+                  <option value="highest_price">{t('listingDetail.sort.highest', 'Highest price')}</option>
+                  <option value="lowest_price">{t('listingDetail.sort.lowest', 'Lowest price')}</option>
+                  <option value="newest">{t('listingDetail.sort.newest', 'Newest')}</option>
+                </select>
                 <Button
                   variant={viewMode === 'grid' ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => handleViewModeChange('grid')}
                   className={viewMode === 'grid' ? 'gradient-button text-white' : ''}
+                  data-testid="lots-view-grid"
                 >
                   <GridIcon className="h-4 w-4 mr-2" />
                   Grid
@@ -1164,6 +1237,7 @@ const MultiItemListingDetailPage = () => {
                   size="sm"
                   onClick={() => handleViewModeChange('list')}
                   className={viewMode === 'list' ? 'gradient-button text-white' : ''}
+                  data-testid="lots-view-list"
                 >
                   <ListIcon className="h-4 w-4 mr-2" />
                   List
@@ -1171,9 +1245,24 @@ const MultiItemListingDetailPage = () => {
               </div>
             </div>
 
-            {/* Lots Display */}
+            {/* Lots Display — iter367 P1: sort with a stable comparator */}
             <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 gap-6' : 'space-y-6'}>
-              {listing.lots.map((lot) => {
+              {[...listing.lots].sort((a, b) => {
+                const aEnd = a.lot_end_time ? new Date(a.lot_end_time).getTime() : Number.MAX_SAFE_INTEGER;
+                const bEnd = b.lot_end_time ? new Date(b.lot_end_time).getTime() : Number.MAX_SAFE_INTEGER;
+                const aBids = a.bid_count || 0;
+                const bBids = b.bid_count || 0;
+                const aPrice = Number(a.current_price ?? a.starting_price ?? 0);
+                const bPrice = Number(b.current_price ?? b.starting_price ?? 0);
+                switch (lotSort) {
+                  case 'most_bids':      return bBids - aBids;
+                  case 'highest_price':  return bPrice - aPrice;
+                  case 'lowest_price':   return aPrice - bPrice;
+                  case 'newest':         return (b.lot_number || 0) - (a.lot_number || 0);
+                  case 'ending_soonest':
+                  default:               return aEnd - bEnd;
+                }
+              }).map((lot) => {
                 // Calculate if this is a high-stakes lot (>$10,000 USD)
                 const lotIsHighStakes = isHighStakes(lot.current_price);
                 

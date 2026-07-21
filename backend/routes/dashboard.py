@@ -167,19 +167,43 @@ async def get_seller_dashboard(
         for l in payment_collected_listings
     )
 
+    # iter367 P0 — Seller Analytics fix.
+    # `seller_statement` receipts (created by finalize_auction_payment)
+    # survive listings-collection purges and are the canonical record of
+    # completed sales. Union them into sold_count/total_sales so the
+    # dashboard KPIs remain accurate even after listings cleanup.
+    seller_receipts = await rdb.receipts.find(
+        {"user_id": current_user.id, "type": "seller_statement"},
+        {"_id": 0},
+    ).sort("created_at", -1).to_list(500)
+    known_sold_ids = {l.get("id") for l in sold_listings if l.get("id")}
+    receipt_only_sales = [r for r in seller_receipts if r.get("listing_id") and r["listing_id"] not in known_sold_ids]
+    receipt_only_total = sum(float(r.get("hammer_price") or 0) for r in receipt_only_sales)
+    receipt_only_collected = sum(float(r.get("total_charged") or r.get("hammer_price") or 0) for r in receipt_only_sales)
+    receipt_only_payout = sum(float(r.get("net_payout") or 0) for r in receipt_only_sales)
+
+    total_sales += receipt_only_total
+    collected_sales += receipt_only_collected
+    net_payout_total += receipt_only_payout
+
+    counts["sold"] += len(receipt_only_sales)
+    counts["payment_collected"] += len(receipt_only_sales)
+
     return {
         "active_listings": len(active_listings),
-        "sold_listings": len(sold_listings),
+        "sold_listings": len(sold_listings) + len(receipt_only_sales),
         "draft_listings": len(draft_listings),
-        "total_sales": total_sales,
+        "total_sales": round(total_sales, 2),
         # iter298 BUG 5 — payment-collected metrics + statement links.
-        "collected_sales": collected_sales,
+        "collected_sales": round(collected_sales, 2),
         "net_payout_total": round(net_payout_total, 2),
         "listings": listings,
         "multi_item_listings": multi_listings,
         "all_listings": all_listings,
         # HOTFIX v9.1 / Fix 3 — Filter-tab counts for the seller dashboard.
         "counts": counts,
+        # iter367 — Historical sales recovered from receipts.
+        "seller_statements": seller_receipts,
     }
 
 
@@ -203,6 +227,27 @@ async def get_buyer_dashboard(
         {"id": {"$in": listing_ids}}, {"_id": 0}
     ).to_list(1000)
 
+    # iter367 P0 — Dashboard Analytics fix
+    # ROOT CAUSE: When listings are purged post-settlement (common in
+    # long-lived DBs, and every preview refresh), `listings` returns []
+    # for old bid_ids. The old code then rendered every historical bid
+    # as "OUTBID $0.00" because it couldn't find the listing.
+    #
+    # FIX: Also read from `won_auctions` (canonical won-item history)
+    # and buyer `receipts` (canonical paid history). Merge both into the
+    # dashboard so historical activity survives listings purges.
+    won_auctions_docs = await rdb.won_auctions.find(
+        {"winner_id": current_user.id, "archived": {"$ne": True}},
+        {"_id": 0},
+    ).sort("won_at", -1).to_list(200)
+    won_by_listing = {w["listing_id"]: w for w in won_auctions_docs if w.get("listing_id")}
+
+    buyer_receipts = await rdb.receipts.find(
+        {"user_id": current_user.id, "type": "buyer_receipt"},
+        {"_id": 0},
+    ).sort("created_at", -1).to_list(200)
+    receipts_by_listing = {r["listing_id"]: r for r in buyer_receipts if r.get("listing_id")}
+
     # Fetch watchlist items
     watchlist_items = await rdb.watchlist.find(
         {"user_id": current_user.id}, {"_id": 0}
@@ -220,7 +265,11 @@ async def get_buyer_dashboard(
     # iter298 BUG 5 — winner detection covers all conventions:
     # `winner_user_id` (canonical since iter296), legacy `winner_id`,
     # and `highest_bidder_id` on ended/sold docs.
+    # iter367 — Also consult `won_auctions` fallback: a listing_id in
+    # `won_by_listing` means we won it (survives listings-collection purges).
     def _is_won_by_me(l: dict) -> bool:
+        if l.get("id") and l["id"] in won_by_listing:
+            return True
         if l.get("status") not in ("sold", "ended", "completed"):
             return False
         me = current_user.id
@@ -288,6 +337,13 @@ async def get_buyer_dashboard(
     for lid, my_max in my_max_bid.items():
         l = listings_by_id.get(lid)
         if not l:
+            # iter367 — listing purged from DB. Check won_auctions to
+            # decide whether the buyer WON or LOST this historical bid.
+            if lid in won_by_listing:
+                # bid_status handled below via won_by_listing lookup
+                continue
+            # Not in won_auctions → historical loss.
+            lost_bid_ids.append(lid)
             continue
         if l.get("status") == "active":
             is_leader = (
@@ -300,6 +356,72 @@ async def get_buyer_dashboard(
             if not _is_won_by_me(l):
                 lost_bid_ids.append(lid)
 
+    # iter367 — Enrich each bid with a bid_status ('winning'|'won'|'outbid'|
+    # 'lost'|'ended_no_listing') and a canonical price so frontend never
+    # renders "OUTBID $0.00" for historical activity.
+    for b in bids:
+        lid = b.get("listing_id")
+        l = listings_by_id.get(lid) if lid else None
+        won = won_by_listing.get(lid) if lid else None
+        receipt = receipts_by_listing.get(lid) if lid else None
+        # Attach a stable canonical price and title for the bid card.
+        if won:
+            b["_won_auction"] = {
+                "listing_title": won.get("listing_title") or "Auction item",
+                "listing_image": won.get("listing_image"),
+                "winning_bid": won.get("winning_bid"),
+                "won_at": won.get("won_at"),
+                "currency": won.get("currency", "CAD"),
+            }
+        if receipt:
+            b["_receipt"] = {
+                "id": receipt.get("id"),
+                "hammer_price": receipt.get("hammer_price"),
+                "total_charged": receipt.get("total_charged"),
+                "pickup_code": receipt.get("pickup_code"),
+            }
+        if l and l.get("status") == "active":
+            is_leader = (
+                l.get("highest_bidder_id") == current_user.id
+                or float(l.get("current_price") or 0) == float(b.get("amount") or 0)
+            )
+            b["bid_status"] = "winning" if is_leader else "outbid"
+        elif won:
+            b["bid_status"] = "won"
+        elif l and l.get("status") in ("sold", "ended", "completed") and _is_won_by_me(l):
+            b["bid_status"] = "won"
+        elif l and l.get("status") in ("sold", "ended", "completed", "ended_no_sale"):
+            b["bid_status"] = "lost"
+        elif not l:
+            # Listing purged but no won_auctions row → treat as ended/lost.
+            b["bid_status"] = "ended_no_listing"
+        else:
+            b["bid_status"] = "outbid"
+
+    # iter367 — Merge historical won_auctions into won_items_detail so
+    # they display even when the source listing has been purged.
+    seen_ids = {w["listing_id"] for w in won_items_detail}
+    for w in won_auctions_docs:
+        lid = w.get("listing_id")
+        if not lid or lid in seen_ids:
+            continue
+        receipt = receipts_by_listing.get(lid) or {}
+        won_items_detail.append({
+            "listing_id": lid,
+            "title": w.get("listing_title") or "Auction item",
+            "listing_image": w.get("listing_image"),
+            "final_price": receipt.get("hammer_price") or w.get("winning_bid") or 0,
+            "payment_status": "payment_collected" if receipt.get("id") else "pending_payment",
+            "payment_link_url": None,
+            "pickup_confirmed": False,
+            "pickup_confirmed_at": None,
+            "pickup_code": receipt.get("pickup_code"),
+            "receipt_id": receipt.get("id"),
+            "sold_at": w.get("won_at"),
+            "currency": w.get("currency", "CAD"),
+        })
+        seen_ids.add(lid)
+
     deposits = await rdb.bidding_deposits.find(
         {"user_id": current_user.id}, {"_id": 0}
     ).sort("created_at", -1).to_list(100)
@@ -310,6 +432,14 @@ async def get_buyer_dashboard(
         d["deposit_type"] = "storage"
     for d in deposits:
         d.setdefault("deposit_type", "bidding")
+
+    # iter367 — won_items count now includes historical won_auctions
+    # entries whose source listings are no longer in the `listings`
+    # collection (post-cleanup or preview refresh survivors).
+    total_won_items = len(set(
+        [l["id"] for l in won_listings if l.get("id")]
+        + [w["listing_id"] for w in won_auctions_docs if w.get("listing_id")]
+    ))
 
     return {
         "total_bids": len(bids),
@@ -325,8 +455,10 @@ async def get_buyer_dashboard(
             ]
         ),
         # iter298 BUG 5 — corrected won counter + new winning/lost/deposits.
-        "won_items": len(won_listings),
+        # iter367 — total_won_items uses union so purged-listing wins count.
+        "won_items": total_won_items,
         "won_items_detail": won_items_detail,
+        "won_auctions": won_auctions_docs,
         "winning_bids": len(winning_bid_ids),
         "winning_listing_ids": winning_bid_ids,
         "lost_bids": len(lost_bid_ids),

@@ -19,19 +19,90 @@
  * promo banner, and offset the close button by the iOS safe-area top
  * so it never slips behind the notch.
  * ------------------------------------------------------------------ */
+/* iter367 — Fullscreen fix on top of z-index guarantee.
+ * Historical bug (user report): the lightbox opened as a small
+ * left-aligned panel instead of a proper fullscreen modal. Root cause:
+ * global `html { overflow-x: hidden; max-width: 100vw }` (iter176)
+ * conflicted with the third-party lightboxes' fixed positioning on some
+ * browsers. Force every lightbox surface to genuinely fill the viewport
+ * (top:0/left:0/right:0/bottom:0) and centre the image.
+ */
 :root { --yarl__portal_zindex: 9999; }
-.yarl__portal { z-index: 9999 !important; }
+.yarl__portal,
+.yarl__container,
+.yarl__root {
+  position: fixed !important;
+  inset: 0 !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: 100vw !important;
+  max-height: 100vh !important;
+  z-index: 9999 !important;
+  background: rgba(0, 0, 0, 0.95) !important;
+}
+.yarl__slide {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+.yarl__slide_image {
+  max-width: 90vw !important;
+  max-height: 90vh !important;
+  object-fit: contain !important;
+}
 .yarl__toolbar {
   /* push the toolbar (which hosts the × close button) below the notch */
   padding-top: max(8px, env(safe-area-inset-top, 8px)) !important;
 }
 .ReactModal__Overlay--after-open,
 .ril__outer,
-.ril-outer { z-index: 9998 !important; }
+.ril-outer {
+  position: fixed !important;
+  inset: 0 !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: 100vw !important;
+  max-height: 100vh !important;
+  z-index: 9998 !important;
+  background: rgba(0, 0, 0, 0.95) !important;
+}
+.ril__inner,
+.ril-inner {
+  width: 100vw !important;
+  height: 100vh !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+.ril__image,
+.ril-image-current {
+  max-width: 90vw !important;
+  max-height: 90vh !important;
+  object-fit: contain !important;
+  margin: 0 auto !important;
+}
 .ril__toolbar,
 .ril-toolbar { z-index: 9999 !important; padding-top: max(0px, env(safe-area-inset-top, 0px)) !important; }
 .ril__closeButton,
 .ril-close { z-index: 9999 !important; }
+/* When any lightbox is open, prevent the body from restricting the
+ * portal's width/height via the iter176 `overflow-x: hidden; max-width: 100vw`
+ * defence. The lightboxes portal outside the app root anyway; this is
+ * belt & braces.
+ */
+body:has(.yarl__portal),
+body:has(.ril-outer),
+body:has(.ReactModal__Overlay--after-open) {
+  overflow: hidden !important;
+}
 
 
 /* BidVex CSS v2.0.1 - Build Date: 2026-01-08 - Cache Bust */
