@@ -13306,3 +13306,24 @@ Audited CLEAN (no substring bug): listing_moderation_scanner (AI-based prohibite
 - Fixed stale assertion in test_iter203 (scheduler job count 16→dynamic).
 
 - **NOT YET DEPLOYED** to production — user to deploy (after confirming contractor@bidvex.com inbox exists).
+
+
+---
+
+## Iteration 369 (2026-07-21) — Card Bug Fixes + P0 Global Image Lightbox
+Full changelog: `/app/memory/CHANGELOG.md` iteration 369.
+
+### Delivered (all green after `testing_agent_v3_fork` iteration_371)
+- **Bug 1–6 CompactLotCard rewrite**: fixed 200 px images (object-contain, neutral bg), always-red countdown chip (pulses <1h), 36×36 centered wishlist heart, inline `$` bid input + Bid button + inline errors, no Buy Now on grid, Auto-Bid + Fees secondary row with `whitespace-nowrap` + `flex-1 min-w-0` (never wraps down to 280 px).
+- **Bug 7 Auto-Bid end-to-end**: subscription-gated modal (premium/vip/vip_elite/partner/business), POST/GET/DELETE endpoints, `_process_lot_auto_bids` fires after every manual bid, strategies `min_to_lead` + `max_immediate`, ceiling exhaustion deactivates row, owner's own bids skipped. Legacy `AutoBidModal.js` renamed to `AutoBidModalLegacy.js` to unblock the new `.jsx` (webpack `.js` priority was shadowing it).
+- **Bug 8 Fee breakdown maths**: tax-free (individual seller) taxes only the platform fee; taxable (business/broker/partner) taxes both hammer + fee; multi-unit multiplies bid × qty into subtotal before all fees. `fees-preview` endpoint returns `subtotal`, `tax_on_hammer`, `tax_on_fee`, `unit_bid`, `is_private_sale` for a single source of truth.
+- **Bug 9 + P0 GlobalImageViewer**: new `/app/frontend/src/components/GlobalImageViewer.jsx` wrapping `yet-another-react-lightbox` + Zoom + Counter plugins. Fullscreen `100vw × 100vh`, `z-index: 9999`, black bg, `object-fit: contain`. Wired across CompactLotCard, LotDetailPage, ListingDetailPage, MultiItemListingDetailPage, VehicleDetailPage, StorageAuctionDetail. Every image gets `cursor-zoom-in`.
+- Premium test buyer seeded: `iter369_premium@bidvex.com / Premium2026!` (subscription_tier=premium, verified). Documented in `/app/memory/test_credentials.md`.
+
+### Tests (all passing)
+- `backend/tests/test_iter369_launch_gate.py` — 13 static-invariant tests
+- `backend/tests/test_iter369_behavior.py` — 7 HTTP + processor tests (fees tax-free / taxable / multi-unit + auto-bid advance / stop / max_immediate / skip-owner)
+- Regression: iter367 + iter368 + iter369 = 50/50 passing
+- `testing_agent_v3_fork` reports iteration_370 (initial pass — flagged Auto-Bid modal shadow bug) → iteration_371 (retest — all 9 bugs green, Auto-Bid persist round-trip verified for premium user, LotDetailPage lightbox verified)
+
+**NOT YET DEPLOYED** to production — user to deploy after final review.

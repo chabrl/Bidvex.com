@@ -1956,3 +1956,57 @@ EMERGENT_LLM_KEY=sk-emergent-…         (optional; preview uses it. If missing 
 ### Misc
 - test users testbuyer/testseller re-seeded (missing after fork); persistent ui343-* UI-test listings seeded (see test_credentials.md)
 - tests/test_iter343_regressions.py (21 tests) — all pass; zero regressions on 88 prior tests
+
+
+---
+
+## Iteration 369 (2026-07-21) — Card Bug Fixes + P0 Global Image Lightbox
+
+### Delivered — all 9 P0/P1 bugs from user's iter369 punchlist + P0 Fullscreen Lightbox
+
+**Bug 1 — Card action buttons never wrap**: `whitespace-nowrap`, `flex-1 min-w-0`, tight `text-[11px]` + `h-8 px-2`. Auto-Bid + Fees share row equally at any width (verified down to 280 px card width via 390 px viewport).
+
+**Bug 2 — Fixed 200 px image slot, object-contain, neutral bg**: Every card image renders at exactly the same height. No portrait/landscape cropping. Neutral `#f8f9fa` (light) / `slate-800` (dark) padding fills empty space.
+
+**Bug 3 — Wishlist heart perfectly centered**: 36 × 36 white circle with `flex items-center justify-center` and `padding: 0`; heart never offset.
+
+**Bug 4 — Countdown chip ALWAYS red**: `bg-rose-500` (>24h) → `bg-rose-600` (<24h) → `bg-rose-700 animate-pulse` (<1h). Never black/grey.
+
+**Bug 5 — Buy Now removed from grid cards**: Lives only on `LotDetailPage.jsx` sidebar. Simplifies the grid action row to Bid + Auto-Bid + Fees only.
+
+**Bug 6 — Inline "Max bid" input + Bid button on every card (BidSpotter-style)**: `$` prefix, min = next valid bid, step from increment table, placeholder shows `Min $X`. Inline errors below input for empty (`Please enter a bid amount`) + below-minimum (`Minimum bid is $X`) without any modal. Auth-required flow redirects to `/auth`.
+
+**Bug 7 — Auto-Bid bot end-to-end**:
+  - `_process_lot_auto_bids(db, listing, lot, current_price, manual_bidder_id)` fires inside `place_multi_item_bid` after every successful manual bid.
+  - Highest active `max_bid > current_price` wins each round; ownership check via `manual_bidder_id` prevents self-bid loops.
+  - Strategy dispatch: `min_to_lead` → one increment above manual; `max_immediate` → jumps to full ceiling.
+  - Deactivates row (`is_active: false`) once ceiling exhausted.
+  - Subscription gate: `_autobid_allowed_tier` = {premium, vip, vip_elite, partner, business}; free tier returns 403 `subscription_required`.
+  - Legacy `AutoBidModal.js` (old signature) renamed to `AutoBidModalLegacy.js` to unblock the new `.jsx` — webpack `.js` priority was shadowing the new file, causing the modal to silently fail-open.
+
+**Bug 8 — Fee breakdown maths (canonical)**:
+  - Tax-free auction (individual seller): `tax_on_hammer = 0`, `tax_on_fee = buyer_premium × 14.975 %`.
+  - Taxable (business/broker/enterprise/partner): `tax_on_hammer = subtotal × 14.975 %`, plus `tax_on_fee`.
+  - Multi-unit: `subtotal = unit_bid × quantity` → buyer premium + tax computed on subtotal.
+  - Fees popover recalculates live off the current bid-input value; hierarchy is single-source-of-truth via `fee_calculator.py`.
+
+**Bug 9 — Images clickable across all detail pages**: `cursor-zoom-in` cursor on `CompactLotCard`, `LotDetailPage`, `ListingDetailPage`, `MultiItemListingDetailPage`, `VehicleDetailPage`, `StorageAuctionDetail`. Every click opens the new GlobalImageViewer.
+
+**P0 — GlobalImageViewer.jsx** (`/app/frontend/src/components/GlobalImageViewer.jsx`):
+  - Wraps `yet-another-react-lightbox` (already in package.json) with `Zoom` + `Counter` plugins.
+  - Fullscreen `100vw × 100vh`, `position: fixed`, `zIndex: 9999`, black bg (`rgba(0,0,0,0.96)`).
+  - Zoom via mouse-wheel + pinch + double-tap; keyboard ← → Esc; swipe on mobile.
+  - Counter chip (`1 / 12`) bottom-right; download/right-click disabled.
+  - `ListingDetailPage.js` upgraded to the same Zoom + Counter plugins for consistency.
+
+### Files touched
+- Backend: `routes/auctions_bids.py` (fees-preview redesign with `subtotal`, `tax_on_hammer`, `tax_on_fee`, `unit_bid`, `is_private_sale`; anonymous access via `get_current_user_optional`).
+- Frontend: `components/GlobalImageViewer.jsx` (new); `components/CompactLotCard.jsx` (full BidSpotter-style rewrite); `components/AutoBidModal.jsx` (Dialog hoisted above null guard); `components/AutoBidModalLegacy.js` (renamed from old AutoBidModal.js); `pages/LotDetailPage.jsx` (Lightbox wire + cursor-zoom-in + absolute-inset image container); `pages/MultiItemListingDetailPage.js` (swapped react-image-lightbox for GlobalImageViewer + `bidvex:lot-bid-placed` event listener); `pages/ListingDetailPage.js` (Zoom + Counter plugins, cursor-zoom-in, AutoBidModalLegacy import); `pages/vehicles/VehicleDetailPage.js` (ImageGallery → GlobalImageViewer); `pages/storage/StorageAuctionDetail.js` (main image + thumb row → GlobalImageViewer).
+- Tests (all passing): `backend/tests/test_iter369_launch_gate.py` (13 static tests); `backend/tests/test_iter369_behavior.py` (7 behavioural tests: fees maths tax-free / taxable / multi-unit + auto-bid advance / stop / max_immediate / skip-owner); updated `backend/tests/test_iter368_launch_gate.py` for the new card shape.
+- Seed: premium buyer `iter369_premium@bidvex.com / Premium2026!` created for Auto-Bid E2E and recorded in `/app/memory/test_credentials.md`.
+
+### Testing status
+- `pytest tests/test_iter369_launch_gate.py tests/test_iter369_behavior.py tests/test_iter368_launch_gate.py tests/test_iter367_launch_gate.py` → **50/50 passing**.
+- `testing_agent_v3_fork` iteration_371 → **all 9 bugs GREEN + Auto-Bid save/persist round-trip verified for premium user + LotDetailPage lightbox verified**.
+
+**NOT YET DEPLOYED** to production — user to deploy after final review.

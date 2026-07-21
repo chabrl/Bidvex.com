@@ -290,23 +290,25 @@ export default function LotDetailPage() {
           <div className="rounded-xl overflow-hidden bg-black relative" style={{ aspectRatio: '4 / 3' }}>
             {images.length > 0 ? (
               <>
-                <SafeImage
-                  src={images[imgIdx]}
-                  alt={title}
-                  className="w-full h-full object-contain cursor-zoom-in"
-                  onClick={() => setLightboxOpen(true)}
-                  data-testid="lot-detail-main-image"
-                />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <SafeImage
+                    src={images[imgIdx]}
+                    alt={title}
+                    className="w-full h-full object-contain cursor-zoom-in"
+                    onClick={() => setLightboxOpen(true)}
+                    data-testid="lot-detail-main-image"
+                  />
+                </div>
                 {images.length > 1 && (
                   <>
-                    <button className="absolute left-2 top-1/2 -translate-y-1/2 h-10 w-10 bg-black/60 text-white rounded-full flex items-center justify-center hover:bg-black/80" onClick={(e) => { e.stopPropagation(); setImgIdx((i) => (i - 1 + images.length) % images.length); }} data-testid="lot-detail-prev-image"><ChevronLeft className="h-5 w-5" /></button>
-                    <button className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 bg-black/60 text-white rounded-full flex items-center justify-center hover:bg-black/80" onClick={(e) => { e.stopPropagation(); setImgIdx((i) => (i + 1) % images.length); }} data-testid="lot-detail-next-image"><ChevronRight className="h-5 w-5" /></button>
-                    <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-0.5 rounded font-mono">{imgIdx + 1} / {images.length}</div>
+                    <button className="absolute left-2 top-1/2 -translate-y-1/2 h-10 w-10 bg-black/60 text-white rounded-full flex items-center justify-center hover:bg-black/80 z-10" onClick={(e) => { e.stopPropagation(); setImgIdx((i) => (i - 1 + images.length) % images.length); }} data-testid="lot-detail-prev-image"><ChevronLeft className="h-5 w-5" /></button>
+                    <button className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 bg-black/60 text-white rounded-full flex items-center justify-center hover:bg-black/80 z-10" onClick={(e) => { e.stopPropagation(); setImgIdx((i) => (i + 1) % images.length); }} data-testid="lot-detail-next-image"><ChevronRight className="h-5 w-5" /></button>
+                    <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-0.5 rounded font-mono z-10">{imgIdx + 1} / {images.length}</div>
                   </>
                 )}
               </>
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-6xl text-slate-500">🖼️</div>
+              <div className="absolute inset-0 flex items-center justify-center text-6xl text-slate-500">🖼️</div>
             )}
           </div>
 
