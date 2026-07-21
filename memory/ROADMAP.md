@@ -1,5 +1,14 @@
 # BidVex Roadmap
 
+## Iter368 (2026-07-21) — COMPLETE ✅ Multi-Lot UX Refinement + Affiliate Corrections
+- [x] Issue 1: Dynamic bid increment table (server-driven, no hardcoded ladder; tiered / simplified / fixed strategies)
+- [x] Issue 1: Quick Bid pills use same increment engine via new `/next-bid` endpoint
+- [x] Issue 2: Compact lot cards (180px image, arrows, badges, Fees popover, Buy Now, Auto-Bid; NO Starting Bid; 4 states: default/leading/outbid/ended)
+- [x] Issue 3: Dedicated Lot Detail page `/lots/:auctionId/lot/:lotNumber` with prev/next + keyboard + swipe + scroll restoration
+- [x] Issue 4: Affiliate page rewritten (3% net platform profit — for life — 30 day cookie; no 10%, no 12 months)
+- [x] Affiliate Dashboard: This Month / Last Month / Lifetime / Projected metrics + Approved/Pending/Rejected referral statuses
+- [x] Post-testing hotfixes: ladder drift (`/next-bid` now uses utils.py), scroll restoration priority, `?lot=` deep-link ref wiring
+
 ## Iter367 (2026-07-21) — COMPLETE ✅ Production Audit + P0/P1 Regression Pass
 - [x] P0.1 Image Lightbox fullscreen fix
 - [x] P0.2 Dashboard Analytics fix (Buyer/Seller/Admin union with won_auctions + receipts)

@@ -1,5 +1,34 @@
 # BidVex — Auction Marketplace PRD
 
+## iter368 — Multi-Lot UX Refinement + Affiliate Corrections (Jul 21, 2026) ✅ COMPLETE
+
+**Scope**: Fixed four issues from iter367 per user spec. 114/115 tests pass (0 failed, 1 skipped).
+
+### 4 Issues Fixed
+
+1. **Dynamic Bid Increment Table** — `/increment-info` now derived from `utils.py` calculators (single source of truth). NEW `/next-bid` endpoint uses the SAME engine (no ladder drift). Frontend BidIncrementTable.jsx fetches dynamically; supports tiered / simplified / fixed strategies.
+
+2. **Compact Lot Cards** — NEW `CompactLotCard.jsx`: 180 px image, `<`/`>` arrows if multi-image, badges (state + Featured + Reserve + Tax-Free), Buy Now, Auto-Bid, Fees popover. NO Starting Bid. 4 state variants (default/leading/outbid/ended). Card height ~348 px (down from 500-700+).
+
+3. **Individual Lot Detail Page** — NEW route `/lots/:auctionId/lot/:lotNumber`. Full bidding UI: countdown, current+next bid, 3 quick-bid pills (server-derived), Buy Now, Auto-Bid, description, terms, bid history, seller card, badges, actions strip (Watchlist/Compare/Share/Report). Prev/Next nav via buttons + keyboard (←/→/Esc) + mobile swipe.
+
+4. **Affiliate Page Correction** — Rewritten with "3% of BidVex's net platform profit — for life" wording. 30-day attribution cookie. Zero "10%" or "12 months" mentions. Dashboard gains This Month / Last Month / Lifetime / Projected metrics + Approved/Pending/Rejected referral status.
+
+### Bug Fixes (round-2 testing agent findings)
+- **Ladder drift** — `/next-bid` was using `shared.get_minimum_increment` (12-tier `increment_type`) while `/increment-info` used `utils.*` (8-tier `increment_option`). Fixed via explicit local import. Retest: 18 boundary probes match exactly.
+- **Scroll restoration priority** — `?lot=` scrollIntoView fired BEFORE snapshot restore. Reversed priority. Retest: sessionStorage restore exact.
+- **`?lot=N` ref wiring** — CompactLotCard needed a wrapper `<div ref>` to keep `lotRefs.current[N]` populated. Retest: `/lots/{id}?lot=15` → scrollY=4501, lot 15 in-viewport.
+
+### Files Modified — 7
+- `backend/routes/misc.py` · `frontend/src/components/BidIncrementTable.jsx` · `frontend/src/pages/MultiItemListingDetailPage.js` · `frontend/src/pages/AffiliateProgramPage.jsx` · `frontend/src/pages/AffiliateDashboard.js` · `frontend/src/App.js` · `backend/tests/test_iter367_launch_gate.py`
+
+### Files Created — 3
+- `frontend/src/components/CompactLotCard.jsx` · `frontend/src/pages/LotDetailPage.jsx` · `backend/tests/test_iter368_launch_gate.py`
+
+### Zero regressions from iter363-367.
+
+
+
 ## iter367 — Production Audit + P0/P1 Regression Pass (Jul 21, 2026) ✅ COMPLETE — LAUNCH-READY
 
 **Scope**: 4× P0 critical bugs + 4× P1 features + 17-point Production Audit. **30/30 iter367 tests pass** (16 static launch-gate + 14 live HTTP). Testing agent confirms 100% success on both backend + frontend. Zero regressions in prior work (iter364-366 all still green).

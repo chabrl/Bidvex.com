@@ -1,6 +1,98 @@
 # BidVex Changelog
 
 
+## Jul 21, 2026 — iter368 ✅ Multi-Lot UX Refinement + Affiliate Corrections
+
+### 0. Executive Summary
+- 4 issues from iter367 addressed and completed per user spec.
+- 114 iter363-368 tests pass, 1 skipped, 0 failed.
+- Testing agent 2× rounds: both P0 bugs found in round 1 fixed and verified in round 2.
+- All previous iter363-367 functionality preserved (Compare, Escrow union, Buyer bid_status, Unsubscribe admin guard, Multi-lot deep-link, Affiliate footer link, Lightbox fullscreen).
+
+### 1. ISSUE 1 — Dynamic Bid Increment Table
+- Rewrote `GET /api/multi-item-listings/{id}/increment-info` to derive from `utils.py` calculators (single source of truth: `get_minimum_increment_tiered` + `get_minimum_increment_simplified`). Response gains `min/max/step/range_label/increment_label` per row + `fixed_increment` support for future flat-increment auctions.
+- NEW `GET /api/multi-item-listings/{id}/next-bid?current=X` returns `{current, increment, suggestions:[3 amounts], increment_option}` for Quick Bid pill computation. Uses the SAME `utils.get_minimum_increment` engine as `/increment-info` (no ladder drift).
+- Rewrote `frontend/src/components/BidIncrementTable.jsx` to fetch dynamically from the server. Removed all hardcoded ladders. Supports 3 strategies:
+  - `tiered` → 8 rows from server
+  - `simplified` → 4 rows from server
+  - `fixed` → single row "Any amount → +$X"
+- Refactored `MultiItemListingDetailPage.getMinimumIncrement()` to walk the server-supplied `incrementInfo.schedule[]` (never hardcoded).
+
+### 2. ISSUE 2 — Compact Lot Cards
+- NEW `frontend/src/components/CompactLotCard.jsx` — BidSpotter-density layout:
+  - 180 px image with `<` / `>` arrows if multi-image (single image, no thumbnail stack)
+  - Badges strip: state badge (Leading/Outbid/Ended) + Featured + Reserve + Tax-Free (individual seller)
+  - Lot # + title (2-line clamp) + location (MapPin)
+  - Current Bid + bid count
+  - Buy Now (if enabled) + Auto-Bid Bot Setup + Fees popover
+  - Card border reflects one of 4 states: default | leading | outbid | ended
+  - Card height ~348 px (down from 500-700+ before)
+  - NO Starting Bid / Opening Bid anywhere in the card
+- **Fees popover** now hosts Buyer premium, taxes (per province or None for private sale), pickup, storage, payment processing 2.9% + $0.30.
+- Replaced the huge 500-line inline lot card in `MultiItemListingDetailPage.js` with `<CompactLotCard>`. Cards click through to the new Lot Detail page.
+- Preserved all previous BidVex functionality: sort dropdown (5 options), grid/list toggle, activity ticker, increment table, collapsible description.
+
+### 3. ISSUE 3 — Individual Lot Detail Page
+- NEW route `/lots/:auctionId/lot/:lotNumber` (+ EN/FR aliases) → `LotDetailPage.jsx`.
+- Sections rendered: countdown, current bid, next valid bid, 3 Quick Bid pills (server-derived), custom bid input, Buy Now, Auto-Bid Bot Setup, description, terms, shipping/pickup, docs, bid history (PublicBidHistory), seller card with profile link, reserve status hint.
+- Actions strip: Watchlist, Compare, Share, Report.
+- Badges: Featured, Reserve, Tax-Free (Private Sale), Private Sale, Condition, Qty > 1.
+- Prev / Next lot navigation via **buttons** (top + bottom) + **keyboard** (ArrowLeft/ArrowRight, Escape returns to grid) + **mobile swipe** (touch delta > 60 px).
+- Large image gallery: 4:3 primary + thumbnail strip + `<` / `>` inside primary.
+- "Back to grid" button navigates to `/lots/{auctionId}?lot=N`.
+
+### 4. Scroll Restoration on Grid Return
+- `CompactLotCard.onNavigate` snapshots `{scrollY, lotSort, viewMode, descriptionExpanded}` to `sessionStorage['bidvex_grid_state:{auctionId}']` before navigating to lot detail.
+- `MultiItemListingDetailPage.fetchListing` reads the snapshot on mount, restores sort/view/description state immediately, and runs a retry loop that force-scrolls to the saved `scrollY` 6 times over ~1.86 s (defeats React Router auto-restore + layout shifts from lazy images).
+- Snapshot consumed (deleted) once restored.
+- Priority: snapshot (grid-return) > `?lot=N` scrollIntoView > default. Ref wrapper on CompactLotCard ensures `lotRefs.current[lot.lot_number]` still populated so `?lot=N` scrollIntoView also works when no snapshot present.
+
+### 5. ISSUE 4 — Affiliate Page Corrections
+- Rewrote `AffiliateProgramPage.jsx` copy end-to-end:
+  - Title: "Affiliate Center" / "Centre d'affiliation"
+  - Subtitle: "Share, refer, and earn commissions."
+  - Commission headline: **"3% of BidVex's net platform profit — for life."**
+  - Explain: "You earn 3% of BidVex's net platform profit generated from every transaction (auction fees and subscriptions) made by users you refer, for life."
+  - Chip: "Lifetime attribution — no 12-month cutoff"
+  - Cookie chip: "Attribution cookie: 30 days"
+  - How it works: 3 steps (Share → They buy → Get paid).
+  - FAQ updated: attribution is FOR LIFE, no 12-month cutoff. Added Q: what does "3% of net platform profit" mean (formula explained).
+  - **Zero "10%" occurrences. Zero "12 months" occurrences.**
+- Enhanced `AffiliateDashboard.js` (auth-required at `/affiliate`):
+  - NEW period metrics row: This Month / Last Month / Lifetime / Projected Next Month.
+  - Referrals table statuses: Approved / Pending / Rejected (with legacy "converted" mapped to Approved).
+  - All fields already present preserved: Referral link, Copy button, Refresh, Stripe Connect bank management, Earnings widget, Recent Commission Events, Payout requests, Referral table.
+
+### 6. Bug Fixes During Iter368 (round-2 testing agent findings)
+- **Ladder drift** — `/next-bid` was importing `get_minimum_increment` from `shared.py` (12-tier `increment_type` key) while `/increment-info` used `utils.py` (8-tier `increment_option` key). Fixed by explicit local import `from utils import get_minimum_increment as _get_min_incr`. Retested: 18 boundary probes match exactly.
+- **Scroll restoration priority** — `?lot=N` scrollIntoView branch fired BEFORE the snapshot restore. Reversed the priority (snapshot first, `?lot=` fallback). Retested with pre-set sessionStorage: scrollY restored to exact target ±0.
+- **`?lot=N` deep-link post-refactor regression** — CompactLotCard didn't wire `lotRefs`. Added a `<div ref>` wrapper around each card. Retested: `/lots/{id}?lot=15` → `scrollY=4501` and lot 15 in-viewport.
+
+### 7. New / Modified Files
+**Created (2):**
+- `frontend/src/components/CompactLotCard.jsx`
+- `frontend/src/pages/LotDetailPage.jsx`
+- `backend/tests/test_iter368_launch_gate.py` (14 static tests)
+
+**Modified (7):**
+- `backend/routes/misc.py` — dynamic `/increment-info` + new `/next-bid` endpoint
+- `frontend/src/components/BidIncrementTable.jsx` — rewritten dynamic (no hardcoded ladder)
+- `frontend/src/pages/MultiItemListingDetailPage.js` — replaced inline card with CompactLotCard + scroll snapshot restore + ref wrapper
+- `frontend/src/pages/AffiliateProgramPage.jsx` — 3% net profit for life copy
+- `frontend/src/pages/AffiliateDashboard.js` — period metrics row + Approved/Pending/Rejected statuses
+- `frontend/src/App.js` — new `/lots/:auctionId/lot/:lotNumber` route
+- `backend/tests/test_iter367_launch_gate.py` — updated `test_bid_increment_table_component_exists` for iter368 dynamic API
+
+### 8. Test Status
+- iter368 static: 14/14 pass
+- iter368 live: 12/12 pass
+- iter367 static: 16/16 pass
+- iter367 live: 14 pass + 1 skipped
+- iter363-366: 58/58 pass
+- **Cumulative: 114 passed, 1 skipped, 0 failed across iter363-368**
+
+
+
 ## Jul 21, 2026 — iter367 ✅ Production Audit + P0/P1 Regression Pass
 
 ### 0. Executive Summary (zero-credit regression sprint)

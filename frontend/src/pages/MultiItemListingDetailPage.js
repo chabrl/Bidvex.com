@@ -1305,29 +1305,37 @@ const MultiItemListingDetailPage = () => {
                   default:               return aEnd - bEnd;
                 }
               }).map((lot) => (
-                <CompactLotCard
+                // iter368 — Ref wrapper so `?lot=N` deep-link
+                // scrollIntoView (from iter367) still targets the correct
+                // card element after the CompactLotCard refactor.
+                <div
                   key={lot.lot_number}
-                  lot={lot}
-                  auctionId={id}
-                  listing={listing}
-                  currentUserId={user?.id}
-                  onOpenAutoBid={(l) => setAutoBidLot(l)}
-                  onBuyNow={(l) => handleBuyNow(l)}
-                  onNavigate={() => {
-                    // iter368 — snapshot grid state so returning restores it exactly.
-                    try {
-                      window.sessionStorage.setItem(
-                        `bidvex_grid_state:${id}`,
-                        JSON.stringify({
-                          scrollY: window.scrollY,
-                          lotSort,
-                          viewMode,
-                          descriptionExpanded,
-                        }),
-                      );
-                    } catch { /* ignore */ }
-                  }}
-                />
+                  ref={(el) => { if (el) lotRefs.current[lot.lot_number] = el; }}
+                  data-lot-anchor={lot.lot_number}
+                >
+                  <CompactLotCard
+                    lot={lot}
+                    auctionId={id}
+                    listing={listing}
+                    currentUserId={user?.id}
+                    onOpenAutoBid={(l) => setAutoBidLot(l)}
+                    onBuyNow={(l) => handleBuyNow(l)}
+                    onNavigate={() => {
+                      // iter368 — snapshot grid state so returning restores it exactly.
+                      try {
+                        window.sessionStorage.setItem(
+                          `bidvex_grid_state:${id}`,
+                          JSON.stringify({
+                            scrollY: window.scrollY,
+                            lotSort,
+                            viewMode,
+                            descriptionExpanded,
+                          }),
+                        );
+                      } catch { /* ignore */ }
+                    }}
+                  />
+                </div>
               ))}
             </div>
 
