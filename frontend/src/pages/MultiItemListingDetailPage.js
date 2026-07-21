@@ -240,20 +240,35 @@ const MultiItemListingDetailPage = () => {
         setActiveLotId(matched.lot_number);
         setSelectedLot(matched);
         // Scroll behaviour priority:
-        //   (1) explicit ?lot=N deep-link → smooth-scroll to that lot
-        //   (2) saved sessionStorage snapshot on grid return → restore scrollY
+        //   (1) grid-return snapshot (sessionStorage) — takes precedence
+        //       even when ?lot= is present, because the URL param is
+        //       carried by "Back to grid" navigation but we want to
+        //       restore scrollY, not re-scroll into the anchor.
+        //   (2) explicit ?lot=N deep-link → smooth-scroll to that lot
         //   (3) default → let the page start at the top
-        if (targetLotNum != null && matched.lot_number === targetLotNum) {
+        if (savedState && typeof savedState.scrollY === 'number') {
+          // iter368 — the compact-card grid can be tall (dozens of 350 px
+          // cards) but React may not have painted them all by the time we
+          // fire the first scrollTo. Force-scroll multiple times with an
+          // exponential back-off to defeat React Router's scroll-restore
+          // + layout shifts from lazy images.
+          const targetY = savedState.scrollY;
+          let attempts = 0;
+          const tick = () => {
+            attempts += 1;
+            window.scrollTo({ top: targetY, behavior: 'instant' });
+            if (attempts >= 6) {
+              try { window.sessionStorage.removeItem(`bidvex_grid_state:${id}`); } catch { /* ignore */ }
+              return;
+            }
+            setTimeout(tick, 120 * attempts);
+          };
+          setTimeout(tick, 60);
+        } else if (targetLotNum != null && matched.lot_number === targetLotNum) {
           setTimeout(() => {
             const ref = lotRefs.current[matched.lot_number];
             if (ref) ref.scrollIntoView({ behavior: 'smooth', block: 'start' });
           }, 350);
-        } else if (savedState && typeof savedState.scrollY === 'number') {
-          setTimeout(() => {
-            window.scrollTo({ top: savedState.scrollY, behavior: 'instant' });
-            // Consume the snapshot so subsequent visits get a clean state.
-            try { window.sessionStorage.removeItem(`bidvex_grid_state:${id}`); } catch { /* ignore */ }
-          }, 60);
         }
       }
 

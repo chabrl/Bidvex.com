@@ -76,28 +76,54 @@ def test_next_bid_at_250_returns_10_step_suggestions(api):
     assert data["increment_option"] == "tiered"
 
 
-def test_next_bid_ladder_drift_bug_documented(api):
-    """iter368 CONTRACT VIOLATION — /next-bid imports get_minimum_increment
-    from shared.py (12-tier ladder using field `increment_type`) while
-    /increment-info imports get_minimum_increment_tiered from utils.py
-    (8-tier ladder using field `increment_option`).
-
-    Spec explicitly names utils.py as the SINGLE SOURCE OF TRUTH.
-
-    At current=$50 utils.py says step=$5, but /next-bid returns 2.5.
-    At current=$100 utils.py says step=$10, but /next-bid returns 5.
+def test_next_bid_ladder_matches_utils_tiered(api):
+    """iter368 RETEST — /next-bid now imports get_minimum_increment from
+    utils.py (was shared.py). Verify the tiered ladder matches utils.py
+    exactly at every tier boundary. Per utils.get_minimum_increment_tiered:
+      $0-99.99   → +$5
+      $100-499.99→ +$10
+      $500-999.99→ +$25
+      $1000-4999.99 → +$50
+      $5000-9999.99 → +$100
+      $10000-49999.99 → +$250
+      $50000-99999.99 → +$500
+      $100000+   → +$1000
     """
-    r = api.get(f"{BASE_URL}/api/multi-item-listings/{SEED_LISTING_ID}/next-bid",
-                params={"current": 50})
-    assert r.status_code == 200
-    data = r.json()
-    # Document the mismatch – expected per utils.py is 5.0, actual is 2.5.
-    # If the bug is fixed this should equal 5.0.
-    if data["increment"] != 5.0:
-        pytest.xfail(f"LADDER DRIFT — /next-bid returned step={data['increment']} but utils.py says $5 for current=$50. "
-                     "Root cause: routes/misc.py imports get_minimum_increment from shared.py (line 16) — shared has "
-                     "its own 12-tier ladder that disagrees with utils.py. Fix: import from utils, or delete "
-                     "shared.py's copy and re-import.")
+    expected = [
+        (0, 5.0), (50, 5.0), (99.99, 5.0),
+        (100, 10.0), (250, 10.0), (499.99, 10.0),
+        (500, 25.0), (999.99, 25.0),
+        (1000, 50.0), (4999.99, 50.0),
+        (5000, 100.0), (9999.99, 100.0),
+        (10000, 250.0), (49999.99, 250.0),
+        (50000, 500.0), (99999.99, 500.0),
+        (100000, 1000.0), (500000, 1000.0),
+    ]
+    for current, want_step in expected:
+        r = api.get(f"{BASE_URL}/api/multi-item-listings/{SEED_LISTING_ID}/next-bid",
+                    params={"current": current})
+        assert r.status_code == 200, r.text
+        data = r.json()
+        assert data["increment"] == want_step, (
+            f"LADDER DRIFT — at current=${current} expected step=${want_step} but got ${data['increment']}"
+        )
+
+
+def test_next_bid_matches_increment_info_schedule(api):
+    """iter368 — /next-bid and /increment-info must return IDENTICAL steps
+    at every tier boundary. This is the SINGLE SOURCE OF TRUTH contract."""
+    info = api.get(f"{BASE_URL}/api/multi-item-listings/{SEED_LISTING_ID}/increment-info").json()
+    schedule = info["schedule"]
+    assert len(schedule) == 8, f"expected 8 tiered rows, got {len(schedule)}"
+    for row in schedule:
+        probe = float(row["min"])
+        r = api.get(f"{BASE_URL}/api/multi-item-listings/{SEED_LISTING_ID}/next-bid",
+                    params={"current": probe})
+        assert r.status_code == 200
+        got_step = r.json()["increment"]
+        assert got_step == row["step"], (
+            f"LADDER DRIFT — at tier min=${probe}: increment-info says ${row['step']} but /next-bid says ${got_step}"
+        )
 
 
 def test_next_bid_at_1500_returns_50_step_suggestions(api):

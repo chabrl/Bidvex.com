@@ -1,0 +1,48 @@
+{
+  "summary": "iter368 RETEST — BOTH P0 BUGS VERIFIED FIXED. (a) LADDER DRIFT: /next-bid now imports get_minimum_increment from utils.py; verified across ALL 8 tier boundaries + 18 explicit probes ($0-$500,000). /next-bid steps match /increment-info schedule EXACTLY (0→5, 50→5, 100→10, 250→10, 500→25, 1000→50, 5000→100, 10000→250, 50000→500, 100000→1000). Removed xfail marker on test_next_bid_ladder_drift_bug_documented → replaced with 2 stronger positive tests (test_next_bid_ladder_matches_utils_tiered + test_next_bid_matches_increment_info_schedule). (b) SCROLL RESTORATION: pre-set sessionStorage {scrollY:800, lotSort:'most_bids', viewMode:'grid'} via page.evaluate() (avoiding Playwright auto-scroll pitfall), navigated to /lots/{id}/lot/1, clicked [data-testid=lot-detail-back-to-grid], waited 4000ms → window.scrollY = 800 (exact ±0), sort control shows 'most_bids', sessionStorage cleared after consumption. Backend regression: pytest test_iter368_launch_gate.py + test_iter367_launch_gate.py + test_iter367_live.py + test_iter368_live.py → 56 passed, 1 skipped, 0 failed. One PRE-EXISTING minor regression observed: ?lot=N deep-link (no snapshot) no longer scrolls the card into view because CompactLotCard doesn't wire lotRefs (introduced in iter368 refactor; unrelated to the two P0 fixes).",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "MultiItemListingDetailPage → CompactLotCard integration",
+        "issue": "Pre-existing regression from iter368 CompactLotCard refactor (NOT caused by the two P0 fixes retested here): the ?lot=N deep-link scrollIntoView branch (line 267-272) relies on lotRefs.current[matched.lot_number] but CompactLotCard is rendered without a ref binding — the parent no longer wires refs onto the card wrapper. Verified with /lots/179b62b9.../?lot=15 (no sessionStorage): window.scrollY stays at 0, lot-card-15 stays below the fold. Recommendation: wrap CompactLotCard in a div ref={el => (lotRefs.current[lot.lot_number] = el)} inside the map() at MultiItemListingDetailPage.js line 1307-1330, OR forwardRef in CompactLotCard.",
+        "selector": "map(lot => <CompactLotCard/>) at MultiItemListingDetailPage.js:1307",
+        "priority": "MEDIUM"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter368_live.py",
+    "/app/backend/tests/test_iter368_launch_gate.py",
+    "/app/backend/tests/test_iter367_launch_gate.py",
+    "/app/backend/tests/test_iter367_live.py",
+    "/app/test_reports/pytest/iter369_retest.xml"
+  ],
+  "action_items": [
+    "OPTIONAL (MEDIUM) — restore ?lot=N deep-link scrolling by attaching a ref to CompactLotCard so lotRefs.current[lot.lot_number] is populated (regression from iter368 CompactLotCard refactor, unrelated to today's two P0 fixes). Snippet: wrap CompactLotCard in <div ref={el => (lotRefs.current[lot.lot_number] = el)}> inside the .map() at MultiItemListingDetailPage.js:1307, OR make CompactLotCard a forwardRef component."
+  ],
+  "critical_code_review_comments": [
+    "P0 LADDER FIX VERIFIED — routes/misc.py line 1030 now imports get_minimum_increment from utils, and utils.get_minimum_increment delegates to get_minimum_increment_tiered / _simplified keyed off `increment_option`. /next-bid + /increment-info are now provably the SAME ladder (18 boundary probes + 8 schedule-row cross-check all pass).",
+    "P0 SCROLL FIX VERIFIED — MultiItemListingDetailPage.js line 249 checks savedState.scrollY FIRST (retry loop 6× with exponential back-off up to ~1.86s), then falls back to else-if scrollIntoView on line 267. sessionStorage snapshot is cleared inside the retry loop after final tick (line 261).",
+    "MINOR — CompactLotCard-integration bug: lotRefs.current not populated by the map. Independent of the two P0 fixes, but worth addressing so ?lot=N deep-link (when NO snapshot exists) still scrolls to the target lot.",
+    "DUPLICATE SOURCE OF TRUTH still present at code level — /app/backend/shared.py still defines its own get_minimum_increment / get_minimum_increment_tiered / _simplified alongside /app/backend/utils.py. The misc.py hotfix imports from utils locally so /next-bid is safe, but any future imports from shared risk re-introducing the drift. Recommend deleting shared.py copies and re-exporting from utils (as flagged in iter368).",
+    "test_iter368_live.py — updated: xfail marker removed; replaced with two positive assertions covering the full 8-tier ladder (test_next_bid_ladder_matches_utils_tiered) and the cross-check between /next-bid and /increment-info (test_next_bid_matches_increment_info_schedule)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter368_live.py (removed xfail test_next_bid_ladder_drift_bug_documented, added test_next_bid_ladder_matches_utils_tiered + test_next_bid_matches_increment_info_schedule — now 12 tests, all passing)"
+  ],
+  "success_rate": {
+    "backend": "100% (56 passed + 1 skipped, 0 failed across 4 test files)",
+    "frontend": "100% for the two P0 retest items (scroll restore ✅ + sort restore ✅ + affiliate copy ✅). One unrelated pre-existing regression noted for ?lot=N no-snapshot deep-link scroll."
+  },
+  "test_credentials": {
+    "super_admin": "charbel911@gmail.com / Anderosli123!@# — used for buyer dashboard, escrow, unsubscribe guard"
+  },
+  "seed_data_creation": "None — reused seed listing 179b62b9-fa28-4140-b36d-f5903b033f48 (20 lots, increment_option='tiered').",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Both iter368 P0 bugs (ladder drift + scroll restoration) are conclusively fixed. Backend pytest suite is clean (56/56 excluding 1 skipped). Frontend scroll restoration verified with page.evaluate() to sidestep the Playwright auto-scroll pitfall — window.scrollY=800 exact after Back-to-grid. A separate MEDIUM regression exists: CompactLotCard doesn't receive a ref binding from the parent map, so lotRefs.current[N] is never populated → the ?lot=N deep-link scrollIntoView branch is effectively a no-op when NO snapshot exists. This predates the two P0 fixes (introduced when CompactLotCard replaced the inline card in iter368) and does NOT block the P0 gate.",
+  "rca of the issue": "Ladder RCA (FIXED): routes/misc.py's /next-bid now does `from utils import get_minimum_increment as _get_min_incr` locally, bypassing the shared.py 12-tier ladder that keys off `increment_type`. utils.get_minimum_increment routes to get_minimum_increment_tiered (8 rows) or _simplified (4 rows) via the `increment_option` field — the SAME calculators feeding /increment-info. Verified: 8 tier boundaries × 2 endpoints = 16 identical steps. Scroll RCA (FIXED): fetchListing now checks `savedState && typeof savedState.scrollY === 'number'` FIRST; only if false does it fall into `else if (targetLotNum != null …)` scrollIntoView. Retry loop scrolls to targetY 6 times with 60/120/240/…-ms back-off, then removes the sessionStorage key. Verified end-to-end: pre-set scrollY=800 → back-to-grid → final scrollY=800 exactly, sort='most_bids' restored, snapshot cleared."
+}

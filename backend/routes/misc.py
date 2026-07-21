@@ -1018,24 +1018,33 @@ async def get_multi_lot_next_bid(listing_id: str, current: float = 0):
     Used by the Quick Bid pills on the redesigned Multi-Lot page so the
     three suggested amounts always match the same increment engine the
     server enforces at /place-bid time. Never hardcoded on the client.
+
+    iter368 hotfix — Import `get_minimum_increment` LOCALLY from `utils`
+    (not `shared`). `shared.get_minimum_increment` uses a 12-tier ladder
+    keyed off `increment_type`, whereas `utils.get_minimum_increment`
+    delegates to `get_minimum_increment_tiered / _simplified` keyed off
+    `increment_option` — the SAME calculators feeding /increment-info.
+    Without this local import, Quick Bid pills disagreed with the
+    displayed increment table (found by iter368 testing agent).
     """
+    from utils import get_minimum_increment as _get_min_incr
     db = get_db()
     listing = await db.multi_item_listings.find_one({"id": listing_id})
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
 
     current = float(current or 0)
-    step = float(get_minimum_increment(listing, current))
+    step = float(_get_min_incr(listing, current))
     return {
         "current": current,
         "increment": step,
         # Three ascending suggestions on the same ladder — power-buyer UX.
         "suggestions": [
             current + step,
-            current + step + get_minimum_increment(listing, current + step),
+            current + step + _get_min_incr(listing, current + step),
             current + step
-                    + get_minimum_increment(listing, current + step)
-                    + get_minimum_increment(listing, current + step + get_minimum_increment(listing, current + step)),
+                    + _get_min_incr(listing, current + step)
+                    + _get_min_incr(listing, current + step + _get_min_incr(listing, current + step)),
         ],
         "increment_option": (listing.get("increment_option") or "tiered").lower(),
     }
