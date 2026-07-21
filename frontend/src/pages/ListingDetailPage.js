@@ -22,7 +22,7 @@ import { Clock, MapPin, Eye, User, DollarSign, MessageCircle, TrendingUp, Wifi, 
 import PromotionManagerModal from '../components/PromotionManagerModal';
 import WatchlistButton from '../components/WatchlistButton';
 import SocialShare from '../components/SocialShare';
-import AutoBidModal from '../components/AutoBidModal';
+import AutoBidModal from '../components/AutoBidModalLegacy';
 import MessageSellerModal from '../components/MessageSellerModal';
 import RateSellerModal from '../components/RateSellerModal';
 import AuctioneerInfo from '../components/AuctioneerInfo';

@@ -1,0 +1,47 @@
+{
+  "summary": "iter371 retest — Auto-Bid modal shadowing bug is FULLY RESOLVED. All 20 backend pytest tests pass (13 launch-gate + 7 behavior). All targeted UI flows now PASS: (1) Grid Auto-Bid button → modal opens correctly with [data-testid=auto-bid-modal] visible for BOTH anonymous users (upgrade view with Maybe Later / Upgrade to Premium / Upgrade to VIP Elite CTAs) AND premium users (form view with max-input, strategy-min/max, save, cancel — no legacy chunk-load error). (2) Auto-Bid save persistence: POST succeeds, modal closes, reopening shows badge 'Auto-Bid active · $200.00' + Update + Disable buttons — full round-trip verified for iter369_premium@bidvex.com on Lot #2. (3) LotDetailPage main image click opens GlobalImageViewer (100vw×100vh, position:fixed, z-index 9999, black bg, counter '1/2', ESC closes). Thumbnail click also opens. (4) No console error about src_components_AutoBidModal_js.chunk.js — legacy shadowing fix is holding.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "LotDetailPage main image container (DOM height overflow)",
+        "issue": "MINOR — The <img data-testid=lot-detail-main-image> element has DOM bounding-box h=1313px while its parent's overflow-hidden 4:3 container is h=554px. `w-full h-full` on the img is not being honoured because the parent's aspectRatio-only inline style doesn't resolve height for the percentage. Visually the image is clipped correctly (554px 4:3 box) but the img element occupies the DOM extent of its intrinsic dimensions. Practical impact: clicking the visible image opens the lightbox correctly (verified). But automated tests that click at the DOM bounding-box center (y=805) hit whatever is in the document flow below y=703 (the badge row). Fix suggestion: wrap the SafeImage in a nested <div class='absolute inset-0'> so it inherits the 4/3 box explicitly, OR add `min-h-0 max-h-full` on the img, OR change parent to explicit `h-[...]` instead of aspectRatio.",
+        "selector": "[data-testid=lot-detail-main-image]",
+        "priority": "LOW"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter369_launch_gate.py",
+    "/app/backend/tests/test_iter369_behavior.py",
+    "/app/test_reports/pytest/iter371_retest.xml"
+  ],
+  "action_items": [
+    "OPTIONAL — Fix the DOM overflow on LotDetailPage main image so h-full is honoured. Not user-visible but improves DOM/visual consistency and enables tests to click at the DOM center."
+  ],
+  "critical_code_review_comments": [
+    "iter369 Auto-Bid modal fix is correct: <Dialog open={open && !!lot}> always mounts so Radix Dialog can register open transitions, and the null-guard is now on the inner children only. This resolves the legacy .js/.jsx shadowing symptom cleanly.",
+    "MultiItemListingDetailPage.js still has a dead `autoBidModalOpen` useState at line 87 that isn't referenced anywhere. Safe to remove — cognitive-load only, no impact.",
+    "LotDetailPage main image container uses `style={{ aspectRatio: '4 / 3' }}` without an explicit height — inner `<img class='w-full h-full object-contain'>` computes h to its intrinsic value in some browsers because % height requires resolved parent height. `overflow-hidden` clips the visual, but the DOM extent leaks. Recommended: use `h-[554px]` explicitly (or wrap img in `absolute inset-0`).",
+    "Backend fees-preview + Auto-Bid processor tests all pass (20/20). Both launch-gate and behavioural suites are green.",
+    "Multiple 'Failed to load resource: 404' console errors on the multi-lot page appear related to bid history fetch — not related to iter369, pre-existing, seemingly for a stale URL. Worth investigating separately but not a P0."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "100% (20/20 pytest)",
+    "frontend": "100% for the targeted iter369 P0 flows (Auto-Bid open + save + persist + upgrade CTA + GlobalImageViewer on grid & LotDetailPage). 1 minor cosmetic DOM layout note on LotDetailPage image (does not affect users)."
+  },
+  "test_credentials": {
+    "premium_buyer": "iter369_premium@bidvex.com / Premium2026! — verified working, subscription_tier=premium"
+  },
+  "seed_data_creation": "No new seed data. Test performed auto-bid create → disable cycle on Lot #2 of listing 179b62b9 as cleanup.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "iter369 is closed. Auto-Bid grid button opens modal correctly for anonymous (upgrade view) and premium (form) users. Save/persist round-trip verified. GlobalImageViewer opens on main-image click when clicking VISIBLE image bounds; only issue is DOM extent > visible area on LotDetailPage due to aspectRatio inline style not sizing the img — cosmetic. All 9 previously-green bugs remain green: Bug 1 (buttons no wrap), Bug 2 (200px image slot), Bug 3 (wishlist centered), Bug 4 (red countdown), Bug 5 (no Buy Now on grid), Bug 6 (inline bid input), Bug 7 (Auto-Bid) FIXED, Bug 8 (Fees popover), Bug 9 (GlobalImageViewer on grid & lot detail).",
+  "rca of the issue": "Root cause was correctly identified by main agent: webpack `.js` resolution priority made the legacy /app/frontend/src/components/AutoBidModal.js shadow the new /app/frontend/src/components/AutoBidModal.jsx. Import `from './AutoBidModal'` in CompactLotCard.jsx + MultiItemListingDetailPage.js resolved to the OLD legacy file whose signature expected (listingId, currentBid, minimumIncrement, onAutoBidSetup) — none of the new props matched → nothing rendered. Fix (renaming to AutoBidModalLegacy.js + import re-wire in ListingDetailPage.js) + hoisted Dialog wrapper above null-guard now allows Radix Dialog to always mount and correctly transition open state. Verified with fresh live browser session on preview."
+}

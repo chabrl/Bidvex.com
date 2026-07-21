@@ -146,12 +146,15 @@ export default function AutoBidModal({
   };
 
   // ---------- Render ----------
-  if (!lot) return null;
+  // iter369 fix — keep <Dialog> mounted even when `lot` is null so Radix
+  // registers open-state transitions correctly (fixes grid-card open bug).
   const title = isFR ? "Configurer l'auto-enchère" : 'Setup Auto-Bid';
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open && !!lot} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md" data-testid="auto-bid-modal">
+        {!lot ? null : (
+        <>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Bot className="h-5 w-5 text-cyan-600" />
@@ -358,6 +361,8 @@ export default function AutoBidModal({
               </>
             )}
           </div>
+        )}
+        </>
         )}
       </DialogContent>
     </Dialog>
