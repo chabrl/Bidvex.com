@@ -53,6 +53,8 @@ import { LangLink } from '../components/LangLink';
 // increment table + grid sort controls.
 import MultiLotActivityTicker from '../components/MultiLotActivityTicker';
 import BidIncrementTable from '../components/BidIncrementTable';
+// iter368 — Compact lot card replaces the legacy 500-line inline card.
+import CompactLotCard from '../components/CompactLotCard';
 
 const API = API_BASE;
 
@@ -98,6 +100,8 @@ const MultiItemListingDetailPage = () => {
   // iter367 P1 — Lot sorting for the redesigned grid.
   const [lotSort, setLotSort] = useState('ending_soonest'); // ending_soonest | most_bids | highest_price | lowest_price | newest
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
+  // iter368 — Compact-card auto-bid entry point (opens legacy modal).
+  const [autoBidLot, setAutoBidLot] = useState(null);
   const lotRefs = useRef({});
 
   // Check if user has already accepted terms for this auction
@@ -150,25 +154,26 @@ const MultiItemListingDetailPage = () => {
   };
 
   const getMinimumIncrement = (currentBid) => {
-    if (!incrementInfo) return 5; // Default fallback
-    
-    const option = incrementInfo.increment_option;
-    if (option === 'simplified') {
-      if (currentBid <= 100) return 1;
-      if (currentBid <= 1000) return 5;
-      if (currentBid <= 10000) return 25;
-      return 100;
-    } else {
-      // Tiered
-      if (currentBid < 100) return 5;
-      if (currentBid < 500) return 10;
-      if (currentBid < 1000) return 25;
-      if (currentBid < 5000) return 50;
-      if (currentBid < 10000) return 100;
-      if (currentBid < 50000) return 250;
-      if (currentBid < 100000) return 500;
-      return 1000;
+    // iter368 — Walk the server-supplied schedule instead of hardcoding
+    // tier boundaries client-side. This guarantees the Quick Bid, the
+    // increment table, and the placement guard rail all use the exact
+    // same ladder the backend enforces at /place-bid.
+    if (!incrementInfo) return 5;
+    if (incrementInfo.increment_option === 'fixed' && incrementInfo.fixed_increment) {
+      return Number(incrementInfo.fixed_increment);
     }
+    const schedule = incrementInfo.schedule || [];
+    const bid = Number(currentBid || 0);
+    for (const row of schedule) {
+      const lo = Number(row.min ?? 0);
+      const hi = row.max == null ? Infinity : Number(row.max);
+      // Boundaries are half-open [lo, hi): matches server calculators.
+      if (bid >= lo && bid < hi) return Number(row.step);
+    }
+    // If the bid exceeds the top tier's range or the schedule is empty,
+    // fall back to the highest tier's step (or a conservative default).
+    if (schedule.length > 0) return Number(schedule[schedule.length - 1].step);
+    return 5;
   };
 
   useEffect(() => {
@@ -216,17 +221,39 @@ const MultiItemListingDetailPage = () => {
         // iter367 P0 — Deep-link support: if ?lot=N is present, focus
         // that lot and scroll to it once refs are mounted. Otherwise
         // default to the first lot as before.
+        // iter368 — On grid return, prefer the saved sessionStorage
+        // snapshot (scrollY + sort + view mode) over a fresh scroll.
+        let savedState = null;
+        try {
+          const raw = window.sessionStorage.getItem(`bidvex_grid_state:${id}`);
+          if (raw) savedState = JSON.parse(raw);
+        } catch { /* ignore */ }
+        if (savedState) {
+          if (savedState.lotSort) setLotSort(savedState.lotSort);
+          if (savedState.viewMode) setViewMode(savedState.viewMode);
+          if (typeof savedState.descriptionExpanded === 'boolean') setDescriptionExpanded(savedState.descriptionExpanded);
+        }
         const targetLotNum = targetLotParam != null ? Number(targetLotParam) : null;
         const matched =
           (targetLotNum != null && response.data.lots.find(l => l.lot_number === targetLotNum)) ||
           response.data.lots[0];
         setActiveLotId(matched.lot_number);
         setSelectedLot(matched);
+        // Scroll behaviour priority:
+        //   (1) explicit ?lot=N deep-link → smooth-scroll to that lot
+        //   (2) saved sessionStorage snapshot on grid return → restore scrollY
+        //   (3) default → let the page start at the top
         if (targetLotNum != null && matched.lot_number === targetLotNum) {
           setTimeout(() => {
             const ref = lotRefs.current[matched.lot_number];
             if (ref) ref.scrollIntoView({ behavior: 'smooth', block: 'start' });
           }, 350);
+        } else if (savedState && typeof savedState.scrollY === 'number') {
+          setTimeout(() => {
+            window.scrollTo({ top: savedState.scrollY, behavior: 'instant' });
+            // Consume the snapshot so subsequent visits get a clean state.
+            try { window.sessionStorage.removeItem(`bidvex_grid_state:${id}`); } catch { /* ignore */ }
+          }, 60);
         }
       }
 
@@ -1200,7 +1227,7 @@ const MultiItemListingDetailPage = () => {
                 auctionId={id}
                 onLotClick={(lotNum) => scrollToLot(lotNum)}
               />
-              <BidIncrementTable defaultOpen={false} />
+              <BidIncrementTable auctionId={id} defaultOpen={false} />
             </div>
 
             {/* View Mode Toggle + iter367 sort controls */}
@@ -1262,540 +1289,31 @@ const MultiItemListingDetailPage = () => {
                   case 'ending_soonest':
                   default:               return aEnd - bEnd;
                 }
-              }).map((lot) => {
-                // Calculate if this is a high-stakes lot (>$10,000 USD)
-                const lotIsHighStakes = isHighStakes(lot.current_price);
-                
-                return (
-                <Card 
-                  key={lot.lot_number} 
-                  ref={(el) => (lotRefs.current[lot.lot_number] = el)}
-                  className={`border-2 hover:border-primary transition-all cursor-pointer ${
-                    hasActiveBids(lot) ? 'border-amber-300 shadow-amber-100' : ''
-                  } ${activeLotId === lot.lot_number ? 'ring-2 ring-blue-500' : ''} ${
-                    lotIsHighStakes ? getHighStakesCardStyles(lot.current_price) : ''
-                  }`}
-                  onClick={() => {
-                    setActiveLotId(lot.lot_number);
-                    setSelectedLot(lot);
+              }).map((lot) => (
+                <CompactLotCard
+                  key={lot.lot_number}
+                  lot={lot}
+                  auctionId={id}
+                  listing={listing}
+                  currentUserId={user?.id}
+                  onOpenAutoBid={(l) => setAutoBidLot(l)}
+                  onBuyNow={(l) => handleBuyNow(l)}
+                  onNavigate={() => {
+                    // iter368 — snapshot grid state so returning restores it exactly.
+                    try {
+                      window.sessionStorage.setItem(
+                        `bidvex_grid_state:${id}`,
+                        JSON.stringify({
+                          scrollY: window.scrollY,
+                          lotSort,
+                          viewMode,
+                          descriptionExpanded,
+                        }),
+                      );
+                    } catch { /* ignore */ }
                   }}
-                  data-testid={`lot-card-${lot.lot_number}`}
-                >
-                  <CardContent className="pt-6">
-                    {/* High Stakes Timer - Shows for items over $10K */}
-                    {lotIsHighStakes && lot.lot_end_time && !auctionEnded && (
-                      <HighStakesTimer endDate={lot.lot_end_time} currentBidUSD={lot.current_price} />
-                    )}
-                    
-                    <div className={viewMode === 'grid' ? 'space-y-4' : 'flex gap-6'}>
-                      {/* Images */}
-                      {lot.images && lot.images.length > 0 && (
-                        <div className={viewMode === 'grid' ? 'w-full' : 'w-1/3 flex-shrink-0'}>
-                          <div className="grid grid-cols-2 gap-2">
-                            {lot.images.slice(0, 4).map((img, idx) => (
-                              <div 
-                                key={idx} 
-                                className="aspect-square rounded-lg overflow-hidden bg-gray-100 cursor-pointer hover:opacity-80 transition-opacity"
-                                onClick={() => openLightbox(lot.images, idx)}
-                              >
-                                <SafeImage 
-                                  src={img} 
-                                  alt={`${getLocalized(lot, 'title')} - ${idx + 1}`}
-                                  className="w-full h-full object-cover"
-                                />
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Lot Details */}
-                      <div className="flex-1">
-                        <div className="flex items-start justify-between mb-4">
-                          <div className="flex-1">
-                            <h3 className="text-xl font-bold mb-2">
-                              Lot #{lot.lot_number} - {getLocalized(lot, 'title')}
-                            </h3>
-                            <div className="flex gap-2 flex-wrap">
-                              <Badge variant="outline">
-                                Quantity: {lot.quantity}
-                              </Badge>
-                              <Badge variant="secondary">
-                                {lot.condition.replace('_', ' ').toUpperCase()}
-                              </Badge>
-                              {hasActiveBids(lot) && (
-                                <Badge variant="default" className="bg-amber-500 hover:bg-amber-600">
-                                  <Flame className="h-3 w-3 mr-1" />
-                                  Active Bidding
-                                </Badge>
-                              )}
-                              {/* High Stakes Badge */}
-                              {lotIsHighStakes && <HighStakesIndicator currentBidUSD={lot.current_price} />}
-                            </div>
-                          </div>
-                          
-                          {/* Share and Watch Buttons */}
-                          <div className="flex gap-2">
-                            <WatchlistButton 
-                              itemId={`${id}:${lot.lot_number}`}
-                              itemType="lot"
-                              size="default"
-                              showLabel={true}
-                            />
-                            <ShareButton 
-                              url={`${window.location.origin}/lots/${id}?lot=${lot.lot_number}`}
-                              title={`Lot #${lot.lot_number} - ${getLocalized(lot, 'title')}`}
-                              description={`${getLocalized(lot, 'description')} - Starting at $${lot.starting_price}`}
-                            />
-                          </div>
-                        </div>
-
-                        <p className="text-muted-foreground mb-4 line-clamp-2">{getLocalized(lot, 'description')}</p>
-
-                        {/* Simplified Price Display - Clean & Professional */}
-                        {(() => {
-                          // iter233 — Per-lot display multiplier. Renders a "Lot total"
-                          // tile + per-unit subtext when `price_multiplied_by_quantity`
-                          // is set on this lot AND quantity > 1.
-                          const lotDp = computeDisplayPrice({
-                            ...lot,
-                            current_bid: lot.current_price ?? lot.current_bid ?? null,
-                          });
-                          const lotIsFr = i18n.language?.startsWith('fr');
-                          if (lotDp.isMultiplied) {
-                            const startingTotal = (Number(lot.starting_price) || 0) * lotDp.quantity;
-                            return (
-                              <>
-                                <div className="grid grid-cols-2 gap-4 mb-2">
-                                  <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                                    <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">
-                                      {lotIsFr ? `Total de départ (× ${lotDp.quantity} unités)` : `Starting Total (× ${lotDp.quantity} units)`}
-                                    </p>
-                                    <p className="text-xl font-bold text-slate-900 dark:text-slate-100" data-testid={`lot-${lot.lot_number}-starting-total`}>
-                                      {formatCurrency(startingTotal)}
-                                    </p>
-                                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                                      ({formatCurrency(lot.starting_price)} {lotIsFr ? 'par unité' : 'per unit'})
-                                    </p>
-                                  </div>
-                                  <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-                                    <p className="text-xs text-green-700 dark:text-green-400 uppercase tracking-wide mb-1">
-                                      {lotIsFr ? `Offre totale (× ${lotDp.quantity} unités)` : `Total Bid (× ${lotDp.quantity} units)`}
-                                    </p>
-                                    <p className="text-xl font-bold text-green-600 dark:text-green-400" data-testid={`lot-${lot.lot_number}-display-price`}>
-                                      {formatCurrency(lotDp.totalPrice)}
-                                    </p>
-                                    <p className="text-[11px] text-green-700 dark:text-green-400 mt-0.5" data-testid={`lot-${lot.lot_number}-unit-price-subtext`}>
-                                      ({formatCurrency(lotDp.unitPrice)} {lotIsFr ? 'par unité' : 'per unit'})
-                                    </p>
-                                  </div>
-                                </div>
-                                <div className="mb-4 flex items-center gap-2" data-testid={`lot-${lot.lot_number}-multiplier-badge`}>
-                                  <Badge className="bg-amber-100 text-amber-800 border border-amber-300 hover:bg-amber-200 text-[10px] font-semibold uppercase tracking-wider">
-                                    {lotIsFr ? 'Prix lot × Qté' : 'Lot Price × Qty'}
-                                  </Badge>
-                                  <span className="text-xs text-slate-500">
-                                    {lotIsFr ? 'Vous enchérissez au prix unitaire.' : 'You bid the per-unit price.'}
-                                  </span>
-                                </div>
-                              </>
-                            );
-                          }
-                          return (
-                            <div className="grid grid-cols-2 gap-4 mb-4">
-                              <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                                <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">{t('listingDetail.openingBid', 'Opening Bid')}</p>
-                                <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{formatCurrency(lot.starting_price)}</p>
-                              </div>
-                              <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-                                <p className="text-xs text-green-700 dark:text-green-400 uppercase tracking-wide mb-1">{t('listingDetail.currentBid', 'Current Bid')}</p>
-                                <p className="text-xl font-bold text-green-600 dark:text-green-400">{formatCurrency(lot.current_price)}</p>
-                              </div>
-                            </div>
-                          );
-                        })()}
-
-                        {/* Fee Information - Expanded on Click */}
-                        <details className="mb-4">
-                          <summary className="cursor-pointer p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <DollarSign className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                                <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                                  {t('listingDetail.viewFeeBreakdown', 'View Fee Breakdown')}
-                                </span>
-                              </div>
-                              <span className="text-xs text-slate-500 dark:text-slate-400">{t('listingDetail.clickToExpand', 'Click to expand')}</span>
-                            </div>
-                          </summary>
-                          
-                          <div className="mt-2 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border space-y-3">
-                            {/* Tax Status — iter217: account-type aware */}
-                            <div className="flex items-center justify-between py-2 border-b border-slate-200 dark:border-slate-700">
-                              <span className="text-sm text-slate-700 dark:text-slate-300">{t('listingDetail.feeTaxStatus', 'Tax Status:')}</span>
-                              <span className="font-semibold text-slate-900 dark:text-slate-100 text-right">
-                                {(() => {
-                                  const acct = listing?.seller_account_type;
-                                  if (acct === 'vehicle_dealer') return t('listingDetail.feeTaxableLineDealer', 'Taxable (GST/QST or HST on full price)');
-                                  if (acct === 'partner' || acct === 'storage_facility' || listing?.seller_is_business) {
-                                    return t('listingDetail.feeTaxableLine', "Taxable (GST/QST on Buyer's Premium)");
-                                  }
-                                  return t('listingDetail.feeTaxFreeLine', 'Tax-Free (Private Sale)');
-                                })()}
-                              </span>
-                            </div>
-
-                            {/* Buyer's Premium — iter217: partner BP wins over buyer tier */}
-                            {(() => {
-                              const acct = listing?.seller_account_type;
-                              const listingBpFrac = (typeof listing?.buyer_premium_rate === 'number')
-                                ? listing.buyer_premium_rate
-                                : null;
-                              let ratePct = null;
-                              let hint = null;
-                              if (acct === 'partner' && listingBpFrac !== null) {
-                                ratePct = listingBpFrac * 100;
-                                hint = t('listingDetail.feeBuyerPremiumPartnerHint', 'Set by the auction host (Partner)');
-                              } else if (acct === 'vehicle_dealer') {
-                                ratePct = 2.5;
-                                hint = t('listingDetail.feeBuyerPremiumDealerHint', 'Vehicle Dealer — fixed 2.5% buyer fee');
-                              } else if (acct === 'storage_facility') {
-                                ratePct = listingBpFrac !== null ? listingBpFrac * 100 : 0;
-                                hint = t('listingDetail.feeBuyerPremiumStorageHint', 'Set by the facility — buyer never pays BidVex fees on storage auctions');
-                              } else {
-                                const premium = getBuyerPremiumText(
-                                  user?.subscription_tier || 'free',
-                                  listing?.custom_buyer_premium_rate
-                                );
-                                ratePct = premium.rate;
-                                hint = premium.text;
-                              }
-                              return (
-                                <div className="flex items-center justify-between py-2 border-b border-slate-200 dark:border-slate-700">
-                                  <span className="text-sm text-slate-700 dark:text-slate-300">
-                                    {t('listingDetail.feeBuyerPremiumLabel', "Buyer's Premium:")}
-                                  </span>
-                                  <div className="text-right max-w-[60%]">
-                                    <span className="font-bold text-blue-700 dark:text-blue-300" data-testid="fee-buyer-premium-rate">{ratePct}%</span>
-                                    {hint && <p className="text-xs text-slate-500 dark:text-slate-400">{hint}</p>}
-                                  </div>
-                                </div>
-                              );
-                            })()}
-
-                            {/* Estimated Total */}
-                            {(() => {
-                              const acct = listing?.seller_account_type;
-                              const listingBpFrac = (typeof listing?.buyer_premium_rate === 'number') ? listing.buyer_premium_rate : null;
-                              let ratePct;
-                              if (acct === 'partner' && listingBpFrac !== null) ratePct = listingBpFrac * 100;
-                              else if (acct === 'vehicle_dealer') ratePct = 2.5;
-                              else if (acct === 'storage_facility') ratePct = listingBpFrac !== null ? listingBpFrac * 100 : 0;
-                              else {
-                                const premium = getBuyerPremiumText(
-                                  user?.subscription_tier || 'free',
-                                  listing?.custom_buyer_premium_rate
-                                );
-                                ratePct = premium.rate;
-                              }
-                              const multiplier = 1 + (ratePct / 100);
-                              return (
-                                <div className="flex items-center justify-between py-2 bg-blue-100 dark:bg-blue-900/30 -mx-4 px-4 rounded">
-                                  <span className="text-sm font-semibold text-blue-900 dark:text-blue-100">
-                                    {t('listingDetail.feeEstimatedTotal', 'Est. Total Out-of-Pocket:')}
-                                  </span>
-                                  <span className="text-lg font-bold text-blue-700 dark:text-blue-300" data-testid="fee-estimated-total">
-                                    {formatCurrency(lot.current_price * multiplier)}
-                                  </span>
-                                </div>
-                              );
-                            })()}
-                          </div>
-                        </details>
-
-                        {/* Lot Countdown Timer */}
-                        {lot.lot_end_time && !auctionEnded && (
-                          <div className={`border rounded-lg p-3 mb-4 ${
-                            new Date(lot.lot_end_time) - new Date() < 3600000 && new Date(lot.lot_end_time) > new Date()
-                              ? 'bg-red-50 dark:bg-red-950 border-red-300 dark:border-red-800'
-                              : 'bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800'
-                          }`}>
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                {new Date(lot.lot_end_time) - new Date() < 3600000 && new Date(lot.lot_end_time) > new Date() ? (
-                                  <>
-                                    <Flame className="h-5 w-5 text-red-600 dark:text-red-400 animate-pulse" />
-                                    <span className="text-sm font-bold text-red-700 dark:text-red-300">
-                                      {t('marketplace.endingSoon')}
-                                    </span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                                    <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                                      {t('auction.thisLotEndsIn', 'This lot ends in:')}
-                                    </span>
-                                  </>
-                                )}
-                              </div>
-                              <div className={`text-lg font-bold ${
-                                new Date(lot.lot_end_time) - new Date() < 3600000 && new Date(lot.lot_end_time) > new Date()
-                                  ? 'text-red-600 dark:text-red-400'
-                                  : 'text-blue-600 dark:text-blue-400'
-                              }`}>
-                                <Countdown 
-                                  date={new Date(lot.lot_end_time)}
-                                  renderer={({ days, hours, minutes, seconds, completed }) => {
-                                    if (completed) {
-                                      return <span className="text-red-600">{t('marketplace.timeEnded', 'Ended')}</span>;
-                                    }
-                                    return (
-                                      <span>
-                                        {days > 0 && `${days}d `}
-                                        {hours}h {minutes}m {seconds}s
-                                      </span>
-                                    );
-                                  }}
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Buy Now Section */}
-                        {lot.buy_now_enabled && lot.buy_now_price && lot.lot_status !== 'sold_out' && !auctionEnded && (
-                          <div className="bg-gradient-to-r from-[#06B6D4]/10 to-[#1E3A8A]/10 border-2 border-[#06B6D4] rounded-lg p-4 mb-4">
-                            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                              <div className="flex items-center gap-3 min-w-0">
-                                <div className="w-10 h-10 rounded-full bg-[#06B6D4] flex items-center justify-center shrink-0">
-                                  <Zap className="h-5 w-5 text-white" />
-                                </div>
-                                <div className="min-w-0">
-                                  <p className="text-sm font-medium text-[#06B6D4]">⚡ {t('bid.buyNowAvailable', 'Buy Now Available')}</p>
-                                  <p className="text-2xl font-bold text-[#1E3A8A] dark:text-white">
-                                    {formatCurrency(lot.buy_now_price)}
-                                  </p>
-                                  {lot.available_quantity && lot.available_quantity < lot.quantity && (
-                                    <p className="text-xs text-amber-600">
-                                      Only {lot.available_quantity} left!
-                                    </p>
-                                  )}
-                                </div>
-                              </div>
-                              <Button
-                                onClick={() => handleBuyNow(lot)}
-                                disabled={buyNowLoading[lot.lot_number] || lot.lot_status === 'sold_out'}
-                                className="bg-gradient-to-r from-[#06B6D4] to-[#1E3A8A] hover:opacity-90 text-white px-5 py-3 h-auto w-full sm:w-auto text-sm whitespace-nowrap shrink-0"
-                              >
-                                {buyNowLoading[lot.lot_number] ? (
-                                  <>
-                                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                                    {t('common.processing', 'Processing...')}
-                                  </>
-                                ) : (
-                                  <>
-                                    <ShoppingCart className="h-5 w-5 mr-1.5" />
-                                    {t('bid.buyNow', 'Buy Now')}
-                                  </>
-                                )}
-                              </Button>
-                            </div>
-                            <p className="text-xs text-muted-foreground mt-2">
-                              {t('bid.buyNowSkip', 'Skip the bidding - purchase instantly at the fixed price')}
-                            </p>
-                          </div>
-                        )}
-
-                        {/* Sold Out Badge */}
-                        {lot.lot_status === 'sold_out' && (
-                          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-4 text-center">
-                            <Badge variant="destructive" className="text-lg px-4 py-1">
-                              SOLD OUT
-                            </Badge>
-                            <p className="text-sm text-red-600 dark:text-red-400 mt-2">
-                              This item has been purchased via Buy Now
-                            </p>
-                          </div>
-                        )}
-
-                        {/* Bidding Section */}
-                        {isPreviewMode && (
-                          <div className="bg-amber-50 dark:bg-amber-950 border border-amber-300 rounded-lg p-4 text-center mt-4">
-                            <Clock className="h-6 w-6 mx-auto text-amber-600 dark:text-amber-400 mb-2" />
-                            <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">
-                              Bidding opens in{' '}
-                              {auctionStartDate && (
-                                <Countdown 
-                                  date={auctionStartDate}
-                                  renderer={({ days, hours, minutes, completed }) => (
-                                    <span>{completed ? 'moments' : `${days}d ${hours}h ${minutes}m`}</span>
-                                  )}
-                                />
-                              )}
-                            </p>
-                            <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
-                              You can preview details and favorite this auction now
-                            </p>
-                          </div>
-                        )}
-
-                        {!isPreviewMode && !auctionEnded && (
-                          <div className="space-y-3 mt-4">
-                            {/* iter233 — Display-only "Lot price × Quantity" info callout.
-                                Renders only when this lot's price_multiplied_by_quantity flag is set AND quantity > 1. */}
-                            {(() => {
-                              const calloutDp = computeDisplayPrice({
-                                ...lot,
-                                current_bid: lot.current_price ?? lot.current_bid ?? null,
-                              });
-                              if (!calloutDp.isMultiplied) return null;
-                              const calloutFr = i18n.language?.startsWith('fr');
-                              return (
-                                <div
-                                  className="flex items-start gap-2 p-3 border border-blue-300 bg-blue-50 rounded-md text-xs leading-relaxed"
-                                  style={{ borderRadius: 6 }}
-                                  data-testid={`lot-${lot.lot_number}-price-multiplier-callout`}
-                                >
-                                  <Info className="h-4 w-4 mt-0.5 flex-shrink-0 text-blue-600" />
-                                  <p className="text-blue-900">
-                                    {calloutFr ? (
-                                      <>
-                                        Ce lot contient <strong>{calloutDp.quantity} unités</strong>. La valeur totale affichée
-                                        reflète l'offre actuelle multipliée par la quantité ({formatCurrency(calloutDp.unitPrice)} × {calloutDp.quantity}).
-                                        Vous enchérissez au prix unitaire.
-                                      </>
-                                    ) : (
-                                      <>
-                                        This lot contains <strong>{calloutDp.quantity} units</strong>. The total lot value shown
-                                        reflects the current bid multiplied by the quantity ({formatCurrency(calloutDp.unitPrice)} × {calloutDp.quantity}).
-                                        You are bidding the per-unit price.
-                                      </>
-                                    )}
-                                  </p>
-                                </div>
-                              );
-                            })()}
-
-                            {/* iter217 — Deposit notice (i18n-conditional rendering, no raw EN:/FR:) */}
-                            {listing.requires_deposit && listing.deposit_amount > 0 ? (
-                              <div className="p-3 bg-amber-50 border border-amber-300 rounded-md text-xs leading-relaxed" data-testid="multi-bid-deposit-required-notice">
-                                <p className="font-semibold text-amber-900 mb-1">⚠️ {t('listingDetail.depositRequired', 'Deposit required')}</p>
-                                <p className="text-amber-800">
-                                  {t('listingDetail.depositRequiredFull', {
-                                    amount: listing.deposit_type === 'percentage'
-                                      ? t('listingDetail.depositOfPercentage', { pct: listing.deposit_amount })
-                                      : t('listingDetail.depositOfFixed', { amount: Number(listing.deposit_amount).toFixed(2), currency: listing.currency || 'CAD' }),
-                                    defaultValue: 'A deposit of {{amount}} is required to bid on this auction. It is charged to your card immediately on your first bid; refunded automatically if you do not win; credited toward your total if you win.',
-                                  })}
-                                </p>
-                              </div>
-                            ) : (
-                              <div className="text-xs text-slate-500 px-1" data-testid="multi-bid-no-deposit-notice">
-                                {t('listingDetail.noDepositRequired', 'No deposit is required to bid on this auction.')}
-                              </div>
-                            )}
-                            {/* Payment method notice */}
-                            {(listing.payment_method === 'cash' || listing.payment_method === 'e-transfer') ? (
-                              <div className="p-3 bg-purple-50 border border-purple-200 rounded-md text-xs leading-relaxed" data-testid="multi-bid-cash-payment-notice">
-                                <p className="text-purple-900">
-                                  {t('listingDetail.paymentMethodCashCopy', {
-                                    method: listing.payment_method === 'cash' ? t('listingDetail.paymentMethodCash', 'Cash') : t('listingDetail.paymentMethodETransfer', 'E-Transfer'),
-                                    currency: listing.currency || 'CAD',
-                                    defaultValue: 'This seller collects payment via {{method}} directly. BidVex will only charge your saved card our buyer commission fee in {{currency}}.',
-                                  })}
-                                </p>
-                              </div>
-                            ) : (
-                              <div className="p-3 bg-blue-50 border border-blue-200 rounded-md text-xs leading-relaxed" data-testid="multi-bid-stripe-payment-notice">
-                                <p className="text-blue-900">
-                                  {t('listingDetail.paymentMethodStripeCopy', {
-                                    currency: listing.currency || 'CAD',
-                                    defaultValue: 'This seller uses BidVex Stripe checkout. Any deposit you already paid will be deducted from your winning total in {{currency}}.',
-                                  })}
-                                </p>
-                              </div>
-                            )}
-
-                            {/* Increment Info */}
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground bg-blue-50 dark:bg-blue-900/20 px-3 py-2 rounded-md">
-                              <Info className="h-3 w-3" />
-                              <span>
-                                {t('listingDetail.minimumIncrement', { amount: formatCurrency(getMinimumIncrement(lot.current_price)), defaultValue: 'Minimum increment: {{amount}}' })}
-                                {incrementInfo && ` (${incrementInfo.increment_option === 'tiered'
-                                  ? t('listingDetail.tieredSchedule', 'Tiered schedule')
-                                  : t('listingDetail.simplifiedSchedule', 'Simplified schedule')})`}
-                              </span>
-                            </div>
-
-                            {/* Standard Bid Input */}
-                            <div className="flex flex-col gap-2">
-                              <input
-                                type="number"
-                                step="0.01"
-                                min={lot.current_price + getMinimumIncrement(lot.current_price)}
-                                placeholder={`Min: ${formatCurrency(lot.current_price + getMinimumIncrement(lot.current_price))}`}
-                                value={bidAmounts[lot.lot_number] || ''}
-                                onChange={(e) => handleBidChange(lot.lot_number, e.target.value)}
-                                className="w-full px-4 py-3 border border-input rounded-md bg-background min-h-[48px] text-base"
-                                disabled={(listing.auction_terms_en || listing.auction_terms_fr) && !agreedToTerms}
-                                data-testid="bid-amount-input"
-                              />
-                              <Button 
-                                onClick={() => handlePlaceBid(lot.lot_number, 'normal')}
-                                className="gradient-button text-white border-0 min-h-[48px] w-full text-sm whitespace-nowrap"
-                                disabled={(listing.auction_terms_en || listing.auction_terms_fr) && !agreedToTerms}
-                                title={!agreedToTerms && (listing.auction_terms_en || listing.auction_terms_fr) ? t('auction.mustAgreeToTermsFirst', 'Please agree to terms & conditions first') : ''}
-                                style={i18n.language === 'fr' ? { letterSpacing: '-0.02em' } : {}}
-                                data-testid="place-bid-btn"
-                              >
-                                <Gavel className="mr-1.5 h-4 w-4 shrink-0" />
-                                <span className="sm:hidden">{t('bid.placeBidCompact', 'Bid')}</span>
-                                <span className="hidden sm:inline">{t('bid.placeBid', 'Place Bid')}</span>
-                              </Button>
-                            </div>
-                            {!agreedToTerms && (listing.auction_terms_en || listing.auction_terms_fr) && (
-                              <div className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950 px-3 py-2 rounded-md">
-                                <Info className="h-3 w-3" />
-                                <span>{t('auction.agreeToTermsToPlaceBid', 'Please scroll up and agree to the Terms & Conditions to place a bid')}</span>
-                              </div>
-                            )}
-
-                            {/* Bid Error Guide */}
-                            <div className="mt-2">
-                              <BidErrorGuide compact={true} />
-                            </div>
-
-                            {/* Premium Bidding Options */}
-                            {user && (
-                              <div className="flex flex-wrap gap-2 items-center">
-                                <AutoBidModal
-                                  listingId={lot.id}
-                                  currentBid={lot.current_price}
-                                  minimumIncrement={getMinimumIncrement(lot.current_price)}
-                                  onAutoBidSetup={() => {
-                                    fetchListing();
-                                  }}
-                                />
-                                {user.subscription_tier && (
-                                  <SubscriptionBadge tier={user.subscription_tier} size="small" />
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {auctionEnded && !isPreviewMode && (
-                          <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4 text-center">
-                            <AlertCircle className="h-6 w-6 mx-auto text-muted-foreground mb-2" />
-                            <p className="text-sm text-muted-foreground">{t('bid.biddingEnded', 'Bidding has ended for this lot')}</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-              })}
+                />
+              ))}
             </div>
 
             {/* Location Info */}

@@ -61,6 +61,7 @@ const ProfileSettingsPage = lazy(() => import('./pages/ProfileSettingsPage'));
 const VerificationPage = lazy(() => import('./pages/VerificationPage'));
 const AffiliateDashboard = lazy(() => import('./pages/AffiliateDashboard'));
 const AffiliateProgramPage = lazy(() => import('./pages/AffiliateProgramPage'));
+const LotDetailPage = lazy(() => import('./pages/LotDetailPage'));
 const MessagesPage = lazy(() => import('./pages/MessagesPage'));
 const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
 const CreateMultiItemListing = lazy(() => import('./pages/CreateMultiItemListing'));
@@ -617,6 +618,10 @@ const App = () => {
 
           <Route path="/lots" element={<ErrorBoundary scope="lots"><LotsMarketplacePage /></ErrorBoundary>} />
           <Route path="/lots/:id" element={<ErrorBoundary scope="lot-detail"><MultiItemListingDetailPage /></ErrorBoundary>} />
+          {/* iter368 — Dedicated per-lot detail page (Previous/Next nav + full details). */}
+          <Route path="/lots/:auctionId/lot/:lotNumber" element={<ErrorBoundary scope="lot-detail-single"><LotDetailPage /></ErrorBoundary>} />
+          <Route path="/en/lots/:auctionId/lot/:lotNumber" element={<ErrorBoundary scope="lot-detail-single"><LotDetailPage /></ErrorBoundary>} />
+          <Route path="/fr/lots/:auctionId/lot/:lotNumber" element={<ErrorBoundary scope="lot-detail-single"><LotDetailPage /></ErrorBoundary>} />
           <Route path="/listing/:id" element={<ErrorBoundary scope="listing-detail"><ListingDetailPage /></ErrorBoundary>} />
           {/* iter364 — Route removed: replaced by /compare in the language-agnostic
               route block below, which uses the new ComparePage + CompareContext. */}

@@ -114,14 +114,19 @@ def test_recent_activity_endpoint_exists():
     assert "time_ago" in src
 
 
-# ----- 7. Bid increment table -----
+# ----- 7. Bid increment table (iter368 — now dynamic, backed by
+#            /api/multi-item-listings/{id}/increment-info) -----
 
 def test_bid_increment_table_component_exists():
     src = read("frontend/src/components/BidIncrementTable.jsx")
-    assert "INCREMENTS" in src
-    # 10 tiers
-    assert src.count("step:") == 10
+    # iter368 rewrite: no hardcoded INCREMENTS array; fetches from server.
+    assert "INCREMENTS" not in src, "iter368 removed the hardcoded INCREMENTS ladder"
+    assert "increment-info" in src, "BidIncrementTable must fetch schedule from the server"
+    assert "auctionId" in src, "Component must accept the auctionId prop"
     assert 'data-testid="bid-increment-table"' in src
+    assert 'data-testid="bid-increment-strategy"' in src
+    # Fixed mode branch must exist for sellers who pick that strategy.
+    assert 'data-testid="bid-increment-fixed"' in src
 
 
 # ----- 8. Affiliate program + footer link + route + urlMap -----

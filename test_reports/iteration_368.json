@@ -1,0 +1,58 @@
+{
+  "summary": "iter368 launch-gate + live tests. 14/14 static launch-gate tests pass, 10/11 live HTTP tests pass (1 xfail documenting a BACKEND LADDER DRIFT bug). Frontend UI validated: multi-lot page renders 20 CompactLotCards (~348px height), Bid Increment Table dynamically shows 'TIERED SCHEDULE' with 8 tier rows, no 'Starting Bid'/'Opening Bid' text anywhere, LotDetailPage exposes ALL required testids (title, current-bid, next-bid, quick-bid-0..2, bid-input, place-bid, buy-now, auto-bid, prev/next, back-to-grid, bid-history, actions, seller, description), prev/next button navigation + keyboard ArrowLeft/ArrowRight both work, sessionStorage 'bidvex_grid_state:{id}' snapshot is written correctly on card click, Affiliate Center page shows correct '3% of BidVex's net platform profit — for life.' wording with 30-day cookie + zero '10%'/'12 months' occurrences, Affiliate Dashboard renders period-metrics (this-month/last-month/lifetime/projected) + 21 referral status badges with data-status attributes. Regression: Compare buttons intact on marketplace, footer affiliate link href=/en/affiliate-program. TWO P0 BUGS FOUND — see backend_issues.critical.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "GET /api/multi-item-listings/{id}/next-bid",
+        "issue": "LADDER DRIFT — /next-bid imports get_minimum_increment from shared.py (12-tier ladder using field `increment_type`) but /increment-info imports get_minimum_increment_tiered from utils.py (8-tier ladder using field `increment_option`). Spec explicitly names utils.py as the SINGLE SOURCE OF TRUTH. At current=$50 tiered, /next-bid returns step=$2.50 with suggestions=[52.5, 55, 57.5]; utils.py says step=$5 for the $0-$99.99 tier displayed in the Bid Increment Table. Same drift at current=$100 ($5 vs $10). This means Quick Bid pills DISAGREE with the Bid Increment Table shown to the buyer — buyer sees +$5 promised but the pill jumps by +$2.50. Fix: change routes/misc.py line 16 to import `get_minimum_increment` from `utils` (or delete shared.py's copy and re-import). Test confirms the drift via xfail marker in /app/backend/tests/test_iter368_live.py::test_next_bid_ladder_drift_bug_documented.",
+        "priority": "CRITICAL"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "MultiItemListingDetailPage.fetchListing scroll-restore branch",
+        "issue": "Scroll NOT restored on grid return. When 'Back to grid' navigates to /lots/{id}?lot=N, the URL carries ?lot=N which triggers the scrollIntoView(target) branch (priority 1) INSTEAD of the sessionStorage scrollY restore branch (priority 2). Result: window.scrollY resets to 0. Spec explicitly requires 'window.scrollY should be near 800 (within 100px)' AND sort='most_bids' both preserved simultaneously. Currently only sort is restored (from savedState.lotSort setter above). File: /app/frontend/src/pages/MultiItemListingDetailPage.js lines 231-257. Recommended fix: when savedState.scrollY exists AND targetLotNum matches savedState-implied lot, prefer scrollY over scrollIntoView; OR add a check to skip scrollIntoView when a savedState snapshot is being consumed.",
+        "selector": "[data-testid=lot-detail-back-to-grid]",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter368_launch_gate.py",
+    "/app/backend/tests/test_iter368_live.py",
+    "/app/test_reports/pytest/iter368_live.xml"
+  ],
+  "action_items": [
+    "P0 (CRITICAL) — Fix backend ladder drift: routes/misc.py imports get_minimum_increment from shared.py (12-tier ladder). Change to import from utils.py so /next-bid + /increment-info use the same source. Simplest patch: replace `get_minimum_increment,` in line 16 of routes/misc.py with an explicit `from utils import get_minimum_increment` right above the next-bid handler, or replace shared.py's copies of get_minimum_increment_* with re-exports from utils.py.",
+    "P0 (HIGH) — Fix scroll restoration in MultiItemListingDetailPage: when back-to-grid returns to /lots/{id}?lot=N with a fresh sessionStorage snapshot, prefer scrollY restoration over scrollIntoView. One approach: only take the scrollIntoView branch when NO savedState exists.",
+    "P2 (nice-to-have) — verify referrals-list testid works on live after hot reload (already added by testing agent)."
+  ],
+  "critical_code_review_comments": [
+    "DUPLICATE SOURCE OF TRUTH — /app/backend/utils.py AND /app/backend/shared.py both define get_minimum_increment_tiered / get_minimum_increment_simplified / get_minimum_increment with DIFFERENT ladders. shared.py has a 12-tier ladder (`<50→1, <100→2.5, <250→5, <500→10, ...`), utils.py has an 8-tier ladder (`<100→5, <500→10, ...`). Also field names disagree: shared uses `increment_type` (auto_tiered / auto_simplified / fixed), utils uses `increment_option` (tiered / simplified / fixed). Recommend: delete shared.py duplicates and re-export from utils.py.",
+    "misc.py line 16 imports get_minimum_increment from `shared` — should be `utils`. This is the root cause of the ladder drift bug hitting Quick Bid pills.",
+    "MultiItemListingDetailPage.js scroll priority chain misses the (?lot=N + savedState) combo case. When user clicks a lot card, snapshot is written with the current sort/scrollY; on return we come back with ?lot=N which shadows the savedState.scrollY branch.",
+    "AffiliateDashboard.js — the referrals card was missing data-testid='referrals-list' (added by testing agent as a fix-in-scope). Also, all 21 seed referrals show status='pending' — no approved/rejected data available to visually confirm the badge variants, though the code branch logic is correct.",
+    "iter367 endpoints preserved (recent-activity, escrow/seller/status, buyer dashboard won>0, admin unsubscribe guard 403) — regression clean."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter368_live.py (NEW — 11 live HTTP tests: increment-info shape+tiers, next-bid @$250/$1500, ladder-drift xfail exposé at $50, recent-activity smoke, escrow union 3 holds, buyer dashboard won>0, admin unsubscribe 403, listing detail load with 20 lots)",
+    "/app/frontend/src/pages/AffiliateDashboard.js (added missing data-testid='referrals-list' on the referrals Card — testability fix within scope)"
+  ],
+  "success_rate": {
+    "backend": "96% (24/25 executable: 14/14 static launch-gate + 10/11 live; 1 xfail documenting ladder-drift bug)",
+    "frontend": "88% (7/8 spec areas fully pass: compact card grid, no starting bid text, dynamic tiered table, LotDetailPage all testids, prev/next+keyboard nav, affiliate page copy, affiliate dashboard period metrics + status badges; 1 fails: scroll restoration returns scrollY=0 instead of ~800)"
+  },
+  "test_credentials": {
+    "super_admin": "charbel911@gmail.com / Anderosli123!@# — working (used for buyer dashboard, escrow, admin unsubscribe, and affiliate dashboard tests)"
+  },
+  "seed_data_creation": "None — used the existing multi-item listing 179b62b9-fa28-4140-b36d-f5903b033f48 (20 lots, tiered increment_option) and the existing admin's referral history (21 pending referrals).",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "iter368 delivered 3 of 4 P0 items cleanly (compact card, LotDetailPage, affiliate page copy) plus most P1 items. TWO real bugs remain: (a) Backend ladder drift — /next-bid uses shared.py's ladder ($2.50 at $50) while /increment-info uses utils.py's ladder ($5 at $50). This is the SINGLE SOURCE OF TRUTH violation the review request explicitly warned about. Reproduce: `curl {BASE_URL}/api/multi-item-listings/179b62b9-fa28-4140-b36d-f5903b033f48/next-bid?current=50` returns increment=2.5 but the Bid Increment Table on /lots/179b62b9-fa28-4140-b36d-f5903b033f48 shows +$5 for the $0-$99.99 tier. (b) Scroll restoration — sessionStorage snapshot IS written correctly ({\"scrollY\":800,\"lotSort\":\"most_bids\",\"viewMode\":\"grid\"}) but on grid return the scrollIntoView branch wins because ?lot=N is present in the URL. Sort restore works, scroll doesn't. To retest after fix: run `pytest backend/tests/test_iter368_launch_gate.py backend/tests/test_iter368_live.py -v` (expect the xfail to flip to xpass or move it back to a normal assert), then re-run the frontend scroll test in this file. All other iter367 regressions confirmed intact.",
+  "rca of the issue": "Ladder drift RCA: routes/misc.py imports `get_minimum_increment` from shared.py (line 16 of the imports block) while the /increment-info handler imports the tiered/simplified builders from utils.py (line 940, inside the function). shared.py has its own get_minimum_increment_tiered with a 12-tier ladder (added independently of utils.py). Fix: change misc.py's `get_minimum_increment` import to come from utils; ideally delete shared.py's copy and re-export from utils. Scroll restore RCA: fetchListing sees `targetLotNum != null` (from ?lot=1 in the back-to-grid URL) and takes the scrollIntoView branch on line 246-250. The scrollY restore branch (line 251-257) is `else if`, so it never fires. The savedState IS consumed on the lotSort/viewMode setters above, but the scrollY portion is silently ignored. Fix: reverse priority — if savedState.scrollY exists, use it; only fall back to scrollIntoView when no snapshot."
+}

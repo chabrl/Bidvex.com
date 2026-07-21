@@ -201,6 +201,41 @@ const AffiliateDashboard = () => {
         {/* iter339 — Earnings widget + activity feed */}
         <AffiliateEarningsWidget />
 
+        {/* iter368 — Period metrics (This Month / Last Month / Lifetime / Projected) */}
+        {(() => {
+          const history = (stats?.earnings_history || []);
+          const now = new Date();
+          const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+          const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+          const lastMonthEnd = thisMonth;
+          const asDate = (v) => { try { return new Date(v); } catch { return null; } };
+          const inRange = (d, from, to) => d && d >= from && d < to;
+          const sum = (arr) => arr.reduce((s, e) => s + Number(e.commission_amount || 0), 0);
+          const thisMonthSum = sum(history.filter((e) => inRange(asDate(e.created_at), thisMonth, new Date(now.getFullYear(), now.getMonth() + 1, 1))));
+          const lastMonthSum = sum(history.filter((e) => inRange(asDate(e.created_at), lastMonthStart, lastMonthEnd)));
+          // Projection: last 30d earnings extrapolated to full month = simple average
+          const last30 = sum(history.filter((e) => {
+            const d = asDate(e.created_at); return d && (now - d) / (1000 * 60 * 60 * 24) <= 30;
+          }));
+          const projected = Math.round(last30 * (30 / Math.max(1, Math.min(30, now.getDate())))) || 0;
+          const lifetime = Number(stats?.total_earnings || 0);
+          return (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" data-testid="affiliate-period-metrics">
+              {[
+                { label: isFrench ? 'Ce mois' : 'This Month', val: thisMonthSum, key: 'this-month' },
+                { label: isFrench ? 'Mois dernier' : 'Last Month', val: lastMonthSum, key: 'last-month' },
+                { label: isFrench ? 'À vie' : 'Lifetime', val: lifetime, key: 'lifetime' },
+                { label: isFrench ? 'Projeté (mois suivant)' : 'Projected Next Month', val: projected, key: 'projected' },
+              ].map((row) => (
+                <div key={row.key} className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 p-4" data-testid={`period-metric-${row.key}`}>
+                  <div className="text-[10px] uppercase tracking-wide text-slate-500 dark:text-slate-400 font-semibold">{row.label}</div>
+                  <div className="text-xl font-bold text-slate-900 dark:text-white mt-1 font-mono">{formatCurrency(row.val)}</div>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
+
         {/* Metrics */}
         <div className="grid sm:grid-cols-4 gap-4">
           <Card className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950 border-green-200 dark:border-green-800">
@@ -296,7 +331,7 @@ const AffiliateDashboard = () => {
 
         {/* Referrals Table */}
         {stats?.referrals?.length > 0 && (
-          <Card>
+          <Card data-testid="referrals-list">
             <CardHeader className="pb-3">
               <CardTitle className="text-lg">{isFrench ? 'Vos références' : 'Your Referrals'}</CardTitle>
             </CardHeader>
@@ -311,19 +346,28 @@ const AffiliateDashboard = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {stats.referrals.map((ref, i) => (
-                      <tr key={ref.id || i} className="border-b last:border-0">
-                        <td className="py-3 font-mono text-xs">{ref.referred_email ? `${ref.referred_email.slice(0, 3)}***` : '—'}</td>
-                        <td className="py-3 text-muted-foreground">{ref.created_at ? new Date(ref.created_at).toLocaleDateString() : '—'}</td>
-                        <td className="py-3">
-                          <Badge variant={ref.status === 'converted' ? 'default' : 'secondary'} data-testid={`referral-status-${i}`}>
-                            {ref.status === 'converted'
-                              ? (isFrench ? 'Converti' : 'Converted')
-                              : (isFrench ? 'En attente' : 'Pending')}
-                          </Badge>
-                        </td>
-                      </tr>
-                    ))}
+                    {stats.referrals.map((ref, i) => {
+                      // iter368 — Status label matches spec: pending / approved / rejected (converted maps to approved).
+                      const raw = (ref.status || 'pending').toLowerCase();
+                      const statusKey = raw === 'converted' ? 'approved' : (['approved', 'rejected', 'pending'].includes(raw) ? raw : 'pending');
+                      const statusLabel = {
+                        approved: isFrench ? 'Approuvé' : 'Approved',
+                        rejected: isFrench ? 'Rejeté' : 'Rejected',
+                        pending:  isFrench ? 'En attente' : 'Pending',
+                      }[statusKey];
+                      const badgeVariant = statusKey === 'approved' ? 'default' : (statusKey === 'rejected' ? 'destructive' : 'secondary');
+                      return (
+                        <tr key={ref.id || i} className="border-b last:border-0">
+                          <td className="py-3 font-mono text-xs">{ref.referred_email ? `${ref.referred_email.slice(0, 3)}***` : '—'}</td>
+                          <td className="py-3 text-muted-foreground">{ref.created_at ? new Date(ref.created_at).toLocaleDateString() : '—'}</td>
+                          <td className="py-3">
+                            <Badge variant={badgeVariant} data-testid={`referral-status-${i}`} data-status={statusKey}>
+                              {statusLabel}
+                            </Badge>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

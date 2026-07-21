@@ -920,43 +920,125 @@ async def review_currency_appeal(
 
 @misc_router.get("/multi-item-listings/{listing_id}/increment-info")
 async def get_increment_info(listing_id: str):
-    """Get increment information for an auction"""
-    db = get_db()
-    try:
-        listing = await db.multi_item_listings.find_one({"id": listing_id})
-        if not listing:
-            raise HTTPException(status_code=404, detail="Listing not found")
-        
-        increment_option = listing.get("increment_option", "tiered")
-        
-        # Get increment schedule
-        if increment_option == "simplified":
-            schedule = [
-                {"range": "$0-$100", "increment": "$1"},
-                {"range": "$100-$1,000", "increment": "$5"},
-                {"range": "$1,000-$10,000", "increment": "$25"},
-                {"range": "$10,000+", "increment": "$100"}
-            ]
-        else:
-            schedule = [
-                {"range": "$0-$99.99", "increment": "$5"},
-                {"range": "$100-$499.99", "increment": "$10"},
-                {"range": "$500-$999.99", "increment": "$25"},
-                {"range": "$1,000-$4,999.99", "increment": "$50"},
-                {"range": "$5,000-$9,999.99", "increment": "$100"},
-                {"range": "$10,000-$49,999.99", "increment": "$250"},
-                {"range": "$50,000-$99,999.99", "increment": "$500"},
-                {"range": "$100,000+", "increment": "$1,000"}
-            ]
-        
-        return {
-            "increment_option": increment_option,
-            "schedule": schedule
+    """iter368 — Dynamic bid-increment schedule for a multi-lot auction.
+
+    Returns the schedule the SELLER chose during creation (`increment_option`
+    stored on the auction doc). Values are derived from the single-source-of-
+    truth calculators in `utils.py` so we never drift between the ladder used
+    by the bidding engine and the ladder we render to buyers.
+
+    Response shape:
+        {
+          "increment_option": "tiered" | "simplified" | "fixed",
+          "fixed_increment": <float>|null,       # only for "fixed"
+          "schedule": [
+              {"min": <float>, "max": <float>|null, "step": <float>,
+               "range_label": "$100 – $499.99", "increment_label": "+$10"}
+          ],
         }
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    """
+    from utils import get_minimum_increment_tiered, get_minimum_increment_simplified
+    db = get_db()
+    listing = await db.multi_item_listings.find_one({"id": listing_id})
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+
+    def _fmt(v: float) -> str:
+        if v is None:
+            return "∞"
+        # integers → no decimals, floats → 2dp
+        if abs(v - round(v)) < 0.001:
+            return f"${int(round(v)):,}"
+        return f"${v:,.2f}"
+
+    increment_option = (listing.get("increment_option") or "tiered").lower()
+
+    # Optional "fixed" mode — seller specified a flat increment at the
+    # auction level (`auction_bid_increment`) OR every lot shares the same
+    # `bid_increment`. When present, the whole ladder collapses to one step.
+    fixed_increment = None
+    auction_fixed = listing.get("auction_bid_increment") or listing.get("bid_increment")
+    if increment_option == "fixed" or auction_fixed:
+        fixed_increment = float(auction_fixed) if auction_fixed else None
+        # If the auction says fixed but no value stored, fall back to tiered ladder.
+        if fixed_increment and fixed_increment > 0:
+            return {
+                "increment_option": "fixed",
+                "fixed_increment": fixed_increment,
+                "schedule": [{
+                    "min": 0.0, "max": None, "step": fixed_increment,
+                    "range_label": _fmt(0) + " +",
+                    "increment_label": "+" + _fmt(fixed_increment),
+                }],
+            }
+
+    # Tiered / Simplified — derive from the same calculators the engine uses.
+    if increment_option == "simplified":
+        # 4 tiers per get_minimum_increment_simplified()
+        boundaries = [(0, 100), (100, 1000), (1000, 10000), (10000, None)]
+    else:
+        # 8 tiers per get_minimum_increment_tiered()
+        boundaries = [
+            (0, 100), (100, 500), (500, 1000), (1000, 5000),
+            (5000, 10000), (10000, 50000), (50000, 100000), (100000, None),
+        ]
+
+    schedule = []
+    for (lo, hi) in boundaries:
+        probe = float(lo) if lo > 0 else 0.0
+        step = (
+            get_minimum_increment_simplified(probe)
+            if increment_option == "simplified"
+            else get_minimum_increment_tiered(probe)
+        )
+        # Label with ".99" endings so buyers know the boundary is exclusive.
+        hi_label = (hi - 0.01) if hi is not None else None
+        schedule.append({
+            "min": float(lo),
+            "max": (float(hi) if hi is not None else None),
+            "step": float(step),
+            "range_label": (
+                f"{_fmt(lo)} – {_fmt(hi_label)}" if hi_label is not None
+                else f"{_fmt(lo)} +"
+            ),
+            "increment_label": "+" + _fmt(step),
+        })
+
+    return {
+        "increment_option": increment_option,
+        "fixed_increment": None,
+        "schedule": schedule,
+    }
+
+
+@misc_router.get("/multi-item-listings/{listing_id}/next-bid")
+async def get_multi_lot_next_bid(listing_id: str, current: float = 0):
+    """iter368 — Single-source-of-truth next-bid computation.
+
+    Used by the Quick Bid pills on the redesigned Multi-Lot page so the
+    three suggested amounts always match the same increment engine the
+    server enforces at /place-bid time. Never hardcoded on the client.
+    """
+    db = get_db()
+    listing = await db.multi_item_listings.find_one({"id": listing_id})
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+
+    current = float(current or 0)
+    step = float(get_minimum_increment(listing, current))
+    return {
+        "current": current,
+        "increment": step,
+        # Three ascending suggestions on the same ladder — power-buyer UX.
+        "suggestions": [
+            current + step,
+            current + step + get_minimum_increment(listing, current + step),
+            current + step
+                    + get_minimum_increment(listing, current + step)
+                    + get_minimum_increment(listing, current + step + get_minimum_increment(listing, current + step)),
+        ],
+        "increment_option": (listing.get("increment_option") or "tiered").lower(),
+    }
 
 
 
