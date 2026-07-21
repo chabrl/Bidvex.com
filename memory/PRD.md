@@ -1,5 +1,59 @@
 # BidVex — Auction Marketplace PRD
 
+## iter367 — Production Audit + P0/P1 Regression Pass (Jul 21, 2026) ✅ COMPLETE — LAUNCH-READY
+
+**Scope**: 4× P0 critical bugs + 4× P1 features + 17-point Production Audit. **30/30 iter367 tests pass** (16 static launch-gate + 14 live HTTP). Testing agent confirms 100% success on both backend + frontend. Zero regressions in prior work (iter364-366 all still green).
+
+### P0 Critical Bugs — All Fixed
+
+**P0.1 Image Lightbox fullscreen** — Global `html { overflow-x: hidden; max-width: 100vw }` (iter176) conflicted with lightbox portals producing a small left-aligned panel. Fix in `/app/frontend/src/index.css`: `!important` overrides on `.yarl__portal`, `.yarl__container`, `.yarl__root`, `.ril__outer`, `.ril-outer`, `.ReactModal__Overlay--after-open` force `position:fixed; inset:0; width:100vw; height:100vh; z-index:9999`. Slide/image containers centred at `max-width:90vw; max-height:90vh; object-fit:contain`.
+
+**P0.2 Dashboard Analytics ("OUTBID $0.00" bug)** — Listings collection is purged post-settlement in preview/prod; historical wins had no source listing so backend rendered every bid as "OUTBID $0.00". Diagnostic script `/app/backend/scripts/iter367_diagnose.py` mapped the true state (44 bids, 27 won_auctions, 6 receipts, 85 transactions). Backend `dashboard.py` `/buyer` endpoint now unions `won_auctions` + `receipts (type=buyer_receipt)`; each bid gains `bid_status` in {winning|outbid|won|lost|ended_no_listing} + `_won_auction` + `_receipt` fallback data. `total_won_items` uses UNION of listing IDs. Seller `/seller` endpoint unions `receipts (type=seller_statement)`. Admin `admin_analytics.py` uses `sum(receipts.hammer_price)` for GMV fallback (`gmv_all = max(gmv_all, receipts_gmv_all)`). Frontend `BuyerDashboard.js` renders WON/ENDED/OUTBID/WINNING badges + green/red backgrounds + pickup code chips using the new fields.
+
+**P0.3 Escrow flow** — `escrow_transactions` collection was empty because the manual settlement path writes escrow-like rows to `transactions.pickup_code_listing_id` instead of via the Stripe webhook branch. Fix in `/app/backend/services/escrow_service.py`: `get_buyer_escrow_status` + `get_seller_escrow_status` now UNION `escrow_transactions` with `transactions` where `pickup_code` exists. Admin sees 3 active holds (BVX-XERVL5J8/DG9O220P/1H1J5GC9) matching DB truth.
+
+**P0.4 Multi-Lot deep-link routing** — Cards for individual lots routed to `/lots/{auction_id}` (summary page) instead of `/lots/{auction_id}?lot={N}` (specific lot). Fix in `FlattenedMarketplace.js` `getDetailLink()` emits `?lot={lot_number ?? lot_id}` when both are present. `MultiItemListingDetailPage.js` new `useSearchParams()` hook reads `?lot=`, `fetchListing` auto-selects the matching lot + `scrollIntoView({behavior:'smooth', block:'start'})` after refs mount.
+
+### P1 Features — All Delivered
+
+**P1.1 Public Affiliate Program page + Footer link** — New bilingual (EN/FR) landing at `/affiliate-program` and `/fr/programme-affilies`. Sections: hero, 4 perk cards (10% recurring commission, real-time tracking, guaranteed payouts, marketing kit), 4-step "How it works", 4-question FAQ, bottom CTA. Uses `useAuth()` to swap between "Join" (unauth) and "Go to Affiliate Dashboard" (auth). Footer gets `[data-testid=footer-affiliate-program-link]` in the Corporate column. URL map adds `'/affiliate-program': '/programme-affilies'`.
+
+**P1.2 Admin Impersonation verified across 7 role types** — Buyer, Seller, Partner, Broker, Storage Facility, Vehicle Dealer, Contractor all load without crashing. Admin CANNOT impersonate other admins (403 `cannot_impersonate_admin`).
+
+**P1.3 Live Unsubscribe flow verified E2E** — Token generation → `/api/unsubscribe/verify` returns 200 + email_masked → `/api/unsubscribe/confirm` sets `marketing_unsubscribed=True`. Admin `charbel911@gmail.com` blocked with 403 `admin_unsubscribe_blocked` + bilingual message. testbuyer flag reset back post-test.
+
+**P1.4 Multi-Lot Auction Page Redesign (7 sections)** — Preserves 100% of existing BidVex functionality (badges, terms, bid panels, images, watchlist). Adds:
+1. Collapsible description (auto-truncates >260 chars, `[data-testid=multi-lot-description-toggle]`)
+2. Live Activity Ticker (`MultiLotActivityTicker.jsx`, 15s poll, tab-visibility pause, click-to-scroll)
+3. Bid Increment Table (`BidIncrementTable.jsx`, 10 tiers, bilingual, collapsible)
+4. Sort dropdown (5 options: ending_soonest, most_bids, highest_price, lowest_price, newest)
+5. Grid/List toggles (preserved from previous UI)
+6. Compact lot cards with inline Quick Bid + live countdown (preserved)
+7. Deep-link auto-scroll from `?lot=N` (P0.4 fix)
+
+### NEW Endpoint — Live Activity Ticker Source
+`GET /api/lots/{auction_id}/recent-activity?limit={1-50}` returns `{auction_id, generated_at, events: [{lot_id, lot_number, lot_title, amount, bidder_alias, timestamp, time_ago}]}`. Bidder aliases masked (first-letter + capitalized initial + stars; fallback "Bidder XXXX"). Time-ago: Ns/Nm/Nh/Nd.
+
+### 17-Point Production Audit — VERDICT: ✅ LAUNCH-READY
+1. API health ✅ · 2. Frontend renders ✅ · 3. Sitemap ✅ · 4. Robots ✅ · 5. Auth ✅ · 6. Marketplace ✅ · 7. Multi-lot list ✅ · 8. Recent-activity endpoint ✅ · 9. Buyer dash ✅ · 10. Seller dash ✅ · 11. Admin analytics ✅ · 12. Escrow seller ✅ · 13. Escrow buyer ✅ · 14. Compare page ✅ · 15. Affiliate page ✅ · 16. Unsubscribe guards ✅ · 17. Broker annual fee ($500/$250/180d) ✅
+
+No P0/P1 blockers remain. BidVex is production launch-ready.
+
+### Regression Preserved
+- iter366: Compare button positioning, Receipt email redesign, Unsubscribe link/URL/guard
+- iter365: Broker annual fee ($500 base / $250 launch / 180d)
+- iter364: Compare feature (Checkbox, sticky bar, up-to-4, /compare + /fr/comparer)
+- iter364: Hero phone mockup, Google AdSense live publisher, Admin notification bell + sidebar
+- iter210 pricing suite: 26 admin API permission fixes
+
+### Files Modified — 11
+- `frontend/src/index.css` · `frontend/src/pages/BuyerDashboard.js` · `frontend/src/components/FlattenedMarketplace.js` · `frontend/src/pages/MultiItemListingDetailPage.js` · `frontend/src/components/Footer.js` · `frontend/src/App.js` · `frontend/src/i18n/urlMap.js` · `backend/routes/dashboard.py` · `backend/routes/admin_analytics.py` · `backend/services/escrow_service.py` · `backend/routes/listings.py`
+
+### Files Created — 6
+- `frontend/src/pages/AffiliateProgramPage.jsx` · `frontend/src/components/MultiLotActivityTicker.jsx` · `frontend/src/components/BidIncrementTable.jsx` · `backend/scripts/iter367_diagnose.py` · `backend/tests/test_iter367_launch_gate.py` · `backend/tests/test_iter367_live.py`
+
+
+
 ## iter366 — Compare Button Overlap Fix, Receipt Email Redesign, Unsubscribe Link (Jul 20, 2026) ✅ COMPLETE — VERIFIED
 
 **Scope**: 3 regression corrections. **17/17 iter366 tests pass** (9 static + 8 live). 71/71 across iter363–366 + iter210 pricing suites. Zero regressions.

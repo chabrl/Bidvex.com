@@ -1,5 +1,17 @@
 # BidVex Roadmap
 
+## Iter367 (2026-07-21) — COMPLETE ✅ Production Audit + P0/P1 Regression Pass
+- [x] P0.1 Image Lightbox fullscreen fix
+- [x] P0.2 Dashboard Analytics fix (Buyer/Seller/Admin union with won_auctions + receipts)
+- [x] P0.3 Escrow tab union with transactions.pickup_code
+- [x] P0.4 Multi-Lot ?lot= deep-link routing (FlattenedMarketplace + MultiItemListingDetailPage)
+- [x] P1.1 Public Affiliate Program page (EN/FR) + Footer link
+- [x] P1.2 Admin Impersonation verified for all 7 role types
+- [x] P1.3 Live Unsubscribe flow E2E verified + admin guard 403
+- [x] P1.4 Multi-Lot 7-section redesign (activity ticker, increment table, sort dropdown, grid controls, collapsible description, compact cards, deep-link scrolling)
+- [x] NEW endpoint `GET /api/lots/{auction_id}/recent-activity` (15s poll, privacy-safe aliases)
+- [x] 17-point Production Audit — all pass, launch-ready verdict
+
 ## Iter302 (2026-06-11) — COMPLETE
 - [x] Pre-build legal: bid consent flag + Stripe off_session card saving (verified)
 - [x] Directive 1: Seller Winner & Settlement Panel (replaces Promote on ended+winner)
