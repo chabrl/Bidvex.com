@@ -1,0 +1,55 @@
+{
+  "summary": "iter369 verification pass — Backend: 20/20 pytest tests pass (13 launch-gate + 7 behavior on Auto-Bid processor + fees-preview maths). Live fees-preview endpoint against seeded listing 179b62b9... returns correct taxable-broker breakdown ($100 bid × qty 2 = $200 subtotal; BP $10; tax_on_hammer $29.95; tax_on_fee $1.50; total $241.45; auto-bid GET returns 401 for anonymous — as expected). Frontend: 9 of the 10 UI bugs verified working (Bugs 1/2/3/4/5/6/8/9 all PASS). One CRITICAL bug found: **Bug 7 UI — Auto-Bid modal fails to open when clicking `lot-card-N-auto-bid` on the grid card**. Button is clickable (focus ring shows) but `AutoBidModal` never renders (no `[data-testid=auto-bid-modal]`, no [role=dialog], no upgrade view). Backend Auto-Bid API + gate work perfectly (behavioural tests all pass), but the UI entry-point is broken so users can never configure Auto-Bid from the grid. Testids on LotDetailPage all present (title, current-bid, next-bid, quick-bid-0/1/2, place-bid, buy-now-section, auto-bid, main-image, thumb-0, fee-breakdown). Cursor-zoom-in confirmed on lot-detail-main-image. GlobalImageViewer works on the grid card (100vw/100vh, z-index 9999, position fixed, counter '1/2', Esc closes). Fees popover shows exact breakdown: 2 × $2.00 = $4.00 subtotal, BP $0.14, tax on item 14.975%, tax on fee, Estimated total $4.76, plus a 'Taxable item' badge (listing.seller_account_type resolved as 'broker' at runtime, so tax_on_hammer > 0 is correct).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "CompactLotCard → AutoBidModal integration",
+        "issue": "CRITICAL — Clicking [data-testid=lot-card-1-auto-bid] does NOT open the Auto-Bid modal. Button receives focus (visible focus ring) and onClick fires (URL does not change; openDetail early-returns because target is a button; e.stopPropagation() is present), but neither [data-testid=auto-bid-modal], [data-testid=auto-bid-upgrade], nor any [role=dialog] appears in the DOM afterwards. Tested with page.mouse.click(), btn.click(), and JS .click() at the exact bounding-box centre — all three fail to open the modal for the premium user iter369_premium@bidvex.com (subscription_tier=premium, so it should render the form, not the upgrade view). No console errors. document.body.style.pointerEvents='' and no dialogs in body children. Repro: (1) login as iter369_premium, (2) navigate to /lots/179b62b9-fa28-4140-b36d-f5903b033f48, (3) click Auto-Bid button on Lot #1 — nothing visually happens. Root cause is almost certainly that the parent's setAutoBidLot(l) state update in MultiItemListingDetailPage.js:1336 either isn't firing or is being reverted before render. Suggest adding console.log inside onOpenAutoBid callback and inside AutoBidModal's top of function body to confirm which side is broken.",
+        "selector": "[data-testid=lot-card-1-auto-bid]",
+        "priority": "CRITICAL"
+      },
+      {
+        "component": "LotDetailPage main image lightbox",
+        "issue": "MEDIUM — Clicking [data-testid=lot-detail-main-image] on /lots/179b62b9-fa28-4140-b36d-f5903b033f48/lot/1 did not open the GlobalImageViewer within 1.5s (no .yarl__container in DOM). The cursor-zoom-in style + onClick={()=>setLightboxOpen(true)} are wired correctly in LotDetailPage.jsx:297. May be a timing/hot-reload issue OR the state update is being blocked by the same class of bug affecting Auto-Bid (both use standard useState toggles). Retest recommended after Auto-Bid fix.",
+        "selector": "[data-testid=lot-detail-main-image]",
+        "priority": "MEDIUM"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter369_launch_gate.py",
+    "/app/backend/tests/test_iter369_behavior.py",
+    "/app/test_reports/pytest/iter369_retest.xml"
+  ],
+  "action_items": [
+    "P0 CRITICAL — Fix Auto-Bid modal on the grid card. onClick fires (button no longer bubbles / navigates), but setAutoBidLot(lot) doesn't cause the modal to render. Add temporary console.log inside CompactLotCard's onClick handler AND inside MultiItemListingDetailPage's onOpenAutoBid callback to confirm which side breaks. Suspected: AutoBidModal.jsx line 149 (`if (!lot) return null`) might be swallowing renders — try replacing with an inline conditional so <Dialog> can mount even before lot arrives, OR ensure autoBidLot state actually updates by logging setAutoBidLot's argument at the parent.",
+    "MEDIUM — Verify LotDetailPage main image click opens GlobalImageViewer after Auto-Bid fix (may share the same setState pathology). Simple retest: click [data-testid=lot-detail-main-image] and assert .yarl__container appears within 2s."
+  ],
+  "critical_code_review_comments": [
+    "AutoBidModal.jsx line 149 (`if (!lot) return null`) short-circuits the entire component when lot is null. Combined with Dialog open-state driven by !!autoBidLot, if a stale render sends open=false + lot=null while a new render is queued with open=true + lot=…, Radix Dialog may not properly mount the portal. Safer pattern: keep the <Dialog> wrapper always mounted and guard only the inner children with `{lot && <>…</>}`.",
+    "MultiItemListingDetailPage.js has TWO Auto-Bid state variables (`autoBidModalOpen` at line 87 — never used, and `autoBidLot` at line 104 — the real one). Remove the dead `autoBidModalOpen` state to reduce cognitive load.",
+    "Backend fees-preview endpoint (routes/auctions_bids.py) correctly handles taxable-broker branch — verified live against listing 179b62b9…: bid $100 × qty 2 → subtotal $200, BP $10, tax_on_hammer $29.95, tax_on_fee $1.50, total $241.45. Multi-unit and tax_on_hammer=0 for individual-seller path both green in unit tests.",
+    "Auto-Bid processor (routes/auctions_bids.py::_process_lot_auto_bids) is behaviourally correct — 4/4 scenarios pass (min-to-lead advances +$10; ceiling stops at max_bid; max_immediate jumps straight to ceiling; own-bidder is skipped). The bug is UI-only.",
+    "GlobalImageViewer.jsx wrapper is solid — z-index 9999, position fixed, black bg, 100vw×100vh, Zoom + Counter plugins from yet-another-react-lightbox, Esc closes. Verified working on grid card click."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "100% (20/20 pytest + live fees-preview probes)",
+    "frontend": "80% — Bugs 1/2/3/4/5/6/8 + P0 lightbox on grid: PASS. Bug 7 UI (Auto-Bid modal open): FAIL. Bug 9 on LotDetailPage main image: FAIL (needs retest)."
+  },
+  "test_credentials": {
+    "premium_buyer_working": "iter369_premium@bidvex.com / Premium2026! — login 200, tier=premium confirmed",
+    "test_buyer_broken": "testbuyer@bidvex.com / TestBuyer2026! — returns 401 'Invalid credentials'. /app/memory/test_credentials.md notes an iter315 re-seed patch but that appears to have regressed. Admin login works."
+  },
+  "seed_data_creation": "Behavioural tests seed a temporary listing 'iter369-behavior-listing' with 3 users (seller/bidderA/bidderB) via motor. Cleaned up between tests but users stay for later runs (idempotent upserts).",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "iter369 backend is 100% green. The ONE remaining P0 is UI: the Auto-Bid modal never opens from the grid card. Reproduce: login as iter369_premium@bidvex.com, go to /lots/179b62b9-fa28-4140-b36d-f5903b033f48, click any 'Auto-Bid' button on a compact lot card. Expected: modal with max-bid input + strategy radios. Actual: nothing renders (no dialog, no upgrade view, no console error). Backend GET /auto-bid works — the issue is purely React state propagation between CompactLotCard's onClick and MultiItemListingDetailPage's autoBidLot state, OR AutoBidModal's early-return killing Radix Dialog mount. Also test LotDetailPage main image lightbox after the fix — same setState pattern, same suspected failure. All other iter369 items (Bugs 1/2/3/4/5/6/8, P0 GlobalImageViewer, fees-preview taxable broker path, inline empty/below-min errors) are verified working via live browser test.",
+  "rca of the issue": "AutoBid modal UI bug RCA (best guess): CompactLotCard onClick → onOpenAutoBid(lot) → parent setAutoBidLot(lot) → AutoBidModal receives new lot prop + open={!!autoBidLot}=true. AutoBidModal line 149 `if (!lot) return null` short-circuits the component BEFORE Radix Dialog can register as controlled. On the transition from lot=null (return null) to lot=<obj> (Dialog rendered), Radix sees a fresh unmount/mount pair rather than an open-state change, which in some conditions (particularly with concurrent React 18 batching) causes the portal to fail to attach. Fix: hoist the <Dialog> above the null guard so it always renders, then gate the inner content on `lot &&`."
+}

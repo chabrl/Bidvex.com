@@ -77,16 +77,15 @@ def test_frontend_min_increment_walks_server_schedule():
 
 def test_compact_lot_card_exists_and_shape():
     src = read("frontend/src/components/CompactLotCard.jsx")
-    # Fixed 180 px image height per spec.
-    assert "height: 180" in src
+    # iter369 — Fixed 200 px image height (was 180).
+    assert "height: 200" in src
     # Prev/next image arrows for multi-image lots (interpolated data-testids).
     assert "prev-image" in src
     assert "next-image" in src
     # No hardcoded "Starting Bid" / "Opening Bid" in the card.
     assert "Starting Bid" not in src
     assert "Opening Bid" not in src
-    # Buy Now + Auto-Bid + Fees popover buttons present (interpolated ids).
-    assert "buy-now" in src
+    # iter369 — Buy Now removed from grid cards. Auto-Bid + Fees stay.
     assert "auto-bid" in src
     assert "fees-btn" in src
     assert "fees-popover" in src

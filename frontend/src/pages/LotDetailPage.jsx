@@ -40,10 +40,13 @@ import API_BASE from '../config';
 import { useAuth } from '../contexts/AuthContext';
 import { formatCurrency } from '../utils/currencyFormatter';
 import SafeImage from '../components/SafeImage';
+import GlobalImageViewer from '../components/GlobalImageViewer';
 import WatchlistButton from '../components/WatchlistButton';
 import ShareButton from '../components/ShareButton';
 import { CompareCheckbox } from '../components/CompareBar';
-import PublicBidHistory from '../components/PublicBidHistory';
+import MaskedBidHistory from '../components/MaskedBidHistory';
+import AutoBidModal from '../components/AutoBidModal';
+import SanitizedHtml from '../components/SanitizedHtml';
 import { computeDisplayPrice } from '../utils/priceUtils';
 import { LangLink } from '../components/LangLink';
 
@@ -53,7 +56,7 @@ export default function LotDetailPage() {
   const { auctionId, lotNumber: lotNumberParam } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const { i18n, t } = useTranslation();
   const isFR = i18n.language?.startsWith('fr');
 
@@ -63,6 +66,11 @@ export default function LotDetailPage() {
   const [incrementInfo, setIncrementInfo] = useState(null);
   const [imgIdx, setImgIdx] = useState(0);
   const [bidAmount, setBidAmount] = useState('');
+  // iter369 — real Auto-Bid modal + live fee preview + lightbox.
+  const [autoBidOpen, setAutoBidOpen] = useState(false);
+  const [feesPreview, setFeesPreview] = useState(null);
+  const [feesOpen, setFeesOpen] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
 
   const lotNumber = Number(lotNumberParam);
   const lot = useMemo(() => (listing?.lots || []).find((l) => l.lot_number === lotNumber) || null, [listing, lotNumber]);
@@ -90,6 +98,39 @@ export default function LotDetailPage() {
     })();
     return () => { cancelled = true; };
   }, [auctionId]);
+
+  // iter369 — Live current-bid polling every 5 s (per user spec).
+  useEffect(() => {
+    if (!auctionId || !lotNumber) return;
+    const tick = async () => {
+      try {
+        const res = await axios.get(`${API}/multi-item-listings/${auctionId}`, { timeout: 6000 });
+        if (res.data) setListing((prev) => (
+          // Only replace when the polled snapshot is newer.
+          !prev || (res.data.updated_at || '') >= (prev.updated_at || '') ? res.data : prev
+        ));
+      } catch { /* ignore transient */ }
+    };
+    const t = setInterval(() => { if (!document.hidden) tick(); }, 5000);
+    return () => clearInterval(t);
+  }, [auctionId, lotNumber]);
+
+  // iter369 — Fee preview (buyer-premium hierarchy, taxes, deposit) whenever
+  // the lot changes or user auth changes.
+  useEffect(() => {
+    if (!lot || !auctionId) return;
+    let cancelled = false;
+    const url = `${API}/multi-item-listings/${auctionId}/lots/${lot.lot_number}/fees-preview`;
+    axios
+      .get(url, {
+        params: { bid_amount: Number(lot.current_price ?? lot.starting_price ?? 0) },
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        timeout: 8000,
+      })
+      .then((res) => { if (!cancelled) setFeesPreview(res.data); })
+      .catch(() => { /* non-fatal — collapsible just hides preview */ });
+    return () => { cancelled = true; };
+  }, [auctionId, lot?.lot_number, user?.subscription_tier, token, lot]);
 
   useEffect(() => { setImgIdx(0); }, [lotNumber]);
 
@@ -249,11 +290,17 @@ export default function LotDetailPage() {
           <div className="rounded-xl overflow-hidden bg-black relative" style={{ aspectRatio: '4 / 3' }}>
             {images.length > 0 ? (
               <>
-                <SafeImage src={images[imgIdx]} alt={title} className="w-full h-full object-contain" />
+                <SafeImage
+                  src={images[imgIdx]}
+                  alt={title}
+                  className="w-full h-full object-contain cursor-zoom-in"
+                  onClick={() => setLightboxOpen(true)}
+                  data-testid="lot-detail-main-image"
+                />
                 {images.length > 1 && (
                   <>
-                    <button className="absolute left-2 top-1/2 -translate-y-1/2 h-10 w-10 bg-black/60 text-white rounded-full flex items-center justify-center hover:bg-black/80" onClick={() => setImgIdx((i) => (i - 1 + images.length) % images.length)} data-testid="lot-detail-prev-image"><ChevronLeft className="h-5 w-5" /></button>
-                    <button className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 bg-black/60 text-white rounded-full flex items-center justify-center hover:bg-black/80" onClick={() => setImgIdx((i) => (i + 1) % images.length)} data-testid="lot-detail-next-image"><ChevronRight className="h-5 w-5" /></button>
+                    <button className="absolute left-2 top-1/2 -translate-y-1/2 h-10 w-10 bg-black/60 text-white rounded-full flex items-center justify-center hover:bg-black/80" onClick={(e) => { e.stopPropagation(); setImgIdx((i) => (i - 1 + images.length) % images.length); }} data-testid="lot-detail-prev-image"><ChevronLeft className="h-5 w-5" /></button>
+                    <button className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 bg-black/60 text-white rounded-full flex items-center justify-center hover:bg-black/80" onClick={(e) => { e.stopPropagation(); setImgIdx((i) => (i + 1) % images.length); }} data-testid="lot-detail-next-image"><ChevronRight className="h-5 w-5" /></button>
                     <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-0.5 rounded font-mono">{imgIdx + 1} / {images.length}</div>
                   </>
                 )}
@@ -267,7 +314,7 @@ export default function LotDetailPage() {
           {images.length > 1 && (
             <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
               {images.map((src, i) => (
-                <button key={i} type="button" onClick={() => setImgIdx(i)} className={`flex-shrink-0 h-14 w-14 rounded-lg overflow-hidden border-2 ${i === imgIdx ? 'border-cyan-500' : 'border-transparent'}`} data-testid={`lot-detail-thumb-${i}`}>
+                <button key={i} type="button" onClick={() => { setImgIdx(i); setLightboxOpen(true); }} className={`flex-shrink-0 h-14 w-14 rounded-lg overflow-hidden border-2 cursor-zoom-in ${i === imgIdx ? 'border-cyan-500' : 'border-transparent'}`} data-testid={`lot-detail-thumb-${i}`}>
                   <SafeImage src={src} alt={`thumb ${i}`} className="w-full h-full object-cover" />
                 </button>
               ))}
@@ -295,6 +342,136 @@ export default function LotDetailPage() {
             )}
           </div>
 
+          {/* iter369 — Auction Summary block: opening bid, current bid, leader,
+              ends in, bids, lot #, auction name, seller, location. */}
+          <Card data-testid="lot-detail-summary">
+            <CardContent className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-6 text-sm">
+              {[
+                [isFR ? 'Enchère de départ' : 'Opening Bid', formatCurrency(lot.starting_price ?? 0)],
+                [isFR ? 'Enchère courante' : 'Current Bid',
+                  <span key="cb" className="font-semibold text-emerald-700 dark:text-emerald-400 font-mono">
+                    {formatCurrency(currentBid)}
+                  </span>],
+                [isFR ? 'Meneur' : 'Current Leader',
+                  <span key="lead" data-testid="lot-detail-leader-initials">
+                    {feesPreview?.leading_bidder_initials || '—'}
+                  </span>],
+                [isFR ? 'Se termine dans' : 'Ends In',
+                  endTime && !isEnded
+                    ? <Countdown key="end" date={endTime} renderer={({ days, hours, minutes, seconds }) =>
+                        <span data-testid="lot-detail-summary-countdown">{days}d {hours}h {minutes}m {seconds}s</span>} />
+                    : <span key="end" className="text-slate-500">{isFR ? 'Terminé' : 'Ended'}</span>],
+                [isFR ? 'Enchères' : 'Bids', `${lot.bid_count || 0} · ${lot.unique_bidders || 0} ${isFR ? 'enchérisseurs' : 'bidders'}`],
+                [isFR ? 'Lot' : 'Lot', `#${lot.lot_number} of ${listing.lots.length}`],
+                [isFR ? 'Enchère' : 'Auction', listing.title],
+                [isFR ? 'Vendeur' : 'Seller', listing.seller_display_name || listing.seller_name || '—'],
+                [isFR ? 'Emplacement' : 'Location',
+                  [lot.seller_city || listing.city, lot.seller_province || listing.region].filter(Boolean).join(', ') || '—'],
+              ].map(([lbl, val], i) => (
+                <div key={i} className="flex justify-between gap-3">
+                  <span className="text-slate-500 dark:text-slate-400">{lbl}</span>
+                  <span className="font-medium text-slate-800 dark:text-slate-100 text-right truncate max-w-[60%]">{val}</span>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          {/* iter369 — Multi-unit notice: quantity > 1 */}
+          {lot.quantity > 1 && (
+            <div className="rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 p-3 text-xs text-amber-900 dark:text-amber-200" data-testid="lot-detail-multi-unit-notice">
+              {isFR
+                ? <>Ce lot contient <strong>{lot.quantity}</strong> unités. La valeur totale du lot correspond à l&apos;enchère courante multipliée par la quantité ({formatCurrency(currentBid)} × {lot.quantity} = <strong>{formatCurrency(currentBid * lot.quantity)}</strong>). Vous enchérissez le prix <strong>par unité</strong>.</>
+                : <>This lot contains <strong>{lot.quantity}</strong> units. The total lot value reflects the current bid multiplied by quantity ({formatCurrency(currentBid)} × {lot.quantity} = <strong>{formatCurrency(currentBid * lot.quantity)}</strong>). You are bidding the <strong>per-unit</strong> price.</>}
+            </div>
+          )}
+
+          {/* iter369 — Fee Breakdown (collapsible, buyer-tier aware, single source of truth) */}
+          {feesPreview && (
+            <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 overflow-hidden" data-testid="lot-detail-fee-breakdown">
+              <button
+                type="button"
+                onClick={() => setFeesOpen((v) => !v)}
+                className="w-full flex items-center gap-2 px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                data-testid="lot-detail-fee-breakdown-toggle"
+              >
+                <Info className="h-4 w-4 text-cyan-600" />
+                <span className="text-sm font-semibold flex-1 text-left">
+                  {isFR ? 'Voir le détail des frais' : 'View Fee Breakdown'}
+                </span>
+                <span className="text-[10px] uppercase tracking-wide text-slate-500">
+                  {feesPreview.buyer_premium_rate_pct}% BP
+                </span>
+              </button>
+              {feesOpen && (
+                <div className="border-t border-slate-200 dark:border-slate-800 p-4 space-y-2 text-sm" data-testid="lot-detail-fee-breakdown-body">
+                  {[
+                    [isFR ? 'Statut fiscal' : 'Tax Status',
+                      feesPreview.is_private_sale
+                        ? <Badge key="tx" className="bg-emerald-100 text-emerald-800 border border-emerald-200">{isFR ? 'Sans taxe (Vente privée)' : 'Tax-Free (Private Sale)'}</Badge>
+                        : <span key="tx">{isFR ? 'Selon province' : 'Per province'}</span>],
+                    [`${isFR ? "Prime de l'acheteur" : "Buyer's Premium"} (${feesPreview.buyer_premium_rate_pct}%)`,
+                      formatCurrency(feesPreview.buyer_premium_amount)],
+                    [isFR ? 'Taxes' : 'Taxes',
+                      feesPreview.is_private_sale ? formatCurrency(0) : formatCurrency(feesPreview.tax_amount)],
+                    [isFR ? 'Dépôt requis' : 'Deposit Required',
+                      feesPreview.deposit_required > 0
+                        ? formatCurrency(feesPreview.deposit_required)
+                        : (isFR ? 'Aucun dépôt requis' : 'No deposit required')],
+                    [isFR ? 'Paiement' : 'Payment',
+                      <span key="pay" className="text-xs">{isFR ? 'Ce vendeur utilise le paiement Stripe BidVex' : 'This seller uses BidVex Stripe checkout'}</span>],
+                    [<strong key="est">{isFR ? 'Total estimé' : 'Estimated Total'}</strong>,
+                      <strong key="est-v" className="text-emerald-700 dark:text-emerald-400 font-mono" data-testid="lot-detail-fee-estimated-total">
+                        {formatCurrency(feesPreview.estimated_total)} {feesPreview.currency}
+                      </strong>],
+                  ].map(([lbl, val], i) => (
+                    <div key={i} className="flex justify-between gap-3">
+                      <span className="text-slate-600 dark:text-slate-400">{lbl}</span>
+                      <span className="text-slate-800 dark:text-slate-100 text-right">{val}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* iter369 — Buy Now section (only when available) */}
+          {lot.buy_now_enabled && lot.buy_now_price != null && !isEnded && (
+            <div className="rounded-xl border-2 border-cyan-500/30 bg-gradient-to-r from-cyan-50 to-blue-50 dark:from-cyan-950/40 dark:to-blue-950/40 p-4 flex items-center gap-3" data-testid="lot-detail-buy-now-section">
+              <Zap className="h-6 w-6 text-cyan-600 flex-shrink-0" />
+              <div className="flex-1 text-sm">
+                <div className="font-bold text-cyan-900 dark:text-cyan-200">
+                  {isFR ? 'Achat immédiat disponible' : 'Buy Now Available'} — {formatCurrency(lot.buy_now_price)}
+                </div>
+                <div className="text-xs text-cyan-700 dark:text-cyan-300">
+                  {isFR ? "Sautez les enchères — achetez tout de suite au prix fixe." : 'Skip the bidding — purchase instantly at the fixed price.'}
+                </div>
+              </div>
+              <Button
+                className="bg-cyan-600 hover:bg-cyan-700 text-white"
+                onClick={() => navigate(`/lots/${auctionId}?lot=${lot.lot_number}&buy_now=1`)}
+                data-testid="lot-detail-buy-now-section-cta"
+              >
+                {isFR ? 'Acheter' : 'Buy Now'}
+              </Button>
+            </div>
+          )}
+
+          {/* iter369 — Deposit notice (dynamic per auction) */}
+          <div className="text-xs text-slate-500 dark:text-slate-400 flex items-start gap-2 rounded-lg bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 p-3" data-testid="lot-detail-deposit-notice">
+            <ShieldCheck className="h-4 w-4 text-slate-400 flex-shrink-0 mt-0.5" />
+            <span>
+              {feesPreview?.deposit_required > 0 ? (
+                isFR
+                  ? <>Un dépôt de <strong>{formatCurrency(feesPreview.deposit_required)}</strong> est requis pour enchérir sur ce lot. Il sera déduit du total en cas de gain, sinon libéré automatiquement.</>
+                  : <>A deposit of <strong>{formatCurrency(feesPreview.deposit_required)}</strong> is required to bid on this lot. It will be applied to your winning total, otherwise released automatically.</>
+              ) : (
+                isFR
+                  ? <>Aucun dépôt requis pour enchérir sur cette enchère. Ce vendeur utilise le paiement Stripe BidVex. Tout dépôt déjà payé sera déduit de votre total gagnant en CAD.</>
+                  : <>No deposit is required to bid on this auction. This seller uses BidVex Stripe checkout. Any deposit you already paid will be deducted from your winning total in CAD.</>
+              )}
+            </span>
+          </div>
+
           {/* Description */}
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-base">{isFR ? 'Description' : 'Description'}</CardTitle></CardHeader>
@@ -303,12 +480,15 @@ export default function LotDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Auction terms + shipping + pickup */}
+          {/* Auction terms — iter369: sanitized HTML render (no raw tags visible) */}
           {(listing.auction_terms_en || listing.auction_terms_fr) && (
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><ShieldCheck className="h-4 w-4" />{isFR ? "Modalités de l'enchère" : 'Auction Terms'}</CardTitle></CardHeader>
-              <CardContent className="text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap max-h-64 overflow-y-auto" data-testid="lot-detail-terms">
-                {(isFR ? listing.auction_terms_fr : listing.auction_terms_en) || listing.auction_terms_en}
+              <CardContent data-testid="lot-detail-terms">
+                <SanitizedHtml
+                  html={(isFR ? listing.auction_terms_fr : listing.auction_terms_en) || listing.auction_terms_en}
+                  className="text-xs text-slate-700 dark:text-slate-300 max-h-64 overflow-y-auto prose prose-sm dark:prose-invert max-w-none"
+                />
               </CardContent>
             </Card>
           )}
@@ -342,15 +522,15 @@ export default function LotDetailPage() {
             </Card>
           )}
 
-          {/* Bid history */}
+          {/* Bid history — iter369: masked initials + IP octets 1+4 */}
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">
-                {isFR ? "Historique des enchères" : 'Bid History'} · {lot.bid_count || 0} {isFR ? 'enchères' : 'bids'}
+                {isFR ? "Historique des enchères" : 'Bid History'}
               </CardTitle>
             </CardHeader>
             <CardContent data-testid="lot-detail-bid-history">
-              <PublicBidHistory listingId={auctionId} lotNumber={lot.lot_number} currentPrice={currentBid} />
+              <MaskedBidHistory auctionId={auctionId} lotNumber={lot.lot_number} />
             </CardContent>
           </Card>
         </div>
@@ -436,12 +616,12 @@ export default function LotDetailPage() {
                 </Button>
               )}
 
-              {/* Auto-Bid */}
+              {/* Auto-Bid — iter369 real modal (subscription-gated) */}
               {!isEnded && (
                 <Button
                   variant="outline"
                   className="w-full h-9 text-xs"
-                  onClick={() => toast.info(t('autoBid.openSoon', 'Auto-Bid Bot setup opens shortly.'))}
+                  onClick={() => setAutoBidOpen(true)}
                   data-testid="lot-detail-auto-bid"
                 >
                   <Bot className="h-4 w-4 mr-1.5" />
@@ -523,6 +703,27 @@ export default function LotDetailPage() {
           <ChevronRight className="h-4 w-4 ml-1" />
         </Button>
       </div>
+
+      {/* iter369 — Real Auto-Bid modal */}
+      <AutoBidModal
+        open={autoBidOpen}
+        onOpenChange={setAutoBidOpen}
+        auctionId={auctionId}
+        lot={lot}
+        incrementInfo={incrementInfo}
+        onSaved={() => {
+          // Optimistically refetch the auction so bid_count + current_price update.
+          axios.get(`${API}/multi-item-listings/${auctionId}`).then((res) => setListing(res.data)).catch(() => {});
+        }}
+      />
+
+      {/* iter369 — Global fullscreen image viewer */}
+      <GlobalImageViewer
+        open={lightboxOpen}
+        onClose={() => setLightboxOpen(false)}
+        images={images}
+        startIndex={imgIdx}
+      />
     </div>
   );
 }

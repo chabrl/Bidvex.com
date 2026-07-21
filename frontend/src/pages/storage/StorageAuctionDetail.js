@@ -2,6 +2,7 @@ import API_BASE from '../../config';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import React, { useEffect, useState, useCallback } from 'react';
 import SafeImage from '../../components/SafeImage';
+import GlobalImageViewer from '../../components/GlobalImageViewer';
 import axios from 'axios';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -57,6 +58,8 @@ const StorageAuctionDetail = () => {
   // Phase 6.3 — track the timestamp of the most recent soft-close extension
   // so the clock can flash a "+2 min added" banner for 8 seconds.
   const [lastExtendedAt, setLastExtendedAt] = useState(null);
+  // iter369 — fullscreen image viewer state (Bug 9 wire-up).
+  const [viewerOpen, setViewerOpen] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -191,7 +194,13 @@ const StorageAuctionDetail = () => {
             <Card className="overflow-hidden">
               <div className="relative bg-slate-200 dark:bg-slate-800 h-80 flex items-center justify-center">
                 {photos.length > 0 ? (
-                  <SafeImage src={photos[activePhoto]} alt={`Unit ${auction.unit_number}`} className="w-full h-full object-contain" />
+                  <SafeImage
+                    src={photos[activePhoto]}
+                    alt={`Unit ${auction.unit_number}`}
+                    className="w-full h-full object-contain cursor-zoom-in"
+                    onClick={() => setViewerOpen(true)}
+                    data-testid="storage-detail-main-image"
+                  />
                 ) : (
                   <span className="text-7xl opacity-50">🔒</span>
                 )}
@@ -201,8 +210,8 @@ const StorageAuctionDetail = () => {
                   {photos.map((p, i) => (
                     <button
                       key={i}
-                      onClick={() => setActivePhoto(i)}
-                      className={`w-16 h-16 rounded-md overflow-hidden border-2 shrink-0 ${i === activePhoto ? 'border-blue-600' : 'border-transparent'}`}
+                      onClick={() => { setActivePhoto(i); setViewerOpen(true); }}
+                      className={`w-16 h-16 rounded-md overflow-hidden border-2 shrink-0 cursor-zoom-in ${i === activePhoto ? 'border-blue-600' : 'border-transparent'}`}
                     >
                       <SafeImage src={p} alt="" className="w-full h-full object-cover" />
                     </button>
@@ -210,6 +219,14 @@ const StorageAuctionDetail = () => {
                 </div>
               )}
             </Card>
+
+            {/* iter369 — Fullscreen image viewer */}
+            <GlobalImageViewer
+              open={viewerOpen}
+              onClose={() => setViewerOpen(false)}
+              images={photos}
+              startIndex={activePhoto}
+            />
 
             {auction.video_url && (
               <Card className="p-4">

@@ -190,3 +190,12 @@ blog tile anchors, and pricing CTAs.
 - Notes: Purpose-built to exercise the Stripe Identity soft-gate at `/api/settlement/settle` and `/api/vehicles/{id}/buyer-acknowledge`. Since `is_identity_verified=false`, hitting settle/acknowledge returns 403 `IDENTITY_VERIFICATION_REQUIRED` — exactly the branch H-1 is designed to guard.
 - ⚠️ **`testbuyer@bidvex.com` password status**: as of 2026-07-16 the testing agent reports the seeded password `TestBuyer2026!` returns 401 on preview. If that account is needed again, re-run `python /app/backend/scripts/iter308_reseed_test_fixtures.py` to restore. Otherwise prefer `iter355_tester@bidvex.com`.
 - Rate limiting: repeated failed logins trigger 429 for ~60s; back off before retrying.
+
+
+## 🆕 iter369 — Premium buyer for Auto-Bid testing (2026-07-21)
+- Email: `iter369_premium@bidvex.com`
+- Password: `Premium2026!`
+- Role: `user`, subscription_tier: `premium` (Auto-Bid eligible)
+- Phone/email/ID/payment_method all verified
+- Purpose: Exercise the Auto-Bid modal + processor end-to-end.
+- User id: `4b1fa594-574d-4508-967d-6db92113037c`

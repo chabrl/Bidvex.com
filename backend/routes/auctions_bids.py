@@ -5,9 +5,9 @@ Extracted from auctions.py for maintainability.
 """
 
 from fastapi import APIRouter, HTTPException, Depends, Request
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from datetime import datetime, timezone, timedelta
-from deps import User, get_current_user
+from deps import User, get_current_user, get_current_user_optional
 from models import Bid, BidCreate, BuyNowPurchase, BuyNowTransaction, AutoBid
 from rate_limit import limiter as _limiter
 from utils import get_marketplace_settings, get_minimum_increment, get_epoch_timestamp, get_server_timestamp
@@ -623,6 +623,101 @@ async def _process_auto_bids(db, listing_id: str, current_price: float, manual_b
         break
 
 
+async def _process_lot_auto_bids(
+    db,
+    listing_id: str,
+    lot_number: int,
+    current_price: float,
+    manual_bidder_id: str,
+):
+    """iter369 — Multi-lot variant of _process_auto_bids.
+
+    Fires after every manual lot bid so any active auto-bid (Premium/VIP)
+    on this specific lot with `max_bid >= current + increment` places a
+    counter-bid immediately. Uses the SAME `db.auto_bids` collection so
+    the existing scheduler + reporting continue to work.
+    """
+    listing = await db.multi_item_listings.find_one({"id": listing_id})
+    if not listing:
+        return
+    lots = listing.get("lots") or []
+    lot_index = next((i for i, l in enumerate(lots)
+                      if int(l.get("lot_number", -1)) == int(lot_number)), None)
+    if lot_index is None:
+        return
+
+    auto_bids = await db.auto_bids.find({
+        "listing_id": listing_id,
+        "lot_number": int(lot_number),
+        "is_active": True,
+        "user_id": {"$ne": manual_bidder_id},
+    }).to_list(200)
+    if not auto_bids:
+        return
+
+    # Highest max_bid wins each round.
+    auto_bids.sort(key=lambda x: float(x.get("max_bid") or 0), reverse=True)
+    step = float(get_minimum_increment(listing, current_price))
+
+    for ab in auto_bids:
+        max_bid = float(ab.get("max_bid") or 0)
+        strategy = (ab.get("strategy") or "min_to_lead").lower()
+        needed = current_price + step
+        if max_bid < needed:
+            # Bot exhausted → deactivate + notify.
+            await db.auto_bids.update_one({"id": ab["id"]}, {"$set": {"is_active": False}})
+            await db.notifications.insert_one({
+                "id": str(uuid_mod.uuid4()),
+                "user_id": ab["user_id"],
+                "type": "auto_bid_exceeded",
+                "title": "Your Auto-Bid was exceeded",
+                "message": (
+                    f"Someone outbid your max Auto-Bid of ${max_bid:.2f} "
+                    f"on Lot #{lot_number} of '{listing.get('title', 'Item')}'."
+                ),
+                "data": {"auction_id": listing_id, "lot_number": int(lot_number),
+                         "max_bid": max_bid, "current_price": current_price},
+                "read": False,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            })
+            continue
+
+        # Compute the counter-bid based on strategy.
+        counter = max_bid if strategy == "max_immediate" else min(needed, max_bid)
+
+        auto_bid_row = {
+            "id": str(uuid_mod.uuid4()),
+            "listing_id": listing_id,
+            "lot_number": int(lot_number),
+            "bidder_id": ab["user_id"],
+            "amount": counter,
+            "bid_type": "auto",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        await db.lot_bids.insert_one(auto_bid_row.copy())
+        # Reflect on the lot doc so subsequent bids see the new leader.
+        await db.multi_item_listings.update_one(
+            {"id": listing_id, "lots.lot_number": int(lot_number)},
+            {"$set": {
+                "lots.$.current_price": counter,
+                "lots.$.highest_bidder_id": ab["user_id"],
+                "lots.$.updated_at": datetime.now(timezone.utc).isoformat(),
+            }, "$inc": {"lots.$.bid_count": 1}},
+        )
+        current_price = counter
+
+        if _ws_manager:
+            await _ws_manager.broadcast_bid_update(
+                listing_id,
+                {'id': auto_bid_row['id'], 'bidder_id': ab["user_id"],
+                 'amount': counter, 'created_at': auto_bid_row['created_at'],
+                 'lot_number': int(lot_number), 'bid_type': 'auto'},
+                {'bid_count': None, 'current_price': counter,
+                 'currency': listing.get("currency") or "CAD"},
+            )
+        break  # only the highest auto-bid wins per round
+
+
 # ========== BUY NOW ==========
 
 @bids_router.post("/buy-now")
@@ -1106,6 +1201,13 @@ async def bid_on_lot(request: Request, listing_id: str, lot_number: int, data: D
         "extension_count": lots[lot_index].get("extension_count", 0)
     }
 
+    # iter369 — Trigger multi-lot auto-bid processing so bots defending
+    # their max_bid on this lot immediately place counter-bids.
+    try:
+        await _process_lot_auto_bids(db, listing_id, lot_number, amount, current_user.id)
+    except Exception as _ab_err:  # noqa: BLE001
+        logger.warning(f"Multi-lot auto-bid processing failed: {_ab_err}")
+
     if extension_applied and new_end_time:
         response["new_lot_end_time"] = new_end_time.isoformat()
         response["anti_sniping_message"] = "Auction extended by 2 minutes due to last-minute bidding activity."
@@ -1195,3 +1297,391 @@ async def get_user_auto_bids(current_user: User = Depends(get_current_user)):
         return {"auto_bids": auto_bids, "total": len(auto_bids)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ========== iter369 — Multi-Lot Auto-Bid + Masked Bid History ==========
+
+
+def _autobid_allowed_tier(tier: str) -> bool:
+    """Auto-Bid is a Premium/VIP feature. Also allow partner + business.
+
+    The lookup is deliberately duplicated here (rather than importing from a
+    subscription helper) so this file remains the single source of truth for
+    auto-bid access control.
+    """
+    return (tier or "").lower() in ("premium", "vip", "vip_elite", "partner", "business")
+
+
+@bids_router.get("/multi-item-listings/{listing_id}/lots/{lot_number}/auto-bid")
+async def get_lot_auto_bid(
+    listing_id: str,
+    lot_number: int,
+    current_user: User = Depends(get_current_user),
+):
+    """Return the current user's active auto-bid on a given lot (if any)."""
+    db = get_db()
+    row = await db.auto_bids.find_one({
+        "user_id": current_user.id,
+        "listing_id": listing_id,
+        "lot_number": lot_number,
+        "is_active": True,
+    }, {"_id": 0})
+    return {"auto_bid": row, "eligible_tier": _autobid_allowed_tier(current_user.subscription_tier)}
+
+
+@bids_router.post("/multi-item-listings/{listing_id}/lots/{lot_number}/auto-bid")
+@_limiter.limit("10/minute")
+async def setup_lot_auto_bid(
+    request: Request,
+    listing_id: str,
+    lot_number: int,
+    data: Dict[str, Any],
+    current_user: User = Depends(get_current_user),
+):
+    """Create/update an Auto-Bid on a specific lot. Premium/VIP only.
+
+    Body: { max_bid: float, strategy?: 'min_to_lead' | 'max_immediate' }
+    """
+    db = get_db()
+    if not _autobid_allowed_tier(current_user.subscription_tier):
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "subscription_required",
+                "tiers": ["premium", "vip_elite"],
+                "message": "Auto-Bid is a Premium feature. Upgrade to Premium or VIP Elite to use it.",
+            },
+        )
+
+    max_bid = float(data.get("max_bid") or 0)
+    strategy = (data.get("strategy") or "min_to_lead").lower()
+    if strategy not in ("min_to_lead", "max_immediate"):
+        strategy = "min_to_lead"
+
+    listing = await db.multi_item_listings.find_one({"id": listing_id})
+    if not listing:
+        raise HTTPException(status_code=404, detail="Auction not found")
+    lots = listing.get("lots") or []
+    lot = next((l for l in lots if int(l.get("lot_number", -1)) == int(lot_number)), None)
+    if lot is None:
+        raise HTTPException(status_code=404, detail="Lot not found")
+    if listing.get("seller_id") == current_user.id:
+        raise HTTPException(status_code=400, detail="Cannot auto-bid on your own listing")
+
+    current_price = float(lot.get("current_price") or lot.get("starting_price") or 0)
+    step = float(get_minimum_increment(listing, current_price))
+    min_valid = current_price + step
+    if max_bid < min_valid:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Max bid must be at least ${min_valid:.2f} (current + increment).",
+        )
+
+    existing = await db.auto_bids.find_one({
+        "user_id": current_user.id,
+        "listing_id": listing_id,
+        "lot_number": int(lot_number),
+        "is_active": True,
+    })
+    if existing:
+        await db.auto_bids.update_one(
+            {"id": existing["id"]},
+            {"$set": {
+                "max_bid": max_bid,
+                "strategy": strategy,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }},
+        )
+        return {"message": "Auto-Bid updated", "auto_bid_id": existing["id"],
+                "max_bid": max_bid, "strategy": strategy}
+
+    ab = AutoBid(user_id=current_user.id, listing_id=listing_id, max_bid=max_bid)
+    doc = ab.model_dump()
+    doc["lot_number"] = int(lot_number)
+    doc["strategy"] = strategy
+    doc["created_at"] = datetime.now(timezone.utc).isoformat()
+    await db.auto_bids.insert_one(doc)
+    return {"message": "Auto-Bid activated", "auto_bid_id": ab.id,
+            "max_bid": max_bid, "strategy": strategy}
+
+
+@bids_router.delete("/multi-item-listings/{listing_id}/lots/{lot_number}/auto-bid")
+async def deactivate_lot_auto_bid(
+    listing_id: str,
+    lot_number: int,
+    current_user: User = Depends(get_current_user),
+):
+    db = get_db()
+    r = await db.auto_bids.update_one(
+        {"user_id": current_user.id, "listing_id": listing_id,
+         "lot_number": int(lot_number), "is_active": True},
+        {"$set": {"is_active": False}},
+    )
+    if r.modified_count == 0:
+        raise HTTPException(status_code=404, detail="No active Auto-Bid found")
+    return {"message": "Auto-Bid deactivated"}
+
+
+def _mask_ip(ip: str | None) -> str | None:
+    """iter369 — show only the first + last octet of an IPv4/IPv6 address.
+
+    IPv4:    131.147.100.63  → "131.***.***.63"
+    IPv6:    keep the first + last segment for parity.
+    Anything else → "***.***"
+    """
+    if not ip or not isinstance(ip, str):
+        return None
+    ip = ip.strip()
+    if "." in ip:
+        parts = ip.split(".")
+        if len(parts) == 4:
+            return f"{parts[0]}.***.***.{parts[3]}"
+    if ":" in ip:
+        segs = [s for s in ip.split(":") if s]
+        if len(segs) >= 2:
+            return f"{segs[0]}:****:****:{segs[-1]}"
+    return "***.***"
+
+
+def _initials(user_doc: dict | None, fallback: str) -> str:
+    """iter369 — derive privacy-safe initials from a user doc.
+
+    Preference order: first_name + last_name → full name (split on space) →
+    email local-part → fallback. Never exposes more than 2 characters.
+    """
+    if not user_doc:
+        return fallback
+    fn = (user_doc.get("first_name") or "").strip()
+    ln = (user_doc.get("last_name") or "").strip()
+    if fn and ln:
+        return (fn[0] + ln[0]).upper()
+    name = (user_doc.get("name") or "").strip()
+    if name:
+        parts = [p for p in name.split(" ") if p]
+        if len(parts) >= 2:
+            return (parts[0][0] + parts[-1][0]).upper()
+        if parts:
+            return (parts[0][:2]).upper()
+    email = (user_doc.get("email") or "").split("@")[0]
+    if email:
+        return email[:2].upper()
+    return fallback
+
+
+@bids_router.get("/multi-item-listings/{listing_id}/lots/{lot_number}/bids-public")
+async def get_lot_bids_public(listing_id: str, lot_number: int, limit: int = 20):
+    """iter369 — Public masked bid history for a specific lot.
+
+    Response shape:
+        {
+          total_bids: int,
+          unique_bidders: int,
+          leading_bidder_initials: "SN"|null,
+          bids: [
+            {initials: "SN", ip_masked: "131.***.***.63",
+             amount: 600.0, created_at: iso, status: "leading"|"outbid"|"winning",
+             bid_type: "normal"|"auto"}
+          ]
+        }
+    """
+    db = get_db()
+    listing = await db.multi_item_listings.find_one({"id": listing_id})
+    if not listing:
+        raise HTTPException(status_code=404, detail="Auction not found")
+
+    limit = max(1, min(100, int(limit)))
+    bids = await db.bids.find(
+        {"listing_id": listing_id, "lot_number": int(lot_number)},
+        {"_id": 0},
+    ).sort("created_at", -1).to_list(limit)
+
+    bidder_ids = list({b.get("bidder_id") for b in bids if b.get("bidder_id")})
+    users_by_id: Dict[str, dict] = {}
+    if bidder_ids:
+        async for u in db.users.find(
+            {"id": {"$in": bidder_ids}},
+            {"_id": 0, "id": 1, "first_name": 1, "last_name": 1, "name": 1, "email": 1},
+        ):
+            users_by_id[u["id"]] = u
+
+    # The lot's current leader is the top bidder by amount, then earliest by
+    # created_at (matching engine tiebreak).
+    if bids:
+        leader_bid = max(bids, key=lambda b: (float(b.get("amount") or 0),
+                                              -_epoch(b.get("created_at"))))
+        leader_id = leader_bid.get("bidder_id")
+    else:
+        leader_id = None
+
+    unique = set()
+    masked = []
+    for i, b in enumerate(bids):
+        uid = b.get("bidder_id")
+        if uid:
+            unique.add(uid)
+        u = users_by_id.get(uid) if uid else None
+        initials = _initials(u, f"B{i + 1:02d}")
+        status = "leading" if (leader_id and uid == leader_id and i == 0) else "outbid"
+        masked.append({
+            "initials": initials,
+            "ip_masked": _mask_ip(b.get("ip_address")),
+            "amount": float(b.get("amount") or 0),
+            "created_at": (b.get("created_at").isoformat()
+                           if isinstance(b.get("created_at"), datetime)
+                           else b.get("created_at")),
+            "status": status,
+            "bid_type": (b.get("bid_type") or "normal"),
+        })
+    leader_initials = None
+    if leader_id and users_by_id.get(leader_id):
+        leader_initials = _initials(users_by_id[leader_id], "??")
+
+    return {
+        "listing_id": listing_id,
+        "lot_number": int(lot_number),
+        "total_bids": len(bids),
+        "unique_bidders": len(unique),
+        "leading_bidder_initials": leader_initials,
+        "bids": masked,
+    }
+
+
+def _epoch(v):
+    """Timestamp → epoch seconds. Handles ISO string, datetime, None."""
+    try:
+        if isinstance(v, datetime):
+            return v.timestamp()
+        if isinstance(v, str):
+            return datetime.fromisoformat(v.replace("Z", "+00:00")).timestamp()
+    except (ValueError, TypeError):
+        pass
+    return 0
+
+
+@bids_router.get("/multi-item-listings/{listing_id}/lots/{lot_number}/fees-preview")
+async def get_lot_fees_preview(
+    listing_id: str,
+    lot_number: int,
+    bid_amount: float | None = None,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+):
+    """iter369 — Canonical fee breakdown for a lot.
+
+    Buyer-premium hierarchy (single source of truth: fee_calculator.py):
+        1. Partner seller  → seller.configured_buyer_premium_rate
+        2. Buyer vip_elite → INDIVIDUAL_BUYER_RATES.vip_elite (3.0 %)
+        3. Buyer premium   → INDIVIDUAL_BUYER_RATES.premium   (3.5 %)
+        4. Standard        → INDIVIDUAL_BUYER_RATES.standard  (5.0 %)
+
+    Tax logic (iter369 bug 8):
+        • Tax-free auction (individual seller): tax applies ONLY to buyer's
+          premium, never to the hammer price.
+        • Taxable auction (business/enterprise/partner): tax applies to
+          hammer + buyer's premium.
+        • Multi-unit lot (quantity > 1): the hammer used for BP + tax is the
+          per-unit bid × quantity (subtotal).
+
+    Returns per-buyer numbers so the frontend never has to re-implement the
+    hierarchy (avoids drift between card popover and lot-detail breakdown).
+    """
+    from services.fee_calculator import INDIVIDUAL_BUYER_RATES, TIER_ALIASES
+    db = get_db()
+    listing = await db.multi_item_listings.find_one({"id": listing_id})
+    if not listing:
+        raise HTTPException(status_code=404, detail="Auction not found")
+    lots = listing.get("lots") or []
+    lot = next((l for l in lots if int(l.get("lot_number", -1)) == int(lot_number)), None)
+    if lot is None:
+        raise HTTPException(status_code=404, detail="Lot not found")
+
+    # Seller-account-type gate (partner overrides everything).
+    seller = None
+    if listing.get("seller_id"):
+        seller = await db.users.find_one({"id": listing["seller_id"]}, {"_id": 0})
+    seller_account_type = (listing.get("seller_account_type")
+                           or (seller.get("account_type") if seller else None)
+                           or "individual").lower()
+
+    unit_bid = float(bid_amount) if bid_amount is not None else float(
+        lot.get("current_price") or lot.get("starting_price") or 0
+    )
+    quantity = int(lot.get("quantity") or 1)
+    # Subtotal = per-unit bid × quantity (single-unit lots collapse to unit_bid).
+    subtotal = round(unit_bid * quantity, 2)
+
+    tier = (current_user.subscription_tier if current_user else "standard") or "standard"
+    tier = tier.lower()
+    tier = TIER_ALIASES.get(tier, tier)
+    if tier not in INDIVIDUAL_BUYER_RATES:
+        tier = "standard"
+
+    if seller_account_type == "partner":
+        rate = float(listing.get("configured_buyer_premium_rate")
+                     or (seller.get("configured_buyer_premium_rate") if seller else None)
+                     or INDIVIDUAL_BUYER_RATES["standard"])
+        rate_source = "partner_configured"
+    else:
+        rate = float(INDIVIDUAL_BUYER_RATES[tier])
+        rate_source = f"buyer_tier_{tier}"
+
+    buyer_premium = round(subtotal * rate, 2)
+
+    # Tax-free = private sale (individual seller). Only the platform fee is
+    # ever taxed. Everything else follows the QC blended tax (14.975 %) as the
+    # displayed hint — the actual tax is calculated at checkout using the
+    # buyer's province.
+    is_private_sale = seller_account_type == "individual"
+    TAX_HINT_RATE = 0.14975  # GST 5% + QST 9.975% blended (QC hint)
+    tax_status = "tax_free" if is_private_sale else "per_province"
+
+    if is_private_sale:
+        tax_on_hammer = 0.0
+        tax_on_fee = round(buyer_premium * TAX_HINT_RATE, 2)
+    else:
+        tax_on_hammer = round(subtotal * TAX_HINT_RATE, 2)
+        tax_on_fee = round(buyer_premium * TAX_HINT_RATE, 2)
+    tax_amount = round(tax_on_hammer + tax_on_fee, 2)
+
+    estimated_total = round(subtotal + buyer_premium + tax_amount, 2)
+    deposit_required = float(listing.get("deposit_amount") or 0)
+
+    # Leader initials for the Auction Summary card (uses masked-history helper).
+    leader_initials = None
+    try:
+        top_bid = await db.bids.find(
+            {"listing_id": listing_id, "lot_number": int(lot_number)},
+            {"_id": 0, "bidder_id": 1, "amount": 1, "created_at": 1},
+        ).sort([("amount", -1), ("created_at", 1)]).to_list(1)
+        if top_bid and top_bid[0].get("bidder_id"):
+            leader_doc = await db.users.find_one(
+                {"id": top_bid[0]["bidder_id"]},
+                {"_id": 0, "first_name": 1, "last_name": 1, "name": 1, "email": 1},
+            )
+            leader_initials = _initials(leader_doc, "??")
+    except Exception:  # noqa: BLE001
+        leader_initials = None
+
+    return {
+        "hammer": unit_bid,          # per-unit bid the buyer typed
+        "unit_bid": unit_bid,
+        "quantity": quantity,
+        "subtotal": subtotal,        # unit_bid × quantity
+        "lot_total": subtotal,       # alias (kept for older callers)
+        "buyer_premium_rate": rate,
+        "buyer_premium_rate_pct": round(rate * 100, 2),
+        "buyer_premium_amount": buyer_premium,
+        "buyer_premium_source": rate_source,
+        "buyer_tier": tier,
+        "tax_status": tax_status,
+        "tax_rate_pct": round(TAX_HINT_RATE * 100, 3),
+        "tax_on_hammer": tax_on_hammer,
+        "tax_on_fee": tax_on_fee,
+        "tax_amount": tax_amount,
+        "is_private_sale": is_private_sale,
+        "deposit_required": deposit_required,
+        "estimated_total": estimated_total,
+        "currency": listing.get("currency") or "CAD",
+        "payment_method": "bidvex_stripe_checkout",
+        "leading_bidder_initials": leader_initials,
+        "seller_account_type": seller_account_type,
+    }

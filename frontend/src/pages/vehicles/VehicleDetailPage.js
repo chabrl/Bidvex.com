@@ -8,6 +8,7 @@ import ErrorBoundary from '../../components/ErrorBoundary';
 
 import React, { useState, useEffect, useCallback } from 'react';
 import SafeImage from '../../components/SafeImage';
+import GlobalImageViewer from '../../components/GlobalImageViewer';
 import VehicleBidPanel from '../../components/broker/VehicleBidPanel';
 import ListingJsonLd from '../../components/seo/ListingJsonLd';
 import SEO from '../../components/SEO';
@@ -125,9 +126,10 @@ const getConditionColor = (condition) => {
   }
 };
 
-// Image Gallery Component
+// Image Gallery Component — iter369 wires GlobalImageViewer for fullscreen zoom
 const ImageGallery = ({ media = [] }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [viewerOpen, setViewerOpen] = useState(false);
   const photos = media.filter(m => m.type === 'photo');
   
   if (photos.length === 0) {
@@ -145,20 +147,22 @@ const ImageGallery = ({ media = [] }) => {
         <SafeImage
           src={photos[currentIndex]?.url}
           alt={`Vehicle photo ${currentIndex + 1}`}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-cover cursor-zoom-in"
+          onClick={() => setViewerOpen(true)}
+          data-testid="vehicle-detail-main-image"
         />
         
         {/* Navigation Arrows */}
         {photos.length > 1 && (
           <>
             <button
-              onClick={() => setCurrentIndex(i => (i - 1 + photos.length) % photos.length)}
+              onClick={(e) => { e.stopPropagation(); setCurrentIndex(i => (i - 1 + photos.length) % photos.length); }}
               className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-black/50 hover:bg-black/70 rounded-full flex items-center justify-center text-white transition-colors"
             >
               <ChevronLeft className="h-6 w-6" />
             </button>
             <button
-              onClick={() => setCurrentIndex(i => (i + 1) % photos.length)}
+              onClick={(e) => { e.stopPropagation(); setCurrentIndex(i => (i + 1) % photos.length); }}
               className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-black/50 hover:bg-black/70 rounded-full flex items-center justify-center text-white transition-colors"
             >
               <ChevronRight className="h-6 w-6" />
@@ -185,8 +189,8 @@ const ImageGallery = ({ media = [] }) => {
         {photos.map((photo, index) => (
           <button
             key={photo.id || index}
-            onClick={() => setCurrentIndex(index)}
-            className={`flex-shrink-0 w-20 h-14 rounded-lg overflow-hidden border-2 transition-all ${
+            onClick={() => { setCurrentIndex(index); setViewerOpen(true); }}
+            className={`flex-shrink-0 w-20 h-14 rounded-lg overflow-hidden border-2 cursor-zoom-in transition-all ${
               index === currentIndex 
                 ? 'border-blue-500 ring-2 ring-blue-500/30' 
                 : 'border-transparent hover:border-slate-300'
@@ -196,6 +200,14 @@ const ImageGallery = ({ media = [] }) => {
           </button>
         ))}
       </div>
+
+      {/* iter369 — Fullscreen image viewer */}
+      <GlobalImageViewer
+        open={viewerOpen}
+        onClose={() => setViewerOpen(false)}
+        images={photos.map(p => p.url)}
+        startIndex={currentIndex}
+      />
     </div>
   );
 };

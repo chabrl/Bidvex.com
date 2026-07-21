@@ -23,8 +23,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import Countdown from 'react-countdown';
-import Lightbox from 'react-image-lightbox';
-import 'react-image-lightbox/style.css';
+// iter369 — GlobalImageViewer replaces the legacy react-image-lightbox.
+import GlobalImageViewer from '../components/GlobalImageViewer';
 import AutoBidModal from '../components/AutoBidModal';
 import SubscriptionBadge from '../components/SubscriptionBadge';
 import SellerTierBadge from '../components/SellerTierBadge';
@@ -308,6 +308,19 @@ const MultiItemListingDetailPage = () => {
     setPhotoIndex(index);
     setLightboxOpen(true);
   };
+
+  // iter369 — Refetch the auction whenever a CompactLotCard successfully
+  // places an inline bid so `current_price` + `bid_count` update in place.
+  useEffect(() => {
+    const onBid = (ev) => {
+      if (ev?.detail?.auctionId === id) {
+        fetchListing();
+        toast.success(t('bid.placed', 'Bid placed successfully!'));
+      }
+    };
+    window.addEventListener('bidvex:lot-bid-placed', onBid);
+    return () => window.removeEventListener('bidvex:lot-bid-placed', onBid);
+  }, [id]);
 
   const scrollToLot = (lotNumber) => {
     const ref = lotRefs.current[lotNumber];
@@ -1287,8 +1300,9 @@ const MultiItemListingDetailPage = () => {
               </div>
             </div>
 
-            {/* Lots Display — iter367 P1: sort with a stable comparator */}
-            <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 gap-6' : 'space-y-6'}>
+            {/* Lots Display — iter367 P1: sort with a stable comparator.
+                iter369 — Higher density: 2 cols mobile-md, 3 cols lg, 4 xl. */}
+            <div className={viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4' : 'space-y-4'}>
               {[...listing.lots].sort((a, b) => {
                 const aEnd = a.lot_end_time ? new Date(a.lot_end_time).getTime() : Number.MAX_SAFE_INTEGER;
                 const bEnd = b.lot_end_time ? new Date(b.lot_end_time).getTime() : Number.MAX_SAFE_INTEGER;
@@ -1318,6 +1332,7 @@ const MultiItemListingDetailPage = () => {
                     auctionId={id}
                     listing={listing}
                     currentUserId={user?.id}
+                    incrementInfo={incrementInfo}
                     onOpenAutoBid={(l) => setAutoBidLot(l)}
                     onBuyNow={(l) => handleBuyNow(l)}
                     onNavigate={() => {
@@ -1486,23 +1501,13 @@ const MultiItemListingDetailPage = () => {
         </Sheet>
       </div>
 
-      {/* Image Lightbox */}
-      {lightboxOpen && lightboxImages.length > 0 && (
-        <Lightbox
-          mainSrc={lightboxImages[photoIndex]}
-          nextSrc={lightboxImages[(photoIndex + 1) % lightboxImages.length]}
-          prevSrc={lightboxImages[(photoIndex + lightboxImages.length - 1) % lightboxImages.length]}
-          onCloseRequest={() => setLightboxOpen(false)}
-          onMovePrevRequest={() =>
-            setPhotoIndex((photoIndex + lightboxImages.length - 1) % lightboxImages.length)
-          }
-          onMoveNextRequest={() =>
-            setPhotoIndex((photoIndex + 1) % lightboxImages.length)
-          }
-          imageTitle={`Image ${photoIndex + 1} of ${lightboxImages.length}`}
-          enableZoom={true}
-        />
-      )}
+      {/* Image Lightbox — iter369 uses GlobalImageViewer */}
+      <GlobalImageViewer
+        open={lightboxOpen}
+        onClose={() => setLightboxOpen(false)}
+        images={lightboxImages}
+        startIndex={photoIndex}
+      />
 
       {/* Message Seller Modal */}
       {listing && (
@@ -1624,6 +1629,19 @@ const MultiItemListingDetailPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* iter369 — Real Auto-Bid modal, opened by CompactLotCard clicks. */}
+      <AutoBidModal
+        open={!!autoBidLot}
+        onOpenChange={(o) => { if (!o) setAutoBidLot(null); }}
+        auctionId={id}
+        lot={autoBidLot}
+        incrementInfo={incrementInfo}
+        onSaved={() => {
+          fetchListing();
+          setAutoBidLot(null);
+        }}
+      />
     </div>
   );
 };

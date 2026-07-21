@@ -46,7 +46,10 @@ import PickupConfirmButton from '../components/PickupConfirmButton';
 import { VehicleFeeBreakdown, SellerContactGate } from '../components/vehicles/VehicleFeeBreakdown';
 import { CostBreakdown } from '../components/CostBreakdown'; // iter210 Step 6
 import Lightbox from 'yet-another-react-lightbox';
+import Zoom from 'yet-another-react-lightbox/plugins/zoom';
+import Counter from 'yet-another-react-lightbox/plugins/counter';
 import 'yet-another-react-lightbox/styles.css';
+import 'yet-another-react-lightbox/plugins/counter.css';
 import InfoTip from '../components/InfoTip';
 import ListingLogisticsDetails from '../components/ListingLogisticsDetails';
 import { useRealtimeBidding } from '../hooks/useRealtimeBidding';
@@ -423,11 +426,12 @@ const ListingDetailPage = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="space-y-4">
             <div 
-              className="aspect-square rounded-2xl overflow-hidden bg-gray-100 cursor-pointer hover:opacity-95 transition-opacity"
+              className="aspect-square rounded-2xl overflow-hidden bg-gray-100 cursor-zoom-in hover:opacity-95 transition-opacity"
               onClick={() => {
                 setPhotoIndex(0);
                 setLightboxOpen(true);
               }}
+              data-testid="listing-detail-main-image-wrapper"
             >
               {listing.images && listing.images.length > 0 ? (
                 <SafeImage
@@ -450,7 +454,7 @@ const ListingDetailPage = () => {
                 {listing.images.slice(1, 5).map((img, idx) => (
                   <div 
                     key={idx} 
-                    className="aspect-square rounded-lg overflow-hidden bg-gray-100 cursor-pointer hover:opacity-90 transition-opacity"
+                    className="aspect-square rounded-lg overflow-hidden bg-gray-100 cursor-zoom-in hover:opacity-90 transition-opacity"
                     onClick={() => {
                       setPhotoIndex(idx + 1);
                       setLightboxOpen(true);
@@ -1297,13 +1301,24 @@ const ListingDetailPage = () => {
         />
       )}
 
-      {/* Photo Lightbox */}
+      {/* Photo Lightbox — iter369 enhanced with Zoom + Counter plugins */}
       {lightboxOpen && listing?.images && (
         <Lightbox
           open={lightboxOpen}
           close={() => setLightboxOpen(false)}
           slides={listing.images.map(img => ({ src: img }))}
           index={photoIndex}
+          plugins={[Zoom, Counter]}
+          carousel={{ finite: false, preload: 2 }}
+          animation={{ fade: 260, swipe: 400 }}
+          zoom={{ maxZoomPixelRatio: 4, scrollToZoom: true, doubleClickMaxStops: 2 }}
+          counter={{ container: { style: { top: 'unset', bottom: 16, right: 16, left: 'unset' } } }}
+          styles={{
+            container: {
+              backgroundColor: 'rgba(0, 0, 0, 0.96)',
+              position: 'fixed', inset: 0, width: '100vw', height: '100vh', zIndex: 9999,
+            },
+          }}
         />
       )}
 
