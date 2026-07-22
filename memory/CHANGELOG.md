@@ -2054,3 +2054,45 @@ User-reported bugs on top of iter369, all fixed in one pass, zero regressions, 6
 - `testing_agent_v3_fork` iteration_372 → ALL 4 FIXES GREEN + all iter369 regressions holding, zero frontend/backend issues.
 
 **Zero credits charged.** Ready for GitHub push + deploy.
+
+
+---
+
+## Iteration 371 (2026-07-22) — 5 zero-credit hotfixes
+
+User-reported issues on top of iter370. All GREEN after `testing_agent_v3_fork` iteration_373 with zero frontend/backend issues.
+
+### FIX A — Tax logic override for private-sale listings by broker sellers
+- Added `listing.is_tax_free` explicit-override field. Reads on `GET /api/multi-item-listings/{id}/lots/{n}/fees-preview` BEFORE the seller_account_type heuristic. `True` → tax-free, `False` → forced taxable, `None` → fall back to `seller_account_type == "individual"`.
+- Fixed the "Absolute Multi-Lot Clearance" listing (179b62b9-fa28-4140-b36d-f5903b033f48) in the DB: `is_tax_free=true`, `seller_account_type=individual` (seller Alex Boulanger sells personal items privately even though his account_type is broker).
+- Live-verified fees-preview: `is_tax_free: true`, `tax_on_hammer: 0`, total for qty=2 × $2 bid = **$4.59 CAD** (was $5.19 with 14.975% tax on hammer). Popover now shows the green ✓ Tax-Free banner.
+
+### FIX B — "Fees" text overlay/spellcheck squiggle
+- Added `spellCheck={false}` + `translate="no"` to the Fees + Auto-Bid buttons AND their inner spans on `CompactLotCard`. No browser can now underline "Fees" as a mis-spelled word or wrap it with a translation decorator.
+- Verified: `button.spellcheck === false`, `span.spellcheck === false`, `translate="no"`.
+
+### FIX C — Page must open from the top on every navigation
+- Rewrote `/app/frontend/src/components/ScrollToTop.js` with 3 failsafes: `useLayoutEffect` (immediate) + `requestAnimationFrame` (post-paint) + 3 delayed timeouts (60 / 300 / 700 ms) to defeat async layout shifts from lazy images.
+- Skips when the URL has a hash (`#foo`) or a deep-link query param (`?lot=N`, `?buy_now=1`, `?target_lot=N`) so anchor scroll + Buy Now / lot deep-links still work.
+- Live-verified: marketplace scrolled to bottom (scrollY = 4292) → navigate to `/lots/{id}` → scroll resets to **0**.
+
+### FIX D — Terms & Conditions PDF download 500 error
+- Rewrote `GET /api/multi-item-listings/{id}/terms/pdf` in pure reportlab (already at v4.4.0 in requirements). Dropped weasyprint (needed Pango/Cairo/GDK-Pixbuf system packages not in this container image).
+- Sanitises the stored HTML: strips scripts/styles, converts block tags to `<br/>`, whitelists `<b>/<i>/<u>` for reportlab paragraphs.
+- Renders through SimpleDocTemplate with BidVex-branded header, section titles, HR separators, and footer.
+- Returns proper `Content-Disposition: attachment; filename="bidvex-terms-{slug}.pdf"`.
+- Live-verified: HTTP 200 + application/pdf + valid `%PDF-1.4` header + 8491 bytes.
+
+### FIX E — Bid history: single source of truth = MaskedBidHistory
+- `MaskedBidHistory.jsx` now supports both `listingId` (single listing) and `auctionId + lotNumber` (multi-lot) props.
+- Added new backend endpoint `GET /api/listings/{listing_id}/bids-public` mirroring the multi-lot shape (`total_bids`, `unique_bidders`, `leading_bidder_initials`, `bids: [{initials, ip_masked, amount, created_at, status}]`).
+- Removed the legacy bid history block on `ListingDetailPage.js` that leaked `bidder_name` — replaced with `<MaskedBidHistory listingId={id} />`.
+- Removed `PublicBidHistory` from `MultiItemListingDetailPage.js` — replaced with `<MaskedBidHistory auctionId lotNumber />` under a heading card.
+- Law 25 / PIPEDA compliant: initials only + IP first-and-last-octet mask (e.g. "SN · 131.***.***.63"). No exposure of full name / email / IP / user ID.
+
+### Tests
+- `backend/tests/test_iter371_hotfixes.py` — 9 static + 5 live-HTTP tests for all 5 fixes.
+- 67/67 pytest passing (iter367 + iter368 + iter369 + iter370 + iter371).
+- `testing_agent_v3_fork` iteration_373 → **ALL 5 FIXES GREEN, zero regressions**.
+
+**Zero credits charged.** Ready for GitHub push + deploy.

@@ -13347,3 +13347,19 @@ Full details: `/app/memory/CHANGELOG.md` iteration 370.
 - `testing_agent_v3_fork` iteration_372 → ALL 4 FIXES GREEN, zero frontend/backend issues, zero iter369 regressions
 
 **Zero credits charged.** Ready for GitHub push + deploy.
+
+
+---
+
+## Iteration 371 (2026-07-22) — 5 zero-credit hotfixes
+Full details: `/app/memory/CHANGELOG.md` iteration 371.
+
+- **FIX A tax logic**: added `listing.is_tax_free` override; fixed "Absolute Multi-Lot Clearance" data → now correctly renders as Tax-Free ($4.59 CAD total for 2 × $2 bid).
+- **FIX B "Fees" overlay**: `spellCheck={false}` + `translate="no"` on button + span kills browser spellcheck squiggle.
+- **FIX C scroll on nav**: hardened ScrollToTop (useLayoutEffect + rAF + 3 timeouts + hash/deep-link skip). Live-verified 4292 → 0.
+- **FIX D PDF download**: rewrote `/terms/pdf` in reportlab (weasyprint had missing OS deps). Returns valid `%PDF-1.4` + 8491 bytes.
+- **FIX E bid history**: MaskedBidHistory supports both listingId + (auctionId, lotNumber); new `/api/listings/{id}/bids-public`; legacy PublicBidHistory removed. Law 25 / PIPEDA compliant across all detail pages.
+
+### Tests: 67/67 pytest + testing_agent_v3_fork iteration_373 → **ALL GREEN**.
+
+**Zero credits charged.** Ready for GitHub push + deploy.
