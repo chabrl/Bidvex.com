@@ -36,7 +36,7 @@ import MessageSellerModal from '../components/MessageSellerModal';
 import BidErrorGuide from '../components/BidErrorGuide';
 import VerificationRequiredModal from '../components/VerificationRequiredModal';
 import PrivateSaleBadge, { BusinessSellerBadge, SellerAccountBadge } from '../components/PrivateSaleBadge';
-import PublicBidHistory from '../components/PublicBidHistory';
+import MaskedBidHistory from '../components/MaskedBidHistory';
 import ListingJsonLd from '../components/seo/ListingJsonLd';
 import SEO from '../components/SEO';
 import { useMetaPixelTracking } from '../hooks/useMetaPixelTracking';
@@ -1116,14 +1116,20 @@ const MultiItemListingDetailPage = () => {
                       </Card>
                     )}
 
-                    {/* Public Bid History - Transparency Feature */}
+                    {/* iter371 — Masked bid history (Law 25 / PIPEDA):
+                        initials only + first/last IP octets. Replaces the
+                        legacy PublicBidHistory that exposed pseudo-names. */}
                     {selectedLot && (
-                      <PublicBidHistory 
-                        listingId={listing.id}
-                        lotNumber={selectedLot.lot_number}
-                        currentPrice={selectedLot.current_price}
-                        sellerExchangeRate={listing.seller_obligations?.custom_exchange_rate}
-                      />
+                      <div className="mb-6 rounded-lg border border-slate-200 dark:border-slate-800 p-4 bg-white dark:bg-slate-900">
+                        <div className="text-sm font-semibold text-slate-900 dark:text-white mb-2">
+                          {t('listing.bidHistory', 'Bid History')}
+                        </div>
+                        <MaskedBidHistory
+                          auctionId={listing.id}
+                          lotNumber={selectedLot.lot_number}
+                          limit={20}
+                        />
+                      </div>
                     )}
 
                     {/* Auction Terms & Conditions - Enhanced with Show More/Less and Agreement */}

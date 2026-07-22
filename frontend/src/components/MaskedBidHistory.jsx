@@ -31,20 +31,25 @@ const relativeTime = (iso, isFR) => {
   return isFR ? `il y a ${days} j` : `${days}d ago`;
 };
 
-export default function MaskedBidHistory({ auctionId, lotNumber, limit = 20 }) {
+export default function MaskedBidHistory({ auctionId, lotNumber, listingId, limit = 20 }) {
   const { i18n } = useTranslation();
   const isFR = i18n.language?.startsWith('fr');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!auctionId || lotNumber == null) return;
+    // iter371 — supports both endpoints:
+    //   • Multi-lot: /multi-item-listings/{auctionId}/lots/{lotNumber}/bids-public
+    //   • Single listing: /listings/{listingId}/bids-public
+    const url = listingId
+      ? `${API_BASE}/listings/${listingId}/bids-public`
+      : (auctionId && lotNumber != null
+          ? `${API_BASE}/multi-item-listings/${auctionId}/lots/${lotNumber}/bids-public`
+          : null);
+    if (!url) return;
     let cancelled = false;
     const fetchOnce = () => axios
-      .get(`${API_BASE}/multi-item-listings/${auctionId}/lots/${lotNumber}/bids-public`, {
-        params: { limit },
-        timeout: 8000,
-      })
+      .get(url, { params: { limit }, timeout: 8000 })
       .then((res) => { if (!cancelled) { setData(res.data); setLoading(false); } })
       .catch(() => { if (!cancelled) setLoading(false); });
 
@@ -52,7 +57,7 @@ export default function MaskedBidHistory({ auctionId, lotNumber, limit = 20 }) {
     // Poll every 10 s while tab is visible — keeps the "leading" bidder fresh.
     const t = setInterval(() => { if (!document.hidden) fetchOnce(); }, 10000);
     return () => { cancelled = true; clearInterval(t); };
-  }, [auctionId, lotNumber, limit]);
+  }, [auctionId, lotNumber, listingId, limit]);
 
   if (loading) {
     return (

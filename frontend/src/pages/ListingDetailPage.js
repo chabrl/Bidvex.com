@@ -23,6 +23,7 @@ import PromotionManagerModal from '../components/PromotionManagerModal';
 import WatchlistButton from '../components/WatchlistButton';
 import SocialShare from '../components/SocialShare';
 import AutoBidModal from '../components/AutoBidModalLegacy';
+import MaskedBidHistory from '../components/MaskedBidHistory';
 import MessageSellerModal from '../components/MessageSellerModal';
 import RateSellerModal from '../components/RateSellerModal';
 import AuctioneerInfo from '../components/AuctioneerInfo';
@@ -1200,59 +1201,9 @@ const ListingDetailPage = () => {
                   <CardTitle className="text-lg">{t('listing.bidHistory', 'Bid History')}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-3">
-                    {bids.slice(0, 5).map((bid) => (
-                      <div 
-                        key={bid.id} 
-                        className="flex flex-col sm:flex-row justify-between items-start sm:items-center py-3 border-b last:border-0 gap-2 hover:bg-accent/5 rounded-lg transition-colors px-2"
-                      >
-                        {/* Bidder Info with Avatar */}
-                        <div className="flex items-center gap-3 group relative">
-                          {/* Avatar */}
-                          {bid.bidder_avatar ? (
-                            <img 
-                              src={bid.bidder_avatar} 
-                              alt={bid.bidder_name}
-                              className="w-10 h-10 rounded-full border-2 border-primary/20 object-cover"
-                            />
-                          ) : (
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white font-bold text-sm">
-                              {bid.bidder_name?.charAt(0)?.toUpperCase() || 'B'}
-                            </div>
-                          )}
-                          
-                          {/* Bidder Name */}
-                          <div className="flex flex-col">
-                            <span className="text-sm font-medium">{bid.bidder_name || 'Anonymous'}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {new Date(bid.created_at).toLocaleString()}
-                            </span>
-                          </div>
-                          
-                          {/* Tooltip on hover */}
-                          <div className="absolute left-0 -top-10 bg-gray-900 text-white text-xs px-3 py-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
-                            Bid placed by {bid.bidder_name || 'Anonymous'}
-                            <div className="absolute left-6 bottom-0 transform translate-y-1/2 rotate-45 w-2 h-2 bg-gray-900"></div>
-                          </div>
-                        </div>
-                        
-                        {/* Bid Amount */}
-                        <span className="font-bold text-lg gradient-text">{formatListingPrice(bid.amount, listing.currency)}</span>
-                      </div>
-                    ))}
-                  </div>
-                  
-                  {bids.length > 5 && (
-                    <div className="mt-4 text-center">
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => {/* Could expand to show all bids */}}
-                      >
-                        View All {bids.length} Bids
-                      </Button>
-                    </div>
-                  )}
+                  {/* iter371 — Masked bid history (Law 25 / PIPEDA compliant):
+                      shows initials only + masked IP + relative time. */}
+                  <MaskedBidHistory listingId={id} limit={20} />
                 </CardContent>
               </Card>
             )}

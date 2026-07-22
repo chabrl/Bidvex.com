@@ -370,10 +370,12 @@ export default function CompactLotCard({
                   if (onOpenAutoBid) onOpenAutoBid(lot);
                   else setAutoBidOpen(true);
                 }}
+                spellCheck={false}
+                translate="no"
                 data-testid={`lot-card-${lot.lot_number}-auto-bid`}
               >
                 <Bot className="h-3 w-3 mr-1 flex-shrink-0" />
-                <span className="truncate">{isFR ? 'Auto-enchère' : 'Auto-Bid'}</span>
+                <span className="truncate" spellCheck={false} translate="no">{isFR ? 'Auto-enchère' : 'Auto-Bid'}</span>
               </Button>
               <Popover onOpenChange={(o) => { if (o) loadFees(); }}>
                 <PopoverTrigger asChild>
@@ -382,10 +384,12 @@ export default function CompactLotCard({
                     variant="outline"
                     className="flex-1 min-w-0 h-8 px-2 text-[11px] font-semibold whitespace-nowrap overflow-hidden text-ellipsis"
                     onClick={(e) => e.stopPropagation()}
+                    spellCheck={false}
+                    translate="no"
                     data-testid={`lot-card-${lot.lot_number}-fees-btn`}
                   >
                     <Info className="h-3 w-3 mr-1 flex-shrink-0" />
-                    <span className="truncate">{isFR ? 'Frais' : 'Fees'}</span>
+                    <span className="truncate" spellCheck={false} translate="no">{isFR ? 'Frais' : 'Fees'}</span>
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent side="top" className="w-80 p-3" data-testid={`lot-card-${lot.lot_number}-fees-popover`} onClick={(e) => e.stopPropagation()}>

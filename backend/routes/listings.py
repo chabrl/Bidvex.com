@@ -1675,10 +1675,26 @@ async def get_multi_lot_recent_activity(auction_id: str, limit: int = 10):
 
 @listings_router.get("/multi-item-listings/{listing_id}/terms/pdf")
 async def export_auction_terms_pdf(listing_id: str):
-    """Export auction terms as a PDF file."""
-    from fastapi.responses import FileResponse
-    from weasyprint import HTML
-    import os
+    """iter371 — Export auction terms as a PDF using reportlab.
+
+    The previous implementation depended on weasyprint (which needs Pango /
+    Cairo / GDK-Pixbuf system packages that aren't in this container image).
+    Rewritten in pure reportlab so the endpoint works out of the box in every
+    environment.
+    """
+    from fastapi.responses import Response
+    from io import BytesIO
+    from html import unescape
+    import re
+
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import cm
+    from reportlab.lib import colors
+    from reportlab.platypus import (
+        SimpleDocTemplate, Paragraph, Spacer, HRFlowable,
+    )
+    from reportlab.lib.enums import TA_CENTER
 
     db = get_db()
     try:
@@ -1686,82 +1702,135 @@ async def export_auction_terms_pdf(listing_id: str):
         if not listing:
             raise HTTPException(status_code=404, detail="Auction not found")
 
-        seller = await db.users.find_one({"id": listing["seller_id"]}, {"_id": 0, "password": 0})
-        seller_name = seller.get("company_name") or seller.get("name", "Unknown Seller")
+        seller = await db.users.find_one({"id": listing["seller_id"]}, {"_id": 0, "password": 0}) or {}
+        seller_name = seller.get("company_name") or seller.get("name") or "Unknown Seller"
 
-        terms_en = listing.get("auction_terms_en", "")
-        terms_fr = listing.get("auction_terms_fr", "")
+        terms_en = listing.get("auction_terms_en", "") or ""
+        terms_fr = listing.get("auction_terms_fr", "") or ""
 
         if not terms_en and not terms_fr:
             raise HTTPException(status_code=404, detail="No auction terms available")
 
-        html_content = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <style>
-                @page {{ size: A4; margin: 2cm; }}
-                body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
-                .header {{ text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #2563eb; }}
-                .header h1 {{ color: #2563eb; margin: 0 0 10px 0; }}
-                .header p {{ margin: 5px 0; color: #666; }}
-                .section {{ margin: 30px 0; }}
-                .section-title {{ font-size: 20px; font-weight: bold; color: #2563eb; margin-bottom: 15px; padding-bottom: 5px; border-bottom: 1px solid #ddd; }}
-                .terms-content {{ margin: 15px 0; }}
-                .footer {{ margin-top: 50px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; font-size: 12px; color: #666; }}
-            </style>
-        </head>
-        <body>
-            <div class="header">
-                <h1>BidVex Auction Platform</h1>
-                <p style="font-size: 18px; font-weight: bold;">{listing.get('title', 'Auction')}</p>
-                <p>Hosted by: {seller_name}</p>
-                <p>Auction ID: {listing_id}</p>
-            </div>
-        """
+        # ---- Sanitize + tag-strip helper --------------------------------
+        # We can't render raw HTML in reportlab paragraphs, so we normalise
+        # markdown-ish input into plain paragraphs while keeping <b>/<i>/<br>
+        # (reportlab understands those). Strips scripts/styles first.
+        def _clean(html_text: str) -> str:
+            if not html_text:
+                return ""
+            # Kill script/style blocks entirely
+            html_text = re.sub(r"<(script|style)[^>]*>.*?</\1>", "", html_text,
+                                flags=re.IGNORECASE | re.DOTALL)
+            # Convert block-level tags to line breaks so structure survives.
+            html_text = re.sub(r"</?(?:p|div|section|article|header|footer|ul|ol|table|tr|td|th|h[1-6])[^>]*>",
+                                "<br/>", html_text, flags=re.IGNORECASE)
+            html_text = re.sub(r"<li[^>]*>", "&#8226; ", html_text, flags=re.IGNORECASE)
+            html_text = re.sub(r"</li>", "<br/>", html_text, flags=re.IGNORECASE)
+            # Whitelist inline tags that reportlab supports natively.
+            keep = ("br", "b", "i", "u", "strong", "em")
+            def replace_tag(match: "re.Match") -> str:
+                tag = match.group(1).lower()
+                # normalize <strong>/<em> aliases
+                if tag in keep:
+                    slash = "/" if match.group(0).startswith("</") else ""
+                    return f"<{slash}{tag}/>" if tag == "br" else f"<{slash}{tag}>"
+                return ""
+            html_text = re.sub(r"</?([a-zA-Z][a-zA-Z0-9]*)[^>]*>", replace_tag, html_text)
+            html_text = unescape(html_text)
+            # Collapse runs of whitespace / consecutive <br/> to at most two.
+            html_text = re.sub(r"(\s*<br\s*/?>\s*){3,}", "<br/><br/>", html_text)
+            html_text = re.sub(r"[\r\n\t]+", " ", html_text)
+            html_text = re.sub(r" {2,}", " ", html_text)
+            return html_text.strip()
+
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(
+            buffer, pagesize=A4,
+            leftMargin=2 * cm, rightMargin=2 * cm,
+            topMargin=2 * cm, bottomMargin=2 * cm,
+            title=f"BidVex Auction Terms – {listing.get('title', listing_id)}",
+        )
+
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            "TitleBidVex", parent=styles["Title"],
+            textColor=colors.HexColor("#2563eb"), fontName="Helvetica-Bold",
+            fontSize=20, alignment=TA_CENTER, spaceAfter=8,
+        )
+        subtitle_style = ParagraphStyle(
+            "SubtitleBidVex", parent=styles["Normal"],
+            fontSize=13, fontName="Helvetica-Bold", alignment=TA_CENTER, spaceAfter=4,
+        )
+        meta_style = ParagraphStyle(
+            "MetaBidVex", parent=styles["Normal"],
+            fontSize=10, textColor=colors.HexColor("#555555"),
+            alignment=TA_CENTER, spaceAfter=2,
+        )
+        section_style = ParagraphStyle(
+            "SectionBidVex", parent=styles["Heading2"],
+            textColor=colors.HexColor("#2563eb"), fontName="Helvetica-Bold",
+            fontSize=15, spaceBefore=18, spaceAfter=10,
+        )
+        body_style = ParagraphStyle(
+            "BodyBidVex", parent=styles["BodyText"],
+            fontSize=10.5, leading=15, spaceAfter=6,
+        )
+        footer_style = ParagraphStyle(
+            "FooterBidVex", parent=styles["Normal"],
+            fontSize=9, textColor=colors.HexColor("#777777"),
+            alignment=TA_CENTER, spaceBefore=20,
+        )
+
+        story = [
+            Paragraph("BidVex Auction Platform", title_style),
+            Paragraph(listing.get("title", "Auction"), subtitle_style),
+            Paragraph(f"Hosted by: {seller_name}", meta_style),
+            Paragraph(f"Auction ID: {listing_id}", meta_style),
+            Spacer(1, 6),
+            HRFlowable(width="100%", thickness=1.5, color=colors.HexColor("#2563eb")),
+            Spacer(1, 14),
+        ]
 
         if terms_en:
-            html_content += f"""
-            <div class="section">
-                <div class="section-title">Terms & Conditions (English)</div>
-                <div class="terms-content">{terms_en}</div>
-            </div>
-            """
+            story.append(Paragraph("Terms &amp; Conditions (English)", section_style))
+            for block in _clean(terms_en).split("<br/><br/>"):
+                block = block.strip()
+                if not block:
+                    continue
+                story.append(Paragraph(block, body_style))
+                story.append(Spacer(1, 4))
 
         if terms_fr:
-            html_content += f"""
-            <div class="section">
-                <div class="section-title">Termes et Conditions (Fran\u00e7ais)</div>
-                <div class="terms-content">{terms_fr}</div>
-            </div>
-            """
+            story.append(Spacer(1, 8))
+            story.append(Paragraph("Termes et Conditions (Fran\u00e7ais)", section_style))
+            for block in _clean(terms_fr).split("<br/><br/>"):
+                block = block.strip()
+                if not block:
+                    continue
+                story.append(Paragraph(block, body_style))
+                story.append(Spacer(1, 4))
 
-        html_content += """
-            <div class="footer">
-                <p>This document was generated by BidVex Auction Platform</p>
-                <p>For questions, please contact the auctioneer listed above</p>
-            </div>
-        </body>
-        </html>
-        """
+        story.append(Spacer(1, 12))
+        story.append(HRFlowable(width="100%", thickness=0.6, color=colors.HexColor("#dddddd")))
+        story.append(Paragraph(
+            "This document was generated by BidVex Auction Platform. "
+            "For questions, please contact the auctioneer listed above.",
+            footer_style,
+        ))
 
-        pdf_dir = "/app/temp_pdfs"
-        os.makedirs(pdf_dir, exist_ok=True)
-        pdf_filename = f"auction_terms_{listing_id}.pdf"
-        pdf_path = os.path.join(pdf_dir, pdf_filename)
+        doc.build(story)
+        pdf_bytes = buffer.getvalue()
+        buffer.close()
 
-        HTML(string=html_content).write_pdf(pdf_path)
-
-        return FileResponse(
-            path=pdf_path,
-            filename=pdf_filename,
+        safe_filename = re.sub(r"[^a-z0-9_-]+", "-", (listing.get("title") or listing_id).lower())[:60]
+        return Response(
+            content=pdf_bytes,
             media_type="application/pdf",
-            headers={"Content-Disposition": f"attachment; filename={pdf_filename}"}
+            headers={"Content-Disposition": f'attachment; filename="bidvex-terms-{safe_filename}.pdf"'},
         )
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(f"Error generating auction terms PDF: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to generate PDF: {str(e)}")
 

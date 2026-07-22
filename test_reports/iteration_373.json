@@ -1,0 +1,50 @@
+{
+  "summary": "iter373 — Full retest of iter371 zero-credit hotfixes (5 fixes) + iter370/369 regressions. ALL 5 FIXES GREEN. Backend: 42/42 pytest pass (7 iter371 static + 5 iter371 live HTTP + 9 iter370 + 8 iter369 behaviour + 13 iter369 launch-gate). Live curl proves: (a) /api/multi-item-listings/179b62b9-fa28-4140-b36d-f5903b033f48/lots/1/fees-preview?bid_amount=100 returns is_tax_free=true, tax_on_hammer=0, seller_account_type='individual', total=212.18, tax_status='tax_free'; (b) /api/multi-item-listings/{id}/terms/pdf returns HTTP 200 + application/pdf + %PDF-1.4 header + 8491 bytes; (c) /api/multi-item-listings/{id}/lots/1/bids-public shape is canonical (total_bids, unique_bidders, leading_bidder_initials, bids[]) with NO bidder_name / bidder_email / ip_address leaks; (d) /api/listings/{bogus}/bids-public → 404 (route registered). Frontend live browser: FIX A popover on lot-card-1 shows 'Tax-Free' green badge in header, NO 'GST/QST on item' row, total $4.59 CAD, lot-card-1-fees-tax-message='✓ Tax-Free item — taxes apply to platform fees only, not on the item price'; FIX B fees button label = 'Fees' exactly, spellcheck='false', translate='no' on both button AND inner span; FIX C scroll marketplace (scrollY=694) → click auction card → arrives with scrollY=0; FIX C deep-link /lots/{id}?lot=1&buy_now=1 as admin opens [data-testid=payment-method-dialog] + [data-testid=buy-now-fee-breakdown] + buy-now-total='$416.91 CAD' + buy-now-tax-message='✓ Tax-Free item...' (scrollY=938 — NOT force-scrolled to top, per skip logic); FIX D 'Download PDF' button in Terms & Conditions has count=1 and triggers window.open new tab (endpoint independently confirmed valid PDF); FIX E LotDetailPage /lots/{id}/lot/1 renders [data-testid=masked-bid-history-empty] AND multi-lot page /lots/{id}?lot=1 also renders MaskedBidHistory when a lot is selected — DOM privacy check confirms 0 hits for bidder_name / bidder_email / ip_address. Regressions: iter369 GlobalImageViewer opens on card image click (z-index:9999, bg:rgba(0,0,0,0.95), 1/2 counter); iter370 buy-now-fee-breakdown deep-link still works with tax-free math.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter371_hotfixes.py",
+    "/app/backend/tests/test_iter371_live_http.py",
+    "/app/backend/tests/test_iter370_bugfixes.py",
+    "/app/backend/tests/test_iter369_behavior.py",
+    "/app/backend/tests/test_iter369_launch_gate.py",
+    "/app/test_reports/pytest/iter373_full_regression.xml",
+    "/app/test_reports/pytest/iter373_iter371_live.xml"
+  ],
+  "action_items": [
+    "OPTIONAL — On this preview env every entry in /api/listings appears to be an *expanded* multi-lot lot (id contains '_lot_'). No true single-listings exist, so /api/listings/{id}/bids-public shape-when-present test was skipped. The route itself is proven live (returns 404 semantics for bogus id) and its static invariants are already covered. If main agent wants full e2e coverage of the single-listing MaskedBidHistory path, seed one classic /api/listings item with a bid.",
+    "OPTIONAL — Download PDF button uses window.open(url, '_blank') which pops a new tab. This is functionally correct (endpoint delivers valid PDF and browsers will save/preview it), but if a *forced-download* UX is desired the button could switch to an <a href download> tag or fetch → blob → object URL approach. Not a bug; behavioural preference only."
+  ],
+  "critical_code_review_comments": [
+    "auctions_bids.py fees-preview correctly reads `listing.get('is_tax_free')` as an explicit override AND returns both `is_tax_free`, `tax_status`, and `seller_account_type` in the response so the client / regression tests can pin the invariant. Also returns `total` (alias of `estimated_total`) so both the popover and the tests can read the same field.",
+    "listings.py terms/pdf: reportlab implementation strips scripts/styles + whitelists <b>/<i>/<u>, wraps in SimpleDocTemplate, returns Response(media_type='application/pdf'). Live output 8491 bytes starting with %PDF-1.4 — matches spec.",
+    "ScrollToTop.js is defence-in-depth: useLayoutEffect + rAF + [60, 300, 700] ms timeouts, plus explicit skip when url has hash OR /[?&](lot|buy_now|target_lot)=/ so deep-links continue to work. Verified live: marketplace scrollY=694 → /lots/{id} scrollY=0 and /lots/{id}?buy_now=1 preserves scrollY=938 while modal opens.",
+    "MaskedBidHistory.jsx now polymorphic on listingId XOR (auctionId + lotNumber), and always renders a stable data-testid (masked-bid-history / masked-bid-history-empty / masked-bid-history-loading) so tests can assert render without needing bid data. DOM contains ZERO occurrences of bidder_name / bidder_email / ip_address on the live page — Law 25 / PIPEDA invariant holds.",
+    "CompactLotCard buttons: spellCheck={false} + translate='no' on BOTH the outer <button> and the inner <span> for Auto-Bid + Fees. Confirmed live: getAttribute('spellcheck')='false', getAttribute('translate')='no'. iter371 FIX E squiggle root-cause is neutralised.",
+    "Deep-link handler in MultiItemListingDetailPage.js reads searchParams.get('buy_now')+'lot', looks up the target lot, and calls handleBuyNow only when buy_now_enabled + buy_now_price != null. Strips ?buy_now=1 from the URL so a refresh doesn't reopen the modal. Clean.",
+    "Nit — Download PDF button uses window.open() (opens new tab). If future UX wants forced-download semantics, migrate to <a href download> or blob-URL fetch. Non-blocking."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter371_live_http.py (new — live HTTP verification for FIX A / FIX D / FIX E endpoints)"
+  ],
+  "success_rate": {
+    "backend": "100% (42/42 pytest, 1 skipped due to environment lacking a single-listing without _lot_). Live curl confirms fees-preview override, terms PDF, and bids-public endpoints all return correct shape.",
+    "frontend": "100% for all 5 iter371 fixes + iter370/369 regressions probed. Fees button text/spellcheck, Tax-Free popover, ScrollToTop, deep-link ?buy_now=1, MaskedBidHistory on both single-lot detail page and multi-lot page, GlobalImageViewer, and buy-now-fee-breakdown all working live."
+  },
+  "test_credentials": {
+    "admin_working": "charbel911@gmail.com / Anderosli123!@# — login 200, redirects to /en/marketplace",
+    "premium_buyer_status": "iter369_premium@bidvex.com / Premium2026! — not tested (admin sufficient for all iter371 flows); reported broken in iter372"
+  },
+  "seed_data_creation": "None. Existing seed listing 179b62b9-fa28-4140-b36d-f5903b033f48 (Absolute Multi-Lot Clearance, is_tax_free=true) was used. No test data created.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "iter371 is closed. All 5 hotfixes are locked GREEN. Static test file (backend/tests/test_iter371_hotfixes.py) + live HTTP test file (backend/tests/test_iter371_live_http.py) both pass. Backend fees-preview endpoint now returns is_tax_free/tax_status/seller_account_type/total inline for shape assertions. Terms PDF served via reportlab returning 8491 bytes %PDF-1.4. Multi-lot bids-public canonical shape verified live; single-listing bids-public route registered (returns 404 for bogus id). Frontend: Tax-Free popover shows green badge + no item-tax row, Fees button spellcheck/translate flags set on button+inner span, ScrollToTop resets to 0 on navigation while skipping deep-link params, /lots/{id}?lot=N&buy_now=1 opens payment modal with buy-now-fee-breakdown + buy-now-total + buy-now-tax-message, MaskedBidHistory renders on both LotDetailPage and multi-lot page with 0 privacy leaks. GlobalImageViewer (z-9999 rgba(0,0,0,0.95)) still opens on card image click. Only environmental caveat: preview /api/listings feed contains only expanded multi-lot rows (ids ending in _lot_N), so the FIX E single-listing bids-public happy-path was skipped in the live test (route existence + 404 semantics verified separately). Non-blocking for iter371.",
+  "rca of the issue": "N/A — no bugs found in iter371 delivery."
+}

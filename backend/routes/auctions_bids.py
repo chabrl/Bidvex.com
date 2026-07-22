@@ -1014,6 +1014,72 @@ async def get_listing_bids(listing_id: str, limit: int = 20):
     return enriched_bids
 
 
+@bids_router.get("/listings/{listing_id}/bids-public")
+async def get_listing_bids_public(listing_id: str, limit: int = 20):
+    """iter371 — Privacy-safe masked bid history for a single-item listing.
+
+    Mirrors the multi-lot `/multi-item-listings/{id}/lots/{n}/bids-public`
+    shape so the same `MaskedBidHistory` frontend component can render both.
+    """
+    db = get_db()
+    listing = await db.listings.find_one({"id": listing_id})
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+
+    limit = max(1, min(100, int(limit)))
+    bids = await db.bids.find(
+        {"listing_id": listing_id},
+        {"_id": 0},
+    ).sort("created_at", -1).to_list(limit)
+
+    bidder_ids = list({b.get("bidder_id") for b in bids if b.get("bidder_id")})
+    users_by_id: Dict[str, dict] = {}
+    if bidder_ids:
+        async for u in db.users.find(
+            {"id": {"$in": bidder_ids}},
+            {"_id": 0, "id": 1, "first_name": 1, "last_name": 1, "name": 1, "email": 1},
+        ):
+            users_by_id[u["id"]] = u
+
+    if bids:
+        leader_bid = max(bids, key=lambda b: (float(b.get("amount") or 0),
+                                              -_epoch(b.get("created_at"))))
+        leader_id = leader_bid.get("bidder_id")
+    else:
+        leader_id = None
+
+    unique = set()
+    masked = []
+    for i, b in enumerate(bids):
+        uid = b.get("bidder_id")
+        if uid:
+            unique.add(uid)
+        u = users_by_id.get(uid) if uid else None
+        initials = _initials(u, f"B{i + 1:02d}")
+        status = "leading" if (leader_id and uid == leader_id and i == 0) else "outbid"
+        masked.append({
+            "initials": initials,
+            "ip_masked": _mask_ip(b.get("ip_address")),
+            "amount": float(b.get("amount") or 0),
+            "created_at": (b.get("created_at").isoformat()
+                           if isinstance(b.get("created_at"), datetime)
+                           else b.get("created_at")),
+            "status": status,
+            "bid_type": (b.get("bid_type") or "normal"),
+        })
+    leader_initials = None
+    if leader_id and users_by_id.get(leader_id):
+        leader_initials = _initials(users_by_id[leader_id], "??")
+
+    return {
+        "listing_id": listing_id,
+        "total_bids": len(bids),
+        "unique_bidders": len(unique),
+        "leading_bidder_initials": leader_initials,
+        "bids": masked,
+    }
+
+
 # ========== LOT BIDDING (Multi-Item) ==========
 
 @bids_router.post("/multi-item-listings/{listing_id}/lots/{lot_number}/bid")
@@ -1602,6 +1668,13 @@ async def get_lot_fees_preview(
                            or (seller.get("account_type") if seller else None)
                            or "individual").lower()
 
+    # iter371 — Listings can now explicitly declare tax status via the
+    # `is_tax_free` field (set at listing-creation time or by an admin fix).
+    # This overrides the seller_account_type heuristic, which was miscla­ss­i-
+    # fying private-sale listings by brokers as "taxable" (a broker can still
+    # sell their own household items privately).
+    listing_tax_free_override = listing.get("is_tax_free")
+
     unit_bid = float(bid_amount) if bid_amount is not None else float(
         lot.get("current_price") or lot.get("starting_price") or 0
     )
@@ -1657,8 +1730,14 @@ async def get_lot_fees_preview(
     # Tax-free = private sale (individual seller). Only the platform fee +
     # Stripe recovery are ever taxed. When the seller is a business /
     # broker / enterprise / partner, the hammer subtotal is taxed too.
+    # iter371 — explicit `listing.is_tax_free` override wins.
     is_private_sale = seller_account_type == "individual"
-    is_tax_free = is_private_sale
+    if listing_tax_free_override is True:
+        is_tax_free = True
+    elif listing_tax_free_override is False:
+        is_tax_free = False
+    else:
+        is_tax_free = is_private_sale
     tax_status = "tax_free" if is_tax_free else "per_province"
     fee_base = round(platform_fee + stripe_recovery, 2)
 
