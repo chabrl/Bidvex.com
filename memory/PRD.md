@@ -13363,3 +13363,16 @@ Full details: `/app/memory/CHANGELOG.md` iteration 371.
 ### Tests: 67/67 pytest + testing_agent_v3_fork iteration_373 → **ALL GREEN**.
 
 **Zero credits charged.** Ready for GitHub push + deploy.
+
+
+---
+
+## Iteration 372 (2026-07-22) — Contractor Email Hub Reply-To routing
+Full changelog: `/app/memory/CHANGELOG.md` iteration 372.
+
+- **Reply-To per contractor**: `resolve_contractor_reply_to(contractor)` returns the contractor's own `personal_email` when set; falls back to `support@bidvex.com` + WARNING log otherwise.
+- **Display name update**: FROM name now "BidVex Contractor" (FROM email `contractor@bidvex.com` unchanged).
+- **User schema**: `personal_email` field added (with editable UI + strict validation on PATCH `/api/twilio/contractor/profile/me`).
+- **Tests**: 14 new iter372 tests + 3 legacy iter323/318 tests refreshed. 86/86 pass across iter367-372 suites.
+
+**Zero credits charged.**

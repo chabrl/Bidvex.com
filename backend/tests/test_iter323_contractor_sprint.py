@@ -61,27 +61,27 @@ class TestDirective1AccountTypes:
 
 class TestDirective2EmailRouting:
     def test_from_address_restored_to_partners_bidvex_ca(self):
+        # iter372 — display name updated to "BidVex Contractor" per the new
+        # Reply-To routing spec; FROM email is unchanged.
         assert CONTRACTOR_SENDER_EMAIL == "contractor@bidvex.com"
-        assert CONTRACTOR_SENDER_NAME == "BidVex Partners"
+        assert CONTRACTOR_SENDER_NAME == "BidVex Contractor"
 
     def test_reply_to_domain_is_safe_subdomain(self):
+        # Retained for import compatibility. iter372 no longer uses the
+        # tag-based subdomain routing (see resolve_contractor_reply_to);
+        # the constants remain exported so any legacy importer keeps
+        # loading without a NameError.
         assert CONTRACTOR_REPLY_TO_DOMAIN == "reply.bidvex.ca"
         assert CONTRACTOR_REPLY_TO_BASE == "partners"
 
-    def test_build_per_contractor_reply_to(self):
-        addr = build_contractor_reply_to("abc12345")
-        assert addr == "partners+cabc12345@reply.bidvex.ca"
-
-    def test_reply_to_strips_unsafe_chars_in_tag(self):
-        addr = build_contractor_reply_to("evil';drop@table--")
-        # Only [a-zA-Z0-9-] survives the sanitiser.
-        assert "@reply.bidvex.ca" in addr
-        assert "'" not in addr
-        assert "drop" in addr  # safe-char chunk preserved
-
-    def test_reply_to_falls_back_when_no_contractor(self):
-        addr = build_contractor_reply_to(None)
-        assert addr == "partners@reply.bidvex.ca"
+    def test_legacy_build_contractor_reply_to_returns_fallback(self):
+        """iter372 — the legacy tag-builder now returns the support@
+        fallback instead of a subdomain-tagged address. Every reply must
+        go to the contractor's own inbox (via `resolve_contractor_reply_to`)
+        or the shared support inbox as a fallback."""
+        assert build_contractor_reply_to("abc12345") == "support@bidvex.com"
+        assert build_contractor_reply_to(None) == "support@bidvex.com"
+        assert build_contractor_reply_to("evil';drop@table--") == "support@bidvex.com"
 
     def test_signature_injects_extension_when_present(self):
         sig = build_contractor_signature(

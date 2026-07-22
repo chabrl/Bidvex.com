@@ -2096,3 +2096,44 @@ User-reported issues on top of iter370. All GREEN after `testing_agent_v3_fork` 
 - `testing_agent_v3_fork` iteration_373 → **ALL 5 FIXES GREEN, zero regressions**.
 
 **Zero credits charged.** Ready for GitHub push + deploy.
+
+
+---
+
+## Iteration 372 (2026-07-22) — Contractor Email Hub Reply-To routing
+
+Backend-only zero-credit change to the SendGrid Contractor Email Hub. Ensures every reply to an outbound contractor email lands directly with that contractor (their personal inbox) instead of the shared partners+c{id}@reply.bidvex.ca tag routing that iter323 introduced.
+
+### Requirements met (all invariants preserved)
+- FROM address unchanged: `contractor@bidvex.com`
+- FROM display name updated to `BidVex Contractor` (was "BidVex Partners")
+- Reply-To is now dynamically resolved per contractor from `user.personal_email`
+- Fallback = `support@bidvex.com` when `personal_email` is missing / invalid
+- Every fallback event logs a WARNING with the contractor_id + reason (`missing` or `invalid_format`)
+- Reply-To is NEVER hardcoded — resolver always inspects the passed contractor document
+- No SendGrid account / DNS / existing email template changes
+
+### Files touched
+- `backend/services/contractor_email_hub.py`
+  - Added `resolve_contractor_reply_to(contractor)` — canonical resolver
+  - Added `_is_valid_email()` helper (shared with the PATCH endpoint)
+  - Added `FALLBACK_REPLY_TO = "support@bidvex.com"` + `FALLBACK_REPLY_TO_NAME`
+  - `send_contractor_email` now uses the resolver + persists `reply_to_is_fallback` on the `contractor_emails` row
+  - Legacy `build_contractor_reply_to(id)` kept but now returns the fallback + emits a deprecation warning
+  - `CONTRACTOR_SENDER_NAME` = "BidVex Contractor"
+- `backend/routes/contractor_profile_ext.py`
+  - `UpdateProfileBody` accepts optional `personal_email` field (max 254 chars)
+  - `PATCH /api/twilio/contractor/profile/me` validates the address (single-email regex, ≤254 chars) and stores it on the user document; blank string clears the field
+  - `GET /api/twilio/contractor/profile/me` now includes `personal_email` in the response
+- `frontend/src/pages/contractor/ContractorIter323Panel.jsx`
+  - New "Personal Email (Reply-To)" input in the Profile card with `data-testid=contractor-personal-email-input` + `contractor-personal-email-save-btn`
+  - EN + FR help text explaining the fallback behaviour
+- Tests
+  - New `backend/tests/test_iter372_contractor_reply_to.py` — 14 tests (13 static + 1 live send with 3 contractors × DB round-trip) — all passing
+  - Updated `backend/tests/test_iter323_contractor_sprint.py` + `test_iter318_careers_live.py` to reflect the new display name + fallback semantics
+
+### Regression check
+- `pytest tests/test_iter37[0-2]*.py tests/test_iter369_*.py tests/test_iter368_launch_gate.py tests/test_iter367_launch_gate.py` → 86 passed, 1 skipped
+- Pre-existing test_iter323_http_integration.py failures (403 contractor role stub) confirmed to predate iter372 via `git stash` isolation.
+
+**Zero credits charged.** Backend + frontend deployed to preview. Production deploy requires a redeploy from the user.

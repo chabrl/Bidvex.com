@@ -1,9 +1,13 @@
 """
-iter317 Directive 3 — Contractor Email Hub (iter318 sender update).
+iter317 Directive 3 — Contractor Email Hub (iter372 Reply-To routing).
 
 Server-side outbound email pipeline for contractors. Enforces:
-  • Sender FROM = office@bidvex.com    (hardcoded, never overridable)
-  • Reply-To    = service@bidvex.com  (hardcoded, never overridable)
+  • Sender FROM = contractor@bidvex.com   (locked — never overridable)
+  • Sender NAME = "BidVex Contractor"     (iter372 — updated display name)
+  • Reply-To    = the CONTRACTOR'S personal_email from their user profile
+                  (iter372 — dynamically resolved per contractor).
+                  Falls back to support@bidvex.com when the personal email
+                  is missing or invalid; every fallback is logged.
   • Mandatory BidVex signature block appended on every send
   • Canonical CDN logo URL (iter314 token) — NEVER the bidvex.com/assets path
   • Hardcoded support number +1 450 634 3099 — NOT a dynamic variable
@@ -26,55 +30,112 @@ logger = logging.getLogger(__name__)
 
 
 # ─── Hard-locked sender identity (Email Hub only) ───────────────────────
-# iter323 — sender restored to contractor@bidvex.com (per the original
-# directive in iter317), now that SendGrid sender authentication is in
-# place for the `reply.bidvex.ca` subdomain. Per-contractor Reply-To
-# addresses use the `partners+c{contractor_id}@reply.bidvex.ca` tag so
-# replies routed through SendGrid Inbound Parse can be attributed back
-# to the originating contractor.
-#
-# DNS setup required (one-time, on bidvex.ca DNS at the customer's
-# registrar — documented in the iter323 setup checklist):
-#   • CNAMEs for SendGrid Domain Authentication on `bidvex.ca`
-#   • CNAME records on `reply.bidvex.ca` for the Inbound Parse domain
-#   • MX record on `reply.bidvex.ca` → mx.sendgrid.net (priority 10)
-#   • Inbound Parse webhook URL: POST /api/sendgrid/inbound-parse
+# iter372 — display name updated to "BidVex Contractor" per the new spec.
+# The FROM email is still `contractor@bidvex.com`, but the visible name
+# clarifies to recipients that they are corresponding with a BidVex
+# contractor rather than the generic partners program.
 
 CONTRACTOR_SENDER_EMAIL = "contractor@bidvex.com"
-CONTRACTOR_SENDER_NAME = "BidVex Partners"
+CONTRACTOR_SENDER_NAME = "BidVex Contractor"
 
-# Per-contractor reply-to subdomain. The {contractor_id} suffix is the
-# SendGrid Inbound Parse "plus addressing" mechanism — every reply lands
-# in our Inbound Parse webhook with the recipient tag intact, so we know
-# which contractor to attribute the reply to.
+# iter372 — fallback Reply-To. Used ONLY when the contractor doesn't have
+# a valid `personal_email` on file. Every fallback is logged so an admin
+# can nudge the contractor to fix their profile.
+FALLBACK_REPLY_TO = "support@bidvex.com"
+FALLBACK_REPLY_TO_NAME = "BidVex Support"
+
+# Legacy tag-based routing constants kept for import compatibility.
+# NEW callers must use `resolve_contractor_reply_to(contractor)` — the
+# tag-based routing is no longer the default per iter372.
 CONTRACTOR_REPLY_TO_DOMAIN = "reply.bidvex.ca"
-CONTRACTOR_REPLY_TO_BASE = "partners"  # i.e. partners+c{id}@reply.bidvex.ca
+CONTRACTOR_REPLY_TO_BASE = "partners"  # legacy — no longer wired by default
+CONTRACTOR_REPLY_TO = FALLBACK_REPLY_TO  # legacy alias — now points to fallback
 
-# Legacy alias kept for any code path that imports this constant; new
-# code should call `build_contractor_reply_to(contractor_id)` instead.
-CONTRACTOR_REPLY_TO = f"{CONTRACTOR_REPLY_TO_BASE}@{CONTRACTOR_REPLY_TO_DOMAIN}"
-
-# Aliases for new spec naming (so downstream callers can use either).
+# Aliases retained for other services that import them.
 EMAIL_HUB_FROM_EMAIL = CONTRACTOR_SENDER_EMAIL
 EMAIL_HUB_FROM_NAME = CONTRACTOR_SENDER_NAME
-EMAIL_HUB_REPLY_TO = CONTRACTOR_REPLY_TO
+EMAIL_HUB_REPLY_TO = CONTRACTOR_REPLY_TO  # legacy alias
+
+
+# ─── Email validation ───────────────────────────────────────────────────
+
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def _is_valid_email(email: Optional[str]) -> bool:
+    """iter372 — strict single-address email validator used by both the
+    contractor-profile PATCH endpoint and the reply-to resolver."""
+    if not email or not isinstance(email, str):
+        return False
+    email = email.strip()
+    if not email or len(email) > 254:
+        return False
+    return bool(EMAIL_RE.match(email))
+
+
+def resolve_contractor_reply_to(
+    contractor: Optional[Dict[str, Any]],
+) -> Dict[str, str]:
+    """iter372 — Canonical resolver for a contractor's outbound Reply-To.
+
+    Rules:
+      1. If `contractor.personal_email` is set and passes email validation,
+         return it (Reply-To = contractor's own inbox).
+      2. Otherwise return `support@bidvex.com` and log the fallback so an
+         admin can prompt the contractor to update their profile.
+
+    Returns a dict `{"email": str, "name": str, "is_fallback": bool}` so
+    the caller can pass both the address and the display name to SendGrid
+    in a single lookup, and can persist the `is_fallback` bit on the
+    contractor_emails row for reporting.
+    """
+    personal = None
+    contractor_id = None
+    contractor_name = None
+    if contractor:
+        personal = contractor.get("personal_email")
+        contractor_id = contractor.get("id")
+        contractor_name = (
+            contractor.get("name")
+            or f"{contractor.get('first_name','')} {contractor.get('last_name','')}".strip()
+            or None
+        )
+
+    if _is_valid_email(personal):
+        return {
+            "email": personal.strip(),
+            "name": contractor_name or CONTRACTOR_SENDER_NAME,
+            "is_fallback": False,
+        }
+
+    # Fallback path — log so admins can chase down the missing field.
+    reason = "missing" if not personal else "invalid_format"
+    logger.warning(
+        "[contractor-email] reply-to fallback → %s "
+        "(contractor_id=%s, reason=%s, personal_email=%r)",
+        FALLBACK_REPLY_TO,
+        contractor_id,
+        reason,
+        personal,
+    )
+    return {
+        "email": FALLBACK_REPLY_TO,
+        "name": FALLBACK_REPLY_TO_NAME,
+        "is_fallback": True,
+    }
 
 
 def build_contractor_reply_to(contractor_id: Optional[str]) -> str:
-    """Returns the per-contractor tagged reply-to address.
-
-    Example: contractor_id="b3a9..." → "partners+cb3a9...@reply.bidvex.ca"
-
-    The leading `c` prefix on the contractor_id portion lets the inbound
-    parser distinguish contractor-tag replies from any future tag schemes
-    that may be added (e.g. campaign-tagged replies could use `+m<id>`).
-    """
-    if not contractor_id:
-        return CONTRACTOR_REPLY_TO
-    safe_id = re.sub(r"[^a-zA-Z0-9-]", "", str(contractor_id))[:64]
-    if not safe_id:
-        return CONTRACTOR_REPLY_TO
-    return f"{CONTRACTOR_REPLY_TO_BASE}+c{safe_id}@{CONTRACTOR_REPLY_TO_DOMAIN}"
+    """DEPRECATED (iter372). Retained only so callers that imported the
+    old tag-based function keep working during rollout. Returns the
+    fallback address; new code should call `resolve_contractor_reply_to`
+    with the contractor's user document instead."""
+    logger.warning(
+        "[contractor-email] build_contractor_reply_to(%r) is deprecated — "
+        "use resolve_contractor_reply_to(contractor_dict) instead.",
+        contractor_id,
+    )
+    return FALLBACK_REPLY_TO
 
 # Canonical CDN logo URL from iter314 — DO NOT swap to bidvex.com/assets.
 BIDVEX_CDN_LOGO_URL = (
@@ -226,9 +287,13 @@ async def send_contractor_email(
     )
     final_html = inject_signature(body_html or "", sig)
 
-    # iter323 — per-contractor tagged Reply-To so SendGrid Inbound Parse
-    # can attribute incoming replies back to this contractor.
-    contractor_reply_to = build_contractor_reply_to(contractor.get("id"))
+    # iter372 — Reply-To is the contractor's OWN personal_email (dynamic
+    # per contractor). Falls back to support@bidvex.com if the profile
+    # is missing / invalid; the resolver logs the fallback event.
+    reply_to_info = resolve_contractor_reply_to(contractor)
+    contractor_reply_to = reply_to_info["email"]
+    contractor_reply_to_name = reply_to_info["name"]
+    reply_to_is_fallback = reply_to_info["is_fallback"]
 
     sent_status = "sent"
     sg_message_id: Optional[str] = None
@@ -240,7 +305,7 @@ async def send_contractor_email(
             subject=subject,
             html_content=final_html,
             reply_to=contractor_reply_to,
-            reply_to_name=contractor.get("name") or CONTRACTOR_SENDER_NAME,
+            reply_to_name=contractor_reply_to_name,
             custom_args=custom_args,
         )
     except Exception as exc:  # noqa: BLE001
@@ -254,6 +319,8 @@ async def send_contractor_email(
         "from_email":        CONTRACTOR_SENDER_EMAIL,
         "from_name":         CONTRACTOR_SENDER_NAME,
         "reply_to":          contractor_reply_to,
+        "reply_to_name":     contractor_reply_to_name,
+        "reply_to_is_fallback": reply_to_is_fallback,
         "to_email":          to_email,
         "client_account_id": client_account_id,
         "subject":           subject,
@@ -348,13 +415,11 @@ async def _sendgrid_dispatch(
 
 # ─── Validation helpers used by route handler ───────────────────────────
 
-EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
-
 
 def validate_recipient_email(email: str) -> bool:
-    if not email or len(email) > 254:
-        return False
-    return bool(EMAIL_RE.match(email.strip()))
+    """Kept for backward-compat with the route handler; delegates to the
+    canonical `_is_valid_email` above so both use the same regex."""
+    return _is_valid_email(email)
 
 
 __all__ = [
@@ -363,6 +428,8 @@ __all__ = [
     "CONTRACTOR_REPLY_TO",
     "CONTRACTOR_REPLY_TO_DOMAIN",
     "CONTRACTOR_REPLY_TO_BASE",
+    "FALLBACK_REPLY_TO",
+    "FALLBACK_REPLY_TO_NAME",
     "EMAIL_HUB_FROM_EMAIL",
     "EMAIL_HUB_FROM_NAME",
     "EMAIL_HUB_REPLY_TO",
@@ -371,7 +438,8 @@ __all__ = [
     "SUPPORT_PHONE_TEL",
     "SIGNATURE_TOKEN",
     "build_contractor_signature",
-    "build_contractor_reply_to",
+    "build_contractor_reply_to",         # deprecated (iter372)
+    "resolve_contractor_reply_to",       # iter372 canonical
     "inject_signature",
     "send_contractor_email",
     "validate_recipient_email",

@@ -108,6 +108,9 @@ def _require_contractor(user: User = Depends(get_current_user)) -> User:
 
 class UpdateProfileBody(BaseModel):
     personal_phone_number: Optional[str] = Field(None, max_length=20)
+    # iter372 — Contractor's own inbox. Used as SendGrid Reply-To so
+    # replies land directly with the contractor instead of a shared queue.
+    personal_email: Optional[str] = Field(None, max_length=254)
 
 
 # ─── Profile endpoints (Directive 3A + 5) ───────────────────────────────
@@ -143,6 +146,9 @@ async def get_my_contractor_profile(user: User = Depends(_require_contractor)) -
         "last_name":            doc.get("last_name"),
         "phone":                doc.get("phone"),
         "personal_phone_number": doc.get("personal_phone_number"),
+        # iter372 — expose personal_email so the profile UI can render it
+        # in the editor field.
+        "personal_email":       doc.get("personal_email"),
         "extension_number":     doc.get("extension_number"),
         "profile_photo_url":    doc.get("profile_photo_url"),
         "preferred_language":   doc.get("preferred_language") or "en",
@@ -166,6 +172,19 @@ async def update_my_contractor_profile(
                 "message_fr": "Le téléphone personnel doit être au format E.164 (ex. +14501234567).",
             })
         updates["personal_phone_number"] = phone
+    # iter372 — personal_email accept + strict validation.
+    if body.personal_email is not None:
+        from services.contractor_email_hub import _is_valid_email
+        personal_email = body.personal_email.strip().lower()
+        if personal_email and not _is_valid_email(personal_email):
+            raise HTTPException(422, {
+                "error": "invalid_email",
+                "message_en": "Personal email must be a valid email address.",
+                "message_fr": "L'e-mail personnel doit être une adresse valide.",
+            })
+        # Empty string clears the field so the contractor can revert to
+        # the support@bidvex.com fallback intentionally.
+        updates["personal_email"] = personal_email or None
     if len(updates) == 1:  # only updated_at set
         return await get_my_contractor_profile(user=user)
     await db.users.update_one({"id": user.id}, {"$set": updates})

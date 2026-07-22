@@ -124,11 +124,17 @@ function ProfileEditorCard({ profile, token, fr, onChange }) {
   const [photoUploading, setPhotoUploading] = useState(false);
   const [phone, setPhone] = useState(profile?.personal_phone_number || '');
   const [savingPhone, setSavingPhone] = useState(false);
+  // iter372 — personal_email is used as SendGrid Reply-To on all outbound
+  // Contractor Email Hub emails. If left blank, replies fall back to
+  // support@bidvex.com.
+  const [personalEmail, setPersonalEmail] = useState(profile?.personal_email || '');
+  const [savingEmail, setSavingEmail] = useState(false);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
     setPhone(profile?.personal_phone_number || '');
-  }, [profile?.personal_phone_number]);
+    setPersonalEmail(profile?.personal_email || '');
+  }, [profile?.personal_phone_number, profile?.personal_email]);
 
   const photoChangeHandler = async (e) => {
     const file = e.target.files?.[0];
@@ -177,6 +183,34 @@ function ProfileEditorCard({ profile, token, fr, onChange }) {
       toast.error(d?.message_en || (fr ? 'Échec' : 'Save failed'));
     } finally {
       setSavingPhone(false);
+    }
+  };
+
+  // iter372 — Save the contractor's personal_email so it can be used as
+  // the SendGrid Reply-To on outbound Email Hub messages.
+  const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+  const savePersonalEmail = async () => {
+    const trimmed = personalEmail.trim();
+    // Empty string is allowed — clears the field so replies fall back to
+    // support@bidvex.com per the iter372 spec.
+    if (trimmed && !EMAIL_RE.test(trimmed)) {
+      toast.error(fr ? "E-mail invalide." : 'Invalid email address.');
+      return;
+    }
+    setSavingEmail(true);
+    try {
+      const r = await axios.patch(
+        `${API_BASE}/twilio/contractor/profile/me`,
+        { personal_email: trimmed },
+        { headers: authHeaders(token) },
+      );
+      onChange?.(r.data);
+      toast.success(fr ? 'E-mail personnel enregistré' : 'Personal email saved');
+    } catch (err) {
+      const d = err?.response?.data?.detail;
+      toast.error(d?.message_en || (fr ? 'Échec' : 'Save failed'));
+    } finally {
+      setSavingEmail(false);
     }
   };
 
@@ -242,6 +276,38 @@ function ProfileEditorCard({ profile, token, fr, onChange }) {
               data-testid="contractor-personal-phone-save-btn"
             >
               {savingPhone ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Save className="h-3 w-3 mr-1" />}
+              {fr ? 'Enregistrer' : 'Save'}
+            </Button>
+          </div>
+        </div>
+
+        {/* iter372 — Personal email → SendGrid Reply-To on the Contractor
+            Email Hub. Empty string clears the field and falls back to
+            support@bidvex.com per the iter372 spec. */}
+        <div>
+          <label className="text-xs uppercase tracking-wide text-slate-500 font-semibold">
+            {fr ? 'E-mail personnel (Reply-To)' : 'Personal Email (Reply-To)'}
+          </label>
+          <p className="text-[11px] text-slate-500 mb-1">
+            {fr
+              ? "Les réponses aux e-mails envoyés depuis votre Hub Contractor iront à cette adresse. Laissez vide pour utiliser support@bidvex.com."
+              : "Replies to emails you send from the Contractor Hub will go to this address. Leave blank to fall back to support@bidvex.com."}
+          </p>
+          <div className="flex gap-2">
+            <Input
+              type="email"
+              placeholder="jane@example.com"
+              value={personalEmail}
+              onChange={(e) => setPersonalEmail(e.target.value)}
+              className="flex-1"
+              data-testid="contractor-personal-email-input"
+            />
+            <Button
+              onClick={savePersonalEmail}
+              disabled={savingEmail}
+              data-testid="contractor-personal-email-save-btn"
+            >
+              {savingEmail ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Save className="h-3 w-3 mr-1" />}
               {fr ? 'Enregistrer' : 'Save'}
             </Button>
           </div>
