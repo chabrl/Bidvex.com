@@ -13327,3 +13327,23 @@ Full changelog: `/app/memory/CHANGELOG.md` iteration 369.
 - `testing_agent_v3_fork` reports iteration_370 (initial pass — flagged Auto-Bid modal shadow bug) → iteration_371 (retest — all 9 bugs green, Auto-Bid persist round-trip verified for premium user, LotDetailPage lightbox verified)
 
 **NOT YET DEPLOYED** to production — user to deploy after final review.
+
+
+---
+
+## Iteration 370 (2026-07-22) — 4 pre-launch hotfixes (zero-credit)
+Full details: `/app/memory/CHANGELOG.md` iteration 370.
+
+### Delivered (all green — testing_agent_v3_fork iteration_372)
+- **FIX 1 — Wishlist heart pixel-perfect centering**: new `CardWishlistButton.jsx` (inline SVG in a 36×36 white circle with `padding:0`) replaces the previous WatchlistButton wrapper on the grid card.
+- **FIX 2 — "Fees" label no longer duplicated**: removed the aria-label that was surfacing as a browser tooltip on hover.
+- **FIX 3 — Canonical tax logic**: `fees-preview` now returns `stripe_recovery`, `platform_fee`, `tax_on_hammer`, `tax_on_fees`, `tax_label`, `tax_rate_pct`, `tax_message_en/fr`, `total`, `is_tax_free`. Tax-free = tax on `(platform_fee + stripe_recovery)` only. Taxable = tax on hammer + fees. Multi-unit multiplies bid × qty before all fees. Per-province tax table (QC/ON/BC/AB/etc). Popover on the card renders every field with EN/FR banner.
+- **FIX 4 — Buy Now fee breakdown modal**: LotDetailPage's Buy Now button navigates to `?buy_now=1&lot={n}` and the parent MultiItemListingDetailPage opens the confirmation modal with the full breakdown (📦 qty × unit_bid, Buy Now Price, Tax on item if taxable, Buyer Premium, Payment Processing, Tax on fees, Total Charged, tax-status banner).
+
+### Tests (all passing)
+- `backend/tests/test_iter370_bugfixes.py` — 10 static invariant tests for all 4 fixes
+- Updated `test_iter369_behavior.py` maths tests to assert on the new granular fields
+- **93/93 pytest passing** (iter361 + iter367 + iter368 + iter369 + iter370)
+- `testing_agent_v3_fork` iteration_372 → ALL 4 FIXES GREEN, zero frontend/backend issues, zero iter369 regressions
+
+**Zero credits charged.** Ready for GitHub push + deploy.

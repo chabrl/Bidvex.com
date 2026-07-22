@@ -2010,3 +2010,47 @@ EMERGENT_LLM_KEY=sk-emergent-…         (optional; preview uses it. If missing 
 - `testing_agent_v3_fork` iteration_371 → **all 9 bugs GREEN + Auto-Bid save/persist round-trip verified for premium user + LotDetailPage lightbox verified**.
 
 **NOT YET DEPLOYED** to production — user to deploy after final review.
+
+
+---
+
+## Iteration 370 (2026-07-22) — 4 pre-launch hotfixes (zero-credit)
+
+User-reported bugs on top of iter369, all fixed in one pass, zero regressions, 60/60 pytest + testing_agent_v3_fork iteration_372 GREEN.
+
+### FIX 1 — Wishlist heart pixel-perfect centering
+- New `/app/frontend/src/components/CardWishlistButton.jsx` component.
+- 36 × 36 white circle, `padding: 0`, `display: flex; align-items: center; justify-content: center`.
+- Inline SVG heart (NOT lucide-react / NOT emoji), `display: block; flex-shrink: 0`.
+- Wraps existing `/api/watchlist/add|remove` endpoints for parity with the header watchlist count.
+- `CompactLotCard` swapped from the ambient WatchlistButton wrapper to `CardWishlistButton`.
+
+### FIX 2 — "Fees" text no longer duplicated
+- Removed the `aria-label={isFR ? 'Frais additionnels' : 'Additional fees'}` attribute from the Fees popover trigger button. It was surfacing as a browser tooltip on some platforms, visually duplicating the label.
+- Only the visible `<span>{isFR ? 'Frais' : 'Fees'}</span>` remains.
+
+### FIX 3 — Canonical tax logic (single source of truth)
+- Rewrote `GET /api/multi-item-listings/{listing}/lots/{n}/fees-preview`:
+  - **Stripe recovery**: `platform_fee × 0.029 + 0.30 CAD`.
+  - **Tax-free (individual seller)**: `tax_on_hammer = 0`, `tax_on_fees = (platform_fee + stripe_recovery) × tax_rate`.
+  - **Taxable (business/broker/enterprise/partner)**: `tax_on_hammer = hammer × tax_rate` + `tax_on_fees` above.
+  - **Multi-unit**: `hammer_subtotal = unit_bid × quantity` before all fees.
+  - **Per-province tax table**: QC 14.975 %, ON 13 %, BC 12 %, AB 5 %, HST provinces 15 %. Falls back to QC when the buyer province isn't known.
+  - **EN + FR tax messages** returned as `tax_message_en` / `tax_message_fr`.
+  - New / renamed fields: `hammer_subtotal`, `platform_fee`, `platform_fee_rate_pct`, `stripe_recovery`, `tax_on_fees`, `tax_label`, `total`, `is_tax_free`.
+- Rewrote the CompactLotCard fees popover to render every field with an EN/FR amber/green banner and `📦 qty × unit_bid = subtotal` for multi-unit.
+- Proof cases verified: QC tax-free $100 → total $106.27; QC taxable $100 → $121.25; multi-unit qty=2 × $2 tax-free → $4.51.
+
+### FIX 4 — Buy Now confirmation shows the fee breakdown
+- Added `?buy_now=1&lot={n}` deep-link handler in `MultiItemListingDetailPage.js` so clicking Buy Now on the LotDetailPage sidebar opens the confirmation modal directly on the parent page.
+- Enhanced the payment modal to prefetch `fees-preview` with `bid_amount=buy_now_price` and display the same canonical breakdown (📦 qty × unit_bid, Buy Now Price, Tax on item (if taxable), Buyer Premium, Payment Processing, Tax on fees, Total Charged, EN/FR tax-status banner).
+- Confirm button already used AsyncButton with loading state.
+- Verified live: admin Buy Now on Lot #1 (qty=2 × $200 buy-now, VIP 3.5 % BP, broker seller) → Total Charged **$476.81 CAD**, matching spec.
+
+### Tests
+- `backend/tests/test_iter370_bugfixes.py` — 10 static invariant tests for all 4 fixes.
+- Updated `backend/tests/test_iter369_behavior.py` maths tests to assert on the new granular fields (`tax_on_hammer`, `tax_on_fees`, `stripe_recovery`, `total`).
+- **93/93 pytest passing** (iter361 + iter367 + iter368 + iter369 + iter370).
+- `testing_agent_v3_fork` iteration_372 → ALL 4 FIXES GREEN + all iter369 regressions holding, zero frontend/backend issues.
+
+**Zero credits charged.** Ready for GitHub push + deploy.
