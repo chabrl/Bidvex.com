@@ -91,6 +91,9 @@ const MultiItemListingDetailPage = () => {
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [paymentModalLot, setPaymentModalLot] = useState(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('stripe');
+  // iter370 FIX 4 — fee breakdown for the Buy Now confirmation modal.
+  const [buyNowFees, setBuyNowFees] = useState(null);
+  const [buyNowFeesLoading, setBuyNowFeesLoading] = useState(false);
   const [verificationModalOpen, setVerificationModalOpen] = useState(false);
   const [verificationAction, setVerificationAction] = useState('bid');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
@@ -413,7 +416,42 @@ const MultiItemListingDetailPage = () => {
     setPaymentModalLot(lot);
     setSelectedPaymentMethod('stripe');
     setPaymentModalOpen(true);
+
+    // iter370 FIX 4 — fetch the canonical fee breakdown for this Buy Now.
+    // We call the same fees-preview endpoint the fee popover uses, passing
+    // buy_now_price as the effective bid so the totals match the platform.
+    setBuyNowFees(null);
+    setBuyNowFeesLoading(true);
+    axios
+      .get(`${API}/multi-item-listings/${id}/lots/${lot.lot_number}/fees-preview`, {
+        params: { bid_amount: lot.buy_now_price },
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        timeout: 8000,
+      })
+      .then((res) => setBuyNowFees(res.data))
+      .catch(() => setBuyNowFees(null))
+      .finally(() => setBuyNowFeesLoading(false));
   };
+
+  // iter370 FIX 4 — Handle ?buy_now=1&lot=N deep-link (fired by
+  // LotDetailPage's Buy Now button). Once the listing is loaded, open the
+  // confirmation modal for the matching lot.
+  useEffect(() => {
+    if (!listing) return;
+    const buyNowFlag = searchParams.get('buy_now');
+    const lotParam = searchParams.get('lot');
+    if (buyNowFlag !== '1' || !lotParam) return;
+    const targetLot = (listing.lots || []).find(
+      (l) => String(l.lot_number) === String(lotParam),
+    );
+    if (targetLot?.buy_now_enabled && targetLot?.buy_now_price != null) {
+      handleBuyNow(targetLot);
+    }
+    // Strip the buy_now flag so a refresh doesn't reopen the modal.
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('buy_now');
+    navigate(`${window.location.pathname}?${nextParams.toString()}`, { replace: true });
+  }, [listing]);
 
   // Confirm Buy Now — executes the actual purchase
   const confirmBuyNow = async () => {
@@ -1548,11 +1586,78 @@ const MultiItemListingDetailPage = () => {
           </DialogHeader>
 
           {paymentModalLot && (
-            <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-3 mb-2">
-              <p className="font-medium text-sm">{getLocalized(paymentModalLot, 'title')}</p>
-              <p className="text-lg font-bold text-[#1E3A8A] dark:text-white" data-testid="payment-dialog-price">
-                {formatCurrency(paymentModalLot.buy_now_price)}
+            <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-3 mb-2 space-y-2" data-testid="buy-now-fee-breakdown">
+              <p className="font-medium text-sm text-slate-900 dark:text-white">
+                {getLocalized(paymentModalLot, 'title')}
               </p>
+              {/* iter370 FIX 4 — Full fee breakdown BEFORE the buyer confirms */}
+              {buyNowFeesLoading || !buyNowFees ? (
+                <div className="text-xs text-slate-500 dark:text-slate-400 py-2">
+                  {t('common.loading', 'Loading fee breakdown…')}
+                </div>
+              ) : (
+                <ul className="space-y-1 text-xs">
+                  {buyNowFees.quantity > 1 && (
+                    <li className="flex justify-between text-blue-600 dark:text-blue-400 font-semibold">
+                      <span>📦 {buyNowFees.quantity} × {formatCurrency(buyNowFees.unit_bid)}</span>
+                      <span className="font-mono">{formatCurrency(buyNowFees.hammer_subtotal)}</span>
+                    </li>
+                  )}
+                  <li className="flex justify-between">
+                    <span className="text-slate-600 dark:text-slate-400">
+                      {t('checkout.buyNowPrice', 'Buy Now Price')}
+                    </span>
+                    <span className="font-mono">{formatCurrency(buyNowFees.hammer_subtotal)}</span>
+                  </li>
+                  {buyNowFees.tax_on_hammer > 0 && (
+                    <li className="flex justify-between text-amber-700 dark:text-amber-400">
+                      <span>{buyNowFees.tax_label} on item ({buyNowFees.tax_rate_pct}%)</span>
+                      <span className="font-mono">+{formatCurrency(buyNowFees.tax_on_hammer)}</span>
+                    </li>
+                  )}
+                  <li className="flex justify-between">
+                    <span className="text-slate-600 dark:text-slate-400">
+                      {t('checkout.buyerPremium', 'Buyer Premium')} ({buyNowFees.platform_fee_rate_pct}%)
+                    </span>
+                    <span className="font-mono">+{formatCurrency(buyNowFees.platform_fee)}</span>
+                  </li>
+                  <li className="flex justify-between">
+                    <span className="text-slate-600 dark:text-slate-400">
+                      {t('checkout.paymentProcessing', 'Payment Processing')}
+                    </span>
+                    <span className="font-mono">+{formatCurrency(buyNowFees.stripe_recovery)}</span>
+                  </li>
+                  {buyNowFees.tax_on_fees > 0 && (
+                    <li className="flex justify-between">
+                      <span className="text-slate-600 dark:text-slate-400">
+                        {buyNowFees.tax_label} on fees ({buyNowFees.tax_rate_pct}%)
+                      </span>
+                      <span className="font-mono">+{formatCurrency(buyNowFees.tax_on_fees)}</span>
+                    </li>
+                  )}
+                  <li className="flex justify-between pt-1.5 border-t border-slate-200 dark:border-slate-700 font-bold text-sm">
+                    <span className="text-slate-900 dark:text-white">
+                      {t('checkout.totalCharged', 'Total Charged')}
+                    </span>
+                    <span
+                      className="font-mono text-emerald-700 dark:text-emerald-400"
+                      data-testid="buy-now-total"
+                    >
+                      {formatCurrency(buyNowFees.total)} {buyNowFees.currency}
+                    </span>
+                  </li>
+                  <li className={`mt-2 text-[11px] px-2 py-1.5 rounded-lg font-medium ${
+                    buyNowFees.is_tax_free
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
+                      : 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800'
+                    }`}
+                    data-testid="buy-now-tax-message"
+                  >
+                    {buyNowFees.is_tax_free ? '✓ ' : '⚠️ '}
+                    {i18n.language?.startsWith('fr') ? buyNowFees.tax_message_fr : buyNowFees.tax_message_en}
+                  </li>
+                </ul>
+              )}
             </div>
           )}
 

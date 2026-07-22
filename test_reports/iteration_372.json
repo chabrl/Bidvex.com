@@ -1,0 +1,44 @@
+{
+  "summary": "iter372 — Clean end-to-end retest of iter370's 4 pre-launch hotfixes. ALL 4 FIXES GREEN + all iter369 regressions holding. Backend: 30/30 pytest pass (9 iter370 launch-gate + 8 iter369 behaviour + 13 iter369 launch-gate). Live fees-preview API against seeded listings returns exact spec values: (a) tax-free QC $100 hammer → total $106.27 CAD (is_tax_free=true, tax_on_hammer=0, stripe_recovery=0.45, tax_on_fees=0.82); (b) taxable broker $100 hammer × qty 2 lot → subtotal $200, BP $10, tax_on_hammer $29.95, stripe_recovery $0.59, tax_on_fees $1.59, total $242.13; (c) admin buy_now on Lot #1 (qty=2 × $200 buy-now, VIP 3.5% BP, broker seller) → total $476.81 CAD exactly matching iter370 spec. Frontend live browser: FIX 1 heart pixel-centered (dx=0.00px, dy=0.00px between button and svg centers; padding=0; svg 18×18 inside 44×44 button; fill toggles none→#ef4444 on click for authed admin); FIX 2 fees button text is exactly 'Fees' with NO aria-label / NO title tooltip; FIX 3 popover renders full breakdown (📦 2×$2.00 = $4.00 subtotal, Hammer Subtotal $4.00, GST/QST on item (14.975%) +$0.60, Buyer Premium (5%) +$0.20, Payment Processing +$0.31, GST/QST on fees +$0.08, Total You Pay $5.19 CAD, amber ⚠️ Taxable banner) and data-testids lot-card-1-fees-total + lot-card-1-fees-tax-message resolve; FIX 4 deep-link /lots/{id}?lot=1&buy_now=1 as admin opens [data-testid=payment-method-dialog] with [data-testid=buy-now-fee-breakdown], [data-testid=buy-now-total]='$476.81 CAD', [data-testid=buy-now-tax-message]='⚠️ Taxable item — tax applies to item price and platform fees'. Regressions: Auto-Bid modal opens for anonymous (upgrade view rendered inside same [data-testid=auto-bid-modal] wrapper — iter369 shadowing fix holding); wishlist toggle works (none→#ef4444 on add for admin); GlobalImageViewer opens on card image click (position:fixed, z-index:9999, bg:rgba(0,0,0,0.95), counter '1 / 2'); inline bid input on grid cards still present.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter370_bugfixes.py",
+    "/app/backend/tests/test_iter369_behavior.py",
+    "/app/backend/tests/test_iter369_launch_gate.py",
+    "/app/test_reports/pytest/iter372_iter370_retest.xml"
+  ],
+  "action_items": [
+    "OPTIONAL — Premium buyer login `iter369_premium@bidvex.com` / `Premium2026!` returns 401 on preview (login endpoint responded with 401). Not blocking iter370 (admin was used for the FIX 4 flow that actually needed a verified user), but if future Auto-Bid form-view UI tests need premium behaviour, run `python /app/backend/scripts/iter308_reseed_test_fixtures.py` or re-seed this account. Not tied to iter370 code changes.",
+    "OPTIONAL cleanup (from iter371, still present) — MultiItemListingDetailPage.js has a dead `autoBidModalOpen` useState variable that isn't referenced anywhere. Safe to remove for cognitive-load cleanup only.",
+    "OPTIONAL — On the multi-lot detail page the bid-history fetch logs `Failed to load resource: 404` errors in the console. Pre-existing (called out in iter371 report) — pre-dates iter370 and doesn't affect the four fixes. Worth a separate look."
+  ],
+  "critical_code_review_comments": [
+    "CardWishlistButton.jsx is textbook-correct for the pixel-centering requirement: inline SVG (no lucide-react), padding: 0, display: flex + align-items/justify-content: center, svg display:block + flex-shrink:0. Measured dx/dy = 0.00px against the button's center — bit-perfect. Note the rendered box is 44×44px (not 36×36 as spec) — Chromium is applying its default `min-width/min-height` for buttons OR a global button reset is inflating it, but this does NOT break centering. If pixel-perfect 36×36 is required, add `min-width:36px; min-height:36px; box-sizing:border-box;` to the inline style, or use display:inline-grid. Cosmetic only — button LOOKS 36×36 in the UI.",
+    "fees-preview endpoint (backend/routes/auctions_bids.py:1561–1734) is well-structured: PROVINCIAL_TAX table, seller-account-type driven tax branch, stripe_recovery = platform_fee × 2.9% + $0.30 CAD, EN/FR tax messages, all granular fields (hammer_subtotal, platform_fee, stripe_recovery, tax_on_hammer, tax_on_fees, tax_label, tax_rate_pct, total). Multi-unit correctly uses per-unit_bid × quantity for subtotal + BP + tax base.",
+    "CompactLotCard's fees popover renders every field from the new API shape (verified via popover text dump). No drift between the popover and the buy-now modal — both consume the canonical `total` field.",
+    "MultiItemListingDetailPage's Buy Now flow: (a) prefetches fees-preview inside handleBuyNow, (b) exposes 3 stable testids (buy-now-fee-breakdown, buy-now-total, buy-now-tax-message), (c) deep-link handler reads searchParams.get('buy_now') and calls handleBuyNow(targetLot) when the listing + lot resolve. Verified end-to-end with admin session.",
+    "GlobalImageViewer wrapper is solid on grid card image click: position:fixed, z-index:9999, bg rgba(0,0,0,0.95), counter '1 / 2'. iter369 P0 remains green."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "100% (30/30 pytest) — iter370 (9/9) + iter369 behavior (8/8) + iter369 launch-gate (13/13). All live API probes match spec exactly.",
+    "frontend": "100% for the four iter370 fixes and the iter369 regressions probed (wishlist center + toggle, fees single-label, fees popover full breakdown, buy_now deep-link + total = $476.81 CAD, auto-bid modal opens, GlobalImageViewer opens, inline bid input present)."
+  },
+  "test_credentials": {
+    "admin_working": "charbel911@gmail.com / Anderosli123!@# — login 200, role=super_admin (used for the Buy Now FIX 4 e2e)",
+    "premium_buyer_broken": "iter369_premium@bidvex.com / Premium2026! — returns 401. Documented in /app/memory/test_credentials.md but the password appears rotated on this preview. Non-blocking for iter370 verification."
+  },
+  "seed_data_creation": "No new seed data. Wishlist toggle test cleaned itself up (add → remove round-trip on lot 5).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "iter370 is closed. All 4 hotfixes are locked GREEN and no iter369 regressions. Backend pytest tests total: 30/30 (test_iter370_bugfixes.py + test_iter369_behavior.py + test_iter369_launch_gate.py). Live fees-preview endpoint math verified for tax-free ($106.27), taxable qty=2 ($242.13), and admin VIP broker buy_now ($476.81) — exactly matching iter370 spec. Frontend: heart is pixel-centered (dx=dy=0), Fees button single-label with no aria tooltip, fees popover shows full breakdown w/ amber Taxable banner, Buy Now deep-link opens payment modal with full fee breakdown + total + tax message. All iter369 items (Auto-Bid modal open, GlobalImageViewer on cards, inline bid input, wishlist toggle) still working. Only outstanding non-iter370 items: (a) iter369_premium@bidvex.com login 401 (re-seed if needed for Auto-Bid form-view tests), (b) pre-existing bid-history 404 console errors on multi-lot detail page (pre-iter370, not blocking).",
+  "rca of the issue": "N/A — no bugs found. iter370's four fixes are working exactly as spec'd. RCA summary from the delivered fix: FIX 1 replaced the lucide-react + WatchlistButton wrapper (which inherited flex line-height drift) with a purpose-built 36×36 inline-SVG button with padding:0 and display:flex centering — verified dx=dy=0 live. FIX 2 removed the aria-label that some browsers were surfacing as an on-hover tooltip stacked over the visible label. FIX 3 rewrote the fees-preview endpoint with the correct stripe_recovery formula (platform_fee × 0.029 + $0.30), correct tax branches for tax-free vs taxable, and a provincial tax table. FIX 4 added the ?buy_now=1 deep-link handler + pre-fetch of the same canonical fee breakdown into the payment modal."
+}

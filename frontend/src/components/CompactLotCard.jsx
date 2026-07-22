@@ -29,7 +29,7 @@ import { Card } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Popover, PopoverTrigger, PopoverContent } from './ui/popover';
-import WatchlistButton from './WatchlistButton';
+import CardWishlistButton from './CardWishlistButton';
 import AutoBidModal from './AutoBidModal';
 import GlobalImageViewer from './GlobalImageViewer';
 import { ChevronLeft, ChevronRight, MapPin, Bot, Info, Gavel } from 'lucide-react';
@@ -275,24 +275,15 @@ export default function CompactLotCard({
             </div>
           )}
 
-          {/* Bug 3 — TOP-RIGHT wishlist heart, PERFECTLY centered in a 36×36 white circle */}
-          <div
-            className="absolute top-2.5 right-2.5 wishlist-btn-wrapper"
-            data-stop-click
-            data-testid={`lot-card-${lot.lot_number}-watchlist`}
-          >
-            <div
-              className="flex items-center justify-center rounded-full bg-white dark:bg-slate-900 shadow-md p-0"
-              style={{ width: 36, height: 36, lineHeight: 1 }}
-            >
-              <WatchlistButton
-                itemId={`${auctionId}:${lot.lot_number}`}
-                itemType="lot"
-                size="sm"
-                showLabel={false}
-              />
-            </div>
-          </div>
+          {/* FIX 1 (iter370) — Wishlist heart uses the pixel-perfect inline
+              SVG button (`padding:0`, flex-centered, 36×36 white circle).
+              This replaces the previous WatchlistButton wrapper which
+              inherited lucide-react's default sizing and drifted off-center
+              on some browsers. */}
+          <CardWishlistButton
+            itemId={`${auctionId}:${lot.lot_number}`}
+            itemType="lot"
+          />
         </div>
 
         {/* Body — BidSpotter style */}
@@ -392,18 +383,17 @@ export default function CompactLotCard({
                     className="flex-1 min-w-0 h-8 px-2 text-[11px] font-semibold whitespace-nowrap overflow-hidden text-ellipsis"
                     onClick={(e) => e.stopPropagation()}
                     data-testid={`lot-card-${lot.lot_number}-fees-btn`}
-                    aria-label={isFR ? 'Frais additionnels' : 'Additional fees'}
                   >
                     <Info className="h-3 w-3 mr-1 flex-shrink-0" />
                     <span className="truncate">{isFR ? 'Frais' : 'Fees'}</span>
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent side="top" className="w-72 p-3" data-testid={`lot-card-${lot.lot_number}-fees-popover`} onClick={(e) => e.stopPropagation()}>
+                <PopoverContent side="top" className="w-80 p-3" data-testid={`lot-card-${lot.lot_number}-fees-popover`} onClick={(e) => e.stopPropagation()}>
                   <div className="text-[11px] font-semibold text-slate-900 dark:text-white mb-2 flex items-center justify-between">
                     <span>{isFR ? 'Détail des frais' : 'Fee Breakdown'}</span>
                     {feesPreview && (
-                      <Badge className={feesPreview.is_private_sale ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-amber-100 text-amber-800 border-amber-200'}>
-                        {feesPreview.is_private_sale
+                      <Badge className={feesPreview.is_tax_free ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-amber-100 text-amber-800 border-amber-200'}>
+                        {feesPreview.is_tax_free
                           ? (isFR ? 'Sans taxe' : 'Tax-Free')
                           : (isFR ? 'Taxable' : 'Taxable')}
                       </Badge>
@@ -416,51 +406,63 @@ export default function CompactLotCard({
                   ) : (
                     <ul className="space-y-1 text-[11px]" data-testid={`lot-card-${lot.lot_number}-fees-body`}>
                       {feesPreview.quantity > 1 && (
-                        <li className="flex justify-between text-slate-500">
-                          <span>{feesPreview.quantity} × {formatCurrency(feesPreview.unit_bid)}</span>
-                          <span className="font-mono">{formatCurrency(feesPreview.subtotal)}</span>
+                        <li className="flex justify-between text-blue-600 dark:text-blue-400 font-semibold">
+                          <span>📦 {feesPreview.quantity} × {formatCurrency(feesPreview.unit_bid)}</span>
+                          <span className="font-mono">{formatCurrency(feesPreview.hammer_subtotal)}</span>
                         </li>
                       )}
                       <li className="flex justify-between">
                         <span className="text-slate-600 dark:text-slate-400">
                           {feesPreview.quantity > 1
-                            ? (isFR ? 'Sous-total' : 'Subtotal')
-                            : (isFR ? 'Prix marteau' : 'Hammer')}
+                            ? (isFR ? 'Sous-total (prix marteau)' : 'Hammer Subtotal')
+                            : (isFR ? 'Prix marteau' : 'Hammer Price')}
                         </span>
-                        <span className="font-mono">{formatCurrency(feesPreview.subtotal)}</span>
+                        <span className="font-mono">{formatCurrency(feesPreview.hammer_subtotal)}</span>
                       </li>
-                      {!feesPreview.is_private_sale && feesPreview.tax_on_hammer > 0 && (
-                        <li className="flex justify-between">
-                          <span className="text-slate-600 dark:text-slate-400">
-                            {isFR ? `Taxe sur l'article (${feesPreview.tax_rate_pct}%)` : `Tax on item (${feesPreview.tax_rate_pct}%)`}
-                          </span>
-                          <span className="font-mono">{formatCurrency(feesPreview.tax_on_hammer)}</span>
+                      {feesPreview.tax_on_hammer > 0 && (
+                        <li className="flex justify-between text-amber-700 dark:text-amber-400">
+                          <span>{feesPreview.tax_label} {isFR ? "sur l'article" : 'on item'} ({feesPreview.tax_rate_pct}%)</span>
+                          <span className="font-mono">+{formatCurrency(feesPreview.tax_on_hammer)}</span>
                         </li>
                       )}
                       <li className="flex justify-between">
                         <span className="text-slate-600 dark:text-slate-400">
-                          {isFR ? "Frais plateforme" : 'Platform Fee'} ({feesPreview.buyer_premium_rate_pct}%)
+                          {isFR ? 'Prime acheteur' : 'Buyer Premium'} ({feesPreview.platform_fee_rate_pct}%)
                         </span>
-                        <span className="font-mono">{formatCurrency(feesPreview.buyer_premium_amount)}</span>
+                        <span className="font-mono">+{formatCurrency(feesPreview.platform_fee)}</span>
                       </li>
-                      {feesPreview.tax_on_fee > 0 && (
+                      <li className="flex justify-between">
+                        <span className="text-slate-600 dark:text-slate-400">
+                          {isFR ? 'Traitement paiement' : 'Payment Processing'}
+                        </span>
+                        <span className="font-mono">+{formatCurrency(feesPreview.stripe_recovery)}</span>
+                      </li>
+                      {feesPreview.tax_on_fees > 0 && (
                         <li className="flex justify-between">
                           <span className="text-slate-600 dark:text-slate-400">
-                            {isFR ? `Taxe sur frais (${feesPreview.tax_rate_pct}%)` : `Tax on fee (${feesPreview.tax_rate_pct}%)`}
+                            {feesPreview.tax_label} {isFR ? 'sur frais' : 'on fees'} ({feesPreview.tax_rate_pct}%)
                           </span>
-                          <span className="font-mono">{formatCurrency(feesPreview.tax_on_fee)}</span>
+                          <span className="font-mono">+{formatCurrency(feesPreview.tax_on_fees)}</span>
                         </li>
                       )}
                       <li className="flex justify-between pt-1 border-t border-slate-100 dark:border-slate-700 font-semibold">
-                        <span className="text-slate-800 dark:text-slate-100">{isFR ? 'Total estimé' : 'Estimated total'}</span>
+                        <span className="text-slate-800 dark:text-slate-100">
+                          {isFR ? 'Total à payer' : 'Total You Pay'}
+                        </span>
                         <span className="font-mono text-emerald-700 dark:text-emerald-400" data-testid={`lot-card-${lot.lot_number}-fees-total`}>
-                          {formatCurrency(feesPreview.estimated_total)}
+                          {formatCurrency(feesPreview.total)} {feesPreview.currency}
                         </span>
                       </li>
-                      <li className="text-[10px] text-slate-500 dark:text-slate-400 pt-1">
-                        {feesPreview.is_private_sale
-                          ? (isFR ? '✓ Sans taxe — la taxe s\'applique uniquement aux frais de plateforme' : '✓ Tax-Free item — taxes apply only to platform fees')
-                          : (isFR ? '⚠️ Article taxable — la taxe s\'applique au prix total' : '⚠️ Taxable item — tax applies to total purchase price')}
+                      <li
+                        className={`mt-2 text-[10px] px-2 py-1.5 rounded-lg font-medium ${
+                          feesPreview.is_tax_free
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
+                            : 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800'
+                        }`}
+                        data-testid={`lot-card-${lot.lot_number}-fees-tax-message`}
+                      >
+                        {feesPreview.is_tax_free ? '✓ ' : '⚠️ '}
+                        {isFR ? feesPreview.tax_message_fr : feesPreview.tax_message_en}
                       </li>
                     </ul>
                   )}

@@ -1624,25 +1624,57 @@ async def get_lot_fees_preview(
         rate = float(INDIVIDUAL_BUYER_RATES[tier])
         rate_source = f"buyer_tier_{tier}"
 
-    buyer_premium = round(subtotal * rate, 2)
+    platform_fee = round(subtotal * rate, 2)
 
-    # Tax-free = private sale (individual seller). Only the platform fee is
-    # ever taxed. Everything else follows the QC blended tax (14.975 %) as the
-    # displayed hint — the actual tax is calculated at checkout using the
-    # buyer's province.
+    # Stripe recovery — pass-through card fee on the platform fee itself
+    # (2.9 % + $0.30 CAD). Only applied when the buyer isn't paying by cash
+    # / e-transfer; kept in the preview as the informational maximum.
+    stripe_recovery = round(platform_fee * 0.029 + 0.30, 2)
+
+    # Buyer-province lookup for the provincial tax rate. Falls back to QC
+    # (14.975 %) when the buyer isn't logged in or has no province on file.
+    PROVINCIAL_TAX = {
+        "QC": (0.14975, "GST/QST"),
+        "ON": (0.13,    "HST"),
+        "NB": (0.15,    "HST"),
+        "NS": (0.15,    "HST"),
+        "NL": (0.15,    "HST"),
+        "PE": (0.15,    "HST"),
+        "BC": (0.12,    "GST/PST"),
+        "AB": (0.05,    "GST"),
+        "SK": (0.11,    "GST/PST"),
+        "MB": (0.12,    "GST/PST"),
+        "YT": (0.05,    "GST"),
+        "NT": (0.05,    "GST"),
+        "NU": (0.05,    "GST"),
+    }
+    buyer_province = None
+    if current_user:
+        buyer_province = getattr(current_user, "province", None)
+    buyer_province = (buyer_province or listing.get("region") or "QC").upper()[:2]
+    tax_rate, tax_label = PROVINCIAL_TAX.get(buyer_province, PROVINCIAL_TAX["QC"])
+
+    # Tax-free = private sale (individual seller). Only the platform fee +
+    # Stripe recovery are ever taxed. When the seller is a business /
+    # broker / enterprise / partner, the hammer subtotal is taxed too.
     is_private_sale = seller_account_type == "individual"
-    TAX_HINT_RATE = 0.14975  # GST 5% + QST 9.975% blended (QC hint)
-    tax_status = "tax_free" if is_private_sale else "per_province"
+    is_tax_free = is_private_sale
+    tax_status = "tax_free" if is_tax_free else "per_province"
+    fee_base = round(platform_fee + stripe_recovery, 2)
 
-    if is_private_sale:
+    if is_tax_free:
         tax_on_hammer = 0.0
-        tax_on_fee = round(buyer_premium * TAX_HINT_RATE, 2)
+        tax_on_fees = round(fee_base * tax_rate, 2)
+        tax_message_en = "Tax-Free item — taxes apply to platform fees only, not on the item price"
+        tax_message_fr = "Article sans taxe — les taxes s'appliquent uniquement aux frais de plateforme, pas au prix de l'article"
     else:
-        tax_on_hammer = round(subtotal * TAX_HINT_RATE, 2)
-        tax_on_fee = round(buyer_premium * TAX_HINT_RATE, 2)
-    tax_amount = round(tax_on_hammer + tax_on_fee, 2)
+        tax_on_hammer = round(subtotal * tax_rate, 2)
+        tax_on_fees = round(fee_base * tax_rate, 2)
+        tax_message_en = "Taxable item — tax applies to item price and platform fees"
+        tax_message_fr = "Article taxable — les taxes s'appliquent au prix de l'article et aux frais de plateforme"
+    tax_amount = round(tax_on_hammer + tax_on_fees, 2)
 
-    estimated_total = round(subtotal + buyer_premium + tax_amount, 2)
+    estimated_total = round(subtotal + platform_fee + stripe_recovery + tax_amount, 2)
     deposit_required = float(listing.get("deposit_amount") or 0)
 
     # Leader initials for the Auction Summary card (uses masked-history helper).
@@ -1663,23 +1695,37 @@ async def get_lot_fees_preview(
 
     return {
         "hammer": unit_bid,          # per-unit bid the buyer typed
+        "bid_per_unit": unit_bid,    # alias used by iter370 fee UI
         "unit_bid": unit_bid,
         "quantity": quantity,
         "subtotal": subtotal,        # unit_bid × quantity
+        "hammer_subtotal": subtotal, # alias
         "lot_total": subtotal,       # alias (kept for older callers)
+        # Platform fee (buyer premium) block
         "buyer_premium_rate": rate,
         "buyer_premium_rate_pct": round(rate * 100, 2),
-        "buyer_premium_amount": buyer_premium,
+        "buyer_premium_amount": platform_fee,
         "buyer_premium_source": rate_source,
         "buyer_tier": tier,
+        "platform_fee": platform_fee,               # iter370 alias
+        "platform_fee_rate_pct": round(rate * 100, 2),
+        "stripe_recovery": stripe_recovery,         # iter370 — Stripe pass-through
+        # Tax block
         "tax_status": tax_status,
-        "tax_rate_pct": round(TAX_HINT_RATE * 100, 3),
+        "tax_rate_pct": round(tax_rate * 100, 3),
+        "tax_label": tax_label,
         "tax_on_hammer": tax_on_hammer,
-        "tax_on_fee": tax_on_fee,
+        "tax_on_fee": tax_on_fees,                  # legacy name (kept)
+        "tax_on_fees": tax_on_fees,                 # iter370 alias
         "tax_amount": tax_amount,
         "is_private_sale": is_private_sale,
+        "is_tax_free": is_tax_free,                 # iter370 alias
+        "tax_message_en": tax_message_en,
+        "tax_message_fr": tax_message_fr,
+        # Totals
         "deposit_required": deposit_required,
         "estimated_total": estimated_total,
+        "total": estimated_total,                   # iter370 alias
         "currency": listing.get("currency") or "CAD",
         "payment_method": "bidvex_stripe_checkout",
         "leading_bidder_initials": leader_initials,

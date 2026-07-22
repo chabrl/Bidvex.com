@@ -95,11 +95,17 @@ def test_card_image_slot_fixed_and_contain():
 # ─────────────────────────────────────────────────────────────────────────────
 
 def test_wishlist_button_wrapper_centered():
-    src = read("frontend/src/components/CompactLotCard.jsx")
-    # 36 × 36 white circle wrapper with flex-center layout.
-    assert "width: 36" in src and "height: 36" in src
-    assert "wishlist-btn-wrapper" in src
-    assert "rounded-full bg-white" in src
+    # iter370 FIX 1 — CompactLotCard now uses CardWishlistButton which draws
+    # its own 36 × 36 white circle with `padding:0` + flex-centered layout
+    # (see /app/frontend/src/components/CardWishlistButton.jsx for spec).
+    src = read("frontend/src/components/CardWishlistButton.jsx")
+    assert "width: '36px'" in src and "height: '36px'" in src
+    assert "borderRadius: '50%'" in src
+    assert "padding: '0'" in src
+    assert "background: 'white'" in src
+    # CompactLotCard MUST use this button (not the ambient WatchlistButton).
+    card = read("frontend/src/components/CompactLotCard.jsx")
+    assert "CardWishlistButton" in card
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -179,14 +185,17 @@ def test_auto_bid_subscription_gate():
 
 def test_fees_preview_supports_multi_unit_and_taxfree():
     src = read("backend/routes/auctions_bids.py")
-    # Endpoint exposes subtotal, tax_on_hammer, tax_on_fee separately.
+    # Endpoint exposes subtotal + granular tax + stripe_recovery blocks.
     assert '"subtotal": subtotal' in src
     assert '"tax_on_hammer": tax_on_hammer' in src
-    assert '"tax_on_fee": tax_on_fee' in src
+    assert '"tax_on_fees": tax_on_fees' in src
+    assert '"stripe_recovery": stripe_recovery' in src
+    assert '"platform_fee": platform_fee' in src
+    assert '"tax_message_en"' in src and '"tax_message_fr"' in src
     # Multi-unit: unit_bid × quantity.
     assert "unit_bid * quantity" in src
-    # Tax-free path: only fee is taxed.
-    assert "buyer_premium * TAX_HINT_RATE" in src
+    # Tax-free path: fee base includes both platform fee AND Stripe recovery.
+    assert "platform_fee + stripe_recovery" in src
     # Anonymous access allowed via get_current_user_optional.
     assert "get_current_user_optional" in src
 
