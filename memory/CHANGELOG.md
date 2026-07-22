@@ -1,6 +1,32 @@
 # BidVex Changelog
 
 
+## Jul 22, 2026 — iter375 ✅ Landing Page Starter Templates + Preview iframe fix
+
+### 0. Executive Summary
+- Added 6 starter templates to the Landing Page Builder (Blank, Seller Acquisition, Buyer Acquisition, Affiliate Program, Vehicle Dealer, Storage Facility) — bilingual EN/FR, editable after creation, using BidVex brand colors (Navy #0B2345, Blue #2B8FD0, Teal #3FB4CB, Green #22c55e).
+- Seller Acquisition includes all requested sections: Hero, Feature grid (6 cards), How it works (3 steps), Pricing (3 tiers, Pro featured), FAQ accordion (5 native `<details>`/`<summary>`), Final CTA.
+- Fixed HIGH bug found by testing agent: `X-Frame-Options: DENY` on `/api/lp/{slug}/render` was blocking the admin Preview iframe — now sends `SAMEORIGIN` only for that path (cross-origin framing still blocked).
+- Added `<details>`/`<summary>` (with `open` attribute) to backend bleach ALLOWED_TAGS so FAQ accordions render publicly.
+
+### 1. Files Created
+- `/app/frontend/src/pages/admin/landingPageTemplates.js` — 6 template presets + shared CSS (BidVex brand palette). Exports `LANDING_PAGE_TEMPLATES` array + `getTemplate(id)`.
+- `/app/frontend/src/pages/admin/LandingPageTemplatePicker.jsx` — Shadcn Dialog with 6 template cards, navigates to `/admin/landing-pages/new?template={id}`.
+
+### 2. Files Modified
+- `/app/frontend/src/pages/admin/AdminLandingPagesList.jsx` — "+ New page" button now opens picker instead of navigating directly.
+- `/app/frontend/src/pages/admin/AdminLandingPageEditor.jsx` — reads `?template=` query param, pre-fills form via `getTemplate()`, shows Template badge in header.
+- `/app/backend/routes/landing_pages.py` — expanded `BLEACH_ALLOWED_TAGS` with `details`, `summary`; added `open` attr allowance.
+- `/app/backend/server.py` — response middleware now sends `X-Frame-Options: SAMEORIGIN` for `/api/lp/*/render` paths (DENY everywhere else).
+
+### 3. Testing
+- Testing agent: 18/19 flows fully verified (94%). Post-fix smoke test confirmed preview iframe now renders published Seller Acquisition template with 6 features / 3 tiers / 5 FAQ details / correct H1.
+- iter373 backend tests: 14/14 still passing.
+
+### 4. Known Follow-ups
+- Pre-existing `test_pagespeed_optimization_85.py` still asserts `SAMEORIGIN` on `/api/health` (unrelated to iter375; middleware serves DENY globally except LP render).
+
+
 ## Jul 22, 2026 — iter374 ✅ Admin Landing Page Builder — Frontend UI
 
 ### 0. Executive Summary

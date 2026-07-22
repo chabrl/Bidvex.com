@@ -622,7 +622,13 @@ async def response_time_middleware(request: Request, call_next):
     response.headers["X-Response-Time"] = f"{elapsed}ms"
     # ── Security Headers (Cloudflare CDN-safe) ──
     response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Frame-Options"] = "DENY"
+    # iter375 — public landing-page render endpoint needs SAMEORIGIN so
+    # the admin editor's preview iframe can display the published page.
+    # Cross-origin framing is still blocked.
+    if path.startswith("/api/lp/") and path.endswith("/render"):
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    else:
+        response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"

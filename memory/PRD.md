@@ -1,5 +1,34 @@
 # BidVex — Auction Marketplace PRD
 
+## iter375 — Landing Page Starter Templates (Jul 22, 2026) ✅ COMPLETE
+
+**Scope**: Admin now picks a starter template when creating a landing page. Six presets bundled with the app:
+
+| Template | Key sections |
+|---|---|
+| Blank Page | (empty canvas) |
+| Seller Acquisition | Hero · 6-Feature grid · 3-step "How it works" · 3-tier Pricing (Pro featured) · FAQ accordion (5 items) · Final CTA |
+| Buyer Acquisition | Hero · 6-Feature grid · Final CTA |
+| Affiliate Program | Hero · 3-Feature grid · 3-step onboarding · Final CTA |
+| Vehicle Dealer | Hero · 6-Feature grid · Final CTA |
+| Storage Facility | Hero · 3-Feature grid · 3-step lien flow · Final CTA |
+
+All content is bilingual EN/FR (title, meta, HTML body). Templates are fully editable after creation via the existing 3-tab editor.
+
+### Design
+- BidVex brand palette: Navy `#0B2345` (hero backgrounds), Blue `#2B8FD0` (CTAs), Teal `#3FB4CB` (accents/gradients), Green `#22c55e` (positive accents / step numbers / final CTA button).
+- Native `<details>`/`<summary>` FAQ accordions — no JS required. Backend bleach sanitizer was extended to allow these tags.
+- Shared CSS module (`SHARED_CSS`) with `.lp-hero`, `.lp-features`, `.lp-steps`, `.lp-tiers`, `.lp-faq`, `.lp-final` classes — namespaced under `lp-` prefix so they don't collide with BidVex site chrome when header/footer toggles are on.
+
+### Files
+- Created: `frontend/src/pages/admin/landingPageTemplates.js`, `frontend/src/pages/admin/LandingPageTemplatePicker.jsx`
+- Modified: `frontend/src/pages/admin/AdminLandingPagesList.jsx` (opens picker), `frontend/src/pages/admin/AdminLandingPageEditor.jsx` (reads `?template=` and pre-fills), `backend/routes/landing_pages.py` (allow-list `<details>`/`<summary>`), `backend/server.py` (SAMEORIGIN for LP render path)
+
+### Testing
+- Testing agent: 18/19 flows verified (94%). One HIGH bug (X-Frame-Options: DENY blocking preview iframe) found and fixed inline; post-fix smoke shows iframe rendering full Seller template with 6 features / 3 tiers / 5 FAQ details.
+- iter373 backend tests: 14/14 green.
+
+
 ## iter374 — Admin Landing Page Builder Frontend UI (Jul 22, 2026) ✅ COMPLETE
 
 **Scope**: Ship the frontend for the iter373 backend Landing Page CRUD. Admins can create, edit, preview, publish/unpublish, duplicate and archive landing pages served publicly at `/lp/{slug}` — no code deploy required.
