@@ -2137,3 +2137,61 @@ Backend-only zero-credit change to the SendGrid Contractor Email Hub. Ensures ev
 - Pre-existing test_iter323_http_integration.py failures (403 contractor role stub) confirmed to predate iter372 via `git stash` isolation.
 
 **Zero credits charged.** Backend + frontend deployed to preview. Production deploy requires a redeploy from the user.
+
+
+---
+
+## Iteration 373 (2026-07-22) — Admin Landing Page Builder (backend foundation)
+
+Backend + public rendering only — frontend UI is intentionally deferred per spec.
+
+### Delivered
+- **New collection `landing_pages`** with the exact field list from the spec + `duplicated_from`, `view_buckets`, `referrer_counts`, `last_viewed_at` for analytics.
+- **Startup index setup** in `server.py`: unique slug + status + audit-log lookup + view lookup.
+- **Admin CRUD** — all under `/api/admin/landing-pages` and gated by `require_admin`:
+  - `GET /` — list with pagination + `status` filter + `q` search
+  - `POST /` — create (validates slug uniqueness; returns 409 on collision)
+  - `GET /{id}` — full page + analytics roll-up
+  - `PATCH /{id}` — partial update
+  - `DELETE /{id}` — soft delete (sets `status=archived`)
+  - `POST /{id}/publish` — sets `status=published` + `published_at`; blocks publish if `title_en` or any HTML body is missing
+  - `POST /{id}/unpublish` — sets `status=draft`
+  - `POST /{id}/duplicate` — deep-copy under `-copy` (auto-increments to `-copy-2` etc.)
+  - `GET /{id}/audit-log` — most-recent 50 entries
+- **Public rendering** under `/api/lp/{slug}` (kubernetes ingress only routes `/api/*` to the backend):
+  - `GET /api/lp/{slug}` — JSON view (for future SPA route)
+  - `GET /api/lp/{slug}/render` — full HTML document with `<title>`, `meta description`, `link rel=canonical`, Open Graph tags, optional `<meta property="og:image">`, `Content-Language`, `Cache-Control`, `X-Robots-Tag: index, follow`
+  - Draft / archived pages → HTTP 404
+  - `?lang=en|fr` override → falls back to Accept-Language → then EN default; collapses to whichever language actually has content
+  - `show_bidvex_header` / `show_bidvex_footer` flags gate the built-in chrome
+- **View analytics**:
+  - Every public hit increments `view_count` + `view_buckets.{yyyy-mm-dd}`.
+  - `top_referrers` bucketed by origin only (never full URL).
+  - `analytics` block on the admin detail returns `total_views`, `views_7d`, `views_30d`, `top_referrers`, `last_viewed_at`.
+  - Analytics failure never breaks a public page render (`try/except` around every write).
+- **Security**:
+  - `bleach 6.3.0` sanitises HTML on write — strips `<script>`, all `on*` event handlers, `javascript:` URLs; keeps `<iframe>` for embedded video only if a whitelisted src.
+  - `_sanitise_css` removes `@import` + neutralises `javascript:` URLs.
+  - `_sanitise_js` escapes `</script>` so an author can't accidentally close the wrapping tag.
+  - Slug validator rejects uppercase, underscores, non-ASCII, reserved slugs (`api`, `admin`, `sitemap.xml`, etc.), leading / trailing / double hyphens.
+  - Every admin write logs to `landing_page_audit_log` with actor + before/after snapshot; HTML/CSS/JS diffs kept small (`[:400]`) to keep the row light.
+  - MongoDB unique index on `slug` guards against parallel-POST races.
+
+### Tests — 14 passing (`backend/tests/test_iter373_landing_pages.py`)
+- Slug validation (rejects 10 bad shapes, accepts 3 good ones)
+- Duplicate slug returns 409
+- Admin authorization (anonymous 401, user 403, admin 200)
+- Full CRUD lifecycle
+- Publish blocks incomplete pages
+- Duplicate creates `-copy` then `-copy-2`
+- Public 404 for draft + archived, 200 for published
+- `?lang=` override + Accept-Language fall-back
+- View count increment + top-referrer bucketing
+- Full HTML render includes title, meta description, canonical URL, OG tags, custom CSS/JS
+- Chrome toggle: `show_bidvex_header=false` → no header rendered
+- HTML sanitisation strips `<script>`, `onclick`, `onerror`, `javascript:` URIs
+- Audit log records create + update + publish actions
+
+Regression: 95/95 across iter367-iter373 suites.
+
+**NOT DEPLOYED** to production — user to deploy after review.

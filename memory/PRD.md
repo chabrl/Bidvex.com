@@ -13376,3 +13376,24 @@ Full changelog: `/app/memory/CHANGELOG.md` iteration 372.
 - **Tests**: 14 new iter372 tests + 3 legacy iter323/318 tests refreshed. 86/86 pass across iter367-372 suites.
 
 **Zero credits charged.**
+
+
+---
+
+## Iteration 373 (2026-07-22) — Admin Landing Page Builder (backend foundation)
+Full details: `/app/memory/CHANGELOG.md` iteration 373.
+
+### Delivered (backend + public rendering, no admin UI yet per spec)
+- New MongoDB collection `landing_pages` + startup index setup (unique slug, status filter, audit + view lookup).
+- Admin CRUD suite under `/api/admin/landing-pages/*` — all gated by `require_admin`.
+- Public `/api/lp/{slug}` (JSON) + `/api/lp/{slug}/render` (full HTML with SEO title, meta description, canonical URL, OG tags, Content-Language, Cache-Control).
+- View analytics roll-up: total, 7-day, 30-day, top referrers (origin-only for privacy).
+- HTML/CSS/JS sanitised with bleach on every write; slug validation rejects uppercase / reserved / malformed slugs.
+- Full admin audit log on every write with actor + before/after snapshot.
+
+### Tests: 14/14 iter373 tests + 95/95 iter367-373 regression suite pass.
+
+### Frontend admin UI intentionally NOT built (spec explicitly said "Do not build frontend UI yet").
+### Next: build the Admin > Landing Pages page (list + editor + preview) once approved.
+
+**NOT DEPLOYED** to production.

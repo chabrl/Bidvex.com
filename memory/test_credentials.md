@@ -199,3 +199,9 @@ blog tile anchors, and pricing CTAs.
 - Phone/email/ID/payment_method all verified
 - Purpose: Exercise the Auto-Bid modal + processor end-to-end.
 - User id: `4b1fa594-574d-4508-967d-6db92113037c`
+
+
+## 🆕 iter373 — Landing Page Builder test accounts (2026-07-22)
+- Admin (created for landing-page tests): `iter373_lp_admin@bidvex.com` / `Iter373LP!`
+- Regular user (for 403 admin-gate tests): `iter373_lp_user@bidvex.com` / `Iter373LPUser!`
+- Both seeded idempotently by `tests/test_iter373_landing_pages.py`.

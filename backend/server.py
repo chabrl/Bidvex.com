@@ -292,6 +292,25 @@ async def lifespan(app):
         # iter236 Mission 2 — 2dsphere index on listings.location.coordinates
         from routes.geo_search import ensure_2dsphere_index
         await ensure_2dsphere_index()
+        # iter373 — Landing Page Builder indexes (slug-unique, status filter,
+        # audit-log page lookup, per-view row lookup).
+        try:
+            await db.landing_pages.create_index(
+                "slug", unique=True, name="idx_landing_pages_slug_unique",
+            )
+            await db.landing_pages.create_index(
+                "status", name="idx_landing_pages_status",
+            )
+            await db.landing_page_audit_log.create_index(
+                [("page_id", 1), ("created_at", -1)],
+                name="idx_lp_audit_page_created",
+            )
+            await db.landing_page_views.create_index(
+                [("page_id", 1), ("created_at", -1)],
+                name="idx_lp_views_page_created",
+            )
+        except Exception as _lpi:  # noqa: BLE001
+            logger.warning(f"[iter373] landing_pages index setup skipped: {_lpi}")
         # iter265 Mission 1.4 — 2dsphere on users.location.coordinates so
         # per-listing nearby fan-out can $geoWithin/$centerSphere. The
         # `sparse=True` flag lets users without coordinates remain
@@ -1307,6 +1326,8 @@ try:
         ("routes.identity", "identity_router", "set_identity_db", False),
         # iter357 — Public platform stats (no auth) — social proof widget
         ("routes.public_stats", "public_stats_router", None, False),
+        # iter373 — Admin Landing Page Builder (backend foundation)
+        ("routes.landing_pages", "router", "set_db", False),
         ("routes.ai_chat", "ai_chat_router", "set_ai_chat_db", False),
         # iter234 — Direct google-genai (Gemini 2.5 Flash) streaming chat + watchdog
         ("routes.genai_chat", "genai_chat_router", "set_genai_chat_db", False),
