@@ -1,5 +1,32 @@
 # BidVex — Auction Marketplace PRD
 
+## iter374 — Admin Landing Page Builder Frontend UI (Jul 22, 2026) ✅ COMPLETE
+
+**Scope**: Ship the frontend for the iter373 backend Landing Page CRUD. Admins can create, edit, preview, publish/unpublish, duplicate and archive landing pages served publicly at `/lp/{slug}` — no code deploy required.
+
+### Deliverables
+1. **List View** at `/admin/landing-pages` (`AdminLandingPagesList.jsx`)
+   - Table columns: Slug/Title · Status badge (Draft/Published/Archived) · Views · Updated · Actions (Edit / Open public / Publish or Unpublish / Duplicate / Archive)
+   - Search input + status filter + refresh + pagination (20/page)
+   - "+ New page" opens `/admin/landing-pages/new`
+2. **Editor** at `/admin/landing-pages/:id` and `/new` (`AdminLandingPageEditor.jsx`) — 3 tabs:
+   - **Settings**: slug, EN/FR titles, EN/FR meta descriptions, OG image URL, "show BidVex header" + "show BidVex footer" switches
+   - **HTML Editor**: EN HTML, FR HTML, CSS, JS — dark monospace `<textarea>` (`CodeArea`) with `Tab` → 2 spaces, `Shift+Tab` dedent, multi-line block indent. No heavy deps.
+   - **Preview**: iframe with device (Desktop 100% / Tablet 768px / Mobile 390px) and language (EN / FR) toggles. Draft pages render via `iframe.srcDoc` mirroring the backend template (so header/footer switches reflect in real time even before publish). Published pages render live from `${REACT_APP_BACKEND_URL}/api/lp/{slug}/render?lang=…`.
+   - Save (draft) / Publish / Unpublish buttons; Unsaved-changes badge + `beforeunload` warning.
+3. **Sidebar entry** — "Landing Pages" added to `MARKETING_TABS` in `AdminDashboard.js` under the Marketing section. `onSecondaryClick` intercepts tabs with a `route` field and navigates to `/admin/landing-pages`.
+
+### Testing
+- Testing subagent: 18/20 flows verified (list, editor tabs, tab-key handling, header/footer live preview, publish/unpublish, slug validation, sidebar navigation). Two partial verifications (duplicate row action + unsaved-back-button confirm) are UI-only and code-reviewed.
+- One HIGH bug found by testing agent — dark-on-dark textarea due to global `html:not(.dark) textarea { color: #1e293b }` rule — fixed via inline `color: '#f1f5f9'` on `CodeArea`. Verified: computed color = `rgb(241, 245, 249)` on background `rgb(2, 6, 23)`.
+
+### Files
+- Created: `frontend/src/pages/admin/AdminLandingPagesList.jsx`, `frontend/src/pages/admin/AdminLandingPageEditor.jsx`
+- Modified: `frontend/src/App.js` (3 routes), `frontend/src/pages/AdminDashboard.js` (marketing tab + navigation intercept + LayoutTemplate icon)
+
+### Zero regressions from iter363-373.
+
+
 ## iter368 — Multi-Lot UX Refinement + Affiliate Corrections (Jul 21, 2026) ✅ COMPLETE
 
 **Scope**: Fixed four issues from iter367 per user spec. 114/115 tests pass (0 failed, 1 skipped).

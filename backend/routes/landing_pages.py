@@ -95,6 +95,8 @@ BLEACH_ALLOWED_TAGS = list({
     "blockquote", "q", "cite", "abbr",
     # Lists
     "ul", "ol", "li", "dl", "dt", "dd",
+    # Collapsible sections (safe native HTML5 — used in FAQ templates)
+    "details", "summary",
     # Tables
     "table", "thead", "tbody", "tfoot", "tr", "td", "th", "caption", "colgroup", "col",
     # Media
@@ -118,6 +120,7 @@ BLEACH_ALLOWED_ATTRS = {
     "audio":   ["src", "controls", "preload"],
     "iframe":  ["src", "width", "height", "allow", "allowfullscreen", "loading", "referrerpolicy", "title"],
     "button":  ["type", "name", "value"],
+    "details": ["open"],
     "table":   ["border", "cellpadding", "cellspacing"],
     "td":      ["colspan", "rowspan", "align", "valign"],
     "th":      ["colspan", "rowspan", "align", "valign", "scope"],

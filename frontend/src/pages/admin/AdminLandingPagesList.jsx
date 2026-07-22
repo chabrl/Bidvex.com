@@ -20,6 +20,7 @@ import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Input } from '../../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
+import LandingPageTemplatePicker from './LandingPageTemplatePicker';
 
 const STATUS_META = {
   draft:     { label: 'Draft',     cls: 'bg-slate-100 text-slate-700 border-slate-200' },
@@ -50,6 +51,7 @@ export default function AdminLandingPagesList() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [q, setQ] = useState('');
   const [page, setPage] = useState(1);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const pageSize = 20;
 
   const authHeaders = useMemo(() => ({
@@ -127,7 +129,7 @@ export default function AdminLandingPagesList() {
             </p>
           </div>
           <Button
-            onClick={() => navigate('/admin/landing-pages/new')}
+            onClick={() => setPickerOpen(true)}
             className="bg-primary text-white"
             data-testid="lp-new-page-btn"
           >
@@ -192,7 +194,7 @@ export default function AdminLandingPagesList() {
                     <td colSpan={5} className="text-center py-16">
                       <div className="text-slate-500">No landing pages yet.</div>
                       <Button
-                        onClick={() => navigate('/admin/landing-pages/new')}
+                        onClick={() => setPickerOpen(true)}
                         className="mt-3 bg-primary text-white"
                         data-testid="lp-empty-new-btn"
                       >
@@ -335,6 +337,8 @@ export default function AdminLandingPagesList() {
           </div>
         )}
       </div>
+
+      <LandingPageTemplatePicker open={pickerOpen} onOpenChange={setPickerOpen} />
     </div>
   );
 }

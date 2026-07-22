@@ -10,8 +10,8 @@
  * first save. Warns the user on unsaved changes (via beforeunload + local
  * dirty flag).
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'sonner';
 import {
@@ -27,6 +27,7 @@ import { Label } from '../../components/ui/label';
 import { Switch } from '../../components/ui/switch';
 import { Textarea } from '../../components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
+import { getTemplate } from './landingPageTemplates';
 
 const _token = () => localStorage.getItem('access_token') || localStorage.getItem('token');
 
@@ -117,20 +118,38 @@ function CodeArea({ value, onChange, testId, rows = 20, placeholder }) {
       placeholder={placeholder}
       data-testid={testId}
       className="w-full font-mono text-[13px] leading-6 bg-slate-950 text-slate-100 rounded-md p-3 border border-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-400/60 resize-vertical"
-      style={{ tabSize: 2, minHeight: '360px' }}
+      style={{ tabSize: 2, minHeight: '360px', color: '#f1f5f9', caretColor: '#f1f5f9' }}
     />
   );
 }
 
 export default function AdminLandingPageEditor() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const isNew = !id || id === 'new';
+  const templateId = searchParams.get('template') || 'blank';
 
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const [page, setPage] = useState(null);
-  const [form, setForm] = useState(DEFAULT_STATE);
+  const [form, setForm] = useState(() => {
+    if (isNew) {
+      const tpl = getTemplate(templateId);
+      return {
+        ...DEFAULT_STATE,
+        title_en: tpl.default_title_en || '',
+        title_fr: tpl.default_title_fr || '',
+        meta_description_en: tpl.default_meta_en || '',
+        meta_description_fr: tpl.default_meta_fr || '',
+        html_en: tpl.html_en || '',
+        html_fr: tpl.html_fr || '',
+        css: tpl.css || '',
+        js: tpl.js || '',
+      };
+    }
+    return DEFAULT_STATE;
+  });
   const [dirty, setDirty] = useState(false);
   const [tab, setTab] = useState('settings');
 
@@ -312,6 +331,15 @@ export default function AdminLandingPageEditor() {
                 {isNew ? 'New Landing Page' : (form.title_en || form.slug || 'Untitled')}
               </h1>
               {!isNew && <Badge className={`border ${statusMeta.cls}`}>{statusMeta.label}</Badge>}
+              {isNew && templateId !== 'blank' && (
+                <Badge
+                  variant="outline"
+                  className="border-cyan-300 bg-cyan-50 text-cyan-800"
+                  data-testid="lp-editor-template-badge"
+                >
+                  Template · {getTemplate(templateId).name_en}
+                </Badge>
+              )}
               {dirty && (
                 <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800">
                   <AlertCircle className="h-3 w-3 mr-1" /> Unsaved

@@ -1,0 +1,69 @@
+{
+  "summary": "iter375 frontend E2E — Landing Page Builder starter templates + picker modal. Verified: template picker modal opens with all 6 cards (blank, seller-acquisition, buyer-acquisition, affiliate-program, vehicle-dealer, storage-facility) with correct testids, EN name + description + FR italic subtitle, cancel closes without navigating, blank navigates to /new?template=blank with empty fields and NO template badge, each non-blank template prefills title/meta/html_en/html_fr/css and shows badge 'Template · <Name>'. Seller Acquisition contains all required sections (lp-hero, 6 lp-feature, 3 lp-step, 3 lp-tier with lp-tier-featured, 5 <details>, lp-final) — html_en=7535 chars, html_fr=8209 chars, css=6430 chars, all 4 brand colors present (#0B2345, #2B8FD0, #3FB4CB, #22c55e). Save → POST /api/admin/landing-pages returns 200 (id created), URL becomes /admin/landing-pages/{id}, dirty flag cleared. Publish returns 200. Public GET /api/lp/{slug}/render preserves <details>/<summary> (5 preserved), returns 200 with 15943 bytes for EN and 16657 for FR, French H1 'Transformez vos actifs en liquidités' present. Editability confirmed: added comment marker to html_en → Save → render now contains marker. Other templates: Buyer=6features+0steps, Affiliate=3features+3steps, Dealer=6features+0steps, Storage=3features+3steps — all with hero+final and correct EN copy. ONE HIGH-PRIORITY BUG found: /api/lp/{slug}/render sends 'X-Frame-Options: DENY' header — the admin editor's lp-preview-iframe cannot render the published page (iframe.contentDocument is null / blocked). The iframe src is correct but the browser blocks framing even same-origin. Public browser access works fine; only the in-app Preview tab is impacted.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "GET /api/lp/{slug}/render",
+        "issue": "Response header 'X-Frame-Options: DENY' prevents admin Preview iframe (testid=lp-preview-iframe) from displaying the published page. contentDocument is inaccessible / body is blank. Verified via HTTP HEAD + Playwright evaluate on preview.emergentagent.com. Public direct access is unaffected (works in browser tab). Fix: change to 'SAMEORIGIN' (or omit and rely on CSP frame-ancestors 'self') for the render endpoint only — global middleware currently applies DENY globally.",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Admin Editor > Preview tab (post-publish)",
+        "issue": "lp-preview-iframe src points at /api/lp/{slug}/render (verified correct) but iframe stays blank because backend sends X-Frame-Options: DENY. Root cause is backend header, not the iframe wiring — flagged under backend_issues.critical.",
+        "affected_selectors": ["[data-testid=\"lp-preview-iframe\"]"]
+      }
+    ],
+    "design_issues": []
+  },
+  "verified_flows": [
+    "Admin at /admin/landing-pages clicks + New page → modal with testid lp-template-picker opens.",
+    "Picker shows exactly 6 cards with expected testids: lp-template-blank, -seller-acquisition, -buyer-acquisition, -affiliate-program, -vehicle-dealer, -storage-facility.",
+    "Each non-blank card renders icon, English name, description, and French italic subtitle (e.g. seller card shows 'Seller Acquisition' + description + 'Acquisition de vendeurs').",
+    "Cancel button (testid=lp-template-cancel) closes modal without navigating (URL stays /admin/landing-pages).",
+    "Blank card → /admin/landing-pages/new?template=blank → editor mounts with empty title, empty html/css/js and NO lp-editor-template-badge.",
+    "Seller Acquisition card → prefills title 'Sell on BidVex — Turn Assets Into Cash | Canada Auction Marketplace' + meta + html_en 7535 chars + html_fr 8209 chars + css 6430 chars. Badge shows 'Template · Seller Acquisition'.",
+    "Seller html_en contains: lp-hero, lp-features (6× lp-feature), lp-steps (3× lp-step), lp-tiers (3× lp-tier incl. 1 lp-tier-featured), lp-faq (5 <details>/<summary> pairs), lp-final. CSS contains #0B2345, #2B8FD0, #3FB4CB, #22c55e.",
+    "html_fr contains French hero H1 'Transformez vos actifs en liquidités'.",
+    "Save on /new?template=seller-acquisition with slug 'iter375-seller-<ts>' → POST /api/admin/landing-pages returns 200, URL replaces with /admin/landing-pages/{id}, 'Unsaved' badge disappears (dirty=false).",
+    "Publish (testid=lp-editor-publish) → POST /publish returns 200, editor shows Unpublish button.",
+    "Public GET /api/lp/{slug}/render?lang=en returns 200 (15943 bytes) with 6 lp-feature, 3 lp-tier (1 featured), 5 <details>, all 4 brand colors, hero H1 'Turn assets into cash'.",
+    "Public GET /api/lp/{slug}/render?lang=fr returns 200 (16657 bytes) with French hero H1 and 5 <details> intact (bleach ALLOWED_TAGS honours 'details'/'summary').",
+    "Editability confirmed: add '<!-- iter375-edit-marker-<ts> -->' comment to top of html_en → Save → GET /api/lp/{slug}/render?lang=en returns 200 and includes the marker.",
+    "Buyer Acquisition template renders hero + 6 features + final CTA (matches spec).",
+    "Affiliate Program template renders hero + 3 features + 3 steps + final (matches spec).",
+    "Vehicle Dealer template renders hero + 6 features + final (matches spec).",
+    "Storage Facility template renders hero + 3 features + 3 steps + final (matches spec).",
+    "All 4 non-blank templates show correct 'Template · <Name>' badge on the /new page.",
+    "Cleanup: DELETE /api/admin/landing-pages/{id} returned 200 for the seller test page."
+  ],
+  "unverified_or_partial": [
+    "Preview iframe visual verification (features=6, tiers=3, faq=5 via iframe.contentDocument) FAILED because backend sets X-Frame-Options: DENY on the render endpoint. Content itself is correct (verified via direct fetch) — only the in-editor iframe is blocked. Retest after backend header fix."
+  ],
+  "test_report_links": [],
+  "action_items": [
+    "HIGH: Backend — /api/lp/{slug}/render must send 'X-Frame-Options: SAMEORIGIN' (or omit and rely on CSP frame-ancestors 'self') so the admin editor's lp-preview-iframe can display the published page. Currently the global middleware forces DENY. Suggest overriding on the render endpoint response or scoping the global middleware to skip /api/lp/*/render.",
+    "LOW: Cleanup — the seller test page id f5f2a032-b554-4f10-abd6-a92b621a2e77 was archived. iter374 stray pages (iter374-e2e-test, upper-case-'T') were NOT touched — main agent may want to archive them via UI or DELETE /api/admin/landing-pages/{id}."
+  ],
+  "critical_code_review_comments": [
+    "landingPageTemplates.js (~1170 lines) is a single very large data file — acceptable for now since it's static template presets, but if more templates are added consider splitting each template into its own module.",
+    "LandingPageTemplatePicker.jsx uses Shadcn Dialog correctly and closes modal before navigate() — no race conditions observed.",
+    "AdminLandingPageEditor.jsx correctly reads searchParams.get('template') at mount and initialises useState via getTemplate(templateId) spread. Template badge visibility logic (isNew && templateId !== 'blank') is correct — verified badge hidden for blank, shown for all 5 others with correct name.",
+    "Backend BLEACH_ALLOWED_TAGS in /app/backend/routes/landing_pages.py already includes 'details' and 'summary' — public render preserves 5 <details>/<summary> pairs for seller FAQ. iter375 sanitizer expansion works.",
+    "X-Frame-Options DENY on /api/lp/{slug}/render defeats the purpose of the admin Preview tab for published pages — the DraftPreview iframe (which renders locally) works fine because it's srcDoc-driven, but the switched-to lp-preview-iframe cannot show content. Recommend backend adjustment."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (frontend-only scope; observed 1 backend header bug)", "frontend": "18/19 flows fully verified (~94%); 1 partial (preview iframe visual rendering blocked by X-Frame-Options: DENY on render endpoint)"},
+  "test_credentials": "Admin charbel911@gmail.com / Anderosli123!@# — VERIFIED working (super_admin). Token key must mirror to both 'access_token' and 'token' in localStorage.",
+  "seed_data_creation": "Created 1 landing page via UI: id=f5f2a032-b554-4f10-abd6-a92b621a2e77, slug=iter375-seller-1784745269 (Seller Acquisition template). Published and edited (added comment marker). ARCHIVED at end of test (DELETE returned 200).",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "iter375 template feature is functionally correct end-to-end: picker (6 cards), Blank flow, Seller Acquisition (all sections + brand colors + FR bilingual), all 4 other templates prefill correctly, Save/Publish/editability persist, public /api/lp/{slug}/render preserves details/summary. Only outstanding issue is the /api/lp/{slug}/render endpoint sends X-Frame-Options: DENY, blocking the admin Preview iframe from showing the published page. Content is verified correct via direct fetch. After main agent fixes the header, retest ONLY the Preview iframe visual by loading /admin/landing-pages/{id} → Preview tab and querying iframe.contentDocument.querySelectorAll('.lp-feature').length===6 etc. Admin login: charbel911@gmail.com / Anderosli123!@# (rate-limited ~60s — mirror token to 'access_token' AND 'token').",
+  "rca of the issue": "X-Frame-Options DENY on /api/lp/{slug}/render RCA — HTTP HEAD/GET on https://prod-verify-2.preview.emergentagent.com/api/lp/iter375-seller-1784745269/render?lang=en returns header 'x-frame-options: DENY'. Chrome console logs 'Refused to display <origin>/ in a frame because it set X-Frame-Options to deny.' when the admin's lp-preview-iframe loads that URL. Verified via Playwright: document.querySelector('[data-testid=\"lp-preview-iframe\"]').contentDocument === null (accessible=false). Impact: the Preview tab renders a blank iframe for published pages (DraftPreview via srcDoc still works). Reproduction: (1) log in as admin, (2) open any published landing page in /admin/landing-pages/{id}, (3) switch to Preview tab, (4) observe blank iframe. Mitigation: In backend, either (a) explicitly set response.headers['X-Frame-Options'] = 'SAMEORIGIN' on the render route (or delete the header) — since it's rendered via Response(html, media_type='text/html'), a middleware likely injects DENY; (b) exempt /api/lp/*/render from the global X-Frame-Options middleware; (c) rely solely on CSP frame-ancestors 'self' for framing control. Header-fixing is a one-line change on the render route."
+}

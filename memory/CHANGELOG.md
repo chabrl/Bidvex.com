@@ -1,6 +1,32 @@
 # BidVex Changelog
 
 
+## Jul 22, 2026 — iter374 ✅ Admin Landing Page Builder — Frontend UI
+
+### 0. Executive Summary
+- Delivered the admin Landing Page Builder UI on top of iter373's backend CRUD.
+- New routes: `/admin/landing-pages` (list), `/admin/landing-pages/new`, `/admin/landing-pages/:id` (editor).
+- 3-tab editor: Settings, HTML Editor (textarea + Tab-to-2-spaces + Shift+Tab dedent), Preview (iframe with device + language toggles).
+- Testing agent verified 18/20 flows (90%); one HIGH contrast bug (dark-on-dark textarea due to global `html:not(.dark) textarea` rule) fixed with inline color style. No new dependencies.
+
+### 1. Files Created
+- `/app/frontend/src/pages/admin/AdminLandingPagesList.jsx` — searchable/status-filtered table, Edit / Preview / Publish/Unpublish / Duplicate / Archive actions, pagination.
+- `/app/frontend/src/pages/admin/AdminLandingPageEditor.jsx` — 3-tab editor (Settings/HTML/Preview) with `CodeArea` (Tab-to-2-spaces) and `DraftPreview` (iframe srcDoc mirroring backend render for drafts). Iframe swaps to `${REACT_APP_BACKEND_URL}/api/lp/{slug}/render?lang=en|fr` once published. Device presets: Desktop 100%, Tablet 768px, Mobile 390px. Header/footer switches reflected live in the DraftPreview iframe.
+
+### 2. Files Modified
+- `/app/frontend/src/App.js` — added 3 lazy-imported routes wrapped in ProtectedRoute + ErrorBoundary.
+- `/app/frontend/src/pages/AdminDashboard.js` — added `landing-pages` entry to `MARKETING_TABS` with `route: '/admin/landing-pages'` and enhanced `onSecondaryClick` to navigate when a tab carries a `route`. Also added `LayoutTemplate` icon from lucide-react.
+
+### 3. Testing
+- Backend: no changes (iter373 tests still green).
+- Frontend E2E via testing subagent: list view CRUD flows, tab-key handling in textareas, iframe device/language toggles, header/footer toggle → DraftPreview live update, publish/unpublish round-trip, slug validation, sidebar Marketing entry navigation — all verified.
+
+### 4. Known Follow-ups (non-blocking)
+- Non-admin test creds `iter350_nonadmin@test.com` returned 401 on preview — re-seed if future admin-gate tests need it.
+- DraftPreview iframe uses `sandbox="allow-scripts allow-same-origin"` — flagged for defense-in-depth review.
+- `handlePublish` awaits `handleSave()` but does not gate on save success — minor edge case.
+
+
 ## Jul 21, 2026 — iter368 ✅ Multi-Lot UX Refinement + Affiliate Corrections
 
 ### 0. Executive Summary
