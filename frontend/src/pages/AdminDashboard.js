@@ -138,7 +138,7 @@ import {
   Users, Package, Gavel, Shield, TrendingUp, Bell, Settings, FileText, 
   MessageSquare, DollarSign, Search, Image, CreditCard, Megaphone, 
   Activity, AlertTriangle, ChevronRight, Power, Zap, Eye, History,
-  ToggleLeft, ToggleRight, Clock, Mail, Sliders, Car, Send, Bot, Ticket, BarChart3, Globe, Building2, BarChart2, ShieldAlert, ShieldCheck, Lock, Inbox, Briefcase
+  ToggleLeft, ToggleRight, Clock, Mail, Sliders, Car, Send, Bot, Ticket, BarChart3, Globe, Building2, BarChart2, ShieldAlert, ShieldCheck, Lock, Inbox, Briefcase, LayoutTemplate
 } from 'lucide-react';
 
 const API = API_BASE;
@@ -264,6 +264,8 @@ const MARKETING_TABS = [
   { id: 'ad-feeds', label: 'Ad Feeds', icon: '📡', lucideIcon: Megaphone },
   // iter337 — Gemini-drafted per-listing ad copy for Google + Meta.
   { id: 'ad-campaigns', label: 'Ad Campaigns', icon: '📢', lucideIcon: Megaphone },
+  // iter374 — Admin Landing Page Builder (dedicated route)
+  { id: 'landing-pages', label: 'Landing Pages', icon: '🧩', lucideIcon: LayoutTemplate, route: '/admin/landing-pages' },
 ];
 
 // ========== FINANCIAL & SAFETY (Cross-Cutting) ==========
@@ -929,7 +931,19 @@ const AdminDashboard = () => {
           primaryTab={primaryTab}
           secondaryTab={secondaryTab}
           onPrimaryClick={(id) => { handlePrimaryTabClick(id); setSidebarOpen(false); }}
-          onSecondaryClick={(id) => { setSecondaryTab(id); setSidebarOpen(false); }}
+          onSecondaryClick={(id) => {
+            // iter374 — Marketing/Finance tabs may carry a `route` field
+            // (e.g. Landing Pages → /admin/landing-pages). Navigate
+            // directly instead of trying to render inline.
+            const found = [...MARKETING_TABS, ...FINANCIAL_TABS].find((t) => t.id === id);
+            if (found?.route) {
+              navigate(found.route);
+              setSidebarOpen(false);
+              return;
+            }
+            setSecondaryTab(id);
+            setSidebarOpen(false);
+          }}
           pendingDealerLicenses={pendingDealerLicenses}
           open={sidebarOpen}
           onClose={() => setSidebarOpen(false)}

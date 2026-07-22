@@ -72,6 +72,9 @@ const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const AdminTaxDashboard = lazy(() => import('./pages/AdminTaxDashboard'));
 // iter217 Phase 5 Hotfix v5b — Broker Ecosystem
 const AdminBrokersPage = lazy(() => import('./pages/admin/AdminBrokersPage'));
+// iter374 — Admin Landing Page Builder
+const AdminLandingPagesList = lazy(() => import('./pages/admin/AdminLandingPagesList'));
+const AdminLandingPageEditor = lazy(() => import('./pages/admin/AdminLandingPageEditor'));
 // iter217 Phase 5 Hotfix v6.5 — Admin Subscription Management
 const AdminSubscriptionsPage = lazy(() => import('./pages/admin/AdminSubscriptionsPage'));
 const StorageHoldSettlementsTab = lazy(() => import('./pages/admin/StorageHoldSettlementsTab'));
@@ -778,6 +781,16 @@ const App = () => {
           {/* iter217 Phase 5 Hotfix v5b — Broker Ecosystem */}
           <Route path="/admin/brokers" element={
             <ProtectedRoute><AdminBrokersPage /></ProtectedRoute>
+          } />
+          {/* iter374 — Admin Landing Page Builder */}
+          <Route path="/admin/landing-pages" element={
+            <ProtectedRoute><ErrorBoundary scope="admin-landing-pages"><AdminLandingPagesList /></ErrorBoundary></ProtectedRoute>
+          } />
+          <Route path="/admin/landing-pages/new" element={
+            <ProtectedRoute><ErrorBoundary scope="admin-landing-page-editor"><AdminLandingPageEditor /></ErrorBoundary></ProtectedRoute>
+          } />
+          <Route path="/admin/landing-pages/:id" element={
+            <ProtectedRoute><ErrorBoundary scope="admin-landing-page-editor"><AdminLandingPageEditor /></ErrorBoundary></ProtectedRoute>
           } />
           {/* iter217 Phase 5 Hotfix v6.5 — Subscription Management */}
           <Route path="/admin/subscriptions" element={
