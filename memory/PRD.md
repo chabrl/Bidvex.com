@@ -1,5 +1,21 @@
 # BidVex — Auction Marketplace PRD
 
+## iter376 — Bid Count + Bid History Regression Fix (Jul 22, 2026) ✅ COMPLETE
+
+**Reported by user**: On the multi-lot auction page, lot cards show "🏆 You're Leading" after a successful bid but the count underneath stays at "0 bids". Additionally the Live Activity ticker always displays "No recent bids — be the first!" even when bids exist. Both affect lots where the current user has an active bid.
+
+### Root cause (3 issues)
+1. **`POST /multi-item-listings/{id}/lots/{n}/bid`** mutated `lots[i].current_price` + `highest_bidder_id` in-memory and persisted them via `$set: {"lots": lots}`, but **never incremented `bid_count`**. Auto-bids already did.
+2. **`GET /lots/{id}/recent-activity`** and **`GET /multi-item-listings/{id}/lots/{n}/bids-public`** both queried `db.bids` — the single-item bid collection — while multi-lot bids live in `db.lot_bids` (different collection, `listing_id` field instead of `auction_id`). Both endpoints returned zero rows for every multi-lot auction.
+
+### Fixes
+- `auctions_bids.py`: `+= 1` on `lots[i]['bid_count']` before the array `$set`; `db.bids` → `db.lot_bids` in `bids-public`.
+- `listings.py`: `db.bids` w/ `auction_id` → `db.lot_bids` w/ `listing_id` in `recent-activity`.
+
+### Testing
+`test_iter376_bid_count_regression.py` — seeds a 2-lot listing, has 2 distinct bidders place 3 bids across both lots (including an outbid), asserts `bid_count`, `current_price`, ticker output (3 events, newest-first, aliases + time_ago present) and the lot-detail bid history (leading/outbid status flips correctly, `unique_bidders=2`). Green. iter373 tests still 14/14 green.
+
+
 ## iter375 — Landing Page Starter Templates (Jul 22, 2026) ✅ COMPLETE
 
 **Scope**: Admin now picks a starter template when creating a landing page. Six presets bundled with the app:

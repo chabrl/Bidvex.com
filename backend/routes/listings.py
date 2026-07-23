@@ -1606,8 +1606,12 @@ async def get_multi_lot_recent_activity(auction_id: str, limit: int = 10):
     }
 
     # Pull recent bids for this multi-lot auction.
-    bid_docs = await db.bids.find(
-        {"auction_id": auction_id},
+    # REGRESSION FIX (iter376) — multi-lot bids are stored in `db.lot_bids`
+    # keyed by `listing_id`, not in the single-item `db.bids` collection
+    # keyed by `auction_id`. Reading the wrong collection meant the ticker
+    # always showed "No recent bids — be the first!" for multi-lot auctions.
+    bid_docs = await db.lot_bids.find(
+        {"listing_id": auction_id},
         {"_id": 0},
     ).sort("created_at", -1).to_list(limit)
 

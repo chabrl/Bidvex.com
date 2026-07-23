@@ -1,6 +1,31 @@
 # BidVex Changelog
 
 
+## Jul 22, 2026 — iter376 🚨 REGRESSION FIX — bid_count + bid history
+
+### 0. Executive Summary
+Two user-visible display bugs fixed. Backend-only change (no new frontend deploy required for the fix).
+
+### 1. Bugs Fixed
+- **Bug A** (`POST /api/multi-item-listings/{id}/lots/{n}/bid`): lot's `bid_count` was never incremented after a normal bid, so lot cards showed "You're Leading" but "0 bids". Auto-bids already `$inc`'d correctly — only the normal-bid path was affected.
+- **Bug B1** (`GET /api/lots/{auction_id}/recent-activity`): endpoint queried `db.bids` with `auction_id`, but multi-lot bids are written to `db.lot_bids` keyed by `listing_id`. Result: the Live Activity ticker always showed "No recent bids — be the first!" regardless of activity.
+- **Bug B2** (`GET /api/multi-item-listings/{id}/lots/{n}/bids-public`): same collection mismatch — the LotDetail page's masked bid history widget returned an empty array for every multi-lot bid.
+
+### 2. Files Modified
+- `/app/backend/routes/auctions_bids.py`
+  - Line 1160 — `lots[lot_index]["bid_count"] += 1` before the `$set` write.
+  - Line 1559 — `db.bids` → `db.lot_bids` for `bids-public`.
+- `/app/backend/routes/listings.py`
+  - Line 1609 — `db.bids` → `db.lot_bids` and `{"auction_id": …}` → `{"listing_id": …}` for `recent-activity`.
+
+### 3. Testing
+- New: `/app/backend/tests/test_iter376_bid_count_regression.py` — seeds a 2-lot listing, has two distinct bidders each place bids on both lots (including one outbid), asserts `bid_count`, `current_price`, `recent-activity` (3 events, newest-first, aliases + time_ago present), and `bids-public` (leading/outbid status flips correctly, `unique_bidders=2`). ✅ passes.
+- iter373 landing-page tests: 14/14 still green.
+
+### 4. Frontend
+No changes required. The event-driven refetch after bid (`bidvex:lot-bid-placed` → `fetchListing()` in `MultiItemListingDetailPage`) was already wired correctly — it just wasn't getting back updated data from the backend.
+
+
 ## Jul 22, 2026 — iter375 ✅ Landing Page Starter Templates + Preview iframe fix
 
 ### 0. Executive Summary

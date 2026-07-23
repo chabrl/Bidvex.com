@@ -1157,6 +1157,11 @@ async def bid_on_lot(request: Request, listing_id: str, lot_number: int, data: D
 
     lots[lot_index]["current_price"] = amount
     lots[lot_index]["highest_bidder_id"] = current_user.id
+    # REGRESSION FIX (iter376) — increment the lot's bid_count so the UI
+    # shows the correct "N bids" total. Prior to this fix the array-level
+    # $set below persisted current_price + highest_bidder_id but bid_count
+    # stayed at 0 even after the buyer became the leader.
+    lots[lot_index]["bid_count"] = int(lots[lot_index].get("bid_count") or 0) + 1
 
     # ========== ANTI-SNIPING LOGIC ==========
     ANTI_SNIPE_WINDOW = 120
@@ -1556,7 +1561,10 @@ async def get_lot_bids_public(listing_id: str, lot_number: int, limit: int = 20)
         raise HTTPException(status_code=404, detail="Auction not found")
 
     limit = max(1, min(100, int(limit)))
-    bids = await db.bids.find(
+    # REGRESSION FIX (iter376) — multi-lot bids live in `db.lot_bids`, not
+    # `db.bids`. The old query returned 0 rows, so the LotDetail bid-history
+    # widget rendered "No recent bids" even after bids were placed.
+    bids = await db.lot_bids.find(
         {"listing_id": listing_id, "lot_number": int(lot_number)},
         {"_id": 0},
     ).sort("created_at", -1).to_list(limit)
