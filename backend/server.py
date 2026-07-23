@@ -1178,6 +1178,29 @@ scheduler.add_job(
     _promotion_expiry_sweep_tick,
     trigger=IntervalTrigger(hours=1), id='promotion_expiry_sweep', replace_existing=True)
 
+# ─── iter378 — Weekly marketing digest (Mon 08:00 UTC) ────────────
+from apscheduler.triggers.cron import CronTrigger as _WeeklyCronTrigger
+
+async def run_weekly_marketing_digest():
+    """Send each opted-in user a personalised weekly digest email —
+    followed sellers' new listings, watchlist updates, interest matches.
+    Bilingual EN/FR; unsubscribe honoured via send_email(is_marketing=True).
+    Transactional bid emails are NOT touched by this job."""
+    from services.weekly_digest import run_weekly_digest_batch
+    return await run_weekly_digest_batch(db)
+
+async def _weekly_marketing_digest_tick():
+    """AsyncIOScheduler wrapper — must be a coroutine function so the
+    executor awaits it (iter377 pattern)."""
+    await safe_run("weekly_marketing_digest", run_weekly_marketing_digest(),
+                   timeout_seconds=1500)  # allow up to 25 min for large sends
+
+scheduler.add_job(
+    _weekly_marketing_digest_tick,
+    trigger=_WeeklyCronTrigger(day_of_week='mon', hour=8, minute=0, timezone="UTC"),
+    id='weekly_marketing_digest', replace_existing=True,
+)
+
 # ─── Deposit refund queue worker (60s SLA — Spec Feature 2) ───
 async def run_deposit_refund_queue():
     from services.deposit_refund_queue import process_deposit_refund_queue

@@ -1,6 +1,38 @@
 # BidVex Changelog
 
 
+## Jul 23, 2026 — iter378 ✨ Weekly Marketing Digest Emails
+
+### 0. Executive Summary
+Personalised weekly digest email — sent every Monday 08:00 UTC via APScheduler + SendGrid — that surfaces (a) new listings from sellers each user follows, (b) updates on their active watchlist items, and (c) fresh listings matching categories they're interested in. Bilingual EN/FR based on `preferred_language`. Unsubscribe is handled centrally by `send_email(is_marketing=True)` which already honours `email_suppressions`, `email_preferences.marketing=False`, and legacy `marketing_unsubscribed=True`. **Transactional bid emails untouched.**
+
+### 1. Content sources per user
+- **Followed sellers' new listings** — `db.seller_follows` → `db.listings` where `seller_id ∈ follows` and `created_at ≥ 7d ago`, cap 5.
+- **Watchlist updates** — `db.watchlist` joined with active `db.listings`, enriched with `ends_in_seconds` and current bid, cap 5.
+- **Interest matches** — top 5 categories from `db.user_interests` events (last 60 d) augmented by watchlisted-item categories → fresh (7 d) active listings in those categories excluding user's own listings and anything already surfaced, cap 6.
+- If all three sections are empty, the send is **skipped** so no empty marketing email ever ships.
+
+### 2. Files Added
+- `backend/services/weekly_digest.py` — payload builder + `send_weekly_digest_to_user` + `run_weekly_digest_batch` (concurrency-limited to 6 in-flight sends).
+- `backend/services/templates/weekly_digest_template.py` — bilingual HTML template with a BidVex-branded gradient header, 2-column card grid (email-client safe), preheader text, correct `time_remaining` formatting (`1d 2h`), and a browse CTA. All strings dual-keyed under `_COPY["en"]` / `_COPY["fr"]`.
+- `backend/tests/test_iter378_weekly_digest.py` — 6 test cases (payload empty→None, all-3-sections payload, EN+FR template render, marketing-suppression audit row, scheduler wrapper guard, weekly-cron guard). All green.
+
+### 3. Files Modified
+- `backend/server.py` — new `async def _weekly_marketing_digest_tick()` async wrapper + `scheduler.add_job(CronTrigger(day_of_week='mon', hour=8, minute=0, timezone='UTC'))`. Uses the iter377 pattern so the coroutine is actually awaited.
+
+### 4. Guardrails
+- Never sends if payload is empty (0 seller listings + 0 watchlist + 0 interest matches).
+- Never sends to `is_contact_only=True` rows (marketing list contacts, not real users).
+- Never sends to `role=dialer_contractor` (contractors aren't the audience).
+- Every send is logged in `db.weekly_digest_sends` with status + section counts for admin audit.
+
+### 5. Verified
+- **Live e2e**: seeded a user + a followed seller + a watchlisted lot + an interest event + 3 fresh listings, ran `send_weekly_digest_to_user`, SendGrid returned status=sent (real dispatch), audit row persisted with counts `{seller_listings:1, watchlist_updates:1, interest_listings:1}`.
+- **Batch runner smoke**: `run_weekly_digest_batch(limit=3)` → `attempted:3 sent:0 skipped:3 errors:0` — correctly skips users with no personal content instead of sending empty digests.
+- **Scheduler**: `_weekly_marketing_digest_tick` registered in job store after fresh backend restart; zero "never awaited" warnings.
+- Regression sweep 25/25 green (iter378 + iter377 + iter372).
+
+
 ## Jul 23, 2026 — iter377 🚨 REGRESSION FIX — Bid notification emails + AsyncIOScheduler unawaited coroutines
 
 ### 0. Executive Summary

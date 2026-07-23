@@ -1,5 +1,25 @@
 # BidVex — Auction Marketplace PRD
 
+## iter378 — Weekly Marketing Digest Emails (Jul 23, 2026) ✅ COMPLETE
+
+**Scope**: Personalised weekly marketing email per user, sent Mondays 08:00 UTC via APScheduler + SendGrid. Bilingual EN/FR, respects existing unsubscribe/marketing suppressions, does not touch transactional bid notifications.
+
+### Content sources per user
+1. **Followed sellers' new listings** (last 7 days) — `db.seller_follows` × `db.listings`, cap 5
+2. **Watchlist updates** — active items in `db.watchlist`, enriched with `ends_in_seconds` + current bid, cap 5
+3. **Interest matches** — top 5 categories from `db.user_interests` (last 60 d) augmented by watchlisted-item categories → fresh listings in those categories, cap 6
+
+If all 3 sections are empty, the send is skipped. Every send is audited in `db.weekly_digest_sends`.
+
+### Delivery
+- **Template**: `backend/services/templates/weekly_digest_template.py` — self-contained bilingual HTML with BidVex-branded gradient header, 2-column card grid (email-client safe), preheader text, correct time-remaining formatting.
+- **Dispatch**: `send_email(is_marketing=True, categories=['weekly-digest'])` which centrally handles suppression (`email_suppressions`, `email_preferences.marketing=False`, `marketing_unsubscribed=True`), List-Unsubscribe headers, and the CASL footer.
+- **Scheduler**: `_weekly_marketing_digest_tick` async wrapper + `CronTrigger(day_of_week='mon', hour=8, minute=0, timezone='UTC')` via APScheduler AsyncIOScheduler. Follows the iter377 pattern so the coroutine is actually awaited.
+
+### Testing
+`test_iter378_weekly_digest.py` — 6 tests: empty-payload skip, full 3-section payload with FR lang, EN + FR template render, marketing suppression audit row, scheduler wrapper guard, weekly cron trigger guard. All 25 tests green in the iter378 + iter377 + iter372 regression sweep. Live e2e confirmed status=sent + full audit row.
+
+
 ## iter377 — Bid Email Coverage + Scheduler Warning Fix (Jul 23, 2026) ✅ COMPLETE
 
 **Reported by user**: bidders were not receiving "You're Leading" or "Outbid" emails, and a `run_watchlist_1h_nudge` unawaited-coroutine warning was flooding the logs (suspected linked to silent notification failures).
