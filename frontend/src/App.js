@@ -532,6 +532,15 @@ const App = () => {
           <Route path="/fr/encheres-entreposage/register-facility" element={
             <ProtectedRoute><StorageFacilityRegister /></ProtectedRoute>
           } />
+          {/* iter377 — same class of fix for the three storage nav sub-pages
+              (Browse / How It Works / For Facilities). Must stay ABOVE the
+              `:id` catch below. */}
+          <Route path="/en/storage-auctions/browse" element={<ErrorBoundary scope="storage-browse"><StorageAuctionsBrowse /></ErrorBoundary>} />
+          <Route path="/fr/encheres-entreposage/browse" element={<ErrorBoundary scope="storage-browse"><StorageAuctionsBrowse /></ErrorBoundary>} />
+          <Route path="/en/storage-auctions/how-it-works" element={<StorageHowItWorks />} />
+          <Route path="/fr/encheres-entreposage/how-it-works" element={<StorageHowItWorks />} />
+          <Route path="/en/storage-auctions/for-facilities" element={<StorageForFacilities />} />
+          <Route path="/fr/encheres-entreposage/for-facilities" element={<StorageForFacilities />} />
           <Route path="/en/storage-auctions/:id" element={<StorageAuctionDetail />} />
           <Route path="/fr/encheres-entreposage/:id" element={<StorageAuctionDetail />} />
 
