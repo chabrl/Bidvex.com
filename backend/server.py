@@ -1048,8 +1048,12 @@ async def run_watchlist_expiry_alerts():
     except Exception as e:
         logger.warning(f"Watchlist expiry alerts failed: {e}")
 
+async def _watchlist_expiry_alerts_tick():
+    """AsyncIOScheduler wrapper — must be a coroutine function so the executor awaits it."""
+    await safe_run("watchlist_expiry_alerts", run_watchlist_expiry_alerts())
+
 scheduler.add_job(
-    lambda: safe_run("watchlist_expiry_alerts", run_watchlist_expiry_alerts()),
+    _watchlist_expiry_alerts_tick,
     trigger=IntervalTrigger(minutes=2), id='watchlist_expiry_alerts', replace_existing=True)
 
 
@@ -1080,8 +1084,15 @@ async def run_watchlist_1h_nudge():
         logger.warning(f"Watchlist 1h nudge failed: {e}")
 
 
+async def _watchlist_1h_nudge_tick():
+    """iter377 — AsyncIOScheduler wrapper. The previous `lambda: safe_run(...)`
+    returned a coroutine that the executor never awaited, so this job silently
+    stopped running (and emitted a `coroutine … was never awaited` warning on
+    every tick)."""
+    await safe_run("watchlist_1h_nudge", run_watchlist_1h_nudge())
+
 scheduler.add_job(
-    lambda: safe_run("watchlist_1h_nudge", run_watchlist_1h_nudge()),
+    _watchlist_1h_nudge_tick,
     trigger=IntervalTrigger(minutes=5), id='watchlist_1h_nudge', replace_existing=True)
 
 
@@ -1096,8 +1107,11 @@ async def run_bill96_autosuspend():
         logger.warning(f"Bill 96 sweep failed: {e}")
 
 
+async def _bill96_autosuspend_tick():
+    await safe_run("bill96_autosuspend", run_bill96_autosuspend())
+
 scheduler.add_job(
-    lambda: safe_run("bill96_autosuspend", run_bill96_autosuspend()),
+    _bill96_autosuspend_tick,
     trigger=IntervalTrigger(minutes=30), id='bill96_autosuspend', replace_existing=True)
 
 
@@ -1111,8 +1125,11 @@ async def run_sitemap_regen():
         logger.warning(f"Sitemap regen failed: {e}")
 
 
+async def _sitemap_regen_tick():
+    await safe_run("sitemap_regen", run_sitemap_regen())
+
 scheduler.add_job(
-    lambda: safe_run("sitemap_regen", run_sitemap_regen()),
+    _sitemap_regen_tick,
     trigger=CronTrigger(hour=6, minute=0, timezone="UTC"),
     id='sitemap_regen', replace_existing=True,
 )
@@ -1154,8 +1171,11 @@ async def run_promotion_expiry_sweep():
     except Exception as e:  # noqa: BLE001
         logger.warning(f"Promotion expiry sweep failed: {e}")
 
+async def _promotion_expiry_sweep_tick():
+    await safe_run("promotion_expiry_sweep", run_promotion_expiry_sweep())
+
 scheduler.add_job(
-    lambda: safe_run("promotion_expiry_sweep", run_promotion_expiry_sweep()),
+    _promotion_expiry_sweep_tick,
     trigger=IntervalTrigger(hours=1), id='promotion_expiry_sweep', replace_existing=True)
 
 # ─── Deposit refund queue worker (60s SLA — Spec Feature 2) ───
@@ -1236,8 +1256,11 @@ async def _fb_feed_cache_warm_tick():
         len(items), _t.time() - started,
     )
 
+async def _fb_feed_cache_warm_scheduler_tick():
+    await safe_run("fb_feed_cache_warm", _fb_feed_cache_warm_tick())
+
 scheduler.add_job(
-    lambda: safe_run("fb_feed_cache_warm", _fb_feed_cache_warm_tick()),
+    _fb_feed_cache_warm_scheduler_tick,
     trigger=IntervalTrigger(minutes=10), id='fb_feed_cache_warm', replace_existing=True)
 
 # ─── Health Endpoints ───

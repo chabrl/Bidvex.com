@@ -564,6 +564,26 @@ async def place_lot_bid(
         except Exception as _e:
             logger.warning(f"multi-lot outbid email failed: {_e}")
 
+    # iter377 — Send BID-PLACED (you're leading) email to the new lot leader.
+    # Was missing on this path — vehicle multi-lot bidders got the outbid
+    # notification when someone topped them, but never a confirmation when
+    # THEY took the lead. Fire-and-forget so bid response stays snappy.
+    try:
+        from services.emails import email_marketplace as _en_placed
+        import asyncio as _aio_placed
+        _aio_placed.create_task(_en_placed.send_bid_placed_email(
+            bidder_email=user.get("email") or "",
+            bidder_name=user.get("first_name") or user.get("name") or "Bidder",
+            listing_title=f"Lot #{lot.get('lot_number', '?')} — {lot.get('title', event.get('title', 'Multi-Lot Auction'))}",
+            bid_amount=float(payload.amount),
+            listing_id=event_id,
+            auction_end_date=new_lot_end.isoformat() if new_lot_end else "",
+            is_leading=True,
+            auction_type="vehicle_multi_lot",
+        ))
+    except Exception as _e:
+        logger.warning(f"vehicle multi-lot bid-placed email failed: {_e}")
+
     return {
         "ok":            True,
         "bid":           {**bid_record, "created_at": now.isoformat()},

@@ -1,5 +1,26 @@
 # BidVex — Auction Marketplace PRD
 
+## iter377 — Bid Email Coverage + Scheduler Warning Fix (Jul 23, 2026) ✅ COMPLETE
+
+**Reported by user**: bidders were not receiving "You're Leading" or "Outbid" emails, and a `run_watchlist_1h_nudge` unawaited-coroutine warning was flooding the logs (suspected linked to silent notification failures).
+
+### Root cause
+1. **Missing wiring on 2 of the 4 bid paths**:
+   - Multi-lot listing (`POST /api/multi-item-listings/{id}/lots/{n}/bid`) fired push + SMS + in-app notification but **never called the outbid or bid-placed email helpers**.
+   - Vehicle multi-lot (`POST /api/multi-lot-events/{id}/bid`) fired the outbid email but **not the bid-placed email**.
+2. **6 AsyncIOScheduler entries wired as sync lambdas** — `scheduler.add_job(lambda: safe_run(...))` returns a coroutine the scheduler executor never awaits → RuntimeWarnings + jobs silently stop running. `watchlist_1h_nudge` and `watchlist_expiry_alerts` were both affected — both of which drive downstream watchlist-based bid notifications.
+
+### Fix
+- Added `send_outbid_email` + `send_bid_placed_email` to the multi-lot listing bid endpoint.
+- Added `send_bid_placed_email` to the vehicle multi-lot endpoint.
+- Replaced all 6 broken `lambda: safe_run(...)` scheduler entries with proper `async def` wrapper functions (matches the pattern documented at server.py:1167).
+
+### Tests
+- `test_iter377_bid_email_coverage.py` — static assertions across all 4 bid paths + scheduler anti-pattern guard (5/5 green).
+- Live e2e: 2 sequential multi-lot bids produced 3 SendGrid dispatches (bid-placed × 2, outbid × 1), all HTTP 202.
+- Backend log shows 0 "never awaited" warnings after clean restart, and `_watchlist_expiry_alerts_tick` fires cleanly every 2 min.
+
+
 ## iter376 — Contractor Email Hub personal_email projection fix (Jul 22, 2026) ✅ COMPLETE
 
 **Reported by user (4-hour outage)**: outbound contractor emails were still using `support@bidvex.com` as Reply-To despite iter372 wiring up the personal_email flow.

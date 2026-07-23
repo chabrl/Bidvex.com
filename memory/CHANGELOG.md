@@ -1,6 +1,41 @@
 # BidVex Changelog
 
 
+## Jul 23, 2026 — iter377 🚨 REGRESSION FIX — Bid notification emails + AsyncIOScheduler unawaited coroutines
+
+### 0. Executive Summary
+Audited outbid/leading email coverage across all four bid paths and fixed missing wiring on the multi-lot listing and vehicle-multi-lot endpoints. Also fixed 6 `lambda: safe_run(...)` scheduler entries that emitted "coroutine was never awaited" RuntimeWarnings and silently never ran (including `watchlist_1h_nudge` and the closely related `watchlist_expiry_alerts` — both of which drive downstream bid notifications).
+
+### 1. Coverage Matrix (before → after)
+| Path | Outbid email | Leading (bid-placed) email |
+|------|--------------|------------------------------|
+| 1. Single marketplace / vehicle (`auctions_bids.py`) | ✅ before | ✅ before |
+| 2. Multi-lot listing (`auctions_bids.py:1265`) | ❌ → ✅ | ❌ → ✅ |
+| 3. Vehicle multi-lot (`vehicle_multi_lot.py:554`) | ✅ before | ❌ → ✅ |
+| 4. Storage facility (`storage_auctions.py:704`) | ✅ before | ✅ before |
+
+### 2. Files Modified
+- `backend/routes/auctions_bids.py` — added `send_outbid_email` + `send_bid_placed_email` calls to the multi-lot POST bid endpoint (line ~1265).
+- `backend/routes/vehicle_multi_lot.py` — added the missing `send_bid_placed_email` call on the vehicle multi-lot bid endpoint (line ~558).
+- `backend/server.py` — replaced 6 broken `lambda: safe_run(...)` scheduler entries with proper `async def` wrapper functions the AsyncIOScheduler awaits correctly:
+  - `_watchlist_expiry_alerts_tick`
+  - `_watchlist_1h_nudge_tick`  ← the specific warning the user reported
+  - `_bill96_autosuspend_tick`
+  - `_sitemap_regen_tick`
+  - `_promotion_expiry_sweep_tick`
+  - `_fb_feed_cache_warm_scheduler_tick`
+
+### 3. Tests
+- New: `backend/tests/test_iter377_bid_email_coverage.py` — 5 static-analysis assertions covering all four bid paths + the scheduler anti-pattern guard. Green.
+- Regression sweep: iter372 (14), iter373 (14), iter377 (5) → 33 passed.
+- Live e2e in preview: 2 sequential multi-lot bids logged SendGrid dispatches for "Your Bid is Live! ⚡" (bid-placed to bidder 1), "You've Been Outbid 😮" (outbid to bidder 1), "Your Bid is Live! ⚡" (bid-placed to bidder 2) — all 202 accepted. Log shows zero "never awaited" warnings after clean restart.
+
+### 4. Not Changed
+- SendGrid account, DNS, templates untouched per user directive.
+- The 6 scheduler wrappers are new functions; the underlying job coroutines (`run_watchlist_1h_nudge`, etc.) are untouched.
+- SMS + in-app notification paths on the multi-lot listing endpoint left as-is.
+
+
 ## Jul 22, 2026 — iter376 🚨 REGRESSION FIX — Contractor Email Hub personal_email projection
 
 ### 0. Executive Summary

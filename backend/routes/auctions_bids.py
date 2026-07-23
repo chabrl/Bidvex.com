@@ -1264,6 +1264,58 @@ async def bid_on_lot(request: Request, listing_id: str, lot_number: int, data: D
         except Exception as sms_error:
             logger.warning(f"SMS outbid notification failed: {sms_error}")
 
+        # iter377 — Send OUTBID email to the previous lot leader. Was missing
+        # entirely for multi-lot listings — only SMS + in-app notification
+        # were fired, so bidders on lot auctions never received the outbid
+        # email that single-item listings ship. Signature matches
+        # send_outbid_email so callers stay consistent across paths.
+        try:
+            outbid_user = await db.users.find_one(
+                {"id": previous_highest_bidder},
+                {"_id": 0, "email": 1, "name": 1},
+            )
+            if outbid_user and outbid_user.get("email"):
+                from services.emails.email_marketplace import send_outbid_email
+                await send_outbid_email(
+                    user_email=outbid_user["email"],
+                    user_name=outbid_user.get("name", "Bidder"),
+                    listing_title=f"{listing.get('title', 'Item')} — Lot #{lot_number}",
+                    their_bid=float(previous_bid or 0),
+                    new_high_bid=amount,
+                    listing_id=listing_id,
+                    auction_end_date=(
+                        lots[lot_index].get("lot_end_time")
+                        or listing.get("auction_end_time")
+                        or ""
+                    ),
+                    auction_type="lots",
+                )
+        except Exception as email_error:
+            logger.warning(f"Multi-lot outbid email failed: {email_error}")
+
+    # iter377 — Send BID-PLACED (you're leading) email to the new bidder.
+    # Was missing for multi-lot listings, so buyers who took the lead never
+    # received the confirmation email single-item bidders get.
+    try:
+        from services.emails.email_marketplace import send_bid_placed_email
+        await send_bid_placed_email(
+            bidder_email=current_user.email,
+            bidder_name=current_user.name or "Bidder",
+            listing_title=f"{listing.get('title', 'Item')} — Lot #{lot_number}",
+            bid_amount=amount,
+            listing_id=listing_id,
+            auction_end_date=(
+                (new_end_time.isoformat() if extension_applied and new_end_time else None)
+                or lots[lot_index].get("lot_end_time")
+                or listing.get("auction_end_time")
+                or ""
+            ),
+            is_leading=True,
+            auction_type="lots",
+        )
+    except Exception as email_error:
+        logger.warning(f"Multi-lot bid-placed email failed: {email_error}")
+
     response = {
         "message": "Bid placed successfully",
         "bid": bid,
