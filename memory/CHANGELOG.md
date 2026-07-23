@@ -1,6 +1,35 @@
 # BidVex Changelog
 
 
+## Jul 22, 2026 — iter376 🚨 REGRESSION FIX — Contractor Email Hub personal_email projection
+
+### 0. Executive Summary
+The iter372 spec (contractor Reply-To = their `personal_email`, fallback = `support@bidvex.com`) was already implemented across:
+  - `contractor_email_hub.py` resolver (correct)
+  - `UpdateProfileBody` PATCH endpoint schema (correct)
+  - `GET /twilio/contractor/profile/me` (returns `personal_email`, correct)
+  - Frontend Contractor Profile UI (`ContractorIter323Panel.jsx`) exposes an editable field (correct)
+  - 14 unit tests in `test_iter372_contractor_reply_to.py` all passed
+
+…but the **HTTP send route silently omitted `personal_email` from its Mongo projection**, so the resolver always saw `None` at runtime → **every send fell back to `support@bidvex.com` with a warning log**. The iter372 tests missed it because they passed synthetic dicts directly to the resolver instead of exercising the live route.
+
+### 1. Files Modified
+- `/app/backend/routes/twilio.py` (line 2129) — projection for `contractor_doc` now includes `personal_email` and `extension_number`. `extension_number` was also silently missing, which meant the "Direct ext." line in the signature block never rendered.
+
+### 2. Tests Added
+- `/app/backend/tests/test_iter376_contractor_email_reply_to_e2e.py` — hits the real `POST /api/twilio/contractor/emails/send` HTTP endpoint over a live client:
+  1. `personal_email` set → row's `reply_to == personal_email`, `reply_to_is_fallback=False`
+  2. `personal_email` missing → falls back to `support@bidvex.com`, `reply_to_is_fallback=True`
+  3. `personal_email` malformed → falls back safely (never sends to garbage)
+  4. Full PATCH → send round-trip: contractor patches personal_email through the profile endpoint and the next outbound email reflects the change
+
+### 3. Regression Proof
+Reverting the projection fix causes test #1 to fail immediately (asserts on `reply_to == personal_email`). With the fix in place, all 4 new e2e tests pass alongside all 14 iter372 unit tests (18 green).
+
+### 4. Not Changed
+- SendGrid account, DNS, templates, existing signature block, CDN logo URL, support phone — all untouched per the "zero credit charge / cost" and "do not change SendGrid setup" directives.
+
+
 ## Jul 22, 2026 — iter376 🚨 REGRESSION FIX — bid_count + bid history
 
 ### 0. Executive Summary

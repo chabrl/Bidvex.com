@@ -1,5 +1,25 @@
 # BidVex — Auction Marketplace PRD
 
+## iter376 — Contractor Email Hub personal_email projection fix (Jul 22, 2026) ✅ COMPLETE
+
+**Reported by user (4-hour outage)**: outbound contractor emails were still using `support@bidvex.com` as Reply-To despite iter372 wiring up the personal_email flow.
+
+### Root cause
+Everything in the iter372 spec was implemented — resolver, PATCH endpoint, GET endpoint, editable frontend field, unit tests — **except one line**. The `POST /api/twilio/contractor/emails/send` route's Mongo projection at `twilio.py:2129` did not include `personal_email` (or `extension_number`). So `contractor_doc.get("personal_email")` was always `None` at the moment the resolver ran, forcing the fallback path on every send and emitting a warning log for each one. iter372's unit tests never caught this because they passed synthetic dicts straight into the resolver.
+
+### Fix
+Added `personal_email: 1, extension_number: 1` to the projection. That's it — one line, in one endpoint. No changes to SendGrid, DNS, templates, or the existing service architecture.
+
+### New tests (`test_iter376_contractor_email_reply_to_e2e.py`)
+Live HTTP round-trip via `POST /api/twilio/contractor/emails/send`:
+- personal_email valid → `reply_to == personal_email`, is_fallback=False
+- personal_email missing → fallback support@bidvex.com, is_fallback=True, warning logged
+- personal_email malformed → fallback (never dispatches to garbage)
+- Full PATCH→send cycle: contractor edits personal_email via the same endpoint the frontend UI uses, then the next send reflects it
+
+Reverting the projection fix causes test #1 to fail — proving the tests actually catch this class of bug. iter372 unit tests still 14/14 green; new suite 4/4 green.
+
+
 ## iter376 — Bid Count + Bid History Regression Fix (Jul 22, 2026) ✅ COMPLETE
 
 **Reported by user**: On the multi-lot auction page, lot cards show "🏆 You're Leading" after a successful bid but the count underneath stays at "0 bids". Additionally the Live Activity ticker always displays "No recent bids — be the first!" even when bids exist. Both affect lots where the current user has an active bid.

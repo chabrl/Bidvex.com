@@ -2126,10 +2126,17 @@ async def contractor_send_email(body: ContractorEmailSendBody,
             "message_fr": "Le corps du courriel doit faire moins de 50 000 caractères.",
         })
 
+    # iter376 regression fix — MUST include `personal_email` in the
+    # projection. Without it, the resolver in contractor_email_hub.py
+    # always sees personal_email=None and silently falls back to
+    # support@bidvex.com for every send. This was the "hasn't been done
+    # correctly for 4 hours" bug: iter372 shipped the resolver + PATCH
+    # endpoint + frontend field, but the projection here was never
+    # updated so the value never made it to SendGrid.
     contractor_doc = await db.users.find_one(
         {"id": user.id},
         {"_id": 0, "id": 1, "email": 1, "name": 1, "first_name": 1, "last_name": 1,
-         "preferred_language": 1},
+         "preferred_language": 1, "personal_email": 1, "extension_number": 1},
     )
     if contractor_doc is None:
         raise HTTPException(404, "contractor not found")
