@@ -521,6 +521,17 @@ const App = () => {
           {/* Storage Auctions */}
           <Route path="/en/storage-auctions" element={<ErrorBoundary scope="storage-auctions"><StorageAuctionsBrowse /></ErrorBoundary>} />
           <Route path="/fr/encheres-entreposage" element={<ErrorBoundary scope="storage-auctions"><StorageAuctionsBrowse /></ErrorBoundary>} />
+          {/* iter376 — lang-prefixed sub-pages MUST be declared BEFORE the
+              `:id` catch, otherwise words like `terms` and `register-facility`
+              are captured as auction IDs and the detail page blanks out. */}
+          <Route path="/en/storage-auctions/terms" element={<StorageTerms />} />
+          <Route path="/fr/encheres-entreposage/terms" element={<StorageTerms />} />
+          <Route path="/en/storage-auctions/register-facility" element={
+            <ProtectedRoute><StorageFacilityRegister /></ProtectedRoute>
+          } />
+          <Route path="/fr/encheres-entreposage/register-facility" element={
+            <ProtectedRoute><StorageFacilityRegister /></ProtectedRoute>
+          } />
           <Route path="/en/storage-auctions/:id" element={<StorageAuctionDetail />} />
           <Route path="/fr/encheres-entreposage/:id" element={<StorageAuctionDetail />} />
 
