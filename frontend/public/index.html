@@ -26,14 +26,33 @@
         <link rel="preconnect" href="https://images.unsplash.com" crossorigin />
         <link rel="preconnect" href="https://us-assets.i.posthog.com" />
         <link rel="dns-prefetch" href="https://js.stripe.com" />
-        <!-- iter382 CLS fix — Google Fonts now loaded with `display=optional`
-             instead of `display=swap`. `swap` shows the fallback font first
-             then swaps to the web font once it downloads, and the metric
-             difference reflows the hero (grew ~250-300 px in the previous
-             CLS report, pushing everything below it and emitting the top
-             layout-shift entries). `optional` uses fallback permanently if
-             the font isn't cached within 100 ms — eliminates the reflow. -->
-        <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=optional" rel="stylesheet" />
+        <!-- iter386 LCP fix — Google Fonts CSS was the ONLY render-blocking
+             third-party resource on the homepage (measured via
+             PerformanceObserver: type=link, renderBlockingStatus=blocking).
+             The h1/hero text on the landing page uses SYSTEM fonts (from
+             the body font-family), so the Outfit+DM Sans web fonts are
+             only needed on inner pages (AboutUsPage etc.). Loading the
+             stylesheet with media="print" + onload swap trick makes it
+             non-blocking: the browser downloads it in the background and
+             swaps to media="all" once ready. The <noscript> fallback keeps
+             fonts working when JS is disabled.
+
+             Previous fix (iter382) set `display=optional` on the URL so
+             font-swap reflows don't cause CLS — that's preserved here.
+
+             iter386 addendum — Space Grotesk + Inter (used by all h1/h2/h3
+             globally per index.css) were previously loaded via CSS @import,
+             which delays discovery until after the parent CSS parses. We
+             now load them from HTML with the same non-blocking pattern
+             AND `display=optional` — earlier discovery + no font-swap
+             reflow risk on the hero h1. -->
+        <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=optional" />
+        <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=optional" rel="stylesheet" media="print" onload="this.media='all'" />
+        <noscript><link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=optional" rel="stylesheet" /></noscript>
+
+        <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=optional" />
+        <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=optional" rel="stylesheet" media="print" onload="this.media='all'" />
+        <noscript><link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=optional" rel="stylesheet" /></noscript>
 
         <!-- iter358 CWV — Preload the homepage LCP hero image so it starts
              fetching BEFORE React boots. `fetchpriority="high"` forces the

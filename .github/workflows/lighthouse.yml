@@ -1,0 +1,81 @@
+name: Lighthouse CI (homepage Core Web Vitals)
+
+# iter386 — Guards the homepage against Core Web Vitals regressions like
+# the iter380→iter381 CLS blowup (0.084 → 0.886) that was caused by
+# lazy-loading the HomePage bundle. Runs on every PR and every push to
+# main. Thresholds live in /app/lighthouserc.json. CLS regressions above
+# 0.1 fail the build; LCP/TBT/FCP regressions warn.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - 'lighthouserc.json'
+      - '.github/workflows/lighthouse.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - 'lighthouserc.json'
+
+jobs:
+  lighthouse:
+    name: Lighthouse — Homepage CWV
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'yarn'
+          cache-dependency-path: frontend/yarn.lock
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: yarn install --frozen-lockfile
+
+      - name: Build frontend (production-like)
+        working-directory: frontend
+        env:
+          CI: 'false'
+          REACT_APP_BACKEND_URL: 'https://prod-verify-2.preview.emergentagent.com'
+        run: yarn build
+
+      - name: Install serve
+        run: npm install -g serve
+
+      - name: Serve the build
+        run: |
+          serve -s frontend/build -l 3000 &
+          echo "Waiting for server..."
+          for i in $(seq 1 30); do
+            if curl -s http://localhost:3000/ > /dev/null; then
+              echo "Server ready after $i seconds"
+              break
+            fi
+            sleep 1
+          done
+
+      - name: Run Lighthouse CI
+        run: |
+          npm install -g @lhci/cli@0.14.x
+          # Override startServerCommand since we're already serving the build.
+          lhci autorun \
+            --config=./lighthouserc.json \
+            --collect.startServerCommand="" \
+            --collect.url=http://localhost:3000/
+        env:
+          LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
+
+      - name: Upload Lighthouse reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-reports
+          path: .lighthouseci/
+          retention-days: 14

@@ -105,8 +105,20 @@ body:has(.ReactModal__Overlay--after-open) {
 }
 
 
-/* BidVex CSS v2.0.1 - Build Date: 2026-01-08 - Cache Bust */
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap');
+/* BidVex CSS v2.0.1 - Build Date: 2026-01-08 - Cache Bust
+ * iter386 LCP fix — Removed the Google Fonts `@import url(...)` for
+ * Space Grotesk + Inter. `@import` inside a CSS file is a well-known
+ * anti-pattern for LCP because:
+ *   1. The browser only discovers the third-party URL AFTER parsing
+ *      the parent CSS file — delaying font download by 50-200ms.
+ *   2. The URL used `display=swap`, so once the font arrived it
+ *      swapped the fallback → web font, changing metrics and shifting
+ *      surrounding content.
+ * The font is now preloaded + loaded non-blocking (media=print + onload)
+ * from index.html with `display=optional`, matching the Outfit/DM Sans
+ * treatment. The h1/h2/h3 body font-family declaration below is
+ * unchanged — the font itself is still Space Grotesk when available;
+ * on slow networks the fallback (sans-serif) stays permanently. */
 
 @tailwind base;
 @tailwind components;

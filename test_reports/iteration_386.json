@@ -1,0 +1,33 @@
+{
+  "summary": "iter386 audit VERIFIED. (1) Anonymous GET /api/promotions/active-banners now returns HTTP 200 with {banners:[],total:0} — previously 401. (2) All 9 pytest cases in test_iter386_promotions_coupons_audit.py pass (coupon CRUD, validation math, duplicate rejection, %>100 rejection). (3) Mobile CLS = 0.00144 (identical to iter385 baseline — no regression from font-loading changes). Desktop CLS = 0.00191 (improved vs iter385's 0.00427). (4) LCP verified: winner is hero <p> paragraph at startTime=2104ms (<2500ms). (5) NO fonts.googleapis.com stylesheet is render-blocking anymore — only remaining third-party render-blocking resource is assets.emergent.sh/scripts/emergent-main.js (Emergent platform script, unrelated to this iteration). (6) Homepage renders correctly — H1 'Discover./Bid./Win.' visible, EN/FR toggle present, cookie banner shown on first load.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter386_promotions_coupons_audit.py",
+    "/app/test_reports/pytest/iter386_results.xml",
+    "/app/test_reports/iter386_mobile.png"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Font-loading pattern (preload as=style + media=print onload swap) is a well-known non-blocking pattern — implemented correctly.",
+    "get_current_user_optional dependency correctly gates target='all' filtering for anonymous — good practice for public-visible promotions.",
+    "Only remaining render-blocking third-party is assets.emergent.sh/scripts/emergent-main.js — outside app control (Emergent platform injection); no action needed."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "admin: charbel911@gmail.com / Anderosli123!@# (from /app/memory/test_credentials.md, not needed for anonymous banner test)",
+  "seed_data_creation": "none",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "iter386 verified all three fixes: (a) anon active-banners=200, (b) Google Fonts no longer render-blocking, (c) CLS still <0.1 on both mobile (0.00144) & desktop (0.00191). LCP=2104ms on mobile (hero paragraph). If auditing again, expect same metrics unless HomePage.jsx or fonts change. Lighthouse CI is configured at /app/lighthouserc.json and .github/workflows/lighthouse.yml (not executed in this env; will run in CI).",
+  "measurements": {
+    "mobile_cls": 0.00144,
+    "desktop_cls": 0.00191,
+    "mobile_lcp_ms": 2104,
+    "mobile_lcp_element": "P.text-lg text-white (hero paragraph: 'Discover unique items, place competitive bids...')",
+    "third_party_blocking_after_fix": ["assets.emergent.sh/scripts/emergent-main.js (platform, unrelated)"],
+    "fonts_googleapis_blocking": false,
+    "anon_active_banners_status": 200,
+    "pytest_pass_rate": "9/9"
+  }
+}

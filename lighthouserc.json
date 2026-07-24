@@ -1,0 +1,33 @@
+{
+  "//": "iter386 — Lighthouse CI config. Guards the homepage against Core Web Vitals regressions like the iter380→iter381 CLS blowup (0.084 → 0.886) that this PR just fixed. Run locally with: `npx @lhci/cli@0.14.x autorun --config=./lighthouserc.json`. In CI, use the GitHub Action at .github/workflows/lighthouse.yml.",
+  "ci": {
+    "collect": {
+      "url": [
+        "http://localhost:3000/"
+      ],
+      "startServerCommand": "cd frontend && yarn start",
+      "startServerReadyPattern": "Compiled successfully|webpack compiled",
+      "startServerReadyTimeout": 120000,
+      "numberOfRuns": 3,
+      "settings": {
+        "preset": "desktop",
+        "onlyCategories": ["performance"],
+        "chromeFlags": "--no-sandbox --disable-dev-shm-usage --headless=new"
+      }
+    },
+    "assert": {
+      "assertions": {
+        "//": "Guardrails calibrated to iter385 verified numbers (Mobile CLS 0.00144, Desktop CLS 0.00427). LCP threshold at 2.5s = Google's 'good' bucket. Any regression above these values fails the CI check.",
+        "categories:performance": ["warn", { "minScore": 0.7 }],
+        "cumulative-layout-shift": ["error", { "maxNumericValue": 0.1 }],
+        "largest-contentful-paint": ["warn", { "maxNumericValue": 2500 }],
+        "total-blocking-time": ["warn", { "maxNumericValue": 300 }],
+        "first-contentful-paint": ["warn", { "maxNumericValue": 1800 }],
+        "render-blocking-resources": ["warn", { "maxLength": 2 }]
+      }
+    },
+    "upload": {
+      "target": "temporary-public-storage"
+    }
+  }
+}

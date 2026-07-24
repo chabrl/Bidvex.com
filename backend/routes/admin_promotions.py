@@ -21,7 +21,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from deps import get_db, get_current_user, User
+from deps import get_db, get_current_user, get_current_user_optional, User
 
 logger = logging.getLogger(__name__)
 
@@ -1396,14 +1396,20 @@ async def activate_coupon_to_account(
 
 @admin_promotions_router.get("/promotions/active-banners")
 async def active_banners(
-    current_user: User = Depends(get_current_user),
+    current_user: Optional[User] = Depends(get_current_user_optional),
 ):
     """iter243 Mission 1 — Active promotional banners for the calling user.
 
-    Filters promotions with `status=active`, `show_banner=true`, within
-    the validity window, and matches the user's tier / province /
-    target_config eligibility. Returns localized fields ready for the
-    front-end banner component.
+    iter386 — This endpoint is now PUBLIC (auth is optional). Anonymous
+    visitors see all `target="all"` promotions with `show_banner=true`
+    inside their validity window. Signed-in users additionally see
+    promotions targeted at their tier / province / new-user cohort /
+    partner status / explicit custom list — matched via
+    `_user_matches_target(user, promo)`.
+
+    Prior behaviour (auth required) meant the top-of-page promotional
+    ticker was silently empty for logged-out visitors, which was the
+    exact audience the promotion was aimed at.
     """
     db = get_db()
     now_iso = datetime.now(timezone.utc).isoformat()
@@ -1417,19 +1423,29 @@ async def active_banners(
     cur = db.promotions.find(base_query, {"_id": 0}).sort("created_at", -1)
     candidates = await cur.to_list(length=50)
 
-    # Hydrate user once for eligibility checks.
-    user = await db.users.find_one(
-        {"id": current_user.id},
-        {"_id": 0, "id": 1, "email": 1, "subscription_tier": 1, "province": 1, "created_at": 1},
-    )
+    # Hydrate user once for eligibility checks (None if anonymous).
+    user = None
+    if current_user is not None:
+        user = await db.users.find_one(
+            {"id": current_user.id},
+            {"_id": 0, "id": 1, "email": 1, "subscription_tier": 1, "province": 1, "created_at": 1, "is_partner": 1, "account_type": 1},
+        )
 
     banners: List[Dict[str, Any]] = []
     for promo in candidates:
         # Max uses gate
         if promo.get("max_uses") and promo.get("current_uses", 0) >= promo["max_uses"]:
             continue
-        if not await _user_matches_target(user, promo):
-            continue
+        # Eligibility — anonymous visitors ONLY see target="all" promos.
+        # Signed-in users go through the full matcher.
+        if user is None:
+            tc = promo.get("target_config", {}) or {}
+            target = (promo.get("target") or tc.get("target") or "all").lower()
+            if target != "all":
+                continue
+        else:
+            if not await _user_matches_target(user, promo):
+                continue
         banners.append({
             "id": promo["id"],
             "name_en": promo.get("name_en", ""),
