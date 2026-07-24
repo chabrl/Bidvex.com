@@ -1,5 +1,23 @@
 # BidVex — Auction Marketplace PRD
 
+
+## iter382-385 — Homepage CLS Regression Fix (Feb 8, 2026) ✅ COMPLETE
+
+**Reported by user (Msg 799)**: iter380 lazy-loading push caused critical CLS regression on homepage (0.084 → 0.886). CLS must return below 0.1 while preserving lazy loading.
+
+### Root cause & fixes applied over iter382→385
+1. **iter382-383** — Added explicit `minHeight` reservations to every `LazyMount` section + `contain: layout style paint` (below-the-fold). Killed lazy-mount shifts but hero remained the problem.
+2. **iter384** — (a) `hidden md:block` on 3 decorative blobs + 20 particles (they were the top mobile shift source at 0.6272 due to percentage positioning inside a growing hero). (b) Google Fonts `display=swap` → `display=optional` in `index.html` (killed the ~250px font-swap reflow). (c) Outer `RecentlySoldTicker` wrapped in `<div style={{minHeight:42, contain:'layout paint'}}>` to reserve the 42px it renders at (was pushing hero + everything below down). (d) Inner `live-auctions-pill` + ticker flex-row given `style={{minHeight:42}}` so async fetch → pill+ticker render doesn't grow the hero column.
+3. **iter385 (final)** — Reverted `HomePage` from `React.lazy()` to eager import in `/app/frontend/src/App.js`. Was the dominant remaining CLS source: Suspense fallback (`PageLoader` ~468px) was replaced by hero (~1111px) at t≈1050ms, shifting footer down by 604px = 0.22 CLS. Every user hits `/` first — lazy-loading it was net-negative for CLS+LCP.
+
+### Final measurements (testing_agent iter385)
+- **Mobile 390x780**: CLS **0.00144** (615× improvement from 0.886).
+- **Desktop 1440x900**: CLS **0.00427** (target <0.1 met with 20× margin).
+- Hero H1 "Discover./Bid./Win." renders immediately, no PageLoader flash.
+- Lazy-loading of all OTHER pages + all below-the-fold homepage sections preserved.
+
+
+
 ## iter380 / iter381 — Homepage LCP Performance Fix (Jul 23, 2026) ✅ COMPLETE
 
 **Reported by user**: mobile PageSpeed = 6/100, LCP = 58 s on the BidVex homepage. Requested a 5-step fix (in order).

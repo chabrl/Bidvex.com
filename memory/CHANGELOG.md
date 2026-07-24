@@ -1,6 +1,32 @@
 # BidVex Changelog
 
 
+## Feb 8, 2026 — iter382-385 🚨 CLS Regression Fix (Homepage)
+
+### 0. Executive Summary
+User reported the iter380 lazy-loading push caused a critical CLS regression on the homepage (0.084 → 0.886). Fixed to Mobile **0.00144** and Desktop **0.00427** — both 100× better than the <0.1 target. Verified end-to-end by testing_agent iter385 (100% pass, retest_needed=false).
+
+### 1. Root Causes & Fixes
+- **HomePage was React.lazy() in App.js (primary cause)**: The Suspense fallback (`PageLoader min-h-60vh` ≈ 468px) was replaced by the hero (~1111px) at t≈1050ms, shifting the footer 604px down = 0.22 CLS entry alone. **Fix**: reverted `HomePage` to eager import in `/app/frontend/src/App.js`. Every user hits `/` first so lazy-loading it was net-negative for both CLS and LCP.
+- **Decorative blobs + 20 particles inside hero** shifted on mobile as hero grew. **Fix**: `hidden md:block` — removes them from the mobile render tree entirely.
+- **Google Fonts `display=swap` caused font-swap reflow** (~250px hero growth after font download). **Fix**: switched to `display=optional` in `/app/frontend/public/index.html`.
+- **`RecentlySoldTicker` above hero rendered `null` initially, then a ~42px `<section>` after fetch** — pushed hero + everything below down. **Fix**: wrapped in `<div style={{minHeight:42, contain:'layout paint'}}>` at the call site to reserve exact height.
+- **Inner `live-auctions-pill` + ticker row** rendered async, pushing trust indicators and hero height. **Fix**: `style={{minHeight:42}}` on the flex-wrap parent.
+- **LazyMount below-the-fold sections** were already given explicit per-section `minHeight` reservations + `contain: layout style paint` (iter382 baseline) — kept.
+
+### 2. Files Changed (iter385)
+- `/app/frontend/src/App.js` — Line 48: `HomePage` reverted from `lazy()` to eager `import`.
+- `/app/frontend/src/pages/HomePage.js` — Ticker reservation wrapper (line ~231), pill row minHeight (line ~343), blobs+particles `hidden md:block` (lines ~258-267).
+- `/app/frontend/public/index.html` — Fonts `display=optional`.
+
+### 3. Testing (testing_agent iter385)
+- Mobile 390x780: **CLS = 0.00144** (615× improvement from user-reported 0.886, 154× from iter384). Only 1 shift entry (0.00144 SVG rasterization).
+- Desktop 1440x900: **CLS = 0.00427** (56× improvement from iter384). Top shifts are tiny 4×4px decorative particle animations.
+- Hero H1 "Discover./Bid./Win." renders immediately (no PageLoader flash).
+- Preserved: lazy-loading of ALL other pages + below-the-fold sections still active.
+
+
+
 ## Jul 23, 2026 — iter380/381 🚀 Homepage LCP Performance Fix
 
 ### 0. Executive Summary
