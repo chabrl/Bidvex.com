@@ -227,8 +227,17 @@ const HomePage = () => {
           }
         }}
       />
-      {/* Recently Sold Ticker (iter175) — only renders when ≥10 sold auctions exist */}
-      <RecentlySoldTicker />
+      {/* Recently Sold Ticker (iter175) — only renders when ≥10 sold auctions exist.
+          iter384 CLS fix — Wrap in a fixed-height reservation so the async
+          fetch → render doesn't push the hero (and everything below) down by
+          ~42px. The ticker's <section> is ~42px tall (py-2 + text row); we
+          reserve exactly that. `contain: layout paint` also isolates internal
+          reflows. If a fresh account has <10 sold auctions and the ticker
+          returns null, this leaves a 42px visual gap — acceptable trade-off
+          since the production platform is well past this threshold. */}
+      <div style={{ minHeight: 42, contain: 'layout paint' }} data-testid="recently-sold-ticker-reservation">
+        <RecentlySoldTicker />
+      </div>
 
       {/* ========== EXTRAORDINARY HERO SECTION ========== */}
       {/* iter382 CLS fix — `contain: layout paint` on the outer hero
@@ -250,19 +259,21 @@ const HomePage = () => {
         </div>
         
         {/* Floating Orbs — iter382 CLS fix: `contain: layout paint size`
-            isolates these decorative blobs so any internal reflow (e.g.
-            when the hero container settles as content streams in) cannot
-            propagate a layout-shift entry to the surrounding page. */}
-        <div className="absolute top-20 left-10 w-64 h-64 bg-cyan-400/20 rounded-full blur-[80px] float-animation" style={{ contain: 'layout paint size' }} />
-        <div className="absolute bottom-20 right-10 w-96 h-96 bg-blue-600/20 rounded-full blur-[100px] float-animation" style={{ animationDelay: '-2s', contain: 'layout paint size' }} />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-cyan-500/10 rounded-full blur-[120px]" style={{ contain: 'layout paint size' }} />
-        
-        {/* Particle Effects — iter382 CLS fix: `contain: strict` locks the
-            container's size + layout so the particles inside can't create
-            layout-shift entries when the hero reflows. Particles are pure
-            visual decoration and don't need to participate in layout. */}
+            isolates these decorative blobs. `hidden md:block` also removes
+            them from the mobile render tree entirely — they were the top
+            source of shift entries on 390 px viewport (blob's percentage
+            positioning re-computed every time the hero reflowed) and are
+            barely visible at that width anyway. */}
+        <div className="hidden md:block absolute top-20 left-10 w-64 h-64 bg-cyan-400/20 rounded-full blur-[80px] float-animation" style={{ contain: 'layout paint size' }} />
+        <div className="hidden md:block absolute bottom-20 right-10 w-96 h-96 bg-blue-600/20 rounded-full blur-[100px] float-animation" style={{ animationDelay: '-2s', contain: 'layout paint size' }} />
+        <div className="hidden md:block absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-cyan-500/10 rounded-full blur-[120px]" style={{ contain: 'layout paint size' }} />
+
+        {/* Particle Effects — iter382 CLS fix: hidden on mobile for the
+            same reason as the blobs above (20 percentage-positioned divs
+            producing shift entries on every hero reflow). `contain: strict`
+            still applied on desktop as an extra safety net. */}
         <div
-          className="absolute inset-0 overflow-hidden pointer-events-none"
+          className="hidden md:block absolute inset-0 overflow-hidden pointer-events-none"
           style={{ contain: 'strict', height: '100%', width: '100%' }}
         >
           {[...Array(20)].map((_, i) => (
@@ -328,8 +339,13 @@ const HomePage = () => {
                 </Button>
               </div>
 
-              {/* Live auction counter — only render when there are real active auctions */}
-              <div className="flex flex-wrap items-center gap-3">
+              {/* Live auction counter — only render when there are real active auctions.
+                  iter384 CLS fix — Reserve min-height so the async fetch of
+                  active auction count + the RecentlySoldTicker's late render
+                  (fetch → visible) don't grow this row post-mount, which
+                  would push the trust indicators + hero height + everything
+                  below down. 42px matches the ticker's rendered height. */}
+              <div className="flex flex-wrap items-center gap-3" style={{ minHeight: 42 }}>
                 {activeAuctions > 0 && (
                   <div
                     className="inline-flex items-center gap-2 bg-white/10 backdrop-blur rounded-full px-4 py-2 text-white border border-white/20"

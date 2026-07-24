@@ -1,0 +1,65 @@
+{
+  "summary": "Iter384 CLS verification on homepage. Mobile 390x780 CLS=0.2271 (FAIL, target <0.1). Desktop 1440x900 CLS=0.2418 (FAIL, target <0.1). The iter384 fixes DID successfully eliminate the blob+particles shift (0.6272 → ~0.001) on mobile. However, a NEW dominant shift is now the primary cause: the hero <section> renders at height=0 initially and then jumps to ~1111px around t=1150ms, pushing the FOOTER down by 604px and emitting a single 0.2256 (mobile) / 0.2400 (desktop) layout-shift entry at ~925-1056ms. RecentlySoldTicker at top, EN/FR toggle, hero H1 'Discover.Bid.Win.' all render correctly; no console errors.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "cls_measurement": {
+    "mobile_390x780": {
+      "total_cls": 0.2271,
+      "verdict": "FAIL",
+      "top_shifts": [
+        {"rank": 1, "value": 0.2256, "time_ms": 996, "element": "FOOTER.bg-gray-900.text-gray-300.pt-12.pb-6", "previousRect": "0,604 390x176", "currentRect": "0,0 0x0", "delta_y_px": -604, "root_cause": "Hero <section> grew from height=0 to height=1111px between t=758ms and t=1151ms, pushing footer out of viewport"},
+        {"rank": 2, "value": 0.0014, "time_ms": 5002, "element": "svg [234x54]", "note": "Negligible"}
+      ]
+    },
+    "desktop_1440x900": {
+      "total_cls": 0.2418,
+      "verdict": "FAIL",
+      "top_shifts": [
+        {"rank": 1, "value": 0.2400, "time_ms": 925, "element": "FOOTER.bg-gray-900.text-gray-300.pt-12", "root_cause": "Same hero-height-jump as mobile"},
+        {"rank": 2, "value": 0.0003, "time_ms": 1049, "element": "DIV.absolute.w-1.h-1 (particle)"},
+        {"rank": 3, "value": 0.0003, "time_ms": 1708, "element": "particle"},
+        {"rank": 4, "value": 0.0003, "time_ms": 1662, "element": "particle"},
+        {"rank": 5, "value": 0.0003, "time_ms": 1406, "element": "particle"}
+      ]
+    },
+    "hero_section_height_timeline_mobile": [
+      {"t_ms": 758, "hero_height_px": 0.0, "note": "Initial paint — hero not yet mounted/hydrated"},
+      {"t_ms": 1151, "hero_height_px": 1111.3, "note": "After React hydration — hero mounted at full height"}
+    ]
+  },
+  "iter384_fixes_effectiveness": {
+    "blobs_particles_hidden_on_mobile": "EFFECTIVE — 0.6272 shift eliminated. Only tiny particle shifts (~0.0003 each) remain on desktop.",
+    "font_display_optional": "EFFECTIVE — no font-swap shifts observed.",
+    "outer_ticker_42px_reservation": "EFFECTIVE — no ticker shift observed.",
+    "inner_pill_row_min_h_42": "EFFECTIVE — no visible shift attributed.",
+    "hero_contain_layout_paint": "INSUFFICIENT — `contain: layout paint` on the hero <section> does NOT reserve space; it only prevents inner reflows from propagating. When the hero <section> itself grows from 0 → 1111px on hydration, the elements BELOW it (footer + lazy-mount reservations) shift. `min-h-[90vh]` on the section is only honored AFTER the section is rendered by React; there is a paint window where the DOM tree is present but the CSS Tailwind class hasn't applied (or the section wasn't yet mounted)."
+  },
+  "verified_functionality": {
+    "page_loads_200": true,
+    "console_errors": false,
+    "hero_h1_visible": "Discover.Bid.Win. (rendered correctly)",
+    "en_fr_toggle": "FR button visible in header (functional in UI, not clicked in this measurement run — did not want to add user input which would set hadRecentInput=true and pollute CLS data)",
+    "recently_sold_ticker": "Renders 42px reservation placeholder correctly — no shift attributed to it"
+  },
+  "test_report_links": [],
+  "action_items": [
+    "CRITICAL: The hero <section> in /app/frontend/src/pages/HomePage.js (line 247-250) renders at height=0 initially and jumps to ~1111px at ~1050ms, causing a single 0.22-0.24 shift that dominates CLS on both mobile and desktop. Fixes to try (in order): (1) Add an explicit inline `style={{minHeight: '90vh'}}` on the hero <section> in ADDITION to the Tailwind `min-h-[90vh]` class so the reservation applies even before Tailwind CSS classes evaluate. (2) Alternatively wrap the hero in a reservation div with fixed pixel height matching the rendered height on mobile (~1111px) and desktop. (3) Investigate whether the HomePage is code-split / lazy-loaded — if the root HomePage bundle is loaded via React.lazy, the initial paint would show 0px until the chunk arrives, which matches the t=758ms→t=1151ms jump. If yes, consider preloading the homepage chunk or providing an SSR-style skeleton with the same min-height.",
+    "The hero-height 0→1111 shift correlates exactly with the footer's 604px displacement (0.2256 = 604/780 impact fraction on mobile). Confirming the root cause is the hero mount, not any LazyMount section below."
+  ],
+  "critical_code_review_comments": [
+    "The `contain: layout paint` style on the hero section is being used incorrectly for CLS mitigation — it prevents INTERNAL shifts from being reported but does not prevent the hero's OWN height change from shifting downstream siblings. To fix CLS from a growing section, you must reserve space with min-height or aspect-ratio on a stable outer wrapper.",
+    "The measured hero height (1111px) exceeds `min-h-[90vh]` (702px on mobile 780vh) — the Tailwind reservation is under-sized. Even if applied at initial paint, the hero would still grow from 702→1111 causing a residual shift."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "0% (CLS target not met on either viewport)"},
+  "test_credentials": "not needed for this test",
+  "seed_data_creation": "none",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter384 successfully killed the blob+particles CLS source (0.6272 → ~0.001 on mobile) via `hidden md:block`. Remaining CLS is a SINGLE ~0.22-0.24 entry on FOOTER at ~925-1056ms caused by the hero <section> mounting/growing from height=0 → 1111px. Root cause is likely a paint window where the hero DOM is empty before React hydration or the min-h-[90vh] class hasn't computed. Recommended next fix: put an inline `style={{minHeight: 1120}}` (px, not vh) on the hero <section> or a stable wrapper around it to reserve the actual rendered height until content arrives. Re-measure with same methodology: PerformanceObserver({type:'layout-shift', buffered:true}) via add_init_script, goto, wait 3s, scroll 400px steps 350ms pauses, sum entries where !hadRecentInput.",
+  "rca of the issue": "Hero <section> element (HomePage.js line 247) has `className='relative min-h-[90vh] flex items-center overflow-hidden'` and `style={{contain: 'layout paint'}}`. Between initial paint at ~758ms and hydration at ~1151ms, the section reports height=0 (measured via periodic getBoundingClientRect). At hydration, hero jumps to 1111px, pushing the footer 604px down. This produces a layout-shift entry attributed to the footer with impact fraction ~0.77 * distance fraction ~0.29 = ~0.22 on mobile. The `contain: layout paint` only isolates INTERNAL reflows; it does not reserve outer space. Mitigation: replace or supplement `min-h-[90vh]` with an inline pixel-based min-height matching actual rendered height (~1120px mobile, ~800-900px desktop), OR reserve a fixed-height skeleton wrapper around the hero and around the entire HomePage that persists until content mounts."
+}
