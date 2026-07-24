@@ -1,5 +1,21 @@
 # BidVex — Auction Marketplace PRD
 
+## iter380 / iter381 — Homepage LCP Performance Fix (Jul 23, 2026) ✅ COMPLETE
+
+**Reported by user**: mobile PageSpeed = 6/100, LCP = 58 s on the BidVex homepage. Requested a 5-step fix (in order).
+
+### Changes
+1. **nginx.conf** (new file at `/app/frontend/nginx.conf`) — gzip on for JS/CSS/JSON/text/fonts + `location /static/` + font/WebP paths set `Cache-Control: public, max-age=31536000, immutable`.
+2. **React.lazy + Suspense** — HomepageVehicleCarousel and ProfessionalAuctionsPromo split into separate chunks that only download when the user scrolls near them.
+3. **Non-critical JS deferred** — `LazyMount` (IntersectionObserver, rootMargin=400px) wraps every below-the-fold section (LiveAuctions, StorageAuctionsPromo, HomepageLiveStorage, HotItems, Featured, NewListings, Features, TopSellers, HowItWorks). Their subtree only hydrates when scrolled close, keeping initial main-thread work small.
+4. **Hero image fetchPriority=high** — already set in HeroPhone.js (loading=eager, fetchpriority=high, explicit width/height).
+5. **WebP conversion** — hero + storage images regenerated at quality=82, all ~90% smaller (700–720 KB PNGs → 57–63 KB WebP). Served via `<picture><source type="image/webp">` with PNG fallback for older browsers. `index.html` preload updated to point at the WebP with `type=image/webp` + `imagesrcset`.
+
+### Testing (testing_agent)
+- iter380 first pass 90% — found `index.html` still preloaded the 721 KB PNG. Fixed by pointing the preload at the 59 KB WebP.
+- iter381 follow-up **100%, retest_needed=false**. Mobile Chromium capture confirmed: 0 PNG hero requests, WebP served at 59,138 bytes, LazyMount chunks arrive only on scroll, no regressions.
+
+
 ## iter379 — Partner Trial Expiry Fix (Jul 23, 2026) ✅ COMPLETE
 
 **Reported by user**: full audit of promotions + coupon codes + promotional banners + promotional emails + free trial system.

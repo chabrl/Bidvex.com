@@ -1,6 +1,35 @@
 # BidVex Changelog
 
 
+## Jul 23, 2026 — iter380/381 🚀 Homepage LCP Performance Fix
+
+### 0. Executive Summary
+5-part performance fix to move the homepage off its 6/100 mobile PageSpeed / 58 s LCP baseline. Verified end-to-end by the testing agent (iter381 report: 100% pass, retest_needed=false).
+
+### 1. Changes
+- **`/app/frontend/nginx.conf` (new)** — production frontend server config:
+  - `gzip on` with `gzip_types` covering `application/javascript`, `text/css`, `application/json`, `application/xml`, `text/plain`, `text/html`, and web fonts.
+  - `location /static/` and web-font/WebP paths set `Cache-Control: public, max-age=31536000, immutable`.
+  - `index.html` sends `no-cache, must-revalidate` so new deploys are picked up.
+- **`HomePage.js`** — imported `React.lazy` + `Suspense`, wrapped the two heaviest below-the-fold widgets in `React.lazy(() => import(...))` (**`HomepageVehicleCarousel`** + **`ProfessionalAuctionsPromo`**), added a `LazyMount` helper (IntersectionObserver, `rootMargin=400px`) around every below-the-fold section (LiveAuctions, StorageAuctionsPromo, HomepageLiveStorage, HotItems, Featured, NewListings, Features, TopSellers, HowItWorks). `SectionSkeleton` fallback keeps layout stable while chunks stream.
+- **`HeroPhone.js`** — hero image now `<picture>` with `<source type="image/webp">` + `<img fetchPriority="high" loading="eager" width="1295" height="1215">` fallback.
+- **`public/index.html`** — hero preload switched from the 721 KB PNG to the 59 KB WebP: `<link rel="preload" as="image" href="/assets/hero-phone-en.webp" imagesrcset="/assets/hero-phone-en.webp" type="image/webp" fetchpriority="high">`. WebP-capable browsers preload only the tiny WebP; older browsers gracefully skip and use the PNG via `<picture>` fallback.
+- **WebP assets** — regenerated hero + storage assets at quality=82:
+  - `hero-phone-en.png` 700 KB → `hero-phone-en.webp` **57 KB** (91.9% smaller)
+  - `hero-phone-fr.png` 704 KB → `hero-phone-fr.webp` **58 KB** (91.8% smaller)
+  - `hero-phone-mockup.png` 704 KB → `.webp` **58 KB** (91.8% smaller)
+  - `storage-unit-3d.png` 581 KB → `.webp` **63 KB** (89.1% smaller)
+
+### 2. Not Changed
+- SendGrid config, DNS, existing email templates untouched (per user directive).
+- No unrelated pages/components modified.
+- Backend routes untouched.
+
+### 3. Testing (testing_agent verified)
+- iter380 first pass: 90% — found ONE HIGH miss: `index.html` still preloaded the 721 KB PNG hero, defeating the WebP conversion.
+- iter381 follow-up pass: **100% — retest_needed=false**. Mobile Chromium network capture recorded 95 requests; **zero** hits to any `.png` hero file, hero WebP served at 200/`image/webp`/**59,138 bytes**. LazyMount defer verified — VehicleListingCard + HomepageVehicleCarousel chunks fetched only on scroll. No console errors.
+
+
 ## Jul 23, 2026 — iter379 🚨 REGRESSION FIX — Partner trial expiry sweep
 
 ### 0. Executive Summary
