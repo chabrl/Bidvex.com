@@ -1,0 +1,21 @@
+{
+  "summary": "iter381 follow-up verification of the WebP preload fix in /public/index.html. All three targeted checks PASSED: (a) index.html line 39 now preloads /assets/hero-phone-en.webp with type=image/webp + imagesrcset + fetchpriority=high, and the old PNG preload of hero-phone-mockup.png is gone; (b) mobile (390x780) Chromium network capture recorded 95 requests and ZERO hits to hero-phone-mockup.png or hero-phone-en/fr.png — only the WebP variant is fetched; (c) the hero WebP response is Content-Type: image/webp, HTTP 200, content-length 59138 bytes (~57.7KB) — well within the expected 57-65KB range and ~92% smaller than the previous 721KB PNG. Regression checks also passed: 0 console errors, page 200 OK, LazyMount below-the-fold still defers — 2 new chunks (VehicleListingCard + HomepageVehicleCarousel) loaded only after scroll, not on initial paint.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Preload is EN-only. If a first-time visitor loads /?lang=fr, the browser still preloads /assets/hero-phone-en.webp while HeroPhone.js renders /assets/hero-phone-fr.webp — the preload is wasted for FR visitors (small ~59KB waste, not a regression, just an FYI). A more robust fix would be to leave HeroPhone.js's own fetchPriority=high do the work, or inject the correct preload from JS/SSR based on lang param.",
+    "The captured hero img element in the evaluate() snippet actually matched the header logo (bidvex-logo.webp) because it was the first img[fetchpriority=high] in the DOM at query time. The actual <picture>/hero WebP is confirmed served correctly via the network response (image/webp, 59138 bytes). Not a code issue — test selector nuance."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a", "frontend": "100%"},
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "iter381 confirmed the HIGH issue from iteration_380 is fixed. Preload tag at index.html line 39 is now: <link rel=preload as=image href=/assets/hero-phone-en.webp imagesrcset=/assets/hero-phone-en.webp type=image/webp fetchpriority=high />. Network capture on mobile Chromium: 0 requests for hero-phone-mockup.png, 0 for hero-phone-en.png / hero-phone-fr.png, 2 for hero-phone-en.webp (preload + <picture> pickup, cache-consolidated by the browser). Response: 200, image/webp, 59138 bytes. LazyMount still working — VehicleListingCard + HomepageVehicleCarousel chunks fetched on scroll only. No console errors. Homepage LCP fix is now structurally complete on the CRA dev preview; production nginx build will additionally benefit from gzip + /static/ immutable caching already verified in iter380."
+}

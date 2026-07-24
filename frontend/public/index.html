@@ -30,8 +30,13 @@
 
         <!-- iter358 CWV — Preload the homepage LCP hero image so it starts
              fetching BEFORE React boots. `fetchpriority="high"` forces the
-             browser to move it to the top of the network queue. -->
-        <link rel="preload" as="image" href="/assets/hero-phone-mockup.png" fetchpriority="high" />
+             browser to move it to the top of the network queue.
+             iter380 — Point the preload at the tiny WebP variant (~59KB
+             vs 721KB PNG). `type="image/webp"` + `imagesrcset` mean the
+             preload is only used by WebP-capable browsers; older browsers
+             skip it and fall back to HeroPhone.js's <picture><img
+             src=".png"> fallback so no one gets a broken image. -->
+        <link rel="preload" as="image" href="/assets/hero-phone-en.webp" imagesrcset="/assets/hero-phone-en.webp" type="image/webp" fetchpriority="high" />
         <link rel="preload" as="image" href="/bidvex-icon.png" fetchpriority="high" />
         
         <meta name="description" content="BidVex — Canada's bilingual online auction marketplace. Bid on vehicles, storage units, industrial equipment and lots. No hidden fees." />
