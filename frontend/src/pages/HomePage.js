@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -20,11 +20,59 @@ import SEO from '../components/SEO';
 import SwipeableCardRow from '../components/SwipeableCardRow';
 import { useTopSellers, useHotItems, useEndingSoon, useFeatured, useNewListings, useRecentlySold } from '../hooks/useHomePageData';
 import useMarketplaceSync from '../hooks/useMarketplaceSync';
-// iter202 Phase B — Replaces legacy HomepageLiveVehicles with the new carousel.
-// Position constraint: AFTER StorageAuctionsPromo, BEFORE HotItemsSection (Tendances).
-// Visibility constraint: hidden when feature flag OFF or zero active listings.
-import HomepageVehicleCarousel from '../components/vehicles/HomepageVehicleCarousel';
-import ProfessionalAuctionsPromo from '../components/ProfessionalAuctionsPromo';
+// iter380 — LCP performance fix. Split the two heaviest below-the-fold
+// widgets out of the initial JS bundle so the homepage TTI is not
+// bottlenecked on their weight. React.lazy + Suspense with a skeleton
+// fallback keeps the layout stable while the chunk streams in.
+const HomepageVehicleCarousel = lazy(() =>
+  import('../components/vehicles/HomepageVehicleCarousel'));
+const ProfessionalAuctionsPromo = lazy(() =>
+  import('../components/ProfessionalAuctionsPromo'));
+
+/**
+ * iter380 — Mount its children only when the scroll position gets
+ * within `rootMargin` of the viewport. Cheap replacement for full-fat
+ * React.lazy on inline section components (which would require
+ * extracting each section to its own file). Keeps the initial React
+ * render tree small so the browser can finish the LCP paint before
+ * hydrating below-the-fold widgets.
+ */
+const LazyMount = ({ children, minHeight = 320, rootMargin = '400px' }) => {
+  const [visible, setVisible] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    // Older browsers / SSR fallback — mount immediately.
+    if (typeof window === 'undefined' || !('IntersectionObserver' in window)) {
+      setVisible(true);
+      return;
+    }
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) {
+        setVisible(true);
+        io.disconnect();
+      }
+    }, { rootMargin });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [rootMargin]);
+  return (
+    <div ref={ref} style={{ minHeight: visible ? undefined : minHeight }}>
+      {visible ? children : null}
+    </div>
+  );
+};
+
+// Simple skeleton for lazy-loaded Suspense fallbacks — just reserves
+// vertical space so the layout doesn't jump while the chunk streams.
+const SectionSkeleton = ({ height = 320 }) => (
+  <div
+    aria-hidden
+    style={{ minHeight: height }}
+    className="animate-pulse bg-slate-50 dark:bg-slate-900"
+  />
+);
 
 // Smart routing: backend now tags items with `detail_path` (iter343) —
 // vehicles → /vehicle-auctions/:id, lots → /lots/:id, storage → /storage-auctions/:id
@@ -293,52 +341,82 @@ const HomePage = () => {
       </section>
 
       {/* ========== LIVE AUCTIONS SECTION ========== */}
+      {/* iter380 — Below-the-fold sections are wrapped in <LazyMount>
+          so their subtree doesn't hydrate until the user scrolls close.
+          Cuts initial main-thread work + defers all their data
+          rendering, dropping mobile LCP dramatically. */}
       {isSectionVisible('ending_soon') && (
-        <LiveAuctionsSection items={endingSoon} navigate={navigate} />
+        <LazyMount minHeight={420}>
+          <LiveAuctionsSection items={endingSoon} navigate={navigate} />
+        </LazyMount>
       )}
 
       {/* iter217 Phase 3 — Professional Auctions section (after hero, before Storage Auctions) */}
-      <ProfessionalAuctionsPromo navigate={navigate} />
+      <LazyMount minHeight={320}>
+        <Suspense fallback={<SectionSkeleton height={320} />}>
+          <ProfessionalAuctionsPromo navigate={navigate} />
+        </Suspense>
+      </LazyMount>
 
       {/* ========== STORAGE AUCTIONS PROMO (iter171 — always bilingual) ========== */}
-      <StorageAuctionsPromo navigate={navigate} />
+      <LazyMount minHeight={420}>
+        <StorageAuctionsPromo navigate={navigate} />
+      </LazyMount>
 
       {/* iter202 Phase B — VEHICLE AUCTIONS CAROUSEL ==================== */}
       {/* Position: AFTER Storage Unit Auctions, BEFORE Tendances/Trending  */}
       {/* Visibility: hidden when flag OFF or zero active listings (B3)    */}
-      <HomepageVehicleCarousel />
+      <LazyMount minHeight={520}>
+        <Suspense fallback={<SectionSkeleton height={520} />}>
+          <HomepageVehicleCarousel />
+        </Suspense>
+      </LazyMount>
 
       {/* ========== LIVE STORAGE LOTS (iter172) ========== */}
-      <HomepageLiveStorage navigate={navigate} />
+      <LazyMount minHeight={420}>
+        <HomepageLiveStorage navigate={navigate} />
+      </LazyMount>
 
       {/* ========== HOT ITEMS WITH LIVE ANIMATIONS ========== */}
       {isSectionVisible('hot_items') && (
-        <HotItemsSection items={hotItems} navigate={navigate} />
+        <LazyMount minHeight={420}>
+          <HotItemsSection items={hotItems} navigate={navigate} />
+        </LazyMount>
       )}
 
       {/* ========== FEATURED AUCTIONS ========== */}
       {isSectionVisible('featured') && (
-        <FeaturedSection items={featured} navigate={navigate} />
+        <LazyMount minHeight={420}>
+          <FeaturedSection items={featured} navigate={navigate} />
+        </LazyMount>
       )}
 
       {/* ========== BROWSE INDIVIDUAL ITEMS (Uses browse_items toggle) ========== */}
       {isSectionVisible('browse_items') && (
-        <NewListingsSection items={newListings} navigate={navigate} />
+        <LazyMount minHeight={420}>
+          <NewListingsSection items={newListings} navigate={navigate} />
+        </LazyMount>
       )}
 
       {/* ========== WHY CHOOSE BIDVEX (Trust Features) ========== */}
       {isSectionVisible('trust_features') && (
-        <FeaturesSection navigate={navigate} />
+        <LazyMount minHeight={420}>
+          <FeaturesSection navigate={navigate} />
+        </LazyMount>
       )}
 
       {/* ========== TOP SELLERS ========== */}
       {isSectionVisible('top_sellers') && topSellers.length > 0 && (
-        <TopSellersSection sellers={topSellers} />
+        <LazyMount minHeight={420}>
+          <TopSellersSection sellers={topSellers} />
+        </LazyMount>
       )}
 
       {/* ========== HOW IT WORKS ========== */}
       {isSectionVisible('how_it_works') && (
-        <HowItWorksSection navigate={navigate} />
+        <LazyMount minHeight={420}>
+          <HowItWorksSection navigate={navigate} />
+        </LazyMount>
       )}
     </div>
   );

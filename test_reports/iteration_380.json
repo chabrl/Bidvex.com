@@ -1,0 +1,31 @@
+{
+  "summary": "iter380 structural verification of the BidVex homepage LCP performance fix. Verified nginx.conf gzip + immutable /static/ cache, HeroPhone <picture>+WebP+fetchPriority=high, React.lazy chunks for HomepageVehicleCarousel/ProfessionalAuctionsPromo, LazyMount deferring below-the-fold sections, WebP sizes >80% smaller than PNGs, page loads 200 with no console errors, language toggle present. One important miss found: /public/index.html still hard-preloads the 721KB hero-phone-mockup.png with fetchpriority=high, so the browser eagerly downloads the large PNG on every page load — this fights against the WebP work and will keep mobile LCP inflated even after iter380.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "public/index.html preload tag",
+        "issue": "Line 34: <link rel=\"preload\" as=\"image\" href=\"/assets/hero-phone-mockup.png\" fetchpriority=\"high\" /> — still preloads the 721KB fallback PNG on every homepage load. Network capture confirms hero-phone-mockup.png (image/png, ~721KB) is fetched BEFORE the WebP variant. This defeats the WebP conversion done in iter380 (the primary LCP fix) and keeps the mobile LCP payload large.",
+        "selector": "index.html line 34",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Remove or replace the <link rel=\"preload\" as=\"image\" href=\"/assets/hero-phone-mockup.png\" ...> in /app/frontend/public/index.html. Either delete it (HeroPhone.js already has fetchPriority=high on its <img>, so the browser will preload the WebP via the picture source without help) OR change it to preload the WebP with imagesrcset/type so browsers that support WebP fetch only the WebP: <link rel=\"preload\" as=\"image\" href=\"/assets/hero-phone-en.webp\" imagesrcset=\"/assets/hero-phone-en.webp\" type=\"image/webp\" fetchpriority=\"high\">. Consider language-aware preload for FR."
+  ],
+  "critical_code_review_comments": [
+    "HeroPhone.js uses a static <source srcSet> that only sets the EN or FR file at render time — this is fine, but the <img src> still points to the .png fallback. Combined with the index.html preload above, the browser will fetch the 721KB PNG on Safari/older browsers even though a WebP exists (they'd normally use the fallback PNG which is unavoidable, but the preload forces this on WebP-capable browsers too).",
+    "HomePage.js LazyMount uses rootMargin='400px' which is generous — on a 780px mobile viewport this means sections within ~1180px of the top mount immediately. ProfessionalAuctionsPromo (positioned right after the hero and any LiveAuctionsSection) will mount in the initial pass, which is likely why its lazy chunk was in the initial batch during testing (2 new chunks loaded on scroll were both HomepageVehicleCarousel-related). Not a bug, just an FYI — real deferral kicks in for widgets below ~1200px."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a", "frontend": "90%"},
+  "seed_data_creation": "None",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "iter380 structural checks passed EXCEPT the index.html preload of hero-phone-mockup.png. Verified: nginx.conf gzip on, gzip_types includes application/javascript/text/css/application/json/text/plain, /static/ block sets Cache-Control public,max-age=31536000,immutable. HeroPhone.js DOM verified: <picture><source type=image/webp srcset=/assets/hero-phone-en.webp><img src=/assets/hero-phone-en.png fetchpriority=high loading=eager width=1295 height=1215>. Browser picked WebP: img.currentSrc=/assets/hero-phone-en.webp, response Content-Type=image/webp. WebP file sizes: hero-phone-en 59KB vs 717KB PNG (91.8% smaller), hero-phone-fr 59KB vs 721KB (91.8%), hero-phone-mockup 59KB vs 721KB (91.8%), storage-unit-3d 65KB vs 595KB (89.1%) — all >80% target met. Below-fold LazyMount verified: 2 new /static/js/*.chunk.js requests fired during scroll (src_components_vehicles_HomepageVehicleCarousel_js-*.chunk.js and src_components_vehicles_VehicleListingCard_js-*.chunk.js). testids homepage-live-storage/homepage-live-vehicles never appeared even after scrolling to y=7500 — likely because backend returned empty vehicle/storage lists for anonymous mobile visit (not an iter380 regression). Page 200 OK, 0 console errors, language toggle present.",
+  "rca of the issue": "index.html preloads hero-phone-mockup.png (721KB PNG, fetchpriority=high) before React mounts. Even after iter380 converted the hero to WebP via <picture>, the eager preload from index.html still transfers the ~721KB PNG on every mobile load, which is the single biggest LCP contributor. Fix: update the preload tag to point at the WebP (with imagesrcset/type for WebP-capable browsers) or delete it and rely on HeroPhone.js's fetchPriority=high on the img."
+}

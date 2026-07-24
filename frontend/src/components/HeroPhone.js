@@ -31,26 +31,32 @@ const HeroPhone = () => {
 
       {/* Client-provided phone+hand mockup — language-aware. */}
       <div className="hero-phone-wrapper hero-phone-section">
-        <img
-          src={fr ? '/assets/hero-phone-fr.png' : '/assets/hero-phone-en.png'}
-          onError={(e) => {
-            if (!e.currentTarget.dataset.fellBack) {
-              e.currentTarget.dataset.fellBack = '1';
-              // Legacy Pillow-rendered fallback if the /assets file is
-              // missing on first deploy — better than a broken image.
-              e.currentTarget.src = '/assets/hero-phone-mockup.png';
-            }
-          }}
-          alt={fr
-            ? "Aperçu de l'application mobile BidVex — Découvrez. Misez. Gagnez."
-            : 'BidVex mobile app preview — Discover. Bid. Win.'}
-          className="hero-phone-image hero-phone-mockup"
-          loading="eager"
-          fetchPriority="high"
-          draggable={false}
-          width="1295"
-          height="1215"
-        />
+        <picture>
+          <source
+            type="image/webp"
+            srcSet={fr ? '/assets/hero-phone-fr.webp' : '/assets/hero-phone-en.webp'}
+          />
+          <img
+            src={fr ? '/assets/hero-phone-fr.png' : '/assets/hero-phone-en.png'}
+            onError={(e) => {
+              if (!e.currentTarget.dataset.fellBack) {
+                e.currentTarget.dataset.fellBack = '1';
+                // Legacy Pillow-rendered fallback if the /assets file is
+                // missing on first deploy — better than a broken image.
+                e.currentTarget.src = '/assets/hero-phone-mockup.png';
+              }
+            }}
+            alt={fr
+              ? "Aperçu de l'application mobile BidVex — Découvrez. Misez. Gagnez."
+              : 'BidVex mobile app preview — Discover. Bid. Win.'}
+            className="hero-phone-image hero-phone-mockup"
+            loading="eager"
+            fetchPriority="high"
+            draggable={false}
+            width="1295"
+            height="1215"
+          />
+        </picture>
       </div>
     </div>
   );
