@@ -1,6 +1,40 @@
 # BidVex Changelog
 
 
+## Feb 8, 2026 — iter386 🛡️ Promotions Audit + LCP Third-Party Fix + Lighthouse CI
+
+### 0. Executive Summary
+Three-part follow-up after iter385's CLS fix: (a) Promotions & Coupons audit closed the last known bug (anonymous access to active-banners), (b) eliminated the render-blocking Google Fonts third-party stylesheets that delayed LCP, (c) added a Lighthouse CI guardrail so this class of regression can't happen silently again. All verified by testing_agent iter386 — 100% backend, 100% frontend, retest_needed=false.
+
+### 1. Promotions & Coupons Audit — closed
+- **`GET /api/promotions/active-banners`** — auth changed from `Depends(get_current_user)` to `Depends(get_current_user_optional)`. Anonymous visitors now get HTTP **200** (previously 401) and see promotions with `target='all'`. Signed-in users go through the full `_user_matches_target` matcher unchanged.
+- Coupon CRUD + validation flows verified end-to-end via 9 new pytest cases (`/app/backend/tests/test_iter386_promotions_coupons_audit.py`), all passing. Create → list → get → PUT update → DELETE (soft) → validate roundtrip. Guards: duplicate code rejection (400), percentage > 100 rejection (400/422), deactivated coupons return invalid on public /validate-coupon.
+
+### 2. LCP Third-Party Fix
+- Measured the homepage LCP element (mobile 390x780): **hero description `<p>`** at 2064ms. Uses SYSTEM fonts, not Google Fonts directly.
+- Root cause of the third-party LCP flag: Google Fonts CSS stylesheets were `renderBlockingStatus='blocking'`. Two of them:
+  1. `Outfit + DM Sans` in `index.html` (blocking, 14ms delay)
+  2. `Space Grotesk + Inter` loaded via CSS `@import` inside `index.css` (delayed discovery — only found after parent CSS parses, plus `display=swap` triggering font-swap reflow on h1/h2/h3 globally)
+- **Fixes applied**:
+  - `/app/frontend/public/index.html`: Both stylesheets now loaded as `<link rel="preload" as="style">` + `<link rel="stylesheet" media="print" onload="this.media='all'">` + `<noscript>` fallback. This makes them **non-render-blocking**.
+  - `/app/frontend/src/index.css`: Removed the `@import url(...Space Grotesk + Inter...)` — earlier discovery via HTML link.
+  - Both stylesheets now use `display=optional` (was `swap` for Space Grotesk) — no more font-swap CLS risk on h1.
+- Only remaining blocking third-party = `assets.emergent.sh/scripts/emergent-main.js` (7ms, platform infra — outside app control).
+
+### 3. Lighthouse CI Guardrail
+- `/app/lighthouserc.json` — Lighthouse CI config. **CLS < 0.1** is an ERROR threshold (fails build); LCP < 2.5s, TBT < 300ms, FCP < 1.8s are WARN thresholds. 3 runs per check.
+- `/app/.github/workflows/lighthouse.yml` — GitHub Action, triggered on push/PR touching `frontend/**` or `lighthouserc.json`. Builds the frontend, serves the static bundle, runs `lhci autorun`, uploads HTML reports as artifacts (14-day retention).
+
+### 4. Final measurements (testing_agent iter386)
+- **Mobile CLS**: 0.00144 (no regression from iter385).
+- **Desktop CLS**: 0.00191 (improved vs iter385's 0.00427).
+- **Mobile LCP**: 2104ms (hero paragraph, under Google's 2.5s "good" threshold).
+- **Anonymous banner endpoint**: HTTP 200.
+- **Google Fonts blocking status**: false (both stylesheets now non-blocking).
+- **Coupon regression tests**: 9/9 pass.
+
+
+
 ## Feb 8, 2026 — iter382-385 🚨 CLS Regression Fix (Homepage)
 
 ### 0. Executive Summary

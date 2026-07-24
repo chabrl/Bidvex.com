@@ -1,6 +1,26 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter386 — Promotions Audit + LCP Third-Party Fix + Lighthouse CI (Feb 8, 2026) ✅ COMPLETE
+
+**Reported by user**: (a) Close the promotions/coupons audit — fix `/api/promotions/active-banners` for anonymous visitors and confirm coupon flows work. (b) Identify the LCP third-party resource on the homepage and preconnect/preload/self-host it. (c) Add a Lighthouse CI check on `/` to protect against future CWV regressions.
+
+### Work
+1. **Promotions banner (anonymous fix)** — `admin_promotions.py` route now uses `Depends(get_current_user_optional)`. Anonymous users see `target='all'` promotions (previously 401). Signed-in users behave as before.
+2. **Coupon flows audit** — Verified end-to-end via 9-test pytest file (`/app/backend/tests/test_iter386_promotions_coupons_audit.py`). All flows work: create, list, update, deactivate, validate math, duplicate rejection, %>100 rejection. No bugs found — this system is healthy.
+3. **LCP third-party (Google Fonts)** — Measured LCP element = hero `<p>` at ~2100ms (system font). Third-party render-blocking resources found: (i) Outfit+DM Sans stylesheet in index.html, (ii) Space Grotesk+Inter loaded via CSS `@import` in index.css (delayed discovery + `display=swap`). **Fix**: both stylesheets moved to non-blocking `<link rel="preload" as="style">` + `<link media="print" onload="this.media='all'">` + `<noscript>` fallback pattern; Space Grotesk migrated to `display=optional`; CSS `@import` removed.
+4. **Lighthouse CI** — `/app/lighthouserc.json` config (CLS < 0.1 as ERROR, LCP < 2.5s / TBT < 300ms / FCP < 1.8s as WARN) + `/app/.github/workflows/lighthouse.yml` GitHub Action running on frontend/** changes.
+
+### Verified (testing_agent iter386)
+- Anonymous `GET /api/promotions/active-banners` → **HTTP 200** (was 401).
+- Mobile CLS **0.00144** · Desktop CLS **0.00191** — no regression from font changes.
+- Mobile LCP **2104ms** (under 2.5s "good" bucket).
+- Zero Google Fonts stylesheets flagged as render-blocking.
+- 9/9 coupon regression tests pass.
+
+
+
+
 ## iter382-385 — Homepage CLS Regression Fix (Feb 8, 2026) ✅ COMPLETE
 
 **Reported by user (Msg 799)**: iter380 lazy-loading push caused critical CLS regression on homepage (0.084 → 0.886). CLS must return below 0.1 while preserving lazy loading.
