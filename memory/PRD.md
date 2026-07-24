@@ -1,6 +1,27 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter387 — Section Error Boundaries + Optional-Chaining Safety Net (Feb 8, 2026) ✅ COMPLETE
+
+**Reported by user**: Homepage broken after latest deploy — middle sections completely missing (massive blank white gap). Requested (a) fix the runtime error, (b) safely optional-chain all data state accesses, (c) add React Error Boundaries around lazy-loaded homepage sections so one crash doesn't blank out the whole layout.
+
+### Work
+1. **`SectionErrorBoundary.jsx`** — new class component with `getDerivedStateFromError` + `componentDidCatch`. Fallback = warning icon + "This section couldn't load right now. The rest of the page is still available." + Reload button. Preserves `minHeight` reservation so CLS stays unchanged. Emits `window` CustomEvent `bidvex:section-error` for downstream error trackers.
+2. **`LazyMount` now auto-wraps** — every below-the-fold section wired through `LazyMount` gets the boundary automatically. 11 sections tagged with `sectionName` (live-auctions, professional-auctions, storage-auctions-promo, vehicle-carousel, live-storage-lots, hot-items, featured, browse-items, trust-features, top-sellers, how-it-works).
+3. **Optional chaining fix** — 4 occurrences of `src={item.images[0]}` in HomePage.js replaced with `src={item?.images?.[0]}`. This was the most probable production crash source (undefined-property access when a listing record didn't have an `images` field).
+4. **10-test regression file** at `/app/backend/tests/test_iter387_section_error_boundary.py` — guards against future removal of the boundary + confirms all homepage API endpoints return list shape (not object shape).
+
+### Verified on Preview
+- All 13 homepage sections render; zero runtime errors; body scrollHeight 10904px.
+- Mobile CLS 0.02858 (well under 0.1); Desktop measured healthy.
+- 10/10 pytest cases pass.
+
+### Production Impact
+Preview fixes are in place; user must redeploy to push to production. The Error Boundary alone means: even if a fifth crash source surfaces post-deploy that we didn't catch, only that one section shows a fallback while every other section still renders normally.
+
+
+
+
 ## iter386 — Promotions Audit + LCP Third-Party Fix + Lighthouse CI (Feb 8, 2026) ✅ COMPLETE
 
 **Reported by user**: (a) Close the promotions/coupons audit — fix `/api/promotions/active-banners` for anonymous visitors and confirm coupon flows work. (b) Identify the LCP third-party resource on the homepage and preconnect/preload/self-host it. (c) Add a Lighthouse CI check on `/` to protect against future CWV regressions.

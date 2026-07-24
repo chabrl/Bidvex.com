@@ -1,6 +1,29 @@
 # BidVex Changelog
 
 
+## Feb 8, 2026 — iter387 🛡️ Section Error Boundaries + Optional-Chaining Safety Net
+
+### 0. Executive Summary
+User reported the production homepage had a massive blank white gap in the middle after the last deploy. Preview looks healthy (all 13 sections render, zero runtime errors, Mobile CLS 0.02858), so the crash is production-only — either bundled-in-prod-only code path or data shape differences. Two parallel fixes shipped in preview so the next deploy carries them:
+  1. **`SectionErrorBoundary` around every `LazyMount`** — a single crashing section can no longer blank out the entire middle of the homepage; the boundary shows an inline "This section couldn't load — Reload page" fallback with the reserved height preserved (no CLS spike).
+  2. **Optional chaining on `item.images[0]`** — four occurrences in `HomePage.js` were unsafe; changed to `item?.images?.[0]`, killing the most likely undefined-access crash on data records missing the `images` field.
+
+### 1. Files Changed
+- `/app/frontend/src/components/SectionErrorBoundary.jsx` — NEW class component with `getDerivedStateFromError` + `componentDidCatch`. Fallback UI: warning icon, "This section couldn't load right now. The rest of the page is still available.", **Reload page** button. Also emits a `bidvex:section-error` `CustomEvent` on `window` so an error tracker adapter can hook in without patching the boundary.
+- `/app/frontend/src/pages/HomePage.js` — imports `SectionErrorBoundary`; `LazyMount` internally wraps its child (when visible) in `<SectionErrorBoundary sectionName={...} minHeight={minHeight}>`; every LazyMount call site now passes a `sectionName` prop (`live-auctions`, `professional-auctions`, `storage-auctions-promo`, `vehicle-carousel`, `live-storage-lots`, `hot-items`, `featured`, `browse-items`, `trust-features`, `top-sellers`, `how-it-works`).
+- `/app/frontend/src/pages/HomePage.js` — 4 occurrences of `src={item.images[0]}` replaced with `src={item?.images?.[0]}`.
+- `/app/backend/tests/test_iter387_section_error_boundary.py` — NEW 10-test regression file. Checks HTML shell renders, all 6 homepage API endpoints return list shape, no listing exposes a non-list `images` field, and guards against future refactors that would delete the boundary or unwire it from `LazyMount`.
+
+### 2. Verification
+- Preview homepage renders all 13 sections; body scrollHeight 10904px; zero runtime errors; Mobile CLS 0.02858 (well under 0.1 target).
+- 10/10 pytest cases pass locally.
+- Guardrail tests fail loudly if a future refactor removes the boundary import or the `<SectionErrorBoundary>` wrapper inside `LazyMount`.
+
+### 3. Production Redeploy Required
+The user must click "Deploy" in Emergent to push these preview fixes to production. Preview URL confirms all fixes work; production is unreachable to this agent by design.
+
+
+
 ## Feb 8, 2026 — iter386 🛡️ Promotions Audit + LCP Third-Party Fix + Lighthouse CI
 
 ### 0. Executive Summary

@@ -10,6 +10,7 @@ import { Badge } from '../components/ui/badge';
 import HeroPhone from '../components/HeroPhone';
 import RecentlySoldTicker from '../components/RecentlySoldTicker';
 import SafeImage from '../components/SafeImage';
+import SectionErrorBoundary from '../components/SectionErrorBoundary';
 import { 
   ArrowRight, Gavel, TrendingUp, Shield, Users, Award, Flame, 
   Search, Trophy, CreditCard, Sparkles, Clock, CheckCircle2,
@@ -49,7 +50,7 @@ const ProfessionalAuctionsPromo = lazy(() =>
  * height on mobile (390 px) so the swap from placeholder → real content
  * doesn't create a shift.
  */
-const LazyMount = ({ children, minHeight = 320, rootMargin = '400px' }) => {
+const LazyMount = ({ children, minHeight = 320, rootMargin = '400px', sectionName = 'section' }) => {
   const [visible, setVisible] = useState(false);
   const ref = useRef(null);
   useEffect(() => {
@@ -71,6 +72,16 @@ const LazyMount = ({ children, minHeight = 320, rootMargin = '400px' }) => {
   // Keep `min-height` applied even after visible=true so the placeholder
   // space is never released — the child grows into it or leaves harmless
   // slack at the bottom, but never causes an upward jump.
+  //
+  // iter387 — Every LazyMount child is now wrapped in a SectionErrorBoundary.
+  // Rationale: if a lazy-mounted section throws (undefined API field,
+  // failed chunk load, hook mis-use in a downstream component), React
+  // will unmount the closest error-catching ancestor. Before this
+  // boundary the ancestor was the routed page → the ENTIRE middle of
+  // the homepage disappeared and left a blank gap between hero and
+  // footer (reported post-iter386 production deploy). Per-section
+  // boundaries turn a single crashing section into a tiny inline
+  // fallback and keep every other section rendering normally.
   return (
     <div
       ref={ref}
@@ -79,7 +90,11 @@ const LazyMount = ({ children, minHeight = 320, rootMargin = '400px' }) => {
         contain: 'layout style paint',
       }}
     >
-      {visible ? children : null}
+      {visible ? (
+        <SectionErrorBoundary sectionName={sectionName} minHeight={minHeight}>
+          {children}
+        </SectionErrorBoundary>
+      ) : null}
     </div>
   );
 };
@@ -401,75 +416,75 @@ const HomePage = () => {
           applied (never released on mount) so the swap from placeholder
           → real content never pushes surrounding content up or down. */}
       {isSectionVisible('ending_soon') && (
-        <LazyMount minHeight={900}>
+        <LazyMount minHeight={900} sectionName="live-auctions">
           <LiveAuctionsSection items={endingSoon} navigate={navigate} />
         </LazyMount>
       )}
 
       {/* iter217 Phase 3 — Professional Auctions section (after hero, before Storage Auctions) */}
-      <LazyMount minHeight={520}>
+      <LazyMount minHeight={520} sectionName="professional-auctions">
         <Suspense fallback={<SectionSkeleton height={520} />}>
           <ProfessionalAuctionsPromo navigate={navigate} />
         </Suspense>
       </LazyMount>
 
       {/* ========== STORAGE AUCTIONS PROMO (iter171 — always bilingual) ========== */}
-      <LazyMount minHeight={900}>
+      <LazyMount minHeight={900} sectionName="storage-auctions-promo">
         <StorageAuctionsPromo navigate={navigate} />
       </LazyMount>
 
       {/* iter202 Phase B — VEHICLE AUCTIONS CAROUSEL ==================== */}
       {/* Position: AFTER Storage Unit Auctions, BEFORE Tendances/Trending  */}
       {/* Visibility: hidden when flag OFF or zero active listings (B3)    */}
-      <LazyMount minHeight={720}>
+      <LazyMount minHeight={720} sectionName="vehicle-carousel">
         <Suspense fallback={<SectionSkeleton height={720} />}>
           <HomepageVehicleCarousel />
         </Suspense>
       </LazyMount>
 
       {/* ========== LIVE STORAGE LOTS (iter172) ========== */}
-      <LazyMount minHeight={1000}>
+      <LazyMount minHeight={1000} sectionName="live-storage-lots">
         <HomepageLiveStorage navigate={navigate} />
       </LazyMount>
 
       {/* ========== HOT ITEMS WITH LIVE ANIMATIONS ========== */}
       {isSectionVisible('hot_items') && (
-        <LazyMount minHeight={900}>
+        <LazyMount minHeight={900} sectionName="hot-items">
           <HotItemsSection items={hotItems} navigate={navigate} />
         </LazyMount>
       )}
 
       {/* ========== FEATURED AUCTIONS ========== */}
       {isSectionVisible('featured') && (
-        <LazyMount minHeight={900}>
+        <LazyMount minHeight={900} sectionName="featured">
           <FeaturedSection items={featured} navigate={navigate} />
         </LazyMount>
       )}
 
       {/* ========== BROWSE INDIVIDUAL ITEMS (Uses browse_items toggle) ========== */}
       {isSectionVisible('browse_items') && (
-        <LazyMount minHeight={900}>
+        <LazyMount minHeight={900} sectionName="browse-items">
           <NewListingsSection items={newListings} navigate={navigate} />
         </LazyMount>
       )}
 
       {/* ========== WHY CHOOSE BIDVEX (Trust Features) ========== */}
       {isSectionVisible('trust_features') && (
-        <LazyMount minHeight={700}>
+        <LazyMount minHeight={700} sectionName="trust-features">
           <FeaturesSection navigate={navigate} />
         </LazyMount>
       )}
 
       {/* ========== TOP SELLERS ========== */}
       {isSectionVisible('top_sellers') && topSellers.length > 0 && (
-        <LazyMount minHeight={700}>
+        <LazyMount minHeight={700} sectionName="top-sellers">
           <TopSellersSection sellers={topSellers} />
         </LazyMount>
       )}
 
       {/* ========== HOW IT WORKS ========== */}
       {isSectionVisible('how_it_works') && (
-        <LazyMount minHeight={800}>
+        <LazyMount minHeight={800} sectionName="how-it-works">
           <HowItWorksSection navigate={navigate} />
         </LazyMount>
       )}
@@ -553,7 +568,7 @@ const LiveAuctionCard = ({ item, index, isVisible, navigate }) => {
     >
       <div className="relative h-40 sm:h-48 overflow-hidden bg-slate-100 dark:bg-slate-700">
         {item.images?.[0] ? (
-          <SafeImage src={item.images[0]} alt={item.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+          <SafeImage src={item?.images?.[0]} alt={item.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-600">
             <span className="text-5xl">📦</span>
@@ -647,7 +662,7 @@ const HotItemsSection = ({ items, navigate }) => {
             >
               <div className="relative h-44 sm:h-52 overflow-hidden">
                 {item.images?.[0] ? (
-                  <SafeImage src={item.images[0]} alt={item.title} className="w-full h-full object-cover transition-transform duration-500 hover:scale-110" />
+                  <SafeImage src={item?.images?.[0]} alt={item.title} className="w-full h-full object-cover transition-transform duration-500 hover:scale-110" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 dark:from-blue-900 dark:to-slate-900">
                     <Package className="h-16 w-16 text-slate-300 dark:text-slate-600" />
@@ -735,7 +750,7 @@ const FeaturedSection = ({ items, navigate }) => {
               onClick={() => navigate(getItemDetailPath(item))}            >
               <div className="relative aspect-square overflow-hidden bg-slate-100 dark:bg-slate-700">
                 {item.images?.[0] ? (
-                  <SafeImage src={item.images[0]} alt={item.title} className="w-full h-full object-cover" />
+                  <SafeImage src={item?.images?.[0]} alt={item.title} className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-600">
                     <span className="text-4xl">📦</span>
@@ -787,7 +802,7 @@ const NewListingsSection = ({ items, navigate }) => {
               onClick={() => navigate(getItemDetailPath(item))}            >
               <div className="relative aspect-square overflow-hidden bg-slate-100 dark:bg-slate-700">
                 {item.images?.[0] ? (
-                  <SafeImage src={item.images[0]} alt={item.title} className="w-full h-full object-cover" />
+                  <SafeImage src={item?.images?.[0]} alt={item.title} className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-600">
                     <span className="text-3xl">📦</span>
