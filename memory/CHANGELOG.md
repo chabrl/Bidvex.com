@@ -1,6 +1,41 @@
 # BidVex Changelog
 
 
+## Jul 23, 2026 — iter379 🚨 REGRESSION FIX — Partner trial expiry sweep
+
+### 0. Executive Summary
+Audit finding: admin-granted partner trials (broker / dealer / storage) **never expired**. Both `POST /api/partner-trial` and trial-coupon redemption stamp `user.partner_trial_active`, `user.partner_trial_expires_at`, `user.is_broker_partner`, `user.partner_type`, plus a `partner_trials` doc with `status='active'`. The only existing trial-expiry job (`expire_partner_pro_trials`) queries a different pair of fields entirely, so these records lived forever regardless of `trial_expires_at`.
+
+### 1. Fix
+- New scheduler job `partner_trial_expiry` running every 6 h.
+- On each tick, `run_partner_trial_expiry(db)`:
+  1. Finds `partner_trials` where `status='active'` AND `trial_expires_at <= now()`.
+  2. Flips the row to `status='expired'` with `expired_at` stamp — atomic guard-condition prevents race with a parallel worker.
+  3. Clears all four user flags (`partner_trial_active`, `partner_trial_expires_at`, `is_broker_partner`, `partner_type`) → `is_broker_partner=False` immediately per the approved scope.
+  4. Fires the pre-existing bilingual `trial_revoked` email via the unified template pipeline (no new SendGrid config).
+  5. Writes one row per expiry to `partner_trial_expiry_log` for admin audit.
+
+### 2. Idempotency
+- Step 1's query naturally excludes already-expired rows once flipped.
+- Step 2's `update_one({id, status='active'})` guard prevents double-processing.
+- Step 4's email dispatch checks the audit log for `sent_email=True` before re-emailing.
+
+### 3. Files
+- Added: `backend/services/partner_trial_expiry.py` (~120 loc)
+- Added: `backend/tests/test_iter379_partner_trial_expiry.py` (3 tests: happy path, future-dated trial untouched, scheduler wired correctly)
+- Modified: `backend/server.py` — new `_partner_trial_expiry_tick` async wrapper + `IntervalTrigger(hours=6)` job registration (uses iter377 pattern so the coroutine is actually awaited)
+
+### 4. Testing
+Regression sweep 28/28 green (iter379 + iter378 + iter377 + iter372). Live seed test proved:
+- Expired trial with `trial_expires_at=yesterday` was flipped, all 4 user flags cleared, 1 audit row inserted, email dispatched.
+- Second sweep run scanned 0 rows and made no changes (idempotency verified).
+- Future-dated trial completely untouched.
+- Scheduler registered `_partner_trial_expiry_tick` at fresh restart with zero "never awaited" warnings.
+
+### 5. Not Changed
+Per approved scope 1A + 2A: no reminder email, no hard-delete for coupons, no changes to SendGrid config, DNS, or existing templates. The other 3 subsystems in the audit (coupon CRUD, promo banners, promotion email broadcast) were verified working during the audit — no fixes needed.
+
+
 ## Jul 23, 2026 — iter378 ✨ Weekly Marketing Digest Emails
 
 ### 0. Executive Summary

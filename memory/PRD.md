@@ -1,5 +1,36 @@
 # BidVex — Auction Marketplace PRD
 
+## iter379 — Partner Trial Expiry Fix (Jul 23, 2026) ✅ COMPLETE
+
+**Reported by user**: full audit of promotions + coupon codes + promotional banners + promotional emails + free trial system.
+
+### Audit outcome
+Only ONE genuine bug found across all four subsystems (documented in CHANGELOG). Everything else works as designed:
+- Coupon CRUD (`/api/admin/coupons`): create, edit, list, deactivate — all working ✅
+- Coupon validation + Stripe checkout: working ✅
+- Admin Promotions Engine: CRUD + pause/activate + duplicate + usage export all working ✅
+- Promotion → email broadcast on activate: working ✅
+- Promotional banners: intentionally silent for anonymous users (documented design, not a bug) ✅
+- Partner trial CRUD: create, list, extend, revoke — all working ✅
+
+### The one bug — Partner trials never expired
+- `POST /api/partner-trial` and trial-coupon redemption both stamp: `partner_trial_active=True`, `partner_trial_expires_at=<ISO>`, `is_broker_partner=True`, `partner_type=<broker|dealer|storage>`, plus `partner_trials` doc with `status='active'`.
+- The only existing trial-expiry scheduler (`expire_partner_pro_trials`) queries a different pair of fields (`subscription_source='trial'`, `partner_pro_trial_end`) and never touches these records.
+- Users granted a partner trial kept `is_broker_partner=True` and premium features forever.
+
+### Fix (approved scope 1A + 2A)
+New `partner_trial_expiry` scheduler job running every 6 h. On each tick, `run_partner_trial_expiry(db)`:
+1. Finds active partner_trials with `trial_expires_at <= now`.
+2. Atomically flips row to `status='expired'`.
+3. Immediately clears all 4 user flags (`is_broker_partner=False` per approved scope).
+4. Fires the pre-existing bilingual `trial_revoked` email.
+5. Writes one row per expiry to `partner_trial_expiry_log`.
+
+Idempotency guard — sweep can safely run repeatedly (second run scans 0 rows, no double-emails).
+
+3/3 tests green. Regression sweep 28/28 green (iter379 + iter378 + iter377 + iter372).
+
+
 ## iter378 — Weekly Marketing Digest Emails (Jul 23, 2026) ✅ COMPLETE
 
 **Scope**: Personalised weekly marketing email per user, sent Mondays 08:00 UTC via APScheduler + SendGrid. Bilingual EN/FR, respects existing unsubscribe/marketing suppressions, does not touch transactional bid notifications.

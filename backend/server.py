@@ -1201,6 +1201,27 @@ scheduler.add_job(
     id='weekly_marketing_digest', replace_existing=True,
 )
 
+# ─── iter379 — Partner-trial expiry sweep (every 6 h) ─────────────
+async def run_partner_trial_expiry_job():
+    """Expire admin-granted partner trials whose date has passed.
+    iter378 audit surfaced that the existing `expire_partner_pro_trials`
+    job only touches subscription-trial fields; admin-granted partner
+    trials (partner_trial_active + trial_expires_at) never expired.
+    """
+    from services.partner_trial_expiry import run_partner_trial_expiry
+    return await run_partner_trial_expiry(db)
+
+async def _partner_trial_expiry_tick():
+    """AsyncIOScheduler wrapper — coroutine function so the executor
+    awaits it (iter377 pattern)."""
+    await safe_run("partner_trial_expiry", run_partner_trial_expiry_job())
+
+scheduler.add_job(
+    _partner_trial_expiry_tick,
+    trigger=IntervalTrigger(hours=6),
+    id='partner_trial_expiry', replace_existing=True,
+)
+
 # ─── Deposit refund queue worker (60s SLA — Spec Feature 2) ───
 async def run_deposit_refund_queue():
     from services.deposit_refund_queue import process_deposit_refund_queue
