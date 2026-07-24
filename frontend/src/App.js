@@ -45,7 +45,13 @@ import CompareBar from './components/CompareBar';
 import { EN_TO_FR } from './i18n/urlMap';
 
 // ─── Lazy-loaded pages (route-level code splitting) ───────────────
-const HomePage = lazy(() => import('./pages/HomePage'));
+// iter384 CLS fix — HomePage MUST be eager-loaded. When lazy, the Suspense
+// fallback (PageLoader min-h-60vh ≈ 468px) is replaced by the hero (~1111px)
+// on chunk arrival at t≈1050ms, shifting the footer 604px down and blowing
+// up CLS to 0.22-0.24. Since `/` is the primary landing route hit by every
+// first-time visitor, keeping it in the main bundle avoids the chunk load
+// wait entirely and is a net win on both CLS and LCP.
+import HomePage from './pages/HomePage';
 // iter307 — public /r/{code} referral landing page
 const ReferralLanding = lazy(() => import('./pages/ReferralLanding'));
 const MarketplacePage = lazy(() => import('./pages/MarketplacePage'));

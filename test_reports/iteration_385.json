@@ -1,0 +1,62 @@
+{
+  "summary": "CLS regression verification after HomePage eager-import fix (iter385). Measured homepage CLS on mobile 390x780 and desktop 1440x900 using PerformanceObserver({type:'layout-shift', buffered:true}) installed via add_init_script BEFORE navigation. Load + 3s wait + scroll top-to-bottom in 400px steps @ 350ms. Both viewports pass the <0.1 target with a very wide margin. Hero H1 'Discover./Bid./Win.' renders immediately (no PageLoader flash). Fix confirmed working.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "cls_measurements": {
+    "mobile_390x780": {
+      "cls": 0.00144,
+      "status": 200,
+      "hero_visible_immediately": true,
+      "hero_text": "Discover. Bid. Win.",
+      "total_entries": 1,
+      "top_shifts": [
+        {"value": 0.00144, "startTime_ms": 5411, "source": "svg (footer language/logo area, y=726, no positional change — likely rasterization only)"}
+      ],
+      "verdict": "PASS (0.00144 << 0.1 target, 154x improvement from iter384 0.2271)"
+    },
+    "desktop_1440x900": {
+      "cls": 0.00427,
+      "status": 200,
+      "hero_visible_immediately": true,
+      "hero_text": "Discover. Bid. Win.",
+      "total_entries": 16,
+      "top_shifts": [
+        {"value": 0.00042, "startTime_ms": 750, "source": "div.absolute.w-1.h-1 particles repositioning (hero decorative particle animation)"},
+        {"value": 0.00042, "startTime_ms": 750, "source": "div.absolute.w-1.h-1 particles"},
+        {"value": 0.00036, "startTime_ms": 724, "source": "div.absolute.w-1.h-1 particles"},
+        {"value": 0.00036, "startTime_ms": 724, "source": "div.absolute.w-1.h-1 particles"},
+        {"value": 0.00030, "startTime_ms": 1026, "source": "div.absolute.w-1.h-1 particles"}
+      ],
+      "verdict": "PASS (0.00427 << 0.1 target, 56x improvement from iter384 0.2418). All top shifts are tiny 4x4px decorative particle movements on desktop — these are intentional animations, not layout shifts of real content."
+    }
+  },
+  "verification_checklist": {
+    "homepage_200_ok": true,
+    "hero_h1_visible_immediately": true,
+    "no_pageloader_flash": true,
+    "blobs_particles_hidden_mobile": "confirmed — mobile had only 1 shift entry vs desktop 16 (particles absent on mobile)",
+    "no_font_swap_shifts": true,
+    "ticker_reservation_working": true,
+    "live_auctions_pill_reservation_working": true,
+    "no_new_console_errors": "not observed"
+  },
+  "test_report_links": [],
+  "action_items": [
+    "None — CLS fix is fully effective. Mobile CLS=0.00144, Desktop CLS=0.00427, both far below the 0.1 threshold.",
+    "OPTIONAL: The desktop particle animation contributes ~all remaining CLS (still trivially small). If ever needed, wrap particles in a transform-only animation or add contain:layout paint on the particle container so they don't register as layout shifts. Not required."
+  ],
+  "critical_code_review_comments": [
+    "Reverting HomePage to eager import is the correct fix — homepage is the LCP-critical route so lazy-loading it forced a Suspense fallback swap that caused footer displacement. Other routes correctly remain lazy.",
+    "Consider using CSS transform (translate) instead of top/left for the .w-1.h-1 particle animations to eliminate the residual desktop shifts entirely (currently ~0.004 total, harmless)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100%"},
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "iter385 HomePage eager-import fix verified. Mobile CLS 0.00144, Desktop CLS 0.00427 — both pass <0.1. Hero H1 renders immediately. All prior reservations still effective (mobile has particles hidden — only 1 total shift observed). Measurement methodology matches iter383/384 exactly."
+}
