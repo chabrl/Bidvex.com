@@ -1,0 +1,33 @@
+{
+  "summary": "iter382 CLS regression fix VERIFIED PARTIALLY. LazyMount implementation is CORRECT (minHeight kept forever after mount, `contain: layout style paint` computed as `content`, per-section minHeight applied 520-1000px, lazy chunk loading preserved — HomepageVehicleCarousel + ProfessionalAuctionsPromo chunks only download after scroll). HOWEVER the goal `CLS < 0.1` is NOT MET. Measured CLS = 0.8628 on mobile 390x780 with full-page scroll journey via PerformanceObserver({type:'layout-shift',buffered:true}). The CLS shifts are NOT caused by the LazyMount sections — they come from the HERO section which is above-the-fold and unrelated to iter382 scope.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Hero animated particles", "issue": "Continuous CLS shifts (sum ~0.63) from ~24 `DIV.absolute w-1 h-1 bg-cyan-400 rounded-full opacity-60` particles repositioning via top/left inline styles instead of CSS transform. Every reposition triggers layout-shift entry. Occurs 300-2000ms after paint and continues during scroll. Uses top/left not transform:translate — every frame is a real layout shift.", "selector": ".absolute.w-1.h-1.bg-cyan-400", "priority": "CRITICAL"},
+      {"component": "Hero 600x600 decorative blob", "issue": "Large CLS shift (0.5476 single-entry) from `DIV.absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px]` — its rendered rect changed from y=290 h=489 to y=311 h=468 at t=1601ms. Blob is centered via translate-x/y-1/2 but appears to reflow as hero container resizes when late content settles. Move it out of layout with `contain` or wrap in a fixed-size positioned parent.", "selector": ".absolute.top-1\\/2.left-1\\/2.w-\\[600px\\]", "priority": "CRITICAL"},
+      {"component": "Footer", "issue": "Shift 0.2256 at t=1186ms — footer previousRect was {y:604, h:176} then currentRect became {0,0,0,0} (detached/re-mounted). Footer was momentarily rendered high on the page then pushed down when children below Suspense boundary mounted. This means one of the Suspense fallbacks (SectionSkeleton for HomepageVehicleCarousel / ProfessionalAuctionsPromo) may not be reserving enough height, OR the footer briefly rendered before LazyMount refs / minHeights took effect on first paint. Verify SectionSkeleton heights match the real component heights AND that the LazyMount wrappers reserve space on the very first paint (SSR/first-render), not only after useEffect.", "selector": "FOOTER.bg-gray-900", "priority": "CRITICAL"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "PRIMARY: Fix hero cyan-400 particle dots to use CSS `transform: translate3d()` instead of top/left inline positioning. Add `will-change: transform` and `contain: strict` on the particle container. This alone should drop CLS by ~0.63.",
+    "SECONDARY: Wrap the hero 600x600 decorative blob container with `contain: layout paint` or convert its position anchoring to pure transform (no width/height reflow) so it can't push siblings when the hero grows.",
+    "TERTIARY: Ensure Suspense fallback (SectionSkeleton) for HomepageVehicleCarousel + ProfessionalAuctionsPromo reserves the SAME height as the LazyMount `minHeight` prop that wraps them — check for mismatch that causes the ~0.22 footer shift when the lazy chunk resolves.",
+    "Consider adding `contain: layout paint` on the top-level hero section wrapper too — the LazyMount `contain: content` only helps below-the-fold sections; the hero itself has no containment."
+  ],
+  "critical_code_review_comments": [
+    "LazyMount iter382 impl (HomePage.js line 52-85) is correctly written: minHeight stays applied when visible=true, `contain: layout style paint` (browser normalized to `content`) is set, and IntersectionObserver disconnects after first hit. GOOD.",
+    "Per-section minHeight tuning is present and appropriate (900/520/900/720/1000/900/900/900/700/800 px). GOOD.",
+    "However the CLS regression scope was misdiagnosed — the actual CLS is dominated by hero-internal animated particles + a large decorative blob, NOT by LazyMount section swaps. Fixing LazyMount alone cannot bring CLS < 0.1 because the hero contributes >0.6 by itself.",
+    "Recommend using `transform` for ANY position-animated decorative element to avoid layout shifts."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A", "frontend": "40% (LazyMount fix correct; CLS goal not met due to hero shifts)"},
+  "seed_data_creation": "None",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Measured CLS 0.8628 on https://prod-verify-2.preview.emergentagent.com/ at mobile 390x780. Largest shift 0.6274 @ 1601ms sourced from `DIV.absolute w-[600px] h-[600px]` (hero blob) + many `w-1 h-1 bg-cyan-400 rounded-full` particles. #2 shift 0.2256 @ 1186ms from FOOTER re-layout. Below-the-fold LazyMount sections are NOT the CLS source — they have proper minHeight + contain. Lazy chunk loading verified: 6 chunks including HomepageVehicleCarousel + ProfessionalAuctionsPromo only load after scroll. Language toggle EN/FR works. Zero console errors. Homepage 200 OK. Hero image + header + cookie banner render fine.",
+  "rca of the issue": "Root Cause: iter382 fixed the WRONG source of CLS. The LazyMount changes are correct and prevent LazyMount-related shifts, but the dominant CLS on this homepage comes from the HERO section (which is not lazy-mounted, is above the fold, and was not touched by iter382). Two specific hero sub-components cause it: (1) ~20-30 animated cyan particle dots (`div.absolute.w-1.h-1.bg-cyan-400.rounded-full`) that reposition using top/left inline styles rather than CSS transform — every frame their new position triggers a layout-shift entry (~0.001-0.002 each, and they cluster into large shifts of 0.63 when many move at once); (2) a `div.absolute.w-[600px].h-[600px]` centered decorative blob that gets clipped/resized when the hero container reflows (rect changed from y=290 h=489 to y=311 h=468 at 1601ms → single 0.5476 shift). Reproduction: load page at 390x780, observe layout-shift entries via PerformanceObserver — shifts start at ~1100ms and continue through the particle animation cycle. Mitigation: switch animated particles to `transform: translate3d(x,y,0)` (transforms don't cause layout shift), wrap decorative blob with `contain: layout paint` and ensure its size is not affected by parent reflow, and audit Suspense fallback heights to match real component heights for HomepageVehicleCarousel + ProfessionalAuctionsPromo lazy loads."
+}

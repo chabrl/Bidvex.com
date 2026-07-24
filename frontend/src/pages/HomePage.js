@@ -36,12 +36,23 @@ const ProfessionalAuctionsPromo = lazy(() =>
  * extracting each section to its own file). Keeps the initial React
  * render tree small so the browser can finish the LCP paint before
  * hydrating below-the-fold widgets.
+ *
+ * iter382 — CLS fix. Two changes vs the iter380 version:
+ *   1. `minHeight` is applied ALWAYS, not just before mount. Removing it
+ *      the moment `visible` flipped true caused the placeholder space to
+ *      collapse if the child rendered shorter than reserved — that in
+ *      turn pushed everything below the section back up, spiking CLS.
+ *   2. `contain: layout style paint` isolates the section's internal
+ *      reflows from the surrounding page so an image load inside a
+ *      mounted section doesn't shift its siblings.
+ * Section-specific `minHeight` values are tuned to the real rendered
+ * height on mobile (390 px) so the swap from placeholder → real content
+ * doesn't create a shift.
  */
 const LazyMount = ({ children, minHeight = 320, rootMargin = '400px' }) => {
   const [visible, setVisible] = useState(false);
   const ref = useRef(null);
   useEffect(() => {
-    // Older browsers / SSR fallback — mount immediately.
     if (typeof window === 'undefined' || !('IntersectionObserver' in window)) {
       setVisible(true);
       return;
@@ -57,8 +68,17 @@ const LazyMount = ({ children, minHeight = 320, rootMargin = '400px' }) => {
     io.observe(el);
     return () => io.disconnect();
   }, [rootMargin]);
+  // Keep `min-height` applied even after visible=true so the placeholder
+  // space is never released — the child grows into it or leaves harmless
+  // slack at the bottom, but never causes an upward jump.
   return (
-    <div ref={ref} style={{ minHeight: visible ? undefined : minHeight }}>
+    <div
+      ref={ref}
+      style={{
+        minHeight,
+        contain: 'layout style paint',
+      }}
+    >
       {visible ? children : null}
     </div>
   );
@@ -343,78 +363,81 @@ const HomePage = () => {
       {/* ========== LIVE AUCTIONS SECTION ========== */}
       {/* iter380 — Below-the-fold sections are wrapped in <LazyMount>
           so their subtree doesn't hydrate until the user scrolls close.
-          Cuts initial main-thread work + defers all their data
-          rendering, dropping mobile LCP dramatically. */}
+          iter382 — CLS fix. Every LazyMount now reserves a realistic
+          minHeight matched to the actual rendered height on mobile
+          (measured at 390 px viewport). Reservations are always
+          applied (never released on mount) so the swap from placeholder
+          → real content never pushes surrounding content up or down. */}
       {isSectionVisible('ending_soon') && (
-        <LazyMount minHeight={420}>
+        <LazyMount minHeight={900}>
           <LiveAuctionsSection items={endingSoon} navigate={navigate} />
         </LazyMount>
       )}
 
       {/* iter217 Phase 3 — Professional Auctions section (after hero, before Storage Auctions) */}
-      <LazyMount minHeight={320}>
-        <Suspense fallback={<SectionSkeleton height={320} />}>
+      <LazyMount minHeight={520}>
+        <Suspense fallback={<SectionSkeleton height={520} />}>
           <ProfessionalAuctionsPromo navigate={navigate} />
         </Suspense>
       </LazyMount>
 
       {/* ========== STORAGE AUCTIONS PROMO (iter171 — always bilingual) ========== */}
-      <LazyMount minHeight={420}>
+      <LazyMount minHeight={900}>
         <StorageAuctionsPromo navigate={navigate} />
       </LazyMount>
 
       {/* iter202 Phase B — VEHICLE AUCTIONS CAROUSEL ==================== */}
       {/* Position: AFTER Storage Unit Auctions, BEFORE Tendances/Trending  */}
       {/* Visibility: hidden when flag OFF or zero active listings (B3)    */}
-      <LazyMount minHeight={520}>
-        <Suspense fallback={<SectionSkeleton height={520} />}>
+      <LazyMount minHeight={720}>
+        <Suspense fallback={<SectionSkeleton height={720} />}>
           <HomepageVehicleCarousel />
         </Suspense>
       </LazyMount>
 
       {/* ========== LIVE STORAGE LOTS (iter172) ========== */}
-      <LazyMount minHeight={420}>
+      <LazyMount minHeight={1000}>
         <HomepageLiveStorage navigate={navigate} />
       </LazyMount>
 
       {/* ========== HOT ITEMS WITH LIVE ANIMATIONS ========== */}
       {isSectionVisible('hot_items') && (
-        <LazyMount minHeight={420}>
+        <LazyMount minHeight={900}>
           <HotItemsSection items={hotItems} navigate={navigate} />
         </LazyMount>
       )}
 
       {/* ========== FEATURED AUCTIONS ========== */}
       {isSectionVisible('featured') && (
-        <LazyMount minHeight={420}>
+        <LazyMount minHeight={900}>
           <FeaturedSection items={featured} navigate={navigate} />
         </LazyMount>
       )}
 
       {/* ========== BROWSE INDIVIDUAL ITEMS (Uses browse_items toggle) ========== */}
       {isSectionVisible('browse_items') && (
-        <LazyMount minHeight={420}>
+        <LazyMount minHeight={900}>
           <NewListingsSection items={newListings} navigate={navigate} />
         </LazyMount>
       )}
 
       {/* ========== WHY CHOOSE BIDVEX (Trust Features) ========== */}
       {isSectionVisible('trust_features') && (
-        <LazyMount minHeight={420}>
+        <LazyMount minHeight={700}>
           <FeaturesSection navigate={navigate} />
         </LazyMount>
       )}
 
       {/* ========== TOP SELLERS ========== */}
       {isSectionVisible('top_sellers') && topSellers.length > 0 && (
-        <LazyMount minHeight={420}>
+        <LazyMount minHeight={700}>
           <TopSellersSection sellers={topSellers} />
         </LazyMount>
       )}
 
       {/* ========== HOW IT WORKS ========== */}
       {isSectionVisible('how_it_works') && (
-        <LazyMount minHeight={420}>
+        <LazyMount minHeight={800}>
           <HowItWorksSection navigate={navigate} />
         </LazyMount>
       )}
