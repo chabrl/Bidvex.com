@@ -231,7 +231,14 @@ const HomePage = () => {
       <RecentlySoldTicker />
 
       {/* ========== EXTRAORDINARY HERO SECTION ========== */}
-      <section className="relative min-h-[90vh] flex items-center overflow-hidden">
+      {/* iter382 CLS fix — `contain: layout paint` on the outer hero
+          section prevents any reflow inside the hero (blobs resizing,
+          particles repositioning, animated badges settling) from
+          propagating a layout-shift entry to the sections below. */}
+      <section
+        className="relative min-h-[90vh] flex items-center overflow-hidden"
+        style={{ contain: 'layout paint' }}
+      >
         {/* Animated Gradient Background */}
         <div className="absolute inset-0 animated-gradient" />
         
@@ -242,13 +249,22 @@ const HomePage = () => {
           }} />
         </div>
         
-        {/* Floating Orbs */}
-        <div className="absolute top-20 left-10 w-64 h-64 bg-cyan-400/20 rounded-full blur-[80px] float-animation" />
-        <div className="absolute bottom-20 right-10 w-96 h-96 bg-blue-600/20 rounded-full blur-[100px] float-animation" style={{ animationDelay: '-2s' }} />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-cyan-500/10 rounded-full blur-[120px]" />
+        {/* Floating Orbs — iter382 CLS fix: `contain: layout paint size`
+            isolates these decorative blobs so any internal reflow (e.g.
+            when the hero container settles as content streams in) cannot
+            propagate a layout-shift entry to the surrounding page. */}
+        <div className="absolute top-20 left-10 w-64 h-64 bg-cyan-400/20 rounded-full blur-[80px] float-animation" style={{ contain: 'layout paint size' }} />
+        <div className="absolute bottom-20 right-10 w-96 h-96 bg-blue-600/20 rounded-full blur-[100px] float-animation" style={{ animationDelay: '-2s', contain: 'layout paint size' }} />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-cyan-500/10 rounded-full blur-[120px]" style={{ contain: 'layout paint size' }} />
         
-        {/* Particle Effects */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {/* Particle Effects — iter382 CLS fix: `contain: strict` locks the
+            container's size + layout so the particles inside can't create
+            layout-shift entries when the hero reflows. Particles are pure
+            visual decoration and don't need to participate in layout. */}
+        <div
+          className="absolute inset-0 overflow-hidden pointer-events-none"
+          style={{ contain: 'strict', height: '100%', width: '100%' }}
+        >
           {[...Array(20)].map((_, i) => (
             <div
               key={i}
