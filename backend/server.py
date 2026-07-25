@@ -576,18 +576,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ─── iter354 — non-WWW → WWW canonical redirect (aligned with `<link rel="canonical" href="https://www.bidvex.com/...">`) ───
-from starlette.responses import RedirectResponse
-@app.middleware("http")
-async def www_canonical_redirect(request: Request, call_next):
-    host = (request.headers.get("host") or "").lower()
-    # Only rewrite bare `bidvex.com` → `www.bidvex.com`. Leave any other host
-    # (preview.emergentagent.com, launchapp-*.emergent.host, localhost, etc.)
-    # untouched so preview/staging routing keeps working.
-    if host == "bidvex.com":
-        url = str(request.url).replace("://bidvex.com", "://www.bidvex.com", 1)
-        return RedirectResponse(url=url, status_code=301)
-    return await call_next(request)
+# ─── iter354 www_canonical_redirect REMOVED (ticket 209107) — was redirecting
+# bidvex.com -> www.bidvex.com with a 301, stripping CORS headers since
+# www.bidvex.com is an unverified custom domain. bidvex.com is the verified
+# apex; it must be served directly, not redirected. ───
 
 # ─── iter354 — Bot-UA prerender middleware (preview validation layer) ───
 # In preview, this intercepts crawler traffic and serves the SSR HTML instead

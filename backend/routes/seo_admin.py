@@ -102,6 +102,9 @@ class CacheHeadersMiddleware(BaseHTTPMiddleware):
                     response.headers["X-Bot-Detected"] = "true"
 
             # ── 2. Static assets ─ long-lived immutable cache ───────
+            elif path == "/sw.js":
+                response.headers["Cache-Control"] = "no-cache"
+
             elif path.startswith(_IMMUTABLE_PATH_PREFIXES) or _IMMUTABLE_STATIC_EXT.search(path):
                 # Only apply if no explicit Cache-Control already set upstream.
                 if "cache-control" not in {k.lower() for k in response.headers.keys()}:

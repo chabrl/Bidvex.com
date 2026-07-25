@@ -2,14 +2,10 @@
  * BidVex Service Worker — Push Notifications + Offline Caching
  * Self-hosted VAPID Web Push — no Firebase dependency.
  */
-const CACHE_NAME = 'bidvex-v3';
-const STATIC_ASSETS = ['/offline.html'];
+const CACHE_NAME = 'bidvex-v5';
 
 /* ─── Install ─── */
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
-  );
   self.skipWaiting();
 });
 
@@ -105,14 +101,3 @@ self.addEventListener('message', (event) => {
   }
 });
 
-/* ─── Fetch: Network-first, offline fallback ─── */
-self.addEventListener('fetch', (event) => {
-  // Skip non-GET and API requests
-  if (event.request.method !== 'GET' || event.request.url.includes('/api/')) return;
-
-  event.respondWith(
-    fetch(event.request).catch(() =>
-      caches.match(event.request).then((cached) => cached || caches.match('/offline.html'))
-    )
-  );
-});
