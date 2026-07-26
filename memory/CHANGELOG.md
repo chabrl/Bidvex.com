@@ -1,6 +1,46 @@
 # BidVex Changelog
 
 
+## Feb 8, 2026 — iter387 🧹 Google AdSense Removed → Featured Listing Slots
+
+### Executive Summary
+Full removal of Google AdSense from every surface. All 8 ad zones across the 4 marketplace-style pages now render a **FeaturedListingSlot** — a promoted platform listing (admin-flagged `is_featured` or partner-boosted) — and self-hide when no featured content exists for that section, so no empty containers or broken layouts remain.
+
+### What was removed
+- **Component**: `/app/frontend/src/components/AdUnit.jsx` (deleted)
+- **AdSense loader script** in `/app/frontend/public/index.html` (removed — no more `pagead2.googlesyndication.com`, `adsbygoogle` in served HTML)
+- **Publisher ID** `ca-pub-5626625571065443` (removed from every source file)
+- **Env-var contract** — every `REACT_APP_ADSENSE_SLOT_*` and `REACT_APP_ADSENSE_CLIENT` reference is gone
+- **8 `<AdUnit>` mounts** across `MarketplacePage.js`, `LotsMarketplacePage.js`, `VehicleAuctionsPage.js`, `StorageAuctionsBrowse.js`
+- **iter364 launch-gate tests** rewritten to enforce the *absence* of any AdSense token
+
+### What replaced it
+- **New component**: `/app/frontend/src/components/FeaturedListingSlot.jsx`
+  - Fetches `GET /api/carousel/featured?limit=12` (already-existing endpoint that unions all 5 listing collections and returns docs pre-normalized with `title`, `images[]`, `current_price`, `auction_end_date`, `detail_path`, `_section`).
+  - Filters by page section (`marketplace | lots | vehicle | storage`; `vehicle` also matches `vehicle_multi_lot`).
+  - Renders a bilingual promoted card (image · FEATURED badge · title · current bid · "View auction" CTA) linking to the listing's detail page.
+  - **Returns `null` when no featured content matches the section** — no empty container, no dashed placeholder, no layout gap.
+  - Module-level 60s promise cache — 8 slots per navigation share ONE network round-trip.
+- **8 replacements** wired in with `data-testid="featured-<section>-{top|bottom|mid}"`.
+
+### Verification
+- **Test suite**: `test_iter364_launch_gate.py` — 16/16 pass (rewritten to guard against re-introducing AdSense — enforces `AdUnit.jsx` is deleted, `FeaturedListingSlot` is mounted on all 4 pages with the correct `section` prop, and every forbidden AdSense token/publisher-ID/env-var is absent from `frontend/src` + `frontend/public`).
+- **Live scan of preview HTML** on all 4 pages after supervisor restart: 0 `<ins class="adsbygoogle">` tags, 0 `pagead2.googlesyndication.com` strings, 0 `adsbygoogle` globals, 0 legacy `ad-*` `data-testid` placeholders.
+- **Positive-path smoke** — seeded one `is_featured: true` listing → the `featured-marketplace-top` + `featured-marketplace-bottom` slots rendered a full card (badge, title, $240 current bid, CTA) exactly where the ad zone had been. Seed cleaned up.
+- **Negative-path** — with the seed removed, all 4 pages render **zero** featured slots and the surrounding layout has no empty gap or broken container.
+
+### Files changed
+- ADDED: `/app/frontend/src/components/FeaturedListingSlot.jsx`
+- DELETED: `/app/frontend/src/components/AdUnit.jsx`
+- EDITED: `/app/frontend/public/index.html`
+- EDITED: `/app/frontend/src/pages/MarketplacePage.js`
+- EDITED: `/app/frontend/src/pages/LotsMarketplacePage.js`
+- EDITED: `/app/frontend/src/pages/vehicles/VehicleAuctionsPage.js`
+- EDITED: `/app/frontend/src/pages/storage/StorageAuctionsBrowse.js`
+- EDITED: `/app/backend/tests/test_iter364_launch_gate.py`
+
+
+
 ## Feb 8, 2026 — iter386 🔗 Unsubscribe Link Broken Token Fix
 
 ### 0. Executive Summary

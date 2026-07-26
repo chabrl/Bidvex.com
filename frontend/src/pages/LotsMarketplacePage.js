@@ -17,8 +17,8 @@ import SafeImage from '../components/SafeImage';
 import MultiLotImageCarousel from '../components/MultiLotImageCarousel';
 // iter364 — Compare-listings checkbox.
 import { CompareCheckbox } from '../components/CompareBar';
-// iter364 — Google AdSense inline ad zones.
-import AdUnit from '../components/AdUnit';
+// iter387 — Featured listing slot (replaces removed Google AdSense).
+import FeaturedListingSlot from '../components/FeaturedListingSlot';
 import WishlistHeartButton from '../components/WishlistHeartButton';
 import MarketplaceSidebar from '../components/MarketplaceSidebar';
 import { VerifiedBadge } from '../components/VerifiedBadge';
@@ -446,13 +446,10 @@ const LotsMarketplacePage = () => {
               </Card>
             ) : (
               <>
-              {/* iter364 — Ad zone above lots grid */}
-              <AdUnit
-                slot={process.env.REACT_APP_ADSENSE_SLOT_LOTS_TOP || 'lots-top'}
-                format="horizontal"
-                style={{ width: '100%', minHeight: 90 }}
-                testId="ad-lots-top"
-                label="Advertisement"
+              {/* iter387 — Featured lot above grid (hidden if no featured content) */}
+              <FeaturedListingSlot
+                section="lots"
+                testId="featured-lots-top"
               />
               <div className={viewMode === 'grid'
                 ? 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 xl:gap-5'
@@ -476,13 +473,11 @@ const LotsMarketplacePage = () => {
                   return out;
                 })()}
               </div>
-              {/* iter364 — Ad zone below lots grid */}
-              <AdUnit
-                slot={process.env.REACT_APP_ADSENSE_SLOT_LOTS_BOTTOM || 'lots-bottom'}
-                format="horizontal"
-                style={{ width: '100%', minHeight: 90, marginTop: 24 }}
-                testId="ad-lots-bottom"
-                label="Advertisement"
+              {/* iter387 — Featured lot below grid (hidden if no featured content) */}
+              <FeaturedListingSlot
+                section="lots"
+                testId="featured-lots-bottom"
+                style={{ marginTop: 24 }}
               />
               </>
             )}

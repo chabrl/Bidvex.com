@@ -1,6 +1,27 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter387 — Google AdSense Removed → Featured Listing Slots (Feb 8, 2026) ✅ COMPLETE
+
+**Reported by user**: Strip Google AdSense out of the entire app (scripts, ad-unit components, config). Replace every ad slot with a promoted platform listing (`is_featured`) or hide the slot entirely — no empty containers or broken layouts.
+
+### What was removed
+- `AdUnit.jsx` component (deleted)
+- AdSense loader `<script>` from `index.html`
+- Publisher ID `ca-pub-5626625571065443` and all `REACT_APP_ADSENSE_*` env references
+- 8 `<AdUnit>` mounts across the 4 marketplace-style pages
+
+### What replaced it
+- New `FeaturedListingSlot.jsx` — fetches `/api/carousel/featured` (already existing endpoint that unions marketplace / lots / vehicle / vehicle_multi_lot / storage collections), filters by page section, renders a bilingual promoted card (image · FEATURED badge · title · current bid · "View auction" CTA linking to detail page), and **returns `null` when there's no featured content** for the section — no empty container.
+- Module-level 60s promise cache — one network round-trip serves all 8 slots.
+
+### Verification (all pass)
+- `test_iter364_launch_gate.py` rewritten as a guardrail against AdSense re-introduction. 16/16 pass.
+- Live preview HTML scan across all 4 pages: 0 `adsbygoogle`, 0 `pagead2.googlesyndication.com`, 0 `window.adsbygoogle` pushes, 0 legacy `ad-*` placeholders.
+- Positive smoke test — seeded a featured listing → card rendered exactly where the ad zone had been (badge, title, price, CTA). Seed cleaned up.
+
+
+
 ## iter386 — Unsubscribe Link Broken Token Fix (Feb 8, 2026) ✅ COMPLETE
 
 **Reported by user**: `https://bidvex.com/unsubscribe?token=<SIGNED>&lang=en/fr` showed "Invalid or expired link / `token_invalid`" on click; investigate full flow and fix.

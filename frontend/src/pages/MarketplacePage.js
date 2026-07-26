@@ -7,8 +7,8 @@ import { Badge } from '../components/ui/badge';
 import { ShoppingBag, Sparkles, User, Zap } from 'lucide-react';
 // iter268 Mission 4 — SEO meta tags
 import SEO from '../components/SEO';
-// iter364 — Google AdSense inline ad zones.
-import AdUnit from '../components/AdUnit';
+// iter387 — Featured listing slot (replaces removed Google AdSense).
+import FeaturedListingSlot from '../components/FeaturedListingSlot';
 
 const MarketplacePage = () => {
   const { t } = useTranslation();
@@ -91,13 +91,10 @@ const MarketplacePage = () => {
 
           {/* Main Content */}
           <div className="flex-1 min-w-0">
-            {/* iter364 — Ad zone above listing grid */}
-            <AdUnit
-              slot={process.env.REACT_APP_ADSENSE_SLOT_MARKETPLACE_TOP || 'marketplace-top'}
-              format="horizontal"
-              style={{ width: '100%', minHeight: 90 }}
-              testId="ad-marketplace-top"
-              label="Advertisement"
+            {/* iter387 — Featured listing above grid (hidden if no featured content) */}
+            <FeaturedListingSlot
+              section="marketplace"
+              testId="featured-marketplace-top"
             />
             <FlattenedMarketplace
               showFilters={true}
@@ -107,13 +104,10 @@ const MarketplacePage = () => {
               externalFilters={sidebarFilters}
               onClearSidebarCategory={handleClearSidebarCategory}
             />
-            {/* iter364 — Ad zone below listing grid */}
-            <AdUnit
-              slot={process.env.REACT_APP_ADSENSE_SLOT_MARKETPLACE_BOTTOM || 'marketplace-bottom'}
-              format="horizontal"
-              style={{ width: '100%', minHeight: 90 }}
-              testId="ad-marketplace-bottom"
-              label="Advertisement"
+            {/* iter387 — Featured listing below grid (hidden if no featured content) */}
+            <FeaturedListingSlot
+              section="marketplace"
+              testId="featured-marketplace-bottom"
             />
           </div>
         </div>

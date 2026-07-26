@@ -142,25 +142,9 @@
           gtag('config', 'AW-18140095337');
         </script>
 
-        <!-- iter364 — Google AdSense.
-             Publisher ID (LIVE): ca-pub-5626625571065443
-             The script is loaded ONLY on production hosts so preview /
-             dev never fires impressions or triggers console errors.
-             The AdUnit component further gates individual ad slots. -->
-        <script>
-          (function() {
-            var host = window.location.hostname;
-            var PROD_HOSTS = ['www.bidvex.com','bidvex.com','launchapp-4-r-1774886029.emergent.host'];
-            var PUBLISHER = 'ca-pub-5626625571065443';
-            if (PROD_HOSTS.indexOf(host) !== -1) {
-              var s = document.createElement('script');
-              s.async = true;
-              s.crossOrigin = 'anonymous';
-              s.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=' + PUBLISHER;
-              document.head.appendChild(s);
-            }
-          })();
-        </script>
+        <!-- iter387 — Google AdSense integration removed. All ad-unit slots
+             now render either a featured platform listing or nothing
+             (see /app/frontend/src/components/FeaturedListingSlot.jsx). -->
     </head>
     <body>
         <noscript>You need to enable JavaScript to run this app.</noscript>

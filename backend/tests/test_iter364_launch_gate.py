@@ -77,44 +77,57 @@ def test_compare_page_and_route_registered():
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# P1 — Google AdSense integration
+# P1 — iter387 · Google AdSense REMOVED. Every former ad slot is now
+# replaced with a FeaturedListingSlot that renders a promoted listing or
+# hides itself when there is no featured content for the section.
 # ═══════════════════════════════════════════════════════════════════════
 
-def test_adunit_component_env_aware():
+def test_adsense_component_removed():
+    """AdUnit.jsx must no longer exist in the repo (iter387)."""
     p = "/app/frontend/src/components/AdUnit.jsx"
-    assert os.path.isfile(p)
-    text = open(p, "r", encoding="utf-8").read()
-    # Prod host allowlist
-    assert "www.bidvex.com" in text
-    # Placeholder rendered on non-prod
-    assert "ad-unit-container--placeholder" in text
-    # Uses REACT_APP_ADSENSE_CLIENT env var
-    assert "REACT_APP_ADSENSE_CLIENT" in text
+    assert not os.path.isfile(p), "AdUnit.jsx should have been deleted in iter387"
 
 
-def test_adunit_placed_on_all_4_index_pages():
-    files_and_slots = [
-        ("/app/frontend/src/pages/MarketplacePage.js",             ["marketplace-top", "marketplace-bottom"]),
-        ("/app/frontend/src/pages/LotsMarketplacePage.js",         ["lots-top", "lots-bottom"]),
-        ("/app/frontend/src/pages/vehicles/VehicleAuctionsPage.js",["vehicles-top", "vehicles-mid"]),
-        ("/app/frontend/src/pages/storage/StorageAuctionsBrowse.js",["storage-top", "storage-bottom"]),
+def test_featured_listing_slot_mounted_on_all_4_index_pages():
+    """Every former ad zone is now a <FeaturedListingSlot ... /> with the
+    correct `section` prop, so admin-featured listings surface where ads
+    used to run — and the slot self-hides when nothing is featured."""
+    files_and_sections = [
+        ("/app/frontend/src/pages/MarketplacePage.js",             "marketplace"),
+        ("/app/frontend/src/pages/LotsMarketplacePage.js",         "lots"),
+        ("/app/frontend/src/pages/vehicles/VehicleAuctionsPage.js", "vehicle"),
+        ("/app/frontend/src/pages/storage/StorageAuctionsBrowse.js", "storage"),
     ]
-    for p, slots in files_and_slots:
+    for p, section in files_and_sections:
         text = open(p, "r", encoding="utf-8").read()
-        assert "AdUnit" in text, f"AdUnit not imported in {p}"
-        for slot in slots:
-            assert slot in text, f"Ad slot '{slot}' missing in {p}"
+        assert "FeaturedListingSlot" in text, f"FeaturedListingSlot missing in {p}"
+        assert f'section="{section}"' in text, f'section="{section}" missing in {p}'
+        # And the old AdUnit reference must be fully gone.
+        assert "AdUnit" not in text, f"Stale AdUnit reference in {p}"
 
 
-def test_adsense_script_conditionally_loaded():
-    """index.html conditionally loads AdSense JS only on prod hosts (live publisher ID)."""
-    text = open("/app/frontend/public/index.html", "r", encoding="utf-8").read()
-    assert "pagead2.googlesyndication.com" in text
-    assert "PROD_HOSTS" in text
-    # iter364 follow-up: live publisher ID is now baked in (Charbel provided it).
-    assert "ca-pub-5626625571065443" in text
-    # No placeholder must remain anywhere in the file.
-    assert "ca-pub-XXXX" not in text
+def test_no_adsense_script_or_publisher_id_anywhere():
+    """No AdSense loader, publisher ID, or slot env var should remain."""
+    import subprocess
+    paths_to_scan = [
+        "/app/frontend/src",
+        "/app/frontend/public",
+    ]
+    forbidden = [
+        "pagead2.googlesyndication.com",
+        "adsbygoogle",
+        "ca-pub-5626625571065443",
+        "REACT_APP_ADSENSE_",
+    ]
+    for base in paths_to_scan:
+        for needle in forbidden:
+            r = subprocess.run(
+                ["grep", "-rln", needle, base],
+                capture_output=True, text=True,
+            )
+            assert r.stdout.strip() == "", (
+                f"Forbidden AdSense token '{needle}' still in: {r.stdout}"
+            )
 
 
 def test_no_placeholder_publisher_ids_in_repo():

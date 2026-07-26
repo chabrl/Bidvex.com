@@ -48,8 +48,8 @@ import VehicleEmptyState from '../../components/vehicles/VehicleEmptyState';
 import VehicleLegalFooter from '../../components/vehicles/VehicleLegalFooter';
 import VehicleSidebar from '../../components/vehicles/VehicleSidebar';
 import SEO from '../../components/SEO';
-// iter364 — Google AdSense inline ad zones.
-import AdUnit from '../../components/AdUnit';
+// iter387 — Featured listing slot (replaces removed Google AdSense).
+import FeaturedListingSlot from '../../components/FeaturedListingSlot';
 import useVehicleCountdown from '../../hooks/useVehicleCountdown';
 // iter294 P1 — Live multi-lot feed widget.
 import LiveMultiLotFeedWidget from '../../components/LiveMultiLotFeedWidget';
@@ -398,13 +398,11 @@ const VehicleAuctionsPage = () => {
 
             {!loading && !error && vehicles.length > 0 && (
               <>
-                {/* iter364 — Leaderboard ad zone below filters, above grid */}
-                <AdUnit
-                  slot={process.env.REACT_APP_ADSENSE_SLOT_VEHICLES_TOP || 'vehicles-top'}
-                  format="horizontal"
-                  style={{ width: '100%', minHeight: 90, marginBottom: 16 }}
-                  testId="ad-vehicles-top"
-                  label="Advertisement"
+                {/* iter387 — Featured vehicle above grid (hidden if no featured content) */}
+                <FeaturedListingSlot
+                  section="vehicle"
+                  testId="featured-vehicles-top"
+                  style={{ marginBottom: 16 }}
                 />
                 <div
                   className={`grid gap-4 sm:gap-5 ${viewMode === 'grid' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' : 'grid-cols-1'}`}
@@ -424,13 +422,11 @@ const VehicleAuctionsPage = () => {
                   })}
                 </div>
 
-                {/* iter364 — Ad zone between grid and pagination */}
-                <AdUnit
-                  slot={process.env.REACT_APP_ADSENSE_SLOT_VEHICLES_MID || 'vehicles-mid'}
-                  format="horizontal"
-                  style={{ width: '100%', minHeight: 90, marginTop: 16 }}
-                  testId="ad-vehicles-mid"
-                  label="Advertisement"
+                {/* iter387 — Featured vehicle between grid and pagination (hidden if none) */}
+                <FeaturedListingSlot
+                  section="vehicle"
+                  testId="featured-vehicles-mid"
+                  style={{ marginTop: 16 }}
                 />
 
                 {totalPages > 1 && (

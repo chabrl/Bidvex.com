@@ -14,8 +14,8 @@ import StorageHero from './StorageHero';
 import StorageAuctionCard from './StorageAuctionCard';
 import StorageFooterBanner from './StorageFooterBanner';
 import SEO from '../../components/SEO';
-// iter364 — Google AdSense inline ad zones.
-import AdUnit from '../../components/AdUnit';
+// iter387 — Featured listing slot (replaces removed Google AdSense).
+import FeaturedListingSlot from '../../components/FeaturedListingSlot';
 import { useAuth } from '../../contexts/AuthContext';
 import { LangLink } from '../../components/LangLink';
 
@@ -432,26 +432,22 @@ const StorageAuctionsBrowse = () => {
             </Card>
           ) : (
             <>
-            {/* iter364 — Ad zone above storage grid */}
-            <AdUnit
-              slot={process.env.REACT_APP_ADSENSE_SLOT_STORAGE_TOP || 'storage-top'}
-              format="horizontal"
-              style={{ width: '100%', minHeight: 90, marginBottom: 16 }}
-              testId="ad-storage-top"
-              label="Advertisement"
+            {/* iter387 — Featured storage auction above grid (hidden if none) */}
+            <FeaturedListingSlot
+              section="storage"
+              testId="featured-storage-top"
+              style={{ marginBottom: 16 }}
             />
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {data.auctions.map(a => (
                 <StorageAuctionCard key={a.id} auction={a} />
               ))}
             </div>
-            {/* iter364 — Ad zone below storage grid */}
-            <AdUnit
-              slot={process.env.REACT_APP_ADSENSE_SLOT_STORAGE_BOTTOM || 'storage-bottom'}
-              format="horizontal"
-              style={{ width: '100%', minHeight: 90, marginTop: 24 }}
-              testId="ad-storage-bottom"
-              label="Advertisement"
+            {/* iter387 — Featured storage auction below grid (hidden if none) */}
+            <FeaturedListingSlot
+              section="storage"
+              testId="featured-storage-bottom"
+              style={{ marginTop: 24 }}
             />
             </>
           )}
