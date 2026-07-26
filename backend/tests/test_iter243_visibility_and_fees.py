@@ -59,10 +59,15 @@ def _admin_token(base: str) -> str:
 
 
 # ─── Mission 1: Active banners endpoint ──────────────────────────────
-def test_iter243_active_banners_requires_auth():
+def test_iter243_active_banners_allows_anonymous():
+    # ticket 209107 — anonymous callers are now allowed through; they get
+    # only untargeted ("all") active banners, never a 401/403.
     base = _base()
     r = requests.get(f"{base}/api/promotions/active-banners", timeout=10)
-    assert r.status_code in (401, 403)
+    assert r.status_code == 200
+    body = r.json()
+    assert "banners" in body
+    assert isinstance(body["banners"], list)
 
 
 def test_iter243_active_banners_returns_empty_when_no_banners_active():

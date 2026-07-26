@@ -68,14 +68,14 @@ const LazyMount = ({ children, minHeight = 320, rootMargin = '400px' }) => {
     io.observe(el);
     return () => io.disconnect();
   }, [rootMargin]);
-  // ticket 209107 (rev3) — reserve `min-height` ONLY until the section mounts
-  // (prevents scroll-in layout shift), then release it so short or empty content
-  // (especially on mobile) collapses to its true height with no dead space below.
+  // Keep `min-height` applied even after visible=true so the placeholder
+  // space is never released — the child grows into it or leaves harmless
+  // slack at the bottom, but never causes an upward jump.
   return (
     <div
       ref={ref}
       style={{
-        minHeight: visible ? undefined : minHeight,
+        minHeight,
         contain: 'layout style paint',
       }}
     >
@@ -392,80 +392,82 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* ticket 209107 (rev2) — HomepageBanner removed: the customer's requested
-          homepage layout excludes the banner carousel and they asked for it hidden. */}
-
-      {/* ticket 209107 (rev3) — Section order set to the customer's requested sequence.
-          Data-driven sections are gated on content so empty ones collapse (no blank gaps).
-          HomepageLiveStorage is retained as-is (not in the customer's list; collapses when empty). */}
-
-      {/* 2 — Ending Soon */}
-      {isSectionVisible('ending_soon') && endingSoon.length > 0 && (
+      {/* ========== LIVE AUCTIONS SECTION ========== */}
+      {/* iter380 — Below-the-fold sections are wrapped in <LazyMount>
+          so their subtree doesn't hydrate until the user scrolls close.
+          iter382 — CLS fix. Every LazyMount now reserves a realistic
+          minHeight matched to the actual rendered height on mobile
+          (measured at 390 px viewport). Reservations are always
+          applied (never released on mount) so the swap from placeholder
+          → real content never pushes surrounding content up or down. */}
+      {isSectionVisible('ending_soon') && (
         <LazyMount minHeight={900}>
           <LiveAuctionsSection items={endingSoon} navigate={navigate} />
         </LazyMount>
       )}
 
-      {/* 3 — Featured Auctions */}
-      {isSectionVisible('featured') && featured.length > 0 && (
-        <LazyMount minHeight={900}>
-          <FeaturedSection items={featured} navigate={navigate} />
-        </LazyMount>
-      )}
-
-      {/* 4 — New Listings (browse_items toggle) */}
-      {isSectionVisible('browse_items') && newListings.length > 0 && (
-        <LazyMount minHeight={900}>
-          <NewListingsSection items={newListings} navigate={navigate} />
-        </LazyMount>
-      )}
-
-      {/* 5 — Storage Auctions */}
-      <LazyMount minHeight={900}>
-        <StorageAuctionsPromo navigate={navigate} />
-      </LazyMount>
-
-      {/* 6 — Vehicle Auctions */}
-      <LazyMount minHeight={0}>
-        <Suspense fallback={<SectionSkeleton height={720} />}>
-          <HomepageVehicleCarousel />
-        </Suspense>
-      </LazyMount>
-
-      {/* 7 — Professional Auctions */}
-      <LazyMount minHeight={0}>
+      {/* iter217 Phase 3 — Professional Auctions section (after hero, before Storage Auctions) */}
+      <LazyMount minHeight={520}>
         <Suspense fallback={<SectionSkeleton height={520} />}>
           <ProfessionalAuctionsPromo navigate={navigate} />
         </Suspense>
       </LazyMount>
 
-      {/* Live Storage Lots (iter172) — retained as-is; not in customer's list; collapses when empty */}
-      <LazyMount minHeight={0}>
+      {/* ========== STORAGE AUCTIONS PROMO (iter171 — always bilingual) ========== */}
+      <LazyMount minHeight={900}>
+        <StorageAuctionsPromo navigate={navigate} />
+      </LazyMount>
+
+      {/* iter202 Phase B — VEHICLE AUCTIONS CAROUSEL ==================== */}
+      {/* Position: AFTER Storage Unit Auctions, BEFORE Tendances/Trending  */}
+      {/* Visibility: hidden when flag OFF or zero active listings (B3)    */}
+      <LazyMount minHeight={720}>
+        <Suspense fallback={<SectionSkeleton height={720} />}>
+          <HomepageVehicleCarousel />
+        </Suspense>
+      </LazyMount>
+
+      {/* ========== LIVE STORAGE LOTS (iter172) ========== */}
+      <LazyMount minHeight={1000}>
         <HomepageLiveStorage navigate={navigate} />
       </LazyMount>
 
-      {/* 8 — Hot Items */}
-      {isSectionVisible('hot_items') && hotItems.length > 0 && (
+      {/* ========== HOT ITEMS WITH LIVE ANIMATIONS ========== */}
+      {isSectionVisible('hot_items') && (
         <LazyMount minHeight={900}>
           <HotItemsSection items={hotItems} navigate={navigate} />
         </LazyMount>
       )}
 
-      {/* 9 — Top Sellers */}
-      {isSectionVisible('top_sellers') && topSellers.length > 0 && (
-        <LazyMount minHeight={700}>
-          <TopSellersSection sellers={topSellers} />
+      {/* ========== FEATURED AUCTIONS ========== */}
+      {isSectionVisible('featured') && (
+        <LazyMount minHeight={900}>
+          <FeaturedSection items={featured} navigate={navigate} />
         </LazyMount>
       )}
 
-      {/* 10 — Trust Features */}
+      {/* ========== BROWSE INDIVIDUAL ITEMS (Uses browse_items toggle) ========== */}
+      {isSectionVisible('browse_items') && (
+        <LazyMount minHeight={900}>
+          <NewListingsSection items={newListings} navigate={navigate} />
+        </LazyMount>
+      )}
+
+      {/* ========== WHY CHOOSE BIDVEX (Trust Features) ========== */}
       {isSectionVisible('trust_features') && (
         <LazyMount minHeight={700}>
           <FeaturesSection navigate={navigate} />
         </LazyMount>
       )}
 
-      {/* 11 — How It Works */}
+      {/* ========== TOP SELLERS ========== */}
+      {isSectionVisible('top_sellers') && topSellers.length > 0 && (
+        <LazyMount minHeight={700}>
+          <TopSellersSection sellers={topSellers} />
+        </LazyMount>
+      )}
+
+      {/* ========== HOW IT WORKS ========== */}
       {isSectionVisible('how_it_works') && (
         <LazyMount minHeight={800}>
           <HowItWorksSection navigate={navigate} />
