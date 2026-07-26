@@ -1,6 +1,48 @@
 # BidVex Changelog
 
 
+## Feb 8, 2026 — iter386 🔗 Unsubscribe Link Broken Token Fix
+
+### 0. Executive Summary
+User reported valid unsubscribe links (`https://bidvex.com/unsubscribe?token=<SIGNED>&lang=en`) rendered "Invalid or expired link / `token_invalid`". Investigation found the itsdangerous token round-trip actually works — the real bugs were **three legacy code paths that never emitted a signed token in the first place**, so anyone clicking those links (or Gmail one-click via the `List-Unsubscribe` header) hit `token_missing`/`token_invalid`. Verified end-to-end on preview: EN + FR flows now confirm and show success.
+
+### 1. Root Causes & Fixes
+
+**Bug 1 — `services/email_service.py` (send_email_via_template + send_html_email)**
+   The `List-Unsubscribe` header was hardcoded to `https://bidvex.com/unsubscribe?email={to_email}` (no signed token). Every marketing email had a Gmail one-click header that our own `/unsubscribe` page cannot honor. **Fix**: call `build_unsubscribe_urls(to_email)` and use the signed EN token in the header, exactly like `_email_core.py` already does.
+
+**Bug 2 — `services/user_email_marketing.py` (partner-owned campaigns)**
+   Rendered `{{unsubscribe_url}}` in campaign HTML as `{FRONTEND_URL}/unsubscribe/user?user=<uid>&contact=<cid>`. That path has no frontend route (React Router 404s) and there is no token to decode. **Fix**: call `build_unsubscribe_urls(email)` — the audit trail on `/api/unsubscribe/auto-confirm` still records the event, and legacy /unsubscribe/user backend endpoint is kept as a fallback.
+
+**Bug 3 — `routes/admin_oversight.py` (admin "send test marketing email" tool)**
+   Test marketing emails shipped `<a href="https://bidvex.com/unsubscribe?email={recipient}">` — same unsigned URL. **Fix**: replace with the signed URL from `build_unsubscribe_urls`.
+
+**Bug 4 — Missing singular Handlebars variable in SendGrid dynamic-template dispatch**
+   Templates written with `{{unsubscribe_url}}` (no `_en`/`_fr` suffix) rendered an empty href because only `unsubscribe_url_en` / `unsubscribe_url_fr` were injected. **Fix**: `email_service.py` now also injects the singular `unsubscribe_url` (EN by default) so legacy templates get a valid link.
+
+### 2. What already worked (confirmed by verification)
+- `build_unsubscribe_urls()` uses `itsdangerous.URLSafeTimedSerializer` with `UNSUBSCRIBE_SECRET` — round-trip verified for both EN + FR
+- `/api/unsubscribe/auto-verify` and `/api/unsubscribe/auto-confirm` correctly decode the platform itsdangerous token AND fall back to external JWT for cross-campaign links
+- Frontend `/unsubscribe` route reads `?token=` + `?lang=` and calls the auto-verify/auto-confirm endpoints
+- `lang=fr` renders French copy, `lang=en` renders English copy
+
+### 3. Files Changed
+- `/app/backend/services/email_service.py` — both `send_email_via_template` and `send_html_email` List-Unsubscribe headers now use signed URLs; also injects singular `unsubscribe_url` Handlebars variable.
+- `/app/backend/services/user_email_marketing.py` — partner-campaign `{{unsubscribe_url}}` now signed.
+- `/app/backend/routes/admin_oversight.py` — admin marketing test email link now signed.
+
+### 4. Verification
+- **Backend curl E2E**: `GET /api/unsubscribe/auto-verify?token=<fresh>` → `200 {email_masked, already_unsubscribed:false, source:"platform"}`; `POST /api/unsubscribe/auto-confirm` → `200 {status:"success", ...}` for both EN and FR tokens.
+- **Frontend E2E via Playwright**:
+  - `?lang=fr` → heading "Se désabonner des courriels BidVex" → click confirm → "Vous êtes désabonné." with success icon.
+  - `?lang=en` on same token → "You're already unsubscribed." (already state) with success icon.
+- **No `token_invalid` on any fresh link.**
+
+### 5. Note on production deployment
+The user reported the bug on the production URL `https://bidvex.com/...`. Since preview and production have separate `UNSUBSCRIBE_SECRET` env values, the fix must be redeployed for production to pick it up. If any legacy emails already in inboxes (sent before iter386) contain `?email=` links, those will keep showing `token_missing` — recipients can be directed to `service@bidvex.com` for manual unsubscribe (the same message already shown on the error page).
+
+
+
 ## Feb 8, 2026 — iter382-385 🚨 CLS Regression Fix (Homepage)
 
 ### 0. Executive Summary

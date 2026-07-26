@@ -566,6 +566,15 @@ async def admin_test_email(
 
     if flavor == "marketing":
         subject = "🎉 BidVex SendGrid Live Test — Marketing"
+        # iter386 — Use signed token URL so the test-marketing email's visible
+        # unsubscribe link actually validates on click.
+        try:
+            from routes.unsubscribe import build_unsubscribe_urls
+            _mkt_unsub_url = build_unsubscribe_urls(recipient).get("en", "")
+        except Exception:
+            _mkt_unsub_url = ""
+        if not _mkt_unsub_url:
+            _mkt_unsub_url = f"https://bidvex.com/unsubscribe?email={recipient}"
         body_html = (
             "<p>This is a <strong>marketing</strong> test email.</p>"
             "<p>It should arrive in your Gmail Promotions tab with a "
@@ -574,7 +583,7 @@ async def admin_test_email(
             "<p style='font-size:11px;color:#666;text-align:center;margin-top:24px;'>"
             "BidVex Inc. | Sherbrooke, QC, Canada<br>"
             "You received this email because you registered on BidVex.<br>"
-            f"<a href='https://bidvex.com/unsubscribe?email={recipient}' style='color:#666;'>"
+            f"<a href='{_mkt_unsub_url}' style='color:#666;'>"
             "Unsubscribe / Se désabonner</a></p>"
         )
         send_kwargs = {

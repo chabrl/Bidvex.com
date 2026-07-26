@@ -1,6 +1,28 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter386 — Unsubscribe Link Broken Token Fix (Feb 8, 2026) ✅ COMPLETE
+
+**Reported by user**: `https://bidvex.com/unsubscribe?token=<SIGNED>&lang=en/fr` showed "Invalid or expired link / `token_invalid`" on click; investigate full flow and fix.
+
+### Root cause (three legacy code paths generating unsigned URLs)
+1. `services/email_service.py` (send_email_via_template + send_html_email) — `List-Unsubscribe` header set to `?email={to_email}` (unsigned). Gmail's one-click flow hit our page with no valid token.
+2. `services/user_email_marketing.py` — partner-campaign body rendered `{{unsubscribe_url}}` as `/unsubscribe/user?user=X&contact=Y`, a path with no frontend route and no token.
+3. `routes/admin_oversight.py` — admin test-marketing email hardcoded `?email={recipient}` link.
+4. SendGrid dynamic templates written with singular `{{unsubscribe_url}}` (no `_en`/`_fr` suffix) rendered an empty href because only the suffixed variants were injected.
+
+### Fix
+All four paths now use `build_unsubscribe_urls(email)` which produces canonical signed URLs via `itsdangerous.URLSafeTimedSerializer` (30-day TTL, `UNSUBSCRIBE_SECRET` salt).
+
+### Verified end-to-end
+- Backend: `GET /api/unsubscribe/auto-verify` and `POST /api/unsubscribe/auto-confirm` return success for fresh EN + FR tokens.
+- Frontend Playwright: FR flow renders "Se désabonner…" → confirm → "Vous êtes désabonné."; EN on the same token renders "You're already unsubscribed." No `token_invalid` on any fresh link. `lang=` parameter honored.
+
+**Production redeploy required** — preview and prod hold separate `UNSUBSCRIBE_SECRET` values; the fix takes effect on the next production build.
+
+
+
+
 ## iter382-385 — Homepage CLS Regression Fix (Feb 8, 2026) ✅ COMPLETE
 
 **Reported by user (Msg 799)**: iter380 lazy-loading push caused critical CLS regression on homepage (0.084 → 0.886). CLS must return below 0.1 while preserving lazy loading.

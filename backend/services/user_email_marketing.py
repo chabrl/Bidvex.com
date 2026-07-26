@@ -776,8 +776,20 @@ class UserEmailMarketingService:
             html_content = campaign["html_content"]
             html_content = html_content.replace("{{name}}", name or "")
             html_content = html_content.replace("{{email}}", email)
-            html_content = html_content.replace("{{unsubscribe_url}}",
-                f"{FRONTEND_URL}/unsubscribe/user?user={user_id}&contact={contact['id']}")
+            # iter386 — Use a signed platform token so the /unsubscribe SPA
+            # page validates it correctly. The previous /unsubscribe/user
+            # URL had no matching frontend route (would 404) and no signed
+            # token, so recipients saw a broken/expired-link screen. We
+            # still record the user_id+contact_id lineage via the audit
+            # trail written by /api/unsubscribe/auto-confirm.
+            try:
+                from routes.unsubscribe import build_unsubscribe_urls
+                _unsub_url = build_unsubscribe_urls(email).get("en", "")
+            except Exception:
+                _unsub_url = ""
+            if not _unsub_url:
+                _unsub_url = f"{FRONTEND_URL}/unsubscribe/user?user={user_id}&contact={contact['id']}"
+            html_content = html_content.replace("{{unsubscribe_url}}", _unsub_url)
             
             plain_content = campaign.get("plain_text_content", "")
             plain_content = plain_content.replace("{{name}}", name or "")

@@ -122,11 +122,16 @@ async def send_template_email(
             urls = build_unsubscribe_urls(to_email)
             dynamic_data.setdefault("unsubscribe_url_en", urls["en"])
             dynamic_data.setdefault("unsubscribe_url_fr", urls["fr"])
+            # iter386 — Also inject the singular `unsubscribe_url` so templates
+            # written with `{{unsubscribe_url}}` (no _en/_fr suffix) render a
+            # valid signed link instead of an empty href.
+            dynamic_data.setdefault("unsubscribe_url", urls["en"])
         except Exception as e:
             logger.warning(f"[EMAIL] Failed to build unsubscribe URLs: {e}")
     else:
         dynamic_data.setdefault("unsubscribe_url_en", "")
         dynamic_data.setdefault("unsubscribe_url_fr", "")
+        dynamic_data.setdefault("unsubscribe_url", "")
 
     message = Mail(
         from_email=Email(from_email, from_name),
@@ -150,7 +155,14 @@ async def send_template_email(
         message.add_header(_SgHeader("X-Entity-Ref-ID", entity_id))
         message.add_header(_SgHeader("X-Mailer", "BidVex Email System v2.0"))
         if is_marketing:
-            unsub_url = f"https://bidvex.com/unsubscribe?email={to_email}"
+            # iter386 — Signed one-click unsubscribe URL (List-Unsubscribe hdr).
+            try:
+                from routes.unsubscribe import build_unsubscribe_urls
+                unsub_url = build_unsubscribe_urls(to_email).get("en", "")
+            except Exception:
+                unsub_url = ""
+            if not unsub_url:
+                unsub_url = f"https://bidvex.com/unsubscribe?email={to_email}"
             message.add_header(_SgHeader(
                 "List-Unsubscribe",
                 f"<{unsub_url}>, <mailto:unsubscribe@bidvex.com?subject=unsubscribe>",
@@ -254,7 +266,14 @@ async def send_html_email(
         message.add_header(_SgHeader("X-Entity-Ref-ID", entity_id))
         message.add_header(_SgHeader("X-Mailer", "BidVex Email System v2.0"))
         if is_marketing:
-            unsub_url = f"https://bidvex.com/unsubscribe?email={to_email}"
+            # iter386 — Signed one-click unsubscribe URL (List-Unsubscribe hdr).
+            try:
+                from routes.unsubscribe import build_unsubscribe_urls
+                unsub_url = build_unsubscribe_urls(to_email).get("en", "")
+            except Exception:
+                unsub_url = ""
+            if not unsub_url:
+                unsub_url = f"https://bidvex.com/unsubscribe?email={to_email}"
             message.add_header(_SgHeader(
                 "List-Unsubscribe",
                 f"<{unsub_url}>, <mailto:unsubscribe@bidvex.com?subject=unsubscribe>",
