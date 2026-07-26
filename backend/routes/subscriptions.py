@@ -792,10 +792,16 @@ async def create_subscription_checkout(
         }
         await get_db().payment_transactions.insert_one(transaction)
         
-        # Increment coupon usage if applied
-        if coupon_code:
-            await pricing_service.increment_coupon_usage(coupon_code)
-        
+        # iter388 — Coupon usage MUST be incremented ONLY when payment
+        # actually succeeds (checkout.session.completed webhook), NOT
+        # when the checkout session is created. The previous code
+        # incremented at creation, which:
+        #   (a) burned a redemption slot on every abandoned checkout
+        #   (b) let a single user drain a limited coupon by opening and
+        #       cancelling checkout in a loop
+        # The Stripe webhook (routes/webhooks.py) reads `coupon_code`
+        # from the session metadata (line 701) and finalizes the
+        # increment once the customer has actually paid.
         return {
             "success": True,
             "checkout_url": session.url,

@@ -1,6 +1,26 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter388 — Promotions & Coupons End-to-End Audit + Fixes (Feb 8, 2026) ✅ COMPLETE
+
+**Reported by user**: (1) `GET /api/promotions/active-banners` didn't surface banners to signed-out visitors; (2) audit the full coupon flow — creation → validation → redemption — and fix any broken steps.
+
+### Bugs found
+1. **`PromotionalBanner.jsx` short-circuited on missing token** — the frontend never called the endpoint for anonymous visitors, so no banner ever rendered when signed out. Backend was already public-safe.
+2. **Coupon `usage_count` incremented at Stripe checkout session CREATION, not payment success** — every abandoned checkout burned a redemption slot; a limited-use coupon could be silently exhausted with zero real payments.
+
+### Fixes
+- `PromotionalBanner.jsx` — removed the token-guard; now fetches + polls for every visitor (attaches auth header only when signed in for tier/province targeting).
+- `subscriptions.py::create_subscription_checkout` — deleted the premature `increment_coupon_usage`.
+- `webhooks.py::checkout.session.completed` — added an idempotent redemption block that reads `coupon_code` from `session.metadata`, guards on `payment_transactions.coupon_redeemed`, calls `increment_coupon_usage` exactly once, and writes an audit row to `db.coupon_redemptions`.
+
+### Verified end-to-end on preview
+- Anonymous visitor sees seeded `target=all` banner on the homepage (screenshot).
+- Admin creates coupon → anonymous validates → valid coupon returns correct discount ($180 → $135, 25% off) — expired returns "This coupon has expired" — invalid returns "Invalid coupon code".
+- Stripe checkout session accepts the coupon; `usage_count` remains at 0 until payment success (iter388 fix confirmed by DB inspection).
+
+
+
 ## iter387 — Google AdSense Removed → Featured Listing Slots (Feb 8, 2026) ✅ COMPLETE
 
 **Reported by user**: Strip Google AdSense out of the entire app (scripts, ad-unit components, config). Replace every ad slot with a promoted platform listing (`is_featured`) or hide the slot entirely — no empty containers or broken layouts.

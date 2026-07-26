@@ -17,8 +17,9 @@
  * need for hardcoded `pt-16 / pt-20` hotfixes on individual B2B
  * dashboards — the layout self-balances at every viewport.
  *
- * Mounted globally inside `App.js`. Silent for anonymous users.
- */
+ * Mounted globally inside `App.js`. iter388 — public banners (target=all)
+ * are now surfaced to anonymous visitors too; the previous version
+ * short-circuited on missing token and silently hid every banner. */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import { useTranslation } from 'react-i18next';
@@ -66,14 +67,14 @@ const PromotionalBanner = () => {
   );
 
   const fetchBanners = useCallback(async () => {
-    if (!token) {
-      setBanners([]);
-      return;
-    }
+    // iter388 — Fetch active banners for BOTH anonymous and signed-in
+    // visitors. The backend already gates targeting: anonymous callers
+    // receive only `target=all` public banners; signed-in callers get
+    // those plus tier/province/custom matches. Attaching the token is
+    // optional and only adds targeting eligibility.
     try {
-      const r = await axios.get(`${API_BASE}/promotions/active-banners`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const r = await axios.get(`${API_BASE}/promotions/active-banners`, { headers });
       setBanners(Array.isArray(r?.data?.banners) ? r.data.banners : []);
     } catch {
       setBanners([]);
@@ -82,10 +83,12 @@ const PromotionalBanner = () => {
 
   useEffect(() => {
     fetchBanners();
-    if (!token) return undefined;
+    // Poll for updates for every visitor — a fresh public promotion
+    // launched by an admin should surface on the homepage within 5 min
+    // whether the visitor is signed in or not.
     const id = setInterval(fetchBanners, POLL_MS);
     return () => clearInterval(id);
-  }, [fetchBanners, token]);
+  }, [fetchBanners]);
 
   // iter256 — Live-measure the rendered banner stack height so the
   // Navbar can dynamically bind its `top` offset. ResizeObserver fires

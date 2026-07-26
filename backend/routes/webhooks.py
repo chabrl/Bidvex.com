@@ -167,6 +167,47 @@ async def handle_stripe_webhook(request: Request):
             _meta_all = data.get("metadata", {}) or {}
             session_type = _meta_all.get("type", "") or _meta_all.get("transaction_type", "")
 
+            # iter388 — Finalize subscription coupon redemption ONLY on
+            # payment success. The checkout session stashed the coupon
+            # code in metadata; if the customer paid, we increment the
+            # coupon's usage_count exactly once here. Idempotency: the
+            # webhook itself is idempotent at the payment_transactions
+            # layer (line ~1648 sets is_paid=true only if the doc isn't
+            # already paid); we mirror that by tagging the transaction
+            # with `coupon_redeemed=true` and skipping duplicate ticks.
+            try:
+                _coupon = (_meta_all.get("coupon_code") or "").strip()
+                if _coupon:
+                    _session_id = str(data.get("id") or "")
+                    _tx = await db.payment_transactions.find_one(
+                        {"session_id": _session_id},
+                        {"_id": 0, "coupon_redeemed": 1},
+                    )
+                    if not (_tx and _tx.get("coupon_redeemed")):
+                        from services.subscription_pricing import get_pricing_service
+                        _ps = get_pricing_service(db)
+                        _ok = await _ps.increment_coupon_usage(_coupon)
+                        await db.payment_transactions.update_one(
+                            {"session_id": _session_id},
+                            {"$set": {"coupon_redeemed": True, "coupon_redeemed_at": datetime.now(timezone.utc).isoformat()}},
+                        )
+                        # Audit trail row for admin reporting.
+                        try:
+                            await db.coupon_redemptions.insert_one({
+                                "coupon_code":    _coupon.upper(),
+                                "session_id":     _session_id,
+                                "user_id":        _meta_all.get("user_id"),
+                                "plan_id":        _meta_all.get("plan_id"),
+                                "final_price":    float(_meta_all.get("final_price") or 0),
+                                "discount_amount": float(_meta_all.get("discount_amount") or 0),
+                                "redeemed_at":    datetime.now(timezone.utc).isoformat(),
+                            })
+                        except Exception:  # noqa: BLE001
+                            pass
+                        logger.info(f"[iter388] coupon redeemed on paid session: code={_coupon} session={_session_id} incremented={_ok}")
+            except Exception as _coup_err:  # noqa: BLE001
+                logger.warning(f"[iter388] coupon redemption finalization failed: {_coup_err}")
+
             # iter338 — Affiliate 3% profit share on ONE-TIME subscription
             # checkouts (mode="payment"). Recurring subscriptions are covered
             # by the invoice.payment_succeeded hook. final_price is pre-tax.

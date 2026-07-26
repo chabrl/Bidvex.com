@@ -1,6 +1,51 @@
 # BidVex Changelog
 
 
+## Feb 8, 2026 — iter388 🎟️ Promotions & Coupons End-to-End Audit + Fixes
+
+### Executive Summary
+Full audit of the promotions/coupons system. Fixed a frontend bug that kept anonymous visitors from seeing public banners, plus a subtle backend bug where coupon `usage_count` was incremented at Stripe checkout **session creation** instead of at **payment success** — every abandoned checkout was silently burning through a limited coupon's redemption quota. Verified all three user-visible scenarios end-to-end on preview.
+
+### Bugs found & fixed
+
+**Bug 1 — Anonymous visitors never saw public promotional banners**
+- Location: `/app/frontend/src/components/PromotionalBanner.jsx` (lines 68-88)
+- Root cause: The frontend short-circuited with `if (!token) { setBanners([]); return; }` before even hitting the API — and skipped the 5-min polling interval — so signed-out visitors saw zero banners regardless of what the backend returned. The backend endpoint itself was already public-safe (uses `get_current_user_optional`, returns `target=all` promos for anonymous callers with 200 OK).
+- Fix: Removed the token-guard. `fetchBanners` now always calls `GET /api/promotions/active-banners`, including the `Authorization` header only when a token exists. Polling runs for every visitor.
+
+**Bug 2 — Coupon `usage_count` incremented on checkout session creation, not payment success**
+- Location: `/app/backend/routes/subscriptions.py` `create_subscription_checkout()` (was line ~795)
+- Root cause: The Stripe checkout endpoint called `pricing_service.increment_coupon_usage(coupon_code)` immediately after `stripe.checkout.Session.create()`. A user who opened the checkout page, entered `LAUNCH50`, and then abandoned still burned one of `LAUNCH50`'s finite `usage_limit` slots. Retrying the checkout burned another. A limited coupon could be exhausted with zero actual redemptions.
+- Fix: Removed the premature increment from `create_subscription_checkout`. Added an idempotent redemption block to the `checkout.session.completed` handler in `/app/backend/routes/webhooks.py` that:
+  - Reads `coupon_code` from `session.metadata` (already stashed at creation time)
+  - Skips if `payment_transactions.coupon_redeemed` is already true (idempotency)
+  - Calls `increment_coupon_usage()` exactly once
+  - Writes an audit row to `db.coupon_redemptions` for admin reporting
+
+### End-to-end verification on preview
+
+1. **Anonymous visitor sees active banners on the homepage** ✅
+   - Seeded a `target=all` promo (`PUBLIC20` — 20% off Premium)
+   - Screenshot confirms the banner renders at the top of `/` for a signed-out visitor ("Welcome to BidVex — 20% Off Premium · 20% OFF · PUBLIC20 · dismiss X")
+   - The `Login` button was still visible in the navbar, proving the tester was anonymous
+
+2. **Valid coupon applies the correct discount at checkout** ✅
+   - Admin `POST /api/admin/coupons` `{code:"TESTITER388", discount_type:"percentage", value:25, usage_limit:2}` → `201 success`
+   - Anonymous `POST /api/validate-coupon` `{code:"TESTITER388", plan_id:"premium"}` → `{valid:true, discount_amount:45, new_total:135, original_total:180, message:"Coupon applied! You save $45.00"}`
+   - Admin `POST /api/subscription/checkout` with the coupon → Stripe checkout URL returned + `payment_transactions` row created
+   - `db.coupon_codes.TESTITER388.usage_count` remained at **0** after session creation (iter388 fix) — will only tick to 1 on real payment via the webhook
+
+3. **Expired / invalid coupons rejected with clear error** ✅
+   - Expired: `{valid:false, message:"This coupon has expired"}`
+   - Non-existent: `{valid:false, message:"Invalid coupon code"}`
+
+### Files changed
+- `/app/frontend/src/components/PromotionalBanner.jsx` (drop token-guard early return; poll for everyone)
+- `/app/backend/routes/subscriptions.py` (remove premature `increment_coupon_usage` at line ~795)
+- `/app/backend/routes/webhooks.py` (add idempotent redemption block inside `checkout.session.completed` handler)
+
+
+
 ## Feb 8, 2026 — iter387 🧹 Google AdSense Removed → Featured Listing Slots
 
 ### Executive Summary
