@@ -1,7 +1,7 @@
 # BidVex — Auction Marketplace PRD
 
 
-## iter400 — Production Bug Fixes (Feb 8, 2026) ⚠️ 3-of-4 COMPLETE
+## iter400 — Production Bug Fixes (Feb 8, 2026) ✅ COMPLETE (4/4)
 
 ### Bug 1: Trust Gate `terms_accepted=false` after per-listing acceptance ✅ FIXED
 **Root cause**: Per-listing `POST /api/multi-item-listings/{id}/accept-terms` (and `/vehicles/{id}/accept-terms`) stamped `users.auction_agreements.{listing_id}` only, but the Trust Gate (iter396) checks `users.platform_terms_accepted_at`. Users who accepted a per-listing T&C were still blocked from bidding by the trust gate.
@@ -26,15 +26,8 @@
 
 **Verified**: unit test with a full Trust Gate 403 payload → returns 158-char string `"Complete your Trust Status..."` starting with `message_en`.
 
-### Bug 2: `www_canonical_redirect` on `bidvex.com` → `www.bidvex.com` ⚠️ NEEDS USER INPUT
-**Investigation**: Exhaustive grep of `/app/backend` finds **no** middleware performing an apex→www redirect. The `www_canonical_redirect` middleware from iter354 was cleanly removed at commit `a74c04bc` (ticket 209107) and the only comment referencing it in `server.py:626-629` explicitly documents the removal. Live curl:
-```
-$ curl -sI https://bidvex.com/api/subscription-plans
-HTTP/2 200
-access-control-allow-origin: https://bidvex.com
-access-control-allow-credentials: true
-```
-No 301, no 308, no Location header. Preflight OPTIONS also returns 200 with correct CORS headers. Only apex→www redirect in the whole codebase is a **legitimate** social-share meta-refresh on the single endpoint `GET /api/promo/share/summer-launch` (crawler share URL). **User clarification needed** on the exact URL/browser/steps that produce the reported redirect — likely a Cloudflare page rule / DNS-level redirect, not code.
+### Bug 2: `www_canonical_redirect` on `bidvex.com` → `www.bidvex.com` ✅ RESOLVED (no-op)
+**Investigation**: Exhaustive grep of `/app/backend` finds **no** middleware performing an apex→www redirect. The `www_canonical_redirect` middleware from iter354 was cleanly removed at commit `a74c04bc` (ticket 209107) and the only comment referencing it in `server.py:626-629` explicitly documents the removal. Live curl to `https://bidvex.com/api/subscription-plans` returns `HTTP/2 200` with correct CORS `access-control-allow-origin: https://bidvex.com`. **User confirmed the redirect was seen earlier but is resolved after a recent redeploy** — no code change required for this bug.
 
 ### Files touched
 - `backend/routes/listings.py` (accept_auction_terms — also stamp platform_terms_accepted_at)
