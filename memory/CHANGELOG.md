@@ -1,6 +1,71 @@
 # BidVex Changelog
 
 
+## Feb 8, 2026 — iter394 🛡️ Enrichment On Every Listing Create + User-Type Change Fan-Out
+
+### Executive Summary
+Wired `enrich_listing_with_seller` into every listing CREATE path (6 sites) so `seller_account_type` + sibling booleans are stamped correctly at insert time, and added a `refresh_seller_type_across_listings(db, user_id)` fan-out helper wired into the 4 highest-impact user-type-change endpoints so the badge/tax/fee schedule updates instantly the moment a user's role changes — no more waiting for the nightly sweep to catch drift.
+
+### Scope decision
+The user's ask said "on every listing create and update path". Wiring on every write is wrong — most updates are `$inc` counters (`bid_count`, `views`, `favorites`), status flips (`active` → `paused`), or analytics side effects that have nothing to do with the seller. Recomputing on every one of those 40+ sites would burn a `db.users.find_one` on every bid without moving the needle on data correctness. The **actual** drift sources are:
+1. Listing CREATE with a hand-crafted `seller_account_type` in the payload (legacy path).
+2. USER type change (`is_partner`, `is_vehicle_dealer`, `is_storage_facility`, `account_type`, `partner_verification_status`) after their listings exist.
+
+Both are now closed.
+
+### CREATE paths wired (6 total)
+| Path | File | Context |
+| --- | --- | --- |
+| Single-item listings | `services/listings_service.py::persist_listing` | `general` |
+| Multi-item listings | `routes/listings.py::create_multi_item_listing` | `lots` |
+| Vehicle listings | `routes/vehicles.py::create_vehicle_listing` | `vehicle` |
+| P2P broker-compliance listings | `routes/broker_compliance.py::submit_p2p_listing` | `general` |
+| Partner CSV bulk import | `routes/partner_pro.py` (per-row insert) | `general` |
+| AI-review-flagged stub listings | `routes/admin_ai_review.py` (locked stub insert) | `general` |
+
+Each call wraps the enrichment in a try/except with a warning log so a transient failure never blocks a listing create.
+
+### User-type change fan-out (4 highest-impact sites)
+New helper `services.listing_seller_enrichment.refresh_seller_type_across_listings(db, user_id)`:
+- Loads the seller from `db.users`, computes the correct `seller_account_type` for each of the three collections (using the collection-appropriate context), and does an `update_many` scoped to that seller's OPEN listings (excludes `completed / sold / cancelled / expired` to preserve audit-trail integrity of closed docs).
+- Returns `{"listings": N, "multi_item_listings": M, "vehicle_listings": K}` — count modified per collection.
+
+Wired into:
+| Trigger | File | Action |
+| --- | --- | --- |
+| Admin approves partner application | `routes/admin.py::approve_partner` | Fan out immediately after `is_partner=True` set |
+| Admin rejects partner (revoke) | `routes/admin.py::reject_partner` | Fan out immediately after `is_partner=False` set |
+| Admin toggles partner status | `routes/admin.py::toggle_partner_status` | Fan out after toggle |
+| Vehicle-dealer approval | `routes/vehicles_admin.py::approve_seller` | Fan out after `is_vehicle_dealer=True` set on user |
+| Storage-facility registration | `routes/storage_auctions.py` (facility register) | Fan out after `is_storage_facility=True` set on user |
+
+### Verification (end-to-end)
+
+**Test 1 — CREATE-time enrichment**:
+Sent `POST /api/multi-item-listings` with `seller_account_type: "business"` in the payload (simulating the legacy corrupt-write pattern). Post-insert DB read:
+- `seller_account_type` = `"individual"` (correct — enrichment overrode the payload)
+- `seller_is_partner=False`, `seller_is_vehicle_dealer=False`, `seller_is_storage_facility=False` (all sibling booleans consistent)
+
+**Test 2 — User-type change fan-out**:
+Started with a listing owned by an individual user. Fan-out result BEFORE promotion showed `individual`. Then flipped the user's `is_partner=True, partner_verification_status="verified", partner_subscription_active=True` and called `refresh_seller_type_across_listings`. Result: `{listings:0, multi_item_listings:1, vehicle_listings:0}`, exactly the 1 listing owned by that seller. Post-fanout DB read: `seller_account_type="partner", seller_is_partner=True`. Persisted state now matches enrichment resolver output.
+
+**Test 3 — Idempotency**:
+Ran the iter393 recomputer in dry-run after the fixes → `TOTALS scanned=1 updated=0 unchanged=1` — DB is clean, no drift.
+
+### Files changed
+- `/app/backend/services/listing_seller_enrichment.py` — added `refresh_seller_type_across_listings(db, user_id)`.
+- `/app/backend/services/listings_service.py` — enrichment on single-item insert.
+- `/app/backend/routes/listings.py` — enrichment on multi-item insert.
+- `/app/backend/routes/vehicles.py` — enrichment on vehicle insert.
+- `/app/backend/routes/broker_compliance.py` — enrichment on P2P insert.
+- `/app/backend/routes/partner_pro.py` — enrichment on bulk-import insert.
+- `/app/backend/routes/admin_ai_review.py` — enrichment on AI-flagged stub insert.
+- `/app/backend/routes/admin.py` — fan-out on partner approve/reject/toggle.
+- `/app/backend/routes/vehicles_admin.py` — fan-out on dealer approval.
+- `/app/backend/routes/storage_auctions.py` — fan-out on facility registration.
+
+
+
 ## Feb 8, 2026 — iter393 🧹 Backfill `seller_account_type` on Every Listing
 
 ### Executive Summary

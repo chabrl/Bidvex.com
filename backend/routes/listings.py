@@ -1484,6 +1484,16 @@ async def create_multi_item_listing(
     except Exception as _ge:  # noqa: BLE001
         logger.warning(f"[iter343-geo] multi-item geo enrichment skipped: {_ge}")
 
+    # iter394 — Enrich with the live seller record so seller_account_type
+    # + sibling booleans are stamped correctly from day one. Prevents the
+    # persistence drift class of bugs (iter392) that made individual-seller
+    # lots incorrectly appear "Taxable" in the fees-preview popover.
+    try:
+        from services.listing_seller_enrichment import enrich_listing_async
+        listing_dict = await enrich_listing_async(db, listing_dict, "lots")
+    except Exception as _ee:  # noqa: BLE001 — never block a create on enrichment failure
+        logger.warning(f"[iter394] multi-item seller enrichment skipped: {_ee}")
+
     await db.multi_item_listings.insert_one(listing_dict)
     listing_dict.pop("_id", None)
 

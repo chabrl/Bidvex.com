@@ -274,6 +274,15 @@ async def bulk_import_listings(
             "source": "csv_bulk_import",
         }
 
+        # iter394 — Enrich each bulk-imported listing with the live seller
+        # record so seller_account_type + sibling booleans reflect the
+        # partner's current status (they're a verified partner if they're
+        # using this endpoint, but resolver handles all edge cases).
+        try:
+            from services.listing_seller_enrichment import enrich_listing_async
+            listing = await enrich_listing_async(db, listing, "general")
+        except Exception:  # noqa: BLE001
+            pass
         await db.listings.insert_one(listing)
         created.append({"id": listing_id, "title": title})
 

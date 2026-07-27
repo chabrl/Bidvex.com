@@ -179,7 +179,11 @@ async def request_manual_vehicle_review(
     if not actual_listing_id:
         actual_listing_id = f"locked-{req_id}"
         try:
-            await db.listings.insert_one({
+            # iter394 — Even for these "locked" AI-flagged stub listings we
+            # want the seller_account_type stamped correctly so downstream
+            # dashboards & fee calculators see the right partner/dealer
+            # badge. Build the doc first, enrich, then insert.
+            _locked_doc = {
                 "id":                 actual_listing_id,
                 "seller_id":          current_user.id,
                 "title":              title or "(no title)",
@@ -217,7 +221,13 @@ async def request_manual_vehicle_review(
                 # iter312 D2/D3 — Mark as editable-by-seller-while-pending.
                 "is_seller_editable_pending": True,
                 "pending_admin_review_at":     now,
-            })
+            }
+            try:
+                from services.listing_seller_enrichment import enrich_listing_async
+                _locked_doc = await enrich_listing_async(db, _locked_doc, "general")
+            except Exception:  # noqa: BLE001
+                pass
+            await db.listings.insert_one(_locked_doc)
             logger.info(f"[manual_review] created locked listing {actual_listing_id} for seller dashboard visibility (iter312 — full form snapshot)")
         except Exception as exc:
             logger.error(f"[manual_review] locked listing create failed: {exc}", exc_info=True)

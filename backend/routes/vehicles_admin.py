@@ -213,6 +213,15 @@ async def approve_seller(
                 "vehicle_dealer_approved_by": admin["id"],
             }},
         )
+        # iter394 — Fan out the newly-granted dealer status to every open
+        # vehicle_listing (and any misclassified listing) so the badge,
+        # tax treatment, and fee schedule reflect it instantly.
+        try:
+            from services.listing_seller_enrichment import refresh_seller_type_across_listings
+            _fanout = await refresh_seller_type_across_listings(_db, seller["user_id"])
+            logger.info(f"[iter394] vehicle_dealer_approved user={seller['user_id']} fanout={_fanout}")
+        except Exception as _fe:  # noqa: BLE001
+            logger.warning(f"[iter394] vehicle_dealer_approved fanout skipped: {_fe}")
 
     await log_audit(
         "seller", seller_id, "approved", 

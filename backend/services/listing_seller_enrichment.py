@@ -248,3 +248,67 @@ async def enrich_listing_async(
         },
     )
     return enrich_listing_with_seller(listing, seller, listing_context)
+
+
+
+# ── iter394 · Fan-out helper ────────────────────────────────────────
+async def refresh_seller_type_across_listings(db, user_id: str) -> Dict[str, int]:
+    """Recompute `seller_account_type` (+ sibling booleans) on every open
+    listing owned by `user_id` across `listings`, `multi_item_listings`,
+    and `vehicle_listings`.
+
+    Call this from any endpoint that promotes/demotes a user's seller flags
+    (partner grant/revoke, vehicle-dealer approval, storage-facility grant,
+    account-type change). This closes the persistence-drift class of bugs
+    that iter392 diagnosed — the moment a user upgrades to partner, every
+    one of their listings sees the correct `partner` badge, tax rate, and
+    fee schedule without waiting for the nightly sweep to catch it.
+
+    Returns `{"listings": N, "multi_item_listings": M, "vehicle_listings": K}` —
+    the number of docs updated per collection.
+    """
+    if not user_id:
+        return {"listings": 0, "multi_item_listings": 0, "vehicle_listings": 0}
+
+    seller = await db.users.find_one(
+        {"id": user_id},
+        {
+            "_id": 0, "is_partner": 1, "partner_verification_status": 1,
+            "partner_company_name": 1, "partner_buyer_premium_pct": 1,
+            "is_vehicle_dealer": 1, "is_storage_facility": 1,
+            "is_tax_registered": 1, "account_type": 1,
+            "subscription_tier": 1, "platform_fee_paid": 1,
+            "partner_subscription_active": 1, "is_top_seller": 1,
+            "website": 1, "company_name": 1, "province": 1, "city": 1,
+        },
+    )
+    seller = seller or {}
+
+    result: Dict[str, int] = {}
+    # Only recompute on the seller's OPEN listings so we don't churn every
+    # closed/sold/completed doc unnecessarily. Closed listings keep their
+    # historical badge, which is intentional for audit-trail integrity.
+    open_status_filter = {"status": {"$nin": ["completed", "sold", "cancelled", "expired"]}}
+
+    for coll_name, context in (
+        ("listings",            "general"),
+        ("multi_item_listings", "lots"),
+        ("vehicle_listings",    "vehicle"),
+    ):
+        new_type = (resolve_seller_account_type(seller, context) or "individual").lower()
+        update_fields = {
+            "seller_account_type":         new_type,
+            "seller_is_partner":           new_type == "partner",
+            "seller_is_vehicle_dealer":    new_type == "vehicle_dealer",
+            "seller_is_storage_facility":  new_type == "storage_facility",
+        }
+        try:
+            res = await db[coll_name].update_many(
+                {"seller_id": user_id, **open_status_filter},
+                {"$set": update_fields},
+            )
+            result[coll_name] = res.modified_count
+        except Exception:  # noqa: BLE001 — never let one collection block the others
+            result[coll_name] = -1
+
+    return result

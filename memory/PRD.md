@@ -1,6 +1,31 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter394 — Enrichment On Every Listing Create + User-Type Change Fan-Out (Feb 8, 2026) ✅ COMPLETE
+
+**Reported by user**: Wire `enrich_listing_with_seller` into every listing create/update path so `seller_account_type` + sibling booleans are always recomputed from the live seller record, preventing persistence drift.
+
+### Scope decision
+Wiring on every write is wrong — most updates are `$inc` counters or status flips that don't touch the seller. Real drift sources: CREATE-time payload trust + user-type change afterwards.
+
+### CREATE paths wired (6/6)
+- `services/listings_service.py::persist_listing` (single-item, ctx=`general`)
+- `routes/listings.py::create_multi_item_listing` (ctx=`lots`)
+- `routes/vehicles.py::create_vehicle_listing` (ctx=`vehicle`)
+- `routes/broker_compliance.py::submit_p2p_listing` (ctx=`general`)
+- `routes/partner_pro.py` CSV bulk-import (ctx=`general`)
+- `routes/admin_ai_review.py` AI-flagged stub insert (ctx=`general`)
+
+### User-type change fan-out
+New `services.listing_seller_enrichment.refresh_seller_type_across_listings(db, user_id)` — recomputes across all 3 collections for OPEN listings only (preserves audit trail on closed docs). Wired into: partner approve/reject/toggle (`admin.py`), vehicle-dealer approval (`vehicles_admin.py`), storage-facility registration (`storage_auctions.py`).
+
+### Verified end-to-end
+- CREATE with `seller_account_type="business"` in payload → post-insert doc has `individual` (enrichment overrode).
+- Promote user to verified partner + call fan-out → their listing flips from `individual` to `partner` instantly; sibling `seller_is_partner=True` set correctly.
+- iter393 recomputer dry-run afterwards: `scanned=1, updated=0` — no drift.
+
+
+
 ## iter393 — Backfill `seller_account_type` on Every Listing (Feb 8, 2026) ✅ COMPLETE
 
 **Reported by user**: Run a one-off migration that recomputes and overwrites the persisted `seller_account_type` on every doc in `listings`, `multi_item_listings`, and `vehicle_listings` using the enrichment resolver. Log a per-collection summary.

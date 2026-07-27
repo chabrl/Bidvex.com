@@ -976,6 +976,15 @@ async def create_vehicle_listing(
         listing["approved_at"] = datetime.now(timezone.utc)
         listing["approved_by"] = user["id"]
 
+    # iter394 — Enrich with live seller data so seller_account_type +
+    # sibling booleans are stamped correctly on the vehicle listing
+    # (context="vehicle" makes vehicle_dealer flag dominant here).
+    try:
+        from services.listing_seller_enrichment import enrich_listing_async
+        listing = await enrich_listing_async(db, listing, "vehicle")
+    except Exception:  # noqa: BLE001 — never block create on enrichment failure
+        pass
+
     await db.vehicle_listings.insert_one(listing)
     
     # Update seller monthly count

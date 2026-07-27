@@ -99,6 +99,15 @@ async def create_individual_listing(
         "auto_approved":      auto_approved,
         "created_at":         _utcnow(),
     }
+    # iter394 — Recompute seller_account_type from the live user record.
+    # The hardcoded "individual" above is the intended P2P value, but if
+    # this user has since upgraded to partner/dealer/facility, the live
+    # resolver will overwrite with the correct type + sibling booleans.
+    try:
+        from services.listing_seller_enrichment import enrich_listing_async
+        doc = await enrich_listing_async(db, doc, "general")
+    except Exception:  # noqa: BLE001
+        pass
     await db.listings.insert_one(doc)
 
     # Strip Mongo ObjectId before returning

@@ -961,6 +961,15 @@ async def register_facility(
                 "storage_facility_id": fac_id,
             }},
         )
+        # iter394 — Fan out the new storage-facility flag across any open
+        # listings this user owns so their badge + fee schedule update
+        # instantly instead of waiting for the nightly recompute sweep.
+        try:
+            from services.listing_seller_enrichment import refresh_seller_type_across_listings
+            _fanout = await refresh_seller_type_across_listings(db, current_user.id)
+            logger.info(f"[iter394] storage_facility_registered user={current_user.id} fanout={_fanout}")
+        except Exception as _fe:  # noqa: BLE001
+            logger.warning(f"[iter394] storage_facility fanout skipped: {_fe}")
     except Exception as e:
         logger.error(f"[STORAGE] user-flag update failed for {current_user.id}: {e}")
 

@@ -942,7 +942,15 @@ async def verify_partner(
         update["custom_premium_rate"] = float(custom_rate)
     
     await db.users.update_one({"id": user_id}, {"$set": update})
-    
+
+    # iter394 — Partner approval → recompute badge on every open listing.
+    try:
+        from services.listing_seller_enrichment import refresh_seller_type_across_listings
+        _fanout = await refresh_seller_type_across_listings(db, user_id)
+        logger.info(f"[iter394] partner_approved user={user_id} fanout={_fanout}")
+    except Exception as _fe:  # noqa: BLE001
+        logger.warning(f"[iter394] partner_approved fanout skipped: {_fe}")
+
     # Create Stripe Checkout Session for annual partner fee
     checkout_url = None
     try:
@@ -1036,6 +1044,14 @@ async def reject_partner(
             "updated_at": now,
         }}
     )
+
+    # iter394 — Partner rejection revokes badge/pricing across every open listing.
+    try:
+        from services.listing_seller_enrichment import refresh_seller_type_across_listings
+        _fanout = await refresh_seller_type_across_listings(db, user_id)
+        logger.info(f"[iter394] partner_rejected user={user_id} fanout={_fanout}")
+    except Exception as _fe:  # noqa: BLE001
+        logger.warning(f"[iter394] partner_rejected fanout skipped: {_fe}")
     
     await db.admin_logs.insert_one({
         "id": str(uuid.uuid4()),
@@ -1118,7 +1134,18 @@ async def admin_toggle_partner(
         update["partner_subscription_id"] = None
     
     await db.users.update_one({"id": user_id}, {"$set": update})
-    
+
+    # iter394 — Fan out the partner-status change to every open listing
+    # owned by this user across all three collections so seller badges,
+    # tax logic, and fee schedules update instantly instead of waiting
+    # for the nightly recompute sweep.
+    try:
+        from services.listing_seller_enrichment import refresh_seller_type_across_listings
+        _fanout = await refresh_seller_type_across_listings(db, user_id)
+        logger.info(f"[iter394] partner_toggled user={user_id} fanout={_fanout}")
+    except Exception as _fe:  # noqa: BLE001
+        logger.warning(f"[iter394] partner_toggled fanout skipped: {_fe}")
+
     await db.admin_logs.insert_one({
         "id": str(uuid.uuid4()), "action": f"partner_toggled_{'on' if new_partner else 'off'}",
         "admin_id": current_user.id, "target_user_id": user_id,

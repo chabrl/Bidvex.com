@@ -186,6 +186,15 @@ async def persist_listing(db, listing_dict: Dict, agreement_metadata: Dict) -> D
     from services.demo_filter import tag_listing_if_demo
     await tag_listing_if_demo(db, listing_dict.get("seller_id") or listing_dict.get("user_id"), listing_dict)
 
+    # iter394 — Enrich with live seller data BEFORE insert so seller_account_type
+    # + sibling booleans (seller_is_partner / _vehicle_dealer / _storage_facility)
+    # are correct from day one and can't drift.
+    try:
+        from services.listing_seller_enrichment import enrich_listing_async
+        listing_dict = await enrich_listing_async(db, listing_dict, "general")
+    except Exception:  # noqa: BLE001 — never block a listing insert on enrichment failure
+        pass
+
     await db.listings.insert_one(listing_dict)
     listing_dict.pop("_id", None)
 
