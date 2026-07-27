@@ -1154,6 +1154,15 @@ async def create_storage_auction(
         ))
     except Exception:  # noqa: BLE001
         pass
+
+    # iter401 — Flow 1 Buyer Interest emails (real-time) for storage auctions.
+    try:
+        if (doc.get("status") or "").lower() in ("active", "live", "scheduled"):
+            import asyncio as _aio2
+            from services.marketing_flows import dispatch_buyer_interest_emails
+            _aio2.ensure_future(dispatch_buyer_interest_emails(db, listing_id=auction_id, listing_type="storage"))
+    except Exception:  # noqa: BLE001
+        pass
     return doc
 
 
@@ -1943,10 +1952,16 @@ async def admin_create_storage_auction(
     }
     await db.storage_auctions.insert_one(doc.copy())
     doc.pop("_id", None)
+
+    # iter401 — Flow 1 Buyer Interest emails for admin-created storage auctions.
+    try:
+        if (doc.get("status") or "").lower() in ("active", "upcoming", "live"):
+            import asyncio as _aio3
+            from services.marketing_flows import dispatch_buyer_interest_emails
+            _aio3.ensure_future(dispatch_buyer_interest_emails(db, listing_id=doc.get("id"), listing_type="storage"))
+    except Exception:  # noqa: BLE001
+        pass
     return doc
-
-
-# User-facing: list user's own deposits (iter172)
 @storage_router.get("/my-storage-deposits")
 async def my_storage_deposits(current_user: User = Depends(get_current_user)):
     """Return the current user's deposit history for the My Deposits profile tab."""

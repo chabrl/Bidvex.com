@@ -1000,7 +1000,18 @@ async def create_vehicle_listing(
     
     # Log audit
     await log_audit("vehicle", listing_id, "created", user["id"], "seller")
-    
+
+    # iter401 — Flow 1 Buyer Interest emails (real-time). Only fires when
+    # the vehicle goes live immediately. `asyncio.ensure_future` because
+    # this endpoint does not accept a `BackgroundTasks` param.
+    if (listing.get("status") or "").lower() in ("active", "live"):
+        try:
+            import asyncio as _aio
+            from services.marketing_flows import dispatch_buyer_interest_emails
+            _aio.ensure_future(dispatch_buyer_interest_emails(db, listing_id=listing_id, listing_type="vehicle"))
+        except Exception as _bie:  # noqa: BLE001
+            logger.warning(f"[iter401 buyer-interest vehicle] skipped: {_bie}")
+
     listing.pop("_id", None)
     return listing
 

@@ -1,6 +1,54 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter401 — Marketing Automation Flows (Feb 8, 2026) ✅ COMPLETE
+
+**Reported by user**: Build two automated marketing email flows, both bilingual EN + FR:
+- **Flow 1** (Buyer Interest, real-time): When a new listing goes live, email every user who has placed ≥1 bid AND either follows the seller OR has previously bid on the same category. Show title, starting price, end time, listing link. Rate-limit 1 email/user/hour.
+- **Flow 2** (Seller Action, cron): Three triggers — (A) draft listing ≥24h old, (B) live auction starting in ~2h, (C) auction ended ≥24h with unapproved winners. Restricted to registered sellers with ≥1 listing.
+
+### Delivered
+- **`services/marketing_flows.py`** — Single module owning both flows. Public API:
+  - `dispatch_buyer_interest_emails(db, listing_id, listing_type)` — real-time.
+  - `run_seller_draft_reminders(db)` — Flow 2A.
+  - `run_seller_auction_starting_reminders(db)` — Flow 2B.
+  - `run_seller_winner_approval_reminders(db)` — Flow 2C.
+- **Flow 1 real-time triggers wired** into all three listing-create endpoints as `BackgroundTasks` / `asyncio.ensure_future`:
+  - `routes/listings.py::create_multi_item_listing`
+  - `routes/vehicles.py::create_vehicle_listing`
+  - `routes/storage_auctions.py::create_storage_auction` (both admin + seller paths)
+- **Flow 2 APScheduler jobs** registered in `server.py`:
+  - `iter401_draft` — CronTrigger(minute=15)   (hourly)
+  - `iter401_starting` — CronTrigger(minute=35) (hourly)
+  - `iter401_winners` — CronTrigger(minute=45)  (hourly)
+- **Eligibility logic (Flow 1)**:
+  - Union of `(followers of seller)` + `(users who bid on same category)`
+  - Intersected with `(users with ≥1 bid ever)` — enforces the "must have bid at least once" requirement
+  - Minus seller themselves and current bidders on the same listing
+- **Rate limit (Flow 1)** — `buyer_interest_email_log` collection tracks `{user_id, listing_id, sent_at}`. Query checks last-hour window on every dispatch.
+- **Idempotency (Flow 2)** — each listing/auction stamps `draft_reminder_sent_at`, `starting_reminder_sent_at`, `winner_reminder_sent_at`. Second cron run for the same doc is a no-op.
+- **Bilingual** — user's `preferred_language` chooses EN/FR subject + body. Both templates share the same BidVex email shell and include a canonical unsubscribe footer.
+- **Suppression respect** — every send goes through `services.emails._email_core.send_email` with `is_marketing=True`, so `email_suppressions` + `marketing_unsubscribed=True` users are skipped automatically.
+
+### Verified end-to-end
+Test file `backend/tests/test_iter401_marketing_flows_e2e.py` seeds a fixture graph (seller, follower with ≥1 bid, category bidder with ≥1 bid, ineligible user, historical listing) and monkey-patches `send_email` to capture calls without hitting SendGrid. All 5 scenarios pass:
+```
+✅ Flow 1 Buyer Interest — 2 eligible, 2 sent (follower + category bidder), FR user got FR subject, seller + ineligible excluded
+✅ Flow 1 Rate-limit — second dispatch within 1h → 0 sends, 2 rate_limited
+✅ Flow 2A Draft ≥24h — 1 scanned, 1 sent; second run idempotent (0 sends)
+✅ Flow 2B Starting T-2h — 1 scanned, 1 sent; second run idempotent
+✅ Flow 2C Winners T+24h — 1 scanned, 1 sent; second run idempotent
+```
+
+### Files touched
+- `backend/services/marketing_flows.py` (new)
+- `backend/routes/listings.py` (Flow 1 hook after multi-item create)
+- `backend/routes/vehicles.py` (Flow 1 hook after vehicle create)
+- `backend/routes/storage_auctions.py` (Flow 1 hook on both storage-auction creates)
+- `backend/server.py` (3 APScheduler jobs)
+- `backend/tests/test_iter401_marketing_flows_e2e.py` (new, 5-scenario e2e suite)
+
+
 ## iter400 — Production Bug Fixes (Feb 8, 2026) ✅ COMPLETE (4/4)
 
 ### Bug 1: Trust Gate `terms_accepted=false` after per-listing acceptance ✅ FIXED

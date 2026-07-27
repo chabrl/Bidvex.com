@@ -1550,6 +1550,20 @@ async def create_multi_item_listing(
         except Exception as e:  # noqa: BLE001
             logger.warning(f"[follow-notify] skipped for {listing.id}: {e}")
 
+        # iter401 — Flow 1 Buyer Interest emails (real-time). Fires only
+        # when the listing goes live immediately (status="active") and
+        # never for demo sandbox lots. Rate-limited to 1/user/hour inside
+        # the dispatcher itself.
+        try:
+            from services.marketing_flows import dispatch_buyer_interest_emails
+            background_tasks.add_task(
+                dispatch_buyer_interest_emails, db,
+                listing_id=listing.id,
+                listing_type="multi_item",
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[iter401 buyer-interest] skipped for {listing.id}: {e}")
+
     return listing
 
 

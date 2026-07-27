@@ -1071,6 +1071,26 @@ scheduler.add_job(
     trigger=CronTrigger(hour=3, minute=30),
     id='regenerate_feed_placeholders', replace_existing=True)
 
+# ── iter401 — Seller Action Marketing Emails (Flow 2) ──
+# Three triggers, all cron-driven:
+#   A) Draft ≥24h — hourly at :15
+#   B) Auction starts in 90–150 min — hourly at :35 (matches lower/upper bound)
+#   C) Ended ≥24h with unapproved winners — hourly at :45
+from services.marketing_flows import (
+    run_seller_draft_reminders,
+    run_seller_auction_starting_reminders,
+    run_seller_winner_approval_reminders,
+)
+async def _job_seller_draft_reminders():
+    await safe_run("seller_draft_reminders", run_seller_draft_reminders(db))
+async def _job_seller_starting_reminders():
+    await safe_run("seller_starting_reminders", run_seller_auction_starting_reminders(db))
+async def _job_seller_winner_reminders():
+    await safe_run("seller_winner_reminders", run_seller_winner_approval_reminders(db))
+scheduler.add_job(_job_seller_draft_reminders,   trigger=CronTrigger(minute=15), id='iter401_draft',    replace_existing=True)
+scheduler.add_job(_job_seller_starting_reminders, trigger=CronTrigger(minute=35), id='iter401_starting', replace_existing=True)
+scheduler.add_job(_job_seller_winner_reminders,   trigger=CronTrigger(minute=45), id='iter401_winners',  replace_existing=True)
+
 # Watchlist expiry push alerts — check every 2 minutes for items ending within 5 min
 async def run_watchlist_expiry_alerts():
     from routes.push_notifications import send_push_to_user
