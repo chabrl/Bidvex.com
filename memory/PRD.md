@@ -1,6 +1,31 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter396 — Trust Gate T&C Third Pillar (Feb 8, 2026) ✅ COMPLETE
+
+**Reported by user**: Add auction Terms & Conditions acceptance as a third pillar to the Trust Gate (`services/trust_gate.py`) alongside phone verification + card on file. Enforce across ALL bid endpoints (single-item, multi-item lot, auto-bid, vehicle, storage). User chose: **global one-time platform acceptance** stored as `users.platform_terms_accepted_at`.
+
+### Delivered
+- `services/trust_gate.py` upgraded from 2-pillar to **3-pillar** enforcement. `missing` array now includes `"terms"` when the user has never accepted the platform T&C. Bilingual EN/FR message auto-composes ("verify your phone number and add a valid payment card and accept the auction Terms & Conditions"). When only `terms` is missing, `cta_path` deep-links to `/profile/settings#terms`; otherwise `/profile/settings#trust`.
+- Added `platform_terms_accepted_at` (ISO-8601, first-acceptance stamp), `platform_terms_version` (default `v1`, future-proof for versioned re-consent), and `platform_terms_last_seen_at` fields on `db.users`.
+- **New endpoint**: `POST /api/users/me/accept-platform-terms` — idempotent, preserves the original acceptance timestamp on repeat calls.
+- `GET /api/payments/trust-status` now returns `terms_accepted`, `platform_terms_accepted_at`, and includes `"terms"` in `missing[]`. `can_bid`/`can_list` require all three pillars.
+- `POST /api/bids` (single-item) migrated from its inline 2-pillar check to the centralised `require_trust_verified` — now enforces T&C alongside phone+card and matches every other bid endpoint.
+- `POST /api/bids/auto-bid` (single-item auto-bid) — added the centralised gate (was previously ungated).
+- The four bid endpoints already routing through `require_trust_verified` (`multi-item lot bid`, `multi-item auto-bid`, `vehicle bid`, `storage auction bid`) + the three listing-create endpoints automatically inherit the T&C pillar.
+
+### Verified end-to-end
+- 5/5 pytest unit tests in `tests/test_iter396_trust_gate_terms.py` pass (missing→raise→accept→pass→idempotency + live-DB stale-user fallback).
+- Live HTTP: fresh account with no T&C returns `403 trust_required missing=[phone,payment_method,terms]` with bilingual message. After `POST /accept-platform-terms`, `trust-status` reports `terms_accepted=true, missing=[phone,payment_method]`; second accept returns same `platform_terms_accepted_at` (idempotent).
+
+### Files touched
+- `backend/services/trust_gate.py` (2→3 pillars, terms fallback lookup)
+- `backend/routes/payments.py` (trust-status now surfaces terms + all-3-pillar can_bid/can_list)
+- `backend/routes/users.py` (new POST /me/accept-platform-terms)
+- `backend/routes/auctions_bids.py` (POST /bids inline check → require_trust_verified; POST /bids/auto-bid gated)
+- `backend/tests/test_iter396_trust_gate_terms.py` (new)
+
+
 ## iter395 — Trust Status Verification Gate Audit + Fix (Feb 8, 2026) ✅ COMPLETE
 
 **Reported by user**: Audit the two-pillar (phone verified + card on file) Trust Status gate that should block bidding and listing creation. Fix anything broken and verify end-to-end.

@@ -147,6 +147,69 @@ async def update_current_user(
     return updated_user
 
 
+# ========== iter396 — PLATFORM T&C ACCEPTANCE ==========
+
+@users_router.post("/me/accept-platform-terms")
+async def accept_platform_terms(request: Request):
+    """Record that the current user has accepted the platform-wide
+    auction Terms & Conditions. Idempotent — a second call returns the
+    original acceptance timestamp.
+
+    This is the third pillar of the Trust Gate (phone + card + terms)
+    and is required before any bid or listing-create call succeeds.
+
+    Body (optional): { "version": "v1" }  # for future versioned re-consent.
+
+    Returns:
+        {
+          "success":                     True,
+          "platform_terms_accepted_at":  ISO-8601 timestamp,
+          "platform_terms_version":      str,
+        }
+    """
+    # Import inline to avoid circular-import at module load time (this file
+    # is imported by server.py before deps auth wiring is complete).
+    from deps import get_current_user
+    from fastapi.security import HTTPBearer
+    _bearer = HTTPBearer(auto_error=False)
+    credentials = await _bearer(request)
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    current_user = await get_current_user(request, credentials)
+
+    db = get_db()
+    try:
+        payload = await request.json()
+    except Exception:  # noqa: BLE001 — empty body is fine
+        payload = {}
+    version = (payload.get("version") or "v1").strip() or "v1"
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    # Idempotent: only stamp on first acceptance, but always refresh
+    # the version + last-accepted timestamp so we can revoke consent
+    # in the future by bumping the platform version.
+    existing = await db.users.find_one(
+        {"id": current_user.id},
+        {"_id": 0, "platform_terms_accepted_at": 1, "platform_terms_version": 1},
+    )
+    first_accepted_at = (existing or {}).get("platform_terms_accepted_at") or now_iso
+
+    await db.users.update_one(
+        {"id": current_user.id},
+        {"$set": {
+            "platform_terms_accepted_at":  first_accepted_at,
+            "platform_terms_version":      version,
+            "platform_terms_last_seen_at": now_iso,
+        }},
+    )
+
+    return {
+        "success":                    True,
+        "platform_terms_accepted_at": first_accepted_at,
+        "platform_terms_version":     version,
+    }
+
+
 @users_router.get("/me/stats")
 async def get_user_stats(
     credentials: HTTPAuthorizationCredentials = Depends(security)

@@ -51,19 +51,12 @@ async def place_bid(request: Request, bid_data: BidCreate, current_user: User = 
     from services.bid_guard import ensure_bidding_allowed
     await ensure_bidding_allowed(db, current_user.id)
 
-    # ========== HIGH-TRUST GATEKEEPING ==========
-    if current_user.role not in ('admin', 'super_admin'):
-        if not current_user.phone_verified:
-            raise HTTPException(
-                status_code=403,
-                detail="Phone verification required. Please verify your phone number before placing bids."
-            )
-        payment_methods = await db.payment_methods.count_documents({"user_id": current_user.id})
-        if payment_methods == 0:
-            raise HTTPException(
-                status_code=403,
-                detail="Payment method required. Please add a payment card before placing bids."
-            )
+    # iter396 — Three-pillar Trust Gate (phone verified + card on file +
+    # platform T&C accepted). Replaces the previous inline two-pillar
+    # check so single-item bids match every other bid endpoint and now
+    # also require T&C acceptance before any DB work runs.
+    from services.trust_gate import require_trust_verified
+    await require_trust_verified(db, current_user, action="bid")
 
     # ========== LOAD MARKETPLACE SETTINGS ==========
     settings = await get_marketplace_settings(db)
@@ -1352,6 +1345,12 @@ async def bid_on_lot(request: Request, listing_id: str, lot_number: int, data: D
 async def setup_auto_bid(request: Request, listing_id: str, max_bid: float, current_user: User = Depends(get_current_user)):
     """Setup Auto-Bid Bot (Premium/VIP/Partner only)"""
     db = get_db()
+    # iter396 — Three-pillar Trust Gate. Setting up an auto-bid means the
+    # system may place bids on the user's behalf; the same gate that
+    # protects manual bids protects auto-bids.
+    from services.trust_gate import require_trust_verified
+    await require_trust_verified(db, current_user, action="bid")
+
     try:
         allowed_tiers = ["premium", "vip", "partner", "business"]
         if current_user.subscription_tier not in allowed_tiers:

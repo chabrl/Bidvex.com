@@ -637,25 +637,34 @@ async def get_trust_status(
         except stripe.StripeError:
             pass
     
+    # iter396 — Third Trust Gate pillar: platform T&C acceptance. The
+    # value is a UTC ISO timestamp stored when the user first accepts
+    # the auction Terms & Conditions (POST /api/users/me/accept-platform-terms).
+    platform_terms_accepted_at = user.get("platform_terms_accepted_at")
+    terms_accepted = bool(platform_terms_accepted_at)
+
     return {
-        "trust_status":       trust_status,
-        "is_verified":        effective_verified,
-        "has_payment_method": has_payment_method,
-        "phone_verified":     phone_verified,
-        "payment_method":     payment_method,
-        "trust_verified_at":  user.get("trust_verified_at"),
-        # iter395 — `can_bid` is the two-pillar gate (phone_verified AND
-        # payment_method). The previous formula `effective_verified` (which
-        # accepted email-verified-only) let unverified users bypass the
-        # entire gate. The bid + listing-create endpoints now enforce the
-        # same two-pillar rule server-side via services.trust_gate, so
-        # this flag is authoritative and matches what the API will accept.
-        "can_bid":            bool(phone_verified and has_payment_method),
-        "can_list":           bool(phone_verified and has_payment_method),
-        "missing":            (
-            [] if (phone_verified and has_payment_method)
-            else [x for x, ok in (("phone", phone_verified), ("payment_method", has_payment_method)) if not ok]
-        ),
+        "trust_status":                  trust_status,
+        "is_verified":                   effective_verified,
+        "has_payment_method":            has_payment_method,
+        "phone_verified":                phone_verified,
+        "terms_accepted":                terms_accepted,
+        "platform_terms_accepted_at":    platform_terms_accepted_at,
+        "payment_method":                payment_method,
+        "trust_verified_at":             user.get("trust_verified_at"),
+        # iter396 — `can_bid`/`can_list` = phone_verified AND payment_method
+        # AND platform T&C accepted. The bid + listing-create endpoints
+        # enforce the same three-pillar rule server-side via
+        # services.trust_gate, so this flag is authoritative.
+        "can_bid":            bool(phone_verified and has_payment_method and terms_accepted),
+        "can_list":           bool(phone_verified and has_payment_method and terms_accepted),
+        "missing":            [
+            x for x, ok in (
+                ("phone", phone_verified),
+                ("payment_method", has_payment_method),
+                ("terms", terms_accepted),
+            ) if not ok
+        ],
     }
 
 
