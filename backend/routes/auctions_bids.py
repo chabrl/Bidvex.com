@@ -1720,13 +1720,32 @@ async def get_lot_fees_preview(
     if lot is None:
         raise HTTPException(status_code=404, detail="Lot not found")
 
-    # Seller-account-type gate (partner overrides everything).
+    # iter392 — Runtime-resolve seller_account_type via the canonical
+    # enrichment service (same source of truth used by the listing GET
+    # endpoint and the seller card display). Reading the persisted
+    # `listing.seller_account_type` alone was fragile — legacy multi-item
+    # listings that predate enrichment sometimes had it stored as an
+    # unexpected string (e.g. "business" for an individual seller who
+    # briefly registered as a broker), which made INDIVIDUAL sellers'
+    # lots incorrectly report taxable in the fees-preview popover while
+    # the top-level display badge (which uses the enriched value) still
+    # showed "Tax Free". Using `resolve_seller_account_type` here means
+    # every lot in a multi-item listing gets the same, correct tax
+    # treatment regardless of what's persisted on the doc.
     seller = None
     if listing.get("seller_id"):
         seller = await db.users.find_one({"id": listing["seller_id"]}, {"_id": 0})
-    seller_account_type = (listing.get("seller_account_type")
-                           or (seller.get("account_type") if seller else None)
-                           or "individual").lower()
+
+    try:
+        from services.listing_seller_enrichment import resolve_seller_account_type
+        # "lots" context ensures partner > vehicle_dealer > storage_facility > individual
+        # ordering — a partner selling in a multi-lot auction is still classified
+        # as a partner (not "vehicle_dealer" even if they also hold that flag).
+        seller_account_type = (resolve_seller_account_type(seller or {}, "lots") or "individual").lower()
+    except Exception:  # noqa: BLE001 — never let enrichment failure block a bid preview
+        seller_account_type = (listing.get("seller_account_type")
+                               or (seller.get("account_type") if seller else None)
+                               or "individual").lower()
 
     # iter371 — Listings can now explicitly declare tax status via the
     # `is_tax_free` field (set at listing-creation time or by an admin fix).

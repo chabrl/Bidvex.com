@@ -831,25 +831,53 @@ const MultiItemListingDetailPage = () => {
                       </Card>
                     )}
 
-                    {/* Visit Availability Section */}
-                    {listing.visit_availability && listing.visit_availability.offered && (
+                    {/* Visit Availability / Inspection Date Section
+                        iter392 — Display the raw ISO date (YYYY-MM-DD) as a
+                        human-readable bilingual string. Falls back to the
+                        raw string if parsing fails (e.g., legacy "Nov 15-20,
+                        2025" range strings). Also renders when there's a
+                        date/instructions set, even if `offered` accidentally
+                        got saved as false (defensive display). */}
+                    {listing.visit_availability && (listing.visit_availability.offered || listing.visit_availability.dates || listing.visit_availability.instructions) && (
                       <Card className="mb-6 border-green-200 bg-green-50 dark:bg-green-900/10">
                         <CardHeader>
                           <CardTitle className="text-lg flex items-center gap-2">
-                            🏠 Visit Before Auction
-                            <Badge variant="secondary" className="bg-green-500 text-white">Available</Badge>
+                            🏠 {i18n.language?.startsWith('fr') ? 'Visite avant l\'enchère' : 'Visit Before Auction'}
+                            <Badge variant="secondary" className="bg-green-500 text-white">
+                              {i18n.language?.startsWith('fr') ? 'Disponible' : 'Available'}
+                            </Badge>
                           </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3">
                           {listing.visit_availability.dates && (
-                            <div>
-                              <p className="text-sm font-semibold">Available Dates:</p>
-                              <p className="text-sm">{listing.visit_availability.dates}</p>
+                            <div data-testid="visit-availability-dates">
+                              <p className="text-sm font-semibold">
+                                {i18n.language?.startsWith('fr') ? 'Date d\'inspection :' : 'Inspection Date:'}
+                              </p>
+                              <p className="text-sm">
+                                {(() => {
+                                  const raw = String(listing.visit_availability.dates || '').trim();
+                                  // Try YYYY-MM-DD → localized date; else show raw text (range strings, etc.).
+                                  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+                                    try {
+                                      // Local-time parse to avoid TZ off-by-one that shifts the date backwards.
+                                      const [y, m, d] = raw.split('-').map(Number);
+                                      const dt = new Date(y, (m || 1) - 1, d || 1);
+                                      return dt.toLocaleDateString(i18n.language?.startsWith('fr') ? 'fr-CA' : 'en-CA', {
+                                        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+                                      });
+                                    } catch { return raw; }
+                                  }
+                                  return raw;
+                                })()}
+                              </p>
                             </div>
                           )}
                           {listing.visit_availability.instructions && (
                             <div>
-                              <p className="text-sm font-semibold">Instructions:</p>
+                              <p className="text-sm font-semibold">
+                                {i18n.language?.startsWith('fr') ? 'Instructions :' : 'Instructions:'}
+                              </p>
                               <p className="text-sm text-muted-foreground">{listing.visit_availability.instructions}</p>
                             </div>
                           )}

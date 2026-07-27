@@ -1,6 +1,51 @@
 # BidVex Changelog
 
 
+## Feb 8, 2026 — iter392 🐛 Three Production Bug Fixes
+
+### Executive Summary
+Fixed three production-reported issues in a single sweep. All three verified end-to-end on preview via curl and Playwright. Since preview and production share the same code, redeploy pushes all three fixes live.
+
+### Bug 1 — Multi-Item Listing Inspection Date "Not Being Saved/Displayed Correctly"
+**Root cause**: The save + fetch path was actually fine (curl reproduced `{"offered":true, "dates":"2026-08-10", "instructions":"…"}` round-trip). The **display** rendered the raw ISO string `"2026-08-10"` under the label "Available Dates:" — hard to read for sellers/buyers and hard for admins to visually verify.
+**Fix** (`/app/frontend/src/pages/MultiItemListingDetailPage.js`):
+- Added a bilingual date formatter — parses `YYYY-MM-DD` (using local-time to avoid the classic TZ-off-by-one that shifts the date backwards on the west coast) into `"Monday, August 10, 2026"` (EN) / `"lundi 10 août 2026"` (FR).
+- Falls back gracefully to the raw string for legacy free-text range values ("Nov 15-20, 2025").
+- Also renders the section when EITHER `offered=true` OR `dates`/`instructions` is set — defensive display so a stale `offered=false` doesn't hide a legitimate inspection date.
+- Renamed the label from "Available Dates:" to "Inspection Date:" / "Date d'inspection :" (matches admin nomenclature).
+- Added `data-testid="visit-availability-dates"` for testing.
+
+### Bug 2 — Individual Seller Lots Incorrectly Marked Taxable (Only Some Lots in Same Auction)
+**Root cause**: `GET /multi-item-listings/{id}/lots/{n}/fees-preview` read the **persisted** `listing.seller_account_type` field (with a `seller.account_type` fallback). Legacy multi-item listings that predate the seller-type enrichment sometimes had this field stored as `"business"` even for individual sellers, causing the popover to report `is_tax_free=False` and tax the $100 hammer at 14.975% ($14.97). Meanwhile the top-level "Tax Free" badge on the card used the *enriched* value (`resolve_seller_account_type`) which correctly returned "individual" — creating the inconsistent split the user saw.
+**Fix** (`/app/backend/routes/auctions_bids.py::get_lot_fees_preview`):
+- Now calls `services.listing_seller_enrichment.resolve_seller_account_type(seller, "lots")` at request time — same source of truth as the display badge and the listing GET endpoint.
+- Fallback chain preserved as a defence-in-depth if the enrichment module ever fails to import.
+- Consequence: every lot in a multi-item listing now gets the exact same `is_tax_free` verdict regardless of what's persisted; individual-seller lots always Tax Free.
+- **Repro + verification**: I deliberately corrupted a fresh listing's persisted `seller_account_type` to `"business"` (matching the exact prod bug pattern), then queried `/fees-preview` for all 4 lots. Result: all 4 returned `is_tax_free=True`, `seller_account_type="individual"`, `tax_amount=$0.58` (14.975% on fees only, NOT on the $100 hammer) — matching Lots #1/#2/#4 in the user's screenshot.
+
+### Bug 3 — Seller Dashboard "Ratings & Reviews" Tab Crashes for Sellers with Zero Ratings
+**Root cause**: `SellerRatingsPanel` inside `/app/frontend/src/pages/SellerDashboard.js` referenced `t('sellerDash.noRatingsYet')` in its empty-state branch without importing `useTranslation`. `t` was undefined → `ReferenceError: t is not defined` → whole panel crashed the moment a seller with 0 reviews clicked the tab. Preview never hit this because the test admin already had 3 reviews.
+**Fix**: Added `const { t } = useTranslation();` inside the panel component.
+**Also investigated but confirmed working**:
+- `SellerEarningsDashboard`: correctly imports `useTranslation`; all curls return 200; renders on preview.
+- `SellerAnalyticsDashboard`: same — imports the hook, defensively defaults `summary || {}` and `charts || {}`; `SimpleLineChart` handles empty data gracefully.
+- The user's report that these two were also "broken" in production is most likely a cascade — when a seller's ratings tab crashed, React's error boundary might have unmounted neighboring panels depending on how their `SellerDashboard` tabs are wired. Fixing the ratings crash likely revives all three tabs.
+
+### Files changed
+- `/app/frontend/src/pages/MultiItemListingDetailPage.js` — inspection date bilingual formatter + defensive display gate.
+- `/app/backend/routes/auctions_bids.py` — `get_lot_fees_preview` now uses `resolve_seller_account_type`.
+- `/app/frontend/src/pages/SellerDashboard.js` — `SellerRatingsPanel` now destructures `t` from `useTranslation()`.
+
+### Verification (all three via curl + Playwright)
+- **Bug 1**: Listing persisted with `visit_availability.dates="2026-08-10"` → detail page renders "Monday, August 10, 2026" (EN) / equivalent FR.
+- **Bug 2**: With `listing.seller_account_type="business"` (corrupted) on a real 4-lot listing, all 4 `/fees-preview` calls return `is_tax_free=True, seller_account_type=individual, tax_amount=$0.58` (14.975% on fees only, not on hammer). Zero divergence between lots.
+- **Bug 3**: Playwright loaded the dashboard for a seller mocked to have 0 ratings → tab renders "No ratings yet. Complete transactions to build your reputation." with the correct icon; `[data-testid="ratings-empty"]` present; zero `ReferenceError` in console; screenshot confirms clean render.
+
+### Note on production deployment
+The user reported these bugs in production. Since preview and prod share code, redeploying the app applies all three fixes.
+
+
+
 ## Feb 8, 2026 — iter391 🕓 Nightly Base64-in-Mongo Sweep + Admin Alert (04:00 UTC)
 
 ### Executive Summary

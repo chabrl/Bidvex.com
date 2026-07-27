@@ -1352,6 +1352,12 @@ const StatementsPanel = () => {
 
 // ========== Seller Ratings Panel ==========
 const SellerRatingsPanel = ({ userId, token }) => {
+  // iter392 — Panel previously called `t('sellerDash.noRatingsYet')` on the
+  // empty-state branch without importing `useTranslation`. This threw
+  // `ReferenceError: t is not defined` whenever a seller had zero ratings,
+  // crashing the entire Ratings & Reviews tab in production. Adding the
+  // hook restores the empty state and keeps the populated branch working.
+  const { t } = useTranslation();
   const [ratings, setRatings] = useState(null);
   const [loading, setLoading] = useState(true);
 

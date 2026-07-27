@@ -1,6 +1,22 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter392 — Three Production Bug Fixes (Feb 8, 2026) ✅ COMPLETE
+
+**Reported by user**: (1) Inspection date on multi-item listings not saving/displaying correctly; (2) individual-seller lots incorrectly taxed on hammer (some lots in same auction show Taxable, others Tax Free); (3) Seller Dashboard Earnings/Analytics/Ratings sections down.
+
+### Fixes
+1. **Inspection date display** (`MultiItemListingDetailPage.js`) — save + fetch already worked; added a local-time-safe bilingual formatter that renders `YYYY-MM-DD` as "Monday, August 10, 2026" / "lundi 10 août 2026" and defensively surfaces the block when EITHER `offered=true` OR `dates`/`instructions` is set.
+2. **Tax consistency** (`auctions_bids.py::get_lot_fees_preview`) — now uses `services.listing_seller_enrichment.resolve_seller_account_type()` at request time instead of reading a potentially stale persisted `listing.seller_account_type`. Same source of truth as the top-level "Tax Free" badge; guarantees every lot in a multi-item listing gets identical, correct tax treatment.
+3. **Seller Ratings tab crash** (`SellerDashboard.js::SellerRatingsPanel`) — panel called `t('sellerDash.noRatingsYet')` without importing `useTranslation`. `ReferenceError: t is not defined` crashed the tab for sellers with 0 reviews. Fixed by adding `const { t } = useTranslation();` inside the component. Earnings + Analytics already import `t` correctly — they likely appeared "down" as a cascade off the ratings crash.
+
+### Verified end-to-end on preview
+- **Bug 1**: `visit_availability.dates="2026-08-10"` round-trips via curl; detail page now displays "Monday, August 10, 2026" (EN) / French equivalent.
+- **Bug 2**: Corrupted a fresh 4-lot listing's persisted `seller_account_type` to `"business"`, then curl'd `/fees-preview` for all 4 lots. All returned `is_tax_free=True, seller_account_type=individual, tax_amount=$0.58` (fees only, hammer tax-free). Zero divergence.
+- **Bug 3**: Mocked ratings endpoint to return 0 → Playwright screenshot shows "No ratings yet…" empty state with correct icon and zero console errors.
+
+
+
 ## iter391 — Nightly Base64-in-Mongo Sweep + Admin Alert (04:00 UTC) (Feb 8, 2026) ✅ COMPLETE
 
 **Reported by user**: Add a nightly APScheduler job that runs the base64 sweep in dry-run mode at 04:00 UTC. Email admin per-collection counts if any base64 remains. No automatic migration.
