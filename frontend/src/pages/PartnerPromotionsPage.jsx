@@ -118,11 +118,11 @@ const PartnerPromotionsPage = () => {
               <li className="flex gap-2"><Check className="h-4 w-4 text-emerald-600 mt-0.5" /> {t('Geo-targeted buyer matching by province', "Mise en relation par province")}</li>
             </ul>
             <p className="text-xs text-slate-500 mb-3">
-              {t('After trial — Dealer Pro Plan:', "Après l'essai — Forfait Dealer Pro :")}
+              {t('After trial — Dealer Annual Fee:', "Après l'essai — Adhésion annuelle Concessionnaire :")}
               <br />
-              <strong className="text-slate-800">$149 CAD/mo</strong> {t('(up to 50 active listings)', '(jusqu\'à 50 annonces actives)')}
+              <strong className="text-slate-800">$200 CAD/year</strong> {t('(annual, includes verified badge + priority)', '(annuel, badge vérifié + priorité)')}
               <br />
-              <span className="text-emerald-700">$99 CAD/mo</span> {t('(yearly commitment)', '(engagement annuel)')}
+              <span className="text-emerald-700">$100 CAD/year</span> {t('(launch promotion — 50% off)', '(promotion de lancement — 50 % de rabais)')}
             </p>
             <Button
               className="w-full font-bold"
@@ -161,11 +161,11 @@ const PartnerPromotionsPage = () => {
               <li className="flex gap-2"><Check className="h-4 w-4 text-emerald-600 mt-0.5" /> {t('Direct buyer messaging system', "Messagerie directe acheteur")}</li>
             </ul>
             <p className="text-xs text-slate-500 mb-3">
-              {t('After trial — Broker Pro Plan:', "Après l'essai — Forfait Broker Pro :")}
+              {t('After trial — Broker Annual Fee:', "Après l'essai — Adhésion annuelle Courtier :")}
               <br />
-              <strong className="text-slate-800">$249 CAD/mo</strong> {t('(unlimited listings)', '(annonces illimitées)')}
+              <strong className="text-slate-800">$500 CAD/year</strong> {t('(annual, includes dedicated profile + referral tools)', '(annuel, profil dédié + outils de référencement)')}
               <br />
-              <span className="text-emerald-700">$199 CAD/mo</span> {t('(yearly commitment)', '(engagement annuel)')}
+              <span className="text-emerald-700">$250 CAD/year</span> {t('(launch promotion — 50% off)', '(promotion de lancement — 50 % de rabais)')}
             </p>
             <Button
               className="w-full font-bold"

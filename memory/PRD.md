@@ -1,6 +1,42 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter399 — Broker Fee Sync + Trial Reminder + Annual-Only Enforcement (Feb 8, 2026) ✅ COMPLETE
+
+**Reported by user**: Three items:
+1. Broker admin dashboard displayed stale $200 base annual fee instead of the $500 that `pricing_engine` + Stripe actually charge.
+2. No trial-conversion reminder email — users were surprised when their 30-day trial silently converted to paid billing.
+3. Ensure Partner / Broker / Vehicle Dealer subscription fees are annual-only (no monthly toggle or monthly display), while preserving Monthly/Yearly for regular user tiers (Starter/Premium/VIP).
+
+### Delivered
+- **Broker $200 → $500 sync**
+  - `routes/brokers.py` constant `BROKER_SUBSCRIPTION_BASE_CAD` bumped from `200.0` to `500.0` (matches `pricing_engine_service.PRODUCT_DEFINITIONS["broker_annual_fee"].default_base_price_cad`).
+  - One-off migration executed in preview: `platform_settings.broker_subscription_global.base_cad: 200 → 500` (updated_by=`iter399-migration`) plus two per-broker overrides at `200.0` → `500.0`.
+  - `GET /api/admin/subscriptions/settings` now returns `base_cad: 500.0`. `GET /api/brokers/me/subscription` now returns `base_cad: 500.0, discount_pct: 50, final_cad: 250.0`.
+- **Trial-conversion reminder email**
+  - New service `services/trial_conversion_reminder.py` — daily CronTrigger at 09:00 UTC, sends a bilingual (EN + FR) reminder to every user whose `trial_redeemed_at + 30d` falls within `now + [2.5d, 3.5d]`.
+  - Email includes plan name, exact amount to be charged (looked up live from Stripe subscription with a `subscription_plans` fallback), the charge date in each locale, and a one-click cancel link to `/settings?tab=subscription&utm_source=trial_reminder`.
+  - Idempotent — writes `users.trial_reminder_sent_at`, `trial_reminder_sent_for_tier`, `trial_reminder_charge_date`. Second run is a no-op for the same user.
+  - Skips users whose subscription is already `cancel_at_period_end=true` or in `canceled/cancelled` status.
+  - Registered as APScheduler job `trial_conversion_reminders_iter399` in `server.py`.
+- **Partner / Broker / Vehicle Dealer are annual-only**
+  - Backend audit: all three role types' Stripe Prices are created with `interval: "year"` in `services/pricing_engine_service.py` and `services/dealer_subscription_service.py`. No monthly toggle exists in any checkout endpoint (`/api/partner/create-checkout`, `/api/broker-subscription/create-checkout-session`, `/api/dealer-subscription/create-checkout-session`).
+  - Frontend audit: no `billing_period` / monthly toggle in the Partner, Broker, or Dealer dashboards or checkout flows. Grep confirmed the only `/mo` displays were on the orphan `PartnerPromotionsPage.jsx` marketing card — rewritten to show the actual yearly prices (`$200 CAD/year` for Dealer, `$500 CAD/year` for Broker, with 50% launch-discount tags).
+  - Regular user tiers (Premium / VIP) keep their Monthly/Yearly toggle from iter398 — not affected.
+
+### Verified end-to-end
+- `/api/admin/subscriptions/settings` ⇒ `base_cad: 500.0`, `discount_value: 50`
+- `/api/brokers/me/subscription` (fresh broker) ⇒ `base_cad: 500.0, final_cad: 250.0`
+- Manual invocation of `send_trial_conversion_reminders(db)` with a user seeded at `trial_redeemed_at = now-27d`: `{scanned:1, matched:1, sent:1, failed:0}`. Second immediate call: `{sent:0}` (idempotency stamp respected). Idempotency stamp fields all present on user doc.
+
+### Files touched
+- `backend/routes/brokers.py` (constant)
+- `backend/services/trial_conversion_reminder.py` (new file)
+- `backend/server.py` (APScheduler job registration)
+- `frontend/src/pages/PartnerPromotionsPage.jsx` (yearly-only marketing copy for Dealer + Broker)
+- Preview DB one-off migration (platform_settings + 2 broker docs)
+
+
 ## iter398 — Subscription P1 Fixes (Feb 8, 2026) ✅ COMPLETE
 
 **Reported by user**: Three P1 issues from the subscription audit:

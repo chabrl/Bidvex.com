@@ -59,7 +59,7 @@ DEFAULT_DEPOSIT_CAD = 500.0
 # Brokers pay a yearly platform fee. Default is $200/year; the launch
 # promotion applies a 50% discount until admin clears it. Per-broker
 # overrides are stored on the broker doc and take precedence.
-BROKER_SUBSCRIPTION_BASE_CAD     = 200.0
+BROKER_SUBSCRIPTION_BASE_CAD     = 500.0  # iter399 — matches pricing_engine broker_annual_fee ($500 base / $250 launch)
 BROKER_SUBSCRIPTION_DISCOUNT_PCT = 50.0   # 0..100, applied to base
 BROKER_SUBSCRIPTION_PERIOD_DAYS  = 365
 

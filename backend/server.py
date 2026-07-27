@@ -1032,6 +1032,21 @@ scheduler.add_job(
 scheduler.add_job(
     _job_send_trial_reminder_emails,
     trigger=IntervalTrigger(hours=1), id='trial_reminders', replace_existing=True)
+
+# ── iter399 — Subscription trial-conversion reminder (T-3 days) ──
+# Sends a bilingual EN+FR email to every user whose 30-day trial converts
+# to paid billing in exactly 3 days. Daily at 09:00 UTC (5am ET, well
+# before most Canadian users open their inbox mid-morning).
+from apscheduler.triggers.cron import CronTrigger as _CronTrigger_iter399
+from services.trial_conversion_reminder import send_trial_conversion_reminders
+async def _job_send_trial_conversion_reminders():
+    await safe_run("trial_conversion_reminder", send_trial_conversion_reminders(db))
+scheduler.add_job(
+    _job_send_trial_conversion_reminders,
+    trigger=_CronTrigger_iter399(hour=9, minute=0, timezone="UTC"),
+    id='trial_conversion_reminders_iter399',
+    replace_existing=True,
+)
 scheduler.add_job(
     _job_send_auction_payment_reminders,
     trigger=IntervalTrigger(hours=1), id='payment_reminders', replace_existing=True)
