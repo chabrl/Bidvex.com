@@ -1,6 +1,45 @@
 # BidVex Changelog
 
 
+## Feb 8, 2026 — iter390 🧹 One-Off Base64 → S3 Backfill Migration (Enhanced Report)
+
+### Executive Summary
+Ran the one-off migration that scans every image field in `listings`, `multi_item_listings`, `vehicle_listings`, and `storage_auctions`, uploads any remaining base64 payloads to S3 via `services.s3_service.upload_base64_to_s3`, replaces the base64 in place with the returned public HTTPS URL, and emits a per-collection summary report. Enhanced the pre-existing `/app/backend/scripts/migrate_base64_images_to_s3.py` (from Phase 5 Hotfix v4) so the summary now breaks down per collection instead of one grand total — satisfying "log a summary report of how many were found and migrated per collection."
+
+### Enhancement to migration script
+- Added `per_coll` dict tracking `docs_scanned`, `docs_with_base64`, `base64_entries_found`, `migrated_to_s3`, `migration_failed`, `already_url_skipped` per collection.
+- Summary block now boxes out `[collection]` sections with the six metrics + a `TOTALS` footer.
+- Existing behaviour preserved: `--dry-run`, `--limit`, `--collection <name>`, per-image failure isolation, and idempotency.
+
+### Verified on preview (both dry-run + live)
+Seeded 3 realistic legacy docs (one per collection) each carrying one or more `data:image/jpeg;base64,…` payloads (400×300 JPEG, ~4675 chars each) alongside a mix of already-S3 URLs and already-http URLs to prove:
+- The script upgrades base64 entries only.
+- Already-URL entries are counted as `already_url_skipped` and never rewritten.
+- Live run produced this report:
+  ```
+  [listings]             found=1  migrated=1  failed=0  skipped=1
+  [multi_item_listings]  found=2  migrated=2  failed=0  skipped=55
+  [vehicle_listings]     found=1  migrated=1  failed=0  skipped=1
+  [storage_auctions]     found=0  migrated=0  failed=0  skipped=1
+  TOTALS  docs=5  migrated=4  skipped=58  failed=0
+  ```
+- Every migrated S3 URL is reachable: `HEAD` returned `HTTP/1.1 200 OK`, `Content-Type: image/jpeg`, valid ETag, `Content-Length: 2245`.
+- Idempotency re-run: same 5 docs scanned, `base64_entries_found=0` everywhere, `TOTALS migrated=0` — script is safe to re-run.
+- DB state after migration confirmed with `is_base64=False` on every image field including `multi_item_listings.lots[i].images[j]` and `vehicle_listings.photos[i].url`.
+
+### File changed
+- `/app/backend/scripts/migrate_base64_images_to_s3.py` — added per-collection stats + summary block in `_run()`.
+
+### Production usage (when the team is ready to run against prod)
+```bash
+# From /app/backend on the production shell
+python -m scripts.migrate_base64_images_to_s3 --dry-run                    # scope check
+python -m scripts.migrate_base64_images_to_s3                              # execute
+python -m scripts.migrate_base64_images_to_s3 --collection multi_item_listings  # single-collection targeted rerun
+```
+
+
+
 ## Feb 8, 2026 — iter389 🚫 Kill Base64-in-Mongo for Multi-Item Listing Creation
 
 ### Executive Summary

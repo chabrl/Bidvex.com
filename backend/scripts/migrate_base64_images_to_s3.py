@@ -222,6 +222,16 @@ async def _run(args) -> int:
     targets = [ADAPTERS[target]] if target else list(ADAPTERS.values())
 
     grand = {"migrated": 0, "skipped": 0, "failed": 0, "docs": 0}
+    # iter390 — Per-collection breakdown so the summary report satisfies
+    # "how many were found and migrated per collection". Each row tracks:
+    #   docs           = docs scanned
+    #   docs_with_base64 = docs that contained ≥1 base64 image entry
+    #   found          = base64 image entries encountered (== migrated+failed
+    #                    in a real run; == migrated in dry-run)
+    #   migrated       = entries successfully uploaded + rewritten
+    #   failed         = entries that raised (base64 left in place)
+    #   skipped        = entries already an https URL (no-op)
+    per_coll: Dict[str, Dict[str, int]] = {}
 
     try:
         for adapter in targets:
@@ -230,21 +240,45 @@ async def _run(args) -> int:
             if args.limit:
                 cursor = cursor.limit(int(args.limit))
 
+            stats = {"docs": 0, "docs_with_base64": 0, "found": 0,
+                     "migrated": 0, "skipped": 0, "failed": 0}
+
             async for doc in cursor:
                 if not doc.get("id"):
                     continue
                 m, s, f, _rows = await _migrate_doc(db, adapter, doc, args.dry_run)
+                stats["docs"] += 1
+                stats["migrated"] += m
+                stats["skipped"] += s
+                stats["failed"] += f
+                stats["found"] += m + f  # everything we tried to migrate
+                if (m + f) > 0:
+                    stats["docs_with_base64"] += 1
                 grand["migrated"] += m
                 grand["skipped"]  += s
                 grand["failed"]   += f
                 grand["docs"]     += 1
 
-        logger.info("───")
+            per_coll[adapter.collection] = stats
+
+        # ── iter390 per-collection summary report ────────────────────
+        logger.info("═" * 68)
+        logger.info("BASE64 → S3 MIGRATION SUMMARY  (dry_run=%s)", args.dry_run)
+        logger.info("═" * 68)
+        for coll_name, s in per_coll.items():
+            logger.info("[%s]", coll_name)
+            logger.info("  docs_scanned         = %d", s["docs"])
+            logger.info("  docs_with_base64     = %d", s["docs_with_base64"])
+            logger.info("  base64_entries_found = %d", s["found"])
+            logger.info("  migrated_to_s3       = %d", s["migrated"])
+            logger.info("  migration_failed     = %d", s["failed"])
+            logger.info("  already_url_skipped  = %d", s["skipped"])
+        logger.info("─" * 68)
         logger.info(
-            "Done. docs=%d  migrated=%d  skipped=%d  failed=%d  dry_run=%s",
+            "TOTALS  docs=%d  migrated=%d  skipped=%d  failed=%d",
             grand["docs"], grand["migrated"], grand["skipped"], grand["failed"],
-            args.dry_run,
         )
+        logger.info("═" * 68)
     finally:
         client.close()
 

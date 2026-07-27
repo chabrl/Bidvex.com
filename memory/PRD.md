@@ -1,6 +1,29 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter390 — Base64 → S3 Backfill Migration (Enhanced Per-Collection Report) (Feb 8, 2026) ✅ COMPLETE
+
+**Reported by user**: Run a one-off migration to scan `listings`, `multi_item_listings`, `vehicle_listings` (and while we're here, `storage_auctions`) for any remaining base64 image strings, upload them to S3, replace in place, and log a per-collection summary.
+
+### What was done
+- Enhanced the existing `/app/backend/scripts/migrate_base64_images_to_s3.py` (from Phase 5 Hotfix v4) so the final summary now breaks down per collection with `docs_scanned`, `docs_with_base64`, `base64_entries_found`, `migrated_to_s3`, `migration_failed`, `already_url_skipped` for each of the four collections plus a `TOTALS` footer.
+- Existing safety features preserved — `--dry-run`, `--limit`, `--collection <name>`, per-image failure isolation, idempotency.
+
+### Verification on preview
+Seeded 3 legacy docs with real base64 JPEGs (one per collection):
+- Live run: `found=4, migrated=4, failed=0` across the 4 collections.
+- Every migrated URL reachable via `HEAD` (200 OK, image/jpeg, valid ETag).
+- Idempotent re-run: `found=0, migrated=0`.
+- DB post-check: every image field on every seeded doc is now an S3 URL, `is_base64=False`.
+
+### Production instructions
+```bash
+python -m scripts.migrate_base64_images_to_s3 --dry-run   # scope check
+python -m scripts.migrate_base64_images_to_s3             # execute
+```
+
+
+
 ## iter389 — Kill Base64-in-Mongo for Multi-Item Listing Creation (Feb 8, 2026) ✅ COMPLETE
 
 **Reported**: Nightly sweep flagged listing `78cbf76f-7d07-40a3-b4dc-f8486da60b4c` for base64 image data in MongoDB. Root cause: `CreateMultiItemListing.js` used `FileReader.readAsDataURL()` and shipped the data URLs to `POST /api/multi-item-listings`.
