@@ -1,6 +1,23 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter391 — Nightly Base64-in-Mongo Sweep + Admin Alert (04:00 UTC) (Feb 8, 2026) ✅ COMPLETE
+
+**Reported by user**: Add a nightly APScheduler job that runs the base64 sweep in dry-run mode at 04:00 UTC. Email admin per-collection counts if any base64 remains. No automatic migration.
+
+### Implementation
+- Extracted a reusable `scan_collections(db, *, dry_run=True) → {per_collection, totals}` public function in `/app/backend/scripts/migrate_base64_images_to_s3.py`.
+- New `/app/backend/services/base64_sweep_alert.py` — `run_nightly_base64_sweep_alert(db)` calls the scanner in dry-run, and when `totals.found > 0` dispatches a per-collection HTML alert via `send_html_email`. Recipient chain: `BASE64_SWEEP_ALERT_EMAIL` → `ADMIN_ALERT_EMAIL` → `ADMIN_EMAIL` → `charbel911@gmail.com`.
+- Registered in `/app/backend/server.py` with the required `async def _nightly_base64_sweep_job()` wrapper pattern + `CronTrigger(hour=4, minute=0, timezone="UTC")`, `id="base64_sweep_alert_nightly"`, `misfire_grace_time=3600`.
+
+### Verified
+- Clean DB → `alert_triggered=False`, `email_sent=False`. Silent night.
+- Seeded 3 docs (4 base64 entries) → alert email sent (`status=202`, valid msgid); subject `[BidVex · preview] Base64 images still in MongoDB — 4 entries`.
+- Dry-run guarantee proven: after the alert ran, all 3 seeded docs still contained the original base64 — nothing was migrated.
+- Boot log: `iter391 — Nightly base64 sweep alert cron registered (04:00 UTC)`.
+
+
+
 ## iter390 — Base64 → S3 Backfill Migration (Enhanced Per-Collection Report) (Feb 8, 2026) ✅ COMPLETE
 
 **Reported by user**: Run a one-off migration to scan `listings`, `multi_item_listings`, `vehicle_listings` (and while we're here, `storage_auctions`) for any remaining base64 image strings, upload them to S3, replace in place, and log a per-collection summary.

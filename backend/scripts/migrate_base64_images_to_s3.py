@@ -208,58 +208,92 @@ async def _migrate_doc(
     return migrated, skipped, failed, migrated_rows
 
 
+async def scan_collections(
+    db,
+    *,
+    dry_run: bool = True,
+    collection: Optional[str] = None,
+    limit: Optional[int] = None,
+) -> Dict[str, Any]:
+    """iter391 — Reusable scanner used by both the CLI and the nightly
+    APScheduler alert job. Returns a dict of the form:
+
+        {
+          "dry_run": bool,
+          "per_collection": {
+              "listings":            {"docs":..., "docs_with_base64":..., "found":..., "migrated":..., "skipped":..., "failed":...},
+              "multi_item_listings": {...},
+              "vehicle_listings":    {...},
+              "storage_auctions":    {...},
+          },
+          "totals": {"docs":..., "migrated":..., "skipped":..., "failed":..., "found":...},
+        }
+
+    In `dry_run=True` mode nothing is uploaded and nothing is written to
+    MongoDB — the counts still reflect what WOULD be migrated. The
+    nightly alert job leans on this.
+    """
+    if collection and collection not in ADAPTERS:
+        raise ValueError(f"Unknown collection '{collection}'. Valid: {list(ADAPTERS)}")
+    targets = [ADAPTERS[collection]] if collection else list(ADAPTERS.values())
+
+    per_coll: Dict[str, Dict[str, int]] = {}
+    grand = {"migrated": 0, "skipped": 0, "failed": 0, "docs": 0, "found": 0}
+
+    for adapter in targets:
+        cursor = db[adapter.collection].find({}, {"_id": 0})
+        if limit:
+            cursor = cursor.limit(int(limit))
+
+        stats = {"docs": 0, "docs_with_base64": 0, "found": 0,
+                 "migrated": 0, "skipped": 0, "failed": 0}
+
+        async for doc in cursor:
+            if not doc.get("id"):
+                continue
+            m, s, f, _rows = await _migrate_doc(db, adapter, doc, dry_run)
+            stats["docs"] += 1
+            stats["migrated"] += m
+            stats["skipped"] += s
+            stats["failed"] += f
+            stats["found"] += m + f
+            if (m + f) > 0:
+                stats["docs_with_base64"] += 1
+            grand["migrated"] += m
+            grand["skipped"]  += s
+            grand["failed"]   += f
+            grand["docs"]     += 1
+            grand["found"]    += m + f
+
+        per_coll[adapter.collection] = stats
+
+    return {
+        "dry_run": dry_run,
+        "per_collection": per_coll,
+        "totals": grand,
+    }
+
+
 async def _run(args) -> int:
     mongo_url = os.environ["MONGO_URL"]
     db_name   = os.environ["DB_NAME"]
     client    = AsyncIOMotorClient(mongo_url)
     db        = client[db_name]
 
-    target = (args.collection or "").strip()
-    if target and target not in ADAPTERS:
-        logger.error("Unknown collection '%s'. Valid: %s", target, list(ADAPTERS))
-        return 2
-
-    targets = [ADAPTERS[target]] if target else list(ADAPTERS.values())
-
-    grand = {"migrated": 0, "skipped": 0, "failed": 0, "docs": 0}
-    # iter390 — Per-collection breakdown so the summary report satisfies
-    # "how many were found and migrated per collection". Each row tracks:
-    #   docs           = docs scanned
-    #   docs_with_base64 = docs that contained ≥1 base64 image entry
-    #   found          = base64 image entries encountered (== migrated+failed
-    #                    in a real run; == migrated in dry-run)
-    #   migrated       = entries successfully uploaded + rewritten
-    #   failed         = entries that raised (base64 left in place)
-    #   skipped        = entries already an https URL (no-op)
-    per_coll: Dict[str, Dict[str, int]] = {}
-
     try:
-        for adapter in targets:
-            logger.info("─── %s ───", adapter.collection)
-            cursor = db[adapter.collection].find({}, {"_id": 0})
-            if args.limit:
-                cursor = cursor.limit(int(args.limit))
+        try:
+            report = await scan_collections(
+                db,
+                dry_run=args.dry_run,
+                collection=(args.collection or None),
+                limit=args.limit,
+            )
+        except ValueError as e:
+            logger.error(str(e))
+            return 2
 
-            stats = {"docs": 0, "docs_with_base64": 0, "found": 0,
-                     "migrated": 0, "skipped": 0, "failed": 0}
-
-            async for doc in cursor:
-                if not doc.get("id"):
-                    continue
-                m, s, f, _rows = await _migrate_doc(db, adapter, doc, args.dry_run)
-                stats["docs"] += 1
-                stats["migrated"] += m
-                stats["skipped"] += s
-                stats["failed"] += f
-                stats["found"] += m + f  # everything we tried to migrate
-                if (m + f) > 0:
-                    stats["docs_with_base64"] += 1
-                grand["migrated"] += m
-                grand["skipped"]  += s
-                grand["failed"]   += f
-                grand["docs"]     += 1
-
-            per_coll[adapter.collection] = stats
+        per_coll = report["per_collection"]
+        grand    = report["totals"]
 
         # ── iter390 per-collection summary report ────────────────────
         logger.info("═" * 68)

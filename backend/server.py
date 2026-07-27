@@ -227,6 +227,39 @@ async def lifespan(app):
     except Exception as e:
         logger.warning(f"Leaderboard overlay cron registration failed (non-fatal): {e}")
 
+    # iter391 — Nightly base64 sweep alert. Runs the migration script in
+    # DRY-RUN mode at 04:00 UTC. NEVER migrates. If ANY base64 entry is
+    # still hiding in listings / multi_item_listings / vehicle_listings /
+    # storage_auctions, sends an HTML admin email with per-collection
+    # counts + the manual `python -m scripts.migrate_...` command.
+    try:
+        from apscheduler.triggers.cron import CronTrigger
+        from services.base64_sweep_alert import run_nightly_base64_sweep_alert
+
+        async def _nightly_base64_sweep_job():
+            try:
+                report = await run_nightly_base64_sweep_alert(db)
+                logger.info(
+                    "[base64_sweep_alert] nightly run complete: "
+                    f"total_found={report.get('totals',{}).get('found',0)} "
+                    f"alert_triggered={report.get('alert_triggered')} "
+                    f"email_sent={report.get('email_sent')} "
+                    f"recipient={report.get('recipient')}"
+                )
+            except Exception as je:  # noqa: BLE001
+                logger.warning(f"[base64_sweep_alert] nightly job failed: {je}")
+
+        scheduler.add_job(
+            _nightly_base64_sweep_job,
+            CronTrigger(hour=4, minute=0, timezone="UTC"),
+            id="base64_sweep_alert_nightly",
+            replace_existing=True,
+            misfire_grace_time=3600,  # 1h scheduler-downtime tolerance
+        )
+        logger.info("iter391 — Nightly base64 sweep alert cron registered (04:00 UTC)")
+    except Exception as e:
+        logger.warning(f"Base64 sweep alert cron registration failed (non-fatal): {e}")
+
     # iter316 Mission 1 — Twilio dialer configuration check (non-fatal).
     try:
         from services.twilio_service import verify_twilio_config, verify_twilio_auth
