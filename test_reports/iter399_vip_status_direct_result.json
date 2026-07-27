@@ -1,0 +1,30 @@
+{
+  "email": "iter399_status_vip_direct_8bdbddebf0@example.com",
+  "id": "cd72d60e-e027-4288-a647-ea5e8e43451a",
+  "status": 200,
+  "response": {
+    "subscription_tier": "vip",
+    "subscription_status": "active",
+    "features": {
+      "tier": "VIP",
+      "buyer_premium": "3%",
+      "seller_commission": "2%",
+      "auto_bid_bot": true,
+      "priority_notifications": true,
+      "early_access": true,
+      "promotion_days": 7,
+      "price_yearly_cad": 300.0,
+      "price": "$300.00 CAD/year",
+      "price_monthly_cad": 25.0
+    },
+    "subscription_start_date": null,
+    "subscription_end_date": null
+  },
+  "assertions": {
+    "status_200": true,
+    "price": true,
+    "price_yearly_cad": true,
+    "price_monthly_cad": true
+  },
+  "overall": "passed"
+}

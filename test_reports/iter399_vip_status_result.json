@@ -1,0 +1,6 @@
+{
+  "email": "iter399_status_vip_direct_c94f4d95b0@example.com",
+  "id": "e06f019a-90c5-44ff-9a60-e3e80d4719ee",
+  "status": 200,
+  "response": "{\"subscription_tier\":\"vip\",\"subscription_status\":\"active\",\"features\":{\"tier\":\"VIP\",\"buyer_premium\":\"3%\",\"seller_commission\":\"2%\",\"auto_bid_bot\":true,\"priority_notifications\":true,\"early_access\":true,\"promotion_days\":7,\"price_yearly_cad\":300.0,\"price\":\"$300.00 CAD/year\",\"price_monthly_cad\":25.0},\"subscription_start_date\":null,\"subscription_end_date\":null}"
+}

@@ -339,29 +339,21 @@ async def create_subscription(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    customer_id = user.get("stripe_customer_id")
-    if not customer_id:
-        raise HTTPException(status_code=400, detail="No Stripe customer on file. Please add a payment method first.")
-
-    default_pm = user.get("default_payment_method_id")
-    if not default_pm:
-        raise HTTPException(status_code=400, detail="No payment method on file. Please add a card first.")
-
-    # Look up the Stripe Price ID from the DB
+    # iter398 — Plan lookup + lazy-mint of the Stripe Price MUST happen
+    # BEFORE the customer/card guards. This ensures a fresh user who
+    # opens the pricing page and clicks Monthly can trigger creation of
+    # the monthly Stripe Price (`_sync_plan_to_stripe`) even though
+    # they'll ultimately get a "add a card" prompt. Otherwise the lazy
+    # mint is unreachable for exactly the users who need it most, and
+    # `subscription_plans.stripe_price_id_monthly` stays null forever.
     pricing_service = get_pricing_service(get_db())
     plan = await pricing_service.get_plan(plan_id)
     if not plan:
         raise HTTPException(status_code=400, detail="Plan not found")
 
-    # iter398 — pick the price ID matching the requested billing period.
     price_field = "stripe_price_id_monthly" if billing_period == "monthly" else "stripe_price_id_yearly"
     stripe_price_id = plan.get(price_field)
 
-    # iter398 — Lazy-mint the missing Stripe Price when a user is the
-    # first to pick a billing period that hasn't been synced yet
-    # (Premium/VIP were seeded with yearly prices only; monthly IDs are
-    # created on-demand here so the Monthly toggle actually charges the
-    # documented monthly rate instead of quietly failing).
     if not stripe_price_id and plan.get(f"price_{billing_period}", 0) > 0:
         try:
             await pricing_service._sync_plan_to_stripe(plan_id, plan)
@@ -375,6 +367,14 @@ async def create_subscription(
             status_code=400,
             detail=f"Stripe price not configured for this plan ({billing_period})",
         )
+
+    customer_id = user.get("stripe_customer_id")
+    if not customer_id:
+        raise HTTPException(status_code=400, detail="No Stripe customer on file. Please add a payment method first.")
+
+    default_pm = user.get("default_payment_method_id")
+    if not default_pm:
+        raise HTTPException(status_code=400, detail="No payment method on file. Please add a card first.")
 
     # Handle existing subscription — upgrade with proration instead of cancel
     existing_sub_id = user.get("stripe_subscription_id")
@@ -704,9 +704,30 @@ async def create_subscription_checkout(
     else:
         price = plan.get("price_yearly", 0)
         stripe_price_id = plan.get("stripe_price_id_yearly")
-    
+
     if price <= 0:
         raise HTTPException(status_code=400, detail="Plan pricing not configured")
+
+    # iter398 — Lazy-mint the recurring Stripe Price when missing. Prior
+    # to this the endpoint would silently fall back to `mode="payment"`
+    # one-time price_data, which means the user paid ONCE instead of
+    # entering a monthly recurring subscription. Doing the mint here
+    # guarantees hosted Checkout is always in `mode="subscription"`.
+    if not stripe_price_id and price > 0:
+        try:
+            await pricing_service._sync_plan_to_stripe(plan_id, plan)
+            plan = await pricing_service.get_plan(plan_id)  # reload
+            price_field = "stripe_price_id_monthly" if billing_period == "monthly" else "stripe_price_id_yearly"
+            stripe_price_id = plan.get(price_field)
+        except Exception as sync_err:
+            logger.error(f"[iter398 /subscription/checkout] on-demand Stripe price sync failed for {plan_id}/{billing_period}: {sync_err}")
+
+    if not stripe_price_id:
+        # Hard-fail rather than silently downgrade to one-time payment.
+        raise HTTPException(
+            status_code=400,
+            detail=f"Recurring Stripe price not configured for {plan_id} / {billing_period}. Please contact support.",
+        )
     
     # Validate coupon if provided
     stripe_coupon_id = None

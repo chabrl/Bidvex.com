@@ -1,0 +1,167 @@
+{
+  "api_base": "http://localhost:8001/api",
+  "started_at": "2026-07-27T20:19:46Z",
+  "tests": {
+    "create_lazy_mint_premium": {
+      "http_status": 400,
+      "response": "{\"detail\":\"No Stripe customer on file. Please add a payment method first.\"}",
+      "original_monthly_price_id": "price_1TxuxkBd6Wtvh7hs6dHUT9o8",
+      "minted_monthly_price_id": "price_1Txv04Bd6Wtvh7hsaiFLfFDD",
+      "email": "iter399_create_premium_2f297f970f@example.com"
+    },
+    "create_lazy_mint_vip": {
+      "http_status": 400,
+      "response": "{\"detail\":\"No Stripe customer on file. Please add a payment method first.\"}",
+      "original_monthly_price_id": "price_1TxuxlBd6Wtvh7hsd73kK1Q1",
+      "minted_monthly_price_id": "price_1Txv06Bd6Wtvh7hsLBaBxBHS",
+      "email": "iter399_create_vip_2f53d5a439@example.com"
+    },
+    "checkout_lazy_mint_premium_monthly": {
+      "http_status": 200,
+      "response": "{\"success\":true,\"checkout_url\":\"https://pay.bidvex.com/c/pay/cs_live_a1OVKs835aKjyIhpzTyVHZFWMi8CuwAF0VPsSdHFmROY87URngT1dysbEO#fidnandhYHdWcXxpYCc%2FJ2FgY2RwaXEnKSd2cGd2ZndsdXFsamtQa2x0cGBrYHZ2QGtkZ2lgYSc%2FY2RpdmApJ2JwZGZkaGppYFNkd2xka3EnPydmamtxd2ppJyknZHVsTmB8Jz8ndW5aaWxzYFowNFZdRDJsR2EzUnFzbTJtdlRGNX9JSzxQdGs1d2dRMWQ3bzVtMUdzS0N8STVBZjd8cGtXYEdoTGFXaG5jc0d%2FQ2Q2TW92Qkpta0xVc2tKUFJqaTZSbWROYTU1SkxIXHNTfFwnKSdjd2poVmB3c2B3Jz9xd3BgKSdnZGZuYndqcGthRmppancnPycmY2NjY2NjJyknaWR8anBxUXx1YCc%2FJ3Zs",
+      "original_monthly_price_id": "price_1Txv04Bd6Wtvh7hsaiFLfFDD",
+      "minted_monthly_price_id": "price_1Txv08Bd6Wtvh7hsbloTfX3e",
+      "email": "iter399_checkout_premium_f2e44f285b@example.com",
+      "checkout_url_redacted": "https://pay.bidvex.com/c/pay/cs_***#fidnandhYHdWcXxpYCc%2FJ2FgY2RwaXEnKSd2cGd2ZndsdXFsamtQa2x0cGBrYHZ2QGtkZ2lgYSc%2FY2RpdmApJ2JwZGZkaGppYFNkd2xka3EnPydmamtxd2ppJyknZHVsTmB8Jz8ndW5aaWxzYFowNFZdRDJsR2EzUnFzbTJtdlRGNX9JSzxQdGs1d2dRMWQ3bzVtMUdzS0N8STVBZjd8cGtXYEdoTGFXaG5jc0d%2FQ2Q2TW92Qkpta0xVc2tKUFJqaTZSbWROYTU1SkxIXHNTfFwnKSdjd2poVmB3c2B3Jz9xd3BgKSdnZGZuYndqcGthRmppancnPycmY2NjY2NjJyknaWR8anBxUXx1YCc%2FJ3Zsa2JpYFpscWBoJyknYGtkZ2lgVWlkZmBtamlhYHd2Jz9xd3BgeCUl",
+      "stripe_session_id": "cs_live_a1OVKs835aKjyIhpzTyVHZFWMi8CuwAF0VPsSdHFmROY87URngT1dysbEO",
+      "stripe_mode": "subscription",
+      "stripe_status": "open",
+      "stripe_line_price_ids": [
+        "price_1Txv08Bd6Wtvh7hsbloTfX3e"
+      ]
+    },
+    "tier_resolver_synthetic_admin_price": {
+      "synthetic_price_id": "price_iter399_test_a80443c0",
+      "resolved_tier": "premium",
+      "cached_tier": "premium",
+      "original_yearly_price_id_restored": "price_1Txv08Bd6Wtvh7hsX1o0EiTq"
+    },
+    "status_free": {
+      "http_status": 200,
+      "response": "{\"subscription_tier\":\"free\",\"subscription_status\":\"inactive\",\"features\":{\"tier\":\"Free\",\"buyer_premium\":\"5%\",\"seller_commission\":\"4%\",\"auto_bid_bot\":false,\"priority_notifications\":false,\"early_access\":false,\"promotion_days\":0},\"subscription_start_date\":null,\"subscription_end_date\":null}",
+      "email": "iter399_status_free_6522f87ec1@example.com",
+      "features": {
+        "tier": "Free",
+        "buyer_premium": "5%",
+        "seller_commission": "4%",
+        "auto_bid_bot": false,
+        "priority_notifications": false,
+        "early_access": false,
+        "promotion_days": 0
+      }
+    },
+    "status_premium": {
+      "http_status": 200,
+      "response": "{\"subscription_tier\":\"premium\",\"subscription_status\":\"active\",\"features\":{\"tier\":\"Premium\",\"buyer_premium\":\"3.5%\",\"seller_commission\":\"2.5%\",\"auto_bid_bot\":true,\"priority_notifications\":true,\"early_access\":false,\"promotion_days\":3,\"price_yearly_cad\":180.0,\"price\":\"$180.00 CAD/year\",\"price_monthly_cad\":15.0},\"subscription_start_date\":null,\"subscription_end_date\":null}",
+      "email": "iter399_status_premium_f7ac0251f7@example.com",
+      "features": {
+        "tier": "Premium",
+        "buyer_premium": "3.5%",
+        "seller_commission": "2.5%",
+        "auto_bid_bot": true,
+        "priority_notifications": true,
+        "early_access": false,
+        "promotion_days": 3,
+        "price_yearly_cad": 180.0,
+        "price": "$180.00 CAD/year",
+        "price_monthly_cad": 15.0
+      }
+    }
+  },
+  "created_users": [
+    {
+      "label": "create_premium",
+      "email": "iter399_create_premium_2f297f970f@example.com",
+      "id": "1e469af2-f452-47cd-bf4d-dd4dc13042c9"
+    },
+    {
+      "label": "create_vip",
+      "email": "iter399_create_vip_2f53d5a439@example.com",
+      "id": "ab692de1-e46f-498b-8f55-4518b68f1584"
+    },
+    {
+      "label": "checkout_premium",
+      "email": "iter399_checkout_premium_f2e44f285b@example.com",
+      "id": "651e4a27-b942-4c04-a210-5523944f55b7"
+    },
+    {
+      "label": "status_free",
+      "email": "iter399_status_free_6522f87ec1@example.com",
+      "id": "319d2032-dff3-4619-99d9-c2591e822c0c"
+    },
+    {
+      "label": "status_premium",
+      "email": "iter399_status_premium_f7ac0251f7@example.com",
+      "id": "6c3490d4-beca-4bb9-b8c6-228345e8c11c"
+    }
+  ],
+  "created_stripe_sessions": [
+    {
+      "session_id": "cs_live_a1OVKs835aKjyIhpzTyVHZFWMi8CuwAF0VPsSdHFmROY87URngT1dysbEO"
+    }
+  ],
+  "created_stripe_prices_seen": [
+    {
+      "plan_id": "premium",
+      "flow": "subscriptions/create",
+      "price_id": "price_1Txv04Bd6Wtvh7hsaiFLfFDD"
+    },
+    {
+      "plan_id": "vip",
+      "flow": "subscriptions/create",
+      "price_id": "price_1Txv06Bd6Wtvh7hsLBaBxBHS"
+    },
+    {
+      "plan_id": "premium",
+      "flow": "subscription/checkout",
+      "price_id": "price_1Txv08Bd6Wtvh7hsbloTfX3e"
+    }
+  ],
+  "restores": [
+    {
+      "plan_id": "premium",
+      "field": "stripe_price_id_yearly",
+      "restored_to": "price_1Txv08Bd6Wtvh7hsX1o0EiTq"
+    },
+    {
+      "plan_id": "premium",
+      "field": "stripe_price_id_monthly",
+      "left_populated_as": "price_1Txv08Bd6Wtvh7hsbloTfX3e"
+    },
+    {
+      "plan_id": "vip",
+      "field": "stripe_price_id_monthly",
+      "left_populated_as": "price_1Txv06Bd6Wtvh7hsLBaBxBHS"
+    }
+  ],
+  "health": {
+    "status": 200,
+    "text": "{\"message\":\"Bazario API v1.0\"}"
+  },
+  "original_plan_price_ids": {
+    "premium": {
+      "stripe_price_id_monthly": "price_1TxuxkBd6Wtvh7hs6dHUT9o8",
+      "stripe_price_id_yearly": "price_1TxuxlBd6Wtvh7hs94470snR",
+      "price_monthly": 15.0,
+      "price_yearly": 180.0
+    },
+    "vip": {
+      "stripe_price_id_monthly": "price_1TxuxlBd6Wtvh7hsd73kK1Q1",
+      "stripe_price_id_yearly": "price_1TxuxmBd6Wtvh7hs28YouReU",
+      "price_monthly": 25.0,
+      "price_yearly": 300.0
+    }
+  },
+  "overall": "failed",
+  "error": "CheckError('register status_vip failed: 429 {\"error\":\"rate_limit_exceeded\",\"message_en\":\"Too many requests. Please wait before trying again.\",\"message_fr\":\"Trop de requ\u00eates. Veuillez patienter avant de r\u00e9essayer.\",\"retry_after_seconds\":60}')",
+  "final_plan_price_ids": {
+    "premium": {
+      "stripe_price_id_monthly": "price_1Txv08Bd6Wtvh7hsbloTfX3e",
+      "stripe_price_id_yearly": "price_1Txv08Bd6Wtvh7hsX1o0EiTq"
+    },
+    "vip": {
+      "stripe_price_id_monthly": "price_1Txv06Bd6Wtvh7hsLBaBxBHS",
+      "stripe_price_id_yearly": "price_1Txv06Bd6Wtvh7hsJuwpFF5H"
+    }
+  }
+}

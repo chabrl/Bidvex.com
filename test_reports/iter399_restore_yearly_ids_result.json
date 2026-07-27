@@ -1,0 +1,22 @@
+{
+  "restored_yearly": [
+    {
+      "plan_id": "premium",
+      "stripe_price_id_yearly": "price_1TxuxlBd6Wtvh7hs94470snR"
+    },
+    {
+      "plan_id": "vip",
+      "stripe_price_id_yearly": "price_1TxuxmBd6Wtvh7hs28YouReU"
+    }
+  ],
+  "final": {
+    "premium": {
+      "stripe_price_id_monthly": "price_1Txv08Bd6Wtvh7hsbloTfX3e",
+      "stripe_price_id_yearly": "price_1TxuxlBd6Wtvh7hs94470snR"
+    },
+    "vip": {
+      "stripe_price_id_monthly": "price_1Txv06Bd6Wtvh7hsLBaBxBHS",
+      "stripe_price_id_yearly": "price_1TxuxmBd6Wtvh7hs28YouReU"
+    }
+  }
+}
