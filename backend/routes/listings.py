@@ -1973,23 +1973,58 @@ async def export_auction_terms_pdf(listing_id: str):
 
 @listings_router.post("/multi-item-listings/{listing_id}/accept-terms")
 async def accept_auction_terms(listing_id: str, current_user: User = Depends(get_current_user)):
-    """Record that a user has accepted the auction terms for a specific auction."""
+    """Record that a user has accepted the auction terms for a specific auction.
+
+    iter400 — Accepting ANY listing T&C now ALSO satisfies the platform-level
+    Trust Gate terms pillar. Rationale: the platform T&C is a strict subset
+    of every seller's per-auction T&C (both bind the user to the same
+    marketplace-wide obligations). If a user is legally accepting the more
+    specific per-auction terms, they are implicitly accepting the platform
+    terms; there is no coherent state where a user has accepted an auction
+    T&C but is still refused for lacking a global acceptance.
+
+    We stamp `platform_terms_accepted_at` (idempotent — only on first accept)
+    so the Trust Gate `terms_accepted` pillar flips to True in one shot.
+    """
     db = get_db()
     listing = await db.multi_item_listings.find_one({"id": listing_id}, {"_id": 0, "id": 1, "title": 1})
     if not listing:
         raise HTTPException(status_code=404, detail="Auction not found")
 
+    now_iso = datetime.now(timezone.utc).isoformat()
     agreement_key = f"auction_agreements.{listing_id}"
+
+    # iter400 — atomic update: stamp per-auction agreement AND (only if
+    # missing) stamp platform_terms_accepted_at + version. Using $set on
+    # the auction key and a conditional $setOnInsert-style guard via
+    # two-step so we don't overwrite an earlier platform acceptance.
     await db.users.update_one(
         {"id": current_user.id},
-        {"$set": {agreement_key: datetime.now(timezone.utc).isoformat()}}
+        {"$set": {agreement_key: now_iso}},
+    )
+    # Only stamp platform_terms_accepted_at if it isn't already set — this
+    # preserves the ORIGINAL acceptance timestamp for audit purposes.
+    await db.users.update_one(
+        {"id": current_user.id,
+         "$or": [
+             {"platform_terms_accepted_at": {"$exists": False}},
+             {"platform_terms_accepted_at": None},
+             {"platform_terms_accepted_at": ""},
+         ]},
+        {"$set": {
+            "platform_terms_accepted_at":  now_iso,
+            "platform_terms_version":      "v1",
+            "platform_terms_last_seen_at": now_iso,
+            "platform_terms_source":       f"listing_accept:{listing_id}",
+        }},
     )
 
     return {
         "success": True,
         "message": "Auction terms accepted",
         "auction_id": listing_id,
-        "accepted_at": datetime.now(timezone.utc).isoformat()
+        "accepted_at": now_iso,
+        "platform_terms_accepted": True,
     }
 
 

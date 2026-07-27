@@ -12,7 +12,12 @@ const useMarketplaceSync = (onUpdate) => {
   onUpdateRef.current = onUpdate;
 
   const connect = useCallback(() => {
-    const base = process.env.REACT_APP_BACKEND_URL || '';
+    // iter400 — Fall back to runtime origin when REACT_APP_BACKEND_URL
+    // is empty/relative so we NEVER produce a broken `ws://api/...` URL.
+    let base = process.env.REACT_APP_BACKEND_URL || '';
+    if (!/^https?:\/\//i.test(base) && typeof window !== 'undefined') {
+      base = window.location.origin || '';
+    }
     const wsUrl = base.replace(/^http/, 'ws') + '/api/ws/marketplace';
 
     try {

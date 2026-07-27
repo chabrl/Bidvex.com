@@ -215,7 +215,10 @@ export default function LotDetailPage() {
       const res = await axios.get(`${API}/multi-item-listings/${auctionId}`);
       setListing(res.data);
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Failed to place bid');
+      // iter400 — use extractErrorMessage so bilingual Trust-Gate 403
+      // envelopes render as a clean string (not a raw object → React #31).
+      const { extractErrorMessage } = await import('../utils/errorHandler');
+      toast.error(extractErrorMessage(e) || 'Failed to place bid');
     }
   };
 

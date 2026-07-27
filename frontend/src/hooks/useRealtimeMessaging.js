@@ -28,8 +28,14 @@ export const useRealtimeMessaging = (conversationId) => {
   const connectRef = useRef(null);
   const maxReconnectAttempts = 10;
 
-  const API_URL = API_BASE || 'http://localhost:8001';
-  const WS_BASE = API_URL.replace('/api', '').replace('https', 'wss').replace('http', 'ws');
+  // iter400 — Robust WS base with runtime-origin fallback.
+  const RUNTIME_ORIGIN = (typeof window !== 'undefined' && window.location && window.location.origin) || '';
+  let _apiRoot = (API_BASE || '').replace(/\/api\/?$/, '');
+  if (!/^https?:\/\//i.test(_apiRoot)) {
+    _apiRoot = RUNTIME_ORIGIN || 'http://localhost:8001';
+  }
+  const API_URL = _apiRoot + '/api';
+  const WS_BASE = _apiRoot.replace('https:', 'wss:').replace('http:', 'ws:');
 
   // Connect to WebSocket
   const connect = useCallback(() => {

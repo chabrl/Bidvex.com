@@ -131,9 +131,10 @@ const StorageAuctionDetail = () => {
       setMaxBid('');
       fetchData();
     } catch (err) {
-      const detail = err?.response?.data?.detail;
-      const msg = typeof detail === 'object' ? (isFr ? detail.message_fr : detail.message_en) : (detail || 'Bid failed');
-      toast.error(msg);
+      // iter400 — route through the shared bilingual extractor so any
+      // Trust Gate / rate-limit / validation shape renders as a string.
+      const { extractErrorMessage } = await import('../../utils/errorHandler');
+      toast.error(extractErrorMessage(err) || 'Bid failed');
     } finally {
       setSubmittingBid(false);
     }

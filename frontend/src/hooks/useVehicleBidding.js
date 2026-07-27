@@ -8,8 +8,18 @@ import API_BASE from '../config';
 import { useState, useEffect, useCallback, useRef } from 'react';
 
 const getWebSocketUrl = () => {
-  const backendUrl = API_BASE || '';
-  return backendUrl.replace('/api', '').replace('https://', 'wss://').replace('http://', 'ws://');
+  // iter400 — Prefer the runtime origin so the WS ALWAYS matches the host
+  // the user loaded the page from. Guards against a missing/relative
+  // REACT_APP_BACKEND_URL producing a broken `ws://api/...` URL.
+  const runtimeOrigin = (typeof window !== 'undefined' && window.location && window.location.origin) || '';
+  let base = API_BASE || '';
+  // Strip trailing /api if present
+  base = base.replace(/\/api\/?$/, '');
+  // If base is empty or doesn't start with http(s), fall back to runtime origin
+  if (!/^https?:\/\//i.test(base)) {
+    base = runtimeOrigin;
+  }
+  return base.replace('https://', 'wss://').replace('http://', 'ws://');
 };
 
 export const useVehicleBidding = (vehicleId, enabled = true, vehicleData = null) => {

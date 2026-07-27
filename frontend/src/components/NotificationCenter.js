@@ -129,13 +129,29 @@ const NotificationCenter = () => {
   }, [user, token]);
 
   // iter267 Mission 4 — WebSocket for instant notification delivery.
+  // iter400 — Harden URL construction: when `REACT_APP_BACKEND_URL` is
+  // empty/relative (e.g. built with `/api` only, or missing at prod
+  // build time), fall back to `window.location.origin` so we NEVER end
+  // up with a broken `ws://api/...` URL. This also guarantees the WS
+  // uses the SAME origin the user loaded the page from, avoiding CORS
+  // and CSP violations.
   // Falls back transparently to 60s polling if the WS connection fails.
   useEffect(() => {
     if (!user?.id || !token) return undefined;
     let ws;
     let closed = false;
     try {
-      const apiBase = API.replace(/\/api\/?$/, '');
+      // Prefer the runtime origin so the WS always matches what the user
+      // sees in the browser bar. Guaranteed absolute (protocol + host)
+      // on every SPA render.
+      const runtimeOrigin = (typeof window !== 'undefined' && window.location && window.location.origin) || '';
+      let apiBase = API.replace(/\/api\/?$/, '');
+      // If apiBase is empty, missing protocol, or looks relative — use
+      // the runtime origin instead so we build an absolute wss:// URL.
+      const looksAbsolute = /^https?:\/\//i.test(apiBase);
+      if (!looksAbsolute) {
+        apiBase = runtimeOrigin;
+      }
       const wsProto = apiBase.startsWith('https:') ? 'wss:' : 'ws:';
       const wsHost = apiBase.replace(/^https?:/, '');
       const wsUrl = `${wsProto}${wsHost}/api/ws/notifications/${user.id}?token=${encodeURIComponent(token)}`;

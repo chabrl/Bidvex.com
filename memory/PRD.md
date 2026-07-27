@@ -1,6 +1,57 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter400 — Production Bug Fixes (Feb 8, 2026) ⚠️ 3-of-4 COMPLETE
+
+### Bug 1: Trust Gate `terms_accepted=false` after per-listing acceptance ✅ FIXED
+**Root cause**: Per-listing `POST /api/multi-item-listings/{id}/accept-terms` (and `/vehicles/{id}/accept-terms`) stamped `users.auction_agreements.{listing_id}` only, but the Trust Gate (iter396) checks `users.platform_terms_accepted_at`. Users who accepted a per-listing T&C were still blocked from bidding by the trust gate.
+
+**Fix (dual-layer, defence in depth)**:
+- `routes/listings.py::accept_auction_terms` and `routes/vehicles.py::accept_bidding_terms` now **also stamp `platform_terms_accepted_at`** (idempotent — only on first accept, preserving original timestamp for audit).
+- `services/trust_gate.py::_has_accepted_terms` now **recognizes any non-empty `auction_agreements`** as satisfying the terms pillar, so legacy users who accepted a listing T&C before the platform stamp existed also flip through.
+
+**Verified**: fresh user → trust_status shows `terms_accepted=false, missing=[phone,payment_method,terms]` → accept per-listing T&C → trust_status shows `terms_accepted=true, missing=[phone,payment_method]` with `platform_terms_accepted_at` populated.
+
+### Bug 3: Broken `ws://api/ws/notifications/...` WebSocket URL ✅ FIXED
+**Root cause**: `NotificationCenter.js`, `useRealtimeBidding.js`, `useRealtimeMessaging.js`, `useVehicleBidding.js`, `useMarketplaceSync.js`, and `MessageNotificationListener.js` built their WS URL by stripping `/api` from `REACT_APP_BACKEND_URL`. If that env var was empty/undefined at build time (config.js line 1: `${process.env.REACT_APP_BACKEND_URL}/api`), the base collapsed to `/api` or `undefined/api`, producing `ws://api/...` or `ws:undefined/api/...` — both invalid, both attributed to a broken relative URL.
+
+**Fix**: All six WebSocket URL builders now fall back to `window.location.origin` when the API_BASE is not an absolute `http(s)://` URL. Guarantees `wss://<current-host>/api/ws/...` in every scenario. Verified via node test with 4 pathological inputs — all produce valid absolute URLs.
+
+### Bug 4: React error #31 (rendering object as React child) ✅ FIXED
+**Root cause**: The Trust Gate `HTTPException(403, detail={...})` returns a bilingual envelope `{error, missing, message_en, message_fr, cta_path, ...}`. Bid handlers (`LotDetailPage.jsx`, `VehicleDetailPage.js`, `StorageAuctionDetail.js`, and any component storing `err.response.data.detail` in state) rendered this raw object as a React child, triggering React error #31.
+
+**Fix**:
+- `utils/errorHandler.js::extractErrorMessage` gained a "Case 3c" branch that detects `{message_en | message_fr}` and returns the locale-appropriate string (reads `document.documentElement.lang` → `localStorage.i18nextLng` → default `en`).
+- Bid handlers on `LotDetailPage.jsx`, `VehicleDetailPage.js` (both manual bid + auto-bid), and `StorageAuctionDetail.js` were re-wired to route their catches through `extractErrorMessage` so no raw object can leak into a toast/setError call.
+
+**Verified**: unit test with a full Trust Gate 403 payload → returns 158-char string `"Complete your Trust Status..."` starting with `message_en`.
+
+### Bug 2: `www_canonical_redirect` on `bidvex.com` → `www.bidvex.com` ⚠️ NEEDS USER INPUT
+**Investigation**: Exhaustive grep of `/app/backend` finds **no** middleware performing an apex→www redirect. The `www_canonical_redirect` middleware from iter354 was cleanly removed at commit `a74c04bc` (ticket 209107) and the only comment referencing it in `server.py:626-629` explicitly documents the removal. Live curl:
+```
+$ curl -sI https://bidvex.com/api/subscription-plans
+HTTP/2 200
+access-control-allow-origin: https://bidvex.com
+access-control-allow-credentials: true
+```
+No 301, no 308, no Location header. Preflight OPTIONS also returns 200 with correct CORS headers. Only apex→www redirect in the whole codebase is a **legitimate** social-share meta-refresh on the single endpoint `GET /api/promo/share/summer-launch` (crawler share URL). **User clarification needed** on the exact URL/browser/steps that produce the reported redirect — likely a Cloudflare page rule / DNS-level redirect, not code.
+
+### Files touched
+- `backend/routes/listings.py` (accept_auction_terms — also stamp platform_terms_accepted_at)
+- `backend/routes/vehicles.py` (accept_bidding_terms — same)
+- `backend/services/trust_gate.py` (_has_accepted_terms — accept per-listing agreements as satisfaction)
+- `frontend/src/utils/errorHandler.js` (Case 3c bilingual envelope handler)
+- `frontend/src/components/NotificationCenter.js` (WS URL fallback)
+- `frontend/src/hooks/useRealtimeBidding.js` (WS URL fallback)
+- `frontend/src/hooks/useRealtimeMessaging.js` (WS URL fallback)
+- `frontend/src/hooks/useVehicleBidding.js` (WS URL fallback)
+- `frontend/src/hooks/useMarketplaceSync.js` (WS URL fallback)
+- `frontend/src/components/MessageNotificationListener.js` (WS URL fallback)
+- `frontend/src/pages/LotDetailPage.jsx` (bid catch → extractErrorMessage)
+- `frontend/src/pages/vehicles/VehicleDetailPage.js` (bid + auto-bid catches → extractErrorMessage)
+- `frontend/src/pages/storage/StorageAuctionDetail.js` (bid catch → extractErrorMessage)
+
+
 ## iter399 — Broker Fee Sync + Trial Reminder + Annual-Only Enforcement (Feb 8, 2026) ✅ COMPLETE
 
 **Reported by user**: Three items:

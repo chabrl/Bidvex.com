@@ -329,8 +329,9 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
           ? `Enchère automatique configurée jusqu'à ${formatPrice(amount, vehicle?.currency)}`
           : `Auto-Bid configured up to ${formatPrice(amount, vehicle?.currency)}`);
       } catch (err) {
-        const detail = err?.response?.data?.detail;
-        toast.error(typeof detail === 'string' ? detail : (detail?.msg || 'Auto-Bid setup failed'));
+        // iter400 — Trust Gate + rate-limit bilingual envelopes.
+        const { extractErrorMessage } = await import('../../utils/errorHandler');
+        toast.error(extractErrorMessage(err) || 'Auto-Bid setup failed');
       } finally {
         setBidding(false);
       }
@@ -376,14 +377,20 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
       setBidAmount((amount + 100).toString());
       
     } catch (error) {
+      // iter400 — bilingual Trust Gate + rate-limit envelopes emit
+      // { error, message_en, message_fr }. Prefer these before falling
+      // back to raw detail JSON so React never receives a plain object.
+      const { extractErrorMessage } = await import('../../utils/errorHandler');
+      const extracted = extractErrorMessage(error);
+      let message = extracted || 'Failed to place bid';
+      // Keep legacy Pydantic array + object.msg handling as a safety net
       const detail = error.response?.data?.detail;
-      let message = 'Failed to place bid';
-      if (typeof detail === 'string') {
-        message = detail;
-      } else if (Array.isArray(detail)) {
-        message = detail.map(e => (typeof e === 'string' ? e : e?.msg || '')).filter(Boolean).join(', ') || message;
-      } else if (detail && typeof detail === 'object') {
-        message = detail.msg || JSON.stringify(detail);
+      if (message === 'An unexpected error occurred') {
+        if (Array.isArray(detail)) {
+          message = detail.map(e => (typeof e === 'string' ? e : e?.msg || '')).filter(Boolean).join(', ') || message;
+        } else if (detail && typeof detail === 'object' && detail.msg) {
+          message = detail.msg;
+        }
       }
       toast.error(message);
     } finally {

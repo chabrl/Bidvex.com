@@ -58,8 +58,18 @@ async def _has_accepted_terms(db, user) -> bool:
     Reads `platform_terms_accepted_at` off the user record. Falls back to
     a live DB lookup when the field isn't present on the in-memory model
     (some legacy code paths hand us a User without the fresh field).
+
+    iter400 — Also recognizes a per-listing T&C acceptance as satisfying
+    the pillar (any non-empty `auction_agreements` entry counts). This
+    handles legacy users who accepted a listing's T&C before the
+    platform-level stamp was introduced.
     """
     if _get(user, "platform_terms_accepted_at"):
+        return True
+    # iter400 — accept a per-listing agreement as proof the user has
+    # already legally opted in.
+    agreements = _get(user, "auction_agreements") or {}
+    if isinstance(agreements, dict) and any(agreements.values()):
         return True
     user_id = _get(user, "id")
     if not user_id:
@@ -67,11 +77,19 @@ async def _has_accepted_terms(db, user) -> bool:
     try:
         row = await db.users.find_one(
             {"id": user_id},
-            {"_id": 0, "platform_terms_accepted_at": 1},
+            {"_id": 0, "platform_terms_accepted_at": 1, "auction_agreements": 1},
         )
-        return bool(row and row.get("platform_terms_accepted_at"))
+        if not row:
+            return False
+        if row.get("platform_terms_accepted_at"):
+            return True
+        # DB fallback for the per-listing acceptance signal.
+        db_agreements = row.get("auction_agreements") or {}
+        if isinstance(db_agreements, dict) and any(db_agreements.values()):
+            return True
     except Exception:  # noqa: BLE001
         return False
+    return False
 
 
 async def user_can_bid_or_list(db, user) -> Tuple[bool, Dict[str, Any]]:

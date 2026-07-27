@@ -55,6 +55,28 @@ export const extractErrorMessage = (error) => {
     return data.detail.message;
   }
 
+  // Case 3c (iter400): Bilingual server error envelope
+  //   { error, missing, message_en, message_fr, cta_path, ... }
+  // Emitted by the Trust Gate (`services/trust_gate.py`) and the rate-limit
+  // handler. Rendering the raw object as a React child crashes with
+  // "Objects are not valid as a React child (found: object with keys
+  // {error, missing, message_en, message_fr, ...})" (React error #31).
+  // Prefer French message when the current UI locale is French; fall back
+  // to English otherwise.
+  if (typeof data?.detail === 'object' && (data.detail.message_en || data.detail.message_fr)) {
+    let lang = 'en';
+    try {
+      if (typeof document !== 'undefined') {
+        lang = (document.documentElement.getAttribute('lang')
+                || (typeof localStorage !== 'undefined' && localStorage.getItem('i18nextLng'))
+                || 'en').toLowerCase().slice(0, 2);
+      }
+    } catch (_) { /* ignore */ }
+    return lang === 'fr'
+      ? (data.detail.message_fr || data.detail.message_en)
+      : (data.detail.message_en || data.detail.message_fr);
+  }
+
   // Case 4: Error message at root level
   if (data?.message) {
     return data.message;

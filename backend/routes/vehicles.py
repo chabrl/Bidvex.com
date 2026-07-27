@@ -2222,7 +2222,25 @@ async def accept_bidding_terms(
     }
     
     await db.vehicle_legal_acceptances.insert_one(acceptance)
-    
+
+    # iter400 — Any per-listing T&C acceptance also satisfies the platform
+    # Trust Gate terms pillar. Stamp `platform_terms_accepted_at` (idempotent).
+    now_iso = datetime.now(timezone.utc).isoformat()
+    await db.users.update_one(
+        {"id": user["id"],
+         "$or": [
+             {"platform_terms_accepted_at": {"$exists": False}},
+             {"platform_terms_accepted_at": None},
+             {"platform_terms_accepted_at": ""},
+         ]},
+        {"$set": {
+            "platform_terms_accepted_at":  now_iso,
+            "platform_terms_version":      "v1",
+            "platform_terms_last_seen_at": now_iso,
+            "platform_terms_source":       f"vehicle_accept:{vehicle_id}",
+        }},
+    )
+
     return {"message": "Terms accepted", "acceptance_id": acceptance["id"]}
 
 
