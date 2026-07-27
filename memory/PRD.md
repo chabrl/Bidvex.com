@@ -1,6 +1,43 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter398 — Subscription P1 Fixes (Feb 8, 2026) ✅ COMPLETE
+
+**Reported by user**: Three P1 issues from the subscription audit:
+1. `PRICE_ID_TO_TIER` stayed hardcoded so admin price edits (which mint new Stripe Prices) caused webhook `_handle_subscription_created` to silently set paying users to `subscription_tier="free"`.
+2. Monthly/Yearly toggle on `SubscriptionPricingPage` showed monthly prices but `POST /subscriptions/create` always used `stripe_price_id_yearly` → users clicking Monthly paid yearly.
+3. Legacy `GET /api/subscription/status` returned hardcoded stub prices `$99.99/year` (Premium) and `$299.99/year` (VIP), out of sync with the real Stripe-synced $180 / $300 catalog. Also crashed with a 500 on any call (pre-existing AttributeError on `subscription_start_date` — the field lives on the raw user doc, not on the `User` Pydantic model).
+
+### Delivered
+- **P1 #1** — DB-aware price → tier resolver
+  - New `services/subscription_service.get_tier_from_price_id_async(db, price_id)` — checks the in-memory map first, then falls back to `subscription_plans` (matching `stripe_price_id_yearly` OR `stripe_price_id_monthly`), then hot-caches the result.
+  - New `services/subscription_service.register_price_id(price_id, tier)` — updates the in-memory reverse map. Called from `subscription_pricing._sync_plan_to_stripe` immediately after `stripe.Price.create` (both monthly + yearly branches).
+  - New `services/subscription_service.rebuild_price_id_map(db)` — one-shot hydration on server startup so process restarts don't lose the mappings written by admin edits during the previous process.
+  - `routes/webhooks.py::_handle_subscription_{created,updated}` now call `get_tier_from_price_id_async(db, price_id)` and fall back to `metadata.tier` / `metadata.plan_id` when the resolver still returns "free".
+  - Wired into `services/subscription_service.handle_subscription_event` same way.
+- **P1 #2** — Honest Monthly billing
+  - `POST /api/subscriptions/create` now accepts `billing_period` ("monthly" | "yearly"), picks the matching Stripe Price field on the plan doc, and lazy-mints the Stripe Price via `_sync_plan_to_stripe` when the user is first to pick a period that hasn't been created yet.
+  - Subscription period_end computed as +1 month (monthly) or +1 year (yearly). Metadata records `billing_period`. Invoice amount reads `plan.price_{period}`.
+  - Frontend `SubscriptionPricingPage.handleCheckout` now passes `billing_period: isYearly ? 'yearly' : 'monthly'` to `/subscriptions/create`. Hosted-checkout fallback already passed this param.
+- **P1 #3** — Legacy `/api/subscription/status` sourced from DB catalog
+  - Endpoint now fetches the plan from `subscription_plans` via `SubscriptionPricingService.get_plan(tier)` and returns `price_yearly_cad`, `price_monthly_cad`, and a formatted `"$180.00 CAD/year"` / `"$300.00 CAD/year"` price string.
+  - Fixed pre-existing 500 by reading `subscription_start_date` / `subscription_end_date` from the user doc directly instead of the User Pydantic model (which never had those fields).
+
+### Verified via unit assertions (P1 #1 + P1 #3)
+- `get_tier_from_price_id_async(db, <admin-created price>)` → returns correct tier ("premium") after simulating an admin edit.
+- Hot-caching: subsequent sync `get_tier_from_price_id()` returns the cached mapping.
+- `/api/subscription/status` returns `"$180.00 CAD/year"` for a Premium user and `"$300.00 CAD/year"` for a VIP user (both previously wrong).
+- P1 #2 verification handed off to bug_testing_agent (needs live Stripe card-on-file scenario).
+
+### Files touched
+- `backend/services/subscription_service.py` (new resolver + registrar + rebuilder + exports)
+- `backend/services/subscription_pricing.py` (register_price_id from _sync_plan_to_stripe)
+- `backend/routes/webhooks.py` (async resolver in subscription created/updated handlers)
+- `backend/routes/subscriptions.py` (billing_period wired end-to-end; /subscription/status fixed)
+- `backend/server.py` (startup call to rebuild_price_id_map)
+- `frontend/src/pages/SubscriptionPricingPage.js` (billing_period passed to /subscriptions/create)
+
+
 ## iter397 — Subscription P0 Fixes (Feb 8, 2026) ✅ COMPLETE
 
 **Reported by user**: Fix three P0 issues from the subscription-plans audit:

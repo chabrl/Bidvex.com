@@ -189,8 +189,91 @@ def _ensure_partner_pro_stripe_price():
 
 
 def get_tier_from_price_id(price_id: str) -> str:
-    """Get subscription tier from Stripe price ID"""
+    """Get subscription tier from Stripe price ID (in-memory map only).
+
+    For legacy sync callers. Prefer `get_tier_from_price_id_async(db, price_id)`
+    which also consults the live `subscription_plans` collection so admin
+    price edits (which create new Stripe Prices) never resolve to `"free"`.
+    """
     return PRICE_ID_TO_TIER.get(price_id, "free")
+
+
+async def get_tier_from_price_id_async(db, price_id: str) -> str:
+    """iter398 — DB-aware price→tier resolver.
+
+    Order of resolution:
+      1. In-memory `PRICE_ID_TO_TIER` (hardcoded pins + runtime additions).
+      2. `subscription_plans` collection — matches by `stripe_price_id_yearly`
+         OR `stripe_price_id_monthly`. This is the authoritative fallback
+         when an admin has updated a plan's price via
+         `PUT /admin/subscription-plans/{plan_id}` (which mints a NEW
+         Stripe Price and stores its id on the plan doc).
+      3. Default `"free"` — final safety net.
+
+    Also hot-registers any DB hits into `PRICE_ID_TO_TIER` so subsequent
+    lookups in the same process are O(1).
+    """
+    if not price_id:
+        return "free"
+    tier = PRICE_ID_TO_TIER.get(price_id)
+    if tier:
+        return tier
+    if db is None:
+        return "free"
+    try:
+        doc = await db.subscription_plans.find_one(
+            {"$or": [
+                {"stripe_price_id_yearly":  price_id},
+                {"stripe_price_id_monthly": price_id},
+            ]},
+            {"_id": 0, "plan_id": 1},
+        )
+        if doc and doc.get("plan_id"):
+            tier = doc["plan_id"]
+            PRICE_ID_TO_TIER[price_id] = tier  # cache
+            return tier
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[get_tier_from_price_id_async] db lookup failed: {e}")
+    return "free"
+
+
+def register_price_id(price_id: str, tier: str) -> None:
+    """iter398 — Update the in-memory reverse map after a new Stripe Price
+    is created. Called by `subscription_pricing._sync_plan_to_stripe`
+    right after `stripe.Price.create` succeeds so the same process's
+    webhook handler can resolve the new price → tier immediately.
+    """
+    if not price_id or not tier:
+        return
+    PRICE_ID_TO_TIER[price_id] = tier.lower().strip()
+
+
+async def rebuild_price_id_map(db) -> int:
+    """iter398 — One-shot sync from `subscription_plans` → PRICE_ID_TO_TIER.
+
+    Called on server startup so process restarts don't lose the mappings
+    written by admin edits during the previous process. Returns the
+    number of entries added.
+    """
+    if db is None:
+        return 0
+    added = 0
+    try:
+        async for doc in db.subscription_plans.find(
+            {},
+            {"_id": 0, "plan_id": 1, "stripe_price_id_yearly": 1, "stripe_price_id_monthly": 1},
+        ):
+            plan_id = doc.get("plan_id")
+            if not plan_id:
+                continue
+            for key in ("stripe_price_id_yearly", "stripe_price_id_monthly"):
+                pid = doc.get(key)
+                if pid and pid not in PRICE_ID_TO_TIER:
+                    PRICE_ID_TO_TIER[pid] = plan_id
+                    added += 1
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[rebuild_price_id_map] failed: {e}")
+    return added
 
 
 def get_price_id_for_tier(tier: str) -> str:
@@ -376,7 +459,17 @@ async def handle_subscription_event(
         items = subscription_data.get("items", {}).get("data", [])
         if items:
             price_id = items[0].get("price", {}).get("id")
-            tier = get_tier_from_price_id(price_id)
+            # iter398 — DB-aware resolver picks up admin-created Stripe
+            # Prices (e.g. after PUT /admin/subscription-plans mints a
+            # new price) so paying users aren't silently set to "free".
+            tier = await get_tier_from_price_id_async(db, price_id)
+            # Metadata override: if the checkout metadata explicitly named
+            # a tier, prefer it (belt-and-braces for coupon-driven
+            # switches or manual overrides).
+            meta_tier = (subscription_data.get("metadata") or {}).get("tier") \
+                or (subscription_data.get("metadata") or {}).get("plan_id")
+            if tier == "free" and meta_tier:
+                tier = meta_tier.lower().strip()
         else:
             tier = subscription_data.get("metadata", {}).get("tier", "free")
         
@@ -480,6 +573,9 @@ __all__ = [
     "SELLER_COMMISSION_RATES",
     "TIER_BENEFITS",
     "get_tier_from_price_id",
+    "get_tier_from_price_id_async",
+    "register_price_id",
+    "rebuild_price_id_map",
     "get_price_id_for_tier",
     "get_buyer_premium_rate",
     "get_seller_commission_rate",

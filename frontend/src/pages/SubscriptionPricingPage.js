@@ -125,7 +125,7 @@ const SubscriptionPricingPage = () => {
         try {
           const res = await axios.post(
             `${API}/subscriptions/create`,
-            { plan_id: plan.plan_id },
+            { plan_id: plan.plan_id, billing_period: isYearly ? 'yearly' : 'monthly' },
             { headers: { Authorization: `Bearer ${token}` } }
           );
           if (res.data.success) {

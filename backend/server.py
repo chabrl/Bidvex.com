@@ -525,6 +525,20 @@ async def lifespan(app):
     except Exception as e:
         logger.warning(f"[iter216] partner-fee sync failed (non-fatal): {e}")
 
+    # ── iter398 — Rebuild PRICE_ID_TO_TIER reverse map on boot ──
+    # After a restart the in-memory reverse map only contains the 3
+    # hardcoded pins from `services.subscription_service`. Read every
+    # `subscription_plans.stripe_price_id_{yearly,monthly}` and register
+    # them so webhook `_handle_subscription_created` can resolve any
+    # admin-created price → correct tier immediately.
+    try:
+        from services.subscription_service import rebuild_price_id_map
+        added = await rebuild_price_id_map(db)
+        if added:
+            logger.info(f"[iter398] PRICE_ID_TO_TIER hydrated with {added} Stripe price IDs from subscription_plans")
+    except Exception as e:
+        logger.warning(f"[iter398] rebuild_price_id_map failed (non-fatal): {e}")
+
     # ── iter194 — Vehicle dealer license / unlock-fee backfill ──
     try:
         from routes.vehicle_dealer_extras import migrate_existing_vehicle_listings

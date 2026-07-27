@@ -1,0 +1,68 @@
+{
+  "api_base": "https://prod-verify-2.preview.emergentagent.com",
+  "checks": {
+    "dynamic_price_id_to_tier": {
+      "async_resolved_tier": "premium",
+      "fake_price": "price_iter398_test_admin_edit_1785183227",
+      "registered_synth_price": "price_iter398_synth_1785183234",
+      "sync_resolved_tier": "vip"
+    },
+    "legacy_subscription_status": {
+      "free_features": {
+        "auto_bid_bot": false,
+        "buyer_premium": "5%",
+        "early_access": false,
+        "priority_notifications": false,
+        "promotion_days": 0,
+        "seller_commission": "4%",
+        "tier": "Free"
+      },
+      "premium_features": {
+        "auto_bid_bot": true,
+        "buyer_premium": "3.5%",
+        "early_access": false,
+        "price": "$180.00 CAD/year",
+        "price_monthly_cad": 15.0,
+        "price_yearly_cad": 180.0,
+        "priority_notifications": true,
+        "promotion_days": 3,
+        "seller_commission": "2.5%",
+        "tier": "Premium"
+      },
+      "vip_features": {
+        "auto_bid_bot": true,
+        "buyer_premium": "3%",
+        "early_access": true,
+        "price": "$300.00 CAD/year",
+        "price_monthly_cad": 25.0,
+        "price_yearly_cad": 300.0,
+        "priority_notifications": true,
+        "promotion_days": 7,
+        "seller_commission": "2%",
+        "tier": "VIP"
+      }
+    },
+    "monthly_billing_period_create": {
+      "detail": "No Stripe customer on file. Please add a payment method first.",
+      "premium_stripe_price_id_monthly": null,
+      "premium_stripe_price_id_yearly": "price_1T5V5xBd6Wtvh7hscWcNnk34",
+      "status_code": 400
+    },
+    "public_subscription_plans": {
+      "premium_price_monthly": 15.0,
+      "premium_price_yearly": 180.0,
+      "premium_stripe_price_id_monthly": null,
+      "premium_stripe_price_id_yearly": "price_1T5V5xBd6Wtvh7hscWcNnk34",
+      "vip_price_monthly": 25.0,
+      "vip_price_yearly": 300.0
+    }
+  },
+  "created_emails": [
+    "iter398_monthly_1785183235_e0k9eeqn@example.com",
+    "iter398_status_1785183236_fjxlrh4m@example.com"
+  ],
+  "failures": [
+    "P1 #2: premium stripe_price_id_monthly is still missing after monthly create attempt: {'stripe_price_id_yearly': 'price_1T5V5xBd6Wtvh7hscWcNnk34'}"
+  ],
+  "ok": false
+}

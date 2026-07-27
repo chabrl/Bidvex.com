@@ -1,0 +1,59 @@
+{
+  "verdict": "not_fixed",
+  "user_reported_bug": "Fix three P1 subscription issues: First, update PRICE_ID_TO_TIER dynamically after any admin price edit via PUT /admin/subscription-plans so that when a new Stripe Price is created, the reverse map is updated and webhook tier assignment never defaults to free for paying users. Second, fix the Monthly/Yearly billing toggle on SubscriptionPricingPage so selecting Monthly actually bills monthly using the monthly Stripe Price ID, not yearly. Third, fix the legacy /api/subscription/status endpoint which returns wrong prices ($99.99 and $299.99) \u2014 update it to read from the same source of truth as the rest of the subscription system.",
+  "summary": "Focused iter398 verification completed. No relevant testing skill found. P1 #1 dynamic price-id tier resolution passed, P1 #3 legacy /api/subscription/status pricing passed, and the visible pricing page toggle shows $15/$25 monthly. P1 #2 is still not fixed end-to-end: POST /api/subscriptions/create with billing_period=monthly returns before lazy-minting a monthly Stripe Price, leaving premium.stripe_price_id_monthly null, so monthly recurring billing is not safely configured.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "POST /api/subscriptions/create",
+        "issue": "For a fresh user requesting plan_id=premium with billing_period=monthly, the endpoint returns 400 'No Stripe customer on file' before plan lookup/lazy _sync_plan_to_stripe. DB still has subscription_plans.premium.stripe_price_id_monthly=null after the call, violating the required lazy-mint behavior and leaving monthly recurring billing unconfigured.",
+        "priority": "CRITICAL"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "SubscriptionPricingPage monthly checkout",
+        "issue": "UI toggle displays monthly prices and sends billing_period=monthly, but backend monthly Stripe Price ID remains absent; /subscription/checkout code also falls back to one-time payment mode when stripe_price_id_monthly is missing, so selecting Monthly is not proven to bill as a recurring monthly subscription.",
+        "affected_selectors": [
+          "[data-testid=\"billing-toggle\"]",
+          "[data-testid=\"select-plan-premium\"]",
+          "[data-testid=\"select-plan-vip\"]"
+        ]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter398_p1_subscription_fixes.py",
+    "/app/test_reports/iter398_backend_run.json"
+  ],
+  "action_items": [
+    "Move monthly/yearly plan lookup and lazy _sync_plan_to_stripe before the stripe_customer_id/default_payment checks in POST /api/subscriptions/create, or otherwise ensure missing monthly Stripe Prices are minted before returning the expected no-customer/no-card errors.",
+    "Add the same lazy recurring Stripe Price sync to /api/subscription/checkout so hosted Checkout monthly mode never falls back to one-time payment because stripe_price_id_monthly is null.",
+    "Retest iter398 P1 #2 after premium/vip monthly Stripe Price IDs are populated/registered."
+  ],
+  "critical_code_review_comments": [
+    "routes/subscriptions.py create_subscription lines ~342-349 check customer/payment method before lines ~350-377 plan lookup/lazy price sync, so fresh-user monthly requests cannot create stripe_price_id_monthly.",
+    "routes/subscriptions.py create_subscription correctly chooses price_field by billing_period, but the lazy sync is unreachable for users without a Stripe customer/card, which was the explicit expected test path.",
+    "routes/subscriptions.py /subscription/checkout chooses stripe_price_id_monthly when monthly, but if missing uses mode='payment' price_data rather than a recurring subscription Price, which can still make Monthly not actually bill monthly."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter398_p1_subscription_fixes.py",
+    "/app/test_reports/iter398_backend_run.json",
+    "/app/test_reports/bug_verification_398.json",
+    "/app/test_reports/iteration_398.json"
+  ],
+  "success_rate": {
+    "backend": "67%",
+    "frontend": "50%"
+  },
+  "seed_data_creation": "Created temporary iter398_monthly_* and iter398_status_* users via /api/auth/register and cleaned them up. Directly mutated subscription_plans.premium.stripe_price_id_yearly to a synthetic value for P1 #1 and restored it to price_1T5V5xBd6Wtvh7hscWcNnk34.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run /app/backend/tests/test_iter398_p1_subscription_fixes.py. Current failing proof is /app/test_reports/iter398_backend_run.json: premium_stripe_price_id_monthly stayed null after POST /api/subscriptions/create with billing_period=monthly. Browser automation confirmed /pricing monthly toggle text shows $15 Premium and $25 VIP.",
+  "rca_of_the_issue": "The fix partially landed. Dynamic PRICE_ID_TO_TIER and DB-sourced legacy status work. The monthly-create lazy-mint is placed after early customer/payment-method validation, so the fresh-user path required by the bug report exits before _sync_plan_to_stripe can create/register the monthly Stripe Price. Hosted checkout has a related gap because missing monthly Price IDs cause mode='payment' one-time checkout instead of recurring monthly subscription."
+}

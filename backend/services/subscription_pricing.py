@@ -397,6 +397,15 @@ class SubscriptionPricingService:
                     {"plan_id": plan_id},
                     {"$set": {"stripe_price_id_monthly": price.id}}
                 )
+                # iter398 — Register the new Price ID in the in-memory
+                # reverse map so webhook `_handle_subscription_created`
+                # (same process) can resolve it to the correct tier
+                # immediately, instead of defaulting the user to "free".
+                try:
+                    from services.subscription_service import register_price_id
+                    register_price_id(price.id, plan_id)
+                except Exception as _reg_err:  # noqa: BLE001
+                    logger.warning(f"register_price_id (monthly) failed: {_reg_err}")
                 logger.info(f"Created Stripe monthly price for {plan_id}: {price.id}")
             
             # Create/update yearly price
@@ -412,6 +421,13 @@ class SubscriptionPricingService:
                     {"plan_id": plan_id},
                     {"$set": {"stripe_price_id_yearly": price.id}}
                 )
+                # iter398 — Register the new Price ID in the in-memory
+                # reverse map (see monthly branch above).
+                try:
+                    from services.subscription_service import register_price_id
+                    register_price_id(price.id, plan_id)
+                except Exception as _reg_err:  # noqa: BLE001
+                    logger.warning(f"register_price_id (yearly) failed: {_reg_err}")
                 logger.info(f"Created Stripe yearly price for {plan_id}: {price.id}")
                 
         except stripe.StripeError as e:

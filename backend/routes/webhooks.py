@@ -12,7 +12,7 @@ from datetime import datetime, timezone, timedelta
 import logging
 import json
 
-from services.subscription_service import handle_subscription_event, get_tier_from_price_id
+from services.subscription_service import handle_subscription_event, get_tier_from_price_id, get_tier_from_price_id_async
 
 logger = logging.getLogger(__name__)
 
@@ -649,7 +649,14 @@ async def _handle_subscription_created(db, subscription):
     
     # Map Stripe price to tier
     price_id = subscription.get("items", {}).get("data", [{}])[0].get("price", {}).get("id")
-    tier = _map_price_to_tier(price_id)
+    # iter398 — DB-aware lookup falls back to `subscription_plans` when
+    # the in-memory map misses (admin-created prices).
+    tier = await get_tier_from_price_id_async(db, price_id)
+    if tier == "free":
+        meta_tier = (subscription.get("metadata") or {}).get("tier") \
+            or (subscription.get("metadata") or {}).get("plan_id")
+        if meta_tier:
+            tier = meta_tier.lower().strip()
     
     await db.users.update_one(
         {"id": user["id"]},
@@ -686,7 +693,14 @@ async def _handle_subscription_updated(db, subscription):
     
     if status == "active":
         price_id = subscription.get("items", {}).get("data", [{}])[0].get("price", {}).get("id")
-        update["subscription_tier"] = _map_price_to_tier(price_id)
+        # iter398 — DB-aware lookup.
+        tier_resolved = await get_tier_from_price_id_async(db, price_id)
+        if tier_resolved == "free":
+            meta_tier = (subscription.get("metadata") or {}).get("tier") \
+                or (subscription.get("metadata") or {}).get("plan_id")
+            if meta_tier:
+                tier_resolved = meta_tier.lower().strip()
+        update["subscription_tier"] = tier_resolved
         update["subscription_end_date"] = datetime.fromtimestamp(
             subscription.get("current_period_end", 0),
             tz=timezone.utc

@@ -323,8 +323,15 @@ async def create_subscription(
     """
     Create a Stripe subscription using the user's saved default payment method.
     No redirect — charges the card on file directly.
+
+    iter398 — `billing_period` (default "yearly") now honors "monthly" too;
+    the endpoint picks `stripe_price_id_monthly` and lazily mints the
+    Stripe Price on first use if it isn't yet stored on the plan.
     """
     plan_id = data.get("plan_id")  # "premium", "partner_pro", or "vip"
+    billing_period = (data.get("billing_period") or "yearly").lower().strip()
+    if billing_period not in ("yearly", "monthly"):
+        billing_period = "yearly"
     if plan_id not in ("premium", "partner_pro", "vip"):
         raise HTTPException(status_code=400, detail="Invalid plan. Choose 'premium', 'partner_pro', or 'vip'.")
 
@@ -346,9 +353,28 @@ async def create_subscription(
     if not plan:
         raise HTTPException(status_code=400, detail="Plan not found")
 
-    stripe_price_id = plan.get("stripe_price_id_yearly")
+    # iter398 — pick the price ID matching the requested billing period.
+    price_field = "stripe_price_id_monthly" if billing_period == "monthly" else "stripe_price_id_yearly"
+    stripe_price_id = plan.get(price_field)
+
+    # iter398 — Lazy-mint the missing Stripe Price when a user is the
+    # first to pick a billing period that hasn't been synced yet
+    # (Premium/VIP were seeded with yearly prices only; monthly IDs are
+    # created on-demand here so the Monthly toggle actually charges the
+    # documented monthly rate instead of quietly failing).
+    if not stripe_price_id and plan.get(f"price_{billing_period}", 0) > 0:
+        try:
+            await pricing_service._sync_plan_to_stripe(plan_id, plan)
+            plan = await pricing_service.get_plan(plan_id)  # reload
+            stripe_price_id = plan.get(price_field)
+        except Exception as sync_err:
+            logger.error(f"[iter398] on-demand Stripe price sync failed for {plan_id}/{billing_period}: {sync_err}")
+
     if not stripe_price_id:
-        raise HTTPException(status_code=400, detail="Stripe price not configured for this plan")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Stripe price not configured for this plan ({billing_period})",
+        )
 
     # Handle existing subscription — upgrade with proration instead of cancel
     existing_sub_id = user.get("stripe_subscription_id")
@@ -374,14 +400,21 @@ async def create_subscription(
                         metadata={
                             "user_id": current_user.id,
                             "plan_id": plan_id,
-                            "billing_period": "yearly"
+                            "billing_period": billing_period
                         }
                     )
                     
                     up_data = dict(updated_sub)
                     start_ts = up_data.get("start_date") or up_data.get("billing_cycle_anchor") or up_data.get("created")
                     start_dt = datetime.fromtimestamp(start_ts, tz=timezone.utc) if start_ts else datetime.now(timezone.utc)
-                    end_dt = start_dt.replace(year=start_dt.year + 1)
+                    # iter398 — Period end depends on the billing interval
+                    # the user selected (monthly vs yearly).
+                    if billing_period == "monthly":
+                        _y = start_dt.year + (1 if start_dt.month == 12 else 0)
+                        _m = 1 if start_dt.month == 12 else start_dt.month + 1
+                        end_dt = start_dt.replace(year=_y, month=_m)
+                    else:
+                        end_dt = start_dt.replace(year=start_dt.year + 1)
                     
                     await get_db().users.update_one(
                         {"id": current_user.id},
@@ -400,7 +433,7 @@ async def create_subscription(
                     logger.info(f"Subscription upgraded: {updated_sub.id} for user {current_user.id}, new tier={plan_id}")
 
                     # Generate invoice for the upgrade — iter350 uses subscriber's province
-                    price_amount = plan.get("price_yearly", 0)
+                    price_amount = plan.get(f"price_{billing_period}", 0)
                     from services.tax_engine import calculate_taxes_for_recipient
                     _u_prov = (user.province if hasattr(user, "province") else None) or (user.business_province if hasattr(user, "business_province") else None) or "QC"
                     fee = _calculate_stripe_fee(calculate_taxes_for_recipient(price_amount, _u_prov)["total_with_tax"]) if price_amount > 0 else 0
@@ -444,7 +477,7 @@ async def create_subscription(
             "metadata": {
                 "user_id": current_user.id,
                 "plan_id": plan_id,
-                "billing_period": "yearly",
+                "billing_period": billing_period,
             },
         }
         applied_trial = False
@@ -461,16 +494,27 @@ async def create_subscription(
             await _trial_redeem(get_db(), current_user.id, plan_id)
 
         sub_data = dict(subscription)
-        # For yearly plans, period end = billing_cycle_anchor + 1 year
+        # iter398 — Period end depends on the billing interval the user picked.
         start_ts = sub_data.get("start_date") or sub_data.get("billing_cycle_anchor") or sub_data.get("created")
         if start_ts:
             start_dt = datetime.fromtimestamp(start_ts, tz=timezone.utc)
-            end_dt = start_dt.replace(year=start_dt.year + 1)
+            if billing_period == "monthly":
+                _y = start_dt.year + (1 if start_dt.month == 12 else 0)
+                _m = 1 if start_dt.month == 12 else start_dt.month + 1
+                end_dt = start_dt.replace(year=_y, month=_m)
+            else:
+                end_dt = start_dt.replace(year=start_dt.year + 1)
             end_date = end_dt.isoformat()
             start_date = start_dt.isoformat()
         else:
-            start_date = datetime.now(timezone.utc).isoformat()
-            end_date = datetime.now(timezone.utc).replace(year=datetime.now(timezone.utc).year + 1).isoformat()
+            _now = datetime.now(timezone.utc)
+            start_date = _now.isoformat()
+            if billing_period == "monthly":
+                _y = _now.year + (1 if _now.month == 12 else 0)
+                _m = 1 if _now.month == 12 else _now.month + 1
+                end_date = _now.replace(year=_y, month=_m).isoformat()
+            else:
+                end_date = _now.replace(year=_now.year + 1).isoformat()
 
         # Update user record in MongoDB
         await get_db().users.update_one(
@@ -489,7 +533,7 @@ async def create_subscription(
         logger.info(f"Subscription created: {subscription.id} for user {current_user.id}, tier={plan_id}")
 
         # Generate invoice — iter350 uses subscriber's province
-        price_amount = plan.get("price_yearly", 0)
+        price_amount = plan.get(f"price_{billing_period}", 0)
         from services.tax_engine import calculate_taxes_for_recipient
         _u_prov = (user.province if hasattr(user, "province") else None) or (user.business_province if hasattr(user, "business_province") else None) or "QC"
         fee = _calculate_stripe_fee(calculate_taxes_for_recipient(price_amount, _u_prov)["total_with_tax"]) if price_amount > 0 else 0
@@ -988,10 +1032,23 @@ async def get_subscription_analytics(current_user: User = Depends(get_current_us
 
 @subscriptions_router.get("/subscription/status")
 async def get_subscription_status_simple(current_user: User = Depends(get_current_user)):
-    """Get user's subscription status and features - Yearly billing, no Power Bids"""
-    tier = current_user.subscription_tier
-    
-    features = {
+    """Get user's subscription status and features.
+
+    iter398 — Pricing now sourced from the `subscription_plans` DB
+    catalog (same source of truth as `/api/subscription-plans` and
+    `/api/subscriptions/create`). Previously this endpoint returned
+    hardcoded stub values ($99.99, $299.99) that drifted from the
+    real Stripe-synced yearly prices ($180 / $300).
+
+    Also fixes a pre-existing 500: `subscription_start_date` /
+    `subscription_end_date` don't live on the `User` Pydantic model —
+    they're only on the raw MongoDB doc — so the endpoint now reads
+    the user row directly instead of `getattr(current_user, …)`.
+    """
+    tier = current_user.subscription_tier or "free"
+
+    # Static feature flags (behavioural gates — not prices).
+    features_base = {
         "free": {
             "tier": "Free",
             "buyer_premium": "5%",
@@ -999,7 +1056,7 @@ async def get_subscription_status_simple(current_user: User = Depends(get_curren
             "auto_bid_bot": False,
             "priority_notifications": False,
             "early_access": False,
-            "promotion_days": 0
+            "promotion_days": 0,
         },
         "premium": {
             "tier": "Premium",
@@ -1009,7 +1066,6 @@ async def get_subscription_status_simple(current_user: User = Depends(get_curren
             "priority_notifications": True,
             "early_access": False,
             "promotion_days": 3,
-            "price": "$99.99/year"
         },
         "vip": {
             "tier": "VIP",
@@ -1019,16 +1075,40 @@ async def get_subscription_status_simple(current_user: User = Depends(get_curren
             "priority_notifications": True,
             "early_access": True,
             "promotion_days": 7,
-            "price": "$299.99/year"
-        }
+        },
     }
-    
+    feats = dict(features_base.get(tier, features_base["free"]))
+
+    # Live price from the DB catalog (admin-editable, Stripe-synced).
+    try:
+        pricing_service = get_pricing_service(get_db())
+        plan = await pricing_service.get_plan(tier)
+        if plan:
+            py = float(plan.get("price_yearly") or 0)
+            pm = float(plan.get("price_monthly") or 0)
+            if py > 0:
+                feats["price_yearly_cad"]  = py
+                feats["price"] = f"${py:.2f} CAD/year"
+            if pm > 0:
+                feats["price_monthly_cad"] = pm
+            if py <= 0 and pm <= 0:
+                # Free tier — keep the price field absent (not "$0.00")
+                feats.pop("price", None)
+    except Exception as e:  # noqa: BLE001 — non-fatal; return static features
+        logger.warning(f"[iter398 /subscription/status] price lookup failed: {e}")
+
+    # Read start/end dates from the raw user document (not on User model).
+    user_doc = await get_db().users.find_one(
+        {"id": current_user.id},
+        {"_id": 0, "subscription_start_date": 1, "subscription_end_date": 1},
+    ) or {}
+
     return {
         "subscription_tier": tier,
         "subscription_status": current_user.subscription_status,
-        "features": features.get(tier, features["free"]),
-        "subscription_start_date": current_user.subscription_start_date,
-        "subscription_end_date": current_user.subscription_end_date
+        "features": feats,
+        "subscription_start_date": user_doc.get("subscription_start_date"),
+        "subscription_end_date":   user_doc.get("subscription_end_date"),
     }
 
 
