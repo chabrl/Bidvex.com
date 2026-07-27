@@ -721,7 +721,12 @@ async def create_vehicle_listing(
             status_code=403, 
             detail=f"Monthly listing limit reached ({limit} vehicles/month for {seller_type} sellers)"
         )
-    
+
+    # iter395 — Two-pillar Trust Gate: creating a listing requires phone
+    # verified AND card on file, same as every other listing surface.
+    from services.trust_gate import require_trust_verified
+    await require_trust_verified(db, user, action="list")
+
     # Private sellers cannot create dealer-only auctions
     if seller["seller_type"] == "private" and listing_data.visibility != VehicleAuctionVisibility.PUBLIC:
         raise HTTPException(
@@ -1629,7 +1634,15 @@ async def place_vehicle_bid(
     # iter300 P1 — suspended buyers cannot bid (overdue-payment escalation).
     from services.bid_guard import ensure_bidding_allowed
     await ensure_bidding_allowed(db, user.id if hasattr(user, "id") else user.get("id"))
-    
+
+    # iter395 — Two-pillar Trust Gate (phone verified AND card on file)
+    # before we hit any DB write, so unverified users get a clean 403
+    # with a structured `trust_required` payload. Vehicle auctions use
+    # the $500 flat deposit path (not the smart hold), but the trust
+    # requirement is identical to every other bid path.
+    from services.trust_gate import require_trust_verified
+    await require_trust_verified(db, user, action="bid")
+
     # Get listing
     listing = await db.vehicle_listings.find_one({
         "id": bid_data.vehicle_id,

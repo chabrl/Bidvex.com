@@ -673,6 +673,10 @@ async def place_storage_bid(
     from services.bid_guard import ensure_bidding_allowed
     await ensure_bidding_allowed(db, current_user.id)
 
+    # iter395 — Two-pillar Trust Gate (phone verified AND card on file).
+    from services.trust_gate import require_trust_verified
+    await require_trust_verified(db, current_user, action="bid")
+
     # ── Deposit guard ──
     # iter285 — Use the dual-visibility bridge so cross-collection storage
     # units (authored via /create-listing) load correctly here too.

@@ -1,6 +1,27 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter395 — Trust Status Verification Gate Audit + Fix (Feb 8, 2026) ✅ COMPLETE
+
+**Reported by user**: Audit the two-pillar (phone verified + card on file) Trust Status gate that should block bidding and listing creation. Fix anything broken and verify end-to-end.
+
+### Bugs found
+1. `/api/payments/trust-status.can_bid` returned `True` for email-only-verified users (accepted `is_email_verified` as a shortcut, bypassing both pillars).
+2. Multi-item lot bid endpoint gated card only when `bid_amount > $500` (bids under that had no gate).
+3. Multi-item auto-bid, vehicle bid, and storage bid endpoints had **no** trust gate at all.
+4. Multi-item and vehicle listing-create endpoints had no trust gate (only single-item creation did).
+
+### Fix
+- New centralised helper `services/trust_gate.py::require_trust_verified(db, user, action)` enforces phone AND card together. Returns bilingual `{error, missing, message_en, message_fr, cta_path}` payload the frontend uses to render the "Complete your Trust Status" prompt.
+- Wired into 6 previously-open write paths (2 listing creates + 4 bid endpoints).
+- `/trust-status` refactored: `can_bid` + `can_list` now both `(phone_verified AND has_payment_method)`; `has_payment_method` now trusts live `payment_methods` collection count; response includes `missing[]` array.
+- Card-locking on bid (`bid_authorization_service::create_bid_hold`, Stripe pre-auth ≥ $500) verified unchanged.
+
+### Verified end-to-end
+Seeded one `unverified` and one `verified` user. Every unverified attempt across all 6 paths now returns `403 trust_required missing=[phone, payment_method]` with the bilingual message. Verified user's `/trust-status` correctly returns `can_bid=true, can_list=true, missing=[]`.
+
+
+
 ## iter394 — Enrichment On Every Listing Create + User-Type Change Fan-Out (Feb 8, 2026) ✅ COMPLETE
 
 **Reported by user**: Wire `enrich_listing_with_seller` into every listing create/update path so `seller_account_type` + sibling booleans are always recomputed from the live seller record, preventing persistence drift.

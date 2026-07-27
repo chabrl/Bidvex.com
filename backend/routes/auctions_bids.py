@@ -1086,6 +1086,13 @@ async def get_listing_bids_public(listing_id: str, limit: int = 20):
 @_limiter.limit("10/minute")
 async def bid_on_lot(request: Request, listing_id: str, lot_number: int, data: Dict[str, Any], current_user: User = Depends(get_current_user)):
     db = get_db()
+    # iter395 — Two-pillar Trust Gate: phone verified AND card on file.
+    # Runs BEFORE any DB work so unverified users get a clean 403 with
+    # the structured `trust_required` payload the frontend uses to open
+    # the "Complete Trust Status" prompt.
+    from services.trust_gate import require_trust_verified
+    await require_trust_verified(db, current_user, action="bid")
+
     listing = await db.multi_item_listings.find_one({"id": listing_id}, {"_id": 0})
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
@@ -1466,6 +1473,12 @@ async def setup_lot_auto_bid(
     Body: { max_bid: float, strategy?: 'min_to_lead' | 'max_immediate' }
     """
     db = get_db()
+    # iter395 — Two-pillar Trust Gate. Setting up an auto-bid means the
+    # system may place bids on the user's behalf; the same gate that
+    # protects manual bids protects auto-bids.
+    from services.trust_gate import require_trust_verified
+    await require_trust_verified(db, current_user, action="bid")
+
     if not _autobid_allowed_tier(current_user.subscription_tier):
         raise HTTPException(
             status_code=403,

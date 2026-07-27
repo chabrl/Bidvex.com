@@ -1240,6 +1240,12 @@ async def create_multi_item_listing(
     from services.stripe_customer_service import validate_payment_method_for_listing
     db = get_db()
 
+    # iter395 — Two-pillar Trust Gate: creating a listing requires phone
+    # verified AND card on file, identical to the single-item listing
+    # flow (see services.listings_service::validate_listing_permissions).
+    from services.trust_gate import require_trust_verified
+    await require_trust_verified(db, current_user, action="list")
+
     # iter223 — Demo Sandbox (multi-item creation). Same isolated-visibility
     # treatment as single-listing flow.
     user_demo_row = await db.users.find_one(

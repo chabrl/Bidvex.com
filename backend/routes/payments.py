@@ -588,7 +588,17 @@ async def get_trust_status(
     user = await db.users.find_one({"id": current_user.id})
     
     trust_status = user.get("trust_status", "unverified")
-    has_payment_method = user.get("has_payment_method", False)
+    # iter395 — `has_payment_method` was previously read only from the
+    # denormalized user field, which can go stale (webhook missed, admin
+    # backfill skipped). Trust the payment_methods collection when a row
+    # exists; fall back to the user flag otherwise. This makes the flag
+    # match what the server-side Trust Gate enforces on bid/list writes.
+    _pm_count = 0
+    try:
+        _pm_count = await db.payment_methods.count_documents({"user_id": current_user.id})
+    except Exception:  # noqa: BLE001
+        _pm_count = 0
+    has_payment_method = bool(_pm_count > 0 or user.get("has_payment_method", False))
     phone_verified = user.get("phone_verified", False)
 
     # Bug 6 fix: Standardize verification gate across the whole app.
@@ -628,13 +638,24 @@ async def get_trust_status(
             pass
     
     return {
-        "trust_status": trust_status,
-        "is_verified": effective_verified,
+        "trust_status":       trust_status,
+        "is_verified":        effective_verified,
         "has_payment_method": has_payment_method,
-        "phone_verified": phone_verified,
-        "payment_method": payment_method,
-        "trust_verified_at": user.get("trust_verified_at"),
-        "can_bid": effective_verified
+        "phone_verified":     phone_verified,
+        "payment_method":     payment_method,
+        "trust_verified_at":  user.get("trust_verified_at"),
+        # iter395 — `can_bid` is the two-pillar gate (phone_verified AND
+        # payment_method). The previous formula `effective_verified` (which
+        # accepted email-verified-only) let unverified users bypass the
+        # entire gate. The bid + listing-create endpoints now enforce the
+        # same two-pillar rule server-side via services.trust_gate, so
+        # this flag is authoritative and matches what the API will accept.
+        "can_bid":            bool(phone_verified and has_payment_method),
+        "can_list":           bool(phone_verified and has_payment_method),
+        "missing":            (
+            [] if (phone_verified and has_payment_method)
+            else [x for x, ok in (("phone", phone_verified), ("payment_method", has_payment_method)) if not ok]
+        ),
     }
 
 

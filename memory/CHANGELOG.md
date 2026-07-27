@@ -1,6 +1,88 @@
 # BidVex Changelog
 
 
+## Feb 8, 2026 — iter395 🛡️ Trust Status Verification Gate — Audit + Fix
+
+### Executive Summary
+Audit uncovered that the "Trust Status" gate protecting bids and listing creation was **wide open on 6 of 8 write paths**. Only single-item bid + single-item listing-create had it wired; every other bid path (multi-item lot bid, multi-item auto-bid, vehicle bid, storage bid) and both other listing-create paths (multi-item, vehicle) let unverified users through. Plus `/api/payments/trust-status.can_bid` returned `True` for any user who had verified email alone — bypassing the "phone verified AND card on file" contract entirely. All fixed with a centralised gate helper, one call site per endpoint.
+
+### Root causes
+
+**Bug 1 — `/trust-status.can_bid` accepted email-only verification**
+`can_bid = (is_trust_verified OR is_email_verified)` at line 637. A user with a verified email but neither a phone nor a card on file was told they could bid. Client-side gates trusted this response and let the user reach the bid button.
+
+**Bug 2 — Multi-item lot bid endpoint had no unconditional gate**
+`POST /multi-item-listings/{id}/lots/{n}/bid` only checked the card count *if* the bid amount was > $500 (to decide whether to place a Stripe pre-auth hold). Bids of $50, $100, $500 were unauthenticated to a phone or card.
+
+**Bug 3 — Multi-item auto-bid endpoint had no gate at all**
+`POST /multi-item-listings/{id}/lots/{n}/auto-bid` — setting up an auto-bid means the system will place bids on the user's behalf; the same trust requirement must apply.
+
+**Bug 4 — Vehicle bid + Storage bid endpoints had no gate**
+`POST /vehicle-bids` and `POST /storage-auctions/{id}/bid` had suspension guards (`bid_guard`) but no phone/card verification.
+
+**Bug 5 — Multi-item + Vehicle listing-create had no gate**
+`POST /multi-item-listings` and `POST /vehicles` allowed unverified users to create listings, while the single-item `POST /listings` correctly required phone + card.
+
+### Fix — Centralised gate helper
+
+**New service** `/app/backend/services/trust_gate.py`:
+```python
+async def user_can_bid_or_list(db, user) -> (bool, {phone_verified, has_payment_method, missing})
+async def require_trust_verified(db, user, *, action="bid") -> None   # raises HTTP 403
+```
+The helper:
+- Reads `user.phone_verified` (Pillar 1).
+- Counts `db.payment_methods` rows for `user_id` (Pillar 2) — same source of truth the rest of the platform uses.
+- Composes bilingual `{message_en, message_fr}` naming the exact missing pillars.
+- Returns a structured 403 payload the frontend uses to open the "Complete your Trust Status" prompt with `cta_path: "/profile/settings#trust"`.
+- Also chains into the existing `services.bid_guard::ensure_bidding_allowed` so admin suspensions still fire before the trust gate.
+
+**`/trust-status` refactor** (`routes/payments.py`):
+- `can_bid` / `can_list` are now BOTH `(phone_verified AND has_payment_method)` — no more email-only shortcut.
+- `has_payment_method` now trusts a live count of `db.payment_methods` over the denormalized `user.has_payment_method` flag (with the flag as a fallback for legacy users). This makes the flag match what the server actually enforces on writes.
+- Response now also includes `can_list` and `missing: ["phone" | "payment_method"]` arrays so the client can render a precise prompt.
+
+**Gate wired into 6 previously-open paths**:
+| Endpoint | File | Action |
+| --- | --- | --- |
+| `POST /api/multi-item-listings/{id}/lots/{n}/bid` | `routes/auctions_bids.py::bid_on_lot` | `bid` |
+| `POST /api/multi-item-listings/{id}/lots/{n}/auto-bid` | `routes/auctions_bids.py::set_lot_autobid` | `bid` |
+| `POST /api/vehicle-bids` | `routes/vehicles.py::place_vehicle_bid` | `bid` |
+| `POST /api/storage-auctions/{id}/bid` | `routes/storage_auctions.py::place_storage_bid` | `bid` |
+| `POST /api/multi-item-listings` | `routes/listings.py::create_multi_item_listing` | `list` |
+| `POST /api/vehicles` | `routes/vehicles.py::create_vehicle_listing` | `list` |
+
+The two paths that already had gates (`POST /api/bids` for single-item bids, `POST /api/listings` for single-item creates) were left untouched — they already require both pillars.
+
+### Card-locking on bid
+Confirmed unchanged: the existing `services.bid_authorization_service::create_bid_hold` still captures a Stripe pre-authorisation on the bidder's default payment method for bids ≥ $500 (invoked from `bid_on_lot` at line ~1137 after the new trust gate passes). This is the "card is locked for that action" mechanism the spec requires. The pre-auth is released via `release_bid_hold` if outbid.
+
+### Verification (end-to-end)
+
+Seeded two users on preview: one `unverified` (email✓ / phone✗ / card✗) and one `verified` (email✓ / phone✓ / card✓). Ran every write path with each user:
+
+| Test | Unverified | Verified |
+| --- | --- | --- |
+| `GET /api/payments/trust-status` | `can_bid=false can_list=false missing=[phone, payment_method]` ✓ | `can_bid=true can_list=true missing=[]` ✓ |
+| `POST /api/listings` (create) | `403 payment_method_required` (existing gate) ✓ | 200 ✓ |
+| `POST /api/multi-item-listings` (create) | `403 trust_required missing=[phone, payment_method]` ✓ | (Stripe pm_test_ id rejected downstream by validate_payment_method_for_listing — expected in preview without a real Stripe attach) |
+| `POST /api/multi-item-listings/{id}/lots/{n}/bid` | `403 trust_required` ✓ | — |
+| `POST /api/multi-item-listings/{id}/lots/{n}/auto-bid` | `403 trust_required` ✓ | — |
+| `POST /api/vehicle-bids` | `403 trust_required` ✓ | — |
+| `POST /api/storage-auctions/{id}/bid` | `403 trust_required` ✓ | — |
+
+Every unverified attempt was refused with the exact bilingual "Complete your Trust Status" payload; the missing-pillars array pinpoints which pillars still need completing so the frontend can deep-link to the right settings section.
+
+### Files changed
+- ADDED: `/app/backend/services/trust_gate.py` — `user_can_bid_or_list`, `require_trust_verified`.
+- MODIFIED: `/app/backend/routes/payments.py::get_trust_status` — two-pillar `can_bid`/`can_list`, live `has_payment_method`, `missing[]` array.
+- MODIFIED: `/app/backend/routes/auctions_bids.py::bid_on_lot` + `set_lot_autobid` — gate wired.
+- MODIFIED: `/app/backend/routes/vehicles.py::place_vehicle_bid` + `create_vehicle_listing` — gate wired.
+- MODIFIED: `/app/backend/routes/storage_auctions.py::place_storage_bid` — gate wired.
+- MODIFIED: `/app/backend/routes/listings.py::create_multi_item_listing` — gate wired.
+
+
+
 ## Feb 8, 2026 — iter394 🛡️ Enrichment On Every Listing Create + User-Type Change Fan-Out
 
 ### Executive Summary
