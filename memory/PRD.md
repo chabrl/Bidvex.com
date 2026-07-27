@@ -1,6 +1,41 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter397 — Subscription P0 Fixes (Feb 8, 2026) ✅ COMPLETE
+
+**Reported by user**: Fix three P0 issues from the subscription-plans audit:
+1. Partner checkout ignored the admin-editable `pricing_engine` `partner_annual_fee` and never applied the `LAUNCH50_PRT` coupon (users paid full $100 instead of $50 launch price).
+2. Brokers had no self-checkout endpoint at all — they could only be activated via admin manual-settle.
+3. `SubscriptionPricingPage` posted directly to `/api/subscriptions/create` which 400'd for users without a saved Stripe card, with no fallback to the working hosted checkout.
+
+### Delivered
+- **Partner**: `routes/partners.py::_get_or_create_partner_fee_price` now delegates to `services/pricing_engine_service.update_pricing("partner_annual_fee")` so the admin-editable Stripe Product/Price is used. The `create_partner_checkout` endpoint auto-attaches `LAUNCH50_PRT` when `is_within_launch_window` returns True and the user has not supplied their own coupon. Verified end-to-end: Stripe session subtotal $100 → total **$50** (−$50 launch discount applied).
+- **Broker**: New `routes/broker_subscription_routes.py` (`broker_subscription_router`) exposes:
+  - `POST /api/broker-subscription/create-checkout-session` — creates hosted Stripe Checkout using pricing_engine `broker_annual_fee` ($500 base) with `LAUNCH50_BRK` coupon attached when the launch window is open. Idempotency: returns `{already_active: true}` when `brokers.subscription_status == "active"` and `subscription_expires_at` is in the future. Demo accounts refused.
+  - `GET /api/broker-subscription/status` — broker-facing subscription state used by the dashboard CTA.
+  - Webhook: added `session_type == "broker_annual_fee"` branch in `routes/webhooks.py` that stamps `brokers.subscription_status="active"`, `subscription_started_at`, `subscription_expires_at=+365d`, all `subscription_stripe_*` fields, in-app notification, and bilingual receipt email.
+  - Frontend: added `handlePayAnnualFee` + green **Pay $250 now** button on `BrokerDashboardPage` subscription card (only when status ≠ active/free/comp). Redirects to Stripe Checkout on click. Verified end-to-end: Stripe session subtotal $500 → total **$250** (−$250 discount applied).
+- **Pricing Page fallback**: `SubscriptionPricingPage.handleCheckout` now checks `subStatus.default_payment_method_id`/`has_payment_method`; users with a card on file still get the instant `/subscriptions/create` upgrade, users without one are redirected to the hosted `/subscription/checkout` flow. Additionally catches the `"No Stripe customer" / "No payment method"` 400 responses from the direct path and auto-falls-back to hosted checkout (handles stale in-browser state).
+
+### Verified end-to-end via live Stripe API
+| P0 | Endpoint | Result |
+|---|---|---|
+| #1 | `POST /api/partner/create-checkout` (partner) | Stripe session amount_subtotal=$100.00, amount_total=**$50.00**, 1 discount = LAUNCH50_PRT (−$50.00) |
+| #2 | `POST /api/broker-subscription/create-checkout-session` (broker) | Stripe session amount_subtotal=$500.00, amount_total=**$250.00**, 1 discount = LAUNCH50_BRK (−$250.00) |
+| #3 | `POST /api/subscription/checkout` fallback (fresh user, no card) | Returns valid `checkout_url` (hosted Stripe Checkout) |
+
+### Files touched
+- `backend/routes/partners.py` (partner checkout wired to pricing_engine + LAUNCH50_PRT)
+- `backend/routes/broker_subscription_routes.py` (new file — broker checkout + status)
+- `backend/routes/webhooks.py` (added `broker_annual_fee` session activation handler)
+- `backend/server.py` (registered broker_subscription_router)
+- `frontend/src/pages/BrokerDashboardPage.jsx` (Pay Annual Fee CTA)
+- `frontend/src/pages/SubscriptionPricingPage.js` (no-card fallback to hosted checkout)
+
+### Not touched (deferred to next iteration per user's scope)
+P1/P2 items from the audit remain: price/naming inconsistencies across the 3 sources, `PRICE_ID_TO_TIER` stale after admin edits, monthly billing broken on direct-charge flow, `stripe_subscription_id` vs `partner_subscription_id` split, broker admin UI displaying $200 base while pricing_engine uses $500.
+
+
 ## iter396 — Trust Gate T&C Third Pillar (Feb 8, 2026) ✅ COMPLETE
 
 **Reported by user**: Add auction Terms & Conditions acceptance as a third pillar to the Trust Gate (`services/trust_gate.py`) alongside phone verification + card on file. Enforce across ALL bid endpoints (single-item, multi-item lot, auto-bid, vehicle, storage). User chose: **global one-time platform acceptance** stored as `users.platform_terms_accepted_at`.

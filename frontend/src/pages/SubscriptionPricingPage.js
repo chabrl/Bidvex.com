@@ -113,11 +113,51 @@ const SubscriptionPricingPage = () => {
     if (!token) { navigate('/auth?redirect=/pricing'); return; }
     if (plan.plan_id === 'free' || plan.plan_id === userTier) return;
     setCheckoutLoading(plan.plan_id);
+    // iter397 — If the user has a saved default payment method we
+    // charge it in-line via /subscriptions/create (instant upgrade,
+    // proration handled by Stripe). If not, we fall back to the
+    // hosted Stripe Checkout flow (/subscription/checkout) so users
+    // without a card on file can enter one during the flow instead
+    // of getting a generic 400 error.
+    const hasCardOnFile = !!(subStatus && (subStatus.default_payment_method_id || subStatus.has_payment_method));
     try {
-      const res = await axios.post(`${API}/subscriptions/create`, { plan_id: plan.plan_id }, { headers: { Authorization: `Bearer ${token}` } });
-      if (res.data.success) { toast.success(t('pricingPage.subscribeSuccess', { plan: getDisplayName(plan.plan_id) })); navigate('/settings'); }
-    } catch (err) { toast.error(err.response?.data?.detail || t('pricingPage.subscribeFail')); }
-    finally { setCheckoutLoading(null); }
+      if (hasCardOnFile) {
+        try {
+          const res = await axios.post(
+            `${API}/subscriptions/create`,
+            { plan_id: plan.plan_id },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          if (res.data.success) {
+            toast.success(t('pricingPage.subscribeSuccess', { plan: getDisplayName(plan.plan_id) }));
+            navigate('/settings');
+            return;
+          }
+        } catch (err) {
+          const msg = err.response?.data?.detail || '';
+          const cardMissing = /No Stripe customer|No payment method/i.test(msg);
+          if (!cardMissing) throw err;
+          // Fall through to hosted Checkout when the card-on-file
+          // assumption turned out wrong (e.g. stale user cache).
+        }
+      }
+      // Hosted Stripe Checkout — user enters card + subscribes there.
+      const originUrl = typeof window !== 'undefined' ? window.location.origin : '';
+      const res = await axios.post(
+        `${API}/subscription/checkout`,
+        { plan_id: plan.plan_id, billing_period: isYearly ? 'yearly' : 'monthly', origin_url: originUrl },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (res.data?.checkout_url) {
+        window.location.href = res.data.checkout_url;
+        return;
+      }
+      toast.error(t('pricingPage.subscribeFail'));
+    } catch (err) {
+      toast.error(err.response?.data?.detail || t('pricingPage.subscribeFail'));
+    } finally {
+      setCheckoutLoading(null);
+    }
   };
 
   const getDisplayName = (planId) => t(`pricingPage.planNames.${planId}`);

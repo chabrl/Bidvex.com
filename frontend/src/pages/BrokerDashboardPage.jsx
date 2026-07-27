@@ -119,6 +119,34 @@ export default function BrokerDashboardPage() {
     })();
   }, [broker]);
 
+  // iter397 — Start Stripe Checkout for the broker's annual fee.
+  const [payingFee, setPayingFee] = React.useState(false);
+  const handlePayAnnualFee = async () => {
+    if (payingFee) return;
+    setPayingFee(true);
+    try {
+      const r = await axios.post(
+        `${API_BASE}/broker-subscription/create-checkout-session`,
+        {},
+        { headers: { Authorization: `Bearer ${_token()}` } }
+      );
+      if (r.data?.already_active) {
+        setSubscription((s) => ({ ...(s || {}), status: 'active', expires_at: r.data.expires_at }));
+        setPayingFee(false);
+        return;
+      }
+      if (r.data?.checkout_url) {
+        window.location.href = r.data.checkout_url;
+        return;
+      }
+      setPayingFee(false);
+    } catch (e) {
+      setPayingFee(false);
+      // Surface the Stripe error in-line via the existing error banner
+      setError(e?.response?.data?.detail?.message || e?.response?.data?.detail || 'Checkout failed');
+    }
+  };
+
   const handleBuyerAction = async (relId, action) => {
     try {
       const path = action === 'approve'
@@ -260,6 +288,24 @@ export default function BrokerDashboardPage() {
                       {lang === 'fr' ? 'Renouvellement : ' : 'Renews: '}
                       {new Date(subscription.expires_at).toLocaleDateString(lang === 'fr' ? 'fr-CA' : 'en-CA')}
                     </p>
+                  )}
+                  {/* iter397 — Broker pays their own annual fee via Stripe */}
+                  {!(subscription.status === 'active' || subscription.status === 'free' || subscription.status === 'comp') && (
+                    <div className="mt-4 flex items-center gap-3 flex-wrap">
+                      <Button
+                        onClick={handlePayAnnualFee}
+                        disabled={payingFee}
+                        data-testid="broker-pay-annual-fee-btn"
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                      >
+                        {payingFee
+                          ? (lang === 'fr' ? 'Redirection…' : 'Redirecting…')
+                          : (lang === 'fr' ? `Payer ${_fmt(subscription.final_cad)} maintenant` : `Pay ${_fmt(subscription.final_cad)} now`)}
+                      </Button>
+                      <span className="text-xs text-slate-500">
+                        {lang === 'fr' ? 'Paiement sécurisé via Stripe' : 'Secure Stripe Checkout'}
+                      </span>
+                    </div>
                   )}
                 </CardContent></Card>
               )}

@@ -321,6 +321,73 @@ async def handle_stripe_webhook(request: Request):
                             pass
             elif session_type == "listing_promotion":
                 await _handle_listing_promotion_paid(db, data)
+            elif session_type == "broker_annual_fee":
+                # iter397 — Activate broker annual membership after Stripe
+                # confirms payment. Mirrors the dealer_annual_fee flow.
+                #   1. brokers.subscription_status = "active"
+                #   2. brokers.subscription_started_at / _expires_at (+365d)
+                #   3. brokers.subscription_stripe_* fields (audit)
+                #   4. Bilingual receipt email + in-app notification
+                from datetime import timedelta
+                broker_id_meta = _meta_all.get("broker_id")
+                user_id_broker = _meta_all.get("user_id")
+                if broker_id_meta and user_id_broker:
+                    now = datetime.now(timezone.utc)
+                    renewal = now + timedelta(days=365)
+                    await db.brokers.update_one(
+                        {"id": broker_id_meta},
+                        {"$set": {
+                            "subscription_status":               "active",
+                            "subscription_started_at":           now,
+                            "subscription_expires_at":           renewal,
+                            "subscription_stripe_session_id":    data.get("id"),
+                            "subscription_stripe_subscription_id": data.get("subscription"),
+                            "subscription_stripe_customer_id":   data.get("customer"),
+                            "subscription_paid_at":              now,
+                            "subscription_updated_at":           now,
+                        }},
+                    )
+                    logger.info(f"[BrokerAnnualFee] Activated broker={broker_id_meta} user={user_id_broker}")
+
+                    # In-app notification (best-effort)
+                    try:
+                        await db.notifications.insert_one({
+                            "id":         f"notif_{user_id_broker}_{now.isoformat()}",
+                            "user_id":    user_id_broker,
+                            "type":       "broker_subscription_activated",
+                            "title":      "Broker Annual Fee Paid",
+                            "message":    (
+                                f"Your broker annual membership is active until "
+                                f"{renewal.strftime('%Y-%m-%d')}."
+                            ),
+                            "read":       False,
+                            "created_at": now.isoformat(),
+                        })
+                    except Exception as _ne:
+                        logger.warning(f"[BrokerAnnualFee] notif insert failed: {_ne}")
+
+                    # Receipt email (best-effort)
+                    user_doc = await db.users.find_one(
+                        {"id": user_id_broker},
+                        {"_id": 0, "email": 1, "name": 1, "preferred_language": 1},
+                    ) or {}
+                    if user_doc.get("email"):
+                        try:
+                            renewal_date = renewal.strftime("%Y-%m-%d")
+                            subject = "Broker Annual Membership Receipt / Reçu — Adhésion annuelle Courtier"
+                            body = (
+                                f"<p>Hello {user_doc.get('name','')},</p>"
+                                f"<p>Your BidVex broker annual membership payment was received. "
+                                f"Your account is active until <b>{renewal_date}</b>.</p>"
+                                f"<hr>"
+                                f"<p>Bonjour {user_doc.get('name','')},</p>"
+                                f"<p>Votre paiement pour l'adhésion annuelle Courtier BidVex a été reçu. "
+                                f"Votre compte est actif jusqu'au <b>{renewal_date}</b>.</p>"
+                            )
+                            from services.emails._email_core import send_email
+                            await send_email(to_email=user_doc["email"], subject=subject, html_content=body)
+                        except Exception as _ee:
+                            logger.warning(f"[BrokerAnnualFee] receipt email failed: {_ee}")
             elif session_type == "payment_request":
                 # iter258 Mission 1 — Mark the matching payment_request as
                 # paid, ping the user with a confirmation email + in-app

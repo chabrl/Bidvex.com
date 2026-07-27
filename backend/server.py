@@ -1518,6 +1518,7 @@ try:
         ("routes.down_payments", "down_payments_router", None, False),
         ("routes.partner_card", "partner_card_router", None, False),
         ("routes.dealer_subscription_routes", "dealer_subscription_router", None, False),
+        ("routes.broker_subscription_routes", "broker_subscription_router", None, False),
         ("routes.manual_settlement", "manual_settlement_router", None, False),
         ("routes.pricing_engine_routes", "pricing_engine_router", None, False),
         ("routes.demo_account_routes", "demo_accounts_router", None, False),

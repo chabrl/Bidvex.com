@@ -42,15 +42,14 @@ async def _get_sendgrid_config():
     return config
 
 async def _get_or_create_partner_fee_price():
-    """Get or create Stripe Price for the partner annual fee."""
-    _db = get_db()
-    config = await _db.site_config.find_one({"key": "partner_fee_price_id"}, {"_id": 0})
-    if config and config.get("price_id"):
-        return config["price_id"]
-    product = stripe.Product.create(name="BidVex Partner Annual Access", metadata={"type": "partner_annual_fee"})
-    price = stripe.Price.create(unit_amount=10000, currency="cad", recurring={"interval": "year"}, product=product.id)
-    await _db.site_config.update_one({"key": "partner_fee_price_id"}, {"$set": {"key": "partner_fee_price_id", "price_id": price.id}}, upsert=True)
-    return price.id
+    """DEPRECATED — Legacy shim. Kept only so any residual imports don't
+    ImportError. Callers must migrate to `pricing_engine_service.update_pricing`
+    with key="partner_annual_fee" so the admin-editable price + LAUNCH50_PRT
+    coupon are honoured. See iter397.
+    """
+    from services.pricing_engine_service import update_pricing
+    settings = await update_pricing(get_db(), "partner_annual_fee")
+    return settings["stripe_price_id"]
 
 
 # iter257 — Stripe Coupon mirror cache. We map each BidVex promotion_id
@@ -785,9 +784,25 @@ async def create_partner_checkout(
             logger.warning(f"Partner checkout coupon bypass failed: {exc}")
 
     try:
-        price_id = await _get_or_create_partner_fee_price()
+        # iter397 — Source Stripe Price + LAUNCH50_PRT coupon from the
+        # admin-editable pricing_engine. When the launch window is open
+        # (default 180 days) the coupon is attached to Checkout so users
+        # pay the reduced $50 launch price instead of the $100 base.
+        # A user-supplied coupon on `payload.coupon_code` still wins —
+        # we only apply LAUNCH50_PRT when nothing else is attached.
+        from services.pricing_engine_service import (
+            update_pricing as _pe_update,
+            is_within_launch_window as _pe_in_window,
+        )
+        pe_settings = await _pe_update(db, "partner_annual_fee")
+        price_id = pe_settings["stripe_price_id"]
         base_url = _os.environ.get("REACT_APP_BACKEND_URL", "https://www.bidvex.com")
-        
+
+        # Auto-attach LAUNCH50_PRT if the user did not bring their own
+        # coupon AND the promo window is open.
+        if not applied_stripe_coupon_id and _pe_in_window(pe_settings) and pe_settings.get("stripe_coupon_id"):
+            applied_stripe_coupon_id = pe_settings["stripe_coupon_id"]
+
         customer_id = current_user.stripe_customer_id
         if not customer_id:
             customer = stripe.Customer.create(
