@@ -1,6 +1,29 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter393 — Backfill `seller_account_type` on Every Listing (Feb 8, 2026) ✅ COMPLETE
+
+**Reported by user**: Run a one-off migration that recomputes and overwrites the persisted `seller_account_type` on every doc in `listings`, `multi_item_listings`, and `vehicle_listings` using the enrichment resolver. Log a per-collection summary.
+
+### Script
+`/app/backend/scripts/recompute_seller_account_type.py` — walks each collection, looks up the seller from `db.users`, runs `resolve_seller_account_type(seller, context)` with the collection-appropriate context (`general` / `lots` / `vehicle`), overwrites `seller_account_type` + `seller_is_partner`/`seller_is_vehicle_dealer`/`seller_is_storage_facility` when they've drifted. Supports `--dry-run`, `--collection <name>`, `--limit N`. Idempotent. Failure-tolerant.
+
+### Verified on preview
+Seeded 9 listings (3 per collection) covering all seller archetypes + 6 stale/2 missing persisted values.
+- Dry-run identified 8 required transitions, 2 unchanged, 1 orphan skipped.
+- Live run applied all 8 updates + fixed a real legacy multi-item listing (`78cbf76f-…`) whose persisted value was `None`.
+- DB post-verify: all 9 docs match expected account_type + sibling booleans.
+- Idempotent re-run: `updated=0, unchanged=10, skipped_no_seller=1`.
+
+### Production instructions
+```bash
+cd /app/backend
+python -m scripts.recompute_seller_account_type --dry-run    # scope check
+python -m scripts.recompute_seller_account_type              # execute
+```
+
+
+
 ## iter392 — Three Production Bug Fixes (Feb 8, 2026) ✅ COMPLETE
 
 **Reported by user**: (1) Inspection date on multi-item listings not saving/displaying correctly; (2) individual-seller lots incorrectly taxed on hammer (some lots in same auction show Taxable, others Tax Free); (3) Seller Dashboard Earnings/Analytics/Ratings sections down.

@@ -1,6 +1,54 @@
 # BidVex Changelog
 
 
+## Feb 8, 2026 — iter393 🧹 Backfill `seller_account_type` on Every Listing
+
+### Executive Summary
+One-off migration that walks every doc in `listings`, `multi_item_listings`, and `vehicle_listings`, recomputes the correct `seller_account_type` via `services.listing_seller_enrichment.resolve_seller_account_type(seller, listing_context)`, and overwrites the persisted value + the three sibling booleans (`seller_is_partner`, `seller_is_vehicle_dealer`, `seller_is_storage_facility`) when they've drifted. This closes the persistence-drift class of bugs that iter392 revealed (individual sellers whose lot-fee popover showed Taxable because `seller_account_type="business"` was stale on disk).
+
+### Script
+- **Location**: `/app/backend/scripts/recompute_seller_account_type.py`
+- **Contract**: `python -m scripts.recompute_seller_account_type [--dry-run] [--collection <name>] [--limit N]`
+- **Context routing**:
+  - `listings` → `context="general"` (partner > vehicle_dealer > storage_facility > individual)
+  - `multi_item_listings` → `context="lots"` (same general ranking — dealer/facility flags don't dominate in the Lots surface)
+  - `vehicle_listings` → `context="vehicle"` (vehicle_dealer > partner > individual — dealer flag wins in the vehicle surface)
+- **Idempotent**: only writes when `(old_type or '').lower() != new_type`; re-running the sweep leaves everything untouched.
+- **Failure-tolerant**: one bad doc raises → counted under `docs_error` with the exception name, sweep continues.
+- **Per-collection summary** (from a real preview run):
+  ```
+  [listings]
+    docs_scanned=4  docs_updated=2  docs_unchanged=1  docs_skipped_no_seller=1
+    transitions={'business→individual':1, 'individual→partner':1}
+  [multi_item_listings]
+    docs_scanned=4  docs_updated=4  docs_unchanged=0
+    transitions={'None→individual':2, 'business→partner':1, 'business→individual':1}
+  [vehicle_listings]
+    docs_scanned=3  docs_updated=2  docs_unchanged=1
+    transitions={'individual→vehicle_dealer':1, 'individual→partner':1}
+  TOTALS  scanned=11  updated=8  unchanged=2  skipped_no_seller=1  errors=0
+  ```
+
+### Verification
+Seeded 9 listings across all 3 collections with the four seller archetypes (individual, verified partner, vehicle dealer, storage facility) and deliberately stored 6 stale/wrong `seller_account_type` values plus 2 missing values.
+- **Dry-run**: identified exactly 8 transitions (correct); 2 unchanged; 1 orphan skipped (`seller_id="nonexistent"`).
+- **Live run**: applied all 8 updates; DB post-verify shows every doc has the expected `seller_account_type` AND the derived sibling booleans (`seller_is_partner=True` only for partners; `seller_is_vehicle_dealer=True` only for the dealer in vehicle context; etc.).
+- **Idempotency re-run**: `scanned=11, updated=0, unchanged=10, skipped_no_seller=1` — safe to re-run any time.
+- The preview DB also had one real legacy `multi_item_listings/78cbf76f-…` doc with `seller_account_type=None` — it was correctly promoted to `"individual"` during the live run.
+
+### Production usage
+```bash
+cd /app/backend
+python -m scripts.recompute_seller_account_type --dry-run          # scope check
+python -m scripts.recompute_seller_account_type                    # execute
+python -m scripts.recompute_seller_account_type --collection multi_item_listings  # targeted rerun
+```
+
+### File added
+- `/app/backend/scripts/recompute_seller_account_type.py`
+
+
+
 ## Feb 8, 2026 — iter392 🐛 Three Production Bug Fixes
 
 ### Executive Summary
