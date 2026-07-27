@@ -33,6 +33,29 @@ import FrenchTitleField from '../components/FrenchTitleField';
 
 const API = API_BASE;
 
+/**
+ * iter389 — Upload a File to S3 and return the public URL.
+ *
+ * Uses `POST /api/uploads/listing-image` (multipart) which pipes through
+ * `services/s3_service.upload_image_to_s3` → returns the public HTTPS URL.
+ * The old behaviour (readAsDataURL → base64 in Mongo) was flagged by a
+ * nightly sweep and would fail the API-level guardrail on submit.
+ *
+ * @param {File} file
+ * @returns {Promise<string>} public S3 URL (never a base64 data URL)
+ */
+async function uploadImageToS3(file) {
+  const form = new FormData();
+  form.append('file', file);
+  const res = await axios.post(`${API}/uploads/listing-image`, form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  if (!res?.data?.url) {
+    throw new Error('S3 upload succeeded but no URL was returned');
+  }
+  return res.data.url;
+}
+
 const CreateMultiItemListing = () => {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
@@ -306,21 +329,29 @@ const CreateMultiItemListing = () => {
     toast.success(`Generated ${count} lot${count > 1 ? 's' : ''}`);
   };
 
-  const handleLotImageUpload = (index, e) => {
+  const handleLotImageUpload = async (index, e) => {
+    // iter389 — Upload directly to S3 and store the returned public URL
+    // in `lot.images`. Base64-in-Mongo is refused by the API guardrail.
     const files = Array.from(e.target.files);
-    files.forEach(file => {
+    // Reset the input so re-selecting the same file still fires onChange.
+    if (e?.target) e.target.value = '';
+    for (const file of files) {
       if (file.size > 5000000) {
-        toast.error('Image size should be less than 5MB');
-        return;
+        toast.error(`${file.name}: image size should be less than 5MB`);
+        continue;
       }
-      const reader = new FileReader();
-      reader.onload = () => {
-        const updatedLots = [...lots];
-        updatedLots[index].images = [...updatedLots[index].images, reader.result];
-        setLots(updatedLots);
-      };
-      reader.readAsDataURL(file);
-    });
+      try {
+        const url = await uploadImageToS3(file);
+        setLots((prev) => {
+          const next = [...prev];
+          next[index] = { ...next[index], images: [...(next[index].images || []), url] };
+          return next;
+        });
+      } catch (err) {
+        console.error('S3 upload failed for lot image:', err);
+        toast.error(`${file.name}: upload failed. Please try again.`);
+      }
+    }
   };
 
   const removeLotImage = (lotIndex, imageIndex) => {
@@ -371,9 +402,13 @@ const CreateMultiItemListing = () => {
   };
 
   // Bulk Image Upload with Drag and Drop
-  const onDrop = (acceptedFiles) => {
-    const imageFiles = acceptedFiles.filter(file => 
-      file.type.startsWith('image/') && 
+  const onDrop = async (acceptedFiles) => {
+    // iter389 — Every dropped file is uploaded to S3 immediately and the
+    // returned URL is stored in `bulkImages[].data`. The rest of the
+    // auto-match / manual-match code paths already treat `data` as a URL
+    // string, so no consumer changes needed.
+    const imageFiles = acceptedFiles.filter(file =>
+      file.type.startsWith('image/') &&
       ['.jpg', '.jpeg', '.png', '.webp'].some(ext => file.name.toLowerCase().endsWith(ext))
     );
 
@@ -381,23 +416,24 @@ const CreateMultiItemListing = () => {
       toast.error('Some files were rejected. Only .jpg, .png, .webp allowed');
     }
 
-    imageFiles.forEach(file => {
+    for (const file of imageFiles) {
       if (file.size > 5000000) {
         toast.error(`${file.name} is too large. Max 5MB per image.`);
-        return;
+        continue;
       }
-
-      const reader = new FileReader();
-      reader.onload = () => {
-        setBulkImages(prev => [...prev, { 
-          name: file.name, 
-          data: reader.result,
+      try {
+        const url = await uploadImageToS3(file);
+        setBulkImages(prev => [...prev, {
+          name: file.name,
+          data: url,
           matched: false,
-          lotIndex: null
+          lotIndex: null,
         }]);
-      };
-      reader.readAsDataURL(file);
-    });
+      } catch (err) {
+        console.error('S3 upload failed for bulk image:', err);
+        toast.error(`${file.name}: upload failed. Please try again.`);
+      }
+    }
   };
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({

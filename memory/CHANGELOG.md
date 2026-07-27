@@ -1,6 +1,50 @@
 # BidVex Changelog
 
 
+## Feb 8, 2026 — iter389 🚫 Kill Base64-in-Mongo for Multi-Item Listing Creation
+
+### Executive Summary
+Nightly sweep flagged listing `78cbf76f-7d07-40a3-b4dc-f8486da60b4c` for base64-in-Mongo. Root cause: `CreateMultiItemListing.js` used `FileReader.readAsDataURL()` → stored data-URL strings in `lot.images` → shipped them as base64 to `POST /api/multi-item-listings` → MongoDB. Fixed with a **three-layer** solution: new stateless S3 upload endpoint, frontend rewritten to use it, and an API-level rejection guardrail so this cannot regress silently.
+
+### Fixes
+
+**1. New backend endpoint — `POST /api/uploads/listing-image`** (in `/app/backend/routes/listings.py`)
+   - Multipart file → `services/s3_service.upload_image_to_s3` → returns `{ "url": "https://bidvex-marketplace-images.s3…/staged-<userid>/<idx>-<rand>.jpg" }`.
+   - Namespaces staged uploads under `staged-<userid>` so orphans can be pruned later without touching real listings.
+   - Auth-required; rejects non-image content-type; 502 on S3 failure with a clear error code.
+
+**2. Frontend — `/app/frontend/src/pages/CreateMultiItemListing.js`**
+   - Added shared `uploadImageToS3(file)` helper that POSTs to the new endpoint and returns the public URL.
+   - Rewrote `handleLotImageUpload` — was `FileReader.readAsDataURL(file)` → now awaits the S3 upload for each file and stores the returned URL in `lot.images`.
+   - Rewrote `onDrop` (react-dropzone bulk upload) — same conversion; `bulkImages[].data` is now an S3 URL string.
+   - The rest of the auto-match / manual-match code paths already treat these as URL strings, so no downstream consumer changes needed.
+   - Documents upload path (line 1708) intentionally kept as base64 — those are PDFs / non-image compliance docs handled by a separate pipeline.
+
+**3. Backend API-level guardrail** (in `/app/backend/routes/listings.py`)
+   - `_looks_like_base64_image(value)` — data URL prefix OR non-URL string longer than 500 chars.
+   - `_reject_base64_in_images(images, path)` — raises `HTTPException(400, detail={error:"base64_image_rejected", message_en, message_fr, path:"lots[N].images[M]"})`.
+   - Wired into BOTH `POST /api/multi-item-listings` (walks parent `images[]` and every `lots[].images[]`) and `POST /api/listings` (single-item parent `images[]`).
+   - Makes silent regression impossible — any future code path that tries to POST base64 images gets a hard 400.
+
+### Verification (end-to-end on preview)
+
+| Test | Expected | Result |
+| --- | --- | --- |
+| `POST /api/uploads/listing-image` with 800×600 JPEG (16.9 KB) | `200 { url: https://bidvex-marketplace-images.s3.…jpg }` | ✅ |
+| `HEAD` on the returned URL | `HTTP/1.1 200 OK` with valid ETag | ✅ |
+| `POST /api/multi-item-listings` with S3 URL in `lots[0].images` | `200`, listing created, DB row stores the S3 URL string | ✅ |
+| Direct MongoDB check on new row | `lot[0].images[0]` = S3 URL, `is_base64=False` | ✅ |
+| `POST /api/multi-item-listings` with base64 data URL in `lots[0].images` | `400 { error:"base64_image_rejected", message_en:"Image at lots[0].images[0] was submitted as base64 data. Upload images to /api/uploads/listing-image first…", path:"lots[0].images[0]" }` | ✅ |
+
+### Files changed
+- `/app/backend/routes/listings.py` — added stateless upload endpoint + `_reject_base64_in_images` guardrail; wired into both create endpoints.
+- `/app/frontend/src/pages/CreateMultiItemListing.js` — `uploadImageToS3` helper + two `readAsDataURL` sites rewritten to await the S3 upload.
+
+### Note on the reported listing
+The listing that triggered the nightly sweep (`78cbf76f-7d07-40a3-b4dc-f8486da60b4c`) actually contains 22 lots of clean S3 URLs — no base64 remained by the time the audit ran. The three-layer fix above ensures this stays true going forward.
+
+
+
 ## Feb 8, 2026 — iter388 🎟️ Promotions & Coupons End-to-End Audit + Fixes
 
 ### Executive Summary

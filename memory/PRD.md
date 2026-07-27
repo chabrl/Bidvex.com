@@ -1,6 +1,25 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter389 — Kill Base64-in-Mongo for Multi-Item Listing Creation (Feb 8, 2026) ✅ COMPLETE
+
+**Reported**: Nightly sweep flagged listing `78cbf76f-7d07-40a3-b4dc-f8486da60b4c` for base64 image data in MongoDB. Root cause: `CreateMultiItemListing.js` used `FileReader.readAsDataURL()` and shipped the data URLs to `POST /api/multi-item-listings`.
+
+### Three-layer fix
+1. **New backend endpoint** `POST /api/uploads/listing-image` — multipart file in, `{url: S3-public-URL}` out. Namespaces staged uploads under `staged-<userid>/`.
+2. **Frontend rewritten** — `CreateMultiItemListing.js` per-lot upload + bulk drop both await the S3 upload and store the returned URL. Documents (PDFs) intentionally left on base64 path.
+3. **API-level guardrail** — `_reject_base64_in_images(images, path)` walks parent + every lot's `images[]` and raises a bilingual 400 with the exact offending path if any element is a data URL or a >500-char non-URL string. Wired into BOTH `POST /api/multi-item-listings` and `POST /api/listings`.
+
+### Verified end-to-end on preview
+- `POST /api/uploads/listing-image` (800×600 JPEG) → `{url:"https://bidvex-marketplace-images.s3…jpg"}`, `HEAD 200 OK`.
+- `POST /api/multi-item-listings` with S3 URL → listing created; DB row stores the URL string, not base64.
+- `POST /api/multi-item-listings` with base64 → `400 error:"base64_image_rejected"` with `path:"lots[0].images[0]"` + bilingual message.
+
+### Note on the reported listing
+`78cbf76f-…` currently contains 22 lots of clean S3 URLs — no base64 remained by the time the audit ran. The three-layer fix ensures this stays true.
+
+
+
 ## iter388 — Promotions & Coupons End-to-End Audit + Fixes (Feb 8, 2026) ✅ COMPLETE
 
 **Reported by user**: (1) `GET /api/promotions/active-banners` didn't surface banners to signed-out visitors; (2) audit the full coupon flow — creation → validation → redemption — and fix any broken steps.

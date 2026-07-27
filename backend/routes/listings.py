@@ -258,6 +258,9 @@ async def create_listing(
             content_language=listing_data.content_language,
         )
 
+    # iter389 — Hard-reject base64 image payloads. See _reject_base64_in_images.
+    _reject_base64_in_images(getattr(listing_data, "images", None) or [], "images")
+
     # ── iter203 P0 — Hard-coded vehicle/dealer compliance gate (FIRST line of defence) ──
     # This runs BEFORE payment-method validation so a non-dealer attempting a
     # vehicle listing receives the clear bilingual 403 immediately, regardless
@@ -1116,6 +1119,110 @@ async def upload_listing_images(
     }
 
 
+# ========== iter389 · STATELESS S3 IMAGE UPLOAD ==========
+# The multi-item / vehicle / general listing CREATE flows can now upload
+# each dropped image to S3 BEFORE calling the JSON create endpoint,
+# collecting the returned public URLs and shipping them (never raw base64)
+# in the create payload. This closes the base64-in-Mongo escape hatch
+# nightly sweeps kept flagging.
+LISTING_IMAGE_UPLOAD_MAX_BYTES = 8 * 1024 * 1024  # 8 MB per file
+
+
+@listings_router.post("/uploads/listing-image")
+async def upload_listing_image_stateless(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+):
+    """Upload a single image to S3 and return its public URL.
+
+    Contract:
+        Request:  multipart/form-data · one `file` field
+        Response: `{ "url": "https://bidvex-marketplace-images.s3.us-…/staged/<userid>/<idx>-<rand>.jpg" }`
+
+    Used by CREATE flows that don't yet have a listing_id (multi-item,
+    vehicle, or single-item listing wizards). The frontend uploads each
+    dropped image with a POST here, collects the resulting URLs, and
+    ships them as `lot.images: [<url>, …]` in the JSON create payload.
+
+    Server never writes base64 to MongoDB — the create endpoint hard-
+    rejects any base64 that sneaks into an image array (see
+    `_reject_base64_in_images` below).
+    """
+    if not file:
+        raise HTTPException(status_code=400, detail={"error": "no_file"})
+    if file.content_type and not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail={
+            "error": "not_an_image",
+            "message_en": "Uploaded file must be an image (JPEG, PNG, or WebP).",
+            "message_fr": "Le fichier doit être une image (JPEG, PNG ou WebP).",
+        })
+
+    from services.s3_service import upload_image_to_s3
+    # Namespace staged uploads under the caller's user id so orphaned
+    # uploads can be pruned later without touching real listings.
+    staged_id = f"staged-{current_user.id}"
+    idx = int(datetime.now(timezone.utc).timestamp() * 1000) % 100000
+
+    try:
+        url = await upload_image_to_s3(file, staged_id, idx)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail={"error": "invalid_image", "detail": str(e)})
+    except Exception as e:
+        logger.error("[uploads/listing-image] S3 upload failed: %s", e)
+        raise HTTPException(status_code=502, detail={"error": "s3_upload_failed"})
+
+    return {"url": url}
+
+
+# ========== iter389 · BASE64-IN-IMAGES API GUARDRAIL ==========
+def _looks_like_base64_image(value: Any) -> bool:
+    """Return True if `value` is a base64-encoded image (data URL or raw)."""
+    if not isinstance(value, str) or not value:
+        return False
+    # Data URL is unambiguous — reject on sight.
+    if value.startswith("data:image/") or value.startswith("data:application/"):
+        return True
+    # Not-a-URL long strings that look like base64 payloads.
+    if value.startswith("http://") or value.startswith("https://") or value.startswith("/"):
+        return False
+    # Anything longer than 500 chars that isn't a URL is almost certainly base64.
+    if len(value) > 500:
+        return True
+    return False
+
+
+def _reject_base64_in_images(images: Any, path: str) -> None:
+    """Raise HTTP 400 if any element of `images` is a base64 payload.
+
+    iter389 — Hard guardrail against the "base64 in Mongo" regression. The
+    frontend MUST upload images to `/api/uploads/listing-image` first and
+    ship the returned S3 URLs. If ANY element in an image array looks
+    like base64, we refuse the whole create request with a clear message.
+    """
+    if not images:
+        return
+    if not isinstance(images, (list, tuple)):
+        return
+    for i, entry in enumerate(images):
+        if _looks_like_base64_image(entry):
+            raise HTTPException(status_code=400, detail={
+                "error": "base64_image_rejected",
+                "message_en": (
+                    "Image at "
+                    f"{path}[{i}] was submitted as base64 data. "
+                    "Upload images to /api/uploads/listing-image first and "
+                    "submit the returned S3 URLs instead."
+                ),
+                "message_fr": (
+                    "L'image à "
+                    f"{path}[{i}] a été soumise en base64. "
+                    "Téléversez d'abord les images vers /api/uploads/listing-image "
+                    "puis soumettez les URL S3 retournées."
+                ),
+                "path": f"{path}[{i}]",
+            })
+
+
 # ========== MULTI-ITEM LISTINGS ==========
 
 @listings_router.post("/multi-item-listings")
@@ -1155,6 +1262,13 @@ async def create_multi_item_listing(
         city=getattr(listing_data, "city", None),
         content_language=getattr(listing_data, "content_language", None),
     )
+
+    # iter389 — Hard-reject any base64 image payloads. The frontend must
+    # upload images to /api/uploads/listing-image first and submit S3 URLs.
+    _reject_base64_in_images(getattr(listing_data, "images", None) or [], "images")
+    for _lidx, _lot in enumerate(listing_data.lots or []):
+        _lot_imgs = getattr(_lot, "images", None) if not isinstance(_lot, dict) else _lot.get("images")
+        _reject_base64_in_images(_lot_imgs or [], f"lots[{_lidx}].images")
 
     # ── Deposit field validation (Spec Feature 1) — runs BEFORE sticky-card guard
     # so negative-path tests can reach 400 with bilingual error before 402-no-card.
