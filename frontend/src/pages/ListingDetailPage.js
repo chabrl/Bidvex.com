@@ -5,6 +5,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
+import { usePlatformTermsGate } from '../contexts/PlatformTermsGateContext';
 import { extractErrorMessage } from '../utils/errorHandler';
 import { formatCurrency, formatPercent, formatListingPrice } from '../utils/currencyFormatter';
 import { getLocalized } from '../utils/localization';
@@ -64,6 +65,7 @@ const ListingDetailPage = () => {
   const { id } = useParams();
   const { t, i18n } = useTranslation();
   const { user, token } = useAuth();
+  const { runWithTermsGate } = usePlatformTermsGate();
   const navigate = useNavigate();
   const [listing, setListing] = useState(null);
   const [seller, setSeller] = useState(null);
@@ -287,7 +289,7 @@ const ListingDetailPage = () => {
       if (isCrossBorder && crossBorderAccepted) {
         bidPayload.cross_border_disclosure_accepted = true;
       }
-      const response = await axios.post(`${API}/bids`, bidPayload);
+      const response = await runWithTermsGate(() => axios.post(`${API}/bids`, bidPayload));
       
       setBidConfirmDialogOpen(false);
       toast.success('Bid placed successfully!');
@@ -323,6 +325,11 @@ const ListingDetailPage = () => {
       setBidAmount('');
       setPendingBidAmount(0);
     } catch (error) {
+      // iter404 — user cancelled the inline platform-terms modal; stay silent.
+      if (error?.termsGateCancelled) {
+        setBidConfirmDialogOpen(false);
+        return;
+      }
       const errorMessage = extractErrorMessage(error);
       
       // Show clear error message

@@ -2,6 +2,7 @@ import API_BASE from '../config';
 import React, { useState, useEffect } from 'react';
 import { Bot, Settings, Zap } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { usePlatformTermsGate } from '../contexts/PlatformTermsGateContext';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import { Input } from './ui/input';
@@ -20,6 +21,7 @@ const API = API_BASE;
 const AutoBidModal = ({ listingId, currentBid, minimumIncrement, onAutoBidSetup }) => {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const { runWithTermsGate } = usePlatformTermsGate();
   const [isOpen, setIsOpen] = useState(false);
   const [maxBid, setMaxBid] = useState('');
   const [loading, setLoading] = useState(false);
@@ -68,12 +70,12 @@ const AutoBidModal = ({ listingId, currentBid, minimumIncrement, onAutoBidSetup 
 
     setLoading(true);
     try {
-      const response = await axios.post(`${API}/bids/auto-bid`, null, {
+      const response = await runWithTermsGate(() => axios.post(`${API}/bids/auto-bid`, null, {
         params: {
           listing_id: listingId,
           max_bid: amount
         }
-      });
+      }));
 
       toast.success('Auto-Bid Bot activated!', {
         description: `Will bid up to ${formatCurrency(amount)} using ${minimumIncrement > 0 ? 'seller\'s increment schedule' : 'standard increments'}`
@@ -86,6 +88,8 @@ const AutoBidModal = ({ listingId, currentBid, minimumIncrement, onAutoBidSetup 
         onAutoBidSetup(amount);
       }
     } catch (error) {
+      // iter404 — silent no-op when the inline T&C modal is cancelled.
+      if (error?.termsGateCancelled) { setLoading(false); return; }
       const errorMessage = extractErrorMessage(error);
       toast.error(errorMessage || 'Failed to setup Auto-Bid Bot');
     } finally {

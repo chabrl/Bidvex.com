@@ -4,6 +4,7 @@ import SafeImage from '../components/SafeImage';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
+import { usePlatformTermsGate } from '../contexts/PlatformTermsGateContext';
 import axios from 'axios';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -65,6 +66,7 @@ const MultiItemListingDetailPage = () => {
   const [searchParams] = useSearchParams();
   const targetLotParam = searchParams.get('lot');
   const { user } = useAuth();
+  const { runWithTermsGate } = usePlatformTermsGate();
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { formatPrice, currency } = useCurrency();
@@ -381,11 +383,11 @@ const MultiItemListingDetailPage = () => {
     trackAddToCart({ listing, bidAmount });
 
     try {
-      await axios.post(
+      await runWithTermsGate(() => axios.post(
         `${API}/multi-item-listings/${id}/lots/${lotNumber}/bid`,
         { amount: bidAmount, bid_type: bidType },
         { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
-      );
+      ));
       toast.success('Bid placed successfully!');
       // Meta Pixel InitiateCheckout — fires on every successful bid commit.
       // lotNumber is carried in `contents[]` while content_ids stay parent-scoped.
@@ -393,6 +395,8 @@ const MultiItemListingDetailPage = () => {
       fetchListing();
       setBidAmounts({ ...bidAmounts, [lotNumber]: '' });
     } catch (error) {
+      // iter404 — user cancelled the inline platform-terms modal; stay silent.
+      if (error?.termsGateCancelled) return;
       const errorMessage = extractErrorMessage(error);
       toast.error(errorMessage || 'Failed to place bid');
     }

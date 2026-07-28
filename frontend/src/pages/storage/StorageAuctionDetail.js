@@ -7,6 +7,7 @@ import axios from 'axios';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
+import { usePlatformTermsGate } from '../../contexts/PlatformTermsGateContext';
 import { authHeaders } from '../../utils/authToken';
 import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -40,6 +41,7 @@ const API = API_BASE;
 const StorageAuctionDetail = () => {
   const { id } = useParams();
   const { token, user } = useAuth();
+  const { runWithTermsGate } = usePlatformTermsGate();
   // iter230 — centralized Meta Pixel tracking hook
   const { trackViewContent, trackAddToCart, trackBidSubmitted } =
     useMetaPixelTracking({ routeHint: 'storage' });
@@ -103,11 +105,11 @@ const StorageAuctionDetail = () => {
     trackAddToCart({ listing: auction || { id, listing_type: 'storage' }, bidAmount: amt });
     setSubmittingBid(true);
     try {
-      const res = await axios.post(
+      const res = await runWithTermsGate(() => axios.post(
         `${API}/storage-auctions/${id}/bid`,
         { max_bid: amt },
         { headers: { Authorization: `Bearer ${token}` } },
-      );
+      ));
       toast.success(
         res.data.you_are_winning
           ? (isFr ? `Vous êtes en tête à ${res.data.current_bid} $` : `You are winning at $${res.data.current_bid}`)
@@ -131,6 +133,8 @@ const StorageAuctionDetail = () => {
       setMaxBid('');
       fetchData();
     } catch (err) {
+      // iter404 — silent no-op when the inline T&C modal is cancelled.
+      if (err?.termsGateCancelled) { setSubmittingBid(false); return; }
       // iter400 — route through the shared bilingual extractor so any
       // Trust Gate / rate-limit / validation shape renders as a string.
       const { extractErrorMessage } = await import('../../utils/errorHandler');

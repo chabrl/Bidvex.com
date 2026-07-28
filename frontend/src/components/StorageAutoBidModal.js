@@ -21,6 +21,7 @@ import React, { useState } from 'react';
 import { Bot } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
+import { usePlatformTermsGate } from '../contexts/PlatformTermsGateContext';
 import { Button } from './ui/button';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -40,6 +41,7 @@ const PREMIUM_TIERS = ['premium', 'vip', 'vip_elite', 'partner_pro', 'business']
 const StorageAutoBidModal = ({ auctionId, currentBid, bidIncrement = 10, onActivated }) => {
   const { t } = useTranslation();
   const { user, token } = useAuth();
+  const { runWithTermsGate } = usePlatformTermsGate();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [maxBid, setMaxBid] = useState('');
@@ -59,11 +61,11 @@ const StorageAutoBidModal = ({ auctionId, currentBid, bidIncrement = 10, onActiv
     }
     setLoading(true);
     try {
-      const res = await axios.post(
+      const res = await runWithTermsGate(() => axios.post(
         `${API}/storage-auctions/${auctionId}/bid`,
         { max_bid: amount },
         { headers: { Authorization: `Bearer ${token}` } },
-      );
+      ));
       toast.success(
         res.data?.you_are_winning
           ? t('storage.autoBid.leadingToast', { amount: formatCurrency(res.data.current_bid) })
@@ -73,6 +75,8 @@ const StorageAutoBidModal = ({ auctionId, currentBid, bidIncrement = 10, onActiv
       setMaxBid('');
       onActivated?.(res.data);
     } catch (error) {
+      // iter404 — silent no-op when the inline T&C modal is cancelled.
+      if (error?.termsGateCancelled) { setLoading(false); return; }
       toast.error(extractErrorMessage(error) || t('storage.autoBid.failedToActivate'));
     } finally {
       setLoading(false);

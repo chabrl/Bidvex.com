@@ -1,0 +1,42 @@
+{
+  "summary": "iter404 platform-terms Trust Gate — backend contract fully verified (3/3 relevant tests PASS; storage-auction SKIPPED for lack of active auction). Frontend wiring is CORRECT on all 8 documented detail pages (ListingDetailPage, MultiItemListingDetailPage, VehicleDetailPage single+auto, VehicleMultiLotDetailPage, StorageAuctionDetail, StorageAutoBidModal, AutoBidModal.jsx, AutoBidModalLegacy.js). PlatformTermsGateProvider correctly mounted in App.js. HOWEVER, an UNCOVERED bid entry point was found: FlattenedMarketplace.js confirmBid() posts to /api/bids and /api/multi-item-listings/:id/lots/:n/bid WITHOUT runWithTermsGate — so the marketplace-grid Quick Bid triggers a generic toast on 403 instead of opening the modal. Reproduced live: click marketplace Quick Bid → Review Total Cost → Confirm Bid → API returns 403 trust_required + terms in missing[], but modal never opens (URL stays on /marketplace, generic 'Failed to place bid' toast fires).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Marketplace-grid Quick Bid (FlattenedMarketplace)",
+        "issue": "confirmBid() at /app/frontend/src/components/FlattenedMarketplace.js line 389 calls axios.post to /api/bids (single-item) and /api/multi-item-listings/:id/lots/:n/bid (multi-lot) directly without runWithTermsGate wrapper. Users bidding via the marketplace grid Quick Bid modal receive a generic 'Failed to place bid' toast instead of the platform-terms-gate-modal, breaking the iter404 UX contract for this common bid entry point.",
+        "affected_selectors": ["FlattenedMarketplace confirmBid", "quick-bid Confirm Bid button on /marketplace"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter404_terms_gate_e2e.py",
+    "/app/test_reports/pytest/iter404_results.xml"
+  ],
+  "action_items": [
+    "Wrap the axios.post call in FlattenedMarketplace.js confirmBid() (line ~389) in runWithTermsGate(() => axios.post(...)) and add the `if (error?.termsGateCancelled) { setPlacingBid(false); return; }` guard in the catch block. Import usePlatformTermsGate at the top of the file.",
+    "(Optional) Seed the preview MongoDB with an active storage_auction so the storage-auction backend contract test can run instead of skipping."
+  ],
+  "critical_code_review_comments": [
+    "FlattenedMarketplace.js is a large (>1200 line) component that duplicates bid submission logic already present in ListingDetailPage and MultiItemListingDetailPage. Consider extracting a shared usePlaceBid hook so future changes (like this iter404 modal) can't accidentally miss a code path.",
+    "In PlatformTermsGateContext.jsx the accept-terms error toast displays the raw axios detail (which may be an object) via `typeof msg === 'string' ? msg : (isFr ? 'Erreur' : 'Error')` — the object branch surfaces just 'Error' with no context. Consider extracting message_en/message_fr like other pages do.",
+    "Backend POST /api/users/me/accept-platform-terms hits deps.get_current_user which in turn calls MongoDB; a single transient Atlas primary-selection blip caused a 500 during testing. The endpoint has no wrapping try/except around the get_current_user call, so any Motor timeout bubbles as a generic 500. Consider a narrow retry or a 503 with a friendlier message.",
+    "trust_gate.py raises through require_trust_verified even on a 'terms only' miss — the CTA path is /profile/settings#terms rather than a modal deep-link. The frontend now handles the modal via 403 detection, but the CTA anchor is dead code for the modal path. Not a bug, just noise."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter404_terms_gate_e2e.py"
+  ],
+  "success_rate": {"backend": "100% (3/3 executed; 1 skipped due to missing seed data)", "frontend": "90% (all 8 documented pages correctly wired; 1 additional bid entry point uncovered)"},
+  "test_credentials": "testbuyer@bidvex.com / TestBuyer2026! — re-seeded via /app/backend/scripts/iter308_reseed_test_fixtures.py at start of run. Buyer was also patched in Mongo to have phone_verified=true and a payment_methods row so canBid=true and the Trust Gate 403 would fire ONLY on terms.",
+  "seed_data_creation": "Inserted 1 active listing (id: iter404-test-3ff84602) into db.listings for the bid contract test. Inserted 1 payment_methods row for testbuyer. Set testbuyer.phone_verified=true, phone=+15145550100. Reset testbuyer.platform_terms_accepted_at (unset) before each backend test run.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend contract for iter404 is solid: POST /api/users/me/accept-platform-terms is idempotent and correctly persists; POST /api/bids returns the expected 403 trust_required with terms in missing[] before acceptance and does not include 'terms' in missing[] after acceptance. Frontend detail-page wiring verified via grep — all documented data-testids (platform-terms-gate-modal, -accept-btn, -cancel-btn, -full-link) exist in PlatformTermsGateContext.jsx and the provider is properly mounted at App.js line 475. The gap is FlattenedMarketplace.js confirmBid() — after main agent wraps it, retest by (1) resetting testbuyer.platform_terms_accepted_at, (2) navigating to /marketplace, (3) clicking Quick Bid → Review Total Cost → Confirm Bid, and verifying the platform-terms-gate-modal opens with URL preserved.",
+  "rca of the issue": "The iter404 implementation added runWithTermsGate wrapping to every *detail page* bid entry (ListingDetailPage, MultiItemListingDetailPage, storage/vehicle pages, and all auto-bid modals), but the marketplace-grid Quick Bid flow in FlattenedMarketplace.js executes its own inline confirmBid() function that duplicates the axios.post call to /api/bids and /api/multi-item-listings/:id/lots/:n/bid. Because this code path was not enumerated in the iter404 files-of-reference, it was not wrapped, so the 403 trust_required response falls through to the generic catch block and surfaces as a 'Failed to place bid' error toast. Fix: import { usePlatformTermsGate } from '../contexts/PlatformTermsGateContext', destructure runWithTermsGate at the top of FlattenedMarketplace, wrap axios.post in confirmBid with runWithTermsGate, and add the termsGateCancelled guard to the catch block (same pattern as ListingDetailPage line 329)."
+}

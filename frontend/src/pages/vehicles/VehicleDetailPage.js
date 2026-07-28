@@ -16,6 +16,7 @@ import { useMetaPixelTracking } from '../../hooks/useMetaPixelTracking';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
+import { usePlatformTermsGate } from '../../contexts/PlatformTermsGateContext';
 import { authHeaders } from '../../utils/authToken';
 import axios from 'axios';
 import { motion } from 'framer-motion';
@@ -215,6 +216,7 @@ const ImageGallery = ({ media = [] }) => {
 // Bidding Panel Component
 const BiddingPanel = ({ vehicle, onBidPlaced }) => {
   const { user, token } = useAuth();
+  const { runWithTermsGate } = usePlatformTermsGate();
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   // iter230 — centralized Meta Pixel tracking (replaces scattered dynamic imports)
@@ -320,15 +322,17 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
     if (autoBidEnabled) {
       setBidding(true);
       try {
-        await axios.post(
+        await runWithTermsGate(() => axios.post(
           `${API}/vehicles/${vehicle.id}/auto-bid?max_bid=${amount}`,
           {},
           { headers: { Authorization: `Bearer ${token}` } },
-        );
+        ));
         toast.success(i18n.language?.startsWith('fr')
           ? `Enchère automatique configurée jusqu'à ${formatPrice(amount, vehicle?.currency)}`
           : `Auto-Bid configured up to ${formatPrice(amount, vehicle?.currency)}`);
       } catch (err) {
+        // iter404 — silent no-op when the inline T&C modal is cancelled.
+        if (err?.termsGateCancelled) { setBidding(false); return; }
         // iter400 — Trust Gate + rate-limit bilingual envelopes.
         const { extractErrorMessage } = await import('../../utils/errorHandler');
         toast.error(extractErrorMessage(err) || 'Auto-Bid setup failed');
@@ -362,12 +366,12 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
       }
       
       // Place bid
-      const response = await axios.post(`${API}/vehicle-bids`, {
+      const response = await runWithTermsGate(() => axios.post(`${API}/vehicle-bids`, {
         vehicle_id: vehicle.id,
         amount,
       }, {
         headers: { Authorization: `Bearer ${token}` }
-      });
+      }));
       
       toast.success(`Bid placed: ${formatPrice(amount, vehicle?.currency)}`);
       // Meta Pixel InitiateCheckout — fires on every successful bid commit.
@@ -377,6 +381,8 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
       setBidAmount((amount + 100).toString());
       
     } catch (error) {
+      // iter404 — silent no-op when the inline T&C modal is cancelled.
+      if (error?.termsGateCancelled) { setBidding(false); return; }
       // iter400 — bilingual Trust Gate + rate-limit envelopes emit
       // { error, message_en, message_fr }. Prefer these before falling
       // back to raw detail JSON so React never receives a plain object.

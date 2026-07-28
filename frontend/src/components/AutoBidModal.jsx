@@ -30,6 +30,7 @@ import { Badge } from './ui/badge';
 import { Bot, CheckCircle2, XCircle, Zap, Loader2, TrendingUp } from 'lucide-react';
 import API_BASE from '../config';
 import { useAuth } from '../contexts/AuthContext';
+import { usePlatformTermsGate } from '../contexts/PlatformTermsGateContext';
 import { formatCurrency } from '../utils/currencyFormatter';
 
 const ELIGIBLE_TIERS = new Set(['premium', 'vip', 'vip_elite', 'partner', 'business']);
@@ -45,6 +46,7 @@ export default function AutoBidModal({
   const { i18n, t } = useTranslation();
   const isFR = i18n.language?.startsWith('fr');
   const { user, token } = useAuth();
+  const { runWithTermsGate } = usePlatformTermsGate();
   const navigate = useNavigate();
 
   const tier = (user?.subscription_tier || 'standard').toLowerCase();
@@ -111,15 +113,17 @@ export default function AutoBidModal({
     }
     setSaving(true);
     try {
-      await axios.post(
+      await runWithTermsGate(() => axios.post(
         `${API_BASE}/multi-item-listings/${auctionId}/lots/${lot.lot_number}/auto-bid`,
         { max_bid: amount, strategy },
         { headers: { Authorization: `Bearer ${token}` } },
-      );
+      ));
       toast.success(isFR ? 'Auto-enchère enregistrée' : 'Auto-Bid saved');
       onSaved && onSaved();
       onOpenChange(false);
     } catch (e) {
+      // iter404 — silent no-op when the inline T&C modal is cancelled.
+      if (e?.termsGateCancelled) { setSaving(false); return; }
       const detail = e?.response?.data?.detail;
       const msg = typeof detail === 'string' ? detail : (detail?.message || 'Failed to save Auto-Bid');
       setErr(msg);

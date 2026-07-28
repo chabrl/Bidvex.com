@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import UpcomingCountdownBadge from '../../components/UpcomingCountdownBadge';
 import { getTimingModeShortLabel } from '../../lib/vehicleMultiLotTimingModes';
 import WatchlistButton from '../../components/WatchlistButton';
+import { usePlatformTermsGate } from '../../contexts/PlatformTermsGateContext';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -124,6 +125,7 @@ const BidHistoryPanel = ({ eventId, lot }) => {
 const VehicleMultiLotDetailPage = () => {
   const { eventId } = useParams();
   const navigate = useNavigate();
+  const { runWithTermsGate } = usePlatformTermsGate();
   const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [bidAmount, setBidAmount] = useState('');
@@ -238,15 +240,17 @@ const VehicleMultiLotDetailPage = () => {
     setPlacing(true);
     try {
       const token = localStorage.getItem('token');
-      await axios.post(
+      await runWithTermsGate(() => axios.post(
         `${API}/vehicle-multi-lot-auctions/${event.id}/lots/${activeLot.id}/bid`,
         { event_id: event.id, lot_id: activeLot.id, amount: amt },
         { headers: { Authorization: `Bearer ${token}` } },
-      );
+      ));
       toast.success('Bid placed!');
       setBidAmount('');
       refresh();
     } catch (e) {
+      // iter404 — silent no-op when the inline T&C modal is cancelled.
+      if (e?.termsGateCancelled) { setPlacing(false); return; }
       const status = e?.response?.status;
       const detail = e?.response?.data?.detail;
 

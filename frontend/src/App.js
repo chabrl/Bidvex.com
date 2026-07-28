@@ -44,6 +44,9 @@ import { CompareProvider } from './contexts/CompareContext';
 import CompareBar from './components/CompareBar';
 import { EN_TO_FR } from './i18n/urlMap';
 
+// iter404 — Inline Trust-Gate T&C acceptance so a bidder never leaves the auction page.
+import { PlatformTermsGateProvider } from './contexts/PlatformTermsGateContext';
+
 // ─── Lazy-loaded pages (route-level code splitting) ───────────────
 // iter384 CLS fix — HomePage MUST be eager-loaded. When lazy, the Suspense
 // fallback (PageLoader min-h-60vh ≈ 468px) is replaced by the hero (~1111px)
@@ -469,6 +472,7 @@ const App = () => {
           <SiteModeProvider>
           <PromoBannerProvider>
           <CompareProvider>
+          <PlatformTermsGateProvider>
             <ScrollToTop />
             <MarketingPixelLoader />
             {/* iter272 — Capture incoming UTM/campaign params on every route change. */}
@@ -1034,6 +1038,7 @@ const App = () => {
             <CompareBar />
           </div>
           </MaintenanceGuard>
+          </PlatformTermsGateProvider>
           </CompareProvider>
           </PromoBannerProvider>
           </SiteModeProvider>
