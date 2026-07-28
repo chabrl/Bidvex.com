@@ -1,6 +1,38 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter404 — Inline Platform Terms Gate on Bid (Feb 8, 2026) ✅ COMPLETE
+
+**Reported by user**: When a bid API call returns 403 with `missing` containing 'terms', open the platform T&C acceptance modal inline (same page — no redirect). After acceptance, automatically retry the exact bid the user just attempted. Applies to every bid type: single-item, lot, auto-bid setup, and storage auction bid.
+
+### Delivered
+- **NEW: `frontend/src/contexts/PlatformTermsGateContext.jsx`** — provider that exposes `usePlatformTermsGate().runWithTermsGate(bidFn)`. Wraps any async bid function; on a 403 `{ error: 'trust_required', missing: ['terms', ...] }` it opens an inline shadcn Dialog. On Accept, it posts to `/api/users/me/accept-platform-terms`, refreshes the auth user via `useAuth().refreshUser()`, then re-invokes bidFn exactly once. On Cancel it throws an error with `.termsGateCancelled = true` so callers stay silent.
+- **`frontend/src/App.js`** — `<PlatformTermsGateProvider>` mounted at app root inside `<CompareProvider>`, wrapping `<MaintenanceGuard>`.
+- **Bid entry points wrapped in `runWithTermsGate(...)` + `if (err?.termsGateCancelled) return;` guard**:
+  1. `pages/ListingDetailPage.js` — single-item bid (`POST /api/bids`)
+  2. `pages/MultiItemListingDetailPage.js` — lot bid (`POST /api/multi-item-listings/:id/lots/:n/bid`)
+  3. `pages/vehicles/VehicleDetailPage.js` — vehicle bid + vehicle auto-bid
+  4. `pages/vehicles/VehicleMultiLotDetailPage.js` — vehicle multi-lot bid
+  5. `pages/storage/StorageAuctionDetail.js` — storage bid
+  6. `components/StorageAutoBidModal.js` — storage auto-bid
+  7. `components/AutoBidModal.jsx` — multi-lot auto-bid
+  8. `components/AutoBidModalLegacy.js` — legacy marketplace auto-bid
+  9. `components/FlattenedMarketplace.js` — marketplace-grid Quick Bid (added after iter404 testing agent flagged it as an uncovered path)
+
+### Verified
+- **Backend contract (curl + testing_agent)**:
+  - `POST /api/bids` returns 403 with `{ detail: { error: 'trust_required', missing: ['terms'], ... } }` when `platform_terms_accepted_at` is null. ✅
+  - `POST /api/users/me/accept-platform-terms` is idempotent — returns 200 and persists `platform_terms_accepted_at`. ✅
+  - Retrying the same bid after acceptance no longer has 'terms' in `missing[]`. ✅
+- **Frontend testing_agent** confirmed all documented data-testids exist (`platform-terms-gate-modal`, `-accept-btn`, `-cancel-btn`, `-full-link`), provider is mounted correctly, and modal opens on 403 without redirect.
+
+### Data-testids (for future automation)
+- `platform-terms-gate-modal` — the Dialog itself
+- `platform-terms-gate-accept-btn` — Accept & Place My Bid button
+- `platform-terms-gate-cancel-btn` — Cancel button
+- `platform-terms-gate-full-link` — link to full `/legal#terms`
+
+
 ## iter403 — Duplicate Pagination Bar on Multi-Item Step 2 (Feb 8, 2026) ✅ COMPLETE
 
 **Reported by user**: On Create Multi-Item Listing → Step 2 (Lots & Items), duplicate the existing pagination bar (`Showing lots X to Y of Z` + Previous/Next/page numbers) so it appears both above and below the list. Both bars must share the same page state — clicking either updates both. No logic/styling changes.

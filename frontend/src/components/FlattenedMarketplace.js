@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
+import { usePlatformTermsGate } from '../contexts/PlatformTermsGateContext';
 import { useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { Badge } from './ui/badge';
@@ -94,6 +95,7 @@ const FlattenedMarketplace = ({
   const { t, i18n } = useTranslation();
   const isFrench = i18n.language?.startsWith('fr');
   const { user, token } = useAuth();
+  const { runWithTermsGate } = usePlatformTermsGate();
   const navigate = useNavigate();
   const { trackView: insightView, trackClick: insightClick, trackSearch: insightSearch } = useInsightsTracker();
   const queryClient = useQueryClient();
@@ -386,9 +388,9 @@ const FlattenedMarketplace = ({
         ? { amount: parseFloat(bidAmount) }
         : { listing_id: selectedItem.id, amount: parseFloat(bidAmount) };
 
-      const response = await axios.post(url, body, 
+      const response = await runWithTermsGate(() => axios.post(url, body, 
         { headers: { Authorization: `Bearer ${token}` } }
-      );
+      ));
       
       toast.success('Bid placed successfully!');
       setBidConfirmOpen(false);
@@ -399,6 +401,12 @@ const FlattenedMarketplace = ({
       // Refresh items via React Query
       refetchItems();
     } catch (error) {
+      // iter404 — user cancelled the inline platform-terms modal; stay silent.
+      if (error?.termsGateCancelled) {
+        setBidConfirmOpen(false);
+        setPlacingBid(false);
+        return;
+      }
       const detail = error.response?.data?.detail;
       let message = 'Failed to place bid';
       if (typeof detail === 'string') {
