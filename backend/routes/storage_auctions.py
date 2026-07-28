@@ -1011,6 +1011,7 @@ async def get_my_facility(current_user: User = Depends(get_current_user)):
 @storage_router.post("/storage-facilities/auctions")
 async def create_storage_auction(
     payload: StorageAuctionCreate,
+    background_tasks: BackgroundTasks,
     facility=Depends(_require_verified_facility),
 ):
     if payload.unit_size not in UNIT_SIZES:
@@ -1158,9 +1159,12 @@ async def create_storage_auction(
     # iter401 — Flow 1 Buyer Interest emails (real-time) for storage auctions.
     try:
         if (doc.get("status") or "").lower() in ("active", "live", "scheduled"):
-            import asyncio as _aio2
             from services.marketing_flows import dispatch_buyer_interest_emails
-            _aio2.ensure_future(dispatch_buyer_interest_emails(db, listing_id=auction_id, listing_type="storage"))
+            background_tasks.add_task(
+                dispatch_buyer_interest_emails, db,
+                listing_id=auction_id,
+                listing_type="storage",
+            )
     except Exception:  # noqa: BLE001
         pass
     return doc
@@ -1873,6 +1877,7 @@ async def admin_forfeit_deposit(
 @storage_router.post("/admin/storage-auctions")
 async def admin_create_storage_auction(
     payload: StorageAuctionCreate,
+    background_tasks: BackgroundTasks,
     facility_id: str = Query(...),
     current_user: User = Depends(_require_admin),
 ):
@@ -1956,9 +1961,12 @@ async def admin_create_storage_auction(
     # iter401 — Flow 1 Buyer Interest emails for admin-created storage auctions.
     try:
         if (doc.get("status") or "").lower() in ("active", "upcoming", "live"):
-            import asyncio as _aio3
             from services.marketing_flows import dispatch_buyer_interest_emails
-            _aio3.ensure_future(dispatch_buyer_interest_emails(db, listing_id=doc.get("id"), listing_type="storage"))
+            background_tasks.add_task(
+                dispatch_buyer_interest_emails, db,
+                listing_id=doc.get("id"),
+                listing_type="storage",
+            )
     except Exception:  # noqa: BLE001
         pass
     return doc

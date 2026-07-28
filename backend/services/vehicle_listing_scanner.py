@@ -73,7 +73,7 @@ async def _call_gemini_scanner(category: Optional[str], title: Optional[str], de
         title=(title or "")[:300],
         description=(description or "")[:1500],
     )
-    response = client.models.generate_content(
+    response = await client.aio.models.generate_content(
         model="gemini-2.5-flash",
         contents=[prompt],
         config={

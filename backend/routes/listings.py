@@ -1529,12 +1529,12 @@ async def create_multi_item_listing(
 
     # Background translation — if _en/_fr not already provided
     if not listing_data.title_en or not listing_data.title_fr:
-        import asyncio as _aio
         raw_lots = [lot_item.model_dump() if hasattr(lot_item, "model_dump") else lot_item for lot_item in listing_data.lots]
-        _aio.ensure_future(_translate_multi_listing_bg(
+        background_tasks.add_task(
+            _translate_multi_listing_bg,
             db, listing.id, listing_data.title, listing_data.description,
-            raw_lots, listing_data.content_language or "en"
-        ))
+            raw_lots, listing_data.content_language or "en",
+        )
 
     # iter300 P2 — "Follow Seller" fan-out for immediately-active lots.
     if listing_dict.get("status") == "active" and not listing_dict.get("is_demo_sandbox"):

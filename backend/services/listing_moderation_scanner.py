@@ -202,7 +202,7 @@ async def _call_gemini_moderation(
         description=(description or "")[:2000],
         price=price if price is not None else "",
     )
-    response = client.models.generate_content(
+    response = await client.aio.models.generate_content(
         model="gemini-2.5-flash",
         contents=[prompt],
         config={

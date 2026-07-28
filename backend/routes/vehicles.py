@@ -13,7 +13,7 @@ Routes:
 - /api/vehicle-documents/* - Document uploads
 """
 
-from fastapi import APIRouter, HTTPException, Depends, Request, WebSocket, WebSocketDisconnect, Query, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, Depends, Request, WebSocket, WebSocketDisconnect, Query, UploadFile, File, Form, BackgroundTasks
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import FileResponse
 from typing import List, Optional, Dict, Any
@@ -666,6 +666,7 @@ async def get_seller_public_profile(seller_id: str):
 @vehicle_router.post("/vehicles")
 async def create_vehicle_listing(
     listing_data: VehicleListingCreate,
+    background_tasks: BackgroundTasks,
     seller: dict = Depends(get_vehicle_seller),
     user: dict = Depends(get_current_user)
 ):
@@ -1002,13 +1003,15 @@ async def create_vehicle_listing(
     await log_audit("vehicle", listing_id, "created", user["id"], "seller")
 
     # iter401 — Flow 1 Buyer Interest emails (real-time). Only fires when
-    # the vehicle goes live immediately. `asyncio.ensure_future` because
-    # this endpoint does not accept a `BackgroundTasks` param.
+    # the vehicle goes live immediately.
     if (listing.get("status") or "").lower() in ("active", "live"):
         try:
-            import asyncio as _aio
             from services.marketing_flows import dispatch_buyer_interest_emails
-            _aio.ensure_future(dispatch_buyer_interest_emails(db, listing_id=listing_id, listing_type="vehicle"))
+            background_tasks.add_task(
+                dispatch_buyer_interest_emails, db,
+                listing_id=listing_id,
+                listing_type="vehicle",
+            )
         except Exception as _bie:  # noqa: BLE001
             logger.warning(f"[iter401 buyer-interest vehicle] skipped: {_bie}")
 

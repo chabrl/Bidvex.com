@@ -8,6 +8,7 @@ Sends transactional emails for vehicle auctions
 """
 
 import os
+import asyncio
 import logging
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone
@@ -424,7 +425,7 @@ async def send_email(
         logger.info(
             f"[EMAIL_DEBUG] Sending email to: {to_email} | Subject: {subject} | From: {_from} | Reply-To: {_reply_to}"
         )
-        response = sg.send(message)
+        response = await asyncio.to_thread(sg.send, message)
         
         logger.info(f"[EMAIL_DEBUG] SendGrid response for {to_email}: status_code={response.status_code}")
         

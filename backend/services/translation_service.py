@@ -47,7 +47,7 @@ async def _translate_via_litellm(text: str, system_prompt: str) -> Optional[str]
     else:
         params["model"] = "gemini/gemini-2.5-flash"
 
-    response = litellm.completion(**params)
+    response = await litellm.acompletion(**params)
     content = response.choices[0].message.content
     return content.strip() if content else None
 
