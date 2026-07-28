@@ -173,8 +173,8 @@ const ManageAllAuctions = () => {
       return;
     }
     if (sec === 'lots') {
-      navigate('/admin?tab=lots');
-      toast.info('Opened Lots Moderation — find this listing to edit it.');
+      navigate('/admin?tab=listings-moderation');
+      toast.info('Opened Listings Moderation — find this listing to edit it.');
       return;
     }
     setEditModal({
@@ -684,7 +684,7 @@ const ManageAllAuctions = () => {
                       title={
                         (listing._section === 'vehicle') ? 'Edit in Vehicle Admin panel' :
                         (listing._section === 'storage') ? 'Edit in Storage Auctions Admin panel' :
-                        (listing._section === 'lots' || listing.type === 'multi') ? 'Edit in Lots Moderation panel' :
+                        (listing._section === 'lots' || listing.type === 'multi') ? 'Edit in Listings Moderation panel' :
                         'Edit listing details'
                       }
                     >

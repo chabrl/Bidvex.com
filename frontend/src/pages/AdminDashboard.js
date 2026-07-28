@@ -301,6 +301,7 @@ const AdminDashboard = () => {
       const SECONDARY_TO_PRIMARY = {
         'flagged-listings':   'marketplace',
         'listings-moderation': 'marketplace',
+        'lots':               'marketplace',
         'conversion-funnel':  'analytics',
         'advanced-analytics': 'analytics',
         'dashboard':          'analytics',

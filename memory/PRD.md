@@ -1,6 +1,23 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter402 — Admin Nav String + Route Alias (Feb 8, 2026) ✅ COMPLETE
+
+**Reported by user**: In the admin panel, unify the moderation nomenclature from "Lots" to "Listings", fix the deep-link that opens the wrong tab, and add a legacy alias so old `?tab=lots` URLs still resolve.
+
+### Delivered
+- **`frontend/src/pages/admin/ManageAllAuctions.js`**
+  - Line 176: `navigate('/admin?tab=lots')` → `navigate('/admin?tab=listings-moderation')`
+  - Line 177: toast copy `Opened Lots Moderation` → `Opened Listings Moderation`
+  - Line 687: tooltip copy `Edit in Lots Moderation panel` → `Edit in Listings Moderation panel`
+- **`frontend/src/pages/AdminDashboard.js`**
+  - `SECONDARY_TO_PRIMARY` map now includes `'lots': 'marketplace'`, so any legacy deep-link `/admin?tab=lots` still resolves to the correct Marketplace primary tab.
+
+### Verified
+- Smoke-test screenshot of `/admin?tab=listings-moderation` compiles and renders (login gate shown as expected).
+- ESLint delta scan clean on touched lines (pre-existing warnings unrelated).
+
+
 ## iter401 — Marketing Automation Flows (Feb 8, 2026) ✅ COMPLETE
 
 **Reported by user**: Build two automated marketing email flows, both bilingual EN + FR:
