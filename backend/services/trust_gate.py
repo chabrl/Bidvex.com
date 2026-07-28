@@ -59,17 +59,14 @@ async def _has_accepted_terms(db, user) -> bool:
     a live DB lookup when the field isn't present on the in-memory model
     (some legacy code paths hand us a User without the fresh field).
 
-    iter400 — Also recognizes a per-listing T&C acceptance as satisfying
-    the pillar (any non-empty `auction_agreements` entry counts). This
-    handles legacy users who accepted a listing's T&C before the
-    platform-level stamp was introduced.
+    iter402 — Per-listing `auction_agreements` fallback removed. The
+    Trust Gate T&C pillar now passes ONLY when the global
+    `platform_terms_accepted_at` timestamp is set. This keeps the
+    server-side gate consistent with the frontend `can_bid` flag and
+    prevents users who accepted a single-listing T&C from being auto-
+    graduated to the platform-wide pillar.
     """
     if _get(user, "platform_terms_accepted_at"):
-        return True
-    # iter400 — accept a per-listing agreement as proof the user has
-    # already legally opted in.
-    agreements = _get(user, "auction_agreements") or {}
-    if isinstance(agreements, dict) and any(agreements.values()):
         return True
     user_id = _get(user, "id")
     if not user_id:
@@ -77,15 +74,9 @@ async def _has_accepted_terms(db, user) -> bool:
     try:
         row = await db.users.find_one(
             {"id": user_id},
-            {"_id": 0, "platform_terms_accepted_at": 1, "auction_agreements": 1},
+            {"_id": 0, "platform_terms_accepted_at": 1},
         )
-        if not row:
-            return False
-        if row.get("platform_terms_accepted_at"):
-            return True
-        # DB fallback for the per-listing acceptance signal.
-        db_agreements = row.get("auction_agreements") or {}
-        if isinstance(db_agreements, dict) and any(db_agreements.values()):
+        if row and row.get("platform_terms_accepted_at"):
             return True
     except Exception:  # noqa: BLE001
         return False

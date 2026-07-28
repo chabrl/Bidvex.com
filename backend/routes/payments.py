@@ -637,11 +637,13 @@ async def get_trust_status(
         except stripe.StripeError:
             pass
     
-    # iter396 — Third Trust Gate pillar: platform T&C acceptance. The
-    # value is a UTC ISO timestamp stored when the user first accepts
-    # the auction Terms & Conditions (POST /api/users/me/accept-platform-terms).
+    # iter402 — Delegate to the same `_has_accepted_terms` helper the
+    # server-side gate uses so `can_bid` / `can_list` on this response
+    # can never drift from what the bid + listing-create endpoints
+    # actually enforce.
+    from services.trust_gate import _has_accepted_terms
     platform_terms_accepted_at = user.get("platform_terms_accepted_at")
-    terms_accepted = bool(platform_terms_accepted_at)
+    terms_accepted = await _has_accepted_terms(db, user)
 
     return {
         "trust_status":                  trust_status,
