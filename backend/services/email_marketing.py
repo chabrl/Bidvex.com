@@ -5,6 +5,7 @@ scheduling, and SendGrid webhook tracking.
 """
 
 import os
+import re
 import uuid
 import logging
 from typing import Dict, Any, List, Optional
@@ -45,6 +46,39 @@ else:
 if TRANSACTIONAL_API_KEY and TRANSACTIONAL_API_KEY != "SG.your-actual-sendgrid-key-here":
     transactional_client = SendGridAPIClient(TRANSACTIONAL_API_KEY)
     logger.info("SendGrid Transactional client initialized")
+
+
+# iter406 — SendGrid Click Tracking exempts any `<a>` tag that carries the
+# `clicktracking="off"` attribute. We MUST keep the CASL unsubscribe link
+# untracked so the recipient always lands on the real /unsubscribe page
+# instead of a redirector (some ISPs block that redirect and treat it as
+# a broken CASL contact-in-writing requirement).
+#
+# Admins author campaign HTML with `{{unsubscribe_url}}` (or the _en/_fr
+# variants) inside an `<a href="…">` tag; not every author remembers to
+# add `clicktracking="off"`. This regex injects the attribute on any
+# anchor whose href points at any unsubscribe placeholder, but ONLY when
+# it isn't already present.
+_UNSUB_ANCHOR_RE = re.compile(
+    r'<a\b(?P<attrs>[^>]*?\bhref\s*=\s*"[^"]*'
+    r'{{\s*unsubscribe_url(?:_(?:en|fr))?\s*}}[^"]*"[^>]*)>',
+    re.IGNORECASE,
+)
+
+
+def _ensure_clicktracking_off_on_unsubscribe(html: str) -> str:
+    """Inject `clicktracking="off"` into any `<a href="…{{unsubscribe_url…}}…">`
+    tag that doesn't already carry it. Idempotent — safe to call twice."""
+    if not html:
+        return html
+
+    def _inject(match: re.Match) -> str:
+        attrs = match.group("attrs")
+        if re.search(r'\bclicktracking\s*=', attrs, re.IGNORECASE):
+            return match.group(0)  # already present — leave untouched
+        return f'<a{attrs} clicktracking="off">'
+
+    return _UNSUB_ANCHOR_RE.sub(_inject, html)
 
 
 # Campaign status constants
@@ -989,6 +1023,10 @@ class EmailMarketingService:
 
             # Personalize content
             html_content = campaign["html_content"]
+            # iter406 — Guarantee `clicktracking="off"` on the CASL
+            # unsubscribe anchor(s) BEFORE the placeholder gets replaced
+            # with the real URL, so SendGrid never rewrites the href.
+            html_content = _ensure_clicktracking_off_on_unsubscribe(html_content)
             html_content = html_content.replace("{{name}}", name or "")
             html_content = html_content.replace("{{email}}", email)
             html_content = html_content.replace("{{unsubscribe_url}}", unsubscribe_url_en)

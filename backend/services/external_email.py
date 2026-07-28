@@ -129,7 +129,7 @@ def casl_footer_html(unsubscribe_url: str) -> str:
       <strong>BidVex Inc.</strong> | Sherbrooke, QC, Canada<br>
       You are receiving this email because your address was added to a BidVex marketing list.<br>
       <strong>Vous recevez cet email car votre adresse a été ajoutée à une liste marketing BidVex.</strong><br><br>
-      <a href="{unsubscribe_url}" style="color:#2f80ff;font-weight:600;">
+      <a href="{unsubscribe_url}" clicktracking="off" style="color:#2f80ff;font-weight:600;">
         Unsubscribe / Se désabonner
       </a>
       &nbsp;·&nbsp;
