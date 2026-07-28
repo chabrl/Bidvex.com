@@ -1708,7 +1708,7 @@ async def get_multi_item_listings(
 
 
 @listings_router.get("/multi-item-listings/{listing_id}")
-async def get_multi_item_listing(listing_id: str):
+async def get_multi_item_listing(listing_id: str, background_tasks: BackgroundTasks):
     db = get_db()
     listing = await db.multi_item_listings.find_one({"id": listing_id}, {"_id": 0})
     if not listing:
@@ -1723,7 +1723,23 @@ async def get_multi_item_listing(listing_id: str):
     from services.listing_seller_enrichment import enrich_listing_async
     listing = await enrich_listing_async(db, listing)
 
+    # iter405 — Fire-and-forget view increment (parity with the single-item
+    # GET endpoint above); never blocks the response.
+    background_tasks.add_task(_increment_multi_item_listing_views, listing_id)
+
     return MultiItemListing(**listing)
+
+
+async def _increment_multi_item_listing_views(listing_id: str) -> None:
+    """iter405 — Best-effort multi-item view counter. Mirrors
+    ``_increment_listing_views``; swallows errors so a transient Mongo blip
+    on the write path never propagates to a user-facing 5xx."""
+    try:
+        await get_db().multi_item_listings.update_one(
+            {"id": listing_id}, {"$inc": {"views": 1}}
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[iter405] multi-item view-increment failed for {listing_id}: {e}")
 
 
 # iter367 P1 — Live activity ticker for multi-lot auction pages.
