@@ -1,6 +1,22 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter403 — Duplicate Pagination Bar on Multi-Item Step 2 (Feb 8, 2026) ✅ COMPLETE
+
+**Reported by user**: On Create Multi-Item Listing → Step 2 (Lots & Items), duplicate the existing pagination bar (`Showing lots X to Y of Z` + Previous/Next/page numbers) so it appears both above and below the list. Both bars must share the same page state — clicking either updates both. No logic/styling changes.
+
+### Delivered
+- `frontend/src/pages/CreateMultiItemListing.js` — inserted an identical pagination bar directly after the lots list `<div>` (line ~1546). It reuses the same `currentPage` state and `setCurrentPage` setter as the top bar, so both bars stay perfectly synchronized without any state duplication.
+- Same visibility gate (`lots.length > lotsPerPage`) and identical markup/classes/labels as the top bar — no styling drift.
+
+### Not applied (user confirmed via clarifying question)
+- Create Vehicle Listing, Create Vehicle Multi-Lot, and Create Storage Auction pages don't currently have a pagination bar. User opted to skip them for now ("The other pages don't have enough lots to need it yet").
+
+### Verified
+- Smoke-test render of `/create-listing` — page compiles, no console errors.
+- ESLint delta clean on inserted lines (pre-existing warnings on unrelated lines).
+
+
 ## iter402 — Admin Nav String + Route Alias (Feb 8, 2026) ✅ COMPLETE
 
 **Reported by user**: In the admin panel, unify the moderation nomenclature from "Lots" to "Listings", fix the deep-link that opens the wrong tab, and add a legacy alias so old `?tab=lots` URLs still resolve.
