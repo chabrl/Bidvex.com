@@ -1,6 +1,35 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter408 — Unified Coupon Cross-Collection Resolution (Feb 8, 2026) ✅ COMPLETE
+
+**Reported by user**: The `coupon_codes` (Admin → Coupon Codes) and `promotions` (Admin → Promotions) systems were validated independently. A code minted on one surface was rejected at every checkout entry point that queried the other. Unify the lookup so every entry point resolves a code from BOTH collections. Do not change how codes are created or stored.
+
+### Delivered
+- **NEW: `backend/services/coupon_lookup.py`** — three shared predicates that mirror the existing validation checks:
+  - `find_in_coupon_codes(db, code, plan_id=None)` — `is_active`, expiry, usage_limit, applicable_plans
+  - `find_in_promotions(db, code, plan_id=None)` — status, start_date, end_date, max_uses
+  - `find_in_trial_coupons(db, code)` — status='issued', not expired
+  - `synthesize_promotion_from_coupon_code(doc)` — maps a `coupon_codes` row into a promotion-shaped dict so the promotion-runtime pipeline can consume it without branching.
+- **`backend/routes/admin_promotions.py::apply_active_promotions`** — when a `coupon_code` argument yields no `promotions` match, fall back to `coupon_codes` and return the synthesised promotion dict (subscription_upgrade path only, since coupon_codes are subscription-plan discounts by design).
+- **`backend/services/subscription_pricing.py::validate_coupon`** — when `coupon_codes.find_one` returns None, fall back to `promotions` via a new `_validate_coupon_from_promotions()` helper. Applies status / date-window / max_uses / applicable_plans checks and shapes the result as a `CouponValidationResult`.
+- **`backend/routes/trial_coupons.py::preview_coupon`** — the strict `BVX-TRIAL-XXXXXXXX` regex now runs first for back-compat, but if the code doesn't match that shape (or matches but isn't found), we cross-lookup in `coupon_codes` then `promotions`. Bilingual reason codes (`coupon_expired`, `coupon_usage_limit`, etc.) surface via a shared `_reason_message_en/_fr` helper.
+
+### Verified
+- **Pytest** (7/7 pass, `backend/tests/test_iter408_unified_coupon_lookup.py`):
+  - `apply_active_promotions` resolves a `coupon_codes` row → synthesised promotion dict with correct discount_percent.
+  - `apply_active_promotions` still returns the native `promotions` row when the code lives there (no regression).
+  - `validate_coupon` resolves a `promotions` row → correct discount_amount computed from `config.discount_percent`.
+  - `validate_coupon` still resolves `coupon_codes` natively (no regression).
+  - `validate_coupon` still rejects expired `coupon_codes` rows.
+  - `preview_coupon` resolves all three sources (`partner_trial_coupons` / `coupon_codes` / `promotions`) with a `source` marker.
+  - `preview_coupon` still 404s / 400s on unknown codes.
+- **Live curl** on preview host:
+  - `GET /api/promotions/coupons/ITER408-LIVE` (coupon_codes) → 200 with `source: coupon_codes`.
+  - `GET /api/promotions/coupons/ITER408-LIVE-PR` (promotions) → 200 with `source: promotions`.
+  - `POST /api/validate-coupon` on a promotions-minted code → 200 with `discount_amount: $72.00 / $180.00` (40% off).
+
+
 ## iter407 — Self-Serve Unsubscribe Form (Feb 8, 2026) ✅ COMPLETE
 
 **Reported by user**: On `/unsubscribe`, when no valid token is in the URL, replace the generic error with a simple form (single email field + submit). On submit, add the email to the suppression list. Show a bilingual confirmation. No login, no token required. The token-based flow must continue working unchanged.

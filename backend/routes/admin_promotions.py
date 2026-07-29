@@ -1597,6 +1597,28 @@ async def apply_active_promotions(
             best, best_value = promo, value
 
     if not best:
+        # ─── iter408 — Cross-collection fallback ────────────────────────
+        # When the caller supplied an explicit `coupon_code` and no
+        # `promotions` row matched, look the code up in `coupon_codes`
+        # (Admin → Coupon Codes surface) and synthesise a promotion-shaped
+        # dict so the downstream pipeline can waive / discount it
+        # uniformly. Only checked when we have a coupon_code (system-wide
+        # fee auto-promotions never touch this path).
+        if coupon_code:
+            from services.coupon_lookup import (
+                find_in_coupon_codes,
+                synthesize_promotion_from_coupon_code,
+            )
+            doc, _reason = await find_in_coupon_codes(db, coupon_code)
+            if doc:
+                synth = synthesize_promotion_from_coupon_code(doc)
+                # Only surface it when the transaction is subscription-related;
+                # coupon_codes are subscription-plan discounts by design.
+                if transaction_type == "subscription_upgrade":
+                    return {
+                        **synth,
+                        "applied_value": float(synth["config"].get("discount_percent", 0)),
+                    }
         return None
     return {**best, "applied_value": best_value}
 

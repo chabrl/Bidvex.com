@@ -362,41 +362,135 @@ async def revoke_coupon(code: str, current_user: User = Depends(get_current_user
 @public_coupons_router.get("/{code}")
 async def preview_coupon(code: str) -> Dict[str, Any]:
     """Used by the AuthPage to show the "FREE TRIAL UNLOCKED" banner
-    before the user finishes signup. Returns ONLY non-sensitive fields."""
+    before the user finishes signup. Returns ONLY non-sensitive fields.
+
+    iter408 — Cross-collection resolver. The strict `BVX-TRIAL-XXXXXXXX`
+    regex is applied FIRST for the native Partner-Trial-Offers surface,
+    but if the code doesn't match that shape we fall back to the
+    unified lookup: Admin → Coupon Codes, then Admin → Promotions. That
+    way a partner who receives a "SPRING50" or "LAUNCH-25" coupon from
+    the other admin surfaces can still land on the same public preview.
+    """
     code = code.upper().strip()
+    db = get_db()
+
+    if COUPON_CODE_RE.match(code):
+        c = await db.partner_trial_coupons.find_one({"code": code}, {"_id": 0})
+        if c:
+            now = _now()
+            expired = False
+            try:
+                expired = datetime.fromisoformat(c["expires_at"]) < now
+            except Exception:
+                pass
+            return {
+                "source":         "partner_trial_coupons",
+                "code":           c["code"],
+                "partner_type":   c["partner_type"],
+                "duration_days":  c["duration_days"],
+                "status":         c["status"],
+                "expired":        expired,
+                "valid":          c["status"] == "issued" and not expired,
+                "pre_filled": {
+                    "recipient_email": c.get("recipient_email"),
+                    "recipient_name":  c.get("recipient_name"),
+                    "company_name":    c.get("company_name"),
+                },
+            }
+        # fall through to the cross-collection fallback below.
+
+    # ─── iter408 — Cross-collection fallback ────────────────────────
+    # A code that didn't hit `partner_trial_coupons` may still be a
+    # legitimate Coupon Codes / Promotions code. Try both, using the
+    # SAME validity predicates each surface applies natively.
+    from services.coupon_lookup import find_in_coupon_codes, find_in_promotions
+
+    cc_doc, cc_reason = await find_in_coupon_codes(db, code)
+    if cc_doc:
+        return {
+            "source":         "coupon_codes",
+            "code":           cc_doc["code"],
+            "discount_type":  cc_doc.get("discount_type"),
+            "discount_value": cc_doc.get("value"),
+            "expiry_date":    cc_doc.get("expiry_date"),
+            "usage_limit":    cc_doc.get("usage_limit", 0),
+            "usage_count":    cc_doc.get("usage_count", 0),
+            "applicable_plans": cc_doc.get("applicable_plans") or ["premium", "vip"],
+            "valid":          True,
+            "expired":        False,
+        }
+    if cc_reason and cc_reason != "not_found":
+        # Present but stale — surface the reason so the frontend can copy
+        # a specific "expired" vs "usage limit reached" banner.
+        raise HTTPException(status_code=400, detail={
+            "error_code": f"coupon_{cc_reason}",
+            "message_en": _reason_message_en(cc_reason),
+            "message_fr": _reason_message_fr(cc_reason),
+        })
+
+    pr_doc, pr_reason = await find_in_promotions(db, code)
+    if pr_doc:
+        cfg = pr_doc.get("config", {}) or {}
+        return {
+            "source":            "promotions",
+            "code":              pr_doc.get("coupon_code"),
+            "promotion_type":    pr_doc.get("type"),
+            "discount_percent":  cfg.get("discount_percent"),
+            "start_date":        pr_doc.get("start_date"),
+            "end_date":          pr_doc.get("end_date"),
+            "max_uses":          pr_doc.get("max_uses", 0),
+            "current_uses":      pr_doc.get("current_uses", 0),
+            "valid":             True,
+            "expired":           False,
+        }
+    if pr_reason and pr_reason != "not_found":
+        raise HTTPException(status_code=400, detail={
+            "error_code": f"promotion_{pr_reason}",
+            "message_en": _reason_message_en(pr_reason),
+            "message_fr": _reason_message_fr(pr_reason),
+        })
+
+    # Nothing found in any of the three collections.
     if not COUPON_CODE_RE.match(code):
+        # The trial-format check only fires when we've also failed the
+        # cross-collection lookup — keeps back-compat for the AuthPage.
         raise HTTPException(status_code=400, detail={
             "error_code": "invalid_coupon_format",
             "message_en": "Coupon code format is invalid.",
             "message_fr": "Le format du code de coupon est invalide.",
         })
-    db = get_db()
-    c = await db.partner_trial_coupons.find_one({"code": code}, {"_id": 0})
-    if not c:
-        raise HTTPException(status_code=404, detail={
-            "error_code": "coupon_not_found",
-            "message_en": "Coupon not found.",
-            "message_fr": "Coupon introuvable.",
-        })
-    now = _now()
-    expired = False
-    try:
-        expired = datetime.fromisoformat(c["expires_at"]) < now
-    except Exception:
-        pass
-    return {
-        "code":           c["code"],
-        "partner_type":   c["partner_type"],
-        "duration_days":  c["duration_days"],
-        "status":         c["status"],
-        "expired":        expired,
-        "valid":          c["status"] == "issued" and not expired,
-        "pre_filled": {
-            "recipient_email": c.get("recipient_email"),
-            "recipient_name":  c.get("recipient_name"),
-            "company_name":    c.get("company_name"),
-        },
-    }
+    raise HTTPException(status_code=404, detail={
+        "error_code": "coupon_not_found",
+        "message_en": "Coupon not found.",
+        "message_fr": "Coupon introuvable.",
+    })
+
+
+# iter408 — Bilingual reason-to-copy helpers used by the fallback path.
+_REASON_MSG_EN = {
+    "expired":       "This coupon has expired.",
+    "usage_limit":   "This coupon has reached its usage limit.",
+    "plan_mismatch": "This coupon is not valid for the selected plan.",
+    "status":        "This coupon is not currently active.",
+    "date_window":   "This coupon is not currently active.",
+    "max_uses":      "This coupon has reached its usage limit.",
+}
+_REASON_MSG_FR = {
+    "expired":       "Ce coupon est expiré.",
+    "usage_limit":   "Ce coupon a atteint sa limite d'utilisation.",
+    "plan_mismatch": "Ce coupon n'est pas valide pour le forfait sélectionné.",
+    "status":        "Ce coupon n'est pas actif en ce moment.",
+    "date_window":   "Ce coupon n'est pas actif en ce moment.",
+    "max_uses":      "Ce coupon a atteint sa limite d'utilisation.",
+}
+
+
+def _reason_message_en(reason: str) -> str:
+    return _REASON_MSG_EN.get(reason, "This coupon is not valid.")
+
+
+def _reason_message_fr(reason: str) -> str:
+    return _REASON_MSG_FR.get(reason, "Ce coupon n'est pas valide.")
 
 
 # ─── Server-side coupon consumption (called from auth.register) ───────

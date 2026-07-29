@@ -546,6 +546,15 @@ class SubscriptionPricingService:
         coupon = await self.coupons_collection.find_one({"code": code, "is_active": True})
         
         if not coupon:
+            # ─── iter408 — Cross-collection fallback ────────────────────
+            # A code created in Admin → Promotions must resolve here too.
+            # Apply the same status / date-window / max-uses gates the
+            # promotion engine uses, then map onto CouponValidationResult.
+            promo_result = await self._validate_coupon_from_promotions(
+                code=code, plan_id=plan_id, billing_period=billing_period,
+            )
+            if promo_result is not None:
+                return promo_result
             return CouponValidationResult(
                 valid=False,
                 message="Invalid coupon code"
@@ -636,6 +645,77 @@ class SubscriptionPricingService:
             {"$inc": {"usage_count": 1}}
         )
         return result.modified_count > 0
+
+    # ─── iter408 — Cross-collection fallback for validate_coupon ─────
+    async def _validate_coupon_from_promotions(
+        self,
+        code: str,
+        plan_id: str,
+        billing_period: str,
+    ) -> Optional["CouponValidationResult"]:
+        """Look the code up in `db.promotions` and shape the result into a
+        `CouponValidationResult` so subscription-checkout accepts it too.
+
+        Returns ``None`` when the code is not present in `promotions`
+        (so the caller can surface its normal "Invalid coupon code"
+        response), or when it is present but fails a validity check.
+        Returns a valid `CouponValidationResult` when everything passes.
+        """
+        try:
+            from services.coupon_lookup import find_in_promotions
+        except Exception:  # pragma: no cover — safe fallback for bootstrapping
+            return None
+
+        doc, _reason = await find_in_promotions(self.db, code, plan_id=plan_id)
+        if not doc:
+            return None
+
+        # Derive discount percent from the promotion config. Promotions
+        # in this codebase are percentage-based; fixed-amount promos are
+        # not modelled there, so we default to 0% for unknown types.
+        cfg = doc.get("config", {}) or {}
+        try:
+            percent = float(cfg.get("discount_percent", 0) or 0)
+        except (TypeError, ValueError):
+            percent = 0.0
+
+        # Some promotion types imply 100% off subscription upgrades.
+        if doc.get("type") in ("free_platform_fee", "free_first_listing", "partner_launch_offer"):
+            percent = 100.0
+
+        percent = max(0.0, min(100.0, percent))
+
+        # Get plan pricing
+        plan = await self.get_plan(plan_id)
+        if not plan:
+            return CouponValidationResult(
+                valid=False,
+                code=code,
+                message="Invalid plan selected",
+            )
+
+        if billing_period == "monthly":
+            original_total = plan.get("price_monthly", 0) or 0
+        else:
+            original_total = plan.get("price_yearly", 0) or 0
+
+        discount_amount = round(float(original_total) * (percent / 100.0), 2)
+        new_total = max(0.0, round(float(original_total) - discount_amount, 2))
+
+        return CouponValidationResult(
+            valid=True,
+            code=code,
+            discount_type="percentage",
+            discount_value=percent,
+            discount_amount=discount_amount,
+            new_total=new_total,
+            original_total=round(float(original_total), 2),
+            message=f"Coupon applied! You save ${discount_amount:.2f}",
+            # Promotions collection has no Stripe coupon id — the
+            # subscription-checkout path falls back to line-item discounts
+            # when this field is None.
+            stripe_coupon_id=None,
+        )
     
     async def _create_stripe_coupon(self, coupon_data: CouponCode) -> stripe.Coupon:
         """Create coupon in Stripe"""
