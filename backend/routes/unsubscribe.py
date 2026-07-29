@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 from typing import Dict, Optional
 import logging
 import os
+import re
 import uuid
 
 import httpx
@@ -123,6 +124,13 @@ class ConfirmRequest(BaseModel):
     token: str
     # iter310 — optional bilingual hint for the Unsubscribe Audit Trail. Falls
     # back to `en` (or whatever the JWT payload carries for external tokens).
+    lang: Optional[str] = None
+
+
+# iter407 — Self-serve unsubscribe (no token / no login required).
+# Rendered by /unsubscribe when no `token` query param is present.
+class SelfServeUnsubscribeRequest(BaseModel):
+    email: str
     lang: Optional[str] = None
 
 
@@ -244,6 +252,129 @@ async def confirm_unsubscribe(payload: ConfirmRequest, request: Request):
             logger.error(f"[UNSUBSCRIBE] SendGrid API call failed: {type(e).__name__}: {e}")
 
     return {"status": "success", "email_masked": _mask_email(email)}
+
+
+# ── Self-serve unsubscribe (no token, no login) ─────────────────
+# iter407 — Rendered by the frontend `/unsubscribe` page when no token
+# is present in the URL. Users can drop their email into a single field
+# and be added to the suppression list immediately. Uses the same
+# downstream write path as the token flow so behaviour is identical.
+_EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$")
+
+
+@unsubscribe_router.post("/self-serve")
+async def self_serve_unsubscribe(payload: SelfServeUnsubscribeRequest, request: Request):
+    """Add ``email`` to the marketing suppression list.
+
+    * No token, no login. Anyone who owns (or claims to own) the address
+      may add it — this is the industry norm for CASL/CAN-SPAM one-click
+      unsubscribe pages.
+    * We do NOT confirm existence in a user response ("email enumeration"
+      protection): the response shape is identical whether the address
+      was known or not, and whether it was already unsubscribed.
+    * Admin addresses are still hard-blocked (same audit trail as the
+      token flow) so a stale click can never silence platform alerts.
+    """
+    raw = (payload.email or "").strip().lower()
+    if not raw or not _EMAIL_RE.match(raw):
+        raise HTTPException(status_code=400, detail="email_invalid")
+
+    db = get_db()
+    now = datetime.now(timezone.utc)
+    ip = (request.client.host if request.client else None)
+
+    # Hard-block admin unsubscribe attempts (same guard as /confirm).
+    if await _is_admin_email(db, raw):
+        logger.warning(
+            f"[UNSUBSCRIBE self-serve] BLOCKED admin attempt for {raw} from ip={ip}"
+        )
+        try:
+            await db.unsubscribe_events.insert_one({
+                "id":              str(uuid.uuid4()),
+                "email":           raw,
+                "event":           "blocked_admin_attempt",
+                "source":          "self_serve",
+                "token_type":      None,
+                "unsubscribed_at": now,
+                "ip":              ip,
+                "user_agent":      (request.headers.get("user-agent") if hasattr(request, "headers") else None),
+            })
+        except Exception:  # noqa: BLE001
+            pass
+        raise HTTPException(status_code=403, detail=ADMIN_UNSUBSCRIBE_REFUSAL)
+
+    existing = await db.users.find_one({"email": raw}, {"_id": 0, "marketing_unsubscribed": 1})
+    already = bool(existing and existing.get("marketing_unsubscribed"))
+
+    if not already:
+        # Upsert user doc — contact-only entry is fine if they never registered.
+        await db.users.update_one(
+            {"email": raw},
+            {
+                "$set": {
+                    "marketing_unsubscribed": True,
+                    "marketing_unsubscribed_at": now,
+                    "marketing_unsubscribed_source": "self_serve",
+                    "marketing_unsubscribed_ip": ip,
+                },
+                "$setOnInsert": {
+                    "id": str(uuid.uuid4()),
+                    "email": raw,
+                    "created_at": now,
+                    "is_contact_only": True,
+                },
+            },
+            upsert=True,
+        )
+
+        # Fast-lookup suppression table (send-time guard hits this first).
+        await db.email_suppressions.update_one(
+            {"email": raw},
+            {"$set": {"email": raw, "unsubscribed_at": now, "source": "self_serve"}},
+            upsert=True,
+        )
+
+        # Propagate to SendGrid global suppressions (best-effort — DB wins).
+        if SENDGRID_API_KEY:
+            try:
+                async with httpx.AsyncClient(timeout=10) as client:
+                    r = await client.post(
+                        SENDGRID_SUPPRESSIONS_URL,
+                        headers={
+                            "Authorization": f"Bearer {SENDGRID_API_KEY}",
+                            "Content-Type": "application/json",
+                        },
+                        json={"recipient_emails": [raw]},
+                    )
+                    if r.status_code not in (200, 201):
+                        logger.warning(
+                            f"[UNSUBSCRIBE self-serve] SendGrid returned {r.status_code}: {r.text[:200]}"
+                        )
+            except Exception as e:  # noqa: BLE001
+                logger.error(
+                    f"[UNSUBSCRIBE self-serve] SendGrid API failed: {type(e).__name__}: {e}"
+                )
+
+    # Audit trail row (single per submission).
+    try:
+        await db.unsubscribe_events.insert_one({
+            "id":              str(uuid.uuid4()),
+            "email":           raw,
+            "event":           "already_done" if already else "unsubscribed",
+            "source":          "self_serve",
+            "token_type":      None,
+            "unsubscribed_at": now,
+            "ip":              ip,
+            "user_agent":      (request.headers.get("user-agent") if hasattr(request, "headers") else None),
+            "lang":            (payload.lang or "en"),
+        })
+    except Exception:  # noqa: BLE001
+        pass
+
+    return {
+        "status":       "already_done" if already else "success",
+        "email_masked": _mask_email(raw),
+    }
 
 
 # ── Send-time guard ────────────────────────────────────────────

@@ -1,6 +1,44 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter407 — Self-Serve Unsubscribe Form (Feb 8, 2026) ✅ COMPLETE
+
+**Reported by user**: On `/unsubscribe`, when no valid token is in the URL, replace the generic error with a simple form (single email field + submit). On submit, add the email to the suppression list. Show a bilingual confirmation. No login, no token required. The token-based flow must continue working unchanged.
+
+### Delivered
+- **Backend — `POST /api/unsubscribe/self-serve`** (`backend/routes/unsubscribe.py`):
+  - Accepts `{ email, lang? }`.
+  - Validates the email format server-side (regex).
+  - Idempotent: repeat submissions for the same address return `status: "already_done"` (privacy-preserving; no email enumeration).
+  - Writes to `db.users` (upsert with `is_contact_only=true` if no account), `db.email_suppressions` (fast-lookup for the send-time guard), and propagates to SendGrid global suppressions (best-effort — DB is source of truth).
+  - Hard-blocks admin/super_admin emails with a `403` + bilingual `admin_unsubscribe_blocked` payload, same guard as the token flow. Blocked attempts still get an audit row.
+  - Emits `db.unsubscribe_events` audit row with `source: "self_serve"` for every submission.
+- **Frontend — `frontend/src/pages/UnsubscribePage.js`**:
+  - When `token` is absent, render a bilingual self-serve form (email + submit + transactional-emails disclaimer) instead of showing an error.
+  - Added state values `self_serve` (form) and `self_serve_success` (thank-you).
+  - Client-side email sanity check + surfaces bilingual error messages for `email_invalid`, `admin_unsubscribe_blocked`, and generic network failures.
+  - Existing token flow left completely untouched: `loading → confirm → success/already/error` still runs when `token` is present.
+
+### Data-testids
+- `self-serve-unsubscribe-form`, `self-serve-unsubscribe-input`, `self-serve-unsubscribe-submit`
+- `self-serve-unsubscribe-error`, `self-serve-unsubscribe-success-icon`
+- `self-serve-unsubscribe-success-message`, `self-serve-unsubscribe-home-link`
+
+### Verified
+- Backend curl: fresh submit → `status: success` + DB row created; repeat submit → `status: already_done`; malformed email → `HTTP 400 email_invalid`; admin email → `HTTP 403` with bilingual payload.
+- DB post-conditions: `email_suppressions` populated, `users.marketing_unsubscribed=true`, `unsubscribe_events` audit rows correctly labelled `unsubscribed / already_done / blocked_admin_attempt`.
+
+
+## iter406 — CASL Unsubscribe `clicktracking="off"` Enforcement (Feb 8, 2026) ✅ COMPLETE
+- `backend/services/external_email.py::casl_footer_html()` — added `clicktracking="off"` on the `<a href="{unsubscribe_url}">` anchor
+- `backend/services/email_marketing.py` — new `_ensure_clicktracking_off_on_unsubscribe()` helper runs on every campaign's `html_content` right before the `{{unsubscribe_url*}}` substitutions. Handles the base placeholder plus `_en`/`_fr` variants, respects existing attributes, and is idempotent
+
+
+## iter405 — Multi-Item Listing View Counter (Feb 8, 2026) ✅ COMPLETE
+- `backend/routes/listings.py` — `get_multi_item_listing` now accepts `background_tasks: BackgroundTasks` and fires `_increment_multi_item_listing_views(listing_id)` before returning, mirroring the single-item pattern
+- Verified: 3 GETs → views 0 → 3
+
+
 ## iter404 — Inline Platform Terms Gate on Bid (Feb 8, 2026) ✅ COMPLETE
 
 **Reported by user**: When a bid API call returns 403 with `missing` containing 'terms', open the platform T&C acceptance modal inline (same page — no redirect). After acceptance, automatically retry the exact bid the user just attempted. Applies to every bid type: single-item, lot, auto-bid setup, and storage auction bid.
