@@ -42,6 +42,13 @@ const SEO = ({
   image = '/bidvex-og.png',
   noindex = false,
   jsonLd = null,
+  // iter412 — set to `true` when the caller emits its own bilingual
+  // hreflang tags (e.g. pages that live at a different URL per
+  // language, like /how-brokers-work vs /comment-fonctionnent-les-courtiers).
+  // The default false emits en-ca / fr-ca / x-default pointing at the
+  // current canonical URL, matching the "one URL renders both languages"
+  // convention BidVex uses everywhere else.
+  noHreflang = false,
 }) => {
   // iter411 — Prefer the caller-supplied `path`; otherwise auto-derive
   // from the current router location so every mount emits a canonical.
@@ -76,10 +83,17 @@ const SEO = ({
 
       {/* Bilingual hreflang — BidVex is one URL with client-side language
           toggle, so EN/FR alternates point at the same canonical URL and
-          x-default resolves to the EN version. */}
-      <link rel="alternate" hrefLang="en-ca" href={fullUrl} />
-      <link rel="alternate" hrefLang="fr-ca" href={fullUrl} />
-      <link rel="alternate" hrefLang="x-default" href={fullUrl} />
+          x-default resolves to the EN version. Set `noHreflang` on pages
+          that emit their own bilingual alternates (different URL per lang). */}
+      {!noHreflang && (
+        <link rel="alternate" hrefLang="en-ca" href={fullUrl} />
+      )}
+      {!noHreflang && (
+        <link rel="alternate" hrefLang="fr-ca" href={fullUrl} />
+      )}
+      {!noHreflang && (
+        <link rel="alternate" hrefLang="x-default" href={fullUrl} />
+      )}
 
       {/* JSON-LD Structured Data */}
       {jsonLd && (

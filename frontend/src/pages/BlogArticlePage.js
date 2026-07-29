@@ -8,11 +8,11 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useParams } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
 import { useTranslation } from 'react-i18next';
 import { ChevronLeft, Loader2, Newspaper, Calendar } from 'lucide-react';
 import API_BASE from '../config';
 import { LangLink } from '../components/LangLink';
+import SEO from '../components/SEO';
 
 function renderMarkdown(text) {
   if (!text) return null;
@@ -141,11 +141,11 @@ export default function BlogArticlePage() {
 
   return (
     <div className="min-h-screen bg-white" data-testid="blog-article-page">
-      <Helmet>
-        <title>{`${title} — BidVex Blog`}</title>
-        <meta name="description" content={excerpt} />
-        <link rel="canonical" href={`https://bidvex.com/blogs/${article.slug}`} />
-      </Helmet>
+      <SEO
+        title={`${title} — BidVex Blog`}
+        description={excerpt}
+        path={`/blogs/${article.slug}`}
+      />
 
       {/* Hero */}
       <section

@@ -10,7 +10,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 
-import { Helmet } from 'react-helmet-async';
 import { useTranslation } from 'react-i18next';
 import {
   Newspaper, ArrowRight, BookOpen, Gavel, ShieldCheck, Truck,
@@ -18,6 +17,7 @@ import {
 } from 'lucide-react';
 import API_BASE from '../config';
 import { LangLink } from '../components/LangLink';
+import SEO from '../components/SEO';
 
 const ICON_MAP = {
   Gavel,
@@ -66,16 +66,13 @@ export default function BlogsPage() {
 
   return (
     <div className="min-h-screen bg-slate-50" data-testid="blogs-page">
-      <Helmet>
-        <title>{fr ? 'Blog BidVex — Articles, guides et nouveautés' : 'BidVex Blog — Articles, Guides & Platform Insights'}</title>
-        <meta
-          name="description"
-          content={fr
-            ? 'Articles, guides et explications techniques pour vendeurs, courtiers, concessionnaires et acheteurs sur la plateforme d\'enchères BidVex.'
-            : 'Articles, guides, and technical explanations for sellers, brokers, dealers, and buyers on the BidVex auction platform.'}
-        />
-        <link rel="canonical" href="https://bidvex.com/blogs" />
-      </Helmet>
+      <SEO
+        title={fr ? 'Blog BidVex — Articles, guides et nouveautés' : 'BidVex Blog — Articles, Guides & Platform Insights'}
+        description={fr
+          ? 'Articles, guides et explications techniques pour vendeurs, courtiers, concessionnaires et acheteurs sur la plateforme d\'enchères BidVex.'
+          : 'Articles, guides, and technical explanations for sellers, brokers, dealers, and buyers on the BidVex auction platform.'}
+        path="/blogs"
+      />
 
       {/* Hero */}
       <section className="relative overflow-hidden border-b border-slate-200" style={{ background: 'linear-gradient(135deg, #0B2545 0%, #1B3D6F 60%, #2186C6 100%)' }}>

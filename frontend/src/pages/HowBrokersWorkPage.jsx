@@ -20,6 +20,7 @@ import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import SEO from '../components/SEO';
 import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from '../components/ui/select';
@@ -209,15 +210,20 @@ export default function HowBrokersWorkPage() {
 
   return (
     <div className="bg-gradient-to-b from-[#0F172A] via-[#1E293B] to-[#0F172A] text-white min-h-screen pb-16">
+      <SEO
+        title={T.title}
+        description={T.description}
+        path={isFR ? '/comment-fonctionnent-les-courtiers' : '/how-brokers-work'}
+        jsonLd={faqLd}
+        noHreflang
+      />
+      {/* iter412 — Page-specific bilingual alternates: this page lives at
+          TWO distinct URLs (EN vs FR), unlike the rest of BidVex which
+          renders both languages at one URL. `noHreflang` on <SEO />
+          suppresses the auto en-ca/fr-ca so we own the alternates here. */}
       <Helmet>
-        <title>{T.title}</title>
-        <meta name="description" content={T.description} />
-        <link rel="canonical" href={isFR
-          ? "https://bidvex.com/comment-fonctionnent-les-courtiers"
-          : "https://bidvex.com/how-brokers-work"} />
         <link rel="alternate" hrefLang="en" href="https://bidvex.com/how-brokers-work" />
         <link rel="alternate" hrefLang="fr" href="https://bidvex.com/comment-fonctionnent-les-courtiers" />
-        <script type="application/ld+json">{JSON.stringify(faqLd)}</script>
       </Helmet>
 
       {/* Language toggle in top right */}

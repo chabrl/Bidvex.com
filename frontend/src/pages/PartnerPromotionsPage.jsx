@@ -14,6 +14,7 @@ import { Helmet } from 'react-helmet-async';
 import { Button } from '../components/ui/button';
 import { Sparkles, Car, Award, Warehouse, Check, X } from 'lucide-react';
 import { LangLink } from '../components/LangLink';
+import SEO from '../components/SEO';
 
 const PartnerPromotionsPage = () => {
   const { i18n } = useTranslation();
@@ -27,27 +28,25 @@ const PartnerPromotionsPage = () => {
 
   return (
     <div className="min-h-screen bg-slate-50" data-testid="partner-promotions-page">
-      <Helmet>
-        <title>{t(
+      <SEO
+        title={t(
           'Partner Program — Free Trial for Dealers, Brokers & Storage | BidVex',
           'Programme Partenaires — Essai gratuit pour concessionnaires, courtiers et entrepôts | BidVex',
-        )}</title>
-        <meta name="description" content={t(
+        )}
+        description={t(
           "Join BidVex as a vehicle dealer, licensed broker, or storage facility operator. Start your free trial today. No credit card required.",
           "Rejoignez BidVex en tant que concessionnaire automobile, courtier licencié ou exploitant d'entrepôt. Démarrez votre essai gratuit dès aujourd'hui. Aucune carte de crédit requise.",
-        )} />
+        )}
+        path="/promotions/partners"
+        image="https://bidvex.com/og-partners.jpg"
+      />
+      {/* iter412 — Slim supplementary Helmet for tags the shared <SEO />
+          component doesn't own: dynamic og:locale (bilingual page) and
+          the historic keywords meta. Everything else (title, description,
+          canonical, og:*, twitter:*) is emitted by <SEO /> above. */}
+      <Helmet>
         <meta name="keywords" content="auction broker Canada, vehicle dealer auction platform, storage auction software, BidVex partner program" />
-        <link rel="canonical" href="https://bidvex.com/promotions/partners" />
-        <meta property="og:title" content={t('Partner Program | BidVex', 'Programme Partenaires | BidVex')} />
-        <meta property="og:description" content={t(
-          'Free trial for vehicle dealers, brokers and storage operators on Canada\'s #1 auction marketplace.',
-          'Essai gratuit pour les concessionnaires, courtiers et entrepôts sur la marketplace d\'enchères #1 au Canada.',
-        )} />
-        <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://bidvex.com/promotions/partners" />
-        <meta property="og:image" content="https://bidvex.com/og-partners.jpg" />
         <meta property="og:locale" content={isFr ? 'fr_CA' : 'en_CA'} />
-        <meta name="twitter:card" content="summary_large_image" />
       </Helmet>
 
       {/* Hero */}
