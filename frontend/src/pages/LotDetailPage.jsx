@@ -39,6 +39,7 @@ import Countdown from 'react-countdown';
 import API_BASE from '../config';
 import { useAuth } from '../contexts/AuthContext';
 import { formatCurrency } from '../utils/currencyFormatter';
+import { extractErrorMessage } from '../utils/errorHandler';
 import SafeImage from '../components/SafeImage';
 import GlobalImageViewer from '../components/GlobalImageViewer';
 import WatchlistButton from '../components/WatchlistButton';
@@ -91,7 +92,7 @@ export default function LotDetailPage() {
         setListing(listingRes.data);
         if (incRes) setIncrementInfo(incRes.data);
       } catch (e) {
-        if (!cancelled) setError(e?.response?.data?.detail || 'Failed to load auction');
+        if (!cancelled) setError(extractErrorMessage(e) || 'Failed to load auction');
       } finally {
         if (!cancelled) setLoading(false);
       }

@@ -52,15 +52,26 @@ def _utc_now_iso() -> str:
 
 
 def _parse_iso(value: Any) -> Optional[datetime]:
-    """Tolerate naive strings, `Z`-suffixed strings, and datetime objects."""
+    """Tolerate naive strings, `Z`-suffixed strings, and datetime objects.
+
+    iter409 — Always returns a **timezone-aware** datetime (UTC when the
+    source lacked tzinfo). This is critical because
+    `datetime.now(timezone.utc)` is aware, and comparing an aware value
+    to a naive one raises ``TypeError: can't compare offset-naive and
+    offset-aware datetimes`` which used to bubble up as a 500 on
+    ``coupon_lookup.find_in_*`` callers and crash the frontend.
+    """
     if isinstance(value, datetime):
         return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
     if not value or not isinstance(value, str):
         return None
     try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except Exception:
         return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed
 
 
 async def find_in_coupon_codes(

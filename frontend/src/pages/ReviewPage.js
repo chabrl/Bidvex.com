@@ -10,6 +10,7 @@ import { Separator } from '../components/ui/separator';
 import { Textarea } from '../components/ui/textarea';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { Star, ArrowLeft, Loader2, CheckCircle2, Package, User, MessageSquare, Truck, Send } from 'lucide-react';
+import { extractErrorMessage } from '../utils/errorHandler';
 
 const API = API_BASE;
 
@@ -81,7 +82,7 @@ const ReviewPage = () => {
         setSubmitted(true);
       }
     } catch (err) {
-      setError(err.response?.data?.detail || t('reviewPage.cannotLoad'));
+      setError(extractErrorMessage(err) || t('reviewPage.cannotLoad'));
     } finally {
       setLoading(false);
     }

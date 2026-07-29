@@ -1,6 +1,34 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter409 — Coupon Lookup Timezone Fix + Bilingual-Error Render Guards (Feb 8, 2026) ✅ COMPLETE
+
+**Reported by user**: (1) Coupon-lookup 500s when the parsed `expiry_date` / `end_date` / `expires_at` was tz-naive vs. `datetime.now(timezone.utc)`. (2) React blank page (Error #31) when the 500's raw `{code, message_en, message_fr}` object was rendered.
+
+### Delivered
+- **Backend — `services/coupon_lookup.py::_parse_iso`** now always returns a timezone-aware datetime. If the parsed ISO string lacks tzinfo, we attach UTC via `.replace(tzinfo=timezone.utc)`. Fixes the `TypeError: can't compare offset-naive and offset-aware datetimes` regression in `find_in_coupon_codes`, `find_in_promotions`, and `find_in_trial_coupons`.
+- **Frontend — `B2BCouponActivationCard.jsx`** now routes catch errors through `extractErrorMessage(e)` instead of passing raw `response.data.detail` (which is `{code, message_en, message_fr}` for 500s) into `toast.error`.
+- **Frontend — codebase sweep** for other catch blocks that store `response.data.detail` in state and later render it as JSX (the classic React #31 crashers):
+  - `pages/CheckoutPage.js` — 3 catch blocks now use `extractErrorMessage`
+  - `pages/vehicles/VehicleDetailPage.js` — vehicle-load catch now uses `extractErrorMessage`
+  - `pages/AffiliateDashboard.js` — 3 catch blocks (load / Stripe / onboarding) now use `extractErrorMessage`
+  - `pages/ReviewPage.js` — review-load catch now uses `extractErrorMessage`
+  - `pages/LotDetailPage.jsx` — lot-load catch now uses `extractErrorMessage`
+
+### Verified
+- **Pytest** — the 7/7 iter408 tests still pass after the tz-aware change (backend contract intact).
+- **Inline unit checks** on `_parse_iso`:
+  - Naive ISO string → returns aware datetime; comparison against `datetime.now(timezone.utc)` no longer raises.
+  - Z-suffixed ISO string → aware.
+  - Naive `datetime` object → aware.
+  - Aware `datetime` object → returned unchanged.
+  - Invalid input → `None`.
+- Lint clean on all touched files (pre-existing warnings on `VehicleDetailPage.js` untouched).
+
+### Follow-up (not in this iter, tracked)
+- Hundreds of other catch blocks still do `toast.error(err?.response?.data?.detail || 'x')`. These are non-crashing (sonner tolerates objects — it just renders `[object Object]`), but the bilingual copy is lost. A codebase-wide migration to `extractErrorMessage` remains as future cleanup.
+
+
 ## iter408 — Unified Coupon Cross-Collection Resolution (Feb 8, 2026) ✅ COMPLETE
 
 **Reported by user**: The `coupon_codes` (Admin → Coupon Codes) and `promotions` (Admin → Promotions) systems were validated independently. A code minted on one surface was rejected at every checkout entry point that queried the other. Unify the lookup so every entry point resolves a code from BOTH collections. Do not change how codes are created or stored.

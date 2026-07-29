@@ -18,6 +18,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePlatformTermsGate } from '../../contexts/PlatformTermsGateContext';
 import { authHeaders } from '../../utils/authToken';
+import { extractErrorMessage as _extractErrorMessage } from '../../utils/errorHandler';
 import axios from 'axios';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
@@ -1104,7 +1105,7 @@ const VehicleDetailPage = () => {
         // Tracking is best-effort. Swallow.
       }
     } catch (err) {
-      setError(err.response?.data?.detail || 'Vehicle not found');
+      setError(_extractErrorMessage(err) || 'Vehicle not found');
     } finally {
       setLoading(false);
     }

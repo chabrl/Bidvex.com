@@ -22,6 +22,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { Ticket, CheckCircle, Loader2, Sparkles } from 'lucide-react';
+import { extractErrorMessage } from '../utils/errorHandler';
 
 const API = API_BASE;
 
@@ -66,7 +67,10 @@ const B2BCouponActivationCard = ({ className = '' }) => {
         toast.error(res?.data?.message_en || 'Invalid coupon code');
       }
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Could not activate coupon');
+      // iter409 — Trust Gate / cross-lookup 500s return
+      // `{code, message_en, message_fr}` objects. Route through the
+      // shared bilingual extractor so React never receives a raw object.
+      toast.error(extractErrorMessage(e) || 'Could not activate coupon');
     } finally {
       setSubmitting(false);
     }

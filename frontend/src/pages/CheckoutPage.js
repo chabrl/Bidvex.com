@@ -5,6 +5,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import { formatCurrency } from '../utils/currencyFormatter';
+import { extractErrorMessage } from '../utils/errorHandler';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -104,7 +105,7 @@ const CheckoutPage = () => {
         // If it's a specific auth/payment error, show it directly
         const winnerStatus = winnerErr.response?.status;
         if (winnerStatus === 403 || winnerStatus === 400) {
-          setError(winnerErr.response?.data?.detail || 'Access denied');
+          setError(extractErrorMessage(winnerErr) || 'Access denied');
           return;
         }
         // 404 = not a winner listing, fall through to general checkout
@@ -127,7 +128,7 @@ const CheckoutPage = () => {
 
     } catch (err) {
       console.error('Failed to load checkout:', err);
-      setError(err.response?.data?.detail || 'Failed to load checkout details');
+      setError(extractErrorMessage(err) || 'Failed to load checkout details');
     } finally {
       setLoading(false);
     }
@@ -173,7 +174,7 @@ const CheckoutPage = () => {
       window.location.href = response.data.checkout_url;
     } catch (err) {
       console.error('Failed to create checkout session:', err);
-      setError(err.response?.data?.detail || 'Failed to initiate payment');
+      setError(extractErrorMessage(err) || 'Failed to initiate payment');
       setProcessing(false);
     }
   };

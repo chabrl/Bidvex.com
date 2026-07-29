@@ -14,6 +14,7 @@ import {
   RefreshCw, Building2, Loader2
 } from 'lucide-react';
 import { formatCurrency } from '../utils/currencyFormatter';
+import { extractErrorMessage } from '../utils/errorHandler';
 import { AffiliateEarningsWidget } from '../components/AffiliateEarningsWidget';
 
 const API = API_BASE;
@@ -40,7 +41,7 @@ const AffiliateDashboard = () => {
       setStats(statsRes.data);
       setConnectStatus(connectRes.data);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to load affiliate data');
+      setError(extractErrorMessage(err) || 'Failed to load affiliate data');
     } finally {
       setLoading(false);
     }
@@ -72,7 +73,7 @@ const AffiliateDashboard = () => {
         window.open(response.data.url, '_blank');
       }
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to open Stripe Dashboard');
+      setError(extractErrorMessage(err) || 'Failed to open Stripe Dashboard');
     }
   };
 
@@ -83,7 +84,7 @@ const AffiliateDashboard = () => {
       });
       window.location.href = response.data.onboarding_url;
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to start onboarding');
+      setError(extractErrorMessage(err) || 'Failed to start onboarding');
     }
   };
 
