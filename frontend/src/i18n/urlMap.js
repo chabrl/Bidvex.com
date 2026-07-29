@@ -140,4 +140,4 @@ export function toLangPath(path, targetLang) {
 }
 
 // Absolute host for hreflang emission (client-side).
-export const CANONICAL_HOST = 'https://www.bidvex.com';
+export const CANONICAL_HOST = 'https://bidvex.com';
