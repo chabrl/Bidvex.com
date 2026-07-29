@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 
-CANONICAL_HOST = "https://www.bidvex.com"
+CANONICAL_HOST = "https://bidvex.com"
 
 
 def organization_ld() -> Dict[str, Any]:
@@ -282,7 +282,7 @@ def vehicle_ld(
 
 
 def breadcrumb_ld(items: List[Dict[str, str]]) -> Dict[str, Any]:
-    """items: [{"name": "Home", "url": "https://www.bidvex.com/"}, ...]"""
+    """items: [{"name": "Home", "url": "https://bidvex.com/"}, ...]"""
     return {
         "@context": "https://schema.org",
         "@type":    "BreadcrumbList",
