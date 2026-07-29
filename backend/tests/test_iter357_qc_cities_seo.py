@@ -173,7 +173,7 @@ def test_fr_qc_city_page_renders_full_ssr():
     # LocalBusiness schema present (with Montréal in the name)
     assert '"LocalBusiness"' in body
     # NAP: exact street address must appear
-    assert "701 Rue Chalifoux" in body
+    assert "761 Rue Chalifoux" in body
     # H1 present
     assert "<h1" in body
 
@@ -230,7 +230,7 @@ def test_qc_storage_province_page_renders_4_city_grid():
 # ============================================================
 
 def test_homepage_emits_local_business_schema_with_correct_nap():
-    """iter357 — homepage LocalBusiness with 701 Rue Chalifoux + Sherbrooke."""
+    """iter357 — homepage LocalBusiness with 761 Rue Chalifoux + Sherbrooke."""
     from server import app
     _install(_FakeDB())
     client = TestClient(app)
@@ -238,7 +238,7 @@ def test_homepage_emits_local_business_schema_with_correct_nap():
     assert r.status_code == 200
     body = r.text
     assert '"LocalBusiness"' in body
-    assert '"701 Rue Chalifoux"' in body
+    assert '"761 Rue Chalifoux"' in body
     assert '"Sherbrooke"' in body
     assert '"J1G 0A8"' in body
     assert '"+14506343099"' in body
@@ -263,7 +263,7 @@ def test_local_business_ld_builder_with_and_without_city():
     # Homepage variant
     generic = local_business_ld(lang="en")
     assert generic["name"] == "BidVex Inc."
-    assert generic["address"]["streetAddress"] == "701 Rue Chalifoux"
+    assert generic["address"]["streetAddress"] == "761 Rue Chalifoux"
     assert generic["geo"]["latitude"] == 45.4041
     # QC city variant (FR)
     fr_mtl = local_business_ld(city_name="Montréal", lang="fr")
@@ -281,7 +281,7 @@ def test_nap_consistency_across_pages():
     from server import app
     _install(_FakeDB())
     client = TestClient(app)
-    canonical_street = "701 Rue Chalifoux"
+    canonical_street = "761 Rue Chalifoux"
     canonical_postal = "J1G 0A8"
     for path in [
         "/api/prerender/",

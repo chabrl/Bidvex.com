@@ -140,7 +140,7 @@ Number: 1175252826.
 <p style="color:#475569;font-size:14px;line-height:1.7;">
 <strong>Media Contact</strong><br>
 BidVex Inc.<br>
-701 Rue Chalifoux, Sherbrooke, Québec, J1G 0A8<br>
+761 Rue Chalifoux, Sherbrooke, Québec, J1G 0A8<br>
 Phone: +1 (450) 634-3099<br>
 Email: <a href="mailto:marketing@bidvex.com" style="color:#2B8FD0;">marketing@bidvex.com</a><br>
 Web: <a href="https://www.bidvex.com" style="color:#2B8FD0;">www.bidvex.com</a>
@@ -251,7 +251,7 @@ affiliée à aucune plateforme de cryptomonnaie. Numéro de corporation : 117525
 <p style="color:#475569;font-size:14px;line-height:1.7;">
 <strong>Contact médias</strong><br>
 BidVex Inc.<br>
-701 Rue Chalifoux, Sherbrooke, Québec, J1G 0A8<br>
+761 Rue Chalifoux, Sherbrooke, Québec, J1G 0A8<br>
 Téléphone : +1 (450) 634-3099<br>
 Courriel : <a href="mailto:marketing@bidvex.com" style="color:#2B8FD0;">marketing@bidvex.com</a><br>
 Web : <a href="https://www.bidvex.com" style="color:#2B8FD0;">www.bidvex.com</a>

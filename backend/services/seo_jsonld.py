@@ -40,7 +40,7 @@ def organization_ld() -> Dict[str, Any]:
         phone_e164 = BIDVEX_NAP["phone"]
     except ImportError:
         sameas = []
-        street = "701 Rue Chalifoux"
+        street = "761 Rue Chalifoux"
         postal = "J1G 0A8"
         phone_e164 = "+14506343099"
 

@@ -23,7 +23,7 @@ from typing import Any, Dict, List, Tuple
 # schemas. Google penalizes NAP inconsistency for local-business ranking.
 BIDVEX_NAP = {
     "name":     "BidVex Inc.",
-    "street":   "701 Rue Chalifoux",
+    "street":   "761 Rue Chalifoux",
     "city":     "Sherbrooke",
     "region":   "QC",
     "region_full": "Québec",

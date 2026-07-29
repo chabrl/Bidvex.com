@@ -133,9 +133,9 @@ def test_contact_page_has_correct_corp_num():
 
 def test_contact_page_has_correct_address():
     text = open(CONTACT_PATH, "r", encoding="utf-8").read()
-    # iter362 — corrected from 761 → 701 Rue Chalifoux
-    assert "701 Rue Chalifoux" in text
-    assert "761 Rue Chalifoux" not in text  # typo removed
+    # iter410 — canonical HQ street number is 761 Rue Chalifoux (was 701 pre-iter410).
+    assert "761 Rue Chalifoux" in text
+    assert "701 Rue Chalifoux" not in text  # old value must be gone
 
 
 def test_contact_page_has_local_business_jsonld():

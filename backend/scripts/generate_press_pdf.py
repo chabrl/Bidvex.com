@@ -125,7 +125,7 @@ def _draw_footer(canvas, doc):
     canvas.setFont("Helvetica", 8)
     canvas.setFillColor(GREY_MED)
     canvas.drawString(0.55 * inch, 0.42 * inch,
-                      "BidVex Inc. · 701 Rue Chalifoux, Sherbrooke (Québec) J1G 0A8 · Corp. no 1175252826")
+                      "BidVex Inc. · 761 Rue Chalifoux, Sherbrooke (Québec) J1G 0A8 · Corp. no 1175252826")
     canvas.setFont("Helvetica-Bold", 8)
     canvas.setFillColor(BLUE)
     canvas.drawRightString(doc.pagesize[0] - 0.55 * inch, 0.42 * inch,
@@ -207,7 +207,7 @@ def _en_page(styles):
     flow.append(Paragraph(
         "<b>marketing@bidvex.com</b> &nbsp;·&nbsp; +1 (450) 634-3099 &nbsp;·&nbsp; "
         "www.bidvex.com<br/>"
-        "BidVex Inc. — 701 Rue Chalifoux, Sherbrooke (Québec) J1G 0A8 — Corp. no 1175252826",
+        "BidVex Inc. — 761 Rue Chalifoux, Sherbrooke (Québec) J1G 0A8 — Corp. no 1175252826",
         styles["body"]))
 
     return flow
@@ -288,7 +288,7 @@ def _fr_page(styles):
     flow.append(Paragraph(
         "<b>marketing@bidvex.com</b> &nbsp;·&nbsp; +1 (450) 634-3099 &nbsp;·&nbsp; "
         "www.bidvex.com<br/>"
-        "BidVex Inc. — 701 Rue Chalifoux, Sherbrooke (Québec) J1G 0A8 — Numéro de corporation 1175252826",
+        "BidVex Inc. — 761 Rue Chalifoux, Sherbrooke (Québec) J1G 0A8 — Numéro de corporation 1175252826",
         styles["body"]))
 
     return flow
