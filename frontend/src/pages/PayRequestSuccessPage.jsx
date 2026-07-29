@@ -8,10 +8,10 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { Helmet } from 'react-helmet-async';
 import { CheckCircle2, Loader2 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import API_BASE from '../config';
+import SEO from '../components/SEO';
 
 const PaymentSuccessPage = () => {
   const { payment_request_id: paymentRequestId } = useParams();
@@ -34,10 +34,7 @@ const PaymentSuccessPage = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 py-16 px-4" data-testid="payment-success-page">
-      <Helmet>
-        <title>Payment Successful — BidVex</title>
-        <meta name="robots" content="noindex,nofollow" />
-      </Helmet>
+      <SEO title="Payment Successful — BidVex" noindex />
       <div className="max-w-md mx-auto bg-white border border-slate-200 rounded-2xl shadow-sm p-8 text-center">
         {!confirmed ? (
           <div data-testid="payment-success-confirming">

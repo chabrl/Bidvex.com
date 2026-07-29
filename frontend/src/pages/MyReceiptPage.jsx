@@ -12,13 +12,13 @@
  * email, phone, or full identity is exposed.
  */
 import React, { useEffect, useState } from 'react';
-import { Helmet } from 'react-helmet-async';
 import { useTranslation } from 'react-i18next';
 import { useParams, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import API_BASE from '../config';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
+import SEO from '../components/SEO';
 import {
   ShieldCheck, FileDown, Printer, AlertTriangle, CheckCircle2,
   Car, User, Briefcase, FileText, Loader2,
@@ -95,10 +95,10 @@ export default function MyReceiptPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 py-8 print:py-0 print:bg-white">
-      <Helmet>
-        <title>{isFR ? `Reçu ${data.invoice_number} — BidVex` : `Receipt ${data.invoice_number} — BidVex`}</title>
-        <meta name="robots" content="noindex,nofollow" />
-      </Helmet>
+      <SEO
+        title={isFR ? `Reçu ${data.invoice_number} — BidVex` : `Receipt ${data.invoice_number} — BidVex`}
+        noindex
+      />
 
       <div className="container mx-auto max-w-3xl px-4">
         {/* Top action bar — hidden on print */}

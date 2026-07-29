@@ -18,8 +18,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { Helmet } from 'react-helmet-async';
 import { Loader2, CreditCard, ShieldCheck, AlertTriangle, Copy, Mail } from 'lucide-react';
+import SEO from '../components/SEO';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
 import API_BASE from '../config';
@@ -93,10 +93,7 @@ const PaymentPage = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 py-12 px-4" data-testid="payment-page">
-      <Helmet>
-        <title>Payment — BidVex</title>
-        <meta name="robots" content="noindex,nofollow" />
-      </Helmet>
+      <SEO title="Payment — BidVex" noindex />
       <div className="max-w-md mx-auto bg-white border border-slate-200 rounded-2xl shadow-sm p-8">
         <div className="flex items-center gap-3 mb-6">
           <span className="text-2xl font-extrabold text-[#0055FF] tracking-tight">BidVex</span>
