@@ -55,7 +55,7 @@ const SEO = ({
   const location = useLocation();
   const resolvedPath = typeof path === 'string' ? path : (location?.pathname || '/');
   const fullUrl = buildCanonicalUrl(resolvedPath);
-  const fullTitle = title === 'BidVex' ? title : `${title} | BidVex`;
+  const fullTitle = title.endsWith('BidVex') ? title : `${title} | BidVex`;
 
   return (
     <Helmet>
