@@ -30,7 +30,7 @@ import {
 import SEO from '../components/SEO';
 
 
-const CORPORATE_ADDRESS = '701 Rue Chalifoux, Sherbrooke (Québec) J1G 0A8, Canada';
+const CORPORATE_ADDRESS = '761 Rue Chalifoux, Sherbrooke (Québec) J1G 0A8, Canada';
 const CORPORATE_PHONE   = '+1 (450) 634-3099';
 const CORPORATION_NUMBER = '1175252826';
 
@@ -49,7 +49,7 @@ const LOCAL_BUSINESS_LD = {
   email:      'office@bidvex.com',
   address: {
     '@type':          'PostalAddress',
-    streetAddress:    '701 Rue Chalifoux',
+    streetAddress:    '761 Rue Chalifoux',
     addressLocality:  'Sherbrooke',
     addressRegion:    'QC',
     postalCode:       'J1G 0A8',
@@ -119,7 +119,7 @@ export default function ContactUsPage() {
           </h2>
           <address className="not-italic text-sm text-slate-700 dark:text-slate-200 leading-relaxed" data-testid="contact-address">
             BidVex Inc.<br />
-            701 Rue Chalifoux<br />
+            761 Rue Chalifoux<br />
             Sherbrooke (Québec) J1G 0A8<br />
             Canada
           </address>
