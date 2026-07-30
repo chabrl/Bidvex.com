@@ -19,6 +19,7 @@ import {
 import SEO from '../components/SEO';
 import MyVehiclesModule from '../components/vehicles/MyVehiclesModule';
 import SalesPerformanceModule from '../components/vehicles/SalesPerformanceModule';
+import SettlementsModule from '../components/vehicles/SettlementsModule';
 
 const VehicleDashboardPage = () => {
   const { i18n } = useTranslation();
@@ -42,16 +43,10 @@ const VehicleDashboardPage = () => {
     salesDesc:  isFr
       ? 'Vues, enchères, revenus et taux de conversion sur 30 / 60 / 90 jours.'
       : 'Views, bids, revenue, and conversion rate over the last 30 / 60 / 90 days.',
-    comingSoon: isFr ? 'À venir' : 'Coming soon',
-    modules: [
-      {
-        icon:  Wallet,
-        title: isFr ? 'Règlements' : 'Settlements',
-        desc:  isFr
-          ? 'Suivi des ventes gagnées, des frais et du calendrier de règlement.'
-          : 'Track won sales, buyer premium, and settlement schedule.',
-      },
-    ],
+    settlementsTitle: isFr ? 'Règlements' : 'Settlements',
+    settlementsDesc:  isFr
+      ? "Enchères gagnées, prime d'acheteur et statut de paiement."
+      : 'Won auctions, buyer premium, and payout status.',
   };
 
   return (
@@ -122,32 +117,20 @@ const VehicleDashboardPage = () => {
           </CardContent>
         </Card>
 
-        {/* Deferred module previews */}
+        {/* iter437 — Settlements module */}
         <Card
-          className="border-slate-200/60 bg-white/60 dark:bg-slate-900/40 dark:border-slate-800"
-          data-testid="vehicle-dashboard-coming-soon"
+          className="mb-8 border-purple-200/60 bg-gradient-to-br from-white to-purple-50/40 dark:from-slate-900 dark:to-slate-900/50 dark:border-slate-800"
+          data-testid="vehicle-dashboard-settlements-card"
         >
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
-              {T.comingSoon}
+              <Wallet className="h-5 w-5 text-purple-600" />
+              {T.settlementsTitle}
             </CardTitle>
+            <p className="text-sm text-slate-500 dark:text-slate-400 pt-1">{T.settlementsDesc}</p>
           </CardHeader>
           <CardContent>
-            <ul className="grid gap-4">
-              {T.modules.map((m) => (
-                <li
-                  key={m.title}
-                  className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-950/40 p-4"
-                  data-testid={`vehicle-dashboard-module-${m.title.replace(/\s+/g, '-').toLowerCase()}`}
-                >
-                  <div className="flex items-center gap-2 mb-2">
-                    <m.icon className="h-5 w-5 text-blue-600" />
-                    <h3 className="font-semibold text-slate-900 dark:text-slate-100">{m.title}</h3>
-                  </div>
-                  <p className="text-sm text-slate-600 dark:text-slate-400">{m.desc}</p>
-                </li>
-              ))}
-            </ul>
+            <SettlementsModule />
           </CardContent>
         </Card>
       </div>

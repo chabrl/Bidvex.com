@@ -1,0 +1,32 @@
+{
+  "summary": "iter437 Settlements Module verified end-to-end. Backend GET /api/vehicles/dealer/pending-settlements returns 4 seeded settlements (auth-gated: 403 without token). Frontend renders 3-module dashboard in correct order (My Vehicles → Sales & Performance → Settlements). Summary values pending=$57,500 and paid=$33,000 match spec exactly. All 4 rows have correct sale price / buyer premium (2.5%) / seller commission ($0) / net payout. Status pills map correctly: AWAITING_DEALER_CONFIRMATION→pending, DEALER_CONFIRMED→processing, FULLY_SETTLED→paid. Mobile viewport hides desktop table (.md:block) and shows mobile card list (.md:hidden). Fee-model footnote text matches spec verbatim. Navbar regression (no 'Vehicle Dashboard' link) confirmed. /vehicle-auctions/my-listings redirects to /vehicle-dashboard. No React Error #31 crashes.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Top of every page", "issues": ["'Annual Platform Fee Required' orange banner is a full-width fixed strip that overlaps the top navbar language toggle at 1920x1080 — clicking [data-testid=language-fr-btn] with force=true navigated to Stripe /pay (likely a Pay-Now anchor beneath the toggle). Not a settlements-module bug, but blocks testability of the FR language switch."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter437_settlements.py",
+    "/app/test_reports/pytest/iter437_results.xml"
+  ],
+  "action_items": [
+    "FR bilingual runtime verification is inconclusive: on cold load with localStorage i18nextLng='fr', the app still rendered EN labels (heading 'Vehicle Dashboard' + '$57,500' Intl EN format), meaning user preferred_language='fr' is NOT applied on login. Code review confirms the SettlementsModule uses t('settlements.*') keys correctly and en.json/fr.json blocks exist per PRD — issue is broader i18n bootstrap, not settlements-scoped. Main agent should verify the i18n init reads user.preferred_language on login/refresh."
+  ],
+  "critical_code_review_comments": [
+    "SettlementsModule.jsx computes summary correctly: 'disputed' bucket rows are EXCLUDED from both pending and paid totals — acceptable but worth documenting so a disputed settlement doesn't silently disappear from summaries.",
+    "Row keys use `r.auction_id` — if a dealer ever has two settlements on the same auction (edge case), the React key collision could cause a render warning. Consider `${auction_id}-${settlement_id}` if that's possible in schema.",
+    "Both desktop table AND mobile card list render simultaneously in DOM (only CSS-hidden). Same `settlement-row-{id}` testid appears twice — playwright .count() returns 2× actual rows. Consider suffixing with `-desktop`/`-mobile` for cleaner testability (but PRD explicitly said keep same testid pattern, so acceptable)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter437_settlements.py"
+  ],
+  "success_rate": {"backend": "100% (4/4)", "frontend": "95% (all DOM/data assertions pass; FR runtime switch not verified due to i18n bootstrap issue outside settlements scope)"},
+  "test_credentials": "testdealer@bidvex.com / TestDealer2026! — works, returns access_token JWT with user object",
+  "seed_data_creation": "None — used existing 4 seeded settlements from iter437 inline reseed",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend regression test file /app/backend/tests/test_iter437_settlements.py covers the settlements endpoint + auth-gate + status bucket sums. Use it as smoke for future iters. When testing FR bilingual on this preview env, DO NOT rely on localStorage.i18nextLng — the app doesn't respect it on cold load. The [data-testid=language-fr-btn] click was intercepted by the fixed 'Annual Platform Fee Required' banner overlay; either dismiss/hide that banner first, or force i18n via `window.i18n.changeLanguage('fr')` if the app exposes it. Ford F-150 hammer=22500, Honda Civic=35000, BMW=18000, Tesla=15000 — sum 90500. Pending 22500+35000=57500, Paid 18000+15000=33000."
+}
