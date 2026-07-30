@@ -101,6 +101,16 @@ const Navbar = () => {
         { path: '/lots', label: t('nav.lotsAuction'), icon: Gavel },
         { path: '/storage-auctions', label: t('nav.storageAuctions', 'Storage Auctions'), icon: Lock },
         { path: '/vehicle-auctions', label: t('vehicles.vehicleAuctions'), icon: Car, comingSoon: showVehicleComingSoon },
+        // iter413 — Vehicle Dashboard appears in the top nav (below the
+        // storage/marketplace/lots row) only for eligible users. Flag is
+        // hydrated by /api/auth/me from services/vehicle_dashboard_eligibility.py.
+        ...(user?.is_vehicle_dashboard_eligible ? [{
+          path: '/vehicle-dashboard',
+          label: (i18n?.language || '').startsWith('fr')
+            ? 'Tableau de bord Véhicules'
+            : 'Vehicle Dashboard',
+          icon: LayoutDashboard,
+        }] : []),
       ];
 
   return (
@@ -295,6 +305,25 @@ const Navbar = () => {
                           ? t('nav.storageDashboard', 'Storage Dashboard')
                           : t('nav.sellerDashboard')}
                       </DropdownMenuItem>
+                      {/* iter413 — Vehicle Dashboard for approved dealers +
+                          brokers. Backend `is_vehicle_dashboard_eligible`
+                          is computed live on every /auth/me call from
+                          services/vehicle_dashboard_eligibility.py so the
+                          moment an admin flips a user's status, their WS
+                          `verification_updated` event refreshes the user
+                          and this link appears without a manual reload. */}
+                      {user.is_vehicle_dashboard_eligible && (
+                        <DropdownMenuItem
+                          onClick={() => navigate('/vehicle-dashboard')}
+                          data-testid="vehicle-dashboard-link"
+                          className="cursor-pointer"
+                        >
+                          <Car className="mr-3 h-4 w-4 text-muted-foreground" />
+                          {i18n?.language?.startsWith('fr')
+                            ? 'Tableau de bord Véhicules'
+                            : 'Vehicle Dashboard'}
+                        </DropdownMenuItem>
+                      )}
                       {!isStorageFacilityOnly && (
                         <DropdownMenuItem onClick={() => navigate('/buyer/dashboard')} data-testid="buyer-dashboard-link" className="cursor-pointer">
                           <ShoppingBag className="mr-3 h-4 w-4 text-muted-foreground" />

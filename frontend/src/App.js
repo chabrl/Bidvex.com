@@ -95,6 +95,8 @@ const BecomeABrokerPage = lazy(() => import('./pages/BecomeABrokerPage'));
 const BrokerDirectoryPage = lazy(() => import('./pages/BrokerDirectoryPage'));
 const BrokerBindingRequestPage = lazy(() => import('./pages/BrokerBindingRequestPage'));
 const BrokerDashboardPage = lazy(() => import('./pages/BrokerDashboardPage'));
+// iter413 — minimal Vehicle Dashboard shell (verified dealers + brokers).
+const VehicleDashboardPage = lazy(() => import('./pages/VehicleDashboardPage'));
 const WatchlistPage = lazy(() => import('./pages/WatchlistPage'));
 const HowItWorksPage = lazy(() => import('./pages/HowItWorksPage'));
 const BlogsPage = lazy(() => import('./pages/BlogsPage'));
@@ -296,6 +298,20 @@ const PhoneVerificationRoute = ({ children }) => {
     return <Navigate to={from} replace />;
   }
   
+  return children;
+};
+
+// iter413 — Vehicle Dashboard guard.
+// Same eligibility rule as `services/vehicle_dashboard_eligibility.py`
+// on the backend; the flag is hydrated onto the user by /api/auth/me.
+// Ineligible users get bounced to the homepage (per user spec).
+const VehicleDashboardGuard = ({ children }) => {
+  const { user, loading } = useAuth();
+  const location = useLocation();
+
+  if (loading) return <PageLoader />;
+  if (!user) return <Navigate to="/auth" state={{ from: location }} replace />;
+  if (!user.is_vehicle_dashboard_eligible) return <Navigate to="/" replace />;
   return children;
 };
 
@@ -850,6 +866,15 @@ const App = () => {
           } />
           <Route path="/broker/dashboard" element={
             <ProtectedRoute><ErrorBoundary scope="broker-dashboard"><BrokerDashboardPage /></ErrorBoundary></ProtectedRoute>
+          } />
+          {/* iter413 — Vehicle Dashboard guarded by is_vehicle_dashboard_eligible.
+              Ineligible users are redirected to "/" (per user spec). */}
+          <Route path="/vehicle-dashboard" element={
+            <ProtectedRoute>
+              <VehicleDashboardGuard>
+                <ErrorBoundary scope="vehicle-dashboard"><VehicleDashboardPage /></ErrorBoundary>
+              </VehicleDashboardGuard>
+            </ProtectedRoute>
           } />
           <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
           <Route path="/privacy" element={<Navigate to="/privacy-policy" replace />} />

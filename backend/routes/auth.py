@@ -922,6 +922,19 @@ async def get_me(current_user: dict = Depends(get_current_user_from_token)):
         or (current_user.get("email") or "").endswith("@admin.bazario.com")
     )
 
+    # iter413 — Vehicle Dashboard eligibility flag. Computed live from
+    # the source-of-truth signals (account_type / partner status / an
+    # approved vehicle_sellers row) so the moment an admin flips a
+    # user's verification, their very next /auth/me call sees it.
+    try:
+        from services.vehicle_dashboard_eligibility import is_vehicle_dashboard_eligible
+        current_user["is_vehicle_dashboard_eligible"] = await is_vehicle_dashboard_eligible(
+            db, current_user,
+        )
+    except Exception:
+        # Never let the nav-gate lookup break auth hydration.
+        current_user["is_vehicle_dashboard_eligible"] = False
+
     return current_user
 
 

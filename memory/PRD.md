@@ -1,6 +1,29 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter413 — Vehicle Dashboard (Verified Dealers + Brokers) (Feb 8, 2026) ✅ COMPLETE
+
+**Reported by user**: Introduce a new `/vehicle-dashboard` route visible in nav for approved vehicle dealers and brokers. Do not modify `/broker/dashboard`. Real-time nav update after admin approves.
+
+### Delivered
+- **Backend `services/vehicle_dashboard_eligibility.py`** — single-source-of-truth predicate `is_vehicle_dashboard_eligible(db, user)` returning True iff **any** of:
+  1. `user.account_type == "broker"`
+  2. `user.partner_verification_status in {"approved", "verified"}`
+  3. an approved row exists in `vehicle_sellers` for the user
+- **Backend `GET /api/auth/me`** — hydrates `is_vehicle_dashboard_eligible: bool` onto the user payload every call. Fails safe to `False` on DB error.
+- **Backend admin approval endpoints** — `PATCH /admin/brokers/{id}/approve` and `POST /vehicle-admin/sellers/{id}/approve` now push a `{type: 'verification_updated'}` WS message to the target user via the existing `notification_manager.send_to_user()` bus.
+- **Frontend `NotificationCenter.js`** — WS handler catches `verification_updated` → calls existing `refreshUser()` from AuthContext → nav updates without a manual reload. Bilingual toast confirms.
+- **Frontend `Navbar.js`** — bilingual "Vehicle Dashboard" / "Tableau de bord Véhicules" link added in avatar dropdown (below Seller Dashboard) AND in the top nav bar, both gated on `user.is_vehicle_dashboard_eligible`.
+- **Frontend `pages/VehicleDashboardPage.jsx`** — minimal shell (breadcrumb, bilingual heading, "Modules coming soon" card with 3 module previews).
+- **Frontend `App.js`** — new `/vehicle-dashboard` route wrapped in a `VehicleDashboardGuard` that redirects ineligible users to `/`. `/broker/dashboard` untouched.
+
+### Verified end-to-end
+- Unauth visit to `/vehicle-dashboard` → correctly redirected to `/auth`.
+- Backend flag toggles correctly across all three signals (broker / partner_verification_status / vehicle_sellers.verification_status) — validated by DB flip + `/auth/me` curl for each.
+- Broker-account user sees the Vehicle Dashboard link in the top nav AND renders the page (screenshot).
+- Lint clean on all 6 touched files.
+
+
 ## iter409 — Coupon Lookup Timezone Fix + Bilingual-Error Render Guards (Feb 8, 2026) ✅ COMPLETE
 
 **Reported by user**: (1) Coupon-lookup 500s when the parsed `expiry_date` / `end_date` / `expires_at` was tz-naive vs. `datetime.now(timezone.utc)`. (2) React blank page (Error #31) when the 500's raw `{code, message_en, message_fr}` object was rendered.

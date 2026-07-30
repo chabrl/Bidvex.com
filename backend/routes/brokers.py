@@ -1683,6 +1683,20 @@ async def admin_approve_broker(broker_id: str, current_user: User = Depends(requ
         raise HTTPException(status_code=404, detail={"error": "broker_not_found"})
     # iter308 — full notification loop (admin audit + email + push)
     await _notify_broker_decision(db, broker_doc, decision="approve", current_user=current_user)
+    # iter413 — Ping the broker's live WS so the Vehicle Dashboard link
+    # appears in their nav without a manual refresh. Best-effort; never
+    # raises (the approval itself already succeeded).
+    try:
+        from routes.notifications import notification_manager
+        user_id = broker_doc.get("user_id")
+        if user_id:
+            await notification_manager.send_to_user(user_id, {
+                "type": "verification_updated",
+                "subject": "broker",
+                "is_vehicle_dashboard_eligible": True,
+            })
+    except Exception:  # noqa: BLE001
+        pass
     return {"success": True}
 
 

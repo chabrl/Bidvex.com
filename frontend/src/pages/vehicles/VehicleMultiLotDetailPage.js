@@ -8,12 +8,15 @@ import { Input } from '../../components/ui/input';
 import {
   Layers, Car, Gavel, Loader2, Clock, BellRing, Trophy,
   Lock, Unlock, ChevronDown, ChevronUp, History, ShieldAlert, Shield,
+  ChevronLeft, ChevronRight, Gauge, MapPin, Hash,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import UpcomingCountdownBadge from '../../components/UpcomingCountdownBadge';
 import { getTimingModeShortLabel } from '../../lib/vehicleMultiLotTimingModes';
 import WatchlistButton from '../../components/WatchlistButton';
 import { usePlatformTermsGate } from '../../contexts/PlatformTermsGateContext';
+import SafeImage from '../../components/SafeImage';
+import useVehicleCountdown from '../../hooks/useVehicleCountdown';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -27,6 +30,22 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
  *   • Lot Queue deposit-lock icon
  */
 const fmtCurrency = (n) => new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD' }).format(n || 0);
+
+// iter418 — Map `lot.media` (array of `{url, thumbnail_url, order}`) → sorted URL list.
+// The full-size URL is used for the hero image and the thumbnail_url (or same URL
+// when missing) is used for thumbnail strips + queue cards.
+const getSortedMediaUrls = (lot) => {
+  const media = Array.isArray(lot?.media) ? lot.media : [];
+  const sorted = [...media].sort(
+    (a, b) => (Number(a?.order) || 0) - (Number(b?.order) || 0),
+  );
+  return sorted
+    .map((m) => ({
+      full: m?.url || m?.thumbnail_url || '',
+      thumb: m?.thumbnail_url || m?.url || '',
+    }))
+    .filter((m) => m.full);
+};
 
 const StatusBadge = ({ status }) => {
   const styles = {
@@ -138,6 +157,10 @@ const VehicleMultiLotDetailPage = () => {
   const [payingDeposit, setPayingDeposit] = useState(false);
   // iter295 — deposit-lock map: { [lot_id]: true/false }
   const [depositMap, setDepositMap] = useState({});
+  // iter418 — active-lot image gallery cursor (fix: images never rendered)
+  const [activeImageIdx, setActiveImageIdx] = useState(0);
+  // iter418 — one shared per-second tick for all countdowns on the page
+  const { format: formatCountdown } = useVehicleCountdown();
 
   const refresh = useCallback(async () => {
     try {
@@ -212,6 +235,25 @@ const VehicleMultiLotDetailPage = () => {
   }
 
   const activeLot = event?.lots?.find((l) => l.id === activeLotId) || null;
+
+  // iter418 — Prev/Next lot navigation. Uses `lot_sequence` when available,
+  // otherwise falls back to the array order.
+  const lotIds = event?.lot_sequence?.length
+    ? event.lot_sequence
+    : (event?.lots || []).map((l) => l.id);
+  const activeIndex = activeLot ? lotIds.indexOf(activeLot.id) : -1;
+  const prevLotId = activeIndex > 0 ? lotIds[activeIndex - 1] : null;
+  const nextLotId = activeIndex >= 0 && activeIndex < lotIds.length - 1
+    ? lotIds[activeIndex + 1] : null;
+
+  // iter418 — Reset the image gallery cursor whenever the active lot changes
+  // so the hero always starts at photo #1 of the newly selected lot.
+  useEffect(() => {
+    setActiveImageIdx(0);
+  }, [activeLotId]);
+
+  // iter418 — Ordered media URLs for the currently-visible active lot.
+  const activeLotMedia = activeLot ? getSortedMediaUrls(activeLot) : [];
 
   const payDeposit = async () => {
     if (!depositModal) return;
@@ -359,9 +401,107 @@ const VehicleMultiLotDetailPage = () => {
 
       {/* Active Lot */}
       {activeLot && (
-        <Card className="p-6 border-blue-200 bg-gradient-to-r from-white to-blue-50" data-testid="active-lot-card">
-          <div className="flex flex-col lg:flex-row gap-4 justify-between">
-            <div className="flex-1">
+        <Card className="p-4 sm:p-6 border-blue-200 bg-gradient-to-r from-white to-blue-50" data-testid="active-lot-card">
+          {/* iter418 — Prev/Next lot navigation strip (only when >1 lot) */}
+          {lotIds.length > 1 && (
+            <div className="flex items-center justify-between mb-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => prevLotId && setActiveLotOverride(prevLotId)}
+                disabled={!prevLotId}
+                data-testid="active-lot-prev-btn"
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" /> Previous Lot
+              </Button>
+              <span className="text-xs text-slate-500 font-medium" data-testid="active-lot-position">
+                Lot {activeIndex + 1} of {lotIds.length}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => nextLotId && setActiveLotOverride(nextLotId)}
+                disabled={!nextLotId}
+                data-testid="active-lot-next-btn"
+              >
+                Next Lot <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+          )}
+
+          <div className="flex flex-col lg:flex-row gap-6 justify-between">
+            {/* Left column — Image gallery + vehicle info */}
+            <div className="flex-1 min-w-0">
+              {/* iter418 — Hero image + thumbnail gallery */}
+              <div className="mb-4" data-testid="active-lot-gallery">
+                <div className="relative w-full aspect-[4/3] bg-slate-100 rounded-lg overflow-hidden">
+                  {activeLotMedia.length > 0 ? (
+                    <>
+                      <SafeImage
+                        src={activeLotMedia[activeImageIdx]?.full}
+                        alt={`Lot ${activeLot.lot_number} — ${activeLot.year} ${activeLot.make} ${activeLot.model}`}
+                        className="w-full h-full object-cover"
+                        loading="eager"
+                        fetchPriority="high"
+                        data-testid="active-lot-hero-image"
+                      />
+                      {activeLotMedia.length > 1 && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setActiveImageIdx((i) => (i - 1 + activeLotMedia.length) % activeLotMedia.length)}
+                            className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-2"
+                            aria-label="Previous image"
+                            data-testid="active-lot-image-prev"
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setActiveImageIdx((i) => (i + 1) % activeLotMedia.length)}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-2"
+                            aria-label="Next image"
+                            data-testid="active-lot-image-next"
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </button>
+                          <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-0.5 rounded">
+                            {activeImageIdx + 1} / {activeLotMedia.length}
+                          </div>
+                        </>
+                      )}
+                    </>
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
+                      <Car className="h-12 w-12 mb-2" />
+                      <span className="text-sm">No photos available</span>
+                    </div>
+                  )}
+                </div>
+                {activeLotMedia.length > 1 && (
+                  <div className="mt-2 flex gap-2 overflow-x-auto pb-1" data-testid="active-lot-thumb-strip">
+                    {activeLotMedia.slice(0, 8).map((m, i) => (
+                      <button
+                        key={m.full}
+                        type="button"
+                        onClick={() => setActiveImageIdx(i)}
+                        className={`flex-shrink-0 w-16 h-16 rounded-md overflow-hidden border-2 transition ${
+                          i === activeImageIdx ? 'border-blue-500 ring-2 ring-blue-200' : 'border-transparent opacity-70 hover:opacity-100'
+                        }`}
+                        data-testid={`active-lot-thumb-${i}`}
+                      >
+                        <SafeImage
+                          src={m.thumb}
+                          alt={`Photo ${i + 1}`}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <div className="flex items-center gap-2 mb-1 flex-wrap">
                 <Car className="h-5 w-5 text-blue-600" />
                 <h2 className="text-xl font-semibold">Lot #{activeLot.lot_number} — {activeLot.title}</h2>
@@ -392,16 +532,45 @@ const VehicleMultiLotDetailPage = () => {
                       </Badge>
                 )}
               </div>
-              <p className="text-sm text-gray-700">
-                {activeLot.year} {activeLot.make} {activeLot.model} · {activeLot.mileage?.toLocaleString()} km · {activeLot.location_city}, {activeLot.location_province}
+              <p className="text-lg font-medium text-slate-900" data-testid="active-lot-ymm">
+                {activeLot.year} {activeLot.make} {activeLot.model}
+                {activeLot.trim ? <span className="text-slate-600"> {activeLot.trim}</span> : null}
               </p>
-              <div className="grid grid-cols-2 gap-2 mt-3 text-sm">
-                <div><span className="text-gray-500">Starting:</span> <span className="font-medium">{fmtCurrency(activeLot.starting_price)}</span></div>
-                <div><span className="text-gray-500">Current Bid:</span> <span className="font-bold text-green-700">{fmtCurrency(activeLot.current_bid)}</span></div>
-                <div><span className="text-gray-500">Bids:</span> <span className="font-medium">{activeLot.bid_count || 0}</span></div>
-                <div><span className="text-gray-500">VIN:</span> <span className="font-mono text-xs">{activeLot.vin}</span></div>
+              <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-600">
+                {typeof activeLot.mileage === 'number' && (
+                  <span className="inline-flex items-center gap-1" data-testid="active-lot-mileage">
+                    <Gauge className="h-3.5 w-3.5" /> {activeLot.mileage.toLocaleString()} km
+                  </span>
+                )}
+                {(activeLot.location_city || activeLot.location_province) && (
+                  <span className="inline-flex items-center gap-1">
+                    <MapPin className="h-3.5 w-3.5" />
+                    {[activeLot.location_city, activeLot.location_province].filter(Boolean).join(', ')}
+                  </span>
+                )}
+                {activeLot.vin && (
+                  <span className="inline-flex items-center gap-1 font-mono text-xs">
+                    <Hash className="h-3.5 w-3.5" /> {activeLot.vin}
+                  </span>
+                )}
               </div>
-              {activeLot.description && <p className="mt-2 text-sm text-gray-600">{activeLot.description}</p>}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3 text-sm">
+                <div>
+                  <div className="text-gray-500 text-xs">Starting</div>
+                  <div className="font-medium">{fmtCurrency(activeLot.starting_price)}</div>
+                </div>
+                <div>
+                  <div className="text-gray-500 text-xs">Current Bid</div>
+                  <div className="font-bold text-green-700 text-base" data-testid="active-lot-current-bid">
+                    {fmtCurrency(activeLot.current_bid)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-gray-500 text-xs">Bids</div>
+                  <div className="font-medium" data-testid="active-lot-bid-count">{activeLot.bid_count || 0}</div>
+                </div>
+              </div>
+              {activeLot.description && <p className="mt-3 text-sm text-gray-600">{activeLot.description}</p>}
 
               {/* iter295 P1 — Active-lot bid history */}
               <BidHistoryPanel eventId={event.id} lot={activeLot} />
@@ -412,12 +581,22 @@ const VehicleMultiLotDetailPage = () => {
               {activeLot.status === 'upcoming' && (
                 <UpcomingCountdownBadge startTime={activeLot.start_time} onLive={refresh} />
               )}
-              {activeLot.status === 'live' && activeLot.end_time && (
-                <div className="inline-flex items-center gap-1 px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">
-                  <Clock className="h-4 w-4" />
-                  Ends {new Date(activeLot.end_time).toLocaleTimeString()}
-                </div>
-              )}
+              {activeLot.status === 'live' && activeLot.end_time && (() => {
+                // iter418 — Live per-second countdown (was previously a static toLocaleTimeString).
+                const c = formatCountdown(activeLot.end_time);
+                const critical = c.critical || (c.ms > 0 && c.ms <= 120000);
+                return (
+                  <div
+                    className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-mono font-semibold ${
+                      critical ? 'bg-red-100 text-red-700 animate-pulse' : 'bg-green-100 text-green-700'
+                    }`}
+                    data-testid="active-lot-countdown"
+                  >
+                    <Clock className="h-4 w-4" />
+                    {c.ended ? 'Ended' : c.label}
+                  </div>
+                );
+              })()}
               {activeLot.status === 'live' && (
                 <div className="space-y-2">
                   <Input
@@ -447,63 +626,153 @@ const VehicleMultiLotDetailPage = () => {
         </Card>
       )}
 
-      {/* Lot queue */}
+      {/* Lot queue — iter418 rebuilt as visual card grid */}
       <Card className="p-4 sm:p-6">
         <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
           <Layers className="h-5 w-5" /> Lot Queue ({lots.length})
         </h3>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm" data-testid="lot-queue-table">
-            <thead className="bg-gray-50 text-left">
-              <tr>
-                <th className="p-2">#</th>
-                <th className="p-2">Vehicle</th>
-                <th className="p-2">Status</th>
-                <th className="p-2">Current Bid</th>
-                <th className="p-2">Bids</th>
-                <th className="p-2">Access</th>
-                <th className="p-2"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {lots.map((lot) => (
-                <React.Fragment key={lot.id}>
-                  <tr
-                    className={`border-t ${lot.id === activeLotId ? 'bg-blue-50' : ''}`}
-                    data-testid={`lot-row-${lot.lot_number}`}
-                  >
-                    <td className="p-2 font-medium">{lot.lot_number}</td>
-                    <td className="p-2">{lot.year} {lot.make} {lot.model}</td>
-                    <td className="p-2"><StatusBadge status={lot.status} /></td>
-                    <td className="p-2">{fmtCurrency(lot.current_bid)}</td>
-                    <td className="p-2">{lot.bid_count || 0}</td>
-                    <td className="p-2">
-                      {depositMap[lot.id] ? (
-                        <span className="inline-flex items-center gap-1 text-emerald-700" data-testid={`lot-deposit-ok-${lot.lot_number}`}>
-                          <Unlock className="h-3.5 w-3.5" /> Bid-ready
-                        </span>
+        <div
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+          data-testid="lot-queue-grid"
+        >
+          {lots.map((lot) => {
+            const media = getSortedMediaUrls(lot);
+            const thumb = media[0]?.thumb || '';
+            const isActive = lot.id === activeLotId;
+            const c = lot.end_time ? formatCountdown(lot.end_time) : null;
+            const isLive = lot.status === 'live';
+            const isUpcoming = lot.status === 'upcoming';
+            const hasReserve = Number(lot.reserve_price) > 0;
+            const reserveMet = hasReserve && Number(lot.current_bid) >= Number(lot.reserve_price);
+            return (
+              <div
+                key={lot.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => setActiveLotOverride(lot.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setActiveLotOverride(lot.id);
+                  }
+                }}
+                className={`text-left rounded-lg border overflow-hidden bg-white transition hover:shadow-md cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  isActive
+                    ? 'ring-2 ring-blue-500 border-blue-500 shadow-md'
+                    : 'border-slate-200'
+                }`}
+                data-testid={`lot-card-${lot.lot_number}`}
+              >
+                {/* Thumbnail */}
+                <div className="relative aspect-[4/3] bg-slate-100">
+                  {thumb ? (
+                    <SafeImage
+                      src={thumb}
+                      alt={`Lot ${lot.lot_number} — ${lot.year} ${lot.make} ${lot.model}`}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                      data-testid={`lot-card-thumb-${lot.lot_number}`}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-slate-400">
+                      <Car className="h-8 w-8" />
+                    </div>
+                  )}
+                  {/* Lot number badge */}
+                  <div className="absolute top-2 left-2 bg-black/70 text-white text-xs font-bold px-2 py-1 rounded">
+                    Lot #{lot.lot_number}
+                  </div>
+                  {/* Active "NOW" badge */}
+                  {isActive && (
+                    <div
+                      className="absolute top-2 right-2 bg-blue-600 text-white text-[10px] font-bold px-2 py-1 rounded shadow"
+                      data-testid={`lot-card-active-indicator-${lot.lot_number}`}
+                    >
+                      NOW VIEWING
+                    </div>
+                  )}
+                  {/* Status badge (bottom-left) */}
+                  <div className="absolute bottom-2 left-2">
+                    <StatusBadge status={lot.status} />
+                  </div>
+                  {/* Countdown (bottom-right) */}
+                  {c && !c.ended && (isLive || isUpcoming) && (
+                    <div
+                      className={`absolute bottom-2 right-2 text-[11px] font-mono font-semibold px-2 py-1 rounded ${
+                        c.critical ? 'bg-red-600 text-white animate-pulse' : 'bg-black/70 text-white'
+                      }`}
+                      data-testid={`lot-card-countdown-${lot.lot_number}`}
+                    >
+                      <Clock className="h-3 w-3 inline mr-0.5" />
+                      {isUpcoming ? `Starts ${c.short}` : c.short}
+                    </div>
+                  )}
+                </div>
+                {/* Body */}
+                <div className="p-3 space-y-1.5">
+                  <div className="font-semibold text-sm truncate" data-testid={`lot-card-ymm-${lot.lot_number}`}>
+                    {lot.year} {lot.make} {lot.model}
+                  </div>
+                  <div className="text-xs text-slate-500 flex items-center gap-1">
+                    <Gauge className="h-3 w-3" />
+                    {typeof lot.mileage === 'number' ? `${lot.mileage.toLocaleString()} km` : '—'}
+                  </div>
+                  <div className="flex items-baseline justify-between pt-1">
+                    <div>
+                      <div className="text-[10px] text-slate-500 uppercase tracking-wide">Current</div>
+                      <div className="font-bold text-green-700 text-sm" data-testid={`lot-card-current-bid-${lot.lot_number}`}>
+                        {fmtCurrency(lot.current_bid)}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-[10px] text-slate-500 uppercase tracking-wide">Bids</div>
+                      <div className="font-semibold text-slate-700 text-sm" data-testid={`lot-card-bid-count-${lot.lot_number}`}>
+                        {lot.bid_count || 0}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                    {hasReserve && (
+                      reserveMet ? (
+                        <Badge
+                          className="bg-green-100 text-green-800 border border-green-300 text-[10px]"
+                          data-testid={`lot-card-reserve-met-${lot.lot_number}`}
+                        >
+                          ✓ Reserve Met
+                        </Badge>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-amber-700" data-testid={`lot-deposit-locked-${lot.lot_number}`}>
-                          <Lock className="h-3.5 w-3.5" /> Deposit
-                        </span>
-                      )}
-                    </td>
-                    <td className="p-2">
-                      <Button size="sm" variant="ghost" onClick={() => setActiveLotOverride(lot.id)} data-testid={`view-lot-${lot.lot_number}`}>
-                        View
-                      </Button>
-                    </td>
-                  </tr>
-                  {/* iter295 — Bid history sub-row */}
-                  <tr className="border-t bg-slate-50/60">
-                    <td colSpan={7} className="px-4 py-1">
-                      <BidHistoryPanel eventId={event.id} lot={lot} />
-                    </td>
-                  </tr>
-                </React.Fragment>
-              ))}
-            </tbody>
-          </table>
+                        <Badge
+                          className="bg-slate-100 text-slate-600 border border-slate-300 text-[10px]"
+                          data-testid={`lot-card-reserve-not-met-${lot.lot_number}`}
+                        >
+                          Reserve Not Met
+                        </Badge>
+                      )
+                    )}
+                    {depositMap[lot.id] ? (
+                      <span
+                        className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-700"
+                        data-testid={`lot-deposit-ok-${lot.lot_number}`}
+                      >
+                        <Unlock className="h-3 w-3" /> Bid-ready
+                      </span>
+                    ) : (
+                      <span
+                        className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-700"
+                        data-testid={`lot-deposit-locked-${lot.lot_number}`}
+                      >
+                        <Lock className="h-3 w-3" /> Deposit
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {/* Bid history sub-panel */}
+                <div className="px-3 pb-3 border-t border-slate-100 mt-1 pt-2" onClick={(e) => e.stopPropagation()}>
+                  <BidHistoryPanel eventId={event.id} lot={lot} />
+                </div>
+              </div>
+            );
+          })}
         </div>
       </Card>
 

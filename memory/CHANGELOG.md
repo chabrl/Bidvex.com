@@ -1,6 +1,33 @@
 # BidVex Changelog
 
 
+## Feb 8, 2026 — iter418 Multi-Lot Vehicle Auction Rendering — Audit + Fix
+
+### User complaint
+"Active lot shows almost no vehicle information and images are missing. Lot queue shows text rows only, no visual cards."
+
+### Full-pipeline audit
+| Stage | Status | Notes |
+|-------|--------|-------|
+| Mongo storage `vehicle_multi_lot_auctions` | ✅ | All fields present per lot (`media` array with S3 URLs, `year/make/model`, `mileage`, `current_bid`, `bid_count`, `reserve_price`, `start_time`, `end_time`, `status`, `lot_number`, `vin`, `location_*`) |
+| Aggregation | N/A | Endpoint uses direct `find_one`, no `$aggregate` |
+| Serializer `_serialise()` | ✅ | Strips `_id`, coerces datetimes → ISO, preserves everything else |
+| API `GET /api/vehicle-multi-lot-auctions/{event_id}` | ✅ | Verified via curl — 9 media items on Lot 1, 2 on Lot 2, all vehicle fields present |
+| React axios query | ✅ | `setEvent(r.data)` stores payload verbatim, no transforms |
+| **Component rendering (`VehicleMultiLotDetailPage.js`)** | ❌ | **Root cause:** ignored `lot.media` entirely; queue rendered as `<table>` with text rows |
+
+### Fix (rendering-only — bid/auction logic untouched)
+- **Active Lot card**: added hero image + thumbnail strip driven by `getSortedMediaUrls(lot.media)`, Prev/Next Lot navigation using `lot_sequence`, live per-second countdown via `useVehicleCountdown`, richer vehicle info grid (mileage, location, VIN, starting/current/bid-count).
+- **Lot Queue**: converted `<table>` → responsive card grid (`grid-cols-1 sm:grid-cols-2 lg:grid-cols-3`). Each card shows thumbnail, lot number badge, Y/M/M, mileage, current bid, bid count, reserve status badge, live countdown, deposit lock/unlock, plus a "NOW VIEWING" badge + `ring-2 ring-blue-500` on the active lot.
+- No changes to `handleBid`, `payDeposit`, `depositMap`, `refresh`, or any bid/auction state.
+
+### Verified
+- Curl confirms API returns full media + vehicle fields.
+- Screenshot on preview: hero image, thumbnail strip, Prev/Next buttons, card grid with photos + Y/M/M + mileage + reserve badges + active-lot ring, all working.
+- Files touched: `/app/frontend/src/pages/vehicles/VehicleMultiLotDetailPage.js` (rendering only).
+
+
+
 ## Feb 8, 2026 — iter395 🛡️ Trust Status Verification Gate — Audit + Fix
 
 ### Executive Summary

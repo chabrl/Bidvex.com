@@ -102,7 +102,7 @@ const NOTIFICATION_TYPES = {
 };
 
 const NotificationCenter = () => {
-  const { user, token } = useAuth();
+  const { user, token, refreshUser } = useAuth();
   const { i18n } = useTranslation();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
@@ -170,6 +170,17 @@ const NotificationCenter = () => {
             }
           } else if (data.type === 'connected' && typeof data.unread_count === 'number') {
             setUnreadCount(data.unread_count);
+          } else if (data.type === 'verification_updated') {
+            // iter413 — Admin just flipped this user's verification. Pull
+            // the fresh user payload so the Vehicle Dashboard link (and
+            // any other role-gated nav item) shows up without a reload.
+            try { refreshUser && refreshUser(); } catch (_) { /* non-fatal */ }
+            toast.message(
+              isFrench ? '✅ Vérification approuvée' : '✅ Verification approved',
+              { description: isFrench
+                ? 'Votre tableau de bord Véhicules est maintenant accessible.'
+                : 'Your Vehicle Dashboard is now available.' },
+            );
           }
         } catch (_) { /* ignore */ }
       };

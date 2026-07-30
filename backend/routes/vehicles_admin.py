@@ -229,7 +229,22 @@ async def approve_seller(
         old_value={"status": old_status},
         new_value={"status": SellerVerificationStatus.APPROVED.value}
     )
-    
+
+    # iter413 — Ping the dealer's live WS so the Vehicle Dashboard link
+    # appears in their nav without a manual refresh. Best-effort; never
+    # raises so a WS blip can never fail the approval itself.
+    try:
+        from routes.notifications import notification_manager
+        target_user_id = seller.get("user_id")
+        if target_user_id:
+            await notification_manager.send_to_user(target_user_id, {
+                "type": "verification_updated",
+                "subject": "vehicle_dealer",
+                "is_vehicle_dashboard_eligible": True,
+            })
+    except Exception:  # noqa: BLE001
+        pass
+
     return {"message": "Seller approved successfully"}
 
 
