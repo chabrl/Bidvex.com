@@ -328,6 +328,16 @@ async def get_dealer_profile(
                 "status": "on_file",
             })
         for extra in (broker.get("additional_documents") or []):
+            # iter423 — `additional_documents` in the DB can be either a
+            # list of dicts (new schema) OR a list of raw URL strings
+            # (legacy schema). Handle both without crashing.
+            if isinstance(extra, str):
+                documents.append({
+                    "document_type": "supplementary",
+                    "file_url": extra,
+                    "status": "on_file",
+                })
+                continue
             documents.append({
                 "document_type": extra.get("document_type") or "supplementary",
                 "file_url": extra.get("url"),

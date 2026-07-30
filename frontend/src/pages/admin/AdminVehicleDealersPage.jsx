@@ -13,6 +13,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { toast } from 'sonner';
+import { extractErrorMessage } from '../../utils/errorHandler';
 import API_BASE from '../../config';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -86,7 +87,7 @@ const DealerNotesPanel = ({ userId }) => {
       );
       setNotes(r.data?.data || []);
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Failed to load notes');
+      toast.error(extractErrorMessage(e) || 'Failed to load notes');
     } finally {
       setLoading(false);
     }
@@ -108,7 +109,7 @@ const DealerNotesPanel = ({ userId }) => {
       toast.success('Note saved');
       load();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Failed to save note');
+      toast.error(extractErrorMessage(e) || 'Failed to save note');
     } finally {
       setSaving(false);
     }
@@ -205,7 +206,7 @@ const DealerDetailPanel = ({ userId, onBack, onActionCompleted }) => {
       setProfile(pRes.data);
       setActivity(aRes.data);
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Failed to load dealer profile');
+      toast.error(extractErrorMessage(e) || 'Failed to load dealer profile');
     } finally {
       setLoading(false);
     }
@@ -225,7 +226,7 @@ const DealerDetailPanel = ({ userId, onBack, onActionCompleted }) => {
       await load();
       onActionCompleted?.();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || `Failed to ${verb}`);
+      toast.error(extractErrorMessage(e) || `Failed to ${verb}`);
     } finally {
       setActionBusy('');
     }
@@ -581,7 +582,7 @@ export default function AdminVehicleDealersPage() {
       setRows(r.data?.data || []);
       setTotal(r.data?.total || 0);
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Failed to load dealers');
+      toast.error(extractErrorMessage(e) || 'Failed to load dealers');
       setRows([]);
       setTotal(0);
     } finally {
@@ -607,7 +608,7 @@ export default function AdminVehicleDealersPage() {
       toast.success(`Dealer ${verb}d`);
       load();
     } catch (err) {
-      toast.error(err?.response?.data?.detail || `Failed to ${verb}`);
+      toast.error(extractErrorMessage(err) || `Failed to ${verb}`);
     }
   };
 
