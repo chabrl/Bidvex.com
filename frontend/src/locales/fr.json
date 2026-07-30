@@ -1529,11 +1529,15 @@
     "soldTab": "Vendus",
     "retiredTab": "Retirés",
     "noVehicles": "Aucune annonce de véhicule",
+    "noVehiclesSubtitle": "Commencez à vendre en publiant votre premier véhicule aux enchères.",
+    "noVehiclesInTab": "Aucune annonce dans cette catégorie.",
     "createFirst": "Créer ma première annonce",
     "createVehicle": "Créer une annonce de véhicule",
     "views": "{{count}} vues",
     "bids": "{{count}} enchères",
-    "startingBid": "Mise de départ",
+    "startingBid": "Départ",
+    "verificationPending": "La vérification concessionnaire doit être approuvée avant de créer une annonce.",
+    "loading": "Chargement de vos annonces…",
     "edit": "Modifier",
     "duplicate": "Dupliquer",
     "retire": "Retirer",
@@ -1546,7 +1550,20 @@
     "toastRetired": "Annonce retirée avec succès",
     "toastRetireFailed": "Échec du retrait de l'annonce",
     "toastDuplicated": "Annonce dupliquée en tant que brouillon",
-    "toastDuplicateFailed": "Échec de la duplication de l'annonce"
+    "toastDuplicateFailed": "Échec de la duplication de l'annonce",
+    "toastLoadFailed": "Échec du chargement des annonces",
+    "status": {
+      "draft": "Brouillon",
+      "pending_approval": "En attente",
+      "approved": "Approuvée",
+      "active": "Active",
+      "ended": "Terminée",
+      "sold": "Vendue",
+      "retired": "Retirée",
+      "rejected": "Refusée",
+      "cancelled": "Annulée",
+      "expired": "Expirée"
+    }
   },
   "vehicleInvoices": {
     "title": "Factures de véhicules",

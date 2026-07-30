@@ -12,7 +12,7 @@
  *   POST  /api/vehicles/{id}/retire       (iter428)
  *   GET   /api/vehicle-sellers/me
  *
- * Bilingual via `useTranslation()` with keys under `vehicleListings.*`.
+ * All copy comes from `locales/{en,fr}.json` under `vehicleListings.*`.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -57,33 +57,36 @@ const formatPrice = (price) => {
 
 /* ---------------------------- status pill ------------------------------- */
 
-const STATUS_META = {
-  draft:            { color: 'bg-slate-500',  Icon: Edit,       en: 'Draft',            fr: 'Brouillon' },
-  pending_approval: { color: 'bg-yellow-500', Icon: Clock,      en: 'Pending',          fr: 'En attente' },
-  approved:         { color: 'bg-blue-500',   Icon: CheckCircle,en: 'Approved',         fr: 'Approuvée' },
-  active:           { color: 'bg-green-500',  Icon: TrendingUp, en: 'Active',           fr: 'Active' },
-  ended:            { color: 'bg-slate-500',  Icon: Clock,      en: 'Ended',            fr: 'Terminée' },
-  sold:             { color: 'bg-purple-500', Icon: DollarSign, en: 'Sold',             fr: 'Vendue' },
-  retired:          { color: 'bg-slate-600',  Icon: Archive,    en: 'Retired',          fr: 'Retirée' },
-  rejected:         { color: 'bg-red-500',    Icon: XCircle,    en: 'Rejected',         fr: 'Refusée' },
-  cancelled:        { color: 'bg-red-500',    Icon: XCircle,    en: 'Cancelled',        fr: 'Annulée' },
-  expired:          { color: 'bg-slate-500',  Icon: Clock,      en: 'Expired',          fr: 'Expirée' },
+const STATUS_STYLE = {
+  draft:            { color: 'bg-slate-500',  Icon: Edit },
+  pending_approval: { color: 'bg-yellow-500', Icon: Clock },
+  approved:         { color: 'bg-blue-500',   Icon: CheckCircle },
+  active:           { color: 'bg-green-500',  Icon: TrendingUp },
+  ended:            { color: 'bg-slate-500',  Icon: Clock },
+  sold:             { color: 'bg-purple-500', Icon: DollarSign },
+  retired:          { color: 'bg-slate-600',  Icon: Archive },
+  rejected:         { color: 'bg-red-500',    Icon: XCircle },
+  cancelled:        { color: 'bg-red-500',    Icon: XCircle },
+  expired:          { color: 'bg-slate-500',  Icon: Clock },
 };
 
-const StatusPill = ({ status, isFr }) => {
-  const meta = STATUS_META[status] || STATUS_META.draft;
+const StatusPill = ({ status, t }) => {
+  const meta = STATUS_STYLE[status] || STATUS_STYLE.draft;
   const Icon = meta.Icon;
   return (
-    <Badge className={`${meta.color} gap-1 text-white whitespace-nowrap`} data-testid={`my-vehicle-status-pill-${status}`}>
+    <Badge
+      className={`${meta.color} gap-1 text-white whitespace-nowrap`}
+      data-testid={`my-vehicle-status-pill-${status}`}
+    >
       <Icon className="h-3 w-3" />
-      {isFr ? meta.fr : meta.en}
+      {t(`vehicleListings.status.${status}`, { defaultValue: status })}
     </Badge>
   );
 };
 
 /* ---------------------------- card ------------------------------------- */
 
-const MyVehicleCard = ({ listing, isFr, onEdit, onDuplicate, onRetire }) => {
+const MyVehicleCard = ({ listing, t, onEdit, onDuplicate, onRetire }) => {
   const mainImage = listing.media?.find((m) => m.category === 'front')?.url
     || listing.media?.[0]?.url
     || listing.images?.[0]?.url
@@ -102,7 +105,10 @@ const MyVehicleCard = ({ listing, isFr, onEdit, onDuplicate, onRetire }) => {
         {mainImage ? (
           <SafeImage src={mainImage} alt="" className="w-full h-full object-cover" />
         ) : (
-          <div className="w-full h-full flex items-center justify-center" data-testid={`my-vehicle-thumb-empty-${listing.id}`}>
+          <div
+            className="w-full h-full flex items-center justify-center"
+            data-testid={`my-vehicle-thumb-empty-${listing.id}`}
+          >
             <Car className="h-10 w-10 text-slate-300" />
           </div>
         )}
@@ -117,7 +123,7 @@ const MyVehicleCard = ({ listing, isFr, onEdit, onDuplicate, onRetire }) => {
           >
             {listing.year} {listing.make} {listing.model}
           </h3>
-          <StatusPill status={listing.status} isFr={isFr} />
+          <StatusPill status={listing.status} t={t} />
         </div>
 
         {/* Stats row */}
@@ -127,13 +133,15 @@ const MyVehicleCard = ({ listing, isFr, onEdit, onDuplicate, onRetire }) => {
         >
           <span className="flex items-center gap-1" data-testid={`my-vehicle-starting-bid-${listing.id}`}>
             <DollarSign className="h-3.5 w-3.5" />
-            {isFr ? 'Mise départ' : 'Start'}: {formatPrice(listing.starting_price)}
+            {t('vehicleListings.startingBid')}: {formatPrice(listing.starting_price)}
           </span>
           <span className="flex items-center gap-1" data-testid={`my-vehicle-bids-${listing.id}`}>
-            <TrendingUp className="h-3.5 w-3.5" /> {listing.bid_count || 0} {isFr ? 'enchères' : 'bids'}
+            <TrendingUp className="h-3.5 w-3.5" />
+            {t('vehicleListings.bids', { count: listing.bid_count || 0 })}
           </span>
           <span className="flex items-center gap-1" data-testid={`my-vehicle-views-${listing.id}`}>
-            <Eye className="h-3.5 w-3.5" /> {listing.views_count || 0} {isFr ? 'vues' : 'views'}
+            <Eye className="h-3.5 w-3.5" />
+            {t('vehicleListings.views', { count: listing.views_count || 0 })}
           </span>
         </div>
 
@@ -148,7 +156,7 @@ const MyVehicleCard = ({ listing, isFr, onEdit, onDuplicate, onRetire }) => {
             data-testid={`my-vehicle-edit-${listing.id}`}
           >
             <Edit className="h-3.5 w-3.5 mr-1" />
-            {isFr ? 'Modifier' : 'Edit'}
+            {t('vehicleListings.edit')}
           </Button>
           <Button
             size="sm"
@@ -158,7 +166,7 @@ const MyVehicleCard = ({ listing, isFr, onEdit, onDuplicate, onRetire }) => {
             data-testid={`my-vehicle-duplicate-${listing.id}`}
           >
             <Copy className="h-3.5 w-3.5 mr-1" />
-            {isFr ? 'Dupliquer' : 'Duplicate'}
+            {t('vehicleListings.duplicate')}
           </Button>
           <Button
             size="sm"
@@ -169,7 +177,7 @@ const MyVehicleCard = ({ listing, isFr, onEdit, onDuplicate, onRetire }) => {
             data-testid={`my-vehicle-retire-${listing.id}`}
           >
             <Archive className="h-3.5 w-3.5 mr-1" />
-            {isFr ? 'Retirer' : 'Retire'}
+            {t('vehicleListings.retire')}
           </Button>
         </div>
       </CardContent>
@@ -180,11 +188,11 @@ const MyVehicleCard = ({ listing, isFr, onEdit, onDuplicate, onRetire }) => {
 /* ---------------------------- module ----------------------------------- */
 
 const TABS = [
-  { id: 'all',      en: 'All',      fr: 'Tous' },
-  { id: 'active',   en: 'Active',   fr: 'Actifs' },
-  { id: 'draft',    en: 'Draft',    fr: 'Brouillons' },
-  { id: 'sold',     en: 'Sold',     fr: 'Vendus' },
-  { id: 'retired',  en: 'Retired',  fr: 'Retirés' },
+  { id: 'all',     labelKey: 'vehicleListings.allVehicles' },
+  { id: 'active',  labelKey: 'vehicleListings.activeTab'   },
+  { id: 'draft',   labelKey: 'vehicleListings.draftTab'    },
+  { id: 'sold',    labelKey: 'vehicleListings.soldTab'     },
+  { id: 'retired', labelKey: 'vehicleListings.retiredTab'  },
 ];
 
 const matchTab = (tab, status) => {
@@ -198,15 +206,14 @@ const matchTab = (tab, status) => {
 
 const MyVehiclesModule = () => {
   const navigate = useNavigate();
-  const { i18n } = useTranslation();
-  const isFr = (i18n.language || '').toLowerCase().startsWith('fr');
+  const { t } = useTranslation();
   const { token } = useAuth();
 
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sellerProfile, setSellerProfile] = useState(null);
   const [activeTab, setActiveTab] = useState('all');
-  const [retireTarget, setRetireTarget] = useState(null); // {id, year, make, model}
+  const [retireTarget, setRetireTarget] = useState(null);
   const [busy, setBusy] = useState(false);
 
   const fetchData = useCallback(async () => {
@@ -214,24 +221,26 @@ const MyVehiclesModule = () => {
     try {
       setLoading(true);
       const [sellerResp, listingsResp] = await Promise.all([
-        axios.get(`${API}/vehicle-sellers/me`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => null),
+        axios
+          .get(`${API}/vehicle-sellers/me`, { headers: { Authorization: `Bearer ${token}` } })
+          .catch(() => null),
         axios.get(`${API}/vehicles/my/listings`, { headers: { Authorization: `Bearer ${token}` } }),
       ]);
       setSellerProfile(sellerResp?.data || null);
       setListings(listingsResp.data.listings || []);
     } catch (err) {
-      toast.error(extractErrorMessage(err) || (isFr ? 'Échec du chargement' : 'Failed to load listings'));
+      toast.error(extractErrorMessage(err) || t('vehicleListings.toastLoadFailed'));
     } finally {
       setLoading(false);
     }
-  }, [token, isFr]);
+  }, [token, t]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const filtered = listings.filter((l) => matchTab(activeTab, l.status));
 
-  const counts = TABS.reduce((acc, t) => {
-    acc[t.id] = listings.filter((l) => matchTab(t.id, l.status)).length;
+  const counts = TABS.reduce((acc, tab) => {
+    acc[tab.id] = listings.filter((l) => matchTab(tab.id, l.status)).length;
     return acc;
   }, {});
 
@@ -243,20 +252,16 @@ const MyVehiclesModule = () => {
     if (busy) return;
     setBusy(true);
     try {
-      const resp = await axios.post(
+      await axios.post(
         `${API}/vehicles/${listing.id}/duplicate`,
         {},
         { headers: { Authorization: `Bearer ${token}` } },
       );
-      toast.success(isFr ? 'Annonce dupliquée en tant que brouillon' : 'Listing duplicated as a new draft');
+      toast.success(t('vehicleListings.toastDuplicated'));
       await fetchData();
-      // Optional: jump to the edit page for the new draft
-      if (resp.data?.id) {
-        // Don't auto-navigate — user may want to duplicate several. Just switch tab.
-        setActiveTab('draft');
-      }
+      setActiveTab('draft');
     } catch (err) {
-      toast.error(extractErrorMessage(err) || (isFr ? 'Échec de la duplication' : 'Failed to duplicate listing'));
+      toast.error(extractErrorMessage(err) || t('vehicleListings.toastDuplicateFailed'));
     } finally {
       setBusy(false);
     }
@@ -271,11 +276,11 @@ const MyVehiclesModule = () => {
         {},
         { headers: { Authorization: `Bearer ${token}` } },
       );
-      toast.success(isFr ? 'Annonce retirée' : 'Listing retired');
+      toast.success(t('vehicleListings.toastRetired'));
       setRetireTarget(null);
       await fetchData();
     } catch (err) {
-      toast.error(extractErrorMessage(err) || (isFr ? 'Échec du retrait' : 'Failed to retire listing'));
+      toast.error(extractErrorMessage(err) || t('vehicleListings.toastRetireFailed'));
     } finally {
       setBusy(false);
     }
@@ -285,8 +290,12 @@ const MyVehiclesModule = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12" data-testid="my-vehicles-loading">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600" />
+      <div
+        className="flex flex-col items-center justify-center py-12"
+        data-testid="my-vehicles-loading"
+      >
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mb-3" />
+        <p className="text-sm text-slate-500">{t('vehicleListings.loading')}</p>
       </div>
     );
   }
@@ -320,23 +329,21 @@ const MyVehiclesModule = () => {
               }`}
               data-testid={`my-vehicles-tab-${tab.id}`}
             >
-              {isFr ? tab.fr : tab.en} ({count})
+              {t(tab.labelKey)} ({count})
             </button>
           );
         })}
       </div>
 
-      {/* Empty state or grid */}
+      {/* Empty state / tab empty / grid */}
       {isEmpty ? (
         <Card className="p-10 text-center" data-testid="my-vehicles-empty">
           <Car className="h-14 w-14 text-slate-300 mx-auto mb-4" />
           <h3 className="text-lg sm:text-xl font-semibold mb-2">
-            {isFr ? 'Aucune annonce pour le moment' : 'No listings yet'}
+            {t('vehicleListings.noVehicles')}
           </h3>
           <p className="text-sm text-slate-500 mb-6 max-w-md mx-auto">
-            {isFr
-              ? 'Commencez à vendre en publiant votre premier véhicule aux enchères.'
-              : 'Get started by publishing your first vehicle for auction.'}
+            {t('vehicleListings.noVehiclesSubtitle')}
           </p>
           {canCreate ? (
             <Button
@@ -345,22 +352,21 @@ const MyVehiclesModule = () => {
               data-testid="my-vehicles-create-first-cta"
             >
               <Plus className="h-4 w-4 mr-2" />
-              {isFr ? 'Créer ma première annonce' : 'Create Your First Listing'}
+              {t('vehicleListings.createFirst')}
             </Button>
           ) : (
-            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2 inline-block">
-              {isFr
-                ? 'La vérification concessionnaire doit être approuvée avant de créer une annonce.'
-                : 'Dealer verification must be approved before creating a listing.'}
+            <p
+              className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2 inline-block"
+              data-testid="my-vehicles-verification-pending"
+            >
+              {t('vehicleListings.verificationPending')}
             </p>
           )}
         </Card>
       ) : filtered.length === 0 ? (
         <Card className="p-10 text-center" data-testid="my-vehicles-tab-empty">
           <Car className="h-14 w-14 text-slate-300 mx-auto mb-4" />
-          <p className="text-sm text-slate-500">
-            {isFr ? `Aucune annonce dans cette catégorie.` : `No listings in this tab.`}
-          </p>
+          <p className="text-sm text-slate-500">{t('vehicleListings.noVehiclesInTab')}</p>
         </Card>
       ) : (
         <div
@@ -371,7 +377,7 @@ const MyVehiclesModule = () => {
             <MyVehicleCard
               key={listing.id}
               listing={listing}
-              isFr={isFr}
+              t={t}
               onEdit={handleEdit}
               onDuplicate={handleDuplicate}
               onRetire={(l) => setRetireTarget(l)}
@@ -384,23 +390,22 @@ const MyVehiclesModule = () => {
       <AlertDialog open={!!retireTarget} onOpenChange={(v) => { if (!v) setRetireTarget(null); }}>
         <AlertDialogContent data-testid="my-vehicles-retire-dialog">
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              {isFr ? 'Retirer cette annonce ?' : 'Retire this listing?'}
-            </AlertDialogTitle>
+            <AlertDialogTitle>{t('vehicleListings.confirmRetireTitle')}</AlertDialogTitle>
             <AlertDialogDescription>
               {retireTarget && (
-                <span className="block font-medium text-slate-900 dark:text-slate-100 mb-2">
+                <span
+                  className="block font-medium text-slate-900 dark:text-slate-100 mb-2"
+                  data-testid="my-vehicles-retire-dialog-target"
+                >
                   {retireTarget.year} {retireTarget.make} {retireTarget.model}
                 </span>
               )}
-              {isFr
-                ? "L'annonce sera archivée et retirée du marché public. Vous pourrez toujours la consulter sous l'onglet Retirés, mais elle ne pourra pas être réactivée. Les annonces vendues ne peuvent pas être retirées."
-                : 'The listing will be archived and removed from the public marketplace. You can still view it under the Retired tab, but it cannot be reactivated. Sold listings cannot be retired.'}
+              {t('vehicleListings.confirmRetireBody')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel data-testid="my-vehicles-retire-cancel">
-              {isFr ? 'Annuler' : 'Cancel'}
+              {t('vehicleListings.confirmRetireCancel')}
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleRetireConfirm}
@@ -408,7 +413,7 @@ const MyVehiclesModule = () => {
               className="bg-rose-600 hover:bg-rose-700 text-white"
               data-testid="my-vehicles-retire-confirm"
             >
-              {isFr ? 'Oui, la retirer' : 'Yes, retire it'}
+              {t('vehicleListings.confirmRetireConfirm')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

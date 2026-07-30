@@ -1509,11 +1509,15 @@
     "soldTab": "Sold",
     "retiredTab": "Retired",
     "noVehicles": "No vehicle listings yet",
+    "noVehiclesSubtitle": "Get started by publishing your first vehicle for auction.",
+    "noVehiclesInTab": "No listings in this tab.",
     "createFirst": "Create Your First Listing",
     "createVehicle": "Create Vehicle Listing",
     "views": "{{count}} views",
     "bids": "{{count}} bids",
-    "startingBid": "Starting bid",
+    "startingBid": "Start",
+    "verificationPending": "Dealer verification must be approved before creating a listing.",
+    "loading": "Loading your listings…",
     "edit": "Edit",
     "duplicate": "Duplicate",
     "retire": "Retire",
@@ -1526,7 +1530,20 @@
     "toastRetired": "Listing retired successfully",
     "toastRetireFailed": "Failed to retire listing",
     "toastDuplicated": "Listing duplicated as a new draft",
-    "toastDuplicateFailed": "Failed to duplicate listing"
+    "toastDuplicateFailed": "Failed to duplicate listing",
+    "toastLoadFailed": "Failed to load listings",
+    "status": {
+      "draft": "Draft",
+      "pending_approval": "Pending",
+      "approved": "Approved",
+      "active": "Active",
+      "ended": "Ended",
+      "sold": "Sold",
+      "retired": "Retired",
+      "rejected": "Rejected",
+      "cancelled": "Cancelled",
+      "expired": "Expired"
+    }
   },
   "vehicleInvoices": {
     "title": "Vehicle Invoices",

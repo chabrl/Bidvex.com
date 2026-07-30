@@ -1,6 +1,75 @@
 # BidVex Changelog
 
 
+## Feb 8, 2026 — iter428 My Vehicles Module (Vehicle Dashboard)
+
+Delivered the P0 "My Vehicles" module inside `/vehicle-dashboard` per PRD.
+
+### Backend
+- **`VehicleListingStatus.RETIRED = "retired"`** added to
+  `/app/backend/models/vehicle_models.py`. Distinct from `CANCELLED`
+  (admin/system cancellation) so we preserve dealer audit intent.
+- **`POST /api/vehicles/{id}/duplicate`** — clones a listing as a fresh
+  draft. Preserves media, VIN, category, condition report; resets
+  `current_bid`, `bid_count`, `views_count`, `winner_id`, `final_price`,
+  `sold_at`, timestamps. Enforces the dealer's monthly listing limit.
+  Title is suffixed with `(Copy)` / `(copie)`.
+- **`POST /api/vehicles/{id}/retire`** — confirm-then-archive endpoint.
+  Flips status to `retired`, stamps `retired_at` + `retired_by`.
+  Returns 409 with `detail.code='cannot_retire_sold'` (bilingual
+  message) when attempting to retire a SOLD listing. Idempotent —
+  second call returns `{ok:true, already:true}`.
+- Public marketplace already filters by `ACTIVE`/`APPROVED` so retired
+  listings drop out of `/marketplace` naturally.
+
+### Frontend
+- New reusable module at
+  `/app/frontend/src/components/vehicles/MyVehiclesModule.jsx`.
+  Mounted inside `VehicleDashboardPage.jsx` (previously a placeholder).
+  Renders:
+  - Filter tabs — **All / Active / Draft / Sold / Retired** with live
+    counts.
+  - Responsive card grid: photo thumbnail, `{year} {make} {model}`,
+    status pill, starting bid, bid count, view count.
+  - Card actions: **Edit** (routes to `/vehicle-auctions/edit/{id}`,
+    disabled for non-draft/non-rejected), **Duplicate** (POSTs to the
+    new endpoint + refetches + auto-switches to Draft tab), **Retire**
+    (opens Shadcn AlertDialog → POSTs to `/retire` → toast + refetch;
+    disabled on Sold and Retired listings).
+  - Empty state with **"Create Your First Listing"** CTA (only when
+    dealer is `approved`; otherwise a verification-pending amber notice).
+- All copy consumed via `useTranslation()` — extended
+  `vehicleListings.*` block in `en.json`/`fr.json` with `retiredTab`,
+  `duplicate`, `retire`, `confirmRetire{Title,Body,Confirm,Cancel}`,
+  `toast{Retired,Duplicated,LoadFailed}`, and a `status.{draft|active|
+  sold|retired|…}` sub-namespace consumed by the status pill.
+- Standalone `/vehicle-auctions/my-listings` page unchanged in
+  behavior; `retired` status now folded into its **Ended** tab and
+  status-pill map so retired listings still render.
+- Every `toast.error` wraps `extractErrorMessage(err)` — no React #31
+  risk from bilingual server error envelopes.
+
+### Testing
+- Backend: 7/7 pytest cases pass (`/app/backend/tests/test_iter428_my_vehicles.py`).
+- Frontend: testing agent iter428 confirmed all data-testids, correct
+  disabled-state matrix, retire dialog, and duplicate flow. Bilingual
+  labels render via `t()` in FR (verified visually) and EN.
+
+### Testids for QA
+`my-vehicles-module`, `my-vehicles-tabs`, `my-vehicles-tab-{all|active|draft|sold|retired}`,
+`my-vehicles-grid`, `my-vehicle-card-{id}`, `my-vehicle-title-{id}`,
+`my-vehicle-status-pill-{status}`, `my-vehicle-starting-bid-{id}`,
+`my-vehicle-bids-{id}`, `my-vehicle-views-{id}`,
+`my-vehicle-edit-{id}`, `my-vehicle-duplicate-{id}`, `my-vehicle-retire-{id}`,
+`my-vehicles-retire-dialog`, `my-vehicles-retire-confirm`,
+`my-vehicles-retire-cancel`, `my-vehicles-empty`, `my-vehicles-tab-empty`,
+`my-vehicles-create-first-cta`, `my-vehicles-verification-pending`.
+
+### Non-goals (deferred per PRD)
+- Sales & Performance module — placeholder card only.
+- Settlements module — placeholder card only.
+
+
 ## Feb 8, 2026 — iter428 Twilio Re-Audit + Dealer Verification Pill
 
 ### Task 1 — Twilio routing re-audit
