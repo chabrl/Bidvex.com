@@ -108,6 +108,11 @@ class VehicleListingStatus(str, Enum):
     SOLD = "sold"
     CANCELLED = "cancelled"
     EXPIRED = "expired"
+    # iter428 — My Vehicles module: dealer can archive a listing so it
+    # disappears from the marketplace but stays accessible from the
+    # dashboard's Retired tab. Distinct from CANCELLED (admin/system
+    # cancellation) so we preserve audit intent.
+    RETIRED = "retired"
 
 
 class VehicleAuctionType(str, Enum):

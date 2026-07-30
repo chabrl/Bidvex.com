@@ -1636,6 +1636,131 @@ async def delete_draft_vehicle_listing(
     return {"ok": True}
 
 
+# iter428 — My Vehicles module: Duplicate + Retire endpoints ────────────
+
+@vehicle_router.post("/vehicles/{vehicle_id}/duplicate")
+async def duplicate_vehicle_listing(
+    vehicle_id: str,
+    seller: dict = Depends(get_vehicle_seller),
+    user: dict = Depends(get_current_user),
+):
+    """Clone an existing vehicle listing as a fresh DRAFT owned by the
+    same dealer. Preserves the descriptive fields (year/make/model/VIN,
+    media, condition report, category, features) but resets bidding
+    state, timestamps, and any winner/settlement metadata.
+    """
+    src = await db.vehicle_listings.find_one({"id": vehicle_id, "seller_id": seller["id"]})
+    if not src:
+        raise HTTPException(status_code=404, detail="Listing not found")
+
+    # Monthly listing limit still applies to duplicates.
+    current_month = datetime.now(timezone.utc).strftime("%Y-%m")
+    if seller.get("current_month") != current_month:
+        await db.vehicle_sellers.update_one(
+            {"id": seller["id"]},
+            {"$set": {"monthly_listing_count": 0, "current_month": current_month}},
+        )
+        seller["monthly_listing_count"] = 0
+    if seller["monthly_listing_count"] >= seller["monthly_listing_limit"]:
+        limit = seller["monthly_listing_limit"]
+        seller_type = seller["seller_type"]
+        raise HTTPException(
+            status_code=403,
+            detail=f"Monthly listing limit reached ({limit} vehicles/month for {seller_type} sellers)",
+        )
+
+    now = datetime.now(timezone.utc)
+    new_id = str(uuid.uuid4())
+
+    # Copy the source doc and stamp draft-specific fields.
+    clone: Dict[str, Any] = {k: v for k, v in src.items() if k != "_id"}
+    clone["id"] = new_id
+    clone["status"] = VehicleListingStatus.DRAFT.value
+
+    # Bidding state reset
+    clone["current_bid"] = 0.0
+    clone["bid_count"] = 0
+    clone["highest_bidder_id"] = None
+    clone["watchers_count"] = 0
+    clone["views_count"] = 0
+    clone["reserve_met"] = False
+
+    # Winner / settlement reset
+    clone["winner_id"] = None
+    clone["final_price"] = None
+    clone["sold_at"] = None
+    clone["rejection_reason"] = None
+
+    # Timestamps reset — user must set new start/end when they publish.
+    clone["start_time"] = None
+    clone["end_time"] = None
+    clone["original_end_time"] = None
+    clone["created_at"] = now
+    clone["updated_at"] = None
+    clone["approved_at"] = None
+    clone["approved_by"] = None
+
+    # Title suffix so the dealer can tell them apart at a glance.
+    original_title = src.get("title") or ""
+    clone["title"] = f"{original_title} (Copy)".strip() if original_title else "(Copy)"
+    if src.get("title_fr"):
+        clone["title_fr"] = f"{src['title_fr']} (copie)".strip()
+
+    await db.vehicle_listings.insert_one(clone)
+
+    # Increment the dealer's monthly count so duplicates count toward the limit.
+    await db.vehicle_sellers.update_one(
+        {"id": seller["id"]},
+        {"$inc": {"monthly_listing_count": 1}},
+    )
+
+    return {"ok": True, "id": new_id, "status": VehicleListingStatus.DRAFT.value}
+
+
+@vehicle_router.post("/vehicles/{vehicle_id}/retire")
+async def retire_vehicle_listing(
+    vehicle_id: str,
+    seller: dict = Depends(get_vehicle_seller),
+    user: dict = Depends(get_current_user),
+):
+    """Confirm-then-archive endpoint. Flips a listing to `retired` so it
+    disappears from the public marketplace but remains visible from the
+    dealer's dashboard (Retired tab). Sold listings cannot be retired
+    (they must stay in the audit trail as SOLD).
+    """
+    listing = await db.vehicle_listings.find_one({"id": vehicle_id, "seller_id": seller["id"]})
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+
+    current_status = listing.get("status")
+    if current_status == VehicleListingStatus.SOLD.value:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "cannot_retire_sold",
+                "message_en": "Sold listings cannot be retired — they are locked for the audit trail.",
+                "message_fr": "Les annonces vendues ne peuvent pas être retirées — elles sont verrouillées pour l'audit.",
+            },
+        )
+    if current_status == VehicleListingStatus.RETIRED.value:
+        # Idempotent: already retired.
+        return {"ok": True, "status": VehicleListingStatus.RETIRED.value, "already": True}
+
+    now = datetime.now(timezone.utc)
+    await db.vehicle_listings.update_one(
+        {"id": vehicle_id},
+        {
+            "$set": {
+                "status": VehicleListingStatus.RETIRED.value,
+                "retired_at": now,
+                "retired_by": user["id"],
+                "updated_at": now,
+            },
+        },
+    )
+    return {"ok": True, "status": VehicleListingStatus.RETIRED.value}
+
+
 # ============= BIDDING ENDPOINTS =============
 
 @vehicle_router.post("/vehicle-bids")

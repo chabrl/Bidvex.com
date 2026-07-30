@@ -56,6 +56,7 @@ const getStatusBadge = (status, isFr) => {
     active:           { en: 'Active',           fr: 'Active' },
     ended:            { en: 'Ended',            fr: 'Terminée' },
     sold:             { en: 'Sold',             fr: 'Vendue' },
+    retired:          { en: 'Retired',          fr: 'Retirée' },
     rejected:         { en: 'Rejected',         fr: 'Refusée' },
     cancelled:        { en: 'Cancelled',        fr: 'Annulée' },
   };
@@ -66,6 +67,7 @@ const getStatusBadge = (status, isFr) => {
     active:           'bg-green-500',
     ended:            'bg-slate-500',
     sold:             'bg-purple-500',
+    retired:          'bg-slate-600',
     rejected:         'bg-red-500',
     cancelled:        'bg-red-500',
   };
@@ -76,6 +78,7 @@ const getStatusBadge = (status, isFr) => {
     active:           TrendingUp,
     ended:            Clock,
     sold:             DollarSign,
+    retired:          Trash2,
     rejected:         XCircle,
     cancelled:        XCircle,
   };
@@ -322,7 +325,7 @@ const MyVehicleListingsPage = () => {
     if (activeTab === 'drafts') return listing.status === 'draft';
     if (activeTab === 'active') return listing.status === 'active';
     if (activeTab === 'pending') return ['pending_approval', 'approved'].includes(listing.status);
-    if (activeTab === 'ended') return ['ended', 'sold', 'cancelled'].includes(listing.status);
+    if (activeTab === 'ended') return ['ended', 'sold', 'cancelled', 'retired'].includes(listing.status);
     return true;
   });
 
@@ -383,7 +386,7 @@ const MyVehicleListingsPage = () => {
     { id: 'drafts',  en: '📝 Drafts',fr: '📝 Brouillons',count: stats.drafts },
     { id: 'active',  en: 'Active',  fr: 'Actives',    count: stats.active },
     { id: 'pending', en: 'Pending', fr: 'En attente', count: stats.pending },
-    { id: 'ended',   en: 'Ended',   fr: 'Terminées',  count: listings.filter((l) => ['ended', 'sold'].includes(l.status)).length },
+    { id: 'ended',   en: 'Ended',   fr: 'Terminées',  count: listings.filter((l) => ['ended', 'sold', 'retired'].includes(l.status)).length },
   ];
 
   return (

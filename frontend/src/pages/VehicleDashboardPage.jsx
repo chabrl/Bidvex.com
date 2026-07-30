@@ -1,52 +1,44 @@
 /**
- * iter413 — Vehicle Dashboard (minimal shell).
+ * iter413 — Vehicle Dashboard.
+ * iter428 — My Vehicles module lit up as the first active section.
  *
- * This is the placeholder shell for the new `/vehicle-dashboard`
- * surface. It intentionally ships without analytics, settlements, or
- * payouts — those modules land in follow-up iterations. What SHIPS
- * here is:
- *
- *   • Route + guard (see App.js — <VehicleDashboardGuard>)
- *   • Breadcrumb → Home / Vehicle Dashboard
- *   • Bilingual (EN/FR) heading + subtitle
- *   • A single "Modules coming soon" card that matches the visual
- *     language of the existing Broker & Storage dashboards (Card
- *     header + soft gradient + Lucide icon)
- *   • data-testid hooks so automation can smoke-test visibility.
+ * Sections rendered:
+ *   1. Breadcrumb + bilingual heading
+ *   2. My Vehicles (ACTIVE) — <MyVehiclesModule />
+ *   3. Coming soon strip — Sales & Performance / Settlements
+ *      placeholders (deferred per PRD).
  */
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Car, Sparkles, TrendingUp, ClipboardList, Wallet } from 'lucide-react';
+import { Car, TrendingUp, Wallet } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import {
   Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList,
   BreadcrumbPage, BreadcrumbSeparator,
 } from '../components/ui/breadcrumb';
 import SEO from '../components/SEO';
+import MyVehiclesModule from '../components/vehicles/MyVehiclesModule';
 
 const VehicleDashboardPage = () => {
   const { i18n } = useTranslation();
   const isFr = (i18n.language || 'en').startsWith('fr');
 
   const T = {
-    seoTitle:     isFr ? 'Tableau de bord Véhicules' : 'Vehicle Dashboard',
-    seoDesc:      isFr
+    seoTitle:  isFr ? 'Tableau de bord Véhicules' : 'Vehicle Dashboard',
+    seoDesc:   isFr
       ? "Votre tableau de bord pour les enchères, ventes et paiements de véhicules sur BidVex."
       : "Your hub for BidVex vehicle listings, sales, settlements, and payouts.",
-    crumbHome:    isFr ? 'Accueil' : 'Home',
-    heading:      isFr ? 'Tableau de bord Véhicules' : 'Vehicle Dashboard',
-    subheading:   isFr
-      ? "Bienvenue — vos modules concessionnaire arrivent bientôt."
-      : "Welcome — your dealer modules are coming soon.",
-    comingCard:   isFr ? 'Modules à venir' : 'Modules coming soon',
+    crumbHome: isFr ? 'Accueil' : 'Home',
+    heading:   isFr ? 'Tableau de bord Véhicules' : 'Vehicle Dashboard',
+    subheading: isFr
+      ? "Gérez vos annonces de véhicules — modifiez, dupliquez ou retirez en un clic."
+      : 'Manage your vehicle listings — edit, duplicate, or retire in a single click.',
+    myVehiclesTitle: isFr ? 'Mes véhicules' : 'My Vehicles',
+    myVehiclesDesc:  isFr
+      ? 'Toutes vos annonces de véhicules, filtrables par statut.'
+      : 'Every vehicle you have listed, filterable by status.',
+    comingSoon: isFr ? 'À venir' : 'Coming soon',
     modules: [
-      {
-        icon:  ClipboardList,
-        title: isFr ? 'Mes véhicules' : 'My Vehicles',
-        desc:  isFr
-          ? 'Publiez, modifiez et retirez rapidement vos annonces de véhicules.'
-          : 'Publish, edit, and retire your vehicle listings at a glance.',
-      },
       {
         icon:  TrendingUp,
         title: isFr ? 'Ventes et performance' : 'Sales & Performance',
@@ -98,19 +90,35 @@ const VehicleDashboardPage = () => {
           </div>
         </header>
 
-        {/* Coming soon card */}
+        {/* Active module: My Vehicles */}
         <Card
-          className="border-blue-200/60 bg-gradient-to-br from-white to-blue-50/50 dark:from-slate-900 dark:to-slate-900/50 dark:border-slate-800"
+          className="mb-8 border-blue-200/60 bg-gradient-to-br from-white to-blue-50/50 dark:from-slate-900 dark:to-slate-900/50 dark:border-slate-800"
+          data-testid="vehicle-dashboard-my-vehicles-card"
+        >
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Car className="h-5 w-5 text-blue-600" />
+              {T.myVehiclesTitle}
+            </CardTitle>
+            <p className="text-sm text-slate-500 dark:text-slate-400 pt-1">{T.myVehiclesDesc}</p>
+          </CardHeader>
+          <CardContent>
+            <MyVehiclesModule />
+          </CardContent>
+        </Card>
+
+        {/* Deferred module previews */}
+        <Card
+          className="border-slate-200/60 bg-white/60 dark:bg-slate-900/40 dark:border-slate-800"
           data-testid="vehicle-dashboard-coming-soon"
         >
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
-              <Sparkles className="h-5 w-5 text-blue-600" />
-              {T.comingCard}
+              {T.comingSoon}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <ul className="grid gap-4 sm:grid-cols-2">
               {T.modules.map((m) => (
                 <li
                   key={m.title}
