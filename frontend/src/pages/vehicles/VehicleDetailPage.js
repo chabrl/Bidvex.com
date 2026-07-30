@@ -240,6 +240,12 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
   const [buyNowProcessing, setBuyNowProcessing] = useState(false);
   // iter194 — Dealer license verification status (for licensed_only auctions)
   const [dealerLicenseStatus, setDealerLicenseStatus] = useState(null);
+  // iter201 Phase 3 / 3A — Province-aware buyer gate. Owned by BiddingPanel
+  // because handleBid (the only caller) lives here and needs to
+  // (a) short-circuit when the gate hasn't been cleared, and
+  // (b) get retried once the modal calls onVerified.
+  const [showBuyerGateModal, setShowBuyerGateModal] = useState(false);
+  const [buyerGateCleared, setBuyerGateCleared] = useState(false);
 
   // Fetch dealer license status if needed
   useEffect(() => {
@@ -889,6 +895,23 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
           />
         </DialogContent>
       </Dialog>
+
+      {/* iter201 — Phase 3 / 3A — Province-aware buyer gate.
+         Rendered inside BiddingPanel because handleBid is the only
+         caller and onVerified needs to re-trigger it. The modal uses
+         Radix Dialog + portal, so visual position is unchanged. */}
+      {showBuyerGateModal && vehicle && (
+        <VehicleBuyerGateModal
+          open={showBuyerGateModal}
+          onClose={() => setShowBuyerGateModal(false)}
+          listingId={vehicle.id}
+          onVerified={() => {
+            setBuyerGateCleared(true);
+            // Re-trigger the bid attempt now that the gate is cleared.
+            setTimeout(() => handleBid(), 200);
+          }}
+        />
+      )}
     </>
   );
 };
@@ -1077,9 +1100,10 @@ const VehicleDetailPage = () => {
   const [showMessageModal, setShowMessageModal] = useState(false);
   // iter304 — Email to Friend share modal
   const [showEmailToFriend, setShowEmailToFriend] = useState(false);
-  // iter201 — Phase 3 / 3A — Province-aware buyer gate
-  const [showBuyerGateModal, setShowBuyerGateModal] = useState(false);
-  const [buyerGateCleared, setBuyerGateCleared] = useState(false);
+  // iter426 — Buyer-gate state moved into <BiddingPanel> (see line 244)
+  // where handleBid is defined. That eliminates the cross-component
+  // references (`buyerGateCleared`, `setShowBuyerGateModal`,
+  // `setBuyerGateCleared`, `handleBid`) that were undefined here.
 
   // iter283-emergency-detail — `trackViewContent` was previously
   // referenced in `fetchVehicle` without being in lexical scope. It
@@ -1871,19 +1895,9 @@ const VehicleDetailPage = () => {
           listingTitle={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
         />
       )}
-      {/* iter201 — Phase 3 / 3A — Province-aware buyer gate */}
-      {showBuyerGateModal && vehicle && (
-        <VehicleBuyerGateModal
-          open={showBuyerGateModal}
-          onClose={() => setShowBuyerGateModal(false)}
-          listingId={vehicle.id}
-          onVerified={() => {
-            setBuyerGateCleared(true);
-            // Re-trigger the bid attempt now that gate is cleared
-            setTimeout(() => handleBid(), 200);
-          }}
-        />
-      )}
+      {/* iter201 — Phase 3 / 3A — Province-aware buyer gate.
+         Rendered by <BiddingPanel> — see fix in iter426. Do not
+         duplicate here. */}
       {/* iter201 — Phase 2 — Bilingual legal footer (CEO Part 4) */}
       <VehicleLegalFooter />
 
