@@ -1,6 +1,74 @@
 # BidVex Changelog
 
 
+## Feb 8, 2026 — iter437 Settlements Module (Vehicle Dashboard)
+
+Delivered the P0 Settlements module inside `/vehicle-dashboard`, below
+the Sales & Performance module. All three dashboard modules are now
+live and the "Coming Soon" placeholder card has been removed.
+
+### Backend audit (reused — no new endpoints)
+- **`GET /api/vehicles/dealer/pending-settlements`** (already existed in
+  `/app/backend/routes/vehicle_settlement.py` at line 256) returns the
+  authenticated dealer's `vehicle_settlements` docs enriched with
+  `vehicle` (year/make/model/vin/title) and `buyer` (id/name/email).
+- Fee-model reminder (from `services/vehicle_fee_service.py`): BidVex
+  charges the BUYER a 2.5% platform fee via Stripe. The dealer settles
+  the vehicle sale price directly with the buyer — **BidVex takes no
+  seller commission**, so `seller_commission = $0` and
+  `net_payout = hammer_price`.
+
+### Frontend
+- **NEW** `/app/frontend/src/components/vehicles/SettlementsModule.jsx`:
+  - Summary bar: **Total Pending Payout** and **Total Paid To Date**
+    (sums of `hammer_price` grouped by dealer-facing bucket).
+  - Desktop table (`md:block`) with 7 columns: Vehicle · Sale Price ·
+    Buyer Premium · Seller Commission · Net Payout · Status ·
+    Settlement Date.
+  - Mobile card list (`md:hidden`) — same fields laid out vertically.
+  - `STATUS_TO_BUCKET` map collapses the 8-state
+    `settlement_status` enum into 3 dealer-friendly buckets:
+    - **pending** ← `FEE_PROCESSING`, `FEE_PAID`, `AWAITING_DEALER_CONFIRMATION`
+    - **processing** ← `DEALER_CONFIRMED`
+    - **paid** ← `FULLY_SETTLED`, `ADMIN_RESOLVED`
+    - **disputed** ← `DISPUTED` (rendered as its own rose-colored pill,
+      excluded from pending/paid summary totals)
+  - Empty state (`Wallet` icon + localized copy) when no settlements.
+  - Fee-model footnote explaining why Seller Commission = $0.
+- **VehicleDashboardPage.jsx** now mounts THREE modules in order —
+  My Vehicles → Sales & Performance → **Settlements**. Removed the
+  "Coming Soon" placeholder card + all its i18n keys (`comingSoon`,
+  `modules` array) since every P0 module is live.
+- **Bilingual** — new `settlements.*` block (~20 keys) added to
+  `en.json` and `fr.json`; all module copy consumed via `t()`.
+
+### Testing
+- Backend: 4/4 pytest cases pass
+  (`/app/backend/tests/test_iter437_settlements.py`) — endpoint returns
+  200 for dealer, 403 without auth, and bucket sums match spec.
+- Frontend: iter437 testing agent verified all data-testids, correct
+  bucket mapping, summary values ($57,500 / $33,000), row-level values
+  for all 4 seeded settlements, responsive mobile/desktop switching,
+  and regressions against iter428/iter432. `retest_needed: false`.
+
+### Testids for QA
+`settlements-module`, `settlements-loading`, `settlements-empty`,
+`settlements-summary`, `settlement-summary-pending{,-value}`,
+`settlement-summary-paid{,-value}`, `settlements-table-card`,
+`settlements-table`, `settlement-row-{auction_id}` +
+`{-sale-price,-buyer-premium,-seller-commission,-net-payout,-date}`,
+`settlement-status-pill-{pending|processing|paid|disputed}`,
+`settlements-mobile-list`, `settlements-fee-note`,
+`vehicle-dashboard-settlements-card`.
+
+### Known follow-up (out of scope, deferred)
+- `localStorage.i18nextLng` is not honored on cold load — the app
+  respects `user.preferred_language` (verified via testdealer whose
+  `preferred_language='fr'`) but doesn't hydrate from local storage
+  when the auth token is stale. Not a settlements-module bug; the
+  broader i18n bootstrap can be addressed later.
+
+
 ## Feb 8, 2026 — iter432 Sales & Performance + Dashboard Consolidation
 
 Delivered three related P0 changes in a single pass.
