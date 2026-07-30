@@ -1,6 +1,82 @@
 # BidVex Changelog
 
 
+## Feb 8, 2026 — iter432 Sales & Performance + Dashboard Consolidation
+
+Delivered three related P0 changes in a single pass.
+
+### 1. Sales & Performance module
+- **NEW backend endpoint** `GET /api/vehicles/my/analytics?window_days=30|60|90`
+  in `/app/backend/routes/vehicles.py` (~line 1562). Aggregates over the
+  two collections the dealer already populates — `vehicle_listings`
+  (views_count, final_price, sold_at) and `vehicle_bids` (created_at).
+  Response includes `totals` (views, bids, revenue, sold_count,
+  conversion_rate), a zero-filled `daily_series`, and a `granularity`
+  hint (`day` for 30d, `week` for 60d/90d). Invalid `window_days`
+  values clamp to 30.
+- **NEW frontend module** `/app/frontend/src/components/vehicles/SalesPerformanceModule.jsx`
+  mounted BELOW `<MyVehiclesModule />` in `VehicleDashboardPage.jsx`.
+  Uses `recharts@3.8.0` (already in package.json). Renders:
+  - 30 / 60 / 90 day window toggle.
+  - Four metric cards — **Total Views**, **Total Bids**, **Total
+    Revenue** (sum of `final_price` where status=sold and sold_at ∈
+    window), **Conversion Rate** (bids ÷ views).
+  - Responsive `<BarChart>` — green Bids series + purple Sold series;
+    x-axis auto-adapts (daily 30d, weekly 60d/90d).
+  - Views-are-lifetime footnote (honest disclosure that per-day view
+    history isn't tracked yet).
+  - Empty state when `has_data === false`.
+- Bilingual — all copy consumed via `t('salesPerformance.*')` with a
+  new ~30-key block in `en.json`/`fr.json`.
+
+### 2. Navbar cleanup
+- Removed the top-nav **Vehicle Dashboard** link from `menuItems` in
+  `Navbar.js` (~line 105).
+- Removed `<DealerVerificationPill />` render (~line 254). Import kept
+  in place with a `iter432 —` comment so future placement is easy.
+- Dashboard is still reachable via its route and via the existing
+  user-menu dropdown shortcut (unchanged).
+
+### 3. `/vehicle-dashboard` consolidation
+- `/app/frontend/src/pages/vehicles/MyVehicleListingsPage.js` converted
+  from the full standalone page (587 lines) into a **thin redirect
+  stub** (~40 lines) that `navigate(..., { replace: true })` to
+  `/vehicle-dashboard`. Preserves any query string.
+- All 5 in-app callers updated to point directly at `/vehicle-dashboard`
+  (no intermediate hop through the redirect stub):
+  - `CreateVehicleListingPage.js`
+  - `VehicleAuctionsPage.js`
+  - `LotTemplatesManagerPage.js`
+  - `SellerFinancialsPage.js`
+  - `SellerRegistrationPage.js`
+- Two alias `<Route>` mounts in `App.js` (`/vehicles/my-listings` and
+  `/my-vehicle-listings`) now `<Navigate to="/vehicle-dashboard" />`.
+
+### Testing
+- Backend: 6/6 pytest cases pass
+  (`/app/backend/tests/test_iter432_sales_performance.py`) — covers
+  30/60/90 windows, invalid-window clamp, auth guard, and non-seller
+  403.
+- Frontend: iter432 testing agent verified all data-testids, metric
+  values (views=301, bids=11, revenue=CAD 22,500, cr=3.7%), chart SVG
+  rendering, granularity toggle (30d→Daily, 60d/90d→Weekly), EN/FR
+  bilingual copy, navbar cleanup, and all 3 redirect aliases.
+
+### Testids for QA
+`sales-performance-module`, `sales-performance-window-toggle`,
+`sales-performance-window-{30|60|90}`, `sales-performance-metrics`,
+`metric-views`, `metric-bids`, `metric-revenue`, `metric-conversion`
+(each with a nested `{id}-value`), `sales-performance-chart-card`,
+`sales-performance-chart`, `sales-performance-granularity`,
+`sales-performance-views-note`, `sales-performance-empty`,
+`sales-performance-loading`, `my-vehicle-listings-redirect`.
+
+### Non-goals (deferred)
+- Settlements module — still a placeholder card only.
+- Per-day view tracking — would require a new `vehicle_view_events`
+  collection; disclosed via the footnote for now.
+
+
 ## Feb 8, 2026 — iter428 My Vehicles Module (Vehicle Dashboard)
 
 Delivered the P0 "My Vehicles" module inside `/vehicle-dashboard` per PRD.
