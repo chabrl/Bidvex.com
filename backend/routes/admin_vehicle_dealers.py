@@ -462,6 +462,74 @@ class ActionPayload(BaseModel):
     reason: Optional[str] = Field(None, max_length=500)
 
 
+class NotePayload(BaseModel):
+    body: str = Field(..., min_length=1, max_length=2000)
+
+
+# ── INTERNAL NOTES ───────────────────────────────────────────────────
+
+@router.get("/{user_id}/notes")
+async def list_dealer_notes(
+    user_id: str,
+    admin: User = Depends(require_admin),
+    db=Depends(get_db),
+):
+    """Return the chronological log of internal notes left by admins on
+    this dealer/broker. Newest first. Internal-only — never surfaced to
+    the dealer themselves."""
+    await _resolve_dealer(db, user_id)
+    notes: List[Dict[str, Any]] = []
+    async for n in db.admin_dealer_notes.find(
+        {"dealer_user_id": user_id},
+        {"_id": 0},
+    ).sort("created_at", -1):
+        notes.append({
+            "id": n.get("id"),
+            "body": n.get("body"),
+            "admin_id": n.get("admin_id"),
+            "admin_email": n.get("admin_email"),
+            "created_at": _iso(n.get("created_at")),
+        })
+    return {"data": notes, "total": len(notes)}
+
+
+@router.post("/{user_id}/notes")
+async def add_dealer_note(
+    user_id: str,
+    payload: NotePayload,
+    admin: User = Depends(require_admin),
+    db=Depends(get_db),
+):
+    """Append a new internal note. Notes are immutable once saved —
+    admins can add more but cannot edit history."""
+    import uuid as _uuid
+    await _resolve_dealer(db, user_id)
+    now = datetime.now(timezone.utc)
+    note = {
+        "id": str(_uuid.uuid4()),
+        "dealer_user_id": user_id,
+        "body": payload.body.strip(),
+        "admin_id": admin.id,
+        "admin_email": admin.email or "",
+        "created_at": now,
+    }
+    await db.admin_dealer_notes.insert_one(note)
+    # Motor mutates `note` to include an ObjectId `_id` — strip before returning.
+    note.pop("_id", None)
+    await record_admin_action(
+        db,
+        admin_id=admin.id,
+        admin_email=admin.email or "",
+        action="vehicle_dealer_note_added",
+        target_user_id=user_id,
+        content={"note_id": note["id"]},
+    )
+    return {
+        "ok": True,
+        "note": {**note, "created_at": _iso(now)},
+    }
+
+
 @router.post("/{user_id}/approve")
 async def approve_dealer(
     user_id: str,

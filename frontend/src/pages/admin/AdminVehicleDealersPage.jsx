@@ -22,8 +22,9 @@ import {
   Building2, Handshake, Search, RefreshCw, ChevronLeft, ShieldCheck,
   ShieldOff, ShieldAlert, Clock, XCircle, CheckCircle, Ban, Play,
   ExternalLink, FileText, Gavel, Car, Users, DollarSign, Package,
-  Mail, Phone, MapPin, Calendar,
+  Mail, Phone, MapPin, Calendar, StickyNote, Send,
 } from 'lucide-react';
+import { Textarea } from '../../components/ui/textarea';
 
 const STATUS_FILTERS = [
   { id: 'all',       label: 'All',       icon: Users,        color: 'bg-slate-100 text-slate-700' },
@@ -66,6 +67,124 @@ const StatusBadge = ({ status }) => {
     <Badge className={`${map[key] || map.pending} border`} data-testid={`dealer-status-${key}`}>
       {key.replace(/_/g, ' ').toUpperCase()}
     </Badge>
+  );
+};
+
+// ── Internal notes panel (admin-only, immutable log) ─────────────────
+const DealerNotesPanel = ({ userId }) => {
+  const [notes, setNotes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [draft, setDraft] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await axios.get(
+        `${API_BASE}/admin/vehicle-dealers/${userId}/notes`,
+        { headers: _authHeaders() },
+      );
+      setNotes(r.data?.data || []);
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || 'Failed to load notes');
+    } finally {
+      setLoading(false);
+    }
+  }, [userId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const save = async () => {
+    const body = draft.trim();
+    if (!body) return;
+    setSaving(true);
+    try {
+      await axios.post(
+        `${API_BASE}/admin/vehicle-dealers/${userId}/notes`,
+        { body },
+        { headers: _authHeaders() },
+      );
+      setDraft('');
+      toast.success('Note saved');
+      load();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || 'Failed to save note');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Card data-testid="dealer-notes-panel">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base flex items-center gap-2">
+          <StickyNote className="h-4 w-4 text-amber-600" />
+          Internal Notes
+          <Badge variant="outline" className="ml-1">{notes.length}</Badge>
+          <span className="ml-auto text-[11px] text-slate-500 font-normal">Admin-only · not visible to the dealer</span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="space-y-2">
+          <Textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="Add a note (e.g. 'Phoned re. license expiry, resubmitting Mon')"
+            rows={3}
+            maxLength={2000}
+            className="resize-y"
+            data-testid="dealer-note-input"
+          />
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-slate-500">
+              {draft.length}/2000 characters · notes are immutable once saved
+            </span>
+            <Button
+              onClick={save}
+              disabled={saving || !draft.trim()}
+              className="bg-amber-600 hover:bg-amber-700"
+              size="sm"
+              data-testid="dealer-note-save-btn"
+            >
+              {saving ? <RefreshCw className="h-4 w-4 mr-1 animate-spin" /> : <Send className="h-4 w-4 mr-1" />}
+              Save note
+            </Button>
+          </div>
+        </div>
+
+        <div className="border-t pt-3">
+          {loading ? (
+            <div className="text-sm text-slate-500 inline-flex items-center gap-1">
+              <RefreshCw className="h-3 w-3 animate-spin" /> Loading notes…
+            </div>
+          ) : notes.length === 0 ? (
+            <p className="text-sm text-slate-500 italic">No notes yet — be the first to leave one.</p>
+          ) : (
+            <ul className="space-y-2" data-testid="dealer-notes-list">
+              {notes.map((n) => (
+                <li
+                  key={n.id}
+                  className="border-l-4 border-amber-300 bg-amber-50/40 rounded-r px-3 py-2"
+                  data-testid={`dealer-note-${n.id}`}
+                >
+                  <div className="text-sm text-slate-800 whitespace-pre-wrap">{n.body}</div>
+                  <div className="mt-1 text-[11px] text-slate-500 flex items-center gap-2">
+                    <span className="font-medium">{n.admin_email || n.admin_id || 'admin'}</span>
+                    <span>·</span>
+                    <span>{fmtDate(n.created_at)}</span>
+                    {n.created_at && (
+                      <span className="opacity-70">
+                        {new Date(n.created_at).toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 
@@ -299,6 +418,9 @@ const DealerDetailPanel = ({ userId, onBack, onActionCompleted }) => {
           )}
         </CardContent>
       </Card>
+
+      {/* Internal notes — admin-only log */}
+      <DealerNotesPanel userId={userId} />
 
       {/* Activity history */}
       {activity && (

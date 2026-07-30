@@ -1,6 +1,42 @@
 # BidVex Changelog
 
 
+## Feb 8, 2026 — iter421 Admin Dealer Internal Notes
+
+Added an internal notes field to the dealer profile in the Admin Vehicle
+Dealer Management page.
+
+### Backend — two new endpoints under `/api/admin/vehicle-dealers/{user_id}`
+- `GET  /notes` — chronological log (newest first) of all notes ever
+  left on this dealer by any admin.
+- `POST /notes` — append a new immutable note; stamps admin id/email +
+  UTC `created_at`, writes an `admin_actions` audit row.
+
+Notes live in their own `admin_dealer_notes` collection (cleaner than
+bloating the user doc; makes cross-admin queries and future retention
+policies trivial). Both endpoints protected by the existing
+`require_admin` middleware and 404 if the target user is not a
+dealer/broker. Fixed a Motor `_id` mutation leak that briefly caused
+the POST response to fail JSON serialization.
+
+### Frontend — new `DealerNotesPanel` sub-component
+Rendered inside the detail view between "Verification Documents" and
+"Activity Summary". Reuses `Card`, `Textarea`, `Button`, `Badge`,
+`Toast`. Features: 2000-char cap with live counter, amber
+left-border rows showing body + admin email + local timestamp, "notes
+are immutable once saved" microcopy, and an "Admin-only · not visible
+to the dealer" tag in the panel header.
+
+### Verified
+- Curl: POST 3 notes → LIST returns 3, newest first, each with admin
+  email + ISO timestamp.
+- Playwright: opened the Bidvex Team dealer profile → panel visible
+  with 3 pre-existing notes; typed + saved a new note via textarea →
+  "Note saved" toast → list refreshed to 4 notes with the new one on
+  top.
+
+
+
 ## Feb 8, 2026 — iter420 Admin Vehicle Dealer Management
 
 Added a new "Dealer Management" sub-tab under Admin → Vehicles offering three
