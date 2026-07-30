@@ -267,7 +267,7 @@ const VehicleAuctionsPage = () => {
               <button onClick={() => navigate('/vehicle-auctions/create')} className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-transparent border border-white text-white hover:bg-white/15 font-semibold text-xs sm:text-sm px-3 py-2 min-h-[40px]" data-testid="btn-create-listing">
                 <PlusCircle className="h-4 w-4" />{t('vehiclePage.listVehicle', 'List a vehicle')}
               </button>
-              <button onClick={() => navigate('/vehicle-auctions/my-listings')} className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-transparent border border-white text-white hover:bg-white/15 font-semibold text-xs sm:text-sm px-3 py-2 min-h-[40px]" data-testid="btn-my-listings">
+              <button onClick={() => navigate('/vehicle-dashboard')} className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-transparent border border-white text-white hover:bg-white/15 font-semibold text-xs sm:text-sm px-3 py-2 min-h-[40px]" data-testid="btn-my-listings">
                 <Building2 className="h-4 w-4" />{t('vehiclePage.myListings', 'My listings')}
               </button>
               <button onClick={() => navigate(i18n?.language?.startsWith('fr') ? '/courtiers' : '/brokers')} className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-amber-400 text-emerald-900 hover:bg-amber-300 font-semibold text-xs sm:text-sm px-3 py-2 min-h-[40px]" data-testid="btn-find-broker">

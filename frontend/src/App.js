@@ -997,9 +997,10 @@ const App = () => {
               </ErrorBoundary>
             </ProtectedRoute>
           } />
-          {/* iter293 — Convenience aliases for common deep-link URLs */}
-          <Route path="/vehicles/my-listings" element={<Navigate to="/vehicle-auctions/my-listings" replace />} />
-          <Route path="/my-vehicle-listings" element={<Navigate to="/vehicle-auctions/my-listings" replace />} />
+          {/* iter293 — Convenience aliases for common deep-link URLs
+              iter432 — All roads point to /vehicle-dashboard now. */}
+          <Route path="/vehicles/my-listings" element={<Navigate to="/vehicle-dashboard" replace />} />
+          <Route path="/my-vehicle-listings" element={<Navigate to="/vehicle-dashboard" replace />} />
           <Route path="/vehicle-auctions/invoices" element={
             <ProtectedRoute><VehicleInvoicesPage /></ProtectedRoute>
           } />

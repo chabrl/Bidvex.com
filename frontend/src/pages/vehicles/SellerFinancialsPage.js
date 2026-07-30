@@ -202,7 +202,7 @@ const SellerFinancialsPage = () => {
         <div className="max-w-7xl mx-auto px-4 py-6">
           <Button 
             variant="ghost" 
-            onClick={() => navigate('/vehicle-auctions/my-listings')}
+            onClick={() => navigate('/vehicle-dashboard')}
             className="mb-4"
           >
             <ChevronLeft className="h-4 w-4 mr-1" /> Back to My Listings

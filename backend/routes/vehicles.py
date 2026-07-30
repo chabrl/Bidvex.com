@@ -1560,6 +1560,160 @@ async def get_my_vehicle_listings(
     return {"listings": listings}
 
 
+# iter432 — Sales & Performance analytics ──────────────────────────────
+#
+# Read-only aggregation over the two collections the dealer already
+# populates (`vehicle_listings` + `vehicle_bids`). No new fields written
+# and no invented data — every metric maps to a real database column.
+# Views are lifetime scalars on the listing document (no per-day
+# tracking exists) so we window them by `created_at` of the listing.
+# Bids and sold-events have their own timestamps and are windowed
+# directly.
+
+@vehicle_router.get("/vehicles/my/analytics")
+async def get_my_vehicle_analytics(
+    window_days: int = 30,
+    seller: dict = Depends(get_vehicle_seller),
+    user: dict = Depends(get_current_user),
+):
+    """Aggregated 30 / 60 / 90 day performance metrics for the dealer.
+
+    Response shape:
+        {
+          "window_days": 30,
+          "start_date": "2026-01-08T00:00:00Z",
+          "end_date":   "2026-02-07T23:59:59Z",
+          "totals": {
+            "views":            <int>,   # sum of views_count on listings created in window
+            "bids":             <int>,   # count of vehicle_bids created in window
+            "revenue":          <float>, # sum(final_price) where status=sold and sold_at in window
+            "sold_count":       <int>,
+            "conversion_rate":  <float>  # bids / views (0..1, 0 if views==0)
+          },
+          "daily_series": [
+            { "date": "2026-01-08", "bids": 3, "sold": 0 },
+            ...
+          ],
+          "granularity": "day" | "week",
+          "has_data": <bool>
+        }
+    """
+    # Guard window range.
+    if window_days not in (30, 60, 90):
+        window_days = 30
+
+    now = datetime.now(timezone.utc)
+    start = now - timedelta(days=window_days)
+
+    seller_id = seller["id"]
+
+    # ── 1. Total Views (sum of views_count across listings created in window)
+    #    We can only window views by listing.created_at because there is
+    #    no per-view timestamp. This is documented and honest.
+    views_pipeline = [
+        {"$match": {"seller_id": seller_id, "created_at": {"$gte": start}}},
+        {"$group": {"_id": None, "total": {"$sum": {"$ifNull": ["$views_count", 0]}}}},
+    ]
+    views_agg = await db.vehicle_listings.aggregate(views_pipeline).to_list(1)
+    total_views = int(views_agg[0]["total"]) if views_agg else 0
+
+    # ── 2. Total Bids (count of vehicle_bids on this seller's listings
+    #    within the window). Bids link to a listing_id — we first fetch
+    #    the dealer's listing ids then count bids whose created_at ∈ window.
+    listing_ids = [
+        doc["id"] for doc in await db.vehicle_listings.find(
+            {"seller_id": seller_id}, {"id": 1, "_id": 0}
+        ).to_list(length=1000)
+    ]
+
+    total_bids = 0
+    daily_bids: Dict[str, int] = {}
+    if listing_ids:
+        bid_pipeline = [
+            {"$match": {
+                "listing_id": {"$in": listing_ids},
+                "created_at": {"$gte": start},
+            }},
+            {"$group": {
+                "_id": {"$dateToString": {"format": "%Y-%m-%d", "date": "$created_at"}},
+                "count": {"$sum": 1},
+            }},
+        ]
+        bid_rows = await db.vehicle_bids.aggregate(bid_pipeline).to_list(length=200)
+        for row in bid_rows:
+            daily_bids[row["_id"]] = int(row["count"])
+            total_bids += int(row["count"])
+
+    # ── 3. Revenue + sold_count (status=sold, sold_at ∈ window)
+    revenue_pipeline = [
+        {"$match": {
+            "seller_id": seller_id,
+            "status": VehicleListingStatus.SOLD.value,
+            "sold_at": {"$gte": start},
+        }},
+        {"$group": {
+            "_id": {"$dateToString": {"format": "%Y-%m-%d", "date": "$sold_at"}},
+            "revenue": {"$sum": {"$ifNull": ["$final_price", 0]}},
+            "count": {"$sum": 1},
+        }},
+    ]
+    revenue_rows = await db.vehicle_listings.aggregate(revenue_pipeline).to_list(length=200)
+
+    daily_sold: Dict[str, int] = {}
+    total_revenue = 0.0
+    sold_count = 0
+    for row in revenue_rows:
+        daily_sold[row["_id"]] = int(row["count"])
+        total_revenue += float(row.get("revenue") or 0)
+        sold_count += int(row["count"])
+
+    # ── 4. Build the daily time-series with zero-filled dates.
+    #    For windows >= 60 days we down-sample to weekly buckets.
+    granularity = "week" if window_days >= 60 else "day"
+    series: List[Dict[str, Any]] = []
+    if granularity == "day":
+        for i in range(window_days):
+            d = (start + timedelta(days=i)).strftime("%Y-%m-%d")
+            series.append({"date": d, "bids": daily_bids.get(d, 0), "sold": daily_sold.get(d, 0)})
+    else:
+        # weekly buckets — group by ISO week starting date (Mon)
+        num_weeks = max(1, window_days // 7)
+        for w in range(num_weeks):
+            week_start = start + timedelta(days=w * 7)
+            week_end = week_start + timedelta(days=7)
+            bids_sum = 0
+            sold_sum = 0
+            for i in range(7):
+                d = (week_start + timedelta(days=i)).strftime("%Y-%m-%d")
+                bids_sum += daily_bids.get(d, 0)
+                sold_sum += daily_sold.get(d, 0)
+            series.append({
+                "date": week_start.strftime("%Y-%m-%d"),
+                "week_end": week_end.strftime("%Y-%m-%d"),
+                "bids": bids_sum,
+                "sold": sold_sum,
+            })
+
+    conversion_rate = (total_bids / total_views) if total_views > 0 else 0.0
+    has_data = bool(total_views or total_bids or sold_count)
+
+    return {
+        "window_days": window_days,
+        "start_date": start.isoformat(),
+        "end_date": now.isoformat(),
+        "totals": {
+            "views": total_views,
+            "bids": total_bids,
+            "revenue": round(total_revenue, 2),
+            "sold_count": sold_count,
+            "conversion_rate": round(conversion_rate, 4),
+        },
+        "daily_series": series,
+        "granularity": granularity,
+        "has_data": has_data,
+    }
+
+
 # iter293 — Directive P2: Dealer Drafts dashboard helpers ────────────
 
 @vehicle_router.post("/vehicles/{vehicle_id}/activate")

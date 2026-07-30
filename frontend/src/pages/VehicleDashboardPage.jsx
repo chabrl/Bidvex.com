@@ -18,6 +18,7 @@ import {
 } from '../components/ui/breadcrumb';
 import SEO from '../components/SEO';
 import MyVehiclesModule from '../components/vehicles/MyVehiclesModule';
+import SalesPerformanceModule from '../components/vehicles/SalesPerformanceModule';
 
 const VehicleDashboardPage = () => {
   const { i18n } = useTranslation();
@@ -37,15 +38,12 @@ const VehicleDashboardPage = () => {
     myVehiclesDesc:  isFr
       ? 'Toutes vos annonces de véhicules, filtrables par statut.'
       : 'Every vehicle you have listed, filterable by status.',
+    salesTitle: isFr ? 'Ventes et performance' : 'Sales & Performance',
+    salesDesc:  isFr
+      ? 'Vues, enchères, revenus et taux de conversion sur 30 / 60 / 90 jours.'
+      : 'Views, bids, revenue, and conversion rate over the last 30 / 60 / 90 days.',
     comingSoon: isFr ? 'À venir' : 'Coming soon',
     modules: [
-      {
-        icon:  TrendingUp,
-        title: isFr ? 'Ventes et performance' : 'Sales & Performance',
-        desc:  isFr
-          ? 'Vues, enchères, revenus et taux de conversion sur 30 / 60 / 90 jours.'
-          : 'Views, bids, revenue, and conversion rate on a 30 / 60 / 90 day window.',
-      },
       {
         icon:  Wallet,
         title: isFr ? 'Règlements' : 'Settlements',
@@ -107,6 +105,23 @@ const VehicleDashboardPage = () => {
           </CardContent>
         </Card>
 
+        {/* iter432 — Sales & Performance module */}
+        <Card
+          className="mb-8 border-emerald-200/60 bg-gradient-to-br from-white to-emerald-50/40 dark:from-slate-900 dark:to-slate-900/50 dark:border-slate-800"
+          data-testid="vehicle-dashboard-sales-performance-card"
+        >
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <TrendingUp className="h-5 w-5 text-emerald-600" />
+              {T.salesTitle}
+            </CardTitle>
+            <p className="text-sm text-slate-500 dark:text-slate-400 pt-1">{T.salesDesc}</p>
+          </CardHeader>
+          <CardContent>
+            <SalesPerformanceModule />
+          </CardContent>
+        </Card>
+
         {/* Deferred module previews */}
         <Card
           className="border-slate-200/60 bg-white/60 dark:bg-slate-900/40 dark:border-slate-800"
@@ -118,7 +133,7 @@ const VehicleDashboardPage = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ul className="grid gap-4 sm:grid-cols-2">
+            <ul className="grid gap-4">
               {T.modules.map((m) => (
                 <li
                   key={m.title}

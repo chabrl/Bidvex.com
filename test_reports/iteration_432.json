@@ -1,0 +1,31 @@
+{
+  "summary": "iter432 full-stack test — Sales & Performance module, Navbar cleanup, /vehicle-dashboard consolidation. Backend: 6/6 pytest passing (all 3 windows, invalid clamp, auth guard, seller-only guard). Frontend: all core UI + i18n + redirect checks pass. Both cards render in correct DOM order (Sales after MyVehicles); metric values match seed exactly (views=301, bids=11, revenue=CAD 22,500, cr=3.7%); chart renders with green Bids + purple Sold SVG rects; footnote visible; 30d→Daily / 60d,90d→Weekly granularity toggles work; EN/FR i18n toggle updates all labels; top-nav no longer shows Vehicle Dashboard link nor DealerVerificationPill; /vehicle-auctions/my-listings, /vehicles/my-listings, /my-vehicle-listings all redirect to /vehicle-dashboard.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter432_sales_performance.py",
+    "/app/test_reports/pytest/iter432_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Analytics endpoint uses seller_id from vehicle_sellers row and correctly windows bids/sold by timestamp; views are documented as lifetime (shown via footnote). Clean implementation.",
+    "Weekly granularity uses window_days//7 (60→8 weeks=56 days, 90→12 weeks=84 days) — matches spec but leaves the last 4-6 days out of the buckets. Matches PRD as stated.",
+    "listing_ids fetch capped at .to_list(length=1000) — fine for current scale but flag if a single dealer ever exceeds 1000 listings.",
+    "SalesPerformanceModule triggers Recharts width(-1) warning on initial hidden mount but renders correctly after the container becomes visible (cosmetic console warning only).",
+    "MyVehicleListingsPage.js redirect stub works cleanly — all three legacy aliases land on /vehicle-dashboard."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter432_sales_performance.py (new)"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "testdealer@bidvex.com / TestDealer2026! (FR default, is_vehicle_dashboard_eligible=True); testbuyer@bidvex.com / TestBuyer2026! (used for non-seller 403 guard).",
+  "seed_data_creation": "none — used existing testdealer seed (5 listings, 11 bids, 1 sold @ $22,500, 301 total views)",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend suite /app/backend/tests/test_iter432_sales_performance.py covers 30/60/90 windows, invalid-window clamp, auth guard, and non-seller 403. If dealer login times out, retry — the login uses a 60s timeout with 3 retries. The Radix dropdown user-menu-btn is difficult to open in automation because the sticky global-dealer-fee-banner overlays it; the vehicle-dashboard-link JSX exists in Navbar.js line ~319 gated on user.is_vehicle_dashboard_eligible (backend confirmed True for testdealer). Chart is Recharts; a width(-1) console warning fires when the container is initially hidden below the fold but renders correctly after scroll.",
+  "rca of the issue": "N/A — no issues found. All 3 iter432 tasks (analytics endpoint, navbar cleanup, /vehicle-dashboard consolidation) verified end-to-end."
+}

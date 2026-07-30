@@ -201,7 +201,7 @@ const SellerRegistrationPage = () => {
                     <Button onClick={() => navigate('/vehicle-auctions/create')}>
                       <Car className="h-4 w-4 mr-2" /> List a Vehicle
                     </Button>
-                    <Button variant="outline" onClick={() => navigate('/vehicle-auctions/my-listings')}>
+                    <Button variant="outline" onClick={() => navigate('/vehicle-dashboard')}>
                       My Listings
                     </Button>
                   </div>

@@ -98,7 +98,7 @@ const LotTemplatesManagerPage = () => {
         {/* Header */}
         <div className="mb-6">
           <button
-            onClick={() => navigate('/vehicle-auctions/my-listings')}
+            onClick={() => navigate('/vehicle-dashboard')}
             className="text-sm text-slate-600 dark:text-slate-300 hover:text-slate-900 mb-3 inline-flex items-center"
             data-testid="back-to-listings-btn"
           >

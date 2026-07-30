@@ -596,7 +596,7 @@ const CreateVehicleListingPage = () => {
       } else {
         toast.success('Vehicle listing created successfully!');
       }
-      navigate(`/vehicle-auctions/my-listings`);
+      navigate(`/vehicle-dashboard`);
       
     } catch (error) {
       // iter283 — Same defense as the inner catch: coerce dict details

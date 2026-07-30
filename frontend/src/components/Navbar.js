@@ -19,6 +19,10 @@ import {
 import SellOptionsModal from './SellOptionsModal';
 import NotificationCenter from './NotificationCenter';
 // iter428 — Dealer verification status pill (only renders for dealers)
+// iter432 — <DealerVerificationPill /> is no longer rendered in the
+// navbar per PRD. The component file is preserved on disk for future
+// placement (e.g., inside the dashboard). Import intentionally kept
+// so callers grepping for the pill find this note.
 import DealerVerificationPill from './DealerVerificationPill';
 import useFeatureFlag from '../hooks/useFeatureFlag';
 import { useBannerHeight } from '../contexts/PromoBannerContext';
@@ -103,16 +107,9 @@ const Navbar = () => {
         { path: '/lots', label: t('nav.lotsAuction'), icon: Gavel },
         { path: '/storage-auctions', label: t('nav.storageAuctions', 'Storage Auctions'), icon: Lock },
         { path: '/vehicle-auctions', label: t('vehicles.vehicleAuctions'), icon: Car, comingSoon: showVehicleComingSoon },
-        // iter413 — Vehicle Dashboard appears in the top nav (below the
-        // storage/marketplace/lots row) only for eligible users. Flag is
-        // hydrated by /api/auth/me from services/vehicle_dashboard_eligibility.py.
-        ...(user?.is_vehicle_dashboard_eligible ? [{
-          path: '/vehicle-dashboard',
-          label: (i18n?.language || '').startsWith('fr')
-            ? 'Tableau de bord Véhicules'
-            : 'Vehicle Dashboard',
-          icon: LayoutDashboard,
-        }] : []),
+        // iter432 — top-nav Vehicle Dashboard link removed per PRD;
+        // dashboard remains reachable from the user-menu dropdown and
+        // its direct route. The dropdown item below is unchanged.
       ];
 
   return (
@@ -251,8 +248,9 @@ const Navbar = () => {
               {/* Notification Center */}
               {user && <NotificationCenter />}
 
-              {/* iter428 — Dealer verification status pill */}
-              {user && <DealerVerificationPill />}
+              {/* iter432 — <DealerVerificationPill /> render removed from
+                  navbar per PRD. Component preserved in codebase for
+                  future placement (e.g., inside the dashboard). */}
 
               {/* User Menu */}
               {user ? (
