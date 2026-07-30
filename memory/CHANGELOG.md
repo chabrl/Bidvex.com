@@ -1,6 +1,66 @@
 # BidVex Changelog
 
 
+## Feb 8, 2026 — iter420 Admin Vehicle Dealer Management
+
+Added a new "Dealer Management" sub-tab under Admin → Vehicles offering three
+capabilities that reuse the existing admin layout, table primitives, and
+`require_admin` middleware:
+
+### Backend — `/app/backend/routes/admin_vehicle_dealers.py` (new)
+Mounted under `/api/admin/vehicle-dealers` and registered next to the other
+admin routers in `server.py`.
+
+- `GET  /admin/vehicle-dealers` — Paginated list of users who are vehicle
+  dealers (`is_vehicle_dealer=True` or have a `vehicle_sellers` row) OR
+  brokers (`account_type=broker` or have a `brokers` row). Returns
+  `verification_status`, registration date, license number/province,
+  suspension flag. Supports `status`, `kind`, `search`, `limit`, `skip`.
+- `GET  /admin/vehicle-dealers/{user_id}` — Full profile: identity,
+  license/registration details, verification documents (pulled from
+  `vehicle_seller_documents` + broker document URLs), current status.
+- `GET  /admin/vehicle-dealers/{user_id}/activity` — Sales history:
+  auctions created (single + multi-lot), vehicles sold with final prices,
+  gross hammer, unique buyers, total bids received, and the last 20 buyer
+  bids.
+- `POST /admin/vehicle-dealers/{user_id}/approve` — Approve pending
+  dealer/broker (writes the same fields the existing verification flow
+  writes so the dealer's dashboard, badges, and fee schedule pick it up
+  instantly + pings the dealer's WS).
+- `POST /admin/vehicle-dealers/{user_id}/suspend` — Set
+  `vehicle_dealer_suspended=True` on the user + `verification_status=
+  suspended` on the seller/broker row. Optional reason.
+- `POST /admin/vehicle-dealers/{user_id}/reinstate` — Restore the prior
+  status (approved if previously approved; otherwise back to pending
+  review). Pings the WS.
+
+All actions write an audit row via the existing `record_admin_action`
+helper. The dealer-facing verification pipeline (document upload/review)
+is intentionally untouched — this manager just consumes and mutates the
+`verification_status` field the existing flow already writes.
+
+### Frontend — `/app/frontend/src/pages/admin/AdminVehicleDealersPage.jsx` (new)
+- Compact list with status pill filters (All / Pending / Approved /
+  Suspended / Rejected) + kind pills (All / Dealers / Brokers) + search
+  + refresh, using the existing Card/Button/Badge/Input/Input primitives.
+- Quick-action buttons per row: approve (emerald), suspend (orange),
+  reinstate (blue) — icons only to keep the row compact.
+- Row click → detail panel with identity card, dealer/broker registration
+  card, verification documents list with per-file `Open` links, activity
+  summary (auctions / sold / gross hammer / unique buyers), plus single
+  listings and multi-lot event tables.
+
+Wired into `AdminDashboard.js` as a new secondary tab under `vehicles`.
+
+### Verified
+- Curl: list returns 3 approved dealers, profile detail returns full
+  registration, activity endpoint returns summary + listings.
+- Playwright: primary → Vehicles → Dealer Management renders the list
+  with the correct total, filter pills, quick actions; clicking a row
+  opens the detail panel with all sections.
+
+
+
 ## Feb 8, 2026 — iter418 Multi-Lot Vehicle Auction Rendering — Audit + Fix
 
 ### User complaint

@@ -1659,6 +1659,10 @@ try:
     from routes.admin_user_actions import router as admin_user_actions_router
     api_router.include_router(admin_user_actions_router)
 
+    # iter420 — Admin Vehicle Dealer & Broker management (list / profile / activity)
+    from routes.admin_vehicle_dealers import router as admin_vehicle_dealers_router
+    api_router.include_router(admin_vehicle_dealers_router)
+
     # iter311 — Unified server-aggregated admin listing view across the
     # 4 listing collections (replaces 4 client-side fetches with 1).
     from routes.admin_listings_aggregated import router as admin_listings_aggregated_router

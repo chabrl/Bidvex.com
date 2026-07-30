@@ -51,6 +51,8 @@ import BrandingLayoutManager from './admin/BrandingLayoutManager';
 import SiteContentManager from './admin/SiteContentManager';
 import VehicleAdminManager from './admin/VehicleAdminManager';
 import AdminDealerLicenses from './admin/AdminDealerLicenses';
+// iter420 — Vehicle dealer & broker management (list / profile / activity)
+import AdminVehicleDealersPage from './admin/AdminVehicleDealersPage';
 import AdminBuyerVerifications from './admin/AdminBuyerVerifications';
 import AdminComplianceAlerts from './admin/AdminComplianceAlerts';
 // iter307 — single-page Compliance Dashboard
@@ -184,6 +186,8 @@ const SECONDARY_TABS = {
   ],
   vehicles: [
     { id: 'vehicle-admin', label: 'Vehicle Administration', icon: '🚗', lucideIcon: Car },
+    // iter420 — Dealer & broker management (list / profile / activity)
+    { id: 'dealer-management', label: 'Dealer Management', icon: '🏢', lucideIcon: Building2 },
     { id: 'dealer-licenses', label: 'Dealer Licenses', icon: '🪪', lucideIcon: ShieldAlert },
     { id: 'buyer-verifications', label: 'Buyer Verifications', icon: '🛂', lucideIcon: ShieldAlert },
     { id: 'compliance-alerts', label: 'Compliance Alerts', icon: '🚨', lucideIcon: AlertTriangle },
@@ -612,6 +616,7 @@ const AdminDashboard = () => {
       case 'vehicles':
         switch (secondaryTab) {
           case 'vehicle-admin': return <VehicleAdminManager />;
+          case 'dealer-management': return <AdminVehicleDealersPage />;
           case 'dealer-licenses': return <AdminDealerLicenses />;
           case 'buyer-verifications': return <AdminBuyerVerifications />;
           case 'compliance-alerts': return <AdminComplianceAlerts />;
