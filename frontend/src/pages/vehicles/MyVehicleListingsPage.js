@@ -27,7 +27,7 @@ import { Badge } from '../../components/ui/badge';
 import {
   Car, Plus, Clock, CheckCircle, XCircle, AlertTriangle, Eye,
   DollarSign, TrendingUp, Edit, Trash2, MoreVertical, Layers,
-  BookmarkPlus,
+  BookmarkPlus, ShieldAlert, ArrowRight,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -430,6 +430,42 @@ const MyVehicleListingsPage = () => {
               </Button>
             </div>
           </div>
+
+          {/* iter427 — Inline "Verify Dealer" banner. Shown whenever
+             the seller profile is missing OR not yet approved OR the
+             dealer is suspended. Replaces the previous silent
+             `disabled` state that gave users no indication why the
+             Create buttons were greyed out or where to fix it. */}
+          {sellerProfile && sellerProfile.verification_status !== 'approved' ? (
+            <Card className="mt-4 border-amber-200 bg-amber-50" data-testid="dealer-verify-banner">
+              <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                <ShieldAlert className="h-6 w-6 text-amber-700 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-amber-900">
+                    {isFr ? 'Vérification concessionnaire requise' : 'Dealer verification required'}
+                  </p>
+                  <p className="text-sm text-amber-800 mt-0.5">
+                    {sellerProfile.verification_status === 'rejected'
+                      ? (isFr
+                          ? 'Votre demande a été refusée. Corrigez et soumettez à nouveau vos documents pour publier des annonces.'
+                          : 'Your application was rejected. Resubmit your documents to publish listings.')
+                      : (isFr
+                          ? 'Votre demande est en cours d’examen. Une fois approuvée, vous pourrez créer et publier des annonces de véhicules.'
+                          : 'Your application is under review. Once approved you can create and publish vehicle listings.')}
+                  </p>
+                </div>
+                <Button
+                  onClick={() => navigate('/vehicle-auctions/seller/register')}
+                  className="bg-amber-600 hover:bg-amber-700 text-white flex-shrink-0"
+                  data-testid="verify-dealer-cta"
+                >
+                  <ShieldAlert className="h-4 w-4 mr-1" />
+                  {isFr ? 'Vérifier concessionnaire' : 'Verify Dealer'}
+                  <ArrowRight className="h-4 w-4 ml-1" />
+                </Button>
+              </CardContent>
+            </Card>
+          ) : null}
 
           {/* Stats — 2×2 on mobile, single row on tablet+ */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5" data-testid="my-listings-stats">

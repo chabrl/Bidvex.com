@@ -132,6 +132,21 @@ async def bulk_import_lots(
     ):
         raise HTTPException(status_code=403, detail="Not authorized for this event")
 
+    # iter427 — Even the event owner cannot import if their dealer
+    # account is currently suspended. Mirrors the guard on
+    # POST /vehicle-multi-lot-auctions (create) so suspension takes
+    # effect immediately on every listing surface.
+    user_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0, "vehicle_dealer_suspended": 1})
+    if (user_doc or {}).get("vehicle_dealer_suspended") is True and getattr(current_user, "role", "") not in {"admin", "super_admin"}:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "dealer_suspended",
+                "message_en": "Your dealer account is currently suspended by an administrator. Please contact support.",
+                "message_fr": "Votre compte concessionnaire est actuellement suspendu par un administrateur. Veuillez contacter le support.",
+            },
+        )
+
     errors = []
     new_lots = []
     lot_ids = []

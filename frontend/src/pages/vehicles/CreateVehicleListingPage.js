@@ -18,6 +18,7 @@ import SaveAsDraftButton from '../../components/SaveAsDraftButton';
 import ProvinceSellerNotice from '../../components/vehicles/ProvinceSellerNotice';
 import VehicleLegalFooter from '../../components/vehicles/VehicleLegalFooter';
 import VehicleProvinceEligibility from '../../components/vehicles/VehicleProvinceEligibility';
+import DealerVerificationGate from '../../components/vehicles/DealerVerificationGate';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -123,6 +124,11 @@ const CreateVehicleListingPage = () => {
   const [loading, setLoading] = useState(false);
   const [vinLoading, setVinLoading] = useState(false);
   const [sellerProfile, setSellerProfile] = useState(null);
+  // iter427 — Track the seller-status probe so we can render an inline
+  // DealerVerificationGate instead of silently redirecting unverified
+  // dealers. Distinguishes "no seller row" (never registered) from
+  // "seller row present but not approved yet".
+  const [sellerProbe, setSellerProbe] = useState({ loaded: false, noProfile: false });
   const [photos, setPhotos] = useState({});
   
   // Form data
@@ -224,25 +230,27 @@ const CreateVehicleListingPage = () => {
         navigate('/auth');
         return;
       }
-      
+
       try {
         const response = await axios.get(`${API}/vehicle-sellers/me`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         setSellerProfile(response.data);
-        
-        if (response.data.verification_status !== 'approved') {
-          toast.error('Your seller account is not yet approved');
-          navigate('/vehicle-auctions');
-        }
+        setSellerProbe({ loaded: true, noProfile: false });
+        // iter427 — Do NOT redirect on unverified. The parent render
+        // now surfaces an inline <DealerVerificationGate> with a
+        // "Verify Dealer" CTA. Redirect only kept for the auth/token
+        // path above.
       } catch (error) {
         if (error.response?.status === 404) {
-          toast.error('Please register as a vehicle seller first');
-          navigate('/vehicle-auctions/seller/register');
+          // Never registered. Render the gate (not_registered branch).
+          setSellerProbe({ loaded: true, noProfile: true });
+          return;
         }
+        setSellerProbe({ loaded: true, noProfile: false });
       }
     };
-    
+
     checkSeller();
   }, [token, navigate]);
 
@@ -1546,6 +1554,29 @@ const CreateVehicleListingPage = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950" data-testid="create-vehicle-listing-page">
+      {/* iter427 — Dealer verification gate. Renders inline with a
+         clear "Verify Dealer" CTA when the seller is not approved
+         or is suspended, replacing the previous silent redirect. */}
+      {sellerProbe.loaded && (
+        sellerProbe.noProfile
+        || user?.vehicle_dealer_suspended
+        || (sellerProfile && sellerProfile.verification_status !== 'approved')
+      ) && (
+        <DealerVerificationGate
+          sellerProfile={sellerProfile}
+          noProfile={sellerProbe.noProfile}
+          suspended={!!user?.vehicle_dealer_suspended}
+          surfaceLabel="vehicle listing"
+        />
+      )}
+
+      {/* The form body only renders once the seller is verified. */}
+      {sellerProbe.loaded
+       && !sellerProbe.noProfile
+       && !user?.vehicle_dealer_suspended
+       && sellerProfile
+       && sellerProfile.verification_status === 'approved' && (
+      <>
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 border-b">
         <div className="max-w-4xl mx-auto px-4 py-6">
@@ -1688,6 +1719,8 @@ const CreateVehicleListingPage = () => {
       </div>
       {/* iter201 — Phase 2 — Bilingual legal footer (CEO Part 4) */}
       <VehicleLegalFooter />
+      </>
+      )}
     </div>
   );
 };

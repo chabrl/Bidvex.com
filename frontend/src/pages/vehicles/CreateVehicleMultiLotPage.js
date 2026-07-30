@@ -64,6 +64,8 @@ import {
 } from 'lucide-react';
 import { TIMING_MODES, getTimingModeLabel, getTimingModeDescription } from '../../lib/vehicleMultiLotTimingModes';
 import BulkImportLotsCSV from '../../components/vehicles/BulkImportLotsCSV';
+import DealerVerificationGate from '../../components/vehicles/DealerVerificationGate';
+import { useAuth } from '../../contexts/AuthContext';
 
 const API = API_BASE;
 
@@ -173,12 +175,42 @@ const emptyLot = () => ({
 const CreateVehicleMultiLotPage = () => {
   const navigate = useNavigate();
   const { i18n } = useTranslation();
+  const { user } = useAuth();
   const fr = (i18n.language || 'en').startsWith('fr');
   const L = (en, frTxt) => (fr ? frTxt : en);
 
   const [loading, setLoading] = useState(false);
   const [infoSheet, setInfoSheet] = useState(null);
   const [vinLoading, setVinLoading] = useState(null); // lot id currently looking up
+
+  // iter427 — Dealer verification gate. Multi-lot auctions are
+  // dealer-only; block the wizard from opening for unverified or
+  // suspended dealers instead of failing at submit time.
+  const [sellerProfile, setSellerProfile] = useState(null);
+  const [sellerProbe, setSellerProbe] = useState({ loaded: false, noProfile: false });
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const token = localStorage.getItem('token');
+      if (!token) { navigate('/auth'); return; }
+      try {
+        const r = await axios.get(`${API}/vehicle-sellers/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (cancelled) return;
+        setSellerProfile(r.data);
+        setSellerProbe({ loaded: true, noProfile: false });
+      } catch (err) {
+        if (cancelled) return;
+        if (err.response?.status === 404) {
+          setSellerProbe({ loaded: true, noProfile: true });
+        } else {
+          setSellerProbe({ loaded: true, noProfile: false });
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [navigate]);
 
   // iter304 — Lot Templates (per-dealer presets that pre-fill Steps 2–5)
   const [templates, setTemplates] = useState([]);
@@ -737,6 +769,22 @@ const CreateVehicleMultiLotPage = () => {
 
   return (
     <div className="max-w-5xl mx-auto p-4 sm:p-6 space-y-6" data-testid="create-multi-lot-page">
+      {/* iter427 — Dealer verification gate. Multi-lot events are
+         dealer-only. If unverified, suspended, or unregistered, we
+         short-circuit the wizard render with an inline gate and CTA. */}
+      {sellerProbe.loaded && (
+        sellerProbe.noProfile
+        || user?.vehicle_dealer_suspended
+        || (sellerProfile && sellerProfile.verification_status !== 'approved')
+      ) ? (
+        <DealerVerificationGate
+          sellerProfile={sellerProfile}
+          noProfile={sellerProbe.noProfile}
+          suspended={!!user?.vehicle_dealer_suspended}
+          surfaceLabel={L('multi-lot vehicle auction', 'enchère multi-lots de véhicules')}
+        />
+      ) : (
+      <>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div>
@@ -1095,6 +1143,8 @@ const CreateVehicleMultiLotPage = () => {
         L={L}
         onImported={handleImported}
       />
+      </>
+      )}
     </div>
   );
 };

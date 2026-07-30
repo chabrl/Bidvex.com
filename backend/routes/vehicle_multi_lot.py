@@ -65,11 +65,26 @@ def _require_dealer(user: dict) -> None:
     """Multi-lot vehicle auctions are dealer-only. Admins also allowed."""
     if user.get("role") in ("admin", "super_admin"):
         return
+    # iter427 — Suspended dealers must be blocked even if
+    # is_vehicle_dealer is still True on the user document.
+    if user.get("vehicle_dealer_suspended") is True:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "dealer_suspended",
+                "message_en": "Your dealer account is currently suspended by an administrator. Please contact support.",
+                "message_fr": "Votre compte concessionnaire est actuellement suspendu par un administrateur. Veuillez contacter le support.",
+            },
+        )
     if user.get("is_vehicle_dealer") is True:
         return
     raise HTTPException(
         status_code=403,
-        detail="Only verified vehicle dealers can run multi-lot auctions.",
+        detail={
+            "code": "dealer_verification_required",
+            "message_en": "Only verified vehicle dealers can run multi-lot auctions.",
+            "message_fr": "Seuls les concessionnaires de véhicules vérifiés peuvent gérer des enchères multi-lots.",
+        },
     )
 
 

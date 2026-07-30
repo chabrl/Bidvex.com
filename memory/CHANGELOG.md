@@ -1,6 +1,92 @@
 # BidVex Changelog
 
 
+## Feb 8, 2026 — iter427 Vehicle Listing System — Audit + Permission Fix
+
+### User request
+Audit and fix the vehicle listing system for verified dealers. Block
+unverified dealers from create-listing / multi-lot / bulk-import /
+publish with a clear message + "Verify Dealer" button; let verified
+dealers through.
+
+### Audit — full flow trace
+| Stage | File / endpoint | Status |
+|---|---|---|
+| 1 · Form state + inputs | `CreateVehicleListingPage.js` (updateField L267, VIN decode L271) | ✅ |
+| 2 · Frontend gate (single) | `CreateVehicleListingPage.js:234` — `toast + navigate('/vehicle-auctions')` | ❌ silent redirect, no CTA |
+| 3 · Frontend gate (multi-lot) | `CreateVehicleMultiLotPage.js` | ❌ **no gate at all** — form-fills before backend 403 |
+| 4 · VIN decode | `GET /api/vehicles/decode-vin/{vin}` | ✅ |
+| 5 · Client-side validation | Inline (year, VIN 17-char, mileage, min photos, reserve ≥ start) | ✅ |
+| 6 · Autosave | `useDebouncedAutoSaveDraft` | ✅ |
+| 7 · Backend `POST /api/vehicles` | `Depends(get_vehicle_seller)` L159 — checks only `verification_status == APPROVED` | ⚠️ ignores `vehicle_dealer_suspended` |
+| 8 · Backend multi-lot `POST /api/vehicle-multi-lot-auctions` | `_require_dealer` L64 — checks only `is_vehicle_dealer is True` | ⚠️ same suspension bypass |
+| 9 · Bulk-import `POST /vehicle-multi-lot-auctions/{event_id}/bulk-import` | Checks event ownership only | ⚠️ suspended owner could still import |
+| 10 · Bill 96 + category + trust-gate | services | ✅ |
+| 11 · MongoDB write `db.vehicle_listings.insert_one` | `vehicles.py:1008` | ✅ |
+| 12 · `MyVehicleListingsPage` create/multi-lot buttons | `disabled={verification_status !== 'approved'}` L408/L417 | ❌ silently disabled, no CTA |
+
+### Step 2 fix — Permission enforcement
+
+**New shared component** `frontend/src/components/vehicles/DealerVerificationGate.jsx`:
+- Full-page bilingual gate card with distinct branches for `pending` /
+  `under_review` / `rejected` / `suspended` / `not_registered`.
+- Shows the rejection reason (from `sellerProfile.rejection_reason`)
+  and the suspension reason (from `user.vehicle_dealer_suspended_reason`)
+  when applicable.
+- Primary CTA button — routes to `/vehicle-auctions/seller/register`
+  (or `/contact` for the suspended branch).
+
+**Frontend wiring**:
+- `CreateVehicleListingPage.js` — removed the silent
+  `toast + navigate('/vehicle-auctions')` on unverified. Renders
+  `<DealerVerificationGate>` when the seller isn't approved OR the
+  user is suspended. Form only renders when both checks pass.
+- `CreateVehicleMultiLotPage.js` — added the same seller probe +
+  gate (previously had zero frontend enforcement).
+- `MyVehicleListingsPage.js` — added an inline amber "Dealer
+  verification required" banner with a **Verify Dealer** CTA next to
+  the (still) disabled Create + Multi-Lot buttons, so users see WHY
+  they can't click and WHERE to go.
+
+**Backend wiring**:
+- `routes/vehicles.py` — `get_vehicle_seller` now short-circuits with
+  a structured bilingual `dealer_suspended` 403 when
+  `user.vehicle_dealer_suspended is True`, BEFORE the seller row is
+  loaded.
+- `routes/vehicle_multi_lot.py` — `_require_dealer` mirrors the same
+  suspension check, and now returns a structured bilingual
+  `dealer_verification_required` payload instead of a plain-string
+  detail.
+- `routes/multi_lot_bulk_import.py` — added a live-DB user lookup
+  after the ownership check; a suspended owner is now rejected with
+  the same bilingual `dealer_suspended` error.
+
+### Step 3 & 4 — spot-check
+Every item in the "fix any broken validation or flow" list was tested:
+- VIN decode: works — `GET /api/vehicles/decode-vin/{vin}` returns
+  year/make/model.
+- Image upload, photo ordering, reserve price, starting bid,
+  save-draft, publish, duplicate, delete, edit: all currently
+  functional (autosave writes to `/api/drafts/{id}`, publish path
+  runs through `submit_for_approval`).
+- Autosave error surfacing: hooked via `useDebouncedAutoSaveDraft`
+  which now benefits from the iter424-iter425 sweep of
+  `extractErrorMessage`.
+- No confirmed broken items in this bucket beyond the permission
+  gaps in Step 2, so no other code was touched (per the
+  "don't invent bugs" rule).
+
+### Verified end-to-end
+- curl (admin dealer suspended → `POST /api/vehicles`) returns the
+  exact structured bilingual `dealer_suspended` payload; unsuspending
+  restores normal 4xx validation behaviour.
+- Playwright on preview: both `/vehicle-auctions/create` and
+  `/vehicle-multi-lot/create` render the SUSPENDED branch of the
+  gate with the correct pill, reason, and `Contact Support` CTA when
+  the dealer is suspended. No runtime errors.
+
+
+
 ## Feb 8, 2026 — iter425 `toast.error` Sweep — Non-Admin Pages
 
 Extended the iter424 admin sweep to non-admin user-facing pages using

@@ -158,6 +158,20 @@ async def get_admin_user(credentials: HTTPAuthorizationCredentials = Depends(sec
 
 async def get_vehicle_seller(user: dict = Depends(get_current_user)):
     """Get verified vehicle seller profile for current user"""
+    # iter427 — Suspended dealers must not create/publish listings even
+    # if their old `vehicle_sellers.verification_status` is still
+    # 'approved'. Suspension is set on the user doc by the admin
+    # Dealer Management screen (iter420) and is the single source of
+    # truth for the active/blocked state.
+    if user.get("vehicle_dealer_suspended") is True:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "dealer_suspended",
+                "message_en": "Your dealer account is currently suspended by an administrator. Please contact support.",
+                "message_fr": "Votre compte concessionnaire est actuellement suspendu par un administrateur. Veuillez contacter le support.",
+            },
+        )
     seller = await db.vehicle_sellers.find_one({
         "user_id": user["id"],
         "verification_status": SellerVerificationStatus.APPROVED.value
