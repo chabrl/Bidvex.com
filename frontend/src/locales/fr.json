@@ -1621,6 +1621,119 @@
     "buyerLabel": "Acheteur",
     "feeModelNote": "BidVex ne perçoit que des frais de plateforme de 2,5 % auprès de l'acheteur — 100 % du prix d'adjudication vous est versé directement par l'acheteur."
   },
+  "licenseInfo": {
+    "iconAria": "En savoir plus sur ce titre",
+    "modalTitle": "À propos de ce titre",
+    "sectionWhat": "De quoi s'agit-il",
+    "sectionWhy": "Pourquoi c'est requis",
+    "sectionIssuer": "Qui le délivre",
+    "sectionHowToGet": "Comment l'obtenir",
+    "sectionVerification": "Comment BidVex le vérifie",
+    "sectionWebsite": "Site officiel",
+    "close": "Fermer",
+    "credentials": {
+      "opc": {
+        "name": "Permis OPC (Québec)",
+        "what": "Un permis de commerce délivré à toute entreprise qui vend des véhicules routiers au Québec. Deux catégories existent : commerçant (véhicules d'occasion) et manufacturier/importateur (véhicules neufs).",
+        "why": "La Loi sur la protection du consommateur exige que tout commerçant de véhicules routiers détienne un permis OPC avant de publier une annonce, de négocier ou de vendre à des consommateurs. BidVex n'accepte que les annonces provenant de commerçants avec un permis OPC valide.",
+        "issuer": "Office de la protection du consommateur (OPC).",
+        "howToGet": "Faites votre demande en ligne sur le portail des commerçants de l'OPC. Vous devrez fournir un NEQ valide, une preuve d'adresse d'affaires et un cautionnement de 100 000 $. L'approbation prend généralement 30 à 60 jours.",
+        "verification": "Notre équipe vérifie votre numéro de permis dans le registre public des commerçants de l'OPC. L'approbation est automatique lorsque votre permis est actif ; les permis expirés ou suspendus sont rejetés.",
+        "websiteUrl": "https://www.opc.gouv.qc.ca/consommateur/bien-service/vehicule/",
+        "websiteLabel": "opc.gouv.qc.ca"
+      },
+      "omvic": {
+        "name": "Certificat OMVIC (Ontario)",
+        "what": "Le certificat obligatoire que tout concessionnaire et vendeur de véhicules automobiles doit détenir pour faire commerce de véhicules en Ontario.",
+        "why": "La Loi sur le commerce des véhicules automobiles de l'Ontario exige que toute activité commerciale passe par un concessionnaire enregistré auprès de l'OMVIC. Les infractions peuvent entraîner des amendes allant jusqu'à 50 000 $. BidVex exige l'enregistrement OMVIC des concessionnaires ontariens.",
+        "issuer": "Ontario Motor Vehicle Industry Council (OMVIC).",
+        "howToGet": "Faites votre demande en ligne sur omvic.on.ca. Les exigences incluent un plan d'affaires, un lieu physique de concession, un cautionnement minimum de 50 000 $ et la réussite du cours de certification automobile. L'approbation prend généralement 4 à 8 semaines.",
+        "verification": "Nous vérifions votre numéro d'enregistrement OMVIC dans le registre public. Seuls les enregistrements actifs sont approuvés.",
+        "websiteUrl": "https://www.omvic.ca/",
+        "websiteLabel": "omvic.ca"
+      },
+      "amvic": {
+        "name": "Licence AMVIC (Alberta)",
+        "what": "La licence que toute entreprise automobile doit détenir pour vendre, louer ou faire le commerce en gros de véhicules en Alberta.",
+        "why": "La Consumer Protection Act de l'Alberta confie la délivrance des licences à l'AMVIC. La vente non licenciée peut entraîner des sanctions et le remboursement du consommateur. BidVex exige la licence AMVIC des concessionnaires albertains.",
+        "issuer": "Alberta Motor Vehicle Industry Council (AMVIC).",
+        "howToGet": "Faites votre demande sur amvic.org. Vous devrez fournir une adresse d'affaires, un cautionnement (15 000 à 50 000 $ selon la classe) et une formation. L'approbation prend généralement 4 à 6 semaines.",
+        "verification": "Nous vérifions votre numéro de licence AMVIC dans le registre public et confirmons la classe ainsi que le statut.",
+        "websiteUrl": "https://www.amvic.org/",
+        "websiteLabel": "amvic.org"
+      },
+      "vsa": {
+        "name": "Licence VSA (Colombie-Britannique)",
+        "what": "La licence de concessionnaire ou de vendeur que toute entreprise automobile de la C.-B. doit détenir.",
+        "why": "Le Motor Dealer Act de la C.-B. confère à la VSA le pouvoir de licencier chaque concessionnaire et vendeur. Les activités non licenciées peuvent entraîner des amendes et une restitution forcée. BidVex exige la licence VSA des concessionnaires de la C.-B.",
+        "issuer": "Vehicle Sales Authority of British Columbia (VSA).",
+        "howToGet": "Faites votre demande sur mvsabc.com. Vous devrez fournir une adresse d'affaires, une vérification d'antécédents, un certificat de formation et un cautionnement de 20 000 $. L'approbation prend généralement 6 à 8 semaines.",
+        "verification": "Nous vérifions votre numéro de licence VSA dans le registre public.",
+        "websiteUrl": "https://mvsabc.com/",
+        "websiteLabel": "mvsabc.com"
+      },
+      "dealerLicense": {
+        "name": "Licence de concessionnaire (autres provinces)",
+        "what": "Chaque province canadienne réglemente les concessionnaires automobiles en vertu de sa propre loi sur la protection du consommateur. Ce titre couvre notamment la Saskatchewan (SGI), le Manitoba (MPI), le Nouveau-Brunswick, la Nouvelle-Écosse, l'Î.-P.-É. et Terre-Neuve-et-Labrador.",
+        "why": "Sans licence provinciale de concessionnaire, vous ne pouvez pas légalement vendre, faire le commerce en gros ou importer des véhicules pour la revente dans cette province. BidVex exige une licence de concessionnaire valide de la province où se trouve le véhicule.",
+        "issuer": "Votre régulateur provincial des véhicules automobiles (varie selon la province).",
+        "howToGet": "Contactez votre régulateur provincial : SGI (Saskatchewan), MPI Auto Fund (Manitoba), Service NL (Terre-Neuve), Access NS (Nouvelle-Écosse), etc. Les exigences incluent généralement un cautionnement, un emplacement d'affaires et une formation.",
+        "verification": "Nous vérifions votre numéro de licence dans le registre provincial applicable. Si votre province ne publie pas de registre public, nous pouvons demander une copie numérisée de votre certificat de licence.",
+        "websiteUrl": "https://www.canada.ca/fr/services/entreprises.html",
+        "websiteLabel": "canada.ca/fr/services/entreprises"
+      },
+      "brokerLicense": {
+        "name": "Licence de courtier en véhicules",
+        "what": "Une catégorie distincte de licence pour les mandataires qui organisent des ventes de véhicules sans en prendre le titre. Certaines provinces réglementent les courtiers dans le cadre de la loi sur les concessionnaires ; d'autres exigent une inscription distincte (p. ex. la classe Courtier de l'OMVIC en Ontario).",
+        "why": "Les courtiers qui mettent en relation acheteurs et vendeurs doivent être licenciés dans les provinces où la pratique est réglementée. BidVex exige les titres de courtier pour tout utilisateur qui met en vente des véhicules dont il n'est pas propriétaire.",
+        "issuer": "Le régulateur provincial des véhicules automobiles applicable à la province de résidence du courtier.",
+        "howToGet": "Lorsque le courtier est une classe distincte (p. ex. OMVIC en Ontario), faites votre demande sur le site Web du même régulateur. Lorsque l'activité de courtier relève de la loi générale sur les concessionnaires, obtenez la licence couvrant le courtage.",
+        "verification": "Nous vérifions le numéro d'enregistrement du courtier dans le registre public applicable et confirmons que la classe permet l'activité de courtage.",
+        "websiteUrl": "https://www.omvic.ca/dealers-salespersons/being-a-motor-vehicle-dealer/",
+        "websiteLabel": "omvic.ca"
+      },
+      "businessNumber": {
+        "name": "Numéro d'entreprise (NE)",
+        "what": "Un identifiant fédéral à 9 chiffres attribué par l'Agence du revenu du Canada à toute entreprise exerçant au Canada. Les comptes propres à un programme (TPS/TVH, paie, impôt sur le revenu) sont des extensions de ce NE racine.",
+        "why": "BidVex utilise votre NE pour lier votre profil de concessionnaire à vos comptes fiscaux et pour émettre des feuillets T4A pour les paiements liés à la plateforme.",
+        "issuer": "Agence du revenu du Canada (ARC).",
+        "howToGet": "Inscrivez-vous à canada.ca/fr/services/impots/numero-dentreprise ou via le portail d'inscription des entreprises de votre province. L'émission est immédiate pour les demandeurs admissibles.",
+        "verification": "Nous validons le format du NE (9 chiffres, contrôle mod-11) à la soumission. Les vérifications croisées avec l'ARC sont effectuées au moment du paiement pour la déclaration fiscale.",
+        "websiteUrl": "https://www.canada.ca/fr/services/impots/numero-dentreprise.html",
+        "websiteLabel": "canada.ca/fr/services/impots/numero-dentreprise"
+      },
+      "gst": {
+        "name": "Numéro TPS/TVH",
+        "what": "L'enregistrement de 15 caractères délivré lorsque votre entreprise perçoit la Taxe sur les produits et services fédérale (ou la Taxe de vente harmonisée dans les provinces participantes). Format : NE + « RT » + compte à 4 chiffres (p. ex. 123456789 RT0001).",
+        "why": "Si les ventes taxables de votre concession dépassent 30 000 $ sur une période de 12 mois, l'inscription à la TPS/TVH est obligatoire. BidVex utilise ce numéro pour produire des factures conformes et remettre la taxe correcte sur les frais de plateforme.",
+        "issuer": "Agence du revenu du Canada (ARC).",
+        "howToGet": "Inscrivez-vous à canada.ca/fr/agence-revenu une fois votre NE en main. L'inscription est gratuite et prend généralement 5 jours ouvrables.",
+        "verification": "Nous vérifions le format (NE + RT + 4 chiffres). Une vérification en direct avec l'ARC est effectuée à la première facture générée.",
+        "websiteUrl": "https://www.canada.ca/fr/agence-revenu/services/impot/entreprises/sujets/tps-tvh-entreprises.html",
+        "websiteLabel": "canada.ca (TPS/TVH)"
+      },
+      "qst": {
+        "name": "Numéro TVQ (Québec)",
+        "what": "L'enregistrement à 10 chiffres + « TQ » + 4 chiffres délivré par Revenu Québec lorsque votre entreprise perçoit la Taxe de vente du Québec. Format exemple : 1234567890 TQ0001.",
+        "why": "Les concessionnaires québécois dont les ventes taxables dépassent 30 000 $ doivent s'inscrire à la TVQ. BidVex émet les factures québécoises avec votre numéro TVQ afin que les acheteurs puissent réclamer les crédits de taxe sur les intrants.",
+        "issuer": "Revenu Québec.",
+        "howToGet": "Inscrivez-vous à revenuquebec.ca — souvent traité en même temps que votre TPS/TVH lors d'une demande via le Registraire des entreprises.",
+        "verification": "Nous validons le format TVQ (10 chiffres + TQ + 4 chiffres). Des vérifications croisées sont effectuées à la première facture québécoise.",
+        "websiteUrl": "https://www.revenuquebec.ca/fr/entreprises/taxes/tpstvh-et-tvq/",
+        "websiteLabel": "revenuquebec.ca"
+      },
+      "neq": {
+        "name": "NEQ (Numéro d'entreprise du Québec)",
+        "what": "Un identifiant à 10 chiffres attribué par le Registraire des entreprises du Québec à toute entreprise, organisme sans but lucratif ou fiducie enregistré au Québec.",
+        "why": "Au Québec, le NEQ est l'identifiant d'entreprise principal — requis pour obtenir un permis de commerçant OPC, pour produire des déclarations fiscales et pour signer des contrats commerciaux. BidVex exige le NEQ pour tout concessionnaire québécois.",
+        "issuer": "Registraire des entreprises du Québec.",
+        "howToGet": "Inscrivez-vous à registreentreprises.gouv.qc.ca. L'inscription initiale est incluse lorsque vous constituez une société ou enregistrez une entreprise individuelle au Québec.",
+        "verification": "Nous validons le format NEQ (10 chiffres) et effectuons une vérification croisée dans le registre public du Registraire.",
+        "websiteUrl": "https://www.registreentreprises.gouv.qc.ca/fr/",
+        "websiteLabel": "registreentreprises.gouv.qc.ca"
+      }
+    }
+  },
   "vehicleInvoices": {
     "title": "Factures de véhicules",
     "subtitle": "Consultez et téléchargez vos factures de transactions de véhicules",

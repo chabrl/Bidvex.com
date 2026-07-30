@@ -1601,6 +1601,119 @@
     "buyerLabel": "Buyer",
     "feeModelNote": "BidVex collects a 2.5% platform fee from the buyer only — 100% of the hammer price is paid directly to you by the buyer."
   },
+  "licenseInfo": {
+    "iconAria": "Learn more about this credential",
+    "modalTitle": "About this credential",
+    "sectionWhat": "What it is",
+    "sectionWhy": "Why it's required",
+    "sectionIssuer": "Who issues it",
+    "sectionHowToGet": "How to get it",
+    "sectionVerification": "How BidVex verifies it",
+    "sectionWebsite": "Official website",
+    "close": "Close",
+    "credentials": {
+      "opc": {
+        "name": "OPC Permit (Quebec)",
+        "what": "A retail permit issued to any business that sells road vehicles in Quebec. Two flavours exist: dealer (used vehicles) and manufacturer/importer (new vehicles).",
+        "why": "Quebec's Consumer Protection Act requires every road-vehicle merchant to hold an OPC permit before advertising, negotiating, or selling to consumers. BidVex only accepts listings from OPC-permitted dealers in Quebec.",
+        "issuer": "Office de la protection du consommateur (OPC).",
+        "howToGet": "Apply online at the OPC's dealer portal — you'll need a valid NEQ, proof of business address, and a $100,000 surety bond. Approval typically takes 30–60 days.",
+        "verification": "Our verification team looks up your permit number on the OPC's public dealer registry. Approval is automatic when your permit is active; expired or suspended permits are rejected.",
+        "websiteUrl": "https://www.opc.gouv.qc.ca/en/consumer/goods-services/vehicles/",
+        "websiteLabel": "opc.gouv.qc.ca"
+      },
+      "omvic": {
+        "name": "OMVIC License (Ontario)",
+        "what": "The mandatory certificate every motor vehicle dealer and salesperson must hold to trade motor vehicles in Ontario.",
+        "why": "Ontario's Motor Vehicle Dealers Act requires all trade activity to go through an OMVIC-registered dealer. Non-registered activity carries fines up to $50,000. BidVex requires OMVIC registration from Ontario dealers.",
+        "issuer": "Ontario Motor Vehicle Industry Council (OMVIC).",
+        "howToGet": "Apply online at omvic.on.ca. Requirements include a business plan, a physical dealership location, a $50,000 minimum bond, and passing the Automotive Certification Course. Approval typically takes 4–8 weeks.",
+        "verification": "We look up your OMVIC registration number in the public registry. Only active registrations are approved.",
+        "websiteUrl": "https://www.omvic.ca/",
+        "websiteLabel": "omvic.ca"
+      },
+      "amvic": {
+        "name": "AMVIC License (Alberta)",
+        "what": "The licence every automotive business must hold to sell, lease, or wholesale vehicles in Alberta.",
+        "why": "Alberta's Consumer Protection Act delegates dealer licensing to AMVIC. Unlicensed selling can result in enforcement action and consumer refunds. BidVex requires AMVIC licensing from Alberta dealers.",
+        "issuer": "Alberta Motor Vehicle Industry Council (AMVIC).",
+        "howToGet": "Apply at amvic.org. You'll need a business address, security bond ($15,000–$50,000 depending on class), and industry education. Approval typically takes 4–6 weeks.",
+        "verification": "We look up your AMVIC licence number in the public licensee lookup and confirm class + status.",
+        "websiteUrl": "https://www.amvic.org/",
+        "websiteLabel": "amvic.org"
+      },
+      "vsa": {
+        "name": "VSA License (British Columbia)",
+        "what": "The dealer or salesperson licence every motor-vehicle business in BC must hold.",
+        "why": "BC's Motor Dealer Act empowers the VSA to license every dealer and salesperson. Unlicensed activity can result in fines and forced restitution. BidVex requires VSA licensing from BC dealers.",
+        "issuer": "Vehicle Sales Authority of British Columbia (VSA).",
+        "howToGet": "Apply at mvsabc.com — you'll need a business location, background check, education certificate, and a $20,000 surety bond. Approval typically takes 6–8 weeks.",
+        "verification": "We look up your VSA licence number in the public licence registry.",
+        "websiteUrl": "https://mvsabc.com/",
+        "websiteLabel": "mvsabc.com"
+      },
+      "dealerLicense": {
+        "name": "Dealer License (Other Provinces)",
+        "what": "Every Canadian province regulates motor-vehicle dealers under its own consumer-protection statute. This is the umbrella credential for Saskatchewan (SGI), Manitoba (MPI), New Brunswick, Nova Scotia, PEI, and Newfoundland & Labrador.",
+        "why": "Without a provincial dealer licence, you cannot legally sell, wholesale, or import vehicles for resale in that province. BidVex requires a valid dealer licence from the province where the vehicle is located.",
+        "issuer": "Your provincial motor-vehicle regulator (varies by province).",
+        "howToGet": "Contact your provincial regulator: SGI (Saskatchewan), MPI Auto Fund (Manitoba), Service NL (Newfoundland), Access NS (Nova Scotia), etc. Requirements typically include bond, business location, and industry training.",
+        "verification": "We check your licence number against the applicable provincial registry. If your province doesn't publish a public lookup, we may request a scanned copy of your licence certificate.",
+        "websiteUrl": "https://www.canada.ca/en/services/business.html",
+        "websiteLabel": "canada.ca/en/services/business"
+      },
+      "brokerLicense": {
+        "name": "Vehicle Broker License",
+        "what": "A separate class of licence for agents who arrange vehicle sales without taking title. Some provinces regulate brokers under the dealer act; others require a distinct broker registration (e.g. Ontario's OMVIC includes a Broker class).",
+        "why": "Brokers who match buyers and sellers must be licensed in provinces where the practice is regulated. BidVex requires broker credentials for any user listing vehicles they don't personally own.",
+        "issuer": "The provincial motor-vehicle regulator applicable to the broker's home province.",
+        "howToGet": "Where broker is a distinct class (e.g. OMVIC in Ontario), apply through the same regulator's website. Where broker activity falls under the general dealer act, obtain the dealer licence covering brokerage.",
+        "verification": "We verify the broker's registration number in the applicable public registry and confirm the class permits brokerage activity.",
+        "websiteUrl": "https://www.omvic.ca/dealers-salespersons/being-a-motor-vehicle-dealer/",
+        "websiteLabel": "omvic.ca"
+      },
+      "businessNumber": {
+        "name": "Business Number (BN)",
+        "what": "A 9-digit federal identifier assigned by the Canada Revenue Agency to every business operating in Canada. Program-specific accounts (GST/HST, payroll, corporate income tax) are extensions of this root BN.",
+        "why": "BidVex uses your BN to link your dealer profile to your tax accounts and to issue T4A slips for platform-related payouts.",
+        "issuer": "Canada Revenue Agency (CRA).",
+        "howToGet": "Register at canada.ca/en/services/taxes/business-number or via your province's business registration portal. Issuance is immediate for eligible applicants.",
+        "verification": "We validate the BN format (9 digits, mod-11 check) at submission. Cross-checks against CRA are performed at payout time for tax reporting.",
+        "websiteUrl": "https://www.canada.ca/en/services/taxes/business-number.html",
+        "websiteLabel": "canada.ca/en/services/taxes/business-number"
+      },
+      "gst": {
+        "name": "GST/HST Number",
+        "what": "The 15-character registration issued when your business collects the federal Goods and Services Tax (or Harmonized Sales Tax in participating provinces). Format: BN + \"RT\" + 4-digit account (e.g. 123456789 RT0001).",
+        "why": "If your dealership's taxable sales exceed $30,000 in any 12-month period, GST/HST registration is mandatory. BidVex uses this number to produce compliant invoices and to remit the correct tax on the buyer's platform fee.",
+        "issuer": "Canada Revenue Agency (CRA).",
+        "howToGet": "Register at canada.ca/en/revenue-agency once you have your BN. Registration is free and typically takes 5 business days.",
+        "verification": "We verify format (BN + RT + 4 digits). Live CRA verification runs at first invoice generation.",
+        "websiteUrl": "https://www.canada.ca/en/revenue-agency/services/tax/businesses/topics/gst-hst-businesses.html",
+        "websiteLabel": "canada.ca (GST/HST)"
+      },
+      "qst": {
+        "name": "QST Number (Quebec)",
+        "what": "The 10-digit + \"TQ\" + 4-digit registration issued by Revenu Québec when your business collects the Quebec Sales Tax (TVQ). Example format: 1234567890 TQ0001.",
+        "why": "Quebec-based dealers with taxable sales above $30,000 must register for QST. BidVex issues Quebec invoices with your QST number so buyers can claim input tax credits.",
+        "issuer": "Revenu Québec.",
+        "howToGet": "Register at revenuquebec.ca — often processed together with your GST/HST when applying via Registraire des entreprises.",
+        "verification": "We validate the QST format (10 digits + TQ + 4 digits). Cross-checks are performed at first Quebec invoice.",
+        "websiteUrl": "https://www.revenuquebec.ca/en/businesses/consumption-taxes/gsthst-and-qst/",
+        "websiteLabel": "revenuquebec.ca"
+      },
+      "neq": {
+        "name": "NEQ (Quebec Enterprise Number)",
+        "what": "A 10-digit identifier assigned by the Registraire des entreprises du Québec to every business, non-profit, or trust registered in Quebec.",
+        "why": "In Quebec, the NEQ is the primary business identifier — required to obtain an OPC dealer permit, to file taxes, and to sign commercial contracts. BidVex requires the NEQ for every Quebec dealer.",
+        "issuer": "Registraire des entreprises du Québec.",
+        "howToGet": "Register at registreentreprises.gouv.qc.ca. First-time registration is included when you incorporate or register a sole proprietorship in Quebec.",
+        "verification": "We validate the NEQ format (10 digits) and cross-check against the public Registraire lookup.",
+        "websiteUrl": "https://www.registreentreprises.gouv.qc.ca/en/default.aspx",
+        "websiteLabel": "registreentreprises.gouv.qc.ca"
+      }
+    }
+  },
   "vehicleInvoices": {
     "title": "Vehicle Invoices",
     "subtitle": "View and download your vehicle transaction invoices",

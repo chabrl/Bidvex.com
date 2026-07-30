@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import SellerDocumentManager from '../../components/vehicles/SellerDocumentManager';
 import { ResubmitApplicationPanel } from '../../components/ResubmitApplicationPanel';
+import LicenseInfoTooltip from '../../components/vehicles/LicenseInfoTooltip';
 import { useTranslation } from 'react-i18next';
 
 const API = API_BASE;
@@ -443,7 +444,10 @@ const SellerRegistrationPage = () => {
                     
                     <div className="grid md:grid-cols-3 gap-4">
                       <div className="space-y-2">
-                        <Label>{selectedType === 'dealer' ? 'Dealer' : 'Auctioneer'} License # *</Label>
+                        <Label className="flex items-center gap-1.5">
+                          {selectedType === 'dealer' ? 'Dealer' : 'Auctioneer'} License # *
+                          <LicenseInfoTooltip credentialKey={selectedType === 'dealer' ? 'dealerLicense' : 'brokerLicense'} />
+                        </Label>
                         <Input
                           value={formData.license_number}
                           onChange={(e) => updateField('license_number', e.target.value)}
@@ -451,7 +455,10 @@ const SellerRegistrationPage = () => {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>{t("seller.licenseProvince")}</Label>
+                        <Label className="flex items-center gap-1.5">
+                          {t("seller.licenseProvince")}
+                          <LicenseInfoTooltip credentialKey="dealerLicense" />
+                        </Label>
                         <Input
                           value={formData.license_province}
                           onChange={(e) => updateField('license_province', e.target.value)}
@@ -459,7 +466,10 @@ const SellerRegistrationPage = () => {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>Tax ID / GST #</Label>
+                        <Label className="flex items-center gap-1.5">
+                          Tax ID / GST #
+                          <LicenseInfoTooltip credentialKey="gst" />
+                        </Label>
                         <Input
                           value={formData.tax_id}
                           onChange={(e) => updateField('tax_id', e.target.value)}
@@ -472,7 +482,10 @@ const SellerRegistrationPage = () => {
                 
                 {/* OPC Permit Field (Bilingual) */}
                 <div className="space-y-2 border-2 border-amber-200 rounded-lg p-4 bg-amber-50/50 dark:bg-amber-900/10">
-                  <Label className="font-semibold">OPC Permit Number / Numéro de permis OPC *</Label>
+                  <Label className="font-semibold flex items-center gap-1.5">
+                    OPC Permit Number / Numéro de permis OPC *
+                    <LicenseInfoTooltip credentialKey="opc" />
+                  </Label>
                   <Input
                     value={formData.license_number}
                     onChange={(e) => updateField('license_number', e.target.value)}

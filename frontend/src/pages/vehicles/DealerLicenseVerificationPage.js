@@ -19,6 +19,7 @@ import {
   ShieldCheck, Clock, CheckCircle2, XCircle, FileText, Upload, Loader2, ArrowLeft,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import LicenseInfoTooltip from '../../components/vehicles/LicenseInfoTooltip';
 
 const API = API_BASE;
 
