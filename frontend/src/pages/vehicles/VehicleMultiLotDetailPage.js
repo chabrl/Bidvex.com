@@ -8,7 +8,7 @@ import { Input } from '../../components/ui/input';
 import {
   Layers, Car, Gavel, Loader2, Clock, BellRing, Trophy,
   Lock, Unlock, ChevronDown, ChevronUp, History, ShieldAlert, Shield,
-  ChevronLeft, ChevronRight, Gauge, MapPin, Hash,
+  ChevronLeft, ChevronRight, Gauge, MapPin, Hash, X, ZoomIn,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import UpcomingCountdownBadge from '../../components/UpcomingCountdownBadge';
@@ -141,6 +141,137 @@ const BidHistoryPanel = ({ eventId, lot }) => {
   );
 };
 
+// iter419 — Photo-swipe zoom modal for the active-lot hero gallery.
+// Full-screen dark backdrop, keyboard arrows + Escape, on-image left/right
+// arrow controls, counter "n / total", close button, and touch-swipe
+// support for mobile. Only used on the Active Lot image gallery.
+const PhotoZoomModal = ({ images, initialIndex = 0, alt = '', onClose }) => {
+  const [index, setIndex] = useState(initialIndex);
+  const touchStartX = React.useRef(null);
+  const touchDeltaX = React.useRef(0);
+
+  const total = images?.length || 0;
+
+  const prev = useCallback(() => {
+    if (total <= 1) return;
+    setIndex((i) => (i - 1 + total) % total);
+  }, [total]);
+
+  const next = useCallback(() => {
+    if (total <= 1) return;
+    setIndex((i) => (i + 1) % total);
+  }, [total]);
+
+  // Keyboard navigation + Escape.
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose();
+      else if (e.key === 'ArrowLeft') prev();
+      else if (e.key === 'ArrowRight') next();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose, prev, next]);
+
+  // Lock body scroll while modal is open.
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prevOverflow; };
+  }, []);
+
+  // Touch-swipe handlers (mobile).
+  const onTouchStart = (e) => {
+    if (e.touches?.length !== 1) return;
+    touchStartX.current = e.touches[0].clientX;
+    touchDeltaX.current = 0;
+  };
+  const onTouchMove = (e) => {
+    if (touchStartX.current == null || e.touches?.length !== 1) return;
+    touchDeltaX.current = e.touches[0].clientX - touchStartX.current;
+  };
+  const onTouchEnd = () => {
+    const dx = touchDeltaX.current;
+    touchStartX.current = null;
+    touchDeltaX.current = 0;
+    if (Math.abs(dx) < 40) return; // ignore taps
+    if (dx > 0) prev(); else next();
+  };
+
+  if (!total) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-[70] bg-black/95 flex items-center justify-center select-none"
+      onClick={onClose}
+      data-testid="photo-zoom-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Vehicle photo viewer"
+    >
+      {/* Top bar */}
+      <div className="absolute top-0 left-0 right-0 flex items-center justify-between p-3 sm:p-4 text-white z-10">
+        <span
+          className="text-sm font-mono bg-white/10 rounded px-2 py-1"
+          data-testid="photo-zoom-counter"
+        >
+          {index + 1} / {total}
+        </span>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onClose(); }}
+          className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition"
+          aria-label="Close photo viewer"
+          data-testid="photo-zoom-close"
+        >
+          <X className="h-5 w-5" />
+        </button>
+      </div>
+
+      {/* Image */}
+      <div
+        className="relative w-full h-full flex items-center justify-center px-4"
+        onClick={(e) => e.stopPropagation()}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+      >
+        <SafeImage
+          src={images[index]?.full}
+          alt={`${alt} — photo ${index + 1}`}
+          className="max-w-full max-h-full object-contain"
+          loading="eager"
+          data-testid="photo-zoom-image"
+        />
+
+        {/* Arrows */}
+        {total > 1 && (
+          <>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); prev(); }}
+              className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 bg-white/10 hover:bg-white/20 text-white rounded-full p-3 transition"
+              aria-label="Previous image"
+              data-testid="photo-zoom-prev"
+            >
+              <ChevronLeft className="h-6 w-6" />
+            </button>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); next(); }}
+              className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 bg-white/10 hover:bg-white/20 text-white rounded-full p-3 transition"
+              aria-label="Next image"
+              data-testid="photo-zoom-next"
+            >
+              <ChevronRight className="h-6 w-6" />
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const VehicleMultiLotDetailPage = () => {
   const { eventId } = useParams();
   const navigate = useNavigate();
@@ -159,6 +290,9 @@ const VehicleMultiLotDetailPage = () => {
   const [depositMap, setDepositMap] = useState({});
   // iter418 — active-lot image gallery cursor (fix: images never rendered)
   const [activeImageIdx, setActiveImageIdx] = useState(0);
+  // iter419 — active-lot photo-swipe zoom modal
+  const [zoomOpen, setZoomOpen] = useState(false);
+  const [zoomIndex, setZoomIndex] = useState(0);
   // iter418 — one shared per-second tick for all countdowns on the page
   const { format: formatCountdown } = useVehicleCountdown();
 
@@ -437,14 +571,25 @@ const VehicleMultiLotDetailPage = () => {
                 <div className="relative w-full aspect-[4/3] bg-slate-100 rounded-lg overflow-hidden">
                   {activeLotMedia.length > 0 ? (
                     <>
-                      <SafeImage
-                        src={activeLotMedia[activeImageIdx]?.full}
-                        alt={`Lot ${activeLot.lot_number} — ${activeLot.year} ${activeLot.make} ${activeLot.model}`}
-                        className="w-full h-full object-cover"
-                        loading="eager"
-                        fetchPriority="high"
-                        data-testid="active-lot-hero-image"
-                      />
+                      <button
+                        type="button"
+                        onClick={() => { setZoomIndex(activeImageIdx); setZoomOpen(true); }}
+                        className="w-full h-full block group relative"
+                        aria-label="Zoom image"
+                        data-testid="active-lot-hero-zoom-btn"
+                      >
+                        <SafeImage
+                          src={activeLotMedia[activeImageIdx]?.full}
+                          alt={`Lot ${activeLot.lot_number} — ${activeLot.year} ${activeLot.make} ${activeLot.model}`}
+                          className="w-full h-full object-cover cursor-zoom-in transition group-hover:brightness-95"
+                          loading="eager"
+                          fetchPriority="high"
+                          data-testid="active-lot-hero-image"
+                        />
+                        <span className="absolute top-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded inline-flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                          <ZoomIn className="h-3.5 w-3.5" /> Click to zoom
+                        </span>
+                      </button>
                       {activeLotMedia.length > 1 && (
                         <>
                           <button
@@ -484,7 +629,7 @@ const VehicleMultiLotDetailPage = () => {
                       <button
                         key={m.full}
                         type="button"
-                        onClick={() => setActiveImageIdx(i)}
+                        onClick={() => { setActiveImageIdx(i); setZoomIndex(i); setZoomOpen(true); }}
                         className={`flex-shrink-0 w-16 h-16 rounded-md overflow-hidden border-2 transition ${
                           i === activeImageIdx ? 'border-blue-500 ring-2 ring-blue-200' : 'border-transparent opacity-70 hover:opacity-100'
                         }`}
@@ -823,6 +968,16 @@ const VehicleMultiLotDetailPage = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* iter419 — Photo-swipe zoom modal for active-lot hero gallery */}
+      {zoomOpen && activeLot && activeLotMedia.length > 0 && (
+        <PhotoZoomModal
+          images={activeLotMedia}
+          initialIndex={zoomIndex}
+          alt={`Lot ${activeLot.lot_number} — ${activeLot.year} ${activeLot.make} ${activeLot.model}`}
+          onClose={() => setZoomOpen(false)}
+        />
       )}
     </div>
   );
