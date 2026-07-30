@@ -584,7 +584,15 @@
     "sellerDashboard": "Seller Dashboard",
     "buyerDashboard": "My Dashboard",
     "adminPanel": "Admin Panel",
-    "affiliateDashboard": "Affiliate Dashboard"
+    "affiliateDashboard": "Affiliate Dashboard",
+    "dealerStatus": {
+      "verified": "Verified",
+      "underReview": "Under Review",
+      "suspended": "Suspended",
+      "tooltipVerified": "Your dealer account is verified. Click to manage.",
+      "tooltipUnderReview": "Your dealer application is under review.",
+      "tooltipSuspended": "Your dealer account is blocked. Click for details."
+    }
   },
   "hero": {
     "browseAuctions": "Browse Auctions"

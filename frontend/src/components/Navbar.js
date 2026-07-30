@@ -18,6 +18,8 @@ import {
 } from './ui/dropdown-menu';
 import SellOptionsModal from './SellOptionsModal';
 import NotificationCenter from './NotificationCenter';
+// iter428 — Dealer verification status pill (only renders for dealers)
+import DealerVerificationPill from './DealerVerificationPill';
 import useFeatureFlag from '../hooks/useFeatureFlag';
 import { useBannerHeight } from '../contexts/PromoBannerContext';
 import { LangLink } from './LangLink';
@@ -248,6 +250,9 @@ const Navbar = () => {
 
               {/* Notification Center */}
               {user && <NotificationCenter />}
+
+              {/* iter428 — Dealer verification status pill */}
+              {user && <DealerVerificationPill />}
 
               {/* User Menu */}
               {user ? (

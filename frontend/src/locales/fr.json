@@ -584,7 +584,15 @@
     "sellerDashboard": "Tableau de bord vendeur",
     "buyerDashboard": "Mon tableau de bord",
     "adminPanel": "Panneau Admin",
-    "affiliateDashboard": "Tableau de bord affilié"
+    "affiliateDashboard": "Tableau de bord affilié",
+    "dealerStatus": {
+      "verified": "Vérifié",
+      "underReview": "En examen",
+      "suspended": "Suspendu",
+      "tooltipVerified": "Votre compte concessionnaire est vérifié. Cliquez pour gérer.",
+      "tooltipUnderReview": "Votre demande de concessionnaire est en cours d'examen.",
+      "tooltipSuspended": "Votre compte concessionnaire est bloqué. Cliquez pour plus de détails."
+    }
   },
   "hero": {
     "browseAuctions": "Parcourir les enchères"

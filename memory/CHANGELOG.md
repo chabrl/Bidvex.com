@@ -1,6 +1,51 @@
 # BidVex Changelog
 
 
+## Feb 8, 2026 — iter428 Twilio Re-Audit + Dealer Verification Pill
+
+### Task 1 — Twilio routing re-audit
+Confirmed the iter422 fix is still in place and every routing scenario
+still passes:
+
+* Single `To=+14165551234` → dials the customer.
+* Duplicate `To=BidVex&To=customer` → dials the customer.
+* Standard `To=BidVex` + custom `PhoneNumber=customer` → dials the customer.
+* SDK outbound with ONLY `To=BidVex` → HTTP 400 (self-dial guard intact).
+
+If the bug is still visible for the user, it's because production
+hasn't been redeployed since iter422; the preview build has the fix.
+
+### Task 2 — Dealer verification status pill
+Added a compact status pill to the top navbar. Renders only for users
+who have a `vehicle_sellers` row (probes `/api/vehicle-sellers/me` —
+404 = not a dealer → no pill). Three states, matching the values
+consumed by `DealerVerificationGate`:
+
+| State | Colour | Label EN | Label FR | Trigger |
+|---|---|---|---|---|
+| `verified` | emerald | `✓ Verified` | `✓ Vérifié` | `verification_status === 'approved'` && not suspended |
+| `under_review` | amber | `⏳ Under Review` | `⏳ En examen` | `verification_status ∈ {pending, under_review}` |
+| `suspended` | rose | `⚠ Suspended` | `⚠ Suspendu` | `user.vehicle_dealer_suspended` OR `verification_status ∈ {suspended, rejected}` |
+
+Clicking the pill navigates to `/vehicle-auctions/seller/register`.
+Hover tooltip is localized (`nav.dealerStatus.tooltip*`).
+
+### Files touched
+- `frontend/src/components/DealerVerificationPill.jsx` (new)
+- `frontend/src/components/Navbar.js` — one import + one JSX line just
+  after `<NotificationCenter />`. Navbar layout, auth logic, and every
+  other component untouched.
+- `frontend/src/locales/en.json`, `frontend/src/locales/fr.json` — new
+  `nav.dealerStatus.*` keys.
+
+### Verified
+- Playwright cycled through all three states by flipping
+  `vehicle_sellers.verification_status` + `users.vehicle_dealer_suspended`
+  live in Mongo. Each state renders the correct pill with the correct
+  colour, symbol, and label. Data restored to `approved` after test.
+
+
+
 ## Feb 8, 2026 — iter427 Vehicle Listing System — Audit + Permission Fix
 
 ### User request
