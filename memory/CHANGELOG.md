@@ -1,6 +1,77 @@
 # BidVex Changelog
 
 
+## Feb 8, 2026 — iter438 i18n Cold-Load Fix + License Info Tooltip System
+
+Two focused improvements shipped in one iteration.
+
+### Task 1 — i18n cold-load
+Small, surgical patch to `/app/frontend/src/i18n.js`:
+- **`getPersistedLanguage()`** now scans `bidvex_language` first, then
+  falls back to the legacy `i18nextLng` key. This prevents a flash of
+  English on cold load for users who arrive with only the i18next
+  default cache key populated (older installs, test harnesses,
+  cross-tab scenarios).
+- **`persistLanguage()`** now mirrors every language change into BOTH
+  keys so future cold-loads always find the preference.
+- Runs synchronously before `i18n.init()`, so `i18n.language` is set
+  BEFORE React mounts — no re-render flash.
+
+Testing agent verified with `localStorage.i18nextLng='fr'` and no
+`bidvex_language` — marketplace renders in French on first paint
+(`Marché`, `Enchères de véhicules`, `document.documentElement.lang='fr'`).
+
+### Task 2 — License Info Tooltip system
+- **NEW component**
+  `/app/frontend/src/components/vehicles/LicenseInfoTooltip.jsx`
+  (~134 lines). Reusable ⓘ trigger + Shadcn Dialog. All copy consumed
+  via `t('licenseInfo.credentials.{credentialKey}.*')` keys — zero
+  hardcoded strings inside the component.
+- **Ten credentials covered** in `en.json` + `fr.json` under
+  `licenseInfo.credentials`:
+  - `opc` — OPC Permit (Quebec)
+  - `omvic` — OMVIC (Ontario)
+  - `amvic` — AMVIC (Alberta)
+  - `vsa` — VSA (British Columbia)
+  - `dealerLicense` — Generic dealer license (SK, MB, NS, NB, PEI, NL)
+  - `brokerLicense` — Vehicle broker license
+  - `businessNumber` — Federal CRA Business Number
+  - `gst` — GST/HST registration
+  - `qst` — Quebec Sales Tax registration
+  - `neq` — Numéro d'Entreprise du Québec
+- Each credential provides 8 fields: `name`, `what`, `why`, `issuer`,
+  `howToGet`, `verification`, `websiteUrl`, `websiteLabel`.
+- **Wired into 6 form fields**:
+  - `SellerRegistrationPage.js` — License #, License Province, Tax ID
+    (GST), OPC Permit (auctioneer variant swaps `dealerLicense` for
+    `brokerLicense`).
+  - `DealerLicenseVerificationPage.js` — License Number, Jurisdiction.
+
+### Testing
+- Frontend testing agent iter438 verified:
+  - Task 1: cold-load in FR + EN, persistence mirror to both keys, no
+    render flash after login.
+  - Task 2: 4 tooltip triggers on SellerRegistrationPage, modal opens
+    with 5 sections + valid https website link + working close button,
+    bilingual FR ⇄ EN toggle updates modal content, all 10 credentials
+    have complete 8-field entries in both locale files, all 20
+    websiteUrl entries are valid https URLs.
+- Post-test fix: DealerLicenseVerificationPage.js was missing the
+  `<LicenseInfoTooltip />` JSX (import existed but wasn't rendered
+  due to an earlier duplicate-content cleanup accident). Re-added
+  inside the License Number and Jurisdiction Labels — verified via
+  grep that all 6 usages are in place.
+
+### Testids for QA
+`license-info-trigger-{credentialKey}`,
+`license-info-modal-{credentialKey}`,
+`license-info-title-{credentialKey}`,
+`license-info-section-{credentialKey}-{what|why|issuer|howToGet|verification}`,
+`license-info-website-{credentialKey}`,
+`license-info-website-link-{credentialKey}`,
+`license-info-close-{credentialKey}`.
+
+
 ## Feb 8, 2026 — iter437 Settlements Module (Vehicle Dashboard)
 
 Delivered the P0 Settlements module inside `/vehicle-dashboard`, below

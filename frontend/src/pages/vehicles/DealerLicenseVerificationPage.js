@@ -199,7 +199,10 @@ const DealerLicenseVerificationPage = () => {
             {(!isApproved && !isPending) && (
               <>
                 <div className="space-y-2">
-                  <Label htmlFor="license_number">{t('vehicleDealer.licenseNumber')}</Label>
+                  <Label htmlFor="license_number" className="flex items-center gap-1.5">
+                    {t('vehicleDealer.licenseNumber')}
+                    <LicenseInfoTooltip credentialKey="dealerLicense" />
+                  </Label>
                   <Input
                     id="license_number"
                     value={form.license_number}
@@ -210,7 +213,10 @@ const DealerLicenseVerificationPage = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="jurisdiction">{t('vehicleDealer.jurisdiction')}</Label>
+                  <Label htmlFor="jurisdiction" className="flex items-center gap-1.5">
+                    {t('vehicleDealer.jurisdiction')}
+                    <LicenseInfoTooltip credentialKey="dealerLicense" />
+                  </Label>
                   <Input
                     id="jurisdiction"
                     value={form.jurisdiction}
