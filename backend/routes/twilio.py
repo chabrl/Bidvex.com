@@ -388,8 +388,24 @@ async def twiml_webhook(request: Request) -> Response:
     iter335: if a CallLogId param is forwarded from the Voice SDK, look
     up the coach nonce and add a <Start><Stream> block so the audio is
     silently mirrored to the AI Coach analysis endpoint. The added
-    stream is non-terminal — the <Dial> still bridges normally."""
-    form = dict((await request.form()))
+    stream is non-terminal — the <Dial> still bridges normally.
+
+    iter422 — Robust destination number resolution.
+    On outbound SDK calls the form body can contain TWO `To` values:
+      1. Twilio's STANDARD `To`, which for a TwiML App defaults to the
+         app's registered phone number (= TWILIO_PHONE_NUMBER).
+      2. The CUSTOM `To` we send via `device.connect({params:{To:...}})`.
+    `form.get("To")` is single-valued and picks whichever the parser saw
+    first; when it lands on TWILIO_PHONE_NUMBER the iter340 self-dial
+    guard trips and the call fails (or, pre-iter340, actually dialed the
+    main line — the reported bug). Resolve by scanning every `To` value
+    plus the `PhoneNumber` custom-param fallback, and pick the first
+    E.164 number that is NOT the main line."""
+    form_multi = await request.form()
+    # Preserve the multi-valued form for destination resolution; the
+    # single-valued dict is what downstream code (signature check,
+    # logging) already expects.
+    form = dict(form_multi)
 
     # iter346 P0 — First-line webhook logging. If this line does NOT
     # appear in production logs when a contractor places a call, then
@@ -398,9 +414,16 @@ async def twiml_webhook(request: Request) -> Response:
     # the request. If it DOES appear, we can see exactly what Twilio
     # sent us (To/From/Direction/CallSid/URL/Host) and route the
     # investigation from there.
+    # iter422 — also dump every `To` value + the `PhoneNumber` custom
+    # param so we can distinguish Twilio's default `To` from our custom
+    # override at a glance.
+    all_to_values = form_multi.getlist("To") if hasattr(form_multi, "getlist") else [form.get("To", "")]
+    phone_number_param = (form.get("PhoneNumber") or "").strip()
     logger.info(
         f"[TWIML] webhook received | "
         f"To={form.get('To', 'MISSING')} | "
+        f"AllToValues={all_to_values} | "
+        f"PhoneNumber={phone_number_param or 'MISSING'} | "
         f"From={form.get('From', 'MISSING')} | "
         f"CallSid={form.get('CallSid', 'MISSING')} | "
         f"Direction={form.get('Direction', 'MISSING')} | "
@@ -422,12 +445,47 @@ async def twiml_webhook(request: Request) -> Response:
     # how calls ended up ringing the BidVex main line instead of the client.
     from_field = (form.get("From") or form.get("Caller") or "").strip()
     direction  = (form.get("Direction") or "").lower()
-    to_number  = (form.get("To") or "").strip()
     is_sdk_outbound = from_field.startswith("client:")
+
+    # iter422 — Resolve the customer destination number from any of the
+    # candidate fields, preferring one that isn't the BidVex main line.
+    # Preference: any To value that is E.164 and != TWILIO_PHONE_NUMBER
+    # → then the PhoneNumber custom param → then any To value at all.
+    to_candidates: List[str] = []
+    for v in all_to_values:
+        v = (v or "").strip()
+        if v:
+            to_candidates.append(v)
+    if phone_number_param and phone_number_param not in to_candidates:
+        to_candidates.append(phone_number_param)
+
+    def _pick_customer_number(cands: List[str]) -> str:
+        # Prefer a valid E.164 that isn't the main line.
+        for c in cands:
+            if validate_e164(c) and c != TWILIO_PHONE_NUMBER:
+                return c
+        # Fallback: any valid E.164 (even the main line — the guard below
+        # will still refuse to dial it, which is what we want).
+        for c in cands:
+            if validate_e164(c):
+                return c
+        # Last resort: whatever `To` says (may be empty).
+        return cands[0] if cands else ""
+
+    to_number = _pick_customer_number(to_candidates)
+
+    if to_number != form.get("To"):
+        logger.info(
+            f"[twiml] destination resolved from candidates {to_candidates} "
+            f"(form.To={form.get('To')!r}) → {to_number}"
+        )
 
     if not is_sdk_outbound or (TWILIO_PHONE_NUMBER and to_number == TWILIO_PHONE_NUMBER):
         if is_sdk_outbound:
-            logger.error(f"[twiml] REFUSED self-dial of main line (from={from_field})")
+            logger.error(
+                f"[twiml] REFUSED self-dial of main line "
+                f"(from={from_field}, all_To={all_to_values}, PhoneNumber={phone_number_param!r})"
+            )
             raise HTTPException(400, "refusing to dial the BidVex main number")
         # Inbound call to the BidVex main line — greet, never self-dial.
         logger.info(f"[twiml] inbound call handled (from={from_field}, direction={direction})")

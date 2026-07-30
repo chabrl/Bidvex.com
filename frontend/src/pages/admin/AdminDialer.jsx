@@ -261,7 +261,13 @@ export default function AdminDialer() {
           // iter335 — Pass CallLogId as a custom param; Twilio forwards it
           // to /api/twilio/twiml as a form field, which the server uses to
           // look up the coach nonce and inject <Start><Stream>.
-          const conn = await twilioDevice.connect({ params: { To: phone.trim(), CallLogId: callLogId } });
+          // iter422 — Also send `PhoneNumber` as a collision-free duplicate
+          // of the customer destination. Twilio's default `To` on SDK
+          // outbound calls is the TwiML App's own phone number, which
+          // clashes with a custom `To` param; the backend picks whichever
+          // valid E.164 candidate isn't the BidVex main line.
+          const dest = phone.trim();
+          const conn = await twilioDevice.connect({ params: { To: dest, PhoneNumber: dest, CallLogId: callLogId } });
           setTwilioConnection(conn);
           conn.on('accept', () => setActiveCall((p) => p && { ...p, status: 'answered' }));
           conn.on('disconnect', () => {

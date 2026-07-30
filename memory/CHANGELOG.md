@@ -1,6 +1,61 @@
 # BidVex Changelog
 
 
+## Feb 8, 2026 — iter422 Contractor Dialer Routing — Audit + Fix
+
+### Reported bug
+"When a contractor initiates an outbound call, the system is routing to
+the BidVex main number instead of the customer's number."
+
+### Audit — Complete call flow
+
+| Stage | Actual behaviour (proven via curl) | Verdict |
+|---|---|---|
+| 1. Frontend `AdminDialer.jsx:264` `.connect({params:{To, CallLogId}})` | Sends customer E.164 in the `To` custom param | ✅ |
+| 2. Twilio SDK → Twilio edge | Adds STANDARD `To`, `From=client:agent-...`, `Direction=outbound-dial`, `CallSid`. **Twilio's default `To` for an SDK outbound call to a TwiML App is the app's own phone number (= TWILIO_PHONE_NUMBER)**, so the form body carries `To` **twice** — the standard one AND our custom one | ⚠️ collision source |
+| 3. Backend `[TWIML]` log at line 401 | Records `To/From/CallSid/Direction/CallLogId` already | ✅ |
+| 4. Destination resolution — line 425 `to_number = form.get("To")` | `form.get` is single-valued → returns whichever `To` the parser saw first. Depending on order, that's either the customer or `TWILIO_PHONE_NUMBER` | ❌ **root cause** |
+| 5. Guard at line 428 | If `to_number == TWILIO_PHONE_NUMBER` → HTTP 400 "refusing to dial the BidVex main number" (iter340 self-dial guard). Pre-iter340, this actually routed the call to the BidVex main line = the reported bug | ⚠️ symptom |
+| 6. `build_outbound_twiml` | Correct — dials whatever it's given | ✅ |
+
+Reproduced live via curl:
+* Duplicate `To` (customer, then BidVex) → HTTP 400 refused
+* Standard `To=BidVex` + custom `PhoneNumber=customer` → HTTP 400 refused
+
+### Fix — Robust destination resolution
+**Backend** (`routes/twilio.py`, `/api/twilio/twiml`):
+- Switched from `dict(form)` to keeping the multi-valued form
+  (`request.form()` → `getlist("To")`).
+- New resolver picks the first E.164 candidate that is **not** the BidVex
+  main line, scanning every `To` value plus a new `PhoneNumber`
+  custom-param fallback.
+- Enhanced `[TWIML]` log line now dumps `AllToValues` + `PhoneNumber`
+  so ops can pinpoint any future collision at a glance.
+- iter340 self-dial guard and the greet-and-hang-up inbound branch
+  untouched.
+
+**Frontend** (`pages/admin/AdminDialer.jsx:264`):
+- `.connect({params: {To, PhoneNumber, CallLogId}})` — sends the same
+  customer number under both `To` and `PhoneNumber` so the backend has
+  a collision-free fallback regardless of how Twilio's form-serialiser
+  orders the standard `To` field.
+
+### Verified — 9 curl scenarios all pass
+* Canada (+14165551234), USA (+14155550123), France (+33612345678): dials the customer
+* Duplicate `To` (BidVex first, customer second): dials the customer
+* Duplicate `To` (customer first, BidVex second): **was HTTP 400, now dials the customer**
+* Standard `To=BidVex` + custom `PhoneNumber=customer`: **was HTTP 400, now dials the customer**
+* SDK outbound with only `To=BidVex`: still HTTP 400 (self-dial guard intact)
+* Real inbound PSTN caller → greet + hang-up (no <Dial>) — unchanged
+
+### Verified — Step 3 (no regressions in other telephony features)
+* TwiML still emits `record="record-from-answer"` + `recordingStatusCallback` + `recordingStatusCallbackMethod="POST"` + `recordingStatusCallbackEvent="completed"`.
+* TwiML still emits `<Number statusCallback=... statusCallbackMethod="POST" statusCallbackEvent="initiated answered completed">`.
+* `/api/twilio/call-status-callback` and `/api/twilio/recording-callback` both still return HTTP 200.
+* CallSid + all diagnostic fields still logged.
+
+
+
 ## Feb 8, 2026 — iter421 Admin Dealer Internal Notes
 
 Added an internal notes field to the dealer profile in the Admin Vehicle
