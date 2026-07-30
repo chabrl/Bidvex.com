@@ -17,6 +17,7 @@ import WatchlistButton from '../../components/WatchlistButton';
 import { usePlatformTermsGate } from '../../contexts/PlatformTermsGateContext';
 import SafeImage from '../../components/SafeImage';
 import useVehicleCountdown from '../../hooks/useVehicleCountdown';
+import { extractErrorMessage } from '../../utils/errorHandler';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -403,7 +404,7 @@ const VehicleMultiLotDetailPage = () => {
       setDepositMap((m) => ({ ...m, [depositModal.lotId]: true }));
       setDepositModal(null);
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Deposit payment failed');
+      toast.error(extractErrorMessage(e) || 'Deposit payment failed');
     } finally {
       setPayingDeposit(false);
     }
@@ -470,7 +471,7 @@ const VehicleMultiLotDetailPage = () => {
       }, { headers: { Authorization: `Bearer ${token}` } });
       toast.success('We\u2019ll email you when bidding opens!');
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Subscription failed — login required');
+      toast.error(extractErrorMessage(e) || 'Subscription failed — login required');
     } finally {
       setNotifying(false);
     }

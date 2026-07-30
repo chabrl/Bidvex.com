@@ -1,4 +1,5 @@
 import API_BASE from '../../config';
+import { extractErrorMessage } from '../../utils/errorHandler';
 /**
  * My Vehicle Listings Page — iter303 Directive 2
  *
@@ -348,7 +349,7 @@ const MyVehicleListingsPage = () => {
         : (isFr ? 'Annonce programmée' : 'Listing scheduled'));
       fetchData();
     } catch (err) {
-      toast.error(err?.response?.data?.detail || (isFr ? "Échec de l'activation" : 'Failed to activate draft'));
+      toast.error(extractErrorMessage(err) || (isFr ? "Échec de l'activation" : 'Failed to activate draft'));
     }
   };
 
@@ -365,7 +366,7 @@ const MyVehicleListingsPage = () => {
       toast.success(isFr ? 'Brouillon supprimé' : 'Draft deleted');
       fetchData();
     } catch (err) {
-      toast.error(err?.response?.data?.detail || (isFr ? 'Échec de la suppression' : 'Failed to delete draft'));
+      toast.error(extractErrorMessage(err) || (isFr ? 'Échec de la suppression' : 'Failed to delete draft'));
     }
   };
 

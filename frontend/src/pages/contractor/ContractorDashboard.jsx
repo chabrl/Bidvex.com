@@ -1,3 +1,4 @@
+import { extractErrorMessage } from '../../utils/errorHandler';
 /**
  * iter316 Phase B — Mission B4
  * Contractor Dashboard at `/contractor/dashboard`.
@@ -131,7 +132,7 @@ export default function ContractorDashboard() {
         toast.error(fr ? 'Impossible d\u2019initier l\u2019inscription Stripe.' : 'Could not start Stripe onboarding.');
       }
     } catch (e) {
-      toast.error(e?.response?.data?.detail || (fr ? 'Échec Stripe.' : 'Stripe onboarding failed.'));
+      toast.error(extractErrorMessage(e) || (fr ? 'Échec Stripe.' : 'Stripe onboarding failed.'));
     } finally {
       setOnboardingBusy(false);
     }

@@ -1,3 +1,4 @@
+import { extractErrorMessage } from '../../utils/errorHandler';
 /**
  * DealerLicenseVerificationPage — iter194
  * Buyer-facing form to submit dealer license proof for "licensed_only" auction access.
@@ -79,7 +80,7 @@ const DealerLicenseVerificationPage = () => {
       setForm((prev) => ({ ...prev, document_url: res.data.url }));
       toast.success(t('storage.facilityRegister.fileUploaded'));
     } catch (err) {
-      toast.error(err?.response?.data?.detail || 'Upload failed');
+      toast.error(extractErrorMessage(err) || 'Upload failed');
     } finally {
       setUploading(false);
     }

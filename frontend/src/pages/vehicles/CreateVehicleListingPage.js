@@ -1,4 +1,5 @@
 import API_BASE from '../../config';
+import { extractErrorMessage } from '../../utils/errorHandler';
 /**
  * Create Vehicle Listing Page
  * Multi-step form with VIN auto-fill and photo upload
@@ -298,7 +299,7 @@ const CreateVehicleListingPage = () => {
       
       toast.success('VIN decoded successfully!');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to decode VIN');
+      toast.error(extractErrorMessage(error) || 'Failed to decode VIN');
     } finally {
       setVinLoading(false);
     }

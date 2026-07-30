@@ -1,6 +1,58 @@
 # BidVex Changelog
 
 
+## Feb 8, 2026 — iter425 `toast.error` Sweep — Non-Admin Pages
+
+Extended the iter424 admin sweep to non-admin user-facing pages using
+the same script and rule set.
+
+### Scope covered
+- `frontend/src/pages/contractor/` (6 files scanned)
+- `frontend/src/pages/vehicles/` (14 files scanned; this dir also
+  houses `SellerRegistrationPage.js` and `DealerLicenseVerificationPage.js`
+  — the codebase has no separate `pages/dealer-registration/` folder)
+
+### Changes
+**12 `toast.error` calls rewritten across 8 files.** Each substitution
+routes a raw `e?.response?.data?.detail` (or `err.` / `error.` variant)
+through the shared `extractErrorMessage` helper, and each touched file
+receives a single `import { extractErrorMessage } from '../../utils/errorHandler';`
+if it wasn't already present.
+
+- `pages/contractor/ContractorDashboard.jsx` — 1 call
+- `pages/vehicles/CreateVehicleListingPage.js` — 1 call
+- `pages/vehicles/CreateVehicleMultiLotPage.js` — 2 calls
+- `pages/vehicles/DealerLicenseVerificationPage.js` — 1 call
+- `pages/vehicles/MyVehicleListingsPage.js` — 2 calls
+- `pages/vehicles/SellerRegistrationPage.js` — 1 call
+- `pages/vehicles/VehicleDetailPage.js` — 2 calls (see manual patch
+  below)
+- `pages/vehicles/VehicleMultiLotDetailPage.js` — 2 calls
+
+### One manual follow-up
+`VehicleDetailPage.js` already imported the helper aliased as
+`_extractErrorMessage`. The sweep injected substitutions that referenced
+the plain name, so ESLint flagged `extractErrorMessage is not defined`.
+Fixed by dropping the `as _extractErrorMessage` alias (single existing
+site at line 1108 renamed to `extractErrorMessage`) — cleaner than
+adding a duplicate import.
+
+### Verified
+- `grep -rE "toast\\.error\\([^)]*\\.response(\\?)?\\.data(\\?)?\\.detail"`
+  on the two sweep dirs returns **0 hits**.
+- Lint reports zero new errors caused by the sweep. All remaining lint
+  issues on these files (undefined `buyerGateCleared` / `handleBid` in
+  `VehicleDetailPage.js`, unescaped JSX entities in
+  `SellerRegistrationPage.js`, empty catch blocks in
+  `CreateVehicleListingPage.js`) pre-date iter425 and were left
+  untouched per the "no other logic changes" rule.
+- Playwright smoke test on preview: multi-lot detail page, general
+  vehicles page, and contractor dashboard all load with no runtime
+  errors; contractor dashboard renders fully with commission stats,
+  profile card, and referral leaderboard.
+
+
+
 ## Feb 8, 2026 — iter424 Admin Panel `toast.error` Sweep
 
 Following iter423's `AdminVehicleDealersPage` fix (React #31 crash when a

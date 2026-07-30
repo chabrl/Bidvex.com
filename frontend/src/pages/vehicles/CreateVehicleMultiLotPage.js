@@ -1,4 +1,5 @@
 import API_BASE from '../../config';
+import { extractErrorMessage } from '../../utils/errorHandler';
 /**
  * CreateVehicleMultiLotPage — iter303 Directive 1
  *
@@ -419,7 +420,7 @@ const CreateVehicleMultiLotPage = () => {
       });
       toast.success(L('VIN decoded — fields auto-filled', 'NIV décodé — champs auto-remplis'));
     } catch (err) {
-      toast.error(err?.response?.data?.detail || L('VIN lookup failed', 'Échec du décodage du NIV'));
+      toast.error(extractErrorMessage(err) || L('VIN lookup failed', 'Échec du décodage du NIV'));
     } finally {
       setVinLoading(null);
     }
@@ -625,7 +626,7 @@ const CreateVehicleMultiLotPage = () => {
       navigate(`/vehicle-multi-lot/${eventId}`);
     } catch (err) {
       console.error(err);
-      toast.error(err?.response?.data?.detail || L('Failed to create multi-lot event', "Échec de création de l'événement"));
+      toast.error(extractErrorMessage(err) || L('Failed to create multi-lot event', "Échec de création de l'événement"));
     } finally {
       setLoading(false);
     }

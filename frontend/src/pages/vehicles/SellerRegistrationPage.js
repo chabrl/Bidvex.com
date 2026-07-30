@@ -1,4 +1,5 @@
 import API_BASE from '../../config';
+import { extractErrorMessage } from '../../utils/errorHandler';
 /**
  * Vehicle Seller Registration Page
  * Register as a vehicle seller (Private, Dealer, or Auctioneer)
@@ -139,7 +140,7 @@ const SellerRegistrationPage = () => {
       navigate('/vehicle-auctions');
       
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Registration failed');
+      toast.error(extractErrorMessage(error) || 'Registration failed');
     } finally {
       setLoading(false);
     }

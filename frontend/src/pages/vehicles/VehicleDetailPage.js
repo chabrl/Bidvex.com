@@ -18,7 +18,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePlatformTermsGate } from '../../contexts/PlatformTermsGateContext';
 import { authHeaders } from '../../utils/authToken';
-import { extractErrorMessage as _extractErrorMessage } from '../../utils/errorHandler';
+import { extractErrorMessage } from '../../utils/errorHandler';
 import axios from 'axios';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
@@ -911,7 +911,7 @@ const VehicleBuyNowBody = ({ vehicle, preview, setPreview, loading, setLoading, 
         );
         if (!cancelled) setPreview(r.data);
       } catch (err) {
-        if (!cancelled) toast.error(err?.response?.data?.detail || t('common.error'));
+        if (!cancelled) toast.error(extractErrorMessage(err) || t('common.error'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -935,7 +935,7 @@ const VehicleBuyNowBody = ({ vehicle, preview, setPreview, loading, setLoading, 
       onClose();
       setTimeout(() => window.location.reload(), 1500);
     } catch (err) {
-      toast.error(err?.response?.data?.detail || t('common.error'));
+      toast.error(extractErrorMessage(err) || t('common.error'));
     } finally {
       setProcessing(false);
     }
@@ -1105,7 +1105,7 @@ const VehicleDetailPage = () => {
         // Tracking is best-effort. Swallow.
       }
     } catch (err) {
-      setError(_extractErrorMessage(err) || 'Vehicle not found');
+      setError(extractErrorMessage(err) || 'Vehicle not found');
     } finally {
       setLoading(false);
     }
