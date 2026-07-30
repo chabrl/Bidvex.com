@@ -18,6 +18,7 @@ import {
   AlertCircle,
   Shield
 } from 'lucide-react';
+import { extractErrorMessage } from '../../utils/errorHandler';
 
 const API = API_BASE;
 
@@ -63,7 +64,7 @@ const CurrencyAppealsManager = () => {
       fetchAllAppeals();
     } catch (error) {
       console.error('Failed to review appeal:', error);
-      toast.error(error.response?.data?.detail || t('admin.appeals.error'));
+      toast.error(extractErrorMessage(error) || t('admin.appeals.error'));
     } finally {
       setProcessing(false);
     }

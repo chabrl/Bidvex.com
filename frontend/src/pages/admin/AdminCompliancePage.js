@@ -1,3 +1,4 @@
+import { extractErrorMessage } from '../../utils/errorHandler';
 /**
  * iter307 — Admin Compliance Dashboard
  *
@@ -88,7 +89,7 @@ const FlaggedListings = () => {
       toast.success(fr ? 'Action effectuée' : 'Action completed');
       load();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || (fr ? 'Échec' : 'Failed'));
+      toast.error(extractErrorMessage(e) || (fr ? 'Échec' : 'Failed'));
     } finally {
       setBusy(null);
     }
@@ -172,7 +173,7 @@ const BiddingSuspended = () => {
       toast.success(fr ? "Utilisateur réintégré" : 'User reinstated');
       load();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || (fr ? 'Échec' : 'Failed'));
+      toast.error(extractErrorMessage(e) || (fr ? 'Échec' : 'Failed'));
     } finally { setBusy(null); }
   };
 
@@ -342,7 +343,7 @@ const EscalatedDisputes = () => {
       toast.success(fr ? 'Note ajoutée' : 'Note added');
       setNoteFor(null); setNoteText(''); load();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || (fr ? 'Échec' : 'Failed'));
+      toast.error(extractErrorMessage(e) || (fr ? 'Échec' : 'Failed'));
     } finally { setSaving(false); }
   };
 
@@ -437,7 +438,7 @@ const Bill96Violations = () => {
       toast.success(fr ? 'Vendeur notifié — 48 h pour corriger' : 'Seller notified — 48h to fix');
       load();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || (fr ? 'Échec' : 'Failed'));
+      toast.error(extractErrorMessage(e) || (fr ? 'Échec' : 'Failed'));
     } finally { setBusy(null); }
   };
 

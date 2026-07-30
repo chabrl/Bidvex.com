@@ -1,3 +1,4 @@
+import { extractErrorMessage } from '../../utils/errorHandler';
 /**
  * Phase 5 — Admin Feed Health dashboard.
  *
@@ -70,7 +71,7 @@ const AdminFeedsPage = () => {
       toast.success(`Feed cache refreshed — ${data.item_count} items`);
       await loadMeta();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Refresh failed');
+      toast.error(extractErrorMessage(e) || 'Refresh failed');
     } finally {
       setRefreshing(false);
     }

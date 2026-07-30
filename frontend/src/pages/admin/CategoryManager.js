@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { toast } from 'sonner';
 import { FolderOpen, Plus, Edit2, Trash2, ChevronRight } from 'lucide-react';
+import { extractErrorMessage } from '../../utils/errorHandler';
 
 const API = API_BASE;
 
@@ -30,7 +31,7 @@ const CategoryManager = () => {
       const data = Array.isArray(response.data) ? response.data : response.data.categories || [];
       setCategories(data);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to load categories');
+      toast.error(extractErrorMessage(error) || 'Failed to load categories');
     } finally {
       setLoading(false);
     }
@@ -53,7 +54,7 @@ const CategoryManager = () => {
       resetForm();
       fetchCategories();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to save category');
+      toast.error(extractErrorMessage(error) || 'Failed to save category');
     }
   };
 
@@ -76,7 +77,7 @@ const CategoryManager = () => {
       toast.success('Category deleted');
       fetchCategories();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to delete category');
+      toast.error(extractErrorMessage(error) || 'Failed to delete category');
     }
   };
 

@@ -1,4 +1,5 @@
 import API_BASE from '../../config';
+import { extractErrorMessage } from '../../utils/errorHandler';
 /**
  * SiteModeManager - Admin control for website maintenance/coming soon mode
  * Features: Toggle between Live/Maintenance/Coming Soon, custom messages, subscriber management
@@ -181,7 +182,7 @@ const SiteModeManager = () => {
       fetchSiteMode();
     } catch (error) {
       console.error('Error updating site mode:', error);
-      toast.error(error.response?.data?.detail || 'Failed to update site mode');
+      toast.error(extractErrorMessage(error) || 'Failed to update site mode');
     } finally {
       setSaving(false);
     }

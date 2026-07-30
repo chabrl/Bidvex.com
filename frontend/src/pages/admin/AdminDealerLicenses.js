@@ -1,3 +1,4 @@
+import { extractErrorMessage } from '../../utils/errorHandler';
 /**
  * AdminDealerLicenses — iter195 (P0)
  * ===================================
@@ -108,7 +109,7 @@ const AdminDealerLicenses = () => {
       const res = await axios.get(url, { headers: { Authorization: `Bearer ${token}` } });
       setItems(res.data?.items || []);
     } catch (err) {
-      toast.error(err?.response?.data?.detail || 'Failed to load licenses');
+      toast.error(extractErrorMessage(err) || 'Failed to load licenses');
     } finally {
       setLoading(false);
     }
@@ -129,7 +130,7 @@ const AdminDealerLicenses = () => {
       toast.success('License approved — buyer notified by email');
       fetchList(activeTab);
     } catch (err) {
-      toast.error(err?.response?.data?.detail || 'Approve failed');
+      toast.error(extractErrorMessage(err) || 'Approve failed');
     } finally {
       setProcessingId(null);
     }
@@ -148,7 +149,7 @@ const AdminDealerLicenses = () => {
       setRejectTarget(null);
       fetchList(activeTab);
     } catch (err) {
-      toast.error(err?.response?.data?.detail || 'Reject failed');
+      toast.error(extractErrorMessage(err) || 'Reject failed');
     } finally {
       setProcessingId(null);
     }

@@ -36,6 +36,7 @@ import {
   UserPlus, UserMinus, Download, ListFilter, Target,
   MailOpen, MousePointerClick, AlertCircle, Loader2
 } from 'lucide-react';
+import { extractErrorMessage } from '../../utils/errorHandler';
 
 const API = API_BASE;
 
@@ -662,7 +663,7 @@ const EmailMarketingManager = () => {
       const res = await axios.get(`${API}/admin/marketing/campaigns/${campaign.id}/stats`, { headers });
       setInsightsModal((m) => ({ ...m, stats: res.data, loading: false }));
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Failed to load campaign insights');
+      toast.error(extractErrorMessage(err) || 'Failed to load campaign insights');
       setInsightsModal((m) => ({ ...m, loading: false }));
     }
   };
@@ -675,7 +676,7 @@ const EmailMarketingManager = () => {
       toast.success(`Cloned as "${res.data.name}"`);
       fetchCampaigns();
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Failed to clone');
+      toast.error(extractErrorMessage(err) || 'Failed to clone');
     } finally { setCloningId(null); }
   };
 
@@ -688,7 +689,7 @@ const EmailMarketingManager = () => {
       toast.success(`Resent: ${res.data.sent || 0} delivered`);
       fetchCampaigns();
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Failed to resend');
+      toast.error(extractErrorMessage(err) || 'Failed to resend');
     } finally { setResendingId(null); }
   };
 

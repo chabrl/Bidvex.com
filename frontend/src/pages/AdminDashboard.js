@@ -76,6 +76,7 @@ import CommunityModerationManager from './admin/CommunityModerationManager';
 import TeamManager from '../components/admin/TeamManager';
 // iter318 — Admin Careers console (lazy)
 import { lazy as _lazyCareers, Suspense as _SuspenseCareers } from 'react';
+import { extractErrorMessage } from '../utils/errorHandler';
 const _AdminCareersConsole = _lazyCareers(() => import('./admin/AdminCareersConsole'));
 const AdminCareersConsoleLazy = (props) => (
   <_SuspenseCareers fallback={<div className="p-8 text-center text-slate-500">Loading…</div>}>
@@ -550,7 +551,7 @@ const AdminDashboard = () => {
         // Rollback on failure
         setLiveSettings(prev => ({ ...prev, [setting]: oldValue }));
         toast.error('Failed to save setting', {
-          description: error.response?.data?.detail || 'Please try again.',
+          description: extractErrorMessage(error) || 'Please try again.',
         });
         return;
       }

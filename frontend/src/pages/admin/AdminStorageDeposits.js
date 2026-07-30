@@ -8,6 +8,7 @@ import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Input } from '../../components/ui/input';
 import { Loader2, ShieldCheck, DollarSign, RefreshCw, AlertTriangle, Ban, CheckCircle } from 'lucide-react';
+import { extractErrorMessage } from '../../utils/errorHandler';
 
 const API = API_BASE;
 
@@ -56,7 +57,7 @@ const AdminStorageDeposits = () => {
       setConfirming(null);
       fetchData();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Release failed · Échec');
+      toast.error(extractErrorMessage(e) || 'Release failed · Échec');
     } finally {
       setBusyId(null);
     }
@@ -79,7 +80,7 @@ const AdminStorageDeposits = () => {
       setReason('');
       fetchData();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Forfeit failed · Échec');
+      toast.error(extractErrorMessage(e) || 'Forfeit failed · Échec');
     } finally {
       setBusyId(null);
     }

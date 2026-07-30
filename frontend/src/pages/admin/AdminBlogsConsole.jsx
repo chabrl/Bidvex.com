@@ -1,3 +1,4 @@
+import { extractErrorMessage } from '../../utils/errorHandler';
 /**
  * iter331 — AdminBlogsConsole
  *
@@ -73,7 +74,7 @@ export default function AdminBlogsConsole() {
       });
       setArticles(r.data?.articles || []);
     } catch (e) {
-      toast.error(`Failed to load articles: ${e?.response?.data?.detail || e?.message}`);
+      toast.error(`Failed to load articles: ${extractErrorMessage(e) || e?.message}`);
     } finally {
       setLoading(false);
     }
@@ -123,7 +124,7 @@ export default function AdminBlogsConsole() {
         toast.success('Cover uploaded.');
       }
     } catch (err) {
-      toast.error(`Upload failed: ${err?.response?.data?.detail || err?.message}`);
+      toast.error(`Upload failed: ${extractErrorMessage(err) || err?.message}`);
     } finally {
       setCoverUploading(false);
       e.target.value = '';  // reset input so re-uploading the same file works
@@ -191,7 +192,7 @@ export default function AdminBlogsConsole() {
       toast.success(next ? 'Published.' : 'Unpublished.');
       await fetchArticles();
     } catch (e) {
-      toast.error(`Toggle failed: ${e?.response?.data?.detail || e?.message}`);
+      toast.error(`Toggle failed: ${extractErrorMessage(e) || e?.message}`);
     }
   };
 
@@ -205,7 +206,7 @@ export default function AdminBlogsConsole() {
       setDeleteId(null);
       await fetchArticles();
     } catch (e) {
-      toast.error(`Delete failed: ${e?.response?.data?.detail || e?.message}`);
+      toast.error(`Delete failed: ${extractErrorMessage(e) || e?.message}`);
     }
   };
 

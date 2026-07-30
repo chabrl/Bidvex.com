@@ -1,3 +1,4 @@
+import { extractErrorMessage } from '../../utils/errorHandler';
 /**
  * iter334 — Admin AI Voice Calls console
  *
@@ -51,7 +52,7 @@ function TranscriptView({ callSid, token }) {
         });
         if (!cancelled) setFull(r.data);
       } catch (e) {
-        if (!cancelled) toast.error(`Failed to load transcript: ${e?.response?.data?.detail || e?.message}`);
+        if (!cancelled) toast.error(`Failed to load transcript: ${extractErrorMessage(e) || e?.message}`);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -115,7 +116,7 @@ export default function AdminAIVoiceCalls() {
       });
       setCalls(r.data?.calls || []);
     } catch (e) {
-      toast.error(`Failed to load AI calls: ${e?.response?.data?.detail || e?.message}`);
+      toast.error(`Failed to load AI calls: ${extractErrorMessage(e) || e?.message}`);
     } finally {
       setLoading(false);
     }

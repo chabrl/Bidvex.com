@@ -1,3 +1,4 @@
+import { extractErrorMessage } from '../../utils/errorHandler';
 /**
  * iter316 Phase B — Mission B5
  * Admin Contractors page + Commission Rate Editor modal.
@@ -459,7 +460,7 @@ function CommissionRateEditorModal({ contractor, fr, token, onClose, onSaved }) 
       );
       onSaved();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || (fr ? 'Échec de la sauvegarde.' : 'Save failed.'));
+      toast.error(extractErrorMessage(e) || (fr ? 'Échec de la sauvegarde.' : 'Save failed.'));
     } finally {
       setSaving(false);
     }
@@ -575,7 +576,7 @@ function RemoveAttributionDialog({ ctx, fr, token, onClose, onDone }) {
       toast.success(fr ? 'Attribution retirée.' : 'Attribution removed.');
       onDone();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || (fr ? 'Échec.' : 'Failed.'));
+      toast.error(extractErrorMessage(e) || (fr ? 'Échec.' : 'Failed.'));
     } finally {
       setBusy(false);
     }

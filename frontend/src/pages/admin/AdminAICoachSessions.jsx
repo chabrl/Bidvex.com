@@ -1,3 +1,4 @@
+import { extractErrorMessage } from '../../utils/errorHandler';
 /**
  * iter335 — AdminAICoachSessions
  *
@@ -149,7 +150,7 @@ function FollowUpEmailPanel({ session, token }) {
           ? "L'appel doit être terminé pour générer un suivi."
           : 'Call session must be completed before generating a follow-up.');
       } else {
-        toast.error(`${e?.response?.data?.detail || e?.message || 'Failed'}`);
+        toast.error(`${extractErrorMessage(e) || e?.message || 'Failed'}`);
       }
     } finally {
       setIsGenerating(false);
@@ -266,7 +267,7 @@ function DetailView({ callLogId, token }) {
         });
         if (!cancelled) setDoc(r.data);
       } catch (e) {
-        if (!cancelled) toast.error(`Failed to load session: ${e?.response?.data?.detail || e?.message}`);
+        if (!cancelled) toast.error(`Failed to load session: ${extractErrorMessage(e) || e?.message}`);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -420,7 +421,7 @@ export default function AdminAICoachSessions() {
       setSessions(rSessions.data?.sessions || []);
       setOpenRate(rOpenRate.data);
     } catch (e) {
-      toast.error(`Failed to load coach sessions: ${e?.response?.data?.detail || e?.message}`);
+      toast.error(`Failed to load coach sessions: ${extractErrorMessage(e) || e?.message}`);
     } finally { setLoading(false); }
   }, [token]);
   useEffect(() => { load(); }, [load]);

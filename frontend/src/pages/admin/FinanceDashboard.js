@@ -17,6 +17,7 @@ import {
   ToggleRight, Trash2, Eye, ChevronLeft, ChevronRight, Clock,
   ArrowUpDown, Percent, Landmark, Download
 } from 'lucide-react';
+import { extractErrorMessage } from '../../utils/errorHandler';
 
 const API = API_BASE;
 
@@ -64,7 +65,7 @@ const FinanceDashboard = () => {
       setTxTotal(res.data.total || 0);
       setTxPages(res.data.pages || 0);
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Failed to load transactions');
+      toast.error(extractErrorMessage(err) || 'Failed to load transactions');
     }
     finally { setTxLoading(false); }
   }, [token, txPage, partnerOnly, txSearch]);
@@ -75,7 +76,7 @@ const FinanceDashboard = () => {
       const res = await axios.get(`${API}/admin/partners${params}`, { headers });
       setPartners(res.data.applications || []);
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Failed to load partners');
+      toast.error(extractErrorMessage(err) || 'Failed to load partners');
     }
   }, [token, partnerFilter]);
 
@@ -90,7 +91,7 @@ const FinanceDashboard = () => {
       await axios.post(`${API}/admin/partners/${userId}/toggle`, {}, { headers });
       toast.success('Partner status toggled.');
       fetchPartners(); fetchRevenue();
-    } catch (err) { toast.error(err.response?.data?.detail || 'Failed to toggle partner'); }
+    } catch (err) { toast.error(extractErrorMessage(err) || 'Failed to toggle partner'); }
     finally { setActionLoading(false); }
   };
 
@@ -101,7 +102,7 @@ const FinanceDashboard = () => {
       const res = await axios.post(`${API}/admin/users/${userId}/pause`, {}, { headers });
       toast.success(`Account ${res.data.new_status}.`);
       fetchPartners();
-    } catch (err) { toast.error(err.response?.data?.detail || 'Failed to pause user'); }
+    } catch (err) { toast.error(extractErrorMessage(err) || 'Failed to pause user'); }
     finally { setActionLoading(false); }
   };
 

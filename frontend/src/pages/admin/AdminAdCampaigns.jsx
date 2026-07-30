@@ -1,3 +1,4 @@
+import { extractErrorMessage } from '../../utils/errorHandler';
 /**
  * iter337 — Admin: Ad Campaigns
  *
@@ -73,7 +74,7 @@ export default function AdminAdCampaigns() {
       });
       setCampaigns(r.data?.items || []);
     } catch (e) {
-      toast.error(`Failed to load campaigns: ${e?.response?.data?.detail || e?.message}`);
+      toast.error(`Failed to load campaigns: ${extractErrorMessage(e) || e?.message}`);
     } finally { setLoading(false); }
   }, [token, filterStatus, filterPlatform]);
 
@@ -103,7 +104,7 @@ export default function AdminAdCampaigns() {
       setNewListingIds('');
       await load();
     } catch (e) {
-      toast.error(`Create failed: ${e?.response?.data?.detail || e?.message}`);
+      toast.error(`Create failed: ${extractErrorMessage(e) || e?.message}`);
     } finally { setCreating(false); }
   };
 
@@ -120,7 +121,7 @@ export default function AdminAdCampaigns() {
       if (st === 429) {
         toast.error('Max regenerations reached (3).');
       } else {
-        toast.error(`Regenerate failed: ${e?.response?.data?.detail || e?.message}`);
+        toast.error(`Regenerate failed: ${extractErrorMessage(e) || e?.message}`);
       }
     }
   };
@@ -146,7 +147,7 @@ export default function AdminAdCampaigns() {
       setEditingId(null);
       toast.success('Saved');
     } catch (e) {
-      toast.error(`Save failed: ${e?.response?.data?.detail || e?.message}`);
+      toast.error(`Save failed: ${extractErrorMessage(e) || e?.message}`);
     }
   };
 
@@ -160,7 +161,7 @@ export default function AdminAdCampaigns() {
       setCampaigns((prev) => prev.map((x) => (x.id === c.id ? r.data : x)));
       toast.success(`Marked ${nextStatus}`);
     } catch (e) {
-      toast.error(`Update failed: ${e?.response?.data?.detail || e?.message}`);
+      toast.error(`Update failed: ${extractErrorMessage(e) || e?.message}`);
     }
   };
 
@@ -173,7 +174,7 @@ export default function AdminAdCampaigns() {
       setCampaigns((prev) => prev.filter((x) => x.id !== c.id));
       toast.success('Deleted');
     } catch (e) {
-      toast.error(`Delete failed: ${e?.response?.data?.detail || e?.message}`);
+      toast.error(`Delete failed: ${extractErrorMessage(e) || e?.message}`);
     }
   };
 
@@ -189,7 +190,7 @@ export default function AdminAdCampaigns() {
         a.click();
         URL.revokeObjectURL(blobUrl);
       })
-      .catch((e) => toast.error(`Export failed: ${e?.response?.data?.detail || e?.message}`));
+      .catch((e) => toast.error(`Export failed: ${extractErrorMessage(e) || e?.message}`));
   };
 
   return (

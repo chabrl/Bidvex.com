@@ -13,6 +13,7 @@ import {
   AlertTriangle, CheckCircle2, Undo2, ArrowUpCircle, StickyNote, Loader2, RefreshCw,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { extractErrorMessage } from '../../utils/errorHandler';
 
 const API = API_BASE;
 
@@ -94,7 +95,7 @@ const GeneralDisputeQueue = () => {
       setNote('');
       fetchData(true);
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Action failed');
+      toast.error(extractErrorMessage(err) || 'Action failed');
     } finally {
       setBusy(false);
     }

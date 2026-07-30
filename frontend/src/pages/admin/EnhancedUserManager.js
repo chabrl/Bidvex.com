@@ -36,6 +36,7 @@ import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
   DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel,
 } from '../../components/ui/dropdown-menu';
+import { extractErrorMessage } from '../../utils/errorHandler';
 
 const API = API_BASE;
 
@@ -224,7 +225,7 @@ const EnhancedUserManager = () => {
       toast.success(isSuspended ? 'Bidding suspension lifted — user notified' : 'Bidding privileges suspended');
       fetchData();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to update bidding suspension');
+      toast.error(extractErrorMessage(error) || 'Failed to update bidding suspension');
     }
   };
 
@@ -241,7 +242,7 @@ const EnhancedUserManager = () => {
       toast.success(`Account ${isSuspended ? 'reactivated' : 'suspended'} successfully`);
       fetchData();
     } catch (error) {
-      toast.error(error.response?.data?.detail || `Failed to ${action} account`);
+      toast.error(extractErrorMessage(error) || `Failed to ${action} account`);
     }
   };
 
@@ -406,7 +407,7 @@ const EnhancedUserManager = () => {
         attachment_max_mb: 1.0,
       });
     } catch (e) {
-      toast.error(e?.response?.data?.detail?.message_en || e?.response?.data?.detail || 'Send failed');
+      toast.error(extractErrorMessage(e) || extractErrorMessage(e) || 'Send failed');
     } finally {
       setNotifyBusy(false);
     }
@@ -427,7 +428,7 @@ const EnhancedUserManager = () => {
       setDocReqModal({ open: false, user: null });
       setDocReqForm({ document_types: [], deadline: '', message: '' });
     } catch (e) {
-      toast.error(e?.response?.data?.detail?.message_en || e?.response?.data?.detail || 'Request failed');
+      toast.error(extractErrorMessage(e) || extractErrorMessage(e) || 'Request failed');
     } finally {
       setDocReqBusy(false);
     }
@@ -487,7 +488,7 @@ const EnhancedUserManager = () => {
       setEditProfileModal({ open: false, user: null });
       fetchData();
     } catch (e) {
-      toast.error(e?.response?.data?.detail?.message_en || e?.response?.data?.detail?.message || 'Update failed');
+      toast.error(extractErrorMessage(e) || extractErrorMessage(e)?.message || 'Update failed');
     } finally {
       setEditBusy(false);
     }
@@ -531,7 +532,7 @@ const EnhancedUserManager = () => {
       localStorage.setItem('token', impTok);
       window.location.href = '/';
     } catch (e) {
-      toast.error(e?.response?.data?.detail?.message_en || e?.response?.data?.detail || 'Impersonation failed');
+      toast.error(extractErrorMessage(e) || extractErrorMessage(e) || 'Impersonation failed');
     }
   };
 
@@ -622,7 +623,7 @@ const EnhancedUserManager = () => {
       setDeleteUserModal({ open: false, user: null });
       fetchData();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to delete user');
+      toast.error(extractErrorMessage(error) || 'Failed to delete user');
     } finally {
       setDeleting(false);
     }

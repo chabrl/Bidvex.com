@@ -1,3 +1,4 @@
+import { extractErrorMessage } from '../../utils/errorHandler';
 /**
  * iter201 — Phase 3 / 3B sub-tab 3 — Admin Buyer Verifications.
  *
@@ -32,7 +33,7 @@ const AdminBuyerVerifications = () => {
       });
       setItems(r.data?.items || []);
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Failed to load buyer verifications');
+      toast.error(extractErrorMessage(e) || 'Failed to load buyer verifications');
     } finally {
       setLoading(false);
     }
@@ -59,7 +60,7 @@ const AdminBuyerVerifications = () => {
       toast.success(decision === 'approve' ? 'Approved — buyer notified' : 'Rejected — buyer notified');
       fetchList();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Action failed');
+      toast.error(extractErrorMessage(e) || 'Action failed');
     } finally {
       setActing(null);
     }

@@ -21,6 +21,7 @@ import {
   Shield, ShieldCheck, DollarSign, Loader2, Search, Eye, AlertTriangle, Mail, Banknote
 } from 'lucide-react';
 import ManualSettleSubscriptionModal from '../../components/ManualSettleSubscriptionModal';
+import { extractErrorMessage } from '../../utils/errorHandler';
 
 const API = API_BASE;
 
@@ -133,7 +134,7 @@ const PartnerManager = () => {
       setReviewDialog(false);
       fetchApplications();
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Verification failed.');
+      toast.error(extractErrorMessage(err) || 'Verification failed.');
     } finally { setActionLoading(false); }
   };
 
@@ -148,7 +149,7 @@ const PartnerManager = () => {
       setReviewDialog(false);
       fetchApplications();
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Rejection failed.');
+      toast.error(extractErrorMessage(err) || 'Rejection failed.');
     } finally { setActionLoading(false); }
   };
 

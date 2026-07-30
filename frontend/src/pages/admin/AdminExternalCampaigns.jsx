@@ -1,3 +1,4 @@
+import { extractErrorMessage } from '../../utils/errorHandler';
 /**
  * iter271 — Admin External Email Campaigns.
  *
@@ -171,7 +172,7 @@ function CampaignsList({ campaigns, loading, statusFilter, setStatusFilter, sear
       toast.success('Campaign deleted');
       onDeleted();
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Delete failed');
+      toast.error(extractErrorMessage(e) || 'Delete failed');
     }
   };
 
@@ -337,7 +338,7 @@ function CampaignWizard({ campaignId, headers, onClose }) {
         return savedId;
       }
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Save failed');
+      toast.error(extractErrorMessage(e) || 'Save failed');
       return null;
     }
   };
@@ -362,7 +363,7 @@ function CampaignWizard({ campaignId, headers, onClose }) {
       setStats(s => ({ ...s, recipient_count: d.total }));
       setManualEmails('');
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Failed to add recipients');
+      toast.error(extractErrorMessage(e) || 'Failed to add recipients');
     }
   };
 
@@ -385,7 +386,7 @@ function CampaignWizard({ campaignId, headers, onClose }) {
       );
       setStats(s => ({ ...s, recipient_count: d.total }));
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'CSV upload failed');
+      toast.error(extractErrorMessage(e) || 'CSV upload failed');
     }
   };
 
@@ -407,7 +408,7 @@ function CampaignWizard({ campaignId, headers, onClose }) {
       const cdoc = await axios.get(`${API}/admin/external-campaigns/${savedId}`, { headers });
       setStats(s => ({ ...s, attachments: cdoc.data.attachments || [] }));
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Attachment upload failed');
+      toast.error(extractErrorMessage(e) || 'Attachment upload failed');
     }
   };
 
@@ -421,7 +422,7 @@ function CampaignWizard({ campaignId, headers, onClose }) {
       setStats(s => ({ ...s, attachments: cdoc.data.attachments || [] }));
       toast.success('Attachment removed');
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Delete failed');
+      toast.error(extractErrorMessage(e) || 'Delete failed');
     }
   };
 
@@ -440,7 +441,7 @@ function CampaignWizard({ campaignId, headers, onClose }) {
       );
       toast.success(`Test sent to ${to}`);
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Test send failed');
+      toast.error(extractErrorMessage(e) || 'Test send failed');
     }
   };
 
@@ -455,7 +456,7 @@ function CampaignWizard({ campaignId, headers, onClose }) {
       toast.success(`Sent: ${r.data.sent} · Skipped: ${r.data.skipped} · Failures: ${r.data.failures}`);
       onClose();
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Send failed');
+      toast.error(extractErrorMessage(e) || 'Send failed');
     } finally {
       setSending(false);
     }
@@ -961,7 +962,7 @@ function SuppressionList({ headers }) {
       setNewEmail('');
       fetchList();
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Add failed');
+      toast.error(extractErrorMessage(e) || 'Add failed');
     }
   };
 
@@ -1101,7 +1102,7 @@ function AutoPausedBanner({ headers, onResumed }) {
       await fetchPaused();
       if (typeof onResumed === 'function') onResumed();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Failed to resume campaign');
+      toast.error(extractErrorMessage(e) || 'Failed to resume campaign');
     } finally {
       setBusy(null);
     }

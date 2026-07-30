@@ -1,6 +1,70 @@
 # BidVex Changelog
 
 
+## Feb 8, 2026 — iter424 Admin Panel `toast.error` Sweep
+
+Following iter423's `AdminVehicleDealersPage` fix (React #31 crash when a
+bilingual `{code, message_en, message_fr}` error object was rendered as
+a toast child), swept the rest of the admin panel with the same
+protection.
+
+### What changed
+Every `toast.error(...)` call across the admin panel that previously
+passed a raw axios error field now routes through the shared
+`extractErrorMessage` helper from `utils/errorHandler.js`. Specifically,
+the following substitutions were applied **inside `toast.error(...)`
+arguments only** — never in logs, alerts, state, or other logic:
+
+```
+e?.response?.data?.detail        →  extractErrorMessage(e)
+err?.response?.data?.detail      →  extractErrorMessage(err)
+error?.response?.data?.detail    →  extractErrorMessage(error)
+e.response?.data?.detail         →  extractErrorMessage(e)
+e.response.data.detail           →  extractErrorMessage(e)
+```
+
+Every file that received a substitution also got a single
+`import { extractErrorMessage } from '../../utils/errorHandler';`
+inserted after its existing import block (multi-line imports are
+handled correctly — the previous naive insertion sometimes split them
+was fixed by scanning for the semicolon that terminates each import).
+
+### Numbers
+- **120 `toast.error` calls rewritten** across **42 files** in
+  `frontend/src/pages/admin/` + `AdminDashboard.js`.
+- `AdminVehicleDealersPage.jsx` skipped (already migrated in iter423).
+- **Zero risky patterns remain** — proven by `grep -rE
+  "toast\\.error\\([^)]*\\.response(\\?)?\\.data(\\?)?\\.detail"`
+  returning 0 hits.
+
+### Verified
+- Every previously-broken parse error from the pilot run (multi-line
+  import split) is gone; `mcp_lint_javascript` reports zero new errors
+  attributable to the sweep. The remaining lint warnings/errors
+  (unescaped entities, unstable nested components, and an unrelated
+  `headers is not defined` in `EmailMarketingManager.js:675`) all
+  predate this sweep.
+- Playwright smoke test: `/admin` boots without any runtime error,
+  Vehicles → Dealer Management renders with all 3 dealers + quick
+  actions intact.
+
+Files touched (42): AdPublishControls, AdminAICoachSessions,
+AdminAIVoiceCalls, AdminAdCampaigns, AdminAffiliatePayouts,
+AdminBlogsConsole, AdminBuyerVerifications, AdminComplianceAlerts,
+AdminCompliancePage, AdminContractorsPage, AdminDealerLicenses,
+AdminExternalCampaigns, AdminFacilities, AdminFeedsPage,
+AdminStorageAuctions, AdminStorageDeposits, AdminUnsubscribeAudit,
+AnalyticsDashboard, AuctionControl, BrandingLayoutManager,
+CategoryManager, CommunityModerationManager, CurrencyAppealsManager,
+DeletionRequestsManager, DisputedSettlements, EmailMarketingManager,
+EmailSettings, EmailTemplates, EnhancedUserManager, FinanceDashboard,
+GeneralDisputeQueue, ListingRequestsManager, ManageAllAuctions,
+MarketplaceSettings, MessagingOversight, PartnerManager,
+PlatformCleanupManager, PromotionManager, SiteModeManager,
+StorageHoldSettlementsTab, VehicleAdminManager, AdminDashboard.
+
+
+
 ## Feb 8, 2026 — iter422 Contractor Dialer Routing — Audit + Fix
 
 ### Reported bug

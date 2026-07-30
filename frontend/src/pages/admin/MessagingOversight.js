@@ -12,6 +12,7 @@ import { MessageCircle, Trash2, Ban, Search, RefreshCw, Flag, Eye, CheckCircle2,
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '../../components/ui/dialog';
+import { extractErrorMessage } from '../../utils/errorHandler';
 
 const API = API_BASE;
 
@@ -168,7 +169,7 @@ const MessagingOversight = () => {
       const d = response.data;
       setMessages(Array.isArray(d) ? d : d.messages || []);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to load flagged messages');
+      toast.error(extractErrorMessage(error) || 'Failed to load flagged messages');
     } finally {
       setLoading(false);
     }

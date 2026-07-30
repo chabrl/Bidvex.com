@@ -15,6 +15,7 @@ import {
   AlertCircle, Package, Gavel, Clock, UserCheck,
   ToggleLeft, Hash, Layers
 } from 'lucide-react';
+import { extractErrorMessage } from '../../utils/errorHandler';
 
 const API = API_BASE;
 
@@ -100,7 +101,7 @@ const AuctionControl = () => {
     } catch (error) {
       console.error('Failed to save settings:', error);
       toast.error('Failed to save settings', {
-        description: error.response?.data?.detail || 'Please try again.'
+        description: extractErrorMessage(error) || 'Please try again.'
       });
     } finally {
       setSaving(false);

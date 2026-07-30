@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { Package, Search, Edit2, Trash2, Pause, Archive, XCircle, Eye, AlertTriangle, Download, Star, Play, Clock } from 'lucide-react';
 import { formatCurrency } from '../../utils/currencyFormatter';
 import AdminLotEditorModal from './AdminLotEditorModal';
+import { extractErrorMessage } from '../../utils/errorHandler';
 
 const API = API_BASE;
 
@@ -106,7 +107,7 @@ const ManageAllAuctions = () => {
       setDeleteModal({ open: false, listing: null });
       fetchAllListings();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to delete auction');
+      toast.error(extractErrorMessage(error) || 'Failed to delete auction');
     }
   };
 
@@ -117,7 +118,7 @@ const ManageAllAuctions = () => {
       toast.success(listing.is_featured ? 'Listing unfeatured' : 'Listing featured');
       fetchAllListings();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to toggle feature');
+      toast.error(extractErrorMessage(error) || 'Failed to toggle feature');
     }
   };
 
@@ -259,7 +260,7 @@ const ManageAllAuctions = () => {
         toast.error('Upload returned no URL');
       }
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Image upload failed');
+      toast.error(extractErrorMessage(err) || 'Image upload failed');
     }
   };
 
@@ -302,7 +303,7 @@ const ManageAllAuctions = () => {
       toast.success(`Auction status updated to ${newStatus}`);
       fetchAllListings();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to update status');
+      toast.error(extractErrorMessage(error) || 'Failed to update status');
     }
   };
 

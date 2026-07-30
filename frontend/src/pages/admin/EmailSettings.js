@@ -11,6 +11,7 @@ import {
   Mail, Shield, Send, CheckCircle2, XCircle, Loader2,
   Eye, EyeOff, Clock, AlertTriangle, Settings2
 } from 'lucide-react';
+import { extractErrorMessage } from '../../utils/errorHandler';
 
 const API = API_BASE;
 
@@ -60,7 +61,7 @@ const EmailSettings = () => {
       setApiKey('');
       fetchConfig();
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Failed to save settings.');
+      toast.error(extractErrorMessage(err) || 'Failed to save settings.');
     } finally { setSaving(false); }
   };
 
@@ -75,7 +76,7 @@ const EmailSettings = () => {
       toast.success(res.data.message || 'Test email sent!');
       fetchConfig();
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Test email failed.');
+      toast.error(extractErrorMessage(err) || 'Test email failed.');
     } finally { setTesting(false); }
   };
 

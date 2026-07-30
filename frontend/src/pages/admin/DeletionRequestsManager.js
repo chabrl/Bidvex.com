@@ -8,6 +8,7 @@ import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { toast } from 'sonner';
 import { AlertTriangle, CheckCircle, XCircle, Eye, Trash2 } from 'lucide-react';
+import { extractErrorMessage } from '../../utils/errorHandler';
 
 const API = API_BASE;
 
@@ -43,7 +44,7 @@ const DeletionRequestsManager = () => {
       fetchRequests();
       setConfirmModal({ open: false, request: null, action: null });
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to approve deletion');
+      toast.error(extractErrorMessage(error) || 'Failed to approve deletion');
     }
   };
 
@@ -54,7 +55,7 @@ const DeletionRequestsManager = () => {
       fetchRequests();
       setConfirmModal({ open: false, request: null, action: null });
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to reject deletion');
+      toast.error(extractErrorMessage(error) || 'Failed to reject deletion');
     }
   };
 

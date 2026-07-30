@@ -11,6 +11,7 @@ import {
   MessageSquare, Search, Trash2, AlertTriangle, ChevronDown,
   ChevronUp, ThumbsUp, Eye, User
 } from 'lucide-react';
+import { extractErrorMessage } from '../../utils/errorHandler';
 
 const API = API_BASE;
 
@@ -82,7 +83,7 @@ const CommunityModerationManager = () => {
       setReplies({});
       setExpandedId(null);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to delete');
+      toast.error(extractErrorMessage(error) || 'Failed to delete');
     } finally {
       setDeleting(false);
     }

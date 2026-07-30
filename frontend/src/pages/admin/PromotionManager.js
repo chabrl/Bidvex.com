@@ -1,3 +1,4 @@
+import { extractErrorMessage } from '../../utils/errorHandler';
 /**
  * iter242 Mission 1 — Admin Promotions Engine
  *
@@ -149,7 +150,7 @@ const PromotionManager = () => {
       const res = await axios.get(`${API}/admin/promotions`, { headers });
       setPromotions(res?.data?.items || []);
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Failed to load promotions');
+      toast.error(extractErrorMessage(e) || 'Failed to load promotions');
     } finally {
       setLoading(false);
     }
@@ -216,7 +217,7 @@ const PromotionManager = () => {
       );
       setPreviewResult(res.data);
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Preview failed');
+      toast.error(extractErrorMessage(e) || 'Preview failed');
     } finally {
       setPreviewLoading(false);
     }
@@ -253,7 +254,7 @@ const PromotionManager = () => {
       setCreating(false);
       fetchPromotions();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Save failed');
+      toast.error(extractErrorMessage(e) || 'Save failed');
     } finally {
       setSubmitting(false);
     }
@@ -266,7 +267,7 @@ const PromotionManager = () => {
       toast.success(`Promotion ${target}d`);
       fetchPromotions();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || `${target} failed`);
+      toast.error(extractErrorMessage(e) || `${target} failed`);
     }
   };
 
@@ -276,7 +277,7 @@ const PromotionManager = () => {
       toast.success('Duplicate created (status: draft)');
       fetchPromotions();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Duplicate failed');
+      toast.error(extractErrorMessage(e) || 'Duplicate failed');
     }
   };
 
@@ -338,7 +339,7 @@ const PromotionManager = () => {
         fetchPromotions();
       }
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Launch failed');
+      toast.error(extractErrorMessage(e) || 'Launch failed');
     } finally {
       setLaunchSubmitting(false);
     }
@@ -351,7 +352,7 @@ const PromotionManager = () => {
       toast.success('Promotion deleted');
       fetchPromotions();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Delete failed');
+      toast.error(extractErrorMessage(e) || 'Delete failed');
     }
   };
 
@@ -384,7 +385,7 @@ const PromotionManager = () => {
       a.remove();
       URL.revokeObjectURL(url);
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'CSV export failed');
+      toast.error(extractErrorMessage(e) || 'CSV export failed');
     }
   };
 
@@ -739,7 +740,7 @@ const PromotionManager = () => {
                       });
                       toast.success(lines.join('\n'), { duration: 8000 });
                     } catch (e) {
-                      toast.error(e?.response?.data?.detail || 'Preview failed');
+                      toast.error(extractErrorMessage(e) || 'Preview failed');
                     }
                   }}
                 >

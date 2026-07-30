@@ -1,3 +1,4 @@
+import { extractErrorMessage } from '../../utils/errorHandler';
 /**
  * iter201 — Phase 3 / 3B sub-tab 4 — Admin Compliance Alerts.
  *
@@ -234,7 +235,7 @@ const AdminComplianceAlerts = () => {
       });
       setData(r.data);
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Failed to load alerts');
+      toast.error(extractErrorMessage(e) || 'Failed to load alerts');
     } finally {
       setLoading(false);
     }

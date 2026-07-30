@@ -1,3 +1,4 @@
+import { extractErrorMessage } from '../../utils/errorHandler';
 /**
  * AdminFacilities — iter178 (FIX 6) + iter212 Provincial Business Registration
  * =============================================================================
@@ -139,7 +140,7 @@ const AdminFacilities = () => {
       setMissingDocModal(null);
       loadFacilities();
     } catch (e) {
-      toast.error(e?.response?.data?.detail?.message_en || 'Resubmission request failed');
+      toast.error(extractErrorMessage(e) || 'Resubmission request failed');
     } finally {
       setRequestingResubmit(false);
     }
@@ -176,7 +177,7 @@ const AdminFacilities = () => {
       toast.success(`Facility ${action}d · ${action}`);
       loadFacilities();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || `${action} failed`);
+      toast.error(extractErrorMessage(e) || `${action} failed`);
     }
   };
 
@@ -199,7 +200,7 @@ const AdminFacilities = () => {
       setRejectReason('');
       loadFacilities();
     } catch (e) {
-      toast.error(e?.response?.data?.detail?.message_en || e?.response?.data?.detail || 'Reject failed');
+      toast.error(extractErrorMessage(e) || extractErrorMessage(e) || 'Reject failed');
     } finally {
       setRejecting(false);
     }

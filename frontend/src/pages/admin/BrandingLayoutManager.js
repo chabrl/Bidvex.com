@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import HeroBannerEditor from '../../components/admin/HeroBannerEditor';
 import { useTranslation } from 'react-i18next';
+import { extractErrorMessage } from '../../utils/errorHandler';
 
 const API = API_BASE;
 
@@ -130,7 +131,7 @@ const BrandingLayoutManager = () => {
       });
     } catch (error) {
       toast.error('Failed to save branding', {
-        description: error.response?.data?.detail || 'Please try again.'
+        description: extractErrorMessage(error) || 'Please try again.'
       });
     } finally {
       setSaving(false);

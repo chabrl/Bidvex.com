@@ -1,3 +1,4 @@
+import { extractErrorMessage } from '../../utils/errorHandler';
 /**
  * BidVex — Phase 6.2 Task 5
  * Admin Storage Hold Settlements desk.
@@ -72,7 +73,7 @@ export default function StorageHoldSettlementsTab() {
       await fetchHolds();
     } catch (e) {
       console.error(e);
-      toast.error(e?.response?.data?.detail?.message_en || 'Failed to approve cleanout.');
+      toast.error(extractErrorMessage(e) || 'Failed to approve cleanout.');
     } finally {
       setActionRowId(null);
     }
@@ -96,7 +97,7 @@ export default function StorageHoldSettlementsTab() {
       await fetchHolds();
     } catch (e) {
       console.error(e);
-      toast.error(e?.response?.data?.detail?.message_en || 'Failed to forfeit deposit.');
+      toast.error(extractErrorMessage(e) || 'Failed to forfeit deposit.');
     } finally {
       setActionRowId(null);
     }

@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { formatCurrency } from '../../utils/currencyFormatter';
 import { useTranslation } from 'react-i18next';
+import { extractErrorMessage } from '../../utils/errorHandler';
 
 const API = API_BASE;
 
@@ -56,7 +57,7 @@ const AnalyticsDashboard = () => {
       setSummary(summaryRes.data || {});
       setAdvanced(advancedRes.data || null);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to load analytics');
+      toast.error(extractErrorMessage(error) || 'Failed to load analytics');
     } finally {
       setLoading(false);
     }

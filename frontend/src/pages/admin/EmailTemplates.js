@@ -15,6 +15,7 @@ import {
   Megaphone, Users, RefreshCw, History, Eye, EyeOff,
   Rocket, MapPin, Zap, X, Code, Globe, Send, FileText
 } from 'lucide-react';
+import { extractErrorMessage } from '../../utils/errorHandler';
 
 const API = API_BASE;
 
@@ -161,7 +162,7 @@ const EmailTemplates = () => {
       toast.success(`Test email sent to ${response.data.to_email} (${response.data.status_code})`);
       setTestInvoicePreview(response.data.invoice_summary);
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Failed to send test email');
+      toast.error(extractErrorMessage(err) || 'Failed to send test email');
     } finally {
       setTestSending(false);
     }
@@ -211,7 +212,7 @@ const EmailTemplates = () => {
       fetchAuditLog();
     } catch (error) {
       console.error('Failed to save templates:', error);
-      toast.error(error.response?.data?.detail || 'Failed to save templates');
+      toast.error(extractErrorMessage(error) || 'Failed to save templates');
     } finally {
       setSaving(false);
     }

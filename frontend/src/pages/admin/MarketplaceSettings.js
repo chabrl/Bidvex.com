@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { formatCurrency } from '../../utils/currencyFormatter';
 import { useTranslation } from 'react-i18next';
+import { extractErrorMessage } from '../../utils/errorHandler';
 
 const API = API_BASE;
 
@@ -173,7 +174,7 @@ const MarketplaceSettings = () => {
       setOriginalSocialLinks(updated);
       toast.success('Social links saved!', { description: 'Footer icons updated across the platform.' });
     } catch (error) {
-      toast.error('Failed to save social links', { description: error.response?.data?.detail || 'Unknown error' });
+      toast.error('Failed to save social links', { description: extractErrorMessage(error) || 'Unknown error' });
     } finally {
       setSavingSocial(false);
     }

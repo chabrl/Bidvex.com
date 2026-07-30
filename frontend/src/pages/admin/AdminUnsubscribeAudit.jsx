@@ -1,3 +1,4 @@
+import { extractErrorMessage } from '../../utils/errorHandler';
 /**
  * iter310 — Admin Unsubscribe Audit
  *
@@ -81,7 +82,7 @@ const AdminUnsubscribeAudit = () => {
       setRows(l.data?.events || []);
       setTotal(l.data?.count || 0);
     } catch (err) {
-      toast.error(err?.response?.data?.detail || 'Failed to load audit data');
+      toast.error(extractErrorMessage(err) || 'Failed to load audit data');
     } finally {
       setLoading(false);
     }

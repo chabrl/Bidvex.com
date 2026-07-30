@@ -1,3 +1,4 @@
+import { extractErrorMessage } from '../../utils/errorHandler';
 /**
  * iter339 — Per-campaign Meta / Google publish controls + performance pull.
  * Buttons are disabled with a tooltip when the platform API prerequisites
@@ -52,7 +53,7 @@ export const AdPublishControls = ({ campaign: c, token, config, onUpdated }) => 
         setMetaCampaigns(r.data?.items || []);
       } catch (e) {
         setMetaCampaigns([]);
-        toast.error(e?.response?.data?.detail || 'Failed to load Meta campaigns');
+        toast.error(extractErrorMessage(e) || 'Failed to load Meta campaigns');
       }
     }
   };
@@ -65,7 +66,7 @@ export const AdPublishControls = ({ campaign: c, token, config, onUpdated }) => 
         setGoogleCampaigns(r.data?.items || []);
       } catch (e) {
         setGoogleCampaigns([]);
-        toast.error(e?.response?.data?.detail || 'Failed to load Google campaigns');
+        toast.error(extractErrorMessage(e) || 'Failed to load Google campaigns');
       }
     }
   };
@@ -79,7 +80,7 @@ export const AdPublishControls = ({ campaign: c, token, config, onUpdated }) => 
       const r = await axios.get(`${API_BASE}/admin/ad-campaigns/google/ad-groups?campaign_id=${id}`, { headers });
       setGoogleAdGroups(r.data?.items || []);
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Failed to load ad groups');
+      toast.error(extractErrorMessage(e) || 'Failed to load ad groups');
     }
   };
 
@@ -95,7 +96,7 @@ export const AdPublishControls = ({ campaign: c, token, config, onUpdated }) => 
       onUpdated({ ...c, meta_ad_id: r.data.meta_ad_id, status: r.data.status });
       setPanel(null);
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Meta publish failed');
+      toast.error(extractErrorMessage(e) || 'Meta publish failed');
     } finally { setPublishing(false); }
   };
 
@@ -115,7 +116,7 @@ export const AdPublishControls = ({ campaign: c, token, config, onUpdated }) => 
       onUpdated({ ...c, google_ad_id: r.data.google_ad_id, status: r.data.status });
       setPanel(null);
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Google publish failed');
+      toast.error(extractErrorMessage(e) || 'Google publish failed');
     } finally { setPublishing(false); }
   };
 
@@ -125,7 +126,7 @@ export const AdPublishControls = ({ campaign: c, token, config, onUpdated }) => 
       const r = await axios.get(`${API_BASE}/admin/ad-campaigns/${c.id}/performance`, { headers });
       setPerf(r.data);
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Performance fetch failed');
+      toast.error(extractErrorMessage(e) || 'Performance fetch failed');
     } finally { setPerfLoading(false); }
   };
 

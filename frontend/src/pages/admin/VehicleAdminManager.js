@@ -1,4 +1,5 @@
 import API_BASE from '../../config';
+import { extractErrorMessage } from '../../utils/errorHandler';
 /**
  * Vehicle Admin Manager
  * Admin panel for managing vehicle auction sellers and listings
@@ -497,7 +498,7 @@ const VehicleAdminManager = () => {
       }));
       toast.success(`Vehicle auctions ${enabled ? 'enabled' : 'disabled'}`);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to update settings');
+      toast.error(extractErrorMessage(error) || 'Failed to update settings');
     } finally {
       setSettingsLoading(false);
     }
@@ -515,7 +516,7 @@ const VehicleAdminManager = () => {
       }));
       toast.success(`Vehicle listing ${enabled ? 'enabled' : 'disabled'}`);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to update settings');
+      toast.error(extractErrorMessage(error) || 'Failed to update settings');
     } finally {
       setSettingsLoading(false);
     }
@@ -535,7 +536,7 @@ const VehicleAdminManager = () => {
       toast.success(`Seller "${seller.business_name || 'Private Seller'}" approved`);
       fetchData();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to approve seller');
+      toast.error(extractErrorMessage(error) || 'Failed to approve seller');
     } finally {
       setActionBusy(null);
     }
@@ -562,7 +563,7 @@ const VehicleAdminManager = () => {
       toast.success(enable ? 'Dealer licence marked verified' : 'Dealer-licence verification removed');
       fetchData();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to update dealer-licence verification');
+      toast.error(extractErrorMessage(error) || 'Failed to update dealer-licence verification');
     } finally {
       setActionBusy(null);
     }
@@ -584,7 +585,7 @@ const VehicleAdminManager = () => {
       setRejectReason('');
       fetchData();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to reject seller');
+      toast.error(extractErrorMessage(error) || 'Failed to reject seller');
     } finally {
       setActionBusy(null);
     }
@@ -600,7 +601,7 @@ const VehicleAdminManager = () => {
       toast.success(`Vehicle "${vehicle.year} ${vehicle.make} ${vehicle.model}" approved`);
       fetchData();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to approve vehicle');
+      toast.error(extractErrorMessage(error) || 'Failed to approve vehicle');
     } finally {
       setActionBusy(null);
     }
@@ -622,7 +623,7 @@ const VehicleAdminManager = () => {
       setRejectReason('');
       fetchData();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to reject vehicle');
+      toast.error(extractErrorMessage(error) || 'Failed to reject vehicle');
     } finally {
       setActionBusy(null);
     }
@@ -1406,7 +1407,7 @@ const VehicleInvoicesTab = ({ token }) => {
       setInvoices(res.data?.invoices || []);
       setStats(res.data?.stats || { pending: 0, overdue: 0, paid: 0 });
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to load invoices');
+      toast.error(extractErrorMessage(error) || 'Failed to load invoices');
     } finally {
       setLoading(false);
     }
@@ -1423,7 +1424,7 @@ const VehicleInvoicesTab = ({ token }) => {
       toast.success(`Invoice ${inv.id} marked paid`);
       fetchData();
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Failed to mark paid');
+      toast.error(extractErrorMessage(e) || 'Failed to mark paid');
     } finally { setBusyId(null); }
   };
 
@@ -1433,7 +1434,7 @@ const VehicleInvoicesTab = ({ token }) => {
       await axios.post(`${API}/admin/vehicle-invoices/${inv.id}/send-reminder`, null, { headers });
       toast.success(`Reminder sent to ${inv.buyer_email || 'buyer'}`);
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Failed to send reminder');
+      toast.error(extractErrorMessage(e) || 'Failed to send reminder');
     } finally { setBusyId(null); }
   };
 

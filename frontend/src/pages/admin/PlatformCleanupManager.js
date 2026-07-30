@@ -10,6 +10,7 @@ import {
   Trash2, AlertTriangle, Shield, Search, RefreshCw,
   Users, Package, MessageSquare, CreditCard, Bell, Heart, Lock
 } from 'lucide-react';
+import { extractErrorMessage } from '../../utils/errorHandler';
 
 const API = API_BASE;
 
@@ -34,7 +35,7 @@ const PlatformCleanupManager = () => {
       setResult(null);
       setConfirmStep(false);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to load cleanup preview');
+      toast.error(extractErrorMessage(error) || 'Failed to load cleanup preview');
     } finally {
       setLoading(false);
     }
@@ -49,7 +50,7 @@ const PlatformCleanupManager = () => {
       toast.success(res.data.message || 'Platform cleanup complete');
       fetchPreview();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Cleanup failed');
+      toast.error(extractErrorMessage(error) || 'Cleanup failed');
     } finally {
       setCleaning(false);
     }

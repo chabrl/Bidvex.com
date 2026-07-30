@@ -1,3 +1,4 @@
+import { extractErrorMessage } from '../../utils/errorHandler';
 /**
  * iter266 Mission 1 — Admin Oversight: Affiliate Payouts tab.
  *
@@ -139,7 +140,7 @@ export default function AdminAffiliatePayouts() {
       );
       toast.success('Stripe onboarding link emailed to affiliate.');
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Failed to send onboarding link');
+      toast.error(extractErrorMessage(e) || 'Failed to send onboarding link');
     } finally {
       setSubmitting(false);
     }
@@ -162,7 +163,7 @@ export default function AdminAffiliatePayouts() {
       setRejectReason('');
       fetchData();
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Reject failed');
+      toast.error(extractErrorMessage(e) || 'Reject failed');
     } finally {
       setSubmitting(false);
     }
@@ -184,7 +185,7 @@ export default function AdminAffiliatePayouts() {
       );
       fetchData();
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Re-issue failed');
+      toast.error(extractErrorMessage(e) || 'Re-issue failed');
     } finally {
       setSubmitting(false);
     }

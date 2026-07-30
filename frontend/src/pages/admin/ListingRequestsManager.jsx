@@ -1,3 +1,4 @@
+import { extractErrorMessage } from '../../utils/errorHandler';
 /**
  * iter288 — Admin: Listing Change-Request Inbox.
  *
@@ -45,7 +46,7 @@ export default function ListingRequestsManager() {
       setRequests(data?.requests || []);
       setPendingCount(data?.pending_count || 0);
     } catch (err) {
-      toast.error(err?.response?.data?.detail || 'Failed to load listing requests');
+      toast.error(extractErrorMessage(err) || 'Failed to load listing requests');
     } finally {
       setLoading(false);
     }
@@ -64,7 +65,7 @@ export default function ListingRequestsManager() {
       toast.success(action === 'approve' ? 'Request approved' : 'Request rejected');
       fetchRequests();
     } catch (err) {
-      toast.error(err?.response?.data?.detail || `Failed to ${action} request`);
+      toast.error(extractErrorMessage(err) || `Failed to ${action} request`);
     } finally {
       setActingId(null);
     }

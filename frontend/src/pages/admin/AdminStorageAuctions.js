@@ -1,3 +1,4 @@
+import { extractErrorMessage } from '../../utils/errorHandler';
 /**
  * AdminStorageAuctions — iter173
  * ================================
@@ -95,7 +96,7 @@ const AdminStorageAuctions = () => {
       toast.success('Auction cancelled · Enchère annulée');
       fetchData();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Cancel failed');
+      toast.error(extractErrorMessage(e) || 'Cancel failed');
     }
   };
 

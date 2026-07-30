@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import {
   AlertTriangle, ShieldCheck, RefreshCw, Loader2, Paperclip, CheckCircle2,
 } from 'lucide-react';
+import { extractErrorMessage } from '../../utils/errorHandler';
 
 const API = API_BASE;
 
@@ -75,7 +76,7 @@ const DisputedSettlements = () => {
       setResolveModal({ open: false, dispute: null });
       setData(prev => ({ ...prev, total: prev.total - 1, disputes: prev.disputes.filter(x => x.auction_id !== d.auction_id) }));
     } catch (err) {
-      toast.error(err?.response?.data?.detail || 'Resolve failed');
+      toast.error(extractErrorMessage(err) || 'Resolve failed');
     } finally {
       setSubmitting(false);
     }
