@@ -1,6 +1,74 @@
 # BidVex Changelog
 
 
+## Feb 8, 2026 — iter441 Storage Facility Custom Buyer's Premium
+
+Storage facility operators can now set a per-listing buyer's premium
+percentage (0–25%) at create and edit time. Blank falls back to the
+platform default (5%). Vehicle and multi-item forms are untouched.
+
+### Backend
+- `routes/listings.py::create_listing` — the existing `apply_partner_tags`
+  path now persists `buyers_premium_rate` (fraction 0–0.25) into
+  `custom_buyer_premium_rate` for any non-partner seller too (storage
+  operators, admins). Validates 0–25% band; bilingual 400 for out-of-
+  band and non-numeric input.
+- `routes/listings.py::update_listing` — the allow-listed update fields
+  now include `custom_buyer_premium_rate` and `buyers_premium_rate`
+  (aliased). Both accept `null` (revert to platform default), any
+  number in `[0, 0.25]`, and reject anything else with a bilingual 400.
+- `routes/misc.py::checkout_fee_breakdown` — passes
+  `listing.custom_buyer_premium_rate` into `calculate_standard_checkout`
+  as the per-listing override.
+- `routes/payments.py` — both standard and partner checkout paths pass
+  `custom_buyer_premium_rate` into `calculate_standard_checkout` /
+  `calculate_general_checkout`.
+- `services/stripe_connect_service.py::calculate_general_checkout` —
+  new `custom_buyer_premium_rate: Optional[float]` param. When set and
+  `> 0`, replaces the tier-based standard BP rate outright.
+- `shared.py::calculate_standard_checkout` — same override semantics.
+
+### Frontend
+- `pages/CreateListingPage.js` — the Buyer's Premium (%) input is now
+  visible when EITHER `isPartner` OR `isStorageLocker` is true (was
+  partner-only). Placeholder + help text change per role:
+  - Storage: "Leave blank for platform default (5%)" + storage help.
+  - Partner: existing partner-exclusive copy.
+  - Everyone else: existing LOCKED notice (`data-testid=bp-locked-notice`).
+- Edit-mode prefill — reads `l.custom_buyer_premium_rate` (fraction)
+  and renders it as a percent (`0.15` → `"15"`).
+- Submit — converts percent → fraction (`15` → `0.15`); blank submits
+  as `null`.
+- Locales — new `createListing.buyersPremiumStoragePh`,
+  `createListing.buyersPremiumStorageHelp` in both `en.json` + `fr.json`.
+  Reused existing `buyersPremiumPartnerHelp` and `buyersPremiumLockedNotice`.
+
+### Verified end-to-end (iter441 testing agent report `/app/test_reports/iteration_439.json`)
+- Backend pytest suite `tests/test_iter441_storage_bp_rate.py` — **8/8 PASS**:
+  create + persist, fee-breakdown honors override (BP=$15 on $100
+  hammer, not $5), PUT accepts 0.08, PUT rejects 0.30 (400 bilingual),
+  PUT rejects `"abc"` (400 bilingual), PUT `null` clears override,
+  non-owner PUT returns 403, regression on non-storage/non-partner
+  listing still uses 5% platform default.
+- Frontend Playwright — BP input renders on `/create-listing?type=storage_locker`,
+  bilingual EN/FR labels + placeholder + help text, LOCKED notice for
+  regular sellers, ZERO BP input on `/vehicle-auctions/create`,
+  `/create-multi-item-listing`, `/vehicle-multi-lot/create` (regression
+  preserved).
+
+### Flagged (documented, not fixed — out of scope)
+- Explicit `0` (zero) is silently treated as `null` (platform default)
+  because both `calculate_standard_checkout` and
+  `calculate_general_checkout` use `> 0` guards on the override. If a
+  future promo lets storage operators offer 0% BP as a marketing lever,
+  change both guards to `is not None`. Test suite includes an assertion
+  documenting the current behavior so any semantic change is caught.
+
+### Testids for QA
+`buyers-premium-input`, `bp-locked-notice`.
+
+
+
 ## Feb 8, 2026 — iter440 Base64 Image Submission Sweep
 
 Audited every listing creation flow for the base64-in-payload

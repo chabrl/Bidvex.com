@@ -1,6 +1,49 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter441 — Storage Facility Custom Buyer's Premium (Feb 8, 2026) ✅ COMPLETE
+
+**Reported by user**: Allow storage facility operators to set a custom
+buyer's premium percentage on each individual listing they create or
+edit. Field must appear in the storage listing create + edit forms,
+default to the platform rate if left blank, be stored on the listing
+record, and be used at checkout for that listing. Bilingual EN/FR.
+Do NOT touch vehicle or lot listing forms.
+
+### Delivered
+- **Backend** — `POST /api/listings`, `PUT /api/listings/{id}`, and
+  `GET /api/checkout/fee-breakdown` now persist/read/enforce
+  `custom_buyer_premium_rate` (fraction 0–0.25) per listing. Bilingual
+  400 for out-of-band + non-numeric input. `null` reverts to platform
+  default.
+- **Backend fee math** — `stripe_connect_service.calculate_general_checkout`
+  and `shared.calculate_standard_checkout` accept
+  `custom_buyer_premium_rate`; when set and `> 0`, replaces the
+  tier-based rate outright. Wired through `routes/payments.py` (both
+  Stripe checkout paths) and `routes/misc.py` (fee-breakdown preview).
+- **Frontend** — `CreateListingPage.js` now shows the BP input
+  (`data-testid="buyers-premium-input"`) when `isPartner OR isStorageLocker`.
+  Storage placeholder + help copy differ from Partner. Edit-mode
+  prefill from `l.custom_buyer_premium_rate`. Submit converts % ↔
+  fraction; blank submits `null`.
+- **Bilingual** — `createListing.buyersPremiumStoragePh` +
+  `createListing.buyersPremiumStorageHelp` in both `en.json` + `fr.json`.
+
+### Verified end-to-end
+- **Backend pytest** — `tests/test_iter441_storage_bp_rate.py` — 8/8 PASS.
+- **Frontend Playwright** — BP input renders on storage-locker creation;
+  EN/FR labels/placeholder/help text; LOCKED notice for regular sellers;
+  regression on vehicle + multi-item + vehicle-multi-lot forms (no BP
+  input on any of them).
+- Testing report: `/app/test_reports/iteration_439.json`.
+
+### Documented quirk (not fixed — out of scope)
+- Explicit `0` is silently treated as `null` (platform default) because
+  the checkout math uses `> 0` guards on the override. Change both to
+  `is not None` if a future promo needs true 0% BP.
+
+
+
 ## iter413 — Vehicle Dashboard (Verified Dealers + Brokers) (Feb 8, 2026) ✅ COMPLETE
 
 **Reported by user**: Introduce a new `/vehicle-dashboard` route visible in nav for approved vehicle dealers and brokers. Do not modify `/broker/dashboard`. Real-time nav update after admin approves.
