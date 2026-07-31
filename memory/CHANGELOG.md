@@ -1,6 +1,106 @@
 # BidVex Changelog
 
 
+## Feb 8, 2026 — iter443 Storage Fee Model Flip + i18n Cold-Load Fix
+
+### Part A — Storage auctions fee model corrected
+**Old (wrong) model**: Facility owed BidVex 5% commission + Stripe recovery + tax
+on the facility's province; buyer paid $0 to BidVex.
+**New (correct) model**: BidVex charges the WINNING BUYER a flat 5% buyer's
+premium + Stripe recovery + tax at the BUYER's province. The facility
+is NEVER charged. Facility receives full hammer under every payment path.
+User confirmed clean cutover at deploy — no retro corrections on
+historical invoices.
+
+#### Backend
+- `services/fee_calculator.py::_iter350_storage` — FLIPPED: buyer_premium
+  = 5% of hammer, buyer_tax anchored on buyer_prov, seller_commission=0,
+  seller_stripe_recovery=0, seller_taxes=0, seller_payout=hammer,
+  charge_seller_card_separately=False. Bilingual EN/FR notes updated.
+- `services/storage_pricing.py::calculate_storage_pricing` — cash and
+  e-transfer paths rewritten. Buyer_invoice now bills BP+recovery+tax
+  to buyer's card (deposit-crediting preserved). Facility_invoice
+  zeros out (facility_receives=hammer, facility_owes_bidvex=0,
+  bidvex_platform_fee=0). Stripe path unchanged (was already correct).
+  Alias `SELLER_COMMISSION_RATE = BUYER_PREMIUM_RATE = 0.05` kept for
+  any downstream import that still uses the old name (numerically same).
+- `services/scheduled_jobs.py` — `send_storage_seller_commission_invoice`
+  IMPORT and CALL removed. `settle_storage_stripe(...)` now fires for
+  ALL payment methods when new_status=='sold' (was stripe-only). This
+  charges the BUYER's card on file for the 5% BP even on cash/etransfer
+  auctions (deposit already covers the small BP charge in most cases).
+- `models/storage_auction.py` — docstring updated.
+- Tests: `tests/test_iter443_storage_fee_model.py` NEW (6 tests, all
+  PASS). `tests/test_storage_payment_deposit_iter170.py` proofs 2+3
+  rewritten to iter443 (10/10 PASS). `tests/test_iter209_step1_fee_calculator.py`
+  cases 5a+5b rewritten to iter443 (3/3 PASS). `test_iter211_storage_fee_corrections.py`
+  DELETED (obsolete). Total 19 storage-fee unit tests PASS.
+
+#### Frontend
+- `pages/storage/StorageAuctionCard.js` — emerald pill copy changed
+  from `💰 No Buyer Fees / Sans frais` to `💰 5% Buyer's Premium / Prime
+  acheteur 5 %` for the `data-testid=bid-status-none` state.
+- `pages/storage/StoragePolicies.js` — HowItWorks section 1 body,
+  section 4 title+body, section 5 body; StorageTerms Article 4 body;
+  StorageForFacilities sections 1, 2, 3 title+body — ALL rewritten
+  EN + FR to reflect corrected model (facility never charged; buyer
+  pays 5% BP + tax + Stripe recovery on top of hammer).
+- `pages/storage/StorageAuctionsBrowse.js` — banner driven by
+  `storage.browse.transparentFeesBody` → 'A 5% buyer's premium is added
+  to the hammer price. No fees charged to the facility.' (FR mirrored).
+- `pages/storage/StorageAuctionDetail.js` — notice card title +
+  body reads corrected model via `storage.detail.noBuyerFeeTitle/Body`.
+- `pages/HomePage.js` — storage promo badge shows '5% Buyer's Premium'
+  / 'Prime acheteur 5 %' via `home.storagePromo.noBuyerFees` locale key
+  (kept the key name for stability; value flipped).
+- Locales: `noBuyerFees*`, `transparentFeesBody`,
+  `feeBuyerPremiumStorageHint`, `storage.hero.subtitle` — all updated
+  EN + FR to reflect the corrected model.
+
+### Part B — i18n cold-load bug fix
+**Root cause**: `LanguageContext.js` useEffect unconditionally called
+`i18n.changeLanguage(lang)` on every render. When URL had NO `/en/` /
+`/fr/` prefix (e.g. cold-load at `/`), `lang` was computed as fallback
+from `i18n.language`. Race: if i18n.language had not yet reflected the
+persisted preference on first render, useEffect called
+`changeLanguage('en')` which fired the `languageChanged` handler and
+OVERWROTE the persisted `bidvex_language` + `i18nextLng` back to 'en'.
+This is why users' saved FR preference was silently lost on every cold
+reload.
+
+- `contexts/LanguageContext.js` — useEffect now gated on `urlHasLangPrefix`:
+  `if (urlHasLangPrefix && i18n.language !== lang) i18n.changeLanguage(lang)`.
+  When URL is language-neutral, the persisted preference (loaded
+  synchronously by `i18n.init({ lng: getPersistedLanguage() })`) wins.
+  `<html lang>` sync remains unconditional.
+- `i18n.js` — on module load (BEFORE i18n.init), a defensive migration
+  block reads `i18nextLng` and mirrors it into `bidvex_language` if the
+  primary key is empty. This ensures i18next-browser-languagedetector
+  (which only reads `bidvex_language` via `lookupLocalStorage`) returns
+  the correct language on FIRST render for users landing with only the
+  legacy cache key populated.
+- No translation keys, locale files, or language-toggle logic changed.
+
+### Verified
+- Backend pytest: 19/19 storage-fee tests PASS.
+- Live curl `/api/fees/v2/preview` (QC cash storage $100): buyer_premium=$5,
+  seller_commission=$0, seller_payout=$100, tax=GST+QST(14.975%).
+- Testing agent report `/app/test_reports/iteration_443.json` — 100%
+  backend + 100% frontend. Both EN + FR verified across all storage
+  pages. i18n cold-load: (A) `bidvex_language=fr` persisted → cold-reload
+  renders FR, key preserved. (B) legacy-only `i18nextLng=fr` → renders
+  FR AND migrated to `bidvex_language`. (C) empty → EN default.
+
+### Documented (minor, not blocking)
+- Testing agent noted `fee_model_version` still reads 'iter350' in the
+  fee_calculator response — cosmetic version stamp, not functionally
+  wrong.
+- For-Facilities EN copy uses variants of the "never charged" phrase
+  ("no platform fees", "you pay nothing") — semantically correct;
+  consider aligning to the exact literal in a future copy pass.
+
+
+
 ## Feb 8, 2026 — iter442 Vehicle Listing Choice Modal
 
 Verified dealers who click any "Create Listing" CTA on the vehicle

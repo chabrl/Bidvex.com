@@ -1,6 +1,48 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter443 — Storage Fee Model Flip + i18n Cold-Load Fix (Feb 8, 2026) ✅ COMPLETE
+
+**Reported by user (dual-track)**:
+1. Fix the storage auctions fee model: BidVex charges the winning
+   bidder 5% BP on hammer. Facility is never charged. Update backend
+   fee math, remove wrong badges/banners, correct how-it-works, terms,
+   for-facilities pages. EN + FR bilingual. Don't touch vehicle or
+   marketplace fee logic.
+2. Fix i18n cold-load: honor `localStorage.i18nextLng` before first
+   render so the app doesn't default to EN over the user's saved FR
+   preference. Don't change translation keys, locale files, or toggle
+   logic.
+
+**User decision**: Clean cutover at deploy — no retro corrections on
+historical facility-commission invoices.
+
+### Delivered
+- **Backend fee math flipped** — `_iter350_storage` now returns
+  buyer_premium=5%, seller_commission=0, seller_payout=hammer for both
+  Stripe and cash/etransfer paths.
+- **Storage pricing service** cash/etransfer path rewritten to bill
+  BUYER's card for BP+recovery+tax; facility receives full hammer
+  offline and is never invoiced.
+- **Scheduled job** `send_storage_seller_commission_invoice` removed;
+  `settle_storage_stripe` fires for all payment methods so BidVex
+  auto-charges buyer's card for the 5% BP on every close.
+- **Frontend** — badge, banner, notice, storage subtitle, home promo,
+  how-it-works, terms, for-facilities all rewritten EN + FR. Zero
+  "No Buyer Fees" copy remaining.
+- **19 backend regression tests** covering all storage combos PASS.
+- **i18n cold-load** — LanguageContext useEffect gated on
+  `urlHasLangPrefix`; i18n.js defensive migration of legacy `i18nextLng`
+  key into primary `bidvex_language` before init.
+
+### Verified
+- Testing report: `/app/test_reports/iteration_443.json` — 100%
+  backend + 100% frontend. All 3 i18n cold-load scenarios PASS.
+- Live curl `/api/fees/v2/preview` — buyer_premium=$5, facility_payout=$100
+  on $100 hammer QC cash.
+
+
+
 ## iter442 — Vehicle Listing Choice Modal (Feb 8, 2026) ✅ COMPLETE
 
 **Reported by user**: On the vehicle listing create flow, when a
