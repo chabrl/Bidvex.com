@@ -557,6 +557,32 @@ async def create_listing(
         listing_dict["deposit_amount"] = None
         listing_dict["deposit_type"] = None
 
+    # iter441 — Storage operators (and any non-partner seller) may pass
+    # a per-listing BP rate. Validate the band here so the checkout code
+    # can trust `custom_buyer_premium_rate` unconditionally.
+    if listing_data.buyers_premium_rate is not None:
+        try:
+            _rate = float(listing_data.buyers_premium_rate)
+        except (TypeError, ValueError):
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "invalid_buyers_premium_rate",
+                    "message_en": "Buyer's premium rate must be a number.",
+                    "message_fr": "Le taux de prime acheteur doit être un nombre.",
+                },
+            )
+        if _rate < 0 or _rate > 0.25:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "buyers_premium_rate_out_of_range",
+                    "message_en": "Buyer's premium rate must be between 0% and 25%.",
+                    "message_fr": "Le taux de prime acheteur doit être entre 0 % et 25 %.",
+                },
+            )
+        listing_data.buyers_premium_rate = _rate
+
     await apply_partner_tags(db, current_user, listing_dict, listing_data.buyers_premium_rate)
 
     # ── Moderation gate for single-item listings ──
@@ -970,8 +996,45 @@ async def update_listing(listing_id: str, updates: Dict[str, Any], current_user:
     if listing["seller_id"] != current_user.id and getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Not authorized")
     allowed_fields = ["title", "description", "category", "condition", "images", "location", "city", "region", "country", "postal_code", "status",
-                      "title_en", "title_fr", "description_en", "description_fr"]
+                      "title_en", "title_fr", "description_en", "description_fr",
+                      # iter441 — Storage operators can edit their per-listing
+                      # buyer's premium override. Accepted as either
+                      # `custom_buyer_premium_rate` or `buyers_premium_rate`.
+                      "custom_buyer_premium_rate", "buyers_premium_rate"]
     update_data = {k: v for k, v in updates.items() if k in allowed_fields}
+
+    # iter441 — Normalize the two accepted BP-rate field names into the
+    # single `custom_buyer_premium_rate` column that checkout reads.
+    if "buyers_premium_rate" in update_data:
+        update_data["custom_buyer_premium_rate"] = update_data.pop("buyers_premium_rate")
+    if "custom_buyer_premium_rate" in update_data:
+        _bp = update_data["custom_buyer_premium_rate"]
+        if _bp is None or _bp == "":
+            # Blank field = revert to platform default.
+            update_data["custom_buyer_premium_rate"] = None
+        else:
+            try:
+                _bp_f = float(_bp)
+            except (TypeError, ValueError):
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "error": "invalid_buyers_premium_rate",
+                        "message_en": "Buyer's premium rate must be a number.",
+                        "message_fr": "Le taux de prime acheteur doit être un nombre.",
+                    },
+                )
+            # Same 0-25% band the OPC-dealer gate uses at create time.
+            if _bp_f < 0 or _bp_f > 0.25:
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "error": "buyers_premium_rate_out_of_range",
+                        "message_en": "Buyer's premium rate must be between 0% and 25%.",
+                        "message_fr": "Le taux de prime acheteur doit être entre 0 % et 25 %.",
+                    },
+                )
+            update_data["custom_buyer_premium_rate"] = _bp_f
 
     # iter250 — Sanitize broker-supplied HTML in description fields BEFORE
     # persistence (UPDATE path).

@@ -943,12 +943,17 @@ async def create_auction_checkout(
                 detail="Seller has not completed Stripe Connect onboarding. Please contact seller."
             )
         
+        # iter441 — Storage operators can set a per-listing BP rate; if
+        # present (>0) it overrides the tier-based default.
+        listing_bp_override = listing.get("custom_buyer_premium_rate")
+
         breakdown = calculate_general_checkout(
             hammer_price=hammer_price,
             buyer_tier=current_user.subscription_tier if hasattr(current_user, 'subscription_tier') else "basic",
             seller_tier=seller.get("subscription_tier", "basic"),
             seller_is_tax_registered=seller.get("is_tax_registered", False),
-            include_processing_fee=True
+            include_processing_fee=True,
+            custom_buyer_premium_rate=listing_bp_override,
         )
         
         result = await create_destination_charge(
@@ -1036,13 +1041,18 @@ async def preview_checkout_breakdown(
     else:
         seller_tier = seller.get("subscription_tier", "basic") if seller else "basic"
         seller_is_tax_registered = seller.get("is_tax_registered", False) if seller else False
-        
+        # iter441 — Storage operators can set a per-listing BP rate; if
+        # present (>0) it overrides the tier-based default in the
+        # preview breakdown too.
+        listing_bp_override = listing.get("custom_buyer_premium_rate")
+
         breakdown = calculate_general_checkout(
             hammer_price=hammer_price,
             buyer_tier=buyer_tier,
             seller_tier=seller_tier,
             seller_is_tax_registered=seller_is_tax_registered,
-            include_processing_fee=True
+            include_processing_fee=True,
+            custom_buyer_premium_rate=listing_bp_override,
         )
         
         return {

@@ -216,14 +216,25 @@ def calculate_partner_checkout(hammer_price: float, custom_buyer_premium_rate: f
         "bidvex_revenue": platform_fee,
     }
 
-def calculate_standard_checkout(hammer_price: float, buyer_subscription_tier: str = "free") -> dict:
-    buyer_premium_rate = STANDARD_BUYER_PREMIUM_RATE
-    discount = 0.0
-    if buyer_subscription_tier == "premium":
-        discount = 0.25
-    elif buyer_subscription_tier == "vip":
-        discount = 0.50
-    effective_rate = buyer_premium_rate * (1 - discount)
+def calculate_standard_checkout(hammer_price: float, buyer_subscription_tier: str = "free", custom_buyer_premium_rate: float = None) -> dict:
+    """iter441 — `custom_buyer_premium_rate` (e.g. 0.075 for 7.5%) is the
+    listing-level override that storage operators set per listing. When
+    provided (>0) it replaces the tier-based standard rate. Falls back
+    to the platform default otherwise so unchanged listings behave
+    exactly like before."""
+    if custom_buyer_premium_rate is not None and float(custom_buyer_premium_rate) > 0:
+        # Skip subscription-tier discount when the seller has locked in a
+        # per-listing rate — the listing rate wins outright.
+        effective_rate = float(custom_buyer_premium_rate)
+        discount = 0.0
+    else:
+        buyer_premium_rate = STANDARD_BUYER_PREMIUM_RATE
+        discount = 0.0
+        if buyer_subscription_tier == "premium":
+            discount = 0.25
+        elif buyer_subscription_tier == "vip":
+            discount = 0.50
+        effective_rate = buyer_premium_rate * (1 - discount)
     buyer_premium = round(hammer_price * effective_rate, 2)
     seller_commission = round(hammer_price * STANDARD_SELLER_COMMISSION_RATE, 2)
     stripe_base = hammer_price + buyer_premium

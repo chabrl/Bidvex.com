@@ -137,6 +137,16 @@ const CreateListingPage = () => {
           currency:         l.currency || 'CAD',
           id:               l.id,
         }));
+        // iter441 — Prefill the storage-operator BP override when editing
+        // a listing that already has a per-listing rate set.
+        if (typeof l.custom_buyer_premium_rate === 'number' && l.custom_buyer_premium_rate > 0) {
+          setBuyersPremiumPercent(String(Math.round(l.custom_buyer_premium_rate * 100 * 100) / 100));
+        }
+        // If the listing is a storage locker, flip the local flag so the
+        // BP field renders (edit mode doesn't re-run the URL param toggle).
+        if (l.category === 'storage_locker' || l.listing_type === 'storage_locker') {
+          setIsStorageLocker(true);
+        }
       } catch (err) {
         toast.error(extractErrorMessage(err) || 'Failed to load listing for editing');
       }
@@ -1113,7 +1123,10 @@ const CreateListingPage = () => {
                 <Label htmlFor="buyers_premium_percent">{t('createListing.buyersPremium', "Buyer's Premium (%)")}
                   <InfoTip en="A fee added to the winning bid, paid by the buyer. Standard: 5%. This covers platform services." fr="Des frais ajoutés à l'enchère gagnante, payés par l'acheteur. Standard: 5%. Cela couvre les services de la plateforme." />
                 </Label>
-                {isPartner ? (
+                {/* iter441 — Storage facility operators can now also set a
+                    per-listing BP rate (0–25%). Falls back to the
+                    platform default (5%) when left blank. */}
+                {(isPartner || isStorageLocker) ? (
                   <>
                     <Input
                       id="buyers_premium_percent"
@@ -1121,13 +1134,15 @@ const CreateListingPage = () => {
                       step="0.5"
                       min="0"
                       max="25"
-                      placeholder="0"
+                      placeholder={t('createListing.buyersPremiumStoragePh', 'Leave blank for platform default (5%)')}
                       value={buyersPremiumPercent}
                       onChange={(e) => setBuyersPremiumPercent(e.target.value)}
                       data-testid="buyers-premium-input"
                     />
                     <p className="text-xs text-muted-foreground">
-                      {t('createListing.buyersPremiumPartnerHelp')}
+                      {isStorageLocker
+                        ? t('createListing.buyersPremiumStorageHelp', 'Set the buyer\'s premium you charge on this specific storage unit auction. Leave blank to use the BidVex platform rate (5%). Max 25%.')
+                        : t('createListing.buyersPremiumPartnerHelp')}
                     </p>
                   </>
                 ) : (

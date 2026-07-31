@@ -1076,7 +1076,10 @@ async def checkout_fee_breakdown(
         # Get buyer's subscription tier for discount
         buyer_doc = await db.users.find_one({"id": current_user.id})
         buyer_tier = buyer_doc.get("subscription_tier", "free") if buyer_doc else "free"
-        breakdown = calculate_standard_checkout(hammer_price, buyer_tier)
+        # iter441 — Storage operators can set a per-listing BP rate; the
+        # /checkout-breakdown preview must honor it too.
+        listing_bp_override = listing.get("custom_buyer_premium_rate")
+        breakdown = calculate_standard_checkout(hammer_price, buyer_tier, custom_buyer_premium_rate=listing_bp_override)
         breakdown["fee_model"] = "standard"
     
     return breakdown

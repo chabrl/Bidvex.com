@@ -1,0 +1,35 @@
+{
+  "summary": "iter441 — Storage-listing-level Buyer's Premium (%) override. Backend pytest suite 8/8 PASS: POST creates listing with custom_buyer_premium_rate=0.15; GET /api/checkout/fee-breakdown honors custom rate 0.15 (BP=$7.50 on $50 hammer, not the 5% default); PUT accepts 0.08 (persists); PUT rejects 0.30 -> 400 bilingual buyers_premium_rate_out_of_range; PUT rejects 'abc' -> 400 bilingual invalid_buyers_premium_rate; PUT null clears override and fee-breakdown falls back to 5% platform default; non-owner PUT returns 403; normal non-storage listing without BP still uses the 5% default. Frontend Playwright verified: BP input (data-testid='buyers-premium-input') visible+enabled on /create-listing?type=storage_locker; after FR toggle label='Prime de l'acheteur (%)', placeholder='Laissez vide pour utiliser le taux par defaut (5 %)', help text French. LOCKED notice (data-testid='bp-locked-notice') renders for regular seller on default /create-listing (bp-input=0). Vehicle /vehicle-auctions/create, multi-item /create-multi-item-listing and vehicle-multi-lot /vehicle-multi-lot/create show ZERO bp-input (regression preserved).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/listings/{id}", "issue": "Preview-env edge cache briefly shadows recent PUTs. Cache-busted GET (?_nc=<random>) returns fresh data; PUT response itself is fresh (backend re-reads from Mongo). Not a code bug in the feature, but read-after-write tests must bust the cache."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "flagged_semantic_quirk": "Confirmed: passing explicit 0 as buyers_premium_rate is treated the same as null (silent fallback to platform default) because shared.calculate_standard_checkout uses `> 0` guard. Left as-is per review-request note.",
+  "flagged_data_note": "testseller@bidvex.com returns is_storage_facility=true in /api/auth/login (leftover iter212 auto-flag). Does NOT leak the BP input because the frontend gate drives isStorageLocker from the URL/checkbox, not from the user field. Locked notice still renders correctly.",
+  "test_report_links": [
+    "/app/backend/tests/test_iter441_storage_bp_rate.py",
+    "/app/test_reports/pytest/iter441_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "shared.calculate_standard_checkout uses `custom_buyer_premium_rate > 0` — combined with PUT storing None on blank, operators cannot force a genuine 0% override. If that's a valid use case (promo storage auctions), change guard to `is not None`; mirror same fix in stripe_connect_service.calculate_general_checkout.",
+    "GET /api/listings/{id} appears cache-fronted at edge; consider Cache-Control: private, no-store on this route so mobile/checkout consumers don't see stale BP rates after a seller edit."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter441_storage_bp_rate.py (new)"
+  ],
+  "success_rate": {"backend": "100% (8/8)", "frontend": "100% (all iter441 checkpoints)"},
+  "test_credentials": "Admin charbel911@gmail.com / Anderosli123!@# WORKS. testbuyer@bidvex.com / TestBuyer2026! WORKS. iter189buyer@test.com / TestBuyer123! => 401 (stale — /app/memory/test_credentials.md out of sync).",
+  "seed_data_creation": "Test suite creates two `iter441-test-*` listings per run and deletes them in teardown. No persistent seed data.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend regression: /app/backend/tests/test_iter441_storage_bp_rate.py (8 tests, ~20s). Run: `REACT_APP_BACKEND_URL=https://prod-verify-2.preview.emergentagent.com pytest backend/tests/test_iter441_storage_bp_rate.py -v`. For read-after-write on /api/listings/{id}, append `?_nc=<random>` to bust preview edge cache. iter189buyer creds stale — use testbuyer@bidvex.com."
+}

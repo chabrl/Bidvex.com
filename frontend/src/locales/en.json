@@ -949,6 +949,8 @@
     "depositPlaceholderFixed": "e.g. 50",
     "depositPlaceholderPercent": "e.g. 10",
     "buyersPremiumPartnerHelp": "Partner Exclusive: Set Buyer's Premium from 0% to 25%.",
+    "buyersPremiumStoragePh": "Leave blank for platform default (5%)",
+    "buyersPremiumStorageHelp": "Set the buyer's premium you charge on this specific storage unit auction. Leave blank to use the BidVex platform rate (5%). Max 25%.",
     "buyersPremiumLockedNotice": "Buyer's Premium is a Partner-exclusive feature. Become a partner to set custom premiums."
   },
   "vehicleListing": {

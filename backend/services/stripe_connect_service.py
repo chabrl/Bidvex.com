@@ -135,7 +135,8 @@ def calculate_general_checkout(
     buyer_tier: str = "basic",
     seller_tier: str = "basic",
     seller_is_tax_registered: bool = False,
-    include_processing_fee: bool = True
+    include_processing_fee: bool = True,
+    custom_buyer_premium_rate: Optional[float] = None,
 ) -> CheckoutBreakdown:
     """
     Calculate complete checkout breakdown for GENERAL items/lots
@@ -151,6 +152,9 @@ def calculate_general_checkout(
         seller_tier: Seller's subscription tier
         seller_is_tax_registered: Whether seller has GST/QST registration
         include_processing_fee: Whether to add processing fee to buyer total
+        custom_buyer_premium_rate: iter441 — Optional listing-level override
+            (e.g. 0.075 for 7.5%). Storage operators set this per listing.
+            When None or 0, the standard tier-based rate applies.
     
     Returns:
         CheckoutBreakdown with all amounts calculated
@@ -160,7 +164,12 @@ def calculate_general_checkout(
     s_tier = _normalize_tier(seller_tier)
     
     # Get rates
-    buyer_premium_rate = BUYER_PREMIUM_RATES.get(b_tier, Decimal("0.05"))
+    # iter441 — Honor per-listing custom BP rate (storage operators) when
+    # set; otherwise fall back to the buyer's subscription-tier default.
+    if custom_buyer_premium_rate is not None and float(custom_buyer_premium_rate) > 0:
+        buyer_premium_rate = Decimal(str(custom_buyer_premium_rate))
+    else:
+        buyer_premium_rate = BUYER_PREMIUM_RATES.get(b_tier, Decimal("0.05"))
     seller_commission_rate = SELLER_COMMISSION_RATES.get(s_tier, Decimal("0.04"))
     
     # Calculate fees
