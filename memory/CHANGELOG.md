@@ -1,6 +1,60 @@
 # BidVex Changelog
 
 
+## Feb 8, 2026 — iter442 Vehicle Listing Choice Modal
+
+Verified dealers who click any "Create Listing" CTA on the vehicle
+surface now see a modal offering two options — Single Listing OR
+Multi-Lot Auction (up to 500 vehicles) — that routes to the correct
+existing create flow. Neither underlying create flow was rebuilt; the
+modal is purely a router.
+
+### New component
+- `components/vehicles/VehicleListingChoiceModal.jsx` — Shadcn Dialog
+  with two card options. Testids: `create-choice-modal`,
+  `create-choice-single`, `create-choice-multi`. Emerald accent for
+  single, Cyan accent for multi. Reads copy from `vehicleListingChoice.*`.
+
+### CTAs wired
+- `pages/vehicles/VehicleAuctionsPage.js::btn-create-listing` — hero.
+- `components/vehicles/MyVehiclesModule.jsx::my-vehicles-create-first-cta`
+  — empty-state on Vehicle Dashboard.
+- `components/vehicles/HomepageVehicleCarousel.js::homepage-vehicles-cta-list`
+  — dealer CTA in the homepage carousel.
+- `components/vehicles/VehicleEmptyState.js::vehicle-empty-list-btn`
+  — marketplace zero-state.
+- `pages/vehicles/SellerRegistrationPage.js::seller-registration-list-cta`
+  — post-approval success card. NOTE: this page has an early-return
+  for the `existingSeller` branch; the modal render is duplicated inside
+  that branch (line 287) AND in the main registration-form branch (line
+  580) so it mounts regardless of the current view.
+
+### Locales
+- `createListing` block untouched.
+- NEW top-level `vehicleListingChoice.*` block in both `en.json` and
+  `fr.json` at line ~1918 (EN) / ~1938 (FR).
+
+### Verified end-to-end
+- iter442 testing agent report: `/app/test_reports/iteration_442.json`.
+  4/5 CTAs verified PASS. 5th (SellerRegistration) initially FAILED
+  because the modal render sat AFTER an early-return; fixed by
+  duplicating inside the early-return branch. 2 CTAs are unverifiable
+  in the current DB (homepage carousel needs an active vehicle listing;
+  VehicleEmptyState needs zero listings) — code path is correct.
+- EN/FR bilingual verified.
+- Esc + backdrop close verified.
+- Direct navigation to `/vehicle-auctions/create` and
+  `/vehicle-multi-lot/create` does NOT auto-open the modal (modal is
+  router-only — no regressions to the underlying create pages).
+
+### Reused (not touched)
+- `/vehicle-auctions/create` — single-vehicle create form.
+- `/vehicle-multi-lot/create` — multi-lot event create form.
+- `DealerVerificationGate` — still guards the underlying create pages;
+  the modal itself does no permission checks by design.
+
+
+
 ## Feb 8, 2026 — iter441 Storage Facility Custom Buyer's Premium
 
 Storage facility operators can now set a per-listing buyer's premium

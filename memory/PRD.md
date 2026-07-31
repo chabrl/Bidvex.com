@@ -1,6 +1,39 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter442 — Vehicle Listing Choice Modal (Feb 8, 2026) ✅ COMPLETE
+
+**Reported by user**: On the vehicle listing create flow, when a
+verified dealer clicks 'Create Listing', show a choice modal with two
+options: 'Single Listing' and 'Multi-Lot Auction (up to 500 vehicles)'.
+Single Listing routes to the existing create form. Multi-Lot routes to
+the existing multi-lot creation flow already built. Reuse existing
+components — do not rebuild either flow.
+
+### Delivered
+- **NEW** `components/vehicles/VehicleListingChoiceModal.jsx` (Shadcn
+  Dialog, 118 lines, EN/FR).
+- **Wired into 5 CTAs**: `btn-create-listing` (Vehicle Auctions hero),
+  `my-vehicles-create-first-cta` (Vehicle Dashboard empty state),
+  `homepage-vehicles-cta-list` (homepage carousel dealer CTA),
+  `vehicle-empty-list-btn` (marketplace zero-state),
+  `seller-registration-list-cta` (post-approval success card).
+- **NO changes** to `/vehicle-auctions/create` or `/vehicle-multi-lot/create`
+  — pure router modal.
+- **Locales** — `vehicleListingChoice.*` block in `en.json` + `fr.json`.
+
+### Verified
+- Testing report: `/app/test_reports/iteration_442.json` — 4/5 CTAs
+  verified PASS on first run, 5th (SellerRegistration) FAILED due to
+  early-return excluding modal render — fixed by duplicating the render
+  inside that branch. EN/FR labels, Esc + backdrop close, and direct-
+  nav regression all PASS.
+- Homepage carousel + VehicleEmptyState CTAs cannot be verified without
+  seeded DB conditions (0 vs ≥1 active vehicle listings) — code wiring
+  is identical to the 3 verified CTAs.
+
+
+
 ## iter441 — Storage Facility Custom Buyer's Premium (Feb 8, 2026) ✅ COMPLETE
 
 **Reported by user**: Allow storage facility operators to set a custom

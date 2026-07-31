@@ -282,6 +282,9 @@ const SellerRegistrationPage = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* iter442 — Choice modal driven by the approved-seller "List a Vehicle" CTA (mounted inside the early-return branch) */}
+        <VehicleListingChoiceModal open={choiceOpen} onOpenChange={setChoiceOpen} />
       </div>
     );
   }
