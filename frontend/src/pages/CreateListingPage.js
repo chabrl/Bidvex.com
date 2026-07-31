@@ -6,6 +6,7 @@ import SaveAsDraftButton from '../components/SaveAsDraftButton';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 import { extractErrorMessage } from '../utils/errorHandler';
+import { uploadListingImage } from '../utils/uploadListingImage';
 import TaxInterviewModal from '../components/TaxInterviewModal';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -311,22 +312,32 @@ const CreateListingPage = () => {
     setFormData({ ...formData, [name]: value });
   };
 
-  const handleImageUpload = (e) => {
-    const files = Array.from(e.target.files);
-    files.forEach(file => {
+  // iter440 — Upload each selected image to S3 via
+  // /api/uploads/listing-image and store the returned public URL in
+  // formData.images. Submitting base64 data URLs directly to
+  // /api/listings was rejected by the API-level guardrail (see
+  // routes/listings.py) and caused Mongo document bloat.
+  const handleImageUpload = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    for (const file of files) {
       if (file.size > 5000000) {
         toast.error('Image size should be less than 5MB');
-        return;
+        continue;
       }
-      const reader = new FileReader();
-      reader.onload = () => {
-        setFormData(prev => ({
+      try {
+        const url = await uploadListingImage(file);
+        setFormData((prev) => ({
           ...prev,
-          images: [...prev.images, reader.result]
+          images: [...prev.images, url],
         }));
-      };
-      reader.readAsDataURL(file);
-    });
+      } catch (err) {
+        console.error('[CreateListing] image upload failed:', err);
+        toast.error(extractErrorMessage(err) || 'Failed to upload image');
+      }
+    }
+    // Reset the input so the same file can be re-picked if needed.
+    e.target.value = '';
   };
 
   const removeImage = (index) => {

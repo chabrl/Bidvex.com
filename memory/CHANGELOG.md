@@ -1,6 +1,40 @@
 # BidVex Changelog
 
 
+## Feb 8, 2026 — iter440 Base64 Image Submission Sweep
+
+Audited every listing creation flow for the base64-in-payload
+anti-pattern that the API-level guardrail rejects and that inflates
+Mongo documents past the 16 MB limit.
+
+### Audit results
+
+| Form | Prior behaviour | Fix |
+|------|-----------------|-----|
+| `pages/CreateListingPage.js` | Read files with `FileReader.readAsDataURL`, pushed base64 strings into `formData.images`, submitted verbatim to `POST /api/listings`. | Now calls the shared `uploadListingImage()` helper → stores S3 URL only. |
+| `pages/CreateMultiItemListing.js` | Correct (used inline `uploadImageToS3`). | DRY-refactored to import the shared helper — same behaviour, single source of truth. |
+| `pages/vehicles/CreateVehicleListingPage.js` | Uses `readAsDataURL` only for the local preview thumbnail; actual submit sends `photo.file` via multipart to `/api/vehicles/{id}/media` (S3-backed). | **No change** — already compliant. |
+| `pages/vehicles/CreateVehicleMultiLotPage.js` | Uses multipart to `/api/vehicle-multi-lot-auctions/{id}/lots/{lotId}/photos` (S3-backed). | **No change** — already compliant. |
+| `pages/storage/MyCleanoutsPage.jsx` | Read broom-swept photos with `readAsDataURL`, stored base64 strings in `photosByInvoice`, submitted verbatim to `POST /api/api/storage-cleanout/{id}/request-clearance`. | Now uses shared helper → S3 URLs only. |
+
+### New shared helper
+- `/app/frontend/src/utils/uploadListingImage.js` (~55 lines).
+  - `uploadListingImage(file)` — posts to `POST /api/uploads/listing-image`, returns the public S3 URL. Throws if the response has no `url` or accidentally returns a `data:` URI.
+  - `uploadListingImages(files)` — parallel upload for multi-file forms.
+- Backend endpoint `POST /api/uploads/listing-image` verified via curl —
+  returns `{ url: "https://…s3.us-east-2.amazonaws.com/…" }` on success.
+
+### Verification
+- Grep across all touched files confirms **zero** remaining code paths
+  that submit base64 image data to the API. Remaining `readAsDataURL`
+  calls are: (a) local preview thumbnails only, (b) PDF/document
+  uploads for the multi-item listing catalog — NOT images.
+- Lint clean on all four touched files (unrelated pre-existing dup-key
+  warnings in `CreateListingPage.js` are outside the edited lines).
+- No behavioural change to any other form logic (validation, submit,
+  error handling, or navigation).
+
+
 ## Feb 8, 2026 — iter438 i18n Cold-Load Fix + License Info Tooltip System
 
 Two focused improvements shipped in one iteration.

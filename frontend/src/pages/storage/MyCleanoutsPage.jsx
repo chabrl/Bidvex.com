@@ -18,6 +18,7 @@ import { Loader2, Upload, X } from 'lucide-react';
 
 import CleanoutCountdownTicker from '../../components/CleanoutCountdownTicker';
 import { authHeaders } from '../../utils/authToken';
+import { uploadListingImage } from '../../utils/uploadListingImage';
 
 const API = process.env.REACT_APP_BACKEND_URL || '';
 
@@ -68,13 +69,11 @@ export default function MyCleanoutsPage() {
     fetchHolds();
   }, [fetchHolds]);
 
-  // Phase 6.3 Task 3 — file → base64 data URL conversion for the photo drawer.
-  const _readAsDataURL = (file) => new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
+  // iter440 — Upload each broom-swept photo to S3 via
+  // /api/uploads/listing-image and store the returned URL. The old
+  // behaviour (readAsDataURL → base64 URLs stored inline in the
+  // clearance-request payload) triggered the API-level base64
+  // guardrail and inflated Mongo documents beyond the 16 MB limit.
 
   const handlePhotoSelect = async (invoiceId, files) => {
     const valid = Array.from(files || []).filter((f) => f.type.startsWith('image/'));
@@ -82,11 +81,16 @@ export default function MyCleanoutsPage() {
       toast.error(t('cleanouts.photoMustBeImage', 'Please select an image file.'));
       return;
     }
-    const dataUrls = await Promise.all(valid.map(_readAsDataURL));
-    setPhotosByInvoice((prev) => ({
-      ...prev,
-      [invoiceId]: [...(prev[invoiceId] || []), ...dataUrls],
-    }));
+    try {
+      const urls = await Promise.all(valid.map((f) => uploadListingImage(f)));
+      setPhotosByInvoice((prev) => ({
+        ...prev,
+        [invoiceId]: [...(prev[invoiceId] || []), ...urls],
+      }));
+    } catch (err) {
+      console.error('[Cleanouts] photo upload failed:', err);
+      toast.error(t('cleanouts.photoUploadFailed', 'Photo upload failed. Please try again.'));
+    }
   };
 
   const removePhoto = (invoiceId, idx) => {

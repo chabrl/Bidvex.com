@@ -34,27 +34,11 @@ import FrenchTitleField from '../components/FrenchTitleField';
 const API = API_BASE;
 
 /**
- * iter389 — Upload a File to S3 and return the public URL.
- *
- * Uses `POST /api/uploads/listing-image` (multipart) which pipes through
- * `services/s3_service.upload_image_to_s3` → returns the public HTTPS URL.
- * The old behaviour (readAsDataURL → base64 in Mongo) was flagged by a
- * nightly sweep and would fail the API-level guardrail on submit.
- *
- * @param {File} file
- * @returns {Promise<string>} public S3 URL (never a base64 data URL)
+ * iter440 — image upload flow moved to shared util
+ * `utils/uploadListingImage.js`. Import re-exposes the same function
+ * name so downstream callers below don't need to change.
  */
-async function uploadImageToS3(file) {
-  const form = new FormData();
-  form.append('file', file);
-  const res = await axios.post(`${API}/uploads/listing-image`, form, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  });
-  if (!res?.data?.url) {
-    throw new Error('S3 upload succeeded but no URL was returned');
-  }
-  return res.data.url;
-}
+import { uploadListingImage as uploadImageToS3 } from '../utils/uploadListingImage';
 
 const CreateMultiItemListing = () => {
   const { t, i18n } = useTranslation();
