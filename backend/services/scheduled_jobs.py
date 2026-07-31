@@ -647,35 +647,24 @@ async def process_ended_storage_auctions(db):
                 # ── Emails (non-blocking in practice; awaited for reliability here) ──
                 if new_status == "sold":
                     try:
+                        # iter443 — Facility is NEVER invoiced by BidVex. The
+                        # `send_storage_seller_commission_invoice` helper is
+                        # deliberately no longer imported/called here.
                         from services.emails.email_marketplace import (
                             send_storage_auction_won_email,
                             send_storage_auction_sold_email,
-                            send_storage_seller_commission_invoice,
                         )
                         await send_storage_auction_won_email(buyer, auction, facility, pricing)
                         await send_storage_auction_sold_email(facility, auction, buyer)
-                        if pricing:
-                            # Reuse existing commission invoice helper (it accepts "seller_invoice" shape)
-                            seller_invoice_compat = {
-                                "seller_invoice": {
-                                    "commission": pricing["facility_invoice"].get("bidvex_platform_fee", 0) if auction.get("payment_method") != "stripe" else pricing["buyer_invoice"].get("platform_fee", 0),
-                                    "stripe_recovery": pricing["facility_invoice"].get("stripe_recovery", 0) if auction.get("payment_method") != "stripe" else pricing["buyer_invoice"].get("stripe_recovery", 0),
-                                    "tax": pricing["facility_invoice"].get("tax", 0) if auction.get("payment_method") != "stripe" else pricing["buyer_invoice"].get("tax", 0),
-                                    "tax_label": pricing.get("tax_label", ""),
-                                    "total": pricing["facility_invoice"].get("facility_owes_bidvex", 0) if auction.get("payment_method") != "stripe" else (float(pricing["buyer_invoice"].get("platform_fee", 0)) + float(pricing["buyer_invoice"].get("stripe_recovery", 0)) + float(pricing["buyer_invoice"].get("tax", 0))),
-                                }
-                            }
-                            # Only send a separate invoice for cash/etransfer (Stripe path = fee already charged to buyer)
-                            if auction.get("payment_method") in ("cash", "etransfer"):
-                                await send_storage_seller_commission_invoice(facility, auction, seller_invoice_compat)
                     except Exception as e:
                         logger.error(f"[STORAGE_CLOSE] email dispatch failed for {auction_id}: {e}")
 
-                # iter298 BUG 3/4 — Storage Stripe path: auto-charge the
-                # winner (hammer + 5% fee + processing + tax − $50
-                # deposit) at close, stamp the payment lifecycle, flag
-                # payout_pending, and issue receipts/statements.
-                if new_status == "sold" and winner_id and pricing and (auction.get("payment_method") or "stripe").lower() == "stripe":
+                # iter443 — Storage BP collection: BidVex ALWAYS charges the
+                # buyer's card on file for its 5% buyer's premium (regardless
+                # of payment method). Stripe path also charges hammer via card;
+                # cash/etransfer path charges ONLY the BP portion because the
+                # buyer pays hammer to the facility off-platform.
+                if new_status == "sold" and winner_id and pricing:
                     try:
                         from services.payment_collection import (
                             settle_storage_stripe, finalize_auction_payment,
@@ -697,7 +686,7 @@ async def process_ended_storage_auctions(db):
                             winner_override=winner_id,
                         )
                     except Exception as e:
-                        logger.error(f"[STORAGE_CLOSE] stripe auto-charge failed for {auction_id}: {e}")
+                        logger.error(f"[STORAGE_CLOSE] buyer-BP auto-charge failed for {auction_id}: {e}")
 
                 # iter298 BUG 2 — unsold storage auction → relist email +
                 # bilingual notification to the facility owner.

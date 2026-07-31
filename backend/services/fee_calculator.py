@@ -15,7 +15,7 @@ Three universal rules (enforced by this module):
      - Seller commission     → taxed at SELLER's province
      - Partner 3% fee        → taxed at PARTNER's province
      - Vehicle 2.5% fee      → taxed at BUYER's province (buyer pays it)
-     - Storage 5% commission → taxed at FACILITY's province
+     - Storage 5% BP         → taxed at BUYER's province (iter443 — buyer pays)
      - Broker's BidVex 2.5%  → taxed at BUYER's province
      - International recipient → 0% (Sched. VI Part V §7 zero-rated)
 
@@ -27,7 +27,7 @@ Account-type routing:
     individual/enterprise → buyer-tier BP + seller-tier commission
     partner               → partner-set BP (buyer) + 3% platform fee (partner pays)
     vehicle_dealer        → 2.5% buyer fee, $0 to dealer per transaction
-    storage_facility      → $0 buyer fee, 5% facility commission (facility pays)
+    storage_facility      → 5% buyer premium (BUYER pays), $0 to facility (iter443)
     broker                → 2.5% BidVex fee + broker's own fee (both buyer-paid)
 
 Every result carries `fee_model_version="iter350"` for audit reproducibility.
@@ -76,7 +76,7 @@ TIER_ALIASES: Dict[str, str] = {
 
 PARTNER_PLATFORM_RATE     = Decimal("0.030")   # 3% of hammer → BidVex
 VEHICLE_DEALER_BUYER_RATE = Decimal("0.025")   # 2.5% of hammer → BidVex (buyer pays)
-STORAGE_FACILITY_RATE     = Decimal("0.050")   # 5% of hammer → BidVex (facility pays)
+STORAGE_FACILITY_RATE     = Decimal("0.050")   # 5% of hammer → BidVex (iter443 — BUYER pays)
 BROKER_PLATFORM_RATE      = Decimal("0.025")   # 2.5% of hammer → BidVex (buyer pays)
 
 # Stripe processing — Stripe recovery = (fee × 2.9%) + $0.30 on BidVex fee ONLY
@@ -581,59 +581,70 @@ def _iter350_storage(
     payment: str,
     auction_type: str,
 ) -> dict:
-    """Facility pays BidVex 5% + Stripe recovery + tax on FACILITY's province.
-    Buyer pays $0 BidVex fees regardless of payment path.
-    On Stripe path: buyer pays hammer only via Stripe; facility receives
-    hammer - 5% commission - Stripe recovery - facility tax."""
-    commission        = _q(hammer * STORAGE_FACILITY_RATE)
-    stripe_recovery   = calculate_stripe_recovery(commission)
-    tax_bd            = tax_on(commission + stripe_recovery, facility_prov)
-    facility_owes     = _q(commission + stripe_recovery + tax_bd["total"])
+    """iter443 CORRECTED MODEL — BidVex charges the BUYER 5% buyer's premium
+    on the hammer price. The storage facility is NEVER charged.
+
+    Stripe path: buyer pays hammer + 5% BP + Stripe recovery + tax on the
+    5%+recovery via card. Facility receives the full hammer.
+    Cash/E-Transfer path: buyer pays hammer to facility OFFLINE. BidVex
+    separately charges the buyer's card on file for 5% BP + Stripe
+    recovery + tax on the 5%+recovery. Facility receives full hammer
+    offline and is never invoiced by BidVex.
+
+    Tax is applied at the BUYER's province (Place-of-Supply: buyer is the
+    recipient of BidVex's supply-of-service under CRA §142.1).
+    """
+    buyer_premium   = _q(hammer * STORAGE_FACILITY_RATE)  # 5% of hammer → BidVex
+    stripe_recovery = calculate_stripe_recovery(buyer_premium)
+    tax_bd          = tax_on(buyer_premium + stripe_recovery, buyer_prov)
+    buyer_bidvex    = _q(buyer_premium + stripe_recovery + tax_bd["total"])  # BidVex portion
 
     is_stripe = payment == "stripe"
     if is_stripe:
-        # Buyer pays hammer only via Stripe; facility receives hammer - (5% + recovery + tax)
-        facility_payout = _q(hammer - commission - stripe_recovery - tax_bd["total"])
-        buyer_total     = hammer
+        # Buyer's Stripe charge = hammer + BP + recovery + tax. Facility gets full hammer.
+        buyer_total = _q(hammer + buyer_bidvex)
     else:
-        # Cash/e-transfer: buyer pays facility directly. BidVex bills the facility card.
-        facility_payout = Decimal("0")
-        buyer_total     = Decimal("0")
+        # Cash/E-Transfer: buyer pays hammer OFFLINE to facility. BidVex charges
+        # only the BidVex portion (BP + recovery + tax) to the buyer's card.
+        buyer_total = buyer_bidvex
 
     result = FeeResult(
         auction_type=auction_type,
         seller_type="storage_facility",
         hammer_price=_r(hammer),
-        buyer_premium=0.0, buyer_premium_rate=0.0,
-        buyer_stripe_recovery=0.0,
-        buyer_gst=0.0, buyer_qst=0.0, buyer_hst=0.0, buyer_taxes=0.0,
-        buyer_tax_label="N/A — Buyer pays no BidVex fees on storage",
-        buyer_tax_province=buyer_prov,
+        buyer_premium=_r(buyer_premium),
+        buyer_premium_rate=float(STORAGE_FACILITY_RATE),
+        buyer_stripe_recovery=_r(stripe_recovery),
+        buyer_gst=_r(tax_bd["gst"]), buyer_qst=_r(tax_bd["qst"]), buyer_hst=_r(tax_bd["hst"]),
+        buyer_taxes=_r(tax_bd["total"]),
+        buyer_tax_label=str(tax_bd["label"]),
+        buyer_tax_province=str(tax_bd["province"]),
         buyer_subtotal=_r(buyer_total),
         buyer_total_charged=_r(buyer_total),
         buyer_stripe_cents=int((buyer_total * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP)),
-        seller_commission=_r(commission),
-        seller_commission_rate=float(STORAGE_FACILITY_RATE),
-        seller_stripe_recovery=_r(stripe_recovery),
-        seller_gst=_r(tax_bd["gst"]), seller_qst=_r(tax_bd["qst"]), seller_hst=_r(tax_bd["hst"]),
-        seller_taxes=_r(tax_bd["total"]),
-        seller_tax_label=str(tax_bd["label"]),
-        seller_tax_province=str(tax_bd["province"]),
-        seller_payout=_r(facility_payout if is_stripe else facility_owes),
-        bidvex_revenue=_r(commission),
-        charge_buyer_via_stripe=is_stripe,
+        # Facility side — ZERO. Facility receives 100% of hammer.
+        seller_commission=0.0,
+        seller_commission_rate=0.0,
+        seller_stripe_recovery=0.0,
+        seller_gst=0.0, seller_qst=0.0, seller_hst=0.0, seller_taxes=0.0,
+        seller_tax_label="N/A — facility never charged by BidVex",
+        seller_tax_province=facility_prov,
+        seller_payout=_r(hammer),  # full hammer to facility
+        bidvex_revenue=_r(buyer_premium),
+        charge_buyer_via_stripe=True,   # always charge buyer via Stripe (BP for cash/etransfer too)
         charge_seller_via_stripe=False,
-        charge_seller_card_separately=not is_stripe,
+        charge_seller_card_separately=False,  # facility never billed
         notes=(
-            f"Storage facility: BidVex charges facility {float(STORAGE_FACILITY_RATE)*100:.1f}% commission "
-            f"+ Stripe recovery + tax ({tax_bd['label']} @ {facility_prov}). Buyer pays no BidVex fee."
+            f"iter443 Storage facility model: BUYER pays {float(STORAGE_FACILITY_RATE)*100:.1f}% BP "
+            f"+ Stripe recovery + tax ({tax_bd['label']} @ {buyer_prov}). "
+            f"Facility receives full hammer (${_r(hammer):.2f}) and is never charged."
         ),
-        tax_province=facility_prov,
-        tax_type=("GST+QST" if facility_prov == "QC" else ("HST" if tax_bd["hst"] > 0 else ("GST" if tax_bd["gst"] > 0 else "ZERO"))),
+        tax_province=buyer_prov,
+        tax_type=("GST+QST" if buyer_prov == "QC" else ("HST" if tax_bd["hst"] > 0 else ("GST" if tax_bd["gst"] > 0 else "ZERO"))),
         tax_rate=float(tax_bd["combined_rate"]),
-        buyer_stripe_fee=0.0,
-        seller_stripe_fee=_r(stripe_recovery),
-        seller_commission_total=_r(facility_owes),
+        buyer_stripe_fee=_r(stripe_recovery),
+        seller_stripe_fee=0.0,
+        seller_commission_total=0.0,
     )
     return result.to_dict()
 

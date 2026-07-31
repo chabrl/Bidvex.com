@@ -11,9 +11,10 @@ NEW in iter170:
   • storage_deposits collection (escrow holds via Stripe PI)
 
 Pricing rules (single source of truth — see services/storage_pricing.py):
-  • Stripe path → BidVex collects 5% + Stripe + tax from BUYER (facility nets full hammer)
-  • Cash/E-Transfer path → buyer pays facility off-platform (hammer only)
-       BidVex invoices FACILITY 5% + Stripe + tax
+  • Stripe path → BidVex charges BUYER 5% BP + Stripe + tax (facility nets full hammer)
+  • Cash/E-Transfer path → buyer pays facility off-platform (hammer only);
+       BidVex separately charges the BUYER's card for 5% BP + Stripe + tax.
+       Facility is NEVER invoiced by BidVex (iter443 corrected model).
 """
 from typing import List, Optional
 from datetime import datetime

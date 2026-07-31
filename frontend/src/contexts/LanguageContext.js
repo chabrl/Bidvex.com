@@ -41,15 +41,24 @@ export function LanguageProvider({ children }) {
     ? detectLangFromPath(location.pathname)
     : (i18n.language && i18n.language.startsWith('fr') ? 'fr' : 'en');
 
-  // Sync i18n and <html lang> when the URL prefix changes.
+  // iter443 — Sync i18n and <html lang> when the URL prefix changes.
+  //
+  // Only force `i18n.changeLanguage(lang)` when the URL is authoritative
+  // for the language (i.e. `/en/*` or `/fr/*` prefix present). When the
+  // URL has NO prefix, the user's persisted language preference —
+  // already loaded synchronously by `i18n.init({ lng: … })` — MUST win.
+  // Forcing changeLanguage on a fallback-computed `lang` was overwriting
+  // the persisted preference on every cold-load, causing the app to
+  // ignore `localStorage.i18nextLng` / `bidvex_language` and default to
+  // English on first paint.
   useEffect(() => {
-    if (i18n.language !== lang) {
+    if (urlHasLangPrefix && i18n.language !== lang) {
       i18n.changeLanguage(lang);
     }
     if (typeof document !== 'undefined') {
       document.documentElement.lang = lang;
     }
-  }, [lang, i18n]);
+  }, [lang, i18n, urlHasLangPrefix]);
 
   const switchLang = useCallback((targetLang) => {
     if (targetLang !== 'en' && targetLang !== 'fr') return;

@@ -15,7 +15,7 @@ const PROVINCE_FLAG = '🇨🇦';
  * Auction card for the browse grid.
  *
  * iter172 — Bid-status badge (always bilingual EN + FR, Bill 96):
- *   • User not signed in OR no bid yet  → "💰 No Buyer Fees / Sans frais" (green)
+ *   • User not signed in OR no bid yet  → "💰 5% Buyer's Premium / Prime acheteur 5 %" (emerald)
  *   • Signed-in user is current leader  → "🏆 Leading / En tête" (green)
  *   • Signed-in user has bid but isn't  → "⚡ Outbid / Surenchéri" (orange pulse)
  *   • Promotion tier featured/premium   → additional promotion badge above
@@ -119,7 +119,7 @@ const StorageAuctionCard = ({ auction }) => {
               className="bg-emerald-500 text-white text-[10px] font-bold px-2 py-1 rounded-full"
               data-testid="bid-status-none"
             >
-              💰 No Buyer Fees / Sans frais
+              💰 5% Buyer&apos;s Premium / Prime acheteur 5 %
             </span>
           )}
         </div>

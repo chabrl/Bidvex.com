@@ -90,7 +90,7 @@ def test_v2_preview_case_4_vehicle_dealer():
     assert r["seller_payout"] == 10000.00
 
 
-# Spec test 5a — storage facility CASH @ $100 (corrected iter211)
+# Spec test 5a — storage facility CASH @ $100 (iter443 corrected model)
 def test_v2_preview_case_5a_storage_facility_cash():
     r = _hit(
         hammer_price=100,
@@ -98,14 +98,19 @@ def test_v2_preview_case_5a_storage_facility_cash():
         seller_account_type="storage_facility",
         buyer_tier="vip_elite",
         payment_method="cash",
+        buyer_province="QC",
+        seller_province="QC",
     )
-    assert r["buyer_total_charged"] == 0
-    assert r["seller_commission_total"] == 5.75
-    assert r["charge_buyer_via_stripe"] is False
-    assert r["charge_seller_card_separately"] is True
+    # iter443: BUYER charged 5% BP + recovery + tax; facility owes 0
+    assert r["buyer_premium"] == 5.00
+    assert r["charge_buyer_via_stripe"] is True
+    assert r["seller_commission"] == 0.00
+    assert r["seller_commission_total"] == 0.00
+    assert r["seller_payout"] == 100.00
+    assert r["charge_seller_card_separately"] is False
 
 
-# Spec test 5b — storage facility STRIPE @ $100 (iter211 P0 fix)
+# Spec test 5b — storage facility STRIPE @ $100 (iter443 corrected model)
 def test_v2_preview_case_5b_storage_facility_stripe():
     r = _hit(
         hammer_price=100,
@@ -113,14 +118,16 @@ def test_v2_preview_case_5b_storage_facility_stripe():
         seller_account_type="storage_facility",
         buyer_tier="vip_elite",
         payment_method="stripe",
+        buyer_province="QC",
+        seller_province="QC",
     )
-    # Buyer pays hammer only via Stripe
-    assert r["buyer_total_charged"] == 100.0
-    assert r["buyer_premium"] == 0.0
+    # iter443: BUYER pays hammer + 5% BP + recovery + tax
+    assert r["buyer_premium"] == 5.00
     assert r["charge_buyer_via_stripe"] is True
-    # Facility absorbs 5% + GST + QST
-    assert r["seller_commission_total"] == 5.75
-    assert r["seller_payout"] == 94.25
+    # Facility keeps full hammer, is never charged
+    assert r["seller_commission"] == 0.00
+    assert r["seller_commission_total"] == 0.00
+    assert r["seller_payout"] == 100.00
     assert r["charge_seller_card_separately"] is False
 
 

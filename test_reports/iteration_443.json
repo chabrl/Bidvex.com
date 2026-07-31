@@ -1,0 +1,29 @@
+{
+  "summary": "iter443 storage fee model flip + i18n cold-load fix — VERIFIED. Backend: /api/fees/v2/preview returns buyer_premium=5%, seller_commission=0, seller_payout=hammer for both cash and stripe payment_method on storage_facility auctions; tax anchored on BUYER province (ON→HST 13%, QC→GST+QST 14.975%). 18/18 pytest tests pass (test_iter443_storage_fee_model.py 6/6, test_storage_payment_deposit_iter170.py 10/10, test_iter209_step1_fee_calculator.py cases 5a+5b). scheduled_jobs.py confirmed: send_storage_seller_commission_invoice removed; settle_storage_stripe called unconditionally after new_status=='sold'. Frontend: browse banner shows correct 5% BP + 'No fees charged to the facility' (EN) and 'prime acheteur de 5 % … aucuns frais facturés à la facilité' (FR); homepage promo badge '5% Buyer's Premium' present, old 'No Buyer Fees' absent; how-it-works section 1 mentions '5% buyer' + 'never charged', section 4 title 'Platform Fees & Payment Methods' present; terms Article 4 mentions 5% + never charged; for-facilities FR mentions 'jamais facturée'. StorageAuctionCard.js line 122 pill copy hard-coded '💰 5% Buyer's Premium / Prime acheteur 5 %' (no active auctions on browse to visually confirm, verified via source). i18n cold-load: (A) bidvex_language=fr persisted → cold reload renders FR, key preserved; (B) legacy-only i18nextLng=fr → page renders FR AND bidvex_language migrated to 'fr'; (C) empty → EN default with FR toggle visible.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/storage-auctions/for-facilities EN", "issues": ["Body copy uses 'facility isn't invoiced' / 'no platform fees' phrasing rather than the literal 'facility is never charged' string. Meaning is preserved and correct model conveyed, but if strict wording alignment with the spec is desired, consider aligning EN copy with the exact phrase used elsewhere."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter443_storage_fee_model.py",
+    "/app/backend/tests/test_storage_payment_deposit_iter170.py",
+    "/app/backend/tests/test_iter209_step1_fee_calculator.py"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "fee_calculator response still carries fee_model_version='iter350' (line inspection) — consider bumping to 'iter443' to match iteration branding for observability.",
+    "for-facilities EN wording could use the exact 'facility is never charged' phrase to match other pages' wording for copy consistency (currently uses variants like 'no platform fees' / 'isn't invoiced')."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "Admin charbel911@gmail.com / Anderosli123!@# — not required for this iteration since fee preview endpoint is public and UI checks were unauthenticated.",
+  "seed_data_creation": "None — storage browse page had 0 active auctions so bid-status-none pill was verified by source inspection (StorageAuctionCard.js line 122).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "iter443 is fully verified. Public browse page shows 0 active storage auctions — if visual pill verification is needed later, seed an active storage auction as super_admin then re-verify data-testid='bid-status-none'. All 18 backend fee-model tests are the regression suite; run them before touching fee_calculator.py or storage_pricing.py again. i18n cold-load fix is robust across (bidvex_language persisted), (legacy i18nextLng migration), and (empty → EN default) paths.",
+  "rca of the issue": "N/A — verification of already-implemented iter443 fixes; no defects found."
+}

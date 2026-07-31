@@ -32,6 +32,24 @@ const getPersistedLanguage = () => {
   return null;
 };
 
+// iter443 — On module load, mirror the legacy `i18nextLng` value into
+// our primary `bidvex_language` key BEFORE i18n.init() runs. This makes
+// i18next-browser-languagedetector (which reads only `bidvex_language`
+// via `lookupLocalStorage`) return the correct language on the FIRST
+// render, eliminating the cold-load English flash for users who arrived
+// with only the legacy cache key set.
+try {
+  const primary = localStorage.getItem('bidvex_language');
+  if (!primary || !['en', 'fr'].includes(primary)) {
+    const legacy = localStorage.getItem('i18nextLng');
+    if (legacy && ['en', 'fr'].includes(legacy)) {
+      localStorage.setItem('bidvex_language', legacy);
+    }
+  }
+} catch (e) {
+  // ignore — SSR / privacy modes
+}
+
 // Helper to persist language choice.
 // iter438 — Mirror the value into both our primary key and the
 // legacy `i18nextLng` so cross-tab / cross-init reads stay in sync.
