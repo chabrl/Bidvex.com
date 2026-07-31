@@ -24,6 +24,8 @@ import {
 import SellerDocumentManager from '../../components/vehicles/SellerDocumentManager';
 import { ResubmitApplicationPanel } from '../../components/ResubmitApplicationPanel';
 import LicenseInfoTooltip from '../../components/vehicles/LicenseInfoTooltip';
+// iter442 — Choice modal (Single Listing vs Multi-Lot Auction)
+import VehicleListingChoiceModal from '../../components/vehicles/VehicleListingChoiceModal';
 import { useTranslation } from 'react-i18next';
 
 const API = API_BASE;
@@ -57,6 +59,8 @@ const SellerRegistrationPage = () => {
   const [selectedType, setSelectedType] = useState(null);
   const [loading, setLoading] = useState(false);
   const [existingSeller, setExistingSeller] = useState(null);
+  // iter442 — Choice modal state
+  const [choiceOpen, setChoiceOpen] = useState(false);
   
   const [formData, setFormData] = useState({
     business_name: '',
@@ -199,7 +203,7 @@ const SellerRegistrationPage = () => {
                     Your account is approved! You can now list vehicles.
                   </p>
                   <div className="mt-4 flex gap-4">
-                    <Button onClick={() => navigate('/vehicle-auctions/create')}>
+                    <Button onClick={() => setChoiceOpen(true)} data-testid="seller-registration-list-cta">
                       <Car className="h-4 w-4 mr-2" /> List a Vehicle
                     </Button>
                     <Button variant="outline" onClick={() => navigate('/vehicle-dashboard')}>
@@ -567,6 +571,9 @@ const SellerRegistrationPage = () => {
           </motion.div>
         )}
       </div>
+
+      {/* iter442 — Choice modal driven by the "List a Vehicle" post-approval CTA */}
+      <VehicleListingChoiceModal open={choiceOpen} onOpenChange={setChoiceOpen} />
     </div>
   );
 };

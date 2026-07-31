@@ -1933,6 +1933,18 @@
     "errorBody": "Une erreur s'est produite lors de la connexion au serveur. Veuillez réessayer dans quelques secondes.",
     "retry": "Réessayer"
   },
+  "vehicleListingChoice": {
+    "title": "Que souhaitez-vous créer ?",
+    "subtitle": "Choisissez la façon dont vous voulez inscrire vos véhicules. Vous pouvez changer à tout moment — rien n'est verrouillé.",
+    "single": {
+      "title": "Annonce unique",
+      "description": "Inscrivez un véhicule à la fois avec tous les détails, photos et prix de réserve."
+    },
+    "multi": {
+      "title": "Enchère multi-lots (jusqu'à 500 véhicules)",
+      "description": "Lancez un événement avec plusieurs lots — idéal pour les ventes de flotte, les liquidations de concessionnaires et les enchères en consignation."
+    }
+  },
   "vehiclePage": {
     "sellerCtaTitle": "Vous voulez vendre votre véhicule?",
     "sellerCtaBody": "Rejoignez notre réseau de vendeurs vérifiés — Particulier, Concessionnaire ou Commissaire-priseur.",

@@ -43,6 +43,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../ui/alert-dialog';
+// iter442 — Choice modal (Single Listing vs Multi-Lot Auction)
+import VehicleListingChoiceModal from './VehicleListingChoiceModal';
 
 const API = API_BASE;
 
@@ -215,6 +217,8 @@ const MyVehiclesModule = () => {
   const [activeTab, setActiveTab] = useState('all');
   const [retireTarget, setRetireTarget] = useState(null);
   const [busy, setBusy] = useState(false);
+  // iter442 — Choice modal state
+  const [choiceOpen, setChoiceOpen] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!token) return;
@@ -347,7 +351,7 @@ const MyVehiclesModule = () => {
           </p>
           {canCreate ? (
             <Button
-              onClick={() => navigate('/vehicle-auctions/create')}
+              onClick={() => setChoiceOpen(true)}
               className="min-h-[44px]"
               data-testid="my-vehicles-create-first-cta"
             >
@@ -418,6 +422,9 @@ const MyVehiclesModule = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* iter442 — Choice modal driven by the empty-state CTA */}
+      <VehicleListingChoiceModal open={choiceOpen} onOpenChange={setChoiceOpen} />
     </section>
   );
 };

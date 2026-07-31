@@ -1913,6 +1913,18 @@
     "errorBody": "Something went wrong while reaching the server. Please try again in a few seconds.",
     "retry": "Retry"
   },
+  "vehicleListingChoice": {
+    "title": "What would you like to create?",
+    "subtitle": "Choose how you want to list your vehicles. You can switch anytime — nothing is locked in.",
+    "single": {
+      "title": "Single Listing",
+      "description": "List one vehicle at a time with full details, photos and reserve pricing."
+    },
+    "multi": {
+      "title": "Multi-Lot Auction (up to 500 vehicles)",
+      "description": "Run one event with multiple lots — perfect for fleet sales, dealer clearances and consignment auctions."
+    }
+  },
   "vehiclePage": {
     "sellerCtaTitle": "Want to sell your vehicle?",
     "sellerCtaBody": "Join our verified seller network — Private, Dealer, or Auctioneer.",

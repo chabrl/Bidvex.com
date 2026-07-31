@@ -1,0 +1,45 @@
+{
+  "summary": "iter442 frontend regression testing of VehicleListingChoiceModal wiring on 5 CTAs. Modal, EN/FR strings, A11y (Esc + backdrop), and direct-nav regression all PASS. Two CTAs could not be verified because pre-conditions were not met on this DB (homepage carousel not rendered, VehicleEmptyState not applicable since listings exist). ONE critical bug found: SellerRegistrationPage's approved-seller CTA does not mount the modal.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "SellerRegistrationPage.js",
+        "issue": "Clicking `seller-registration-list-cta` on the approved-seller success card does NOT open the choice modal. Root cause: the `existingSeller` branch of the component performs an early `return` at line 286 rendering only the status Card; the `<VehicleListingChoiceModal open={choiceOpen} onOpenChange={setChoiceOpen} />` at line 576 lives after this early-return in the registration-form JSX and is therefore never mounted when `existingSeller` is truthy. `setChoiceOpen(true)` fires (React handler is attached and clicking is confirmed) but no dialog is ever inserted into the DOM (document.querySelectorAll('[role=\"dialog\"]').length === 0 after click). Fix: hoist the `<VehicleListingChoiceModal />` render outside/above the early-return branch, OR duplicate it inside the approved-seller Card JSX before line 286.",
+        "selector": "[data-testid=\"seller-registration-list-cta\"]",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Fix SellerRegistrationPage.js: move `<VehicleListingChoiceModal open={choiceOpen} onOpenChange={setChoiceOpen} />` so it is rendered in BOTH JSX branches (the `if (existingSeller) return (...)` branch at ~lines 159-286 AND the main form branch at ~line 289+). Simplest fix: place the modal render just before the top-level closing wrapper by refactoring the early return, or duplicate the single line inside the CardContent of the existingSeller branch (e.g. after line 283) so it is always mounted when the button is visible."
+  ],
+  "critical_code_review_comments": [
+    "SellerRegistrationPage.js has an early-return pattern that inadvertently excludes the modal render from the approved-seller success view. Any global overlay/modal introduced in the future needs to be either lifted to the top level or duplicated in both branches. Consider extracting the modal to a common wrapper to avoid this class of bug.",
+    "The modal component correctly renders `<DialogContent data-testid=\"create-choice-modal\">` — good testability; hover/focus states use Emerald (single) and Cyan (multi) accents with strong 2px borders — meets contrast."
+  ],
+  "verified_working": [
+    "/vehicle-auctions btn-create-listing -> modal opens, both options routed correctly (single -> /vehicle-auctions/create, multi -> /vehicle-multi-lot/create).",
+    "/vehicle-dashboard my-vehicles-create-first-cta -> modal opens (empty state case since dashboard shows the CTA even with 5 listings — noted: admin has 5 listings but CTA was still visible; per spec, this CTA is empty-state only, may warrant a follow-up check by main agent).",
+    "Escape key closes modal and returns to previous page unchanged.",
+    "Backdrop click closes the modal (no navigation).",
+    "Direct navigation to /vehicle-auctions/create and /vehicle-multi-lot/create does NOT auto-open the modal (correct — modal is router-only).",
+    "/create-listing does not render the modal (0 occurrences in DOM).",
+    "FR toggle via header FR button switches language and modal renders French strings: 'Que souhaitez-vous créer ?', 'Annonce unique', 'Enchère multi-lots (jusqu'à 500 véhicules)' — all match spec."
+  ],
+  "not_verified_pre_conditions_absent": [
+    "Homepage vehicle carousel CTA `homepage-vehicles-cta-list` — element count = 0 on `/` for this DB (feature flag off or no active vehicle listings rendered). Cannot verify modal opens from this CTA. Recommend main agent verifies manually or seeds a live active listing.",
+    "VehicleEmptyState `vehicle-empty-list-btn` — vehicles marketplace has active listings on this DB so the empty-state does not render. Skipped per spec."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "not tested (frontend-only per request)", "frontend": "5 of 5 verifiable CTAs pass except SellerRegistration CTA (which fails). 4/5 verifiable CTAs = 80%. EN/FR + a11y + regression all pass."},
+  "test_credentials": "charbel911@gmail.com / Anderosli123!@# (super_admin, has approved vehicle seller record and 5 existing listings).",
+  "seed_data_creation": "None",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Only remaining verification: (1) homepage-vehicles-cta-list — requires feature flag ON + at least 1 active vehicle listing to render; consider seeding a live vehicle listing first. (2) vehicle-empty-list-btn — requires ZERO active vehicle listings (rare). All other 4 CTAs verified; only SellerRegistration CTA has a real code bug (early-return excludes modal render).",
+  "rca of the issue": "SellerRegistrationPage.js has two independent JSX branches. The `if (existingSeller) return (...)` at lines 155-286 short-circuits the component when the user already has a vehicle_sellers record; this branch renders the approved/pending/rejected status card but the `<VehicleListingChoiceModal ... />` component is only present in the OTHER (registration-form) branch at line 576. Consequently, when admin (or any approved dealer) clicks `seller-registration-list-cta`, `setChoiceOpen(true)` fires (verified: React handler attached, onclick truthy), but the modal component is never mounted in the tree (radix_portals=0, [role=dialog]=0 in DOM after click). Reproduction: log in as `charbel911@gmail.com`, navigate to `/vehicle-auctions/seller/register`, click 'List a Vehicle' — nothing happens. Mitigation: duplicate the modal render inside the existingSeller branch or lift it above the early-return."
+}

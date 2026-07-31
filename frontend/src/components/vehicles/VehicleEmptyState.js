@@ -12,6 +12,8 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Car, Filter, RotateCcw, PlusCircle, AlertTriangle, Mail, Sparkles } from 'lucide-react';
+// iter442 — Choice modal (Single Listing vs Multi-Lot Auction)
+import VehicleListingChoiceModal from './VehicleListingChoiceModal';
 
 const ZeroListingsSVG = () => (
   <svg viewBox="0 0 240 160" className="w-48 h-32 mx-auto" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
@@ -70,6 +72,8 @@ const VehicleEmptyState = ({
 }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  // iter442 — Choice modal state
+  const [choiceOpen, setChoiceOpen] = React.useState(false);
 
   if (variant === 'filtered-no-results') {
     return (
@@ -166,7 +170,7 @@ const VehicleEmptyState = ({
         </button>
         <button
           type="button"
-          onClick={() => navigate('/vehicle-auctions/create')}
+          onClick={() => setChoiceOpen(true)}
           className="inline-flex items-center gap-2 rounded-lg border-2 border-cyan-500 text-cyan-700 dark:text-cyan-300 font-semibold text-sm px-4 py-2.5 hover:bg-cyan-50 dark:hover:bg-cyan-900/30"
           data-testid="vehicle-empty-list-btn"
         >
@@ -183,6 +187,9 @@ const VehicleEmptyState = ({
           {t('vehicleEmpty.verifyLicenseCta', 'Verify dealer licence')}
         </button>
       </div>
+
+      {/* iter442 — Choice modal driven by the "List a vehicle" CTA */}
+      <VehicleListingChoiceModal open={choiceOpen} onOpenChange={setChoiceOpen} />
     </div>
   );
 };

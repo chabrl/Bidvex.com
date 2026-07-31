@@ -53,6 +53,8 @@ import FeaturedListingSlot from '../../components/FeaturedListingSlot';
 import useVehicleCountdown from '../../hooks/useVehicleCountdown';
 // iter294 P1 — Live multi-lot feed widget.
 import LiveMultiLotFeedWidget from '../../components/LiveMultiLotFeedWidget';
+// iter442 — Choice modal (Single Listing vs Multi-Lot Auction)
+import VehicleListingChoiceModal from '../../components/vehicles/VehicleListingChoiceModal';
 
 const API = API_BASE;
 
@@ -89,6 +91,9 @@ const VehicleAuctionsPage = () => {
   // Categories (loaded once)
   const [categories, setCategories] = useState([]);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
+
+  // iter442 — Choice modal state
+  const [choiceOpen, setChoiceOpen] = useState(false);
 
   // Listings state
   const [vehicles, setVehicles] = useState([]);
@@ -264,7 +269,7 @@ const VehicleAuctionsPage = () => {
               <button onClick={() => navigate('/vehicle-auctions/seller/register')} className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-white text-emerald-700 hover:bg-emerald-50 font-semibold text-xs sm:text-sm px-3 py-2 min-h-[40px]" data-testid="btn-seller-register">
                 <User className="h-4 w-4" />{t('vehiclePage.becomeSeller', 'Become a seller')}
               </button>
-              <button onClick={() => navigate('/vehicle-auctions/create')} className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-transparent border border-white text-white hover:bg-white/15 font-semibold text-xs sm:text-sm px-3 py-2 min-h-[40px]" data-testid="btn-create-listing">
+              <button onClick={() => setChoiceOpen(true)} className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-transparent border border-white text-white hover:bg-white/15 font-semibold text-xs sm:text-sm px-3 py-2 min-h-[40px]" data-testid="btn-create-listing">
                 <PlusCircle className="h-4 w-4" />{t('vehiclePage.listVehicle', 'List a vehicle')}
               </button>
               <button onClick={() => navigate('/vehicle-dashboard')} className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-transparent border border-white text-white hover:bg-white/15 font-semibold text-xs sm:text-sm px-3 py-2 min-h-[40px]" data-testid="btn-my-listings">
@@ -466,6 +471,9 @@ const VehicleAuctionsPage = () => {
 
       {/* Bilingual legal footer (reused from Phase 2) */}
       <VehicleLegalFooter />
+
+      {/* iter442 — Choice modal driven by the "List a vehicle" CTA */}
+      <VehicleListingChoiceModal open={choiceOpen} onOpenChange={setChoiceOpen} />
     </div>
   );
 };

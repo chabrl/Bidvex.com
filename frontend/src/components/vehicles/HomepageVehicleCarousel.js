@@ -35,6 +35,8 @@ import {
 import VehicleListingCard from './VehicleListingCard';
 import useVehicleCountdown from '../../hooks/useVehicleCountdown';
 import useFeatureFlag from '../../hooks/useFeatureFlag';
+// iter442 — Choice modal (Single Listing vs Multi-Lot Auction)
+import VehicleListingChoiceModal from './VehicleListingChoiceModal';
 
 const API = API_BASE;
 
@@ -47,6 +49,8 @@ const HomepageVehicleCarousel = () => {
   const scrollRef = useRef(null);
   const [showLeft, setShowLeft] = useState(false);
   const [showRight, setShowRight] = useState(false);
+  // iter442 — Choice modal state
+  const [choiceOpen, setChoiceOpen] = useState(false);
   const { format: formatCountdown } = useVehicleCountdown();
 
   // Single fetch on mount — does NOT refetch on language switch (sprint rule).
@@ -247,7 +251,7 @@ const HomepageVehicleCarousel = () => {
           </button>
           <button
             type="button"
-            onClick={() => navigate('/vehicle-auctions/create')}
+            onClick={() => setChoiceOpen(true)}
             className="rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-cyan-400/40 backdrop-blur-sm p-4 text-left transition-all"
             data-testid="homepage-vehicles-cta-list"
           >
@@ -275,6 +279,9 @@ const HomepageVehicleCarousel = () => {
           </button>
         </div>
       </div>
+
+      {/* iter442 — Choice modal driven by the "List a vehicle" CTA */}
+      <VehicleListingChoiceModal open={choiceOpen} onOpenChange={setChoiceOpen} />
     </section>
   );
 };
