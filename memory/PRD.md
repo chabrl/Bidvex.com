@@ -1,6 +1,32 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter444 — Partner CSV Bulk Import (Feb 8, 2026) ✅ COMPLETE
+
+**Reported by user**: Fix and complete the Partner multi-item CSV import
+only. Fixed template, up to 100 listings, review every row before
+create, validate SAME rules as individual Partner form (category,
+price, quantity, dates, Bill 96, duplicates), bilingual errors
+identifying exact row + field, save as DRAFT never live, photo bulk
+upload with auto-match to listings + unmatched tray + missing-photo
+pills, publish-gate = ≥ 1 photo. Duplicate scope: within batch only.
+Do not touch Storage, Vehicle, fees, or any other seller flow.
+
+### Delivered
+- Backend: 7 endpoints on `/partner-pro/bulk-import/*` — template (fixed
+  + auth-gated), preview, confirm (draft-only), photos (append), publish
+  (single, photo-gated), publish-batch, pending.
+- Frontend: 5-step wizard (`BulkImportPage.js`) + `PartnerBulkReviewTable`
+  + `PartnerBulkPhotoStudio`. Bilingual EN/FR.
+- Verified: 28/28 backend pytest PASS. Testing agent full sweep after
+  fixes to 5 initial issues.
+
+### Explicit non-goals honored
+- Storage bulk import: NOT started (Partner is pilot per user).
+- Vehicle multi-lot, fees, and existing seller flows: untouched.
+
+
+
 ## iter443 — Storage Fee Model Flip + i18n Cold-Load Fix (Feb 8, 2026) ✅ COMPLETE
 
 **Reported by user (dual-track)**:

@@ -483,8 +483,12 @@ def _detect_within_batch_duplicates(rows: list[dict]) -> list[dict]:
 
 
 @partner_pro_router.get("/partner-pro/bulk-import/template")
-async def get_csv_template():
-    """iter444 — Fixed template with correct column order + 3 example rows."""
+async def get_csv_template(current_user: User = Depends(get_current_user)):
+    """iter444 — Fixed template with correct column order + 3 example rows.
+
+    Auth-gated to partner_pro / vip / super_admin only (iter444 patch).
+    """
+    _require_partner_pro(current_user)
     buf = io.StringIO()
     writer = csv.writer(buf)
     writer.writerow(CSV_COLUMNS)
@@ -606,6 +610,12 @@ async def preview_bulk_import(
         })
 
     raw_rows = list(reader)
+    # iter444 patch — strip whitespace-only rows so Excel-generated CSVs
+    # don't produce phantom rows full of `_required` errors.
+    raw_rows = [
+        r for r in raw_rows
+        if any((v or "").strip() for v in r.values())
+    ]
     if len(raw_rows) > MAX_ROWS_PER_IMPORT:
         raise HTTPException(status_code=400, detail={
             "code": "row_limit_exceeded",
@@ -678,7 +688,9 @@ class BulkImportConfirmRow(BaseModel):
 
 
 class BulkImportConfirmBody(BaseModel):
-    rows: list[BulkImportConfirmRow] = Field(..., min_length=1)
+    # iter444 patch — no min_length so auth runs BEFORE pydantic rejects
+    # an empty payload (a free-tier caller must get 403, not 400).
+    rows: list[BulkImportConfirmRow] = Field(default_factory=list)
 
 
 @partner_pro_router.post("/partner-pro/bulk-import/confirm")
@@ -695,6 +707,13 @@ async def confirm_bulk_import(
     `status="draft"`, `images=[]`, and `source="csv_bulk_import"`.
     """
     _require_partner_pro(current_user)
+
+    if len(body.rows) == 0:
+        raise HTTPException(status_code=400, detail={
+            "code": "empty_rows",
+            "message_en": "At least one row is required.",
+            "message_fr": "Au moins une ligne est requise.",
+        })
 
     if len(body.rows) > MAX_ROWS_PER_IMPORT:
         raise HTTPException(status_code=400, detail={

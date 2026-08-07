@@ -59,7 +59,12 @@ const BulkImportPage = () => {
   const [publishResult, setPublishResult] = useState(null);
 
   const headers = { Authorization: `Bearer ${token}` };
-  const errorCount = useMemo(
+  // iter444 patch — count ROWS with errors, not total error objects.
+  const errorRowsCount = useMemo(
+    () => rows.reduce((n, r) => n + ((r.errors?.length || 0) > 0 ? 1 : 0), 0),
+    [rows]
+  );
+  const totalErrorObjects = useMemo(
     () => rows.reduce((n, r) => n + (r.errors?.length || 0), 0),
     [rows]
   );
@@ -146,7 +151,7 @@ const BulkImportPage = () => {
   }, []);
 
   const confirmDrafts = async () => {
-    if (errorCount > 0) {
+    if (totalErrorObjects > 0) {
       toast.error(t('bulkImport.cannotImport', 'Fix all errors before creating drafts.'));
       return;
     }
@@ -365,10 +370,10 @@ const BulkImportPage = () => {
                 {t('bulkImport.reviewSubtitle')}
               </p>
               <div className="flex flex-wrap items-center gap-3 text-sm">
-                <Badge className={errorCount === 0 ? 'bg-emerald-500' : 'bg-red-500'} data-testid="bulk-error-summary">
-                  {errorCount === 0
+                <Badge className={totalErrorObjects === 0 ? 'bg-emerald-500' : 'bg-red-500'} data-testid="bulk-error-summary">
+                  {totalErrorObjects === 0
                     ? t('bulkImport.rowsReady', { count: rows.length })
-                    : t('bulkImport.rowsWithErrors', { count: errorCount })}
+                    : t('bulkImport.rowsWithErrors', { count: errorRowsCount })}
                 </Badge>
                 <span className="text-slate-500">{rows.length} / {preview.max_rows}</span>
               </div>
@@ -379,7 +384,7 @@ const BulkImportPage = () => {
                 <Button variant="ghost" onClick={() => setStep(2)}>{t('bulkImport.back')}</Button>
                 <Button
                   onClick={confirmDrafts}
-                  disabled={errorCount > 0 || confirming || rows.length === 0}
+                  disabled={totalErrorObjects > 0 || confirming || rows.length === 0}
                   className="bg-emerald-600 hover:bg-emerald-700 text-white"
                   data-testid="confirm-drafts-btn"
                 >
@@ -461,7 +466,7 @@ const BulkImportPage = () => {
                   <Button variant="ghost" onClick={() => setStep(4)}>{t('bulkImport.back')}</Button>
                   <Button
                     onClick={publishAll}
-                    disabled={publishing || drafts.filter((d) => !d.needs_photos).length === 0}
+                    disabled={publishing || drafts.length === 0}
                     className="bg-emerald-600 hover:bg-emerald-700 text-white"
                     data-testid="publish-all-btn"
                   >

@@ -1,6 +1,122 @@
 # BidVex Changelog
 
 
+## Feb 8, 2026 — iter444 Partner CSV Bulk Import (draft-only, photo-gated)
+
+Partners on the `partner_pro` / `vip` tier (and super_admins) can now
+bulk-import up to 100 marketplace listings from a CSV, review every
+row inline before creation, add photos in a drag-and-drop studio, and
+publish only when each listing has ≥ 1 photo. Every imported row is
+saved as a `status="draft"` — nothing goes live automatically. Storage,
+Vehicle, and fee flows are untouched.
+
+### Backend — `routes/partner_pro.py`
+- **FIXED** `GET /partner-pro/bulk-import/template` — now auth-gated
+  (`_require_partner_pro(current_user)`). Emits 17-column CSV in canonical
+  iter444 order (`title, title_fr, category, starting_price, quantity,
+  condition, auction_end_date, city, region, country, postal_code,
+  description, buy_now_price, buyers_premium_percent, shipping_available,
+  visit_offered, visit_dates`) plus 3 realistic example rows (ON, QC
+  with French title, BC multi-quantity).
+- **REWRITTEN** `POST /partner-pro/bulk-import` — PREVIEW ONLY. Parses,
+  strips whitespace-only rows, validates every row via `_validate_row`,
+  detects intra-batch duplicates (`(title, starting_price, category)`
+  triplet — points at the FIRST matching row), and returns
+  `{ total_rows, total_errors, can_import, preview: [{row, raw,
+  normalized, errors: [{row, field, code, message_en, message_fr}]}] }`.
+  NO listing is written. Rate limit 30/min.
+- **NEW** `POST /partner-pro/bulk-import/confirm` — re-validates every
+  row server-side (defense in depth), rejects empty payloads with 400
+  BEFORE that runs the auth gate first, enforces 100-row cap, then
+  writes each row to `listings` with `status="draft"`, `images=[]`,
+  `source="csv_bulk_import"`, `bulk_import_batch=<created_at>`.
+  Enriches with seller record (best-effort). Returns
+  `{ created, drafts: [{id, title, title_fr, needs_photos: true}] }`.
+- **NEW** `POST /partner-pro/bulk-import/{listing_id}/photos` — appends
+  image URLs to a draft. Only accepts drafts owned by the caller AND
+  status="draft" AND source="csv_bulk_import" (prevents accidental
+  overwrite of already-live listings).
+- **NEW** `POST /partner-pro/bulk-import/{listing_id}/publish` — flips
+  a bulk-imported draft to `active` ONLY if `images.length >= 1`. Any
+  other state returns bilingual 400 (`missing_photo`, `not_a_bulk_draft`).
+- **NEW** `POST /partner-pro/bulk-import/publish-batch` — publishes
+  every bulk-imported draft owned by the caller that has ≥ 1 photo;
+  drafts still missing a photo return in `pending_photos`.
+- **NEW** `GET /partner-pro/bulk-import/pending` — lists all pending
+  bulk-imported drafts owned by the caller with `image_count` +
+  `needs_photos` computed.
+- **NEW** `_require_partner_pro` bypass for `role in {admin, super_admin}`
+  — support / testing pattern; keeps the gate strict for regular users.
+
+### Validation rules (mirrors individual Partner listing form)
+- `starting_price`: 1 ≤ x ≤ 10000 CAD, numeric
+- `quantity`: positive integer
+- `condition`: enum `{new, like_new, excellent, good, fair, poor, used}`
+- `auction_end_date`: valid ISO datetime, in the future
+- `title_fr`: **required when region=QC** (Bill 96)
+- `buy_now_price`: ≥ 1.2 × starting_price
+- `buyers_premium_percent`: 0–25 (iter441)
+- `description`: 20–500 chars when provided
+- `category`: must exist in categories collection (fallback list applied
+  when collection empty)
+- Intra-batch duplicate: `(title, starting_price, category)` triplet
+  appearing twice → error on 2nd row pointing at 1st row's number.
+
+### Bilingual error envelope
+```
+{ row: int, field: str, code: str,
+  message_en: "Row {row} — Field '{field}': ...",
+  message_fr: "Ligne {row} — Champ « {field} » : ..." }
+```
+
+### Frontend
+- **REWRITTEN** `pages/BulkImportPage.js` — 5-step wizard:
+  1. Download template → button `download-template-btn`
+  2. Upload CSV → drop-zone `csv-dropzone`, submit `upload-csv-btn`
+  3. Review + inline-edit → `bulk-review-table` with per-cell error
+     pills (`bulk-input-{row}-{field}`); `bulk-error-summary` counts
+     ROWS with errors (not error objects); `confirm-drafts-btn` disabled
+     until every row is error-free.
+  4. Photo Studio → `bulk-photo-studio` (see below).
+  5. Publish → `publish-all-btn` (always clickable to surface pending
+     photo counts); `publish-result` + `go-to-drafts-btn` render on
+     success.
+- **NEW** `components/bulk/PartnerBulkReviewTable.jsx` — inline-editable
+  table with per-column inputs (title, title_fr, category, starting_price,
+  quantity, condition, auction_end_date, city, region, buy_now_price,
+  buyers_premium_percent). Datalist for common categories. Optimistic
+  error clearing on typing (field-level + row-level `duplicate_row`);
+  server re-validates on confirm.
+- **NEW** `components/bulk/PartnerBulkPhotoStudio.jsx` — drop-zone
+  auto-matches uploaded photos to drafts by filename slug of the draft's
+  title (`sony_camera_1.jpg` → "Sony Camera 1"). Matches → attach.
+  Unmatched → visible tray with per-file assign dropdown. Missing-photo
+  summary banner. Each draft card carries a green `photo-ready-{id}`
+  or red `needs-photo-{id}` pill.
+
+### Locale
+- Expanded `bulkImport.*` block in `en.json` + `fr.json` with 30+ new
+  keys (`step1..5`, `reviewTitle`, `photoStudioTitle`, `needsPhoto`,
+  `publishAllReady`, etc.). Bilingual.
+
+### Verified
+- Backend pytest: `tests/test_iter444_partner_bulk_import.py` (16/16
+  PASS) + `tests/test_iter444_supplement.py` (12/12 PASS from the
+  testing agent). Total 28/28 PASS after iter444 gate + phantom-row +
+  auth-order fixes.
+- Testing report: `/app/test_reports/iteration_444.json` — initial
+  report caught 5 issues (template-no-auth, whitespace phantom rows,
+  confirm 400-before-403, error-summary mislabel, publish-btn
+  always-disabled) — ALL 5 FIXED.
+
+### Explicit non-goals kept
+- Storage bulk import: NOT started (pilot is Partner-only per user).
+- Vehicle multi-lot bulk import: untouched.
+- Fee calculator, existing listings, storage/vehicle create forms,
+  subscription gate for regular partners: untouched.
+
+
+
 ## Feb 8, 2026 — iter443 Storage Fee Model Flip + i18n Cold-Load Fix
 
 ### Part A — Storage auctions fee model corrected

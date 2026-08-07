@@ -51,6 +51,12 @@ Seeded via `python /app/backend/scripts/seed_production_demo.py --execute` (idem
 - Notes: created 2026-02-07 during iter189 consolidated test (id 93aa21c2-4e41-4235-a382-d4b8c8836d41).
 - ⚠️ **iter441 UPDATE (Feb 8, 2026)**: Login now returns 401 on preview env — password rotated or account cleared. Use `testbuyer@bidvex.com` / `TestBuyer2026!` instead (verified WORKING iter441). Re-seed with `python /app/backend/scripts/iter308_reseed_test_fixtures.py` if needed.
 
+## iter444 Test buyer (free-tier, for 403-gate regression)
+- Email: iter444_buyer@test.com
+- Password: Iter444Buy!
+- Role: user; subscription_tier=free; terms_agreed + ai_disclosure_consent
+- Notes: registered by testing agent during iter444 for the Partner bulk-import auth-gate regression. Used to prove all 5 partner-pro endpoints return 403 to non-partner/non-admin callers. Idempotent — the supplement test re-registers if the record is dropped.
+
 ## Legacy test buyer (kept for backward compat — may not log in if password reset on prod)
 - Email: abc@gmail.com
 - Password: TestBuyer123!
