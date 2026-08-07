@@ -828,6 +828,38 @@ async def activate_event(
     if event.get("status") != "draft":
         raise HTTPException(status_code=409, detail="Only draft events can be activated")
 
+    # iter447 — Photo-gate. No lot can go live without at least one
+    # photo. Bulk-imported lots land as `status="draft_no_photos"` and
+    # only pass this check once the dealer attaches a photo via the
+    # per-lot upload endpoint. Retains the existing 20-photo cap.
+    lots_ref = event.get("lots") or []
+    lots_missing_photos = [
+        {
+            "lot_id": lot.get("id"),
+            "vin": lot.get("vin"),
+            "title": lot.get("title"),
+        }
+        for lot in lots_ref
+        if len(lot.get("media") or []) < 1
+    ]
+    if lots_missing_photos:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "lots_missing_photos",
+                "message_en": (
+                    f"{len(lots_missing_photos)} lot(s) still need at least "
+                    f"one photo before this event can go live."
+                ),
+                "message_fr": (
+                    f"{len(lots_missing_photos)} lot(s) nécessitent encore au "
+                    f"moins une photo avant que cet événement puisse être diffusé."
+                ),
+                "lots_missing_photos": lots_missing_photos,
+                "count": len(lots_missing_photos),
+            },
+        )
+
     now = _now()
     if intent == "live":
         new_status = "live"

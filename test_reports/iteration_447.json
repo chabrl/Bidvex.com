@@ -1,0 +1,45 @@
+{
+  "summary": "iter447 Multi-Lot Bulk Import CSV wizard tested end-to-end. Backend endpoints (capacity, template, preview, confirm atomic, legacy /bulk-import) all correct. Frontend Step 1 (upload/template) and Step 2 (Review with per-cell bilingual error pills, capacity tally, atomic behavior) all work as specified. Template header contains NO buyer_premium. All 5 targeted error codes (vin_length_invalid, year_out_of_range, make_required, bill96_title_fr_required, duplicate_vin_in_batch) fire with correct testids and bilingual messages. duplicate_vin_across_dealer correctly returns conflict metadata with event_id for the link icon. CRITICAL FRONTEND BUG: parent page's handleImported navigates away before Step 3 (Photo Studio) renders, so Step 3 (VIN photo auto-match, unmatched tray, Go Live publish-gate) is completely unreachable via the UI even though the child component correctly calls setStep(3).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "CreateVehicleMultiLotPage.handleImported",
+        "issue": "After a successful bulk-import confirm, parent invokes `navigate(`/vehicle-multi-lot/${eventId}`)` which unmounts the BulkImportLotsCSV modal BEFORE the user can see Step 3 (VehicleBulkPhotoStudio). iter447 spec explicitly requires the wizard to auto-advance to Step 3 (Photo Studio) with per-lot 'Needs 1 photo' pills, drag-drop VIN matching, unmatched tray, and the Go Live publish-gate. The user is instead dumped on the read-only event detail page which shows 'No photos available' and has no photo upload UI. Fix: remove the navigate() call in handleImported (BulkImportLotsCSV already calls setStep(3) internally and shows the Photo Studio). Optionally navigate ONLY after Step 4 (post go-live).",
+        "selector": "/app/frontend/src/pages/vehicles/CreateVehicleMultiLotPage.js lines 717-723",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Bulk import → Photo Studio → Go Live",
+        "issue": "Step 3 & Step 4 of the wizard cannot be reached in the browser because the parent page navigates away on onImported. VehicleBulkPhotoStudio (VIN auto-match, unmatched tray, Go Live gate) is therefore untestable via UI until the navigate() call is removed. Backend photo-gate on /activate?intent=live and VIN matching logic are covered by 21/21 pytest + 11/11 jest per handoff.",
+        "affected_selectors": ["vehicle-bulk-photo-studio", "vehicle-bulk-needs-photo-{id}", "vehicle-bulk-unmatched-list", "bulk-import-go-live-btn", "bulk-import-done"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter447_multi_lot_bulk_import.py"
+  ],
+  "action_items": [
+    "REMOVE the navigate() call inside handleImported() in /app/frontend/src/pages/vehicles/CreateVehicleMultiLotPage.js (lines 717-723). BulkImportLotsCSV already sets step=3 to show the Photo Studio; navigating steals focus. Only navigate AFTER the wizard finishes Step 4 (Go Live done) if desired."
+  ],
+  "critical_code_review_comments": [
+    "handleImported navigates away, defeating the 4-step wizard design.",
+    "BulkImportLotsCSV correctly implements Steps 1-4 and calls onImported AFTER setStep(3); the callback contract is fine — only the parent's implementation is wrong.",
+    "Everything else looks well-implemented: file-size cap 500, aliases in COL_ALIASES, atomic confirm, bilingual toast, conflict.event_id → external link icon.",
+    "Minor: template response uses UTF-8 BOM (0xFEFF) which is fine for Excel but note in tests use utf-8-sig when reading."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "70% (Step 1 & Step 2 fully OK; Step 3 & Step 4 blocked by handleImported navigate bug)"},
+  "test_credentials": "charbel911@gmail.com / Anderosli123!@# (super_admin, is_vehicle_dealer). Token stored in /tmp/iter447_token during test run.",
+  "seed_data_creation": "Created 5 test draft events titled 'iter447 QA event', 'iter447 template check', 'iter447 legacy check', 'iter447 atomic', 'iter447 dupA', 'iter447 dupB' under seller_id 8940074d-da97-43ca-9a0b-c59d39411ed6. Cleanup: db.vehicle_multi_lot_auctions.updateMany({seller_id:'8940074d-...', title:{$regex:'^iter447'}}, {$set:{status:'cancelled'}}).",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend 100% green from both pytest (21/21) and direct API smoke tests. Step 1 (upload/template) and Step 2 (review/error-pills/atomic) verified in UI. Only remaining UI work: verify Step 3 (VehicleBulkPhotoStudio) + Step 4 after main agent removes the navigate() from handleImported. Photos test files at /tmp/1HGBH41JXMN109186_front.png, /tmp/2FTRX18L7XCA47201_side.png, /tmp/IMG_1234.png. Valid CSV at /tmp/iter447_valid.csv (VINs: 1HGBH41JXMN109186, 2FTRX18L7XCA47201).",
+  "rca of the issue": "handleImported in CreateVehicleMultiLotPage.js unconditionally calls navigate(`/vehicle-multi-lot/${eventId}`) after any successful bulk-import confirm. The BulkImportLotsCSV modal correctly calls setStep(3) BEFORE onImported, but navigate() unmounts the parent tree (the modal is rendered as a child of the create page), throwing the user onto the read-only /vehicle-multi-lot/:id event detail page. That page has no Photo Studio, so the required iter447 Step 3 (per-lot 'Needs 1 photo' pills, VIN drag-drop auto-match, unmatched tray with 'Assign to lot…' select) and Step 4 (Go Live publish-gate) never appear. Reproduction: (1) login as admin, /vehicle-multi-lot/create, (2) fill title, click 'Import Lots from CSV', (3) upload a valid 2-row CSV, (4) click 'Import 2 lot(s)'. Observed: browser navigates to /vehicle-multi-lot/<id> event detail. Expected: modal stays open showing VehicleBulkPhotoStudio (Step 3). Mitigation: delete lines 717-723's navigate() call or move it to trigger only when the wizard reaches Step 4/close."
+}
