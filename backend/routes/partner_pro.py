@@ -6,6 +6,7 @@ early auction access, featured listings management.
 
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Query, Request
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
 from deps import User, get_current_user
 from typing import Optional
 from datetime import datetime, timezone, timedelta
@@ -39,6 +40,9 @@ TRIAL_REMINDER_DAY = 10  # Send reminder 3 days before expiry
 
 
 def _require_partner_pro(user: User):
+    # iter444 — super_admin bypasses subscription gate (support / testing).
+    if getattr(user, "role", "") in {"admin", "super_admin"}:
+        return
     tier = getattr(user, "subscription_tier", "free")
     if tier not in PARTNER_PRO_TIERS:
         raise HTTPException(
@@ -155,116 +159,610 @@ async def get_trial_status(current_user: User = Depends(get_current_user)):
 
 
 # =====================================================================
-# CSV BULK LISTING IMPORT
+# iter444 — CSV BULK LISTING IMPORT (Partner Pro / VIP only)
+#
+# Two-step wizard on the client:
+#   1. Client POSTs the raw CSV to /partner-pro/bulk-import        (PREVIEW ONLY, no writes)
+#      Server parses + validates every row and returns a preview
+#      payload with per-cell bilingual errors.
+#   2. Client PATCH-edits rows in the review table and POSTs the
+#      finalized rows to /partner-pro/bulk-import/confirm             (CREATES DRAFTS)
+#      Server re-validates, enforces the 100-row cap, dedupes
+#      within the batch, and writes each row to `listings` with
+#      `status="draft"` and `images=[]`.
+#   3. Client attaches photos with /bulk-import/{id}/photos.
+#   4. Client publishes drafts with /bulk-import/{id}/publish (single)
+#      or /bulk-import/publish-batch (many). Publish requires ≥1 image.
+#
+# NO existing live listing is touched. Storage, Vehicle, and fee logic
+# are untouched.
 # =====================================================================
 
-CSV_REQUIRED_FIELDS = {"title", "starting_price", "category"}
-CSV_OPTIONAL_FIELDS = {
-    "description", "condition", "buy_now_price", "auction_duration_hours",
-    "city", "region", "shipping_info", "listing_type",
+MAX_ROWS_PER_IMPORT = 100
+
+# Canonical column order for both the downloadable template AND the
+# server's DictReader field-name normalisation. Order matters — the CSV
+# template is emitted in exactly this order.
+CSV_COLUMNS = [
+    "title",
+    "title_fr",
+    "category",
+    "starting_price",
+    "quantity",
+    "condition",
+    "auction_end_date",
+    "city",
+    "region",
+    "country",
+    "postal_code",
+    "description",
+    "buy_now_price",
+    "buyers_premium_percent",
+    "shipping_available",
+    "visit_offered",
+    "visit_dates",
+]
+
+# Which columns MUST be non-empty for every row. `title_fr` is
+# conditionally required (only when region == "QC") — validated inline.
+CSV_REQUIRED = {
+    "title",
+    "category",
+    "starting_price",
+    "quantity",
+    "condition",
+    "auction_end_date",
+    "city",
+    "region",
 }
-CSV_ALL_FIELDS = CSV_REQUIRED_FIELDS | CSV_OPTIONAL_FIELDS
+
+VALID_CONDITIONS = {"new", "like_new", "excellent", "good", "fair", "poor", "used"}
+
+
+def _row_error(row: int, field: str, code: str, message_en: str, message_fr: str) -> dict:
+    """Bilingual per-cell error record — flat dict for easy JSON handling."""
+    return {
+        "row": row,
+        "field": field,
+        "code": code,
+        "message_en": f"Row {row} — Field '{field}': {message_en}",
+        "message_fr": f"Ligne {row} — Champ « {field} » : {message_fr}",
+    }
+
+
+def _norm_bool(v) -> bool:
+    """Accept 'Y', 'yes', 'true', '1' (any case) as truthy — everything else falsy."""
+    if v is None:
+        return False
+    return str(v).strip().lower() in {"y", "yes", "true", "1", "oui"}
+
+
+async def _validate_row(db, row_num: int, row: dict, valid_categories: set) -> tuple[list, dict]:
+    """Returns (errors, normalized_row). errors=[] means row is import-ready."""
+    errors: list[dict] = []
+
+    # ── title (required, non-empty) ─────────────────────────────────
+    title = (row.get("title") or "").strip()
+    if not title:
+        errors.append(_row_error(
+            row_num, "title", "title_required",
+            "Title is required.", "Titre requis.",
+        ))
+    elif len(title) > 200:
+        errors.append(_row_error(
+            row_num, "title", "title_too_long",
+            "Title must be ≤ 200 characters.",
+            "Le titre doit contenir 200 caractères ou moins.",
+        ))
+
+    # ── category (required, must exist) ─────────────────────────────
+    category = (row.get("category") or "").strip()
+    if not category:
+        errors.append(_row_error(
+            row_num, "category", "category_required",
+            "Category is required.", "Catégorie requise.",
+        ))
+    elif category not in valid_categories:
+        errors.append(_row_error(
+            row_num, "category", "category_unknown",
+            f"Category '{category}' does not exist. Download the template for the current list.",
+            f"La catégorie « {category} » n'existe pas. Téléchargez le modèle pour la liste actuelle.",
+        ))
+
+    # ── starting_price (required, 1-10000 CAD) ──────────────────────
+    starting_price = None
+    raw_sp = str(row.get("starting_price") or "").strip()
+    if not raw_sp:
+        errors.append(_row_error(
+            row_num, "starting_price", "starting_price_required",
+            "Starting price is required.", "Prix de départ requis.",
+        ))
+    else:
+        try:
+            starting_price = float(raw_sp)
+            if starting_price < 1 or starting_price > 10000:
+                errors.append(_row_error(
+                    row_num, "starting_price", "starting_price_out_of_range",
+                    "Starting price must be between 1 and 10,000 CAD.",
+                    "Le prix de départ doit être entre 1 et 10 000 CAD.",
+                ))
+        except ValueError:
+            errors.append(_row_error(
+                row_num, "starting_price", "starting_price_not_numeric",
+                "Starting price must be a number.",
+                "Le prix de départ doit être un nombre.",
+            ))
+
+    # ── quantity (required, positive integer) ───────────────────────
+    quantity = None
+    raw_q = str(row.get("quantity") or "").strip()
+    if not raw_q:
+        errors.append(_row_error(
+            row_num, "quantity", "quantity_required",
+            "Quantity is required.", "Quantité requise.",
+        ))
+    else:
+        try:
+            quantity = int(float(raw_q))
+            if quantity < 1:
+                errors.append(_row_error(
+                    row_num, "quantity", "quantity_positive",
+                    "Quantity must be a positive integer.",
+                    "La quantité doit être un entier positif.",
+                ))
+        except ValueError:
+            errors.append(_row_error(
+                row_num, "quantity", "quantity_not_integer",
+                "Quantity must be a positive integer.",
+                "La quantité doit être un entier positif.",
+            ))
+
+    # ── condition (required, enum) ─────────────────────────────────
+    condition = (row.get("condition") or "").strip().lower()
+    if not condition:
+        errors.append(_row_error(
+            row_num, "condition", "condition_required",
+            "Condition is required.", "État requis.",
+        ))
+    elif condition not in VALID_CONDITIONS:
+        errors.append(_row_error(
+            row_num, "condition", "condition_invalid",
+            f"Condition must be one of: {', '.join(sorted(VALID_CONDITIONS))}.",
+            f"L'état doit être l'un de : {', '.join(sorted(VALID_CONDITIONS))}.",
+        ))
+
+    # ── auction_end_date (required, valid ISO, in the future) ───────
+    end_dt = None
+    raw_end = (row.get("auction_end_date") or "").strip()
+    if not raw_end:
+        errors.append(_row_error(
+            row_num, "auction_end_date", "auction_end_date_required",
+            "Auction end date is required (ISO format, e.g. 2026-06-15T18:00:00).",
+            "Date de fin de l'enchère requise (format ISO, ex. : 2026-06-15T18:00:00).",
+        ))
+    else:
+        try:
+            end_dt = datetime.fromisoformat(raw_end.replace("Z", "+00:00"))
+            if end_dt.tzinfo is None:
+                end_dt = end_dt.replace(tzinfo=timezone.utc)
+            if end_dt <= datetime.now(timezone.utc):
+                errors.append(_row_error(
+                    row_num, "auction_end_date", "auction_end_date_past",
+                    "Auction end date must be in the future.",
+                    "La date de fin de l'enchère doit être dans le futur.",
+                ))
+        except ValueError:
+            errors.append(_row_error(
+                row_num, "auction_end_date", "auction_end_date_invalid",
+                "Auction end date must be a valid ISO datetime (e.g. 2026-06-15T18:00:00).",
+                "La date de fin doit être une date ISO valide (ex. : 2026-06-15T18:00:00).",
+            ))
+
+    # ── city + region (required) ────────────────────────────────────
+    city = (row.get("city") or "").strip()
+    if not city:
+        errors.append(_row_error(
+            row_num, "city", "city_required",
+            "City is required.", "Ville requise.",
+        ))
+
+    region = (row.get("region") or "").strip().upper()
+    if not region:
+        errors.append(_row_error(
+            row_num, "region", "region_required",
+            "Region / province is required.",
+            "Région / province requise.",
+        ))
+
+    # ── title_fr — Bill 96: required when region == "QC" ────────────
+    title_fr = (row.get("title_fr") or "").strip()
+    if region == "QC" and not title_fr:
+        errors.append(_row_error(
+            row_num, "title_fr", "bill96_title_fr_required",
+            "Bill 96 requires a French title for Quebec listings.",
+            "La Loi 96 exige un titre français pour les annonces au Québec.",
+        ))
+
+    # ── description (optional; if present, 20-500 chars) ────────────
+    description = (row.get("description") or "").strip()
+    if description and (len(description) < 20 or len(description) > 500):
+        errors.append(_row_error(
+            row_num, "description", "description_length",
+            "Description must be 20-500 characters when provided.",
+            "La description doit contenir de 20 à 500 caractères si elle est fournie.",
+        ))
+
+    # ── buy_now_price (optional; if present, ≥ 1.2 × starting_price) ─
+    buy_now_price = None
+    raw_bn = str(row.get("buy_now_price") or "").strip()
+    if raw_bn:
+        try:
+            buy_now_price = float(raw_bn)
+            if starting_price is not None and buy_now_price < starting_price * 1.2:
+                errors.append(_row_error(
+                    row_num, "buy_now_price", "buy_now_price_too_low",
+                    f"Buy Now price must be at least 20% above starting price (≥ {starting_price * 1.2:.2f} CAD).",
+                    f"Le prix Achat Immédiat doit être au moins 20 % au-dessus du prix de départ (≥ {starting_price * 1.2:.2f} CAD).",
+                ))
+        except ValueError:
+            errors.append(_row_error(
+                row_num, "buy_now_price", "buy_now_price_not_numeric",
+                "Buy Now price must be a number.",
+                "Le prix Achat Immédiat doit être un nombre.",
+            ))
+
+    # ── buyers_premium_percent (optional; 0-25 per iter441 rule) ────
+    bp = None
+    raw_bp = str(row.get("buyers_premium_percent") or "").strip()
+    if raw_bp:
+        try:
+            bp = float(raw_bp)
+            if bp < 0 or bp > 25:
+                errors.append(_row_error(
+                    row_num, "buyers_premium_percent",
+                    "buyers_premium_out_of_range",
+                    "Buyer's premium must be between 0 and 25 percent.",
+                    "La prime acheteur doit être entre 0 et 25 pour cent.",
+                ))
+        except ValueError:
+            errors.append(_row_error(
+                row_num, "buyers_premium_percent",
+                "buyers_premium_not_numeric",
+                "Buyer's premium must be a number.",
+                "La prime acheteur doit être un nombre.",
+            ))
+
+    return errors, {
+        "title": title,
+        "title_fr": title_fr,
+        "category": category,
+        "starting_price": starting_price,
+        "quantity": quantity,
+        "condition": condition,
+        "auction_end_date": end_dt.isoformat() if end_dt else None,
+        "city": city,
+        "region": region,
+        "country": (row.get("country") or "CA").strip().upper() or "CA",
+        "postal_code": (row.get("postal_code") or "").strip(),
+        "description": description,
+        "buy_now_price": buy_now_price,
+        "buyers_premium_percent": bp,
+        "shipping_available": _norm_bool(row.get("shipping_available")),
+        "visit_offered": _norm_bool(row.get("visit_offered")),
+        "visit_dates": (row.get("visit_dates") or "").strip(),
+    }
+
+
+def _detect_within_batch_duplicates(rows: list[dict]) -> list[dict]:
+    """Flag rows whose (title, starting_price, category) triplet already
+    appeared earlier in the same batch. Points the Partner at the FIRST
+    matching row so they can fix quickly.
+
+    Returns a list of duplicate-error records (same shape as _row_error).
+    """
+    seen: dict[tuple, int] = {}  # triplet -> first row_num
+    errors: list[dict] = []
+    for row_num, r in enumerate(rows, start=2):
+        # Skip rows already failing basic validation — pointless to dupe-check them.
+        title = (r.get("title") or "").strip().lower()
+        cat = (r.get("category") or "").strip().lower()
+        sp = r.get("starting_price")
+        if not title or not cat or sp is None:
+            continue
+        key = (title, cat, round(float(sp), 2))
+        if key in seen:
+            first = seen[key]
+            errors.append(_row_error(
+                row_num, "title", "duplicate_row",
+                f"Duplicate — same title, starting price, and category as row {first}. Change one field to import both.",
+                f"Doublon — même titre, prix de départ et catégorie que la ligne {first}. Modifiez un champ pour importer les deux.",
+            ))
+        else:
+            seen[key] = row_num
+    return errors
+
+
+@partner_pro_router.get("/partner-pro/bulk-import/template")
+async def get_csv_template():
+    """iter444 — Fixed template with correct column order + 3 example rows."""
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(CSV_COLUMNS)
+    # Example row 1 — Ontario, no French title needed.
+    writer.writerow([
+        "Sony Camera A7 III",                                # title
+        "",                                                  # title_fr
+        "electronics",                                       # category
+        "250.00",                                            # starting_price
+        "1",                                                 # quantity
+        "excellent",                                         # condition
+        (datetime.now(timezone.utc) + timedelta(days=14)).isoformat(),  # auction_end_date
+        "Toronto",                                           # city
+        "ON",                                                # region
+        "CA",                                                # country
+        "M5V 2H1",                                           # postal_code
+        "Full-frame mirrorless camera, low shutter count, boxed with charger and 2 batteries.",  # description
+        "500.00",                                            # buy_now_price
+        "5",                                                 # buyers_premium_percent
+        "Y",                                                 # shipping_available
+        "N",                                                 # visit_offered
+        "",                                                  # visit_dates
+    ])
+    # Example row 2 — Quebec, French title required.
+    writer.writerow([
+        "Vintage Leather Sofa",                              # title
+        "Canapé en cuir vintage",                            # title_fr
+        "furniture",                                         # category
+        "300.00",                                            # starting_price
+        "1",                                                 # quantity
+        "good",                                              # condition
+        (datetime.now(timezone.utc) + timedelta(days=10)).isoformat(),  # auction_end_date
+        "Montreal",                                          # city
+        "QC",                                                # region
+        "CA",                                                # country
+        "H3B 1A7",                                           # postal_code
+        "Genuine leather three-seater sofa, minor wear on the arms, freshly cleaned.",
+        "",                                                  # buy_now_price
+        "",                                                  # buyers_premium_percent
+        "N",                                                 # shipping_available
+        "Y",                                                 # visit_offered
+        "Weekdays 10:00–18:00",                              # visit_dates
+    ])
+    # Example row 3 — BC, multi-quantity lot.
+    writer.writerow([
+        "iPhone 12 (refurbished)",                           # title
+        "",                                                  # title_fr
+        "electronics",                                       # category
+        "180.00",                                            # starting_price
+        "5",                                                 # quantity
+        "like_new",                                          # condition
+        (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),   # auction_end_date
+        "Vancouver",                                         # city
+        "BC",                                                # region
+        "CA",                                                # country
+        "V6B 5K3",                                           # postal_code
+        "Refurbished iPhone 12 units — 128GB — reset to factory, 90-day warranty.",
+        "300.00",                                            # buy_now_price
+        "",                                                  # buyers_premium_percent
+        "Y",                                                 # shipping_available
+        "N",                                                 # visit_offered
+        "",                                                  # visit_dates
+    ])
+    buf.seek(0)
+    return StreamingResponse(
+        io.BytesIO(buf.getvalue().encode("utf-8-sig")),  # BOM so Excel opens it correctly
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=bidvex_partner_bulk_import_template.csv"},
+    )
 
 
 @partner_pro_router.post("/partner-pro/bulk-import")
-@_limiter.limit("10/minute")
-async def bulk_import_listings(
+@_limiter.limit("30/minute")
+async def preview_bulk_import(
     request: Request,
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
 ):
-    """
-    Import listings from a CSV file.
-    Required columns: title, starting_price, category
-    Optional: description, condition, buy_now_price, auction_duration_hours,
-              city, region, shipping_info, listing_type
+    """iter444 — PREVIEW ONLY. Parses + validates the CSV and returns
+    per-row + per-cell bilingual errors. NO listings are created.
+
+    Client renders the preview payload in an editable review table,
+    then POSTs the fixed rows back to `/bulk-import/confirm`.
     """
     _require_partner_pro(current_user)
 
     if not file.filename.endswith(".csv"):
-        raise HTTPException(status_code=400, detail="Only CSV files are accepted")
+        raise HTTPException(status_code=400, detail={
+            "code": "invalid_file_type",
+            "message_en": "Only CSV files are accepted.",
+            "message_fr": "Seuls les fichiers CSV sont acceptés.",
+        })
 
     content = await file.read()
     if len(content) > 5 * 1024 * 1024:
-        raise HTTPException(status_code=400, detail="File too large (max 5 MB)")
+        raise HTTPException(status_code=400, detail={
+            "code": "file_too_large",
+            "message_en": "File too large (max 5 MB).",
+            "message_fr": "Fichier trop volumineux (max. 5 Mo).",
+        })
 
     try:
         text = content.decode("utf-8-sig")
     except UnicodeDecodeError:
-        raise HTTPException(status_code=400, detail="Invalid file encoding (UTF-8 required)")
+        raise HTTPException(status_code=400, detail={
+            "code": "invalid_encoding",
+            "message_en": "Invalid file encoding (UTF-8 required).",
+            "message_fr": "Encodage de fichier invalide (UTF-8 requis).",
+        })
 
     reader = csv.DictReader(io.StringIO(text))
-    headers = set(reader.fieldnames or [])
+    headers = set(h.strip() for h in (reader.fieldnames or []))
+    missing_headers = CSV_REQUIRED - headers
+    if missing_headers:
+        raise HTTPException(status_code=400, detail={
+            "code": "missing_columns",
+            "message_en": f"Missing required columns: {', '.join(sorted(missing_headers))}. Download the template.",
+            "message_fr": f"Colonnes obligatoires manquantes : {', '.join(sorted(missing_headers))}. Téléchargez le modèle.",
+        })
 
-    missing = CSV_REQUIRED_FIELDS - headers
-    if missing:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Missing required columns: {', '.join(sorted(missing))}",
-        )
+    raw_rows = list(reader)
+    if len(raw_rows) > MAX_ROWS_PER_IMPORT:
+        raise HTTPException(status_code=400, detail={
+            "code": "row_limit_exceeded",
+            "message_en": f"Maximum {MAX_ROWS_PER_IMPORT} rows per import. Your file has {len(raw_rows)}.",
+            "message_fr": f"Maximum {MAX_ROWS_PER_IMPORT} lignes par importation. Votre fichier en contient {len(raw_rows)}.",
+        })
 
     db = get_db()
-    created = []
-    errors = []
+    # Fetch valid category slugs once.
+    cats = await db.categories.find({}, {"_id": 0, "slug": 1, "name": 1}).to_list(length=1000)
+    valid_categories = {c.get("slug") or c.get("name") for c in cats if c.get("slug") or c.get("name")}
+    # Common fallback categories (in case the categories collection is empty).
+    if not valid_categories:
+        valid_categories = {"electronics", "furniture", "clothing", "collectibles", "tools",
+                            "toys", "sports", "vehicles", "jewelry", "art", "books", "other"}
+
+    preview_rows: list[dict] = []
+    normalized: list[dict] = []
+    for row_num, raw in enumerate(raw_rows, start=2):
+        errors, norm = await _validate_row(db, row_num, raw, valid_categories)
+        preview_rows.append({
+            "row": row_num,
+            "raw": raw,
+            "normalized": norm,
+            "errors": errors,
+        })
+        normalized.append(norm)
+
+    # Batch-wide duplicate detection (only after per-row validation).
+    dup_errors = _detect_within_batch_duplicates(normalized)
+    for de in dup_errors:
+        # Attach the duplicate error to the correct preview row.
+        for pr in preview_rows:
+            if pr["row"] == de["row"]:
+                pr["errors"].append(de)
+                break
+
+    total_errors = sum(len(r["errors"]) for r in preview_rows)
+
+    return {
+        "total_rows": len(preview_rows),
+        "max_rows": MAX_ROWS_PER_IMPORT,
+        "total_errors": total_errors,
+        "can_import": total_errors == 0 and len(preview_rows) > 0,
+        "preview": preview_rows,
+        "columns": CSV_COLUMNS,
+        "required_columns": sorted(CSV_REQUIRED),
+        "valid_categories": sorted(valid_categories),
+    }
+
+
+class BulkImportConfirmRow(BaseModel):
+    title: str
+    title_fr: Optional[str] = ""
+    category: str
+    starting_price: float
+    quantity: int
+    condition: str
+    auction_end_date: str
+    city: str
+    region: str
+    country: Optional[str] = "CA"
+    postal_code: Optional[str] = ""
+    description: Optional[str] = ""
+    buy_now_price: Optional[float] = None
+    buyers_premium_percent: Optional[float] = None
+    shipping_available: Optional[bool] = False
+    visit_offered: Optional[bool] = False
+    visit_dates: Optional[str] = ""
+
+
+class BulkImportConfirmBody(BaseModel):
+    rows: list[BulkImportConfirmRow] = Field(..., min_length=1)
+
+
+@partner_pro_router.post("/partner-pro/bulk-import/confirm")
+@_limiter.limit("10/minute")
+async def confirm_bulk_import(
+    request: Request,
+    body: BulkImportConfirmBody,
+    current_user: User = Depends(get_current_user),
+):
+    """iter444 — Creates a draft listing for every valid row.
+
+    Server re-validates every row (defense in depth). Enforces the 100-
+    row cap and intra-batch dedupe. Writes each row to `listings` with
+    `status="draft"`, `images=[]`, and `source="csv_bulk_import"`.
+    """
+    _require_partner_pro(current_user)
+
+    if len(body.rows) > MAX_ROWS_PER_IMPORT:
+        raise HTTPException(status_code=400, detail={
+            "code": "row_limit_exceeded",
+            "message_en": f"Maximum {MAX_ROWS_PER_IMPORT} rows per import.",
+            "message_fr": f"Maximum {MAX_ROWS_PER_IMPORT} lignes par importation.",
+        })
+
+    db = get_db()
+    cats = await db.categories.find({}, {"_id": 0, "slug": 1, "name": 1}).to_list(length=1000)
+    valid_categories = {c.get("slug") or c.get("name") for c in cats if c.get("slug") or c.get("name")}
+    if not valid_categories:
+        valid_categories = {"electronics", "furniture", "clothing", "collectibles", "tools",
+                            "toys", "sports", "vehicles", "jewelry", "art", "books", "other"}
+
+    normalized: list[dict] = []
+    all_errors: list[dict] = []
+    for row_num, r in enumerate(body.rows, start=2):
+        errors, norm = await _validate_row(db, row_num, r.model_dump(), valid_categories)
+        normalized.append(norm)
+        all_errors.extend(errors)
+
+    all_errors.extend(_detect_within_batch_duplicates(normalized))
+
+    if all_errors:
+        return {
+            "ok": False,
+            "code": "validation_failed",
+            "message_en": "Some rows still have errors. Fix them in the preview table before creating drafts.",
+            "message_fr": "Certaines lignes contiennent encore des erreurs. Corrigez-les dans le tableau d'aperçu avant de créer les brouillons.",
+            "errors": all_errors,
+            "created": 0,
+        }
+
     now = datetime.now(timezone.utc).isoformat()
-
-    for row_num, row in enumerate(reader, start=2):
-        title = (row.get("title") or "").strip()
-        if not title:
-            errors.append({"row": row_num, "error": "Empty title"})
-            continue
-
-        try:
-            starting_price = float(row["starting_price"])
-            if starting_price <= 0:
-                raise ValueError
-        except (ValueError, KeyError):
-            errors.append({"row": row_num, "error": "Invalid starting_price"})
-            continue
-
-        category = (row.get("category") or "").strip()
-        if not category:
-            errors.append({"row": row_num, "error": "Empty category"})
-            continue
-
-        duration_hours = 72
-        if row.get("auction_duration_hours"):
-            try:
-                duration_hours = int(row["auction_duration_hours"])
-                duration_hours = max(1, min(720, duration_hours))
-            except ValueError:
-                pass
-
-        buy_now = None
-        if row.get("buy_now_price"):
-            try:
-                buy_now = float(row["buy_now_price"])
-                if buy_now <= starting_price:
-                    buy_now = None
-            except ValueError:
-                pass
-
+    created: list[dict] = []
+    for norm in normalized:
         listing_id = str(uuid.uuid4())
         listing = {
             "id": listing_id,
             "seller_id": current_user.id,
-            "title": title,
-            "description": (row.get("description") or "").strip(),
-            "starting_price": starting_price,
-            "current_price": starting_price,
-            "category": category,
-            "condition": (row.get("condition") or "used").strip(),
-            "city": (row.get("city") or "").strip(),
-            "region": (row.get("region") or "").strip(),
-            "shipping_info": (row.get("shipping_info") or "").strip(),
-            "listing_type": (row.get("listing_type") or "private_sale").strip(),
-            "buy_now_price": buy_now,
-            "buy_now_enabled": buy_now is not None,
-            "auction_end_date": (
-                datetime.now(timezone.utc) + timedelta(hours=duration_hours)
-            ).isoformat(),
-            "images": [],
-            "status": "active",
+            "title": norm["title"],
+            "title_fr": norm["title_fr"] or None,
+            "description": norm["description"] or "",
+            "category": norm["category"],
+            "starting_price": norm["starting_price"],
+            "current_price": norm["starting_price"],
+            "quantity": norm["quantity"],
+            "condition": norm["condition"],
+            "auction_end_date": norm["auction_end_date"],
+            "city": norm["city"],
+            "region": norm["region"],
+            "country": norm["country"] or "CA",
+            "postal_code": norm["postal_code"] or "",
+            "location": f"{norm['city']}, {norm['region']}",
+            "buy_now_price": norm["buy_now_price"],
+            "buy_now_enabled": norm["buy_now_price"] is not None,
+            # iter441 — partner may override BP per listing.
+            "custom_buyer_premium_rate": (
+                round(norm["buyers_premium_percent"] / 100.0, 4)
+                if norm["buyers_premium_percent"] is not None else None
+            ),
+            "shipping_available": norm["shipping_available"],
+            "visit_offered": norm["visit_offered"],
+            "visit_dates": norm["visit_dates"] or "",
+            "images": [],  # iter444 — starts empty; Partner must attach ≥1 photo before publish
+            "listing_type": "private_sale",
+            "status": "draft",  # iter444 — always draft, never active on create
             "views": 0,
             "total_bids": 0,
             "bid_count": 0,
@@ -272,47 +770,218 @@ async def bulk_import_listings(
             "created_at": now,
             "updated_at": now,
             "source": "csv_bulk_import",
+            "bulk_import_batch": now,  # groups all rows from this import
         }
 
-        # iter394 — Enrich each bulk-imported listing with the live seller
-        # record so seller_account_type + sibling booleans reflect the
-        # partner's current status (they're a verified partner if they're
-        # using this endpoint, but resolver handles all edge cases).
+        # Enrich seller record (best-effort; failure won't block draft creation).
         try:
             from services.listing_seller_enrichment import enrich_listing_async
             listing = await enrich_listing_async(db, listing, "general")
         except Exception:  # noqa: BLE001
             pass
+
         await db.listings.insert_one(listing)
-        created.append({"id": listing_id, "title": title})
+        created.append({
+            "id": listing_id,
+            "title": norm["title"],
+            "title_fr": norm["title_fr"] or "",
+            "needs_photos": True,
+        })
 
     return {
-        "success": True,
-        "imported": len(created),
-        "errors": len(errors),
-        "created_listings": created,
-        "error_details": errors[:50],
+        "ok": True,
+        "code": "drafts_created",
+        "message_en": f"{len(created)} draft listing(s) created. Add at least one photo per draft to publish.",
+        "message_fr": f"{len(created)} annonce(s) brouillon créée(s). Ajoutez au moins une photo par brouillon pour publier.",
+        "created": len(created),
+        "drafts": created,
     }
 
 
-@partner_pro_router.get("/partner-pro/bulk-import/template")
-async def get_csv_template():
-    """Download a CSV template for bulk listing import."""
-    buf = io.StringIO()
-    writer = csv.writer(buf)
-    writer.writerow(sorted(CSV_ALL_FIELDS))
-    writer.writerow([
-        "72", "Electronics", "New",
-        "Vancouver", "Sample listing description",
-        "500.00", "private_sale", "QC",
-        "Free shipping", "100.00", "Sample Widget",
-    ])
-    buf.seek(0)
-    return StreamingResponse(
-        io.BytesIO(buf.getvalue().encode("utf-8")),
-        media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=bidvex_bulk_import_template.csv"},
+class BulkImportPhotosBody(BaseModel):
+    image_urls: list[str] = Field(..., min_length=1)
+
+
+@partner_pro_router.post("/partner-pro/bulk-import/{listing_id}/photos")
+@_limiter.limit("60/minute")
+async def attach_photos_to_bulk_draft(
+    request: Request,
+    listing_id: str,
+    body: BulkImportPhotosBody,
+    current_user: User = Depends(get_current_user),
+):
+    """iter444 — Attach photos to a bulk-imported draft (append, not replace).
+
+    Only works on listings the caller owns AND that are currently `draft`
+    AND were imported via CSV. Prevents accidental image overwrites on
+    already-live listings.
+    """
+    _require_partner_pro(current_user)
+    db = get_db()
+
+    listing = await db.listings.find_one({"id": listing_id}, {"_id": 0})
+    if not listing:
+        raise HTTPException(status_code=404, detail={
+            "code": "listing_not_found",
+            "message_en": "Draft not found.",
+            "message_fr": "Brouillon introuvable.",
+        })
+    if listing.get("seller_id") != current_user.id:
+        raise HTTPException(status_code=403, detail={
+            "code": "not_your_draft",
+            "message_en": "Not your draft.",
+            "message_fr": "Ce brouillon ne vous appartient pas.",
+        })
+    if listing.get("status") != "draft" or listing.get("source") != "csv_bulk_import":
+        raise HTTPException(status_code=400, detail={
+            "code": "not_a_bulk_draft",
+            "message_en": "This endpoint only accepts bulk-imported drafts.",
+            "message_fr": "Ce point de terminaison n'accepte que les brouillons importés en masse.",
+        })
+
+    existing = list(listing.get("images") or [])
+    for u in body.image_urls:
+        if u and u not in existing:
+            existing.append(u)
+
+    await db.listings.update_one(
+        {"id": listing_id},
+        {"$set": {
+            "images": existing,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }},
     )
+    return {
+        "ok": True,
+        "listing_id": listing_id,
+        "image_count": len(existing),
+        "needs_photos": len(existing) == 0,
+    }
+
+
+@partner_pro_router.post("/partner-pro/bulk-import/{listing_id}/publish")
+@_limiter.limit("60/minute")
+async def publish_bulk_draft(
+    request: Request,
+    listing_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """iter444 — Flip a bulk-imported draft to `active` if — and ONLY if
+    — it has ≥ 1 photo. Any other status returns a bilingual 400."""
+    _require_partner_pro(current_user)
+    db = get_db()
+
+    listing = await db.listings.find_one({"id": listing_id}, {"_id": 0})
+    if not listing:
+        raise HTTPException(status_code=404, detail={
+            "code": "listing_not_found",
+            "message_en": "Draft not found.",
+            "message_fr": "Brouillon introuvable.",
+        })
+    if listing.get("seller_id") != current_user.id:
+        raise HTTPException(status_code=403, detail={
+            "code": "not_your_draft",
+            "message_en": "Not your draft.",
+            "message_fr": "Ce brouillon ne vous appartient pas.",
+        })
+    if listing.get("status") != "draft" or listing.get("source") != "csv_bulk_import":
+        raise HTTPException(status_code=400, detail={
+            "code": "not_a_bulk_draft",
+            "message_en": "This endpoint only publishes bulk-imported drafts.",
+            "message_fr": "Ce point de terminaison ne publie que les brouillons importés en masse.",
+        })
+
+    images = listing.get("images") or []
+    if len(images) < 1:
+        raise HTTPException(status_code=400, detail={
+            "code": "missing_photo",
+            "message_en": "Add at least one photo before publishing.",
+            "message_fr": "Ajoutez au moins une photo avant de publier.",
+        })
+
+    await db.listings.update_one(
+        {"id": listing_id},
+        {"$set": {
+            "status": "active",
+            "published_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }},
+    )
+    return {"ok": True, "listing_id": listing_id, "status": "active"}
+
+
+@partner_pro_router.post("/partner-pro/bulk-import/publish-batch")
+@_limiter.limit("10/minute")
+async def publish_bulk_batch(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+):
+    """iter444 — Publish every bulk-imported draft owned by the caller
+    that has ≥ 1 photo. Drafts still missing a photo are skipped and
+    returned in `pending_photos`."""
+    _require_partner_pro(current_user)
+    db = get_db()
+
+    drafts = await db.listings.find(
+        {"seller_id": current_user.id, "status": "draft", "source": "csv_bulk_import"},
+        {"_id": 0, "id": 1, "images": 1, "title": 1},
+    ).to_list(length=MAX_ROWS_PER_IMPORT * 2)
+
+    published: list[str] = []
+    pending: list[dict] = []
+    now = datetime.now(timezone.utc).isoformat()
+    for d in drafts:
+        imgs = d.get("images") or []
+        if len(imgs) >= 1:
+            await db.listings.update_one(
+                {"id": d["id"]},
+                {"$set": {"status": "active", "published_at": now, "updated_at": now}},
+            )
+            published.append(d["id"])
+        else:
+            pending.append({"id": d["id"], "title": d.get("title", "")})
+
+    return {
+        "ok": True,
+        "published_count": len(published),
+        "pending_photos_count": len(pending),
+        "published_ids": published,
+        "pending_photos": pending,
+        "message_en": (
+            f"{len(published)} listing(s) published. "
+            + (f"{len(pending)} still need at least one photo before they can go live." if pending else "")
+        ),
+        "message_fr": (
+            f"{len(published)} annonce(s) publiée(s). "
+            + (f"{len(pending)} nécessitent encore au moins une photo avant d'être publiées." if pending else "")
+        ),
+    }
+
+
+@partner_pro_router.get("/partner-pro/bulk-import/pending")
+async def list_pending_bulk_drafts(current_user: User = Depends(get_current_user)):
+    """iter444 — Return every bulk-imported draft owned by the caller,
+    with photo counts, so the Photo Studio can render the "missing
+    photo" pills next to each draft."""
+    _require_partner_pro(current_user)
+    db = get_db()
+
+    drafts = await db.listings.find(
+        {"seller_id": current_user.id, "status": "draft", "source": "csv_bulk_import"},
+        {"_id": 0, "id": 1, "title": 1, "title_fr": 1, "starting_price": 1,
+         "category": 1, "region": 1, "city": 1, "images": 1, "created_at": 1,
+         "bulk_import_batch": 1},
+    ).sort("created_at", -1).to_list(length=MAX_ROWS_PER_IMPORT * 5)
+
+    return {
+        "count": len(drafts),
+        "drafts": [
+            {**d, "image_count": len(d.get("images") or []),
+             "needs_photos": len(d.get("images") or []) == 0}
+            for d in drafts
+        ],
+    }
+
 
 
 # =====================================================================

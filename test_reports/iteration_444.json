@@ -1,0 +1,81 @@
+{
+  "summary": "iter444 Partner CSV bulk import tested end-to-end. Backend: 27/28 pytest passing (16/16 iter444 core + 11/12 iter444 supplement). Frontend: 5-step wizard renders, download-template-btn / step-1-next-btn / csv-dropzone / upload-csv-btn / bulk-review-table / bulk-input-*-* / confirm-drafts-btn / bulk-photo-studio / bulk-photo-dropzone / needs-photo-*, missing-photo-summary / publish-all-btn / step-4-next-btn all present and functional. Bilingual EN/FR labels + error pills verified. QC missing title_fr surfaces bill96 error under bulk-input-2-title_fr. Confirm creates drafts + advances to photo studio. ONE HIGH-priority backend gap: GET /api/partner-pro/bulk-import/template has NO auth guard — returns 200 to a free-tier buyer (spec requires 403 on all 5 endpoints).",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "GET /api/partner-pro/bulk-import/template",
+        "issue": "Endpoint has NO authentication/subscription gate. Returns 200 with the CSV template for anonymous callers AND for free-tier buyers. Review spec: 'Any of the 5 endpoints → 403' for non-partner/non-admin. All other 4 endpoints (POST /bulk-import, /confirm, /publish-batch, GET /pending) correctly return 403.",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": [
+      {
+        "endpoint": "POST /api/partner-pro/bulk-import (preview)",
+        "issue": "Whitespace-only trailing CSV lines (e.g. 4 spaces after a data-row terminating newline) are parsed as a real row and produce 8+ phantom validation errors (title/category/starting_price/quantity/condition/auction_end_date all 'required'). Real-world Excel/LibreOffice exports frequently contain trailing whitespace. Recommend stripping fully-blank/whitespace-only rows before validation. Repro: file whose last line is only spaces → backend returns total_rows=N+1 with phantom row filled with `_required` codes."
+      },
+      {
+        "endpoint": "POST /api/partner-pro/bulk-import/confirm",
+        "issue": "Rejects empty `rows` payload with 400 (validation_error) BEFORE the _require_partner_pro gate runs, so a free-tier buyer sending `{rows: []}` gets 400 instead of 403. Non-empty payloads correctly return 403. Recommend running the auth gate first."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "BulkImportPage · Step 3 error-summary badge",
+        "issue": "The red pill labelled '{N} row(s) with errors' actually shows the total ERROR COUNT (sum of all error objects), not the number of rows-with-errors. Example: 1 row with 8 field errors renders as '8 row(s) with errors'. Fix: either rename the key `rowsWithErrors` to `errorCount` or compute `rows.filter(r => (r.errors||[]).length > 0).length`.",
+        "selector": "[data-testid=\"bulk-error-summary\"]",
+        "priority": "MEDIUM"
+      },
+      {
+        "component": "BulkImportPage · Step 5 publish gate",
+        "issue": "publish-all-btn is `disabled` when 0 drafts have photos, so clicking it does nothing — no `publish-result` panel, no `go-to-drafts-btn` ever appears. Recommend allowing the click and rendering the count of pending_photos with a link to Drafts (aligns with spec that Publish result surfaces pending_photos_count). Also, publish-result + go-to-drafts-btn testids never mount unless a batch has been published successfully.",
+        "selector": "[data-testid=\"publish-all-btn\"]",
+        "priority": "MEDIUM"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Step 3 review table",
+        "issues": [
+          "Table is wide — horizontal scroll required to see all columns (city, region, buy_now_price, buyers_premium_%). This is acceptable given the 17-column contract."
+        ]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter444_partner_bulk_import.py",
+    "/app/backend/tests/test_iter444_supplement.py",
+    "/app/test_reports/pytest/iter444_results.xml",
+    "/app/test_reports/pytest/iter444_supplement.xml"
+  ],
+  "action_items": [
+    "Add `_require_partner_pro(current_user)` (with a `current_user` dep) to `GET /api/partner-pro/bulk-import/template` — currently unprotected.",
+    "Backend: strip whitespace-only rows before validation in `POST /api/partner-pro/bulk-import` so Excel-generated CSVs don't produce phantom rows.",
+    "Backend: run the partner_pro auth check before Pydantic body validation on `POST /api/partner-pro/bulk-import/confirm` (return 403 before 400).",
+    "Frontend: rename i18n key `bulkImport.rowsWithErrors` → `bulkImport.totalErrors` (label mismatches value in `bulk-error-summary`).",
+    "Frontend: allow clicking `publish-all-btn` even when no drafts are ready — show the `publish-result` panel with `pending_photos_count` + `go-to-drafts-btn` per spec."
+  ],
+  "critical_code_review_comments": [
+    "backend/routes/partner_pro.py line 486 `async def get_csv_template()` takes NO dependencies → no auth gate. All 4 sibling endpoints correctly call `_require_partner_pro(current_user)`.",
+    "BulkImportPage.js line 63: `errorCount` is `sum(errors.length)`; but is rendered under an i18n key that says 'row(s) with errors'. Label/value mismatch.",
+    "PartnerBulkPhotoStudio uploads to S3 via `utils/uploadListingImage` then POSTs URLs to `/photos` — happy path OK, but no bulk-upload progress indicator and no retry on S3 failure.",
+    "Backend `_validate_row` treats blank CSV row as a data row — should filter `all(v.strip()=='' for v in row.values())` first."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter444_supplement.py (new — 12 supplementary tests)"
+  ],
+  "success_rate": {"backend": "96% (27/28)", "frontend": "90% (18/20 flows OK)"},
+  "test_credentials": "Admin charbel911@gmail.com / Anderosli123!@# WORKS. Free-tier buyer testbuyer@bidvex.com / TestBuyer2026! returned 401 on preview — registered new test buyer iter444_buyer@test.com / Iter444Buy! (payload required terms_agreed:true + ai_disclosure_consent:true).",
+  "seed_data_creation": "Registered free-tier buyer iter444_buyer@test.com / Iter444Buy! for the 403-gate regression. Several bulk-imported drafts were created under the admin account during testing (title prefix 'UI444' / 'iter444 sup' / 'iter444 batch'). All remain in status='draft' (never auto-active); recommend a cleanup pass by main agent.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend gate on GET /template is the only functional gap; other 4 endpoints correctly enforce partner_pro. Once template gate is added, re-run /app/backend/tests/test_iter444_supplement.py::test_free_buyer_gets_403_on_all_endpoints — it will go green. Note: the buyer-403 supplement test registers/uses iter444_buyer@test.com automatically (idempotent). Also verify the frontend `bulk-error-summary` label fix and the publish-all-btn always-clickable UX. The 3 UI regressions listed under frontend_issues do NOT block the happy path (create drafts → attach photo → publish is fully functional).",
+  "rca_of_the_issue": {
+    "template_no_auth": "backend/routes/partner_pro.py:485-490 — `@partner_pro_router.get('/partner-pro/bulk-import/template') async def get_csv_template():` has no `current_user: User = Depends(get_current_user)` and no `_require_partner_pro` call. Fix: add the dep and the guard exactly like the other 4 endpoints (e.g., line 572, 697, 819, 922).",
+    "error_summary_mislabel": "BulkImportPage.js:63 sums `errors.length` across rows and renders that value via `t('bulkImport.rowsWithErrors', {count: errorCount})`. The i18n string reads '{count} row(s) with errors' but the value counts field-level errors. Fix either the string or the computation.",
+    "whitespace_rows": "Backend CSV parser in POST /bulk-import iterates every csv.DictReader row including whitespace-only entries. Filter with `if not any(v and v.strip() for v in row.values()): continue` before appending to preview.",
+    "publish_all_disabled": "publish-all-btn is disabled while `readyDrafts.length == 0`. Result panel + go-to-drafts-btn are conditionally rendered on a successful publish-batch response, so if a Partner has ONLY photoless drafts the click never fires and they get no feedback. Recommend always calling publish-batch and rendering the summary."
+  }
+}
