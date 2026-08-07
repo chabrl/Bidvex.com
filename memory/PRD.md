@@ -1,6 +1,40 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter445 — Storage BP is FIXED PLATFORM POLICY (5 %) (Feb 8, 2026) ✅ COMPLETE
+
+**Reported by user**: Audit and enforce the storage auction buyer-
+premium policy — every storage auction has a fixed 5 % buyer premium
+charged to the winning bidder. Facility never charged. Remove or
+prevent any storage create/edit/future-bulk-import field that lets a
+facility set/reduce/override this percentage. 5 % must be consistent
+in buyer total, checkout, invoice, fee display, settlement, and
+storage terms EN + FR. Reconcile legacy per-listing overrides. Cover
+card + cash + e-transfer. Don't touch Partner, Vehicle, or general
+Marketplace fee rules.
+
+### Delivered
+- **Backend** — 4-layer lock: storage-auction model drops the field
+  server-stamps 5.0; general listings service + update route discard
+  any `custom_buyer_premium_rate` on storage rows; fee-breakdown +
+  both payment paths hard-force 0.05 (bypasses buyer-tier discount).
+- **Frontend** — removed `bp-input` from `StorageAuctionCreate`
+  (replaced with `bp-fixed-badge`); replaced iter441 editable BP input
+  in `CreateListingPage.js::isStorageLocker` branch with
+  `bp-storage-fixed-notice`. Bilingual EN/FR.
+- **Migration** — `iter445_reconcile_storage_bp.py` cleared legacy
+  overrides + rewrote `buyer_premium_pct` on storage_auctions rows.
+- **Regression** — iter443 fee-model flip untouched; iter441 partner
+  override untouched (only storage_locker path locked); vehicles,
+  marketplace, and existing live listings untouched.
+
+### Verified
+- 25/25 iter445 pytest + 6/6 iter443 regression + 10/10 live-URL
+  verification. Frontend UI + bilingual terms pages all green.
+- Testing report: `/app/test_reports/iteration_445.json`.
+
+
+
 ## iter444 — Partner CSV Bulk Import (Feb 8, 2026) ✅ COMPLETE
 
 **Reported by user**: Fix and complete the Partner multi-item CSV import

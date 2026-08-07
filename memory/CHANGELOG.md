@@ -1,6 +1,96 @@
 # BidVex Changelog
 
 
+## Feb 8, 2026 — iter445 Storage BP is FIXED PLATFORM POLICY (5 %)
+
+Follow-on to iter443 (fee-model flip). The storage buyer's premium is
+now UNCONDITIONALLY 5 % of the hammer, charged to the winning bidder,
+across every payment path (Stripe, cash, e-transfer). The facility can
+no longer set, reduce, or override this rate anywhere in the product.
+Legacy per-listing overrides are reconciled to null and legacy
+`buyer_premium_pct` values on `storage_auctions` rows are rewritten to
+5.0.
+
+### Backend — lock enforced at 4 layers
+1. **Storage auction model** (`models/storage_auction.py`) — the
+   `buyer_premium_pct` field is REMOVED from `StorageAuctionCreate`.
+   Any client-sent value on the create endpoint is silently ignored —
+   the route now stamps `buyer_premium_pct = 5.0` unconditionally.
+   The edit whitelist on both `/storage-facilities/auctions/{id}` and
+   `/admin/storage-auctions/{id}` already excludes `buyer_premium_pct`,
+   so no update path exposes it.
+2. **General listings service** (`services/listings_service.py`) —
+   `apply_partner_tags` now DISCARDS any `custom_buyer_premium_rate`
+   value when the listing is `category='storage_locker'` OR
+   `listing_type='storage_locker'`. The field is coerced to `None` so
+   the fee calculator falls back to the fixed rate.
+3. **General listings update** (`routes/listings.py`) — the update
+   handler DISCARDS `custom_buyer_premium_rate` on any storage listing
+   before persisting.
+4. **Fee-breakdown + payment paths** (`routes/misc.py`,
+   `routes/payments.py`) — force `custom_buyer_premium_rate = 0.05`
+   explicitly for storage listings so any buyer-tier discount (e.g.
+   `vip_elite` at 25 %) is BYPASSED. On $100 hammer, every buyer pays
+   $5 BP regardless of subscription tier.
+
+### Migration
+- `scripts/iter445_reconcile_storage_bp.py` — one-shot idempotent
+  script that (a) clears any non-null `custom_buyer_premium_rate` on
+  `listings` where category or listing_type is `storage_locker`, and
+  (b) rewrites `buyer_premium_pct` on `storage_auctions` rows to `5.0`
+  wherever it differs. Verified on preview DB: 0 legacy listings + 1
+  legacy `storage_auctions` row updated.
+
+### Frontend — remove overrides
+- `pages/storage/StorageAuctionCreate.js` — the `bp-input` field is
+  DELETED. The BP section (`data-testid=bp-section`) now renders a
+  read-only `bp-fixed-badge` pill (`5%`) plus a bilingual explanation
+  that the buyer pays 5 % on top of the hammer and the facility
+  receives the full hammer. Form state no longer includes
+  `buyer_premium_pct`; submit payload does not send it.
+- `pages/CreateListingPage.js` — the iter441 editable buyer's-premium
+  input for `isStorageLocker` is REPLACED with a read-only
+  `bp-storage-fixed-notice` (green 5 % pill + bilingual text).
+  Partner sellers keep their editable BP input (iter441 override
+  untouched). Submit path sets `buyers_premium_rate=null` whenever
+  `isStorageLocker=true`.
+- Locales — new `createListing.buyersPremiumStorageFixed` +
+  `createListing.buyersPremiumPartnerPh` in `en.json` + `fr.json`.
+
+### Regression tests (all PASS)
+- `tests/test_iter445_storage_bp_locked.py` (25/25 PASS):
+  - `calculate_storage_pricing` returns 5 % across stripe/cash/etransfer
+    × 5 hammers (100/800/1500/2500/10) — 15 cases.
+  - `calculate_fee` on `storage_facility` returns 5 % across all 3
+    payment methods regardless of buyer tier — 3 cases.
+  - `apply_partner_tags` discards BP override on `storage_locker`
+    by category AND by listing_type — 2 cases.
+  - E2E: `POST /api/listings` with a 15 % BP override on a storage
+    listing → server returns `custom_buyer_premium_rate=None`.
+  - E2E: `PUT /api/listings/{id}` with a 20 % BP override on a storage
+    listing → same.
+  - E2E: `GET /api/checkout/fee-breakdown?listing_id=…` for a storage
+    listing → `buyer_premium_rate=0.05` and `buyer_premium=$5.00`
+    (NOT `0.0375` from tier discount).
+  - Reconciliation script is idempotent — 2nd run reports "0 rows".
+- `tests/test_iter443_storage_fee_model.py` (6/6 PASS) — iter443
+  regression preserved.
+- Testing agent report `/app/test_reports/iteration_445.json` — 100%
+  pass across all fronts (25 unit + 6 regression + 10 live-URL +
+  frontend UI + bilingual policy pages). Zero critical or minor
+  backend issues, zero UI bugs.
+
+### Explicit non-goals kept
+- Partner listing BP override — untouched (iter441 override still
+  works on non-storage partner listings).
+- Vehicle listing BP — untouched (fixed 2.5 % platform fee).
+- General marketplace tier-based BP — untouched.
+- Existing live storage listings — reconciled by script, no live sale
+  data touched.
+- Storage bulk import — still not started (Partner is the pilot).
+
+
+
 ## Feb 8, 2026 — iter444 Partner CSV Bulk Import (draft-only, photo-gated)
 
 Partners on the `partner_pro` / `vip` tier (and super_admins) can now
