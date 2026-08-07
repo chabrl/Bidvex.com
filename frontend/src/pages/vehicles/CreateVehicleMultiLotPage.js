@@ -1027,7 +1027,7 @@ const CreateVehicleMultiLotPage = () => {
             >
               <FileSpreadsheet className="h-10 w-10 text-blue-400 mx-auto mb-3" />
               <p className="text-sm font-semibold text-blue-900 mb-1">{L('Import Lots from CSV', 'Importer des lots depuis un CSV')}</p>
-              <p className="text-xs text-slate-500">{L('Bulk-add up to 50 lots at once from a spreadsheet.', "Importez jusqu'à 50 lots à la fois depuis une feuille de calcul.")}</p>
+              <p className="text-xs text-slate-500">{L('Bulk-add up to 500 lots at once from a spreadsheet.', "Importez jusqu'à 500 lots à la fois depuis une feuille de calcul.")}</p>
             </button>
           </div>
         ) : (

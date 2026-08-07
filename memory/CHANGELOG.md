@@ -1,6 +1,53 @@
 # BidVex Changelog
 
 
+## Feb 8, 2026 — iter448 Vehicle Multi-Lot Bulk Import — Final Acceptance Test
+
+Full no-code acceptance sweep on the iter447 wizard at real pilot
+scale (**500 unique vehicles in one CSV**). All 10 acceptance steps
+passed. One stale copy string fixed as a side effect.
+
+### Evidence
+- **CSV parsing @ 500 rows**: valid; deterministic 17-char VINs, 20
+  QC rows with `title_fr`.
+- **Review-table render**: 500 rows in **~1.0 s** (well under 15 s
+  threshold), scroll top/bottom smooth.
+- **Capacity display**: header chip flipped `0 / 500 → 500 / 500 used
+  — 0 remaining` after atomic confirm; tally line `Capacity: 0 / 500
+  — 500 remaining`.
+- **Atomic confirm**: created exactly 500 lots in one call; Mongo
+  verified `lots.length == 500`, all `status='draft_no_photos'`,
+  empty `media[]`.
+- **Photo Studio @ 500**: rendered 500 lot cards with 500 red
+  "Needs 1 photo" pills; banner "500 lot(s) missing a photo".
+- **VIN photo auto-matching** (representative batch of 10 photos):
+  - 3 full 17-char VIN files → auto-attached ✓
+  - 2 unambiguous last-8 suffix files → auto-attached ✓
+  - 2 unambiguous last-6 suffix files → auto-attached ✓
+  - 1 ambiguous last-6 file → **Unmatched tray** ✓ (correctly refused)
+  - 2 random / stock-number files → **Unmatched tray** ✓
+- **Go Live gate math is exact**: label ticked `500 → 493 lot(s)
+  need a photo`; button stayed disabled; direct API
+  `POST /activate?intent=live` returned **HTTP 400** with
+  `detail.code='lots_missing_photos'`, `detail.count=493`, and
+  bilingual EN/FR messages including the full list of missing lots.
+- **Cross-event VIN dedup (bonus)**: same 500-VIN CSV in a second
+  draft event flagged every row with
+  `duplicate_vin_across_dealer` + `conflict.event_id` link.
+- **Cleanup**: 2 test events cancelled; `/tmp/iter447_*` removed.
+
+### One-line copy fix
+- **`pages/vehicles/CreateVehicleMultiLotPage.js` line 1030** — the
+  Bulk Import card's helper text was still saying "Bulk-add up to 50
+  lots at once". Updated to "Bulk-add up to 500 lots at once" (both
+  EN and FR) to match the actual 500-cap the backend + wizard now
+  enforce.
+
+### Not fixed (documented UX gap, not a bug)
+- No client-side search box or "errors-only" filter on the Step 2
+  review table. Acceptable for pilot; a nice-to-have for follow-up.
+
+
 ## Feb 8, 2026 — iter447 Vehicle Dealer Multi-Lot CSV Bulk Import
 
 Rewrite of iter306 to give verified vehicle dealers a **proper 4-step
