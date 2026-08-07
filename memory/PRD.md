@@ -1,6 +1,34 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter446 — Storage Facility CSV Bulk Import (Feb 8, 2026) ✅ COMPLETE
+
+**Delivered**: New 5-step wizard for verified storage facilities to bulk-import up to **50 storage-unit auctions per batch** at `/storage-auctions/bulk-import`, mirroring the Partner Bulk Import contract from iter444.
+
+**Backend** (`routes/storage_bulk_import.py`, new module — 7 endpoints):
+- `GET /api/storage-facilities/bulk-import/template` — fixed CSV template (no `buyer_premium`, no `accepted_legal_notice`)
+- `POST /api/storage-facilities/bulk-import` — preview + bilingual per-cell validation
+- `POST /api/storage-facilities/bulk-import/confirm` — draft creation (max 50, requires active legal-notice acceptance)
+- `POST /api/storage-facilities/bulk-import/{id}/photos` — attach photos
+- `POST /api/storage-facilities/bulk-import/{id}/publish` — photo-gated (≥1 photo)
+- `POST /api/storage-facilities/bulk-import/publish-batch` — publish all photo-ready
+- `GET  /api/storage-facilities/bulk-import/pending` — list caller's bulk drafts
+
+**Rules**: CSV has 19 columns (no BP, no legal-notice). Validation reuses the single-form contract (unit_size/type enums, Bill 96 French descriptions for QC, lien → past_due, deposit_required → deposit_amount+type, end_after_start, end_in_future). **Duplicate unit_number** blocks apply to (a) same batch, (b) facility's OPEN drafts / upcoming / active / scheduled / live / pending auctions. Ended / cancelled auctions free the unit_number. **Legal-notice**: cannot be sourced from CSV; must be actively accepted via a bilingual checkbox on Step 3 and is stamped on every draft. **5% BP**: every draft carries `buyer_premium_pct=5.0` regardless of client override (iter445 policy).
+
+**Frontend**:
+- `pages/StorageBulkImportPage.js` — 5-step wizard
+- `components/bulk/StorageBulkReviewTable.jsx` — inline-editable review with bilingual per-cell error pills
+- `components/bulk/StorageBulkPhotoStudio.jsx` — Unit Photo Studio with fuzzy filename-to-unit_number auto-matching
+- `App.js` — protected route `/storage-auctions/bulk-import`
+- `StorageAuctionCreate.js` — added `storage-bulk-import-cta` shortcut button
+
+**Tests**: `backend/tests/test_iter446_storage_bulk_import.py` — 25/25 passing. Frontend E2E via `testing_agent_v3_fork` reports 95% (only remaining note is pre-existing site-wide FR/EN navbar toggle, out of scope). Test data (drafts + published test auctions) cleaned up post-testing.
+
+**Explicit non-goals**: Partner CSV import, Vehicle imports, fee tables/calculators, existing live storage listings — all UNTOUCHED.
+
+
+
 ## iter445 — Storage BP is FIXED PLATFORM POLICY (5 %) (Feb 8, 2026) ✅ COMPLETE
 
 **Reported by user**: Audit and enforce the storage auction buyer-

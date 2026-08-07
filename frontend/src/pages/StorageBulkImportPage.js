@@ -197,6 +197,9 @@ const StorageBulkImportPage = () => {
         toast.error(isFr ? data.message_fr : data.message_en);
         if (Array.isArray(data.errors)) {
           setRows((prev) => {
+            // Merge server-returned errors onto the existing row state
+            // instead of wiping everything — preserves any client-side
+            // fields the user is still editing.
             const next = prev.map((r) => ({ ...r, errors: [] }));
             for (const e of data.errors) {
               const idx = next.findIndex((r) => r.row === e.row);
@@ -253,9 +256,10 @@ const StorageBulkImportPage = () => {
     }
   };
 
-  // On mount, refresh any pending drafts so a returning facility sees
-  // their in-progress bulk queue.
+  // On mount (and when token hydrates), refresh any pending drafts so a
+  // returning facility sees their in-progress bulk queue.
   useEffect(() => {
+    if (!token) return;
     const loadPending = async () => {
       try {
         const { data } = await axios.get(
@@ -268,7 +272,7 @@ const StorageBulkImportPage = () => {
       } catch { /* silent */ }
     };
     loadPending();
-  }, []);
+  }, [token, headers]);
 
   const canGoToPhotos = drafts.length > 0;
 

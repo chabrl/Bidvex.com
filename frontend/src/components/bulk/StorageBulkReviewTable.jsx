@@ -14,7 +14,6 @@
  * when to re-run validation (typically on server confirm).
  */
 import React from 'react';
-import { useTranslation } from 'react-i18next';
 import { AlertTriangle, CheckCircle2, ExternalLink } from 'lucide-react';
 
 const UNIT_SIZES = ['5x5', '5x10', '10x10', '10x15', '10x20', '10x30+'];
@@ -44,7 +43,6 @@ const ErrorPill = ({ err, isFr }) => (
 );
 
 export const StorageBulkReviewTable = ({ rows, onChange, isFr }) => {
-  const { t } = useTranslation();
   const errsFor = (row, field) =>
     (row.errors || []).filter((e) => e.field === field);
   const rowHasErrors = (row) => (row.errors || []).length > 0;

@@ -1,6 +1,98 @@
 # BidVex Changelog
 
 
+## Feb 8, 2026 — iter446 Storage Facility CSV Bulk Import
+
+New 5-step wizard for **verified storage facilities** to bulk-import up to
+**50 storage-unit auctions per batch** at `/storage-auctions/bulk-import`.
+Mirrors the Partner Bulk Import (iter444) UX contract: draft-only,
+photo-gated publish, bilingual per-cell error surface.
+
+### Backend — `routes/storage_bulk_import.py` (new module)
+7 endpoints under `/api/storage-facilities/bulk-import/*`:
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET  | `/template` | Fixed CSV template (19 columns, 2 example rows) |
+| POST | `/` | PREVIEW — parse + validate; no writes |
+| POST | `/confirm` | Create drafts (max 50, requires active legal-notice acceptance) |
+| POST | `/{id}/photos` | Append photo URLs to a bulk draft |
+| POST | `/{id}/publish` | Photo-gated publish (≥ 1 photo) |
+| POST | `/publish-batch` | Publish every photo-ready draft |
+| GET  | `/pending` | List caller's bulk drafts + photo counts |
+
+**CSV columns** (order-locked, no `buyer_premium`, no `accepted_legal_notice`):
+`unit_number, unit_size, unit_type, is_lien_unit, past_due_balance,
+description_en, description_fr, video_url, starting_price, reserve_price,
+bid_increment, start_time, end_time, cleanup_deadline_hours,
+payment_method, currency, deposit_required, deposit_amount, deposit_type`.
+
+**Validation rules** (reuse single-form contract as source of truth):
+- `unit_number` unique **within batch AND against facility's open drafts /
+  upcoming / active / scheduled / live / pending auctions**. Ended /
+  cancelled / sold auctions free the unit_number for reuse.
+- `unit_size` ∈ `UNIT_SIZES`, `unit_type` ∈ `UNIT_TYPES`, `payment_method`
+  ∈ `PAYMENT_METHODS`.
+- `description_en` ≥ 10 chars; `description_fr` required for QC facilities
+  (Bill 96).
+- `is_lien_unit=Y` ⇒ `past_due_balance > 0`.
+- `deposit_required=Y` ⇒ `deposit_amount > 0` and `deposit_type` ∈
+  `{fixed, percentage}` (percentage sanity 1–100).
+- `starting_price` 1–100 000; `reserve_price` ≥ `starting_price`;
+  `bid_increment` ≥ 1.
+- `start_time < end_time`, `end_time > now`.
+- `cleanup_deadline_hours` 24–168 (default 72).
+- `currency` ∈ `{CAD, USD}`.
+
+**Legal-notice contract**: the CSV cannot carry `accepted_legal_notice`. It
+must be **actively confirmed** on Step 3 (bilingual checkbox). Server
+stamps `accepted_legal_notice=True`, `accepted_legal_notice_at`, and
+`accepted_legal_notice_source="bulk_import_wizard"` on every created
+draft.
+
+**Fixed 5 % BP (iter445 policy)**: every draft is written with
+`buyer_premium_pct=5.0` regardless of any client attempt to override; the
+template has no BP column at all.
+
+### Frontend
+- **`pages/StorageBulkImportPage.js`** — 5-step wizard with SEO tags,
+  stepper, bilingual copy driven by `i18n.language`.
+- **`components/bulk/StorageBulkReviewTable.jsx`** — inline-editable
+  preview grid, per-cell bilingual error pills, click-through link to
+  conflicting listing when `duplicate_unit_in_facility`.
+- **`components/bulk/StorageBulkPhotoStudio.jsx`** — Unit Photo Studio:
+  drag-drop uploads → per-photo POST to
+  `/storage-facilities/upload-photo` → fuzzy filename-to-unit auto-match
+  (case-insensitive substring, alphanumeric-normalised, digit-suffix,
+  longest unit_number wins) → matched photos attach automatically,
+  unmatched sit in a tray with an “Assign to…” dropdown. Red
+  “Needs 1 photo” vs green “N photo(s)” pill per draft.
+- **`App.js`** — new lazy import + protected route
+  `/storage-auctions/bulk-import`.
+- **`pages/storage/StorageAuctionCreate.js`** — added
+  `storage-bulk-import-cta` header button linking to the wizard.
+
+### Tests
+- **`backend/tests/test_iter446_storage_bulk_import.py`** — 25 pytest
+  cases: template contract (no BP / no legal-notice cols); 50-row cap;
+  missing columns; non-CSV; within-batch duplicates; cross-facility open
+  duplicates; ended-auction unit_number reuse; Bill 96; lien +
+  past_due; deposit-required + amount; end-before-start; end-in-past;
+  reserve-below-starting; invalid payment/currency; active
+  legal-notice gate; 5 % BP stamped regardless of client override;
+  photo gate on publish; batch publish separates photo-ready from
+  pending; non-facility user 403. **25/25 passing.**
+- **Frontend E2E**: `testing_agent_v3_fork` full-flow sweep passed at
+  95 % (only non-blocking issue is the pre-existing site-wide FR/EN
+  navbar toggle behaviour, out of scope for this iteration).
+
+### Explicit non-goals (untouched)
+- Partner CSV bulk import (`/api/partner-pro/bulk-import/*`).
+- Vehicle imports.
+- Fee tables / calculators; 5 % BP remains fixed.
+- Existing live storage listings.
+
+
 ## Feb 8, 2026 — iter445 Storage BP is FIXED PLATFORM POLICY (5 %)
 
 Follow-on to iter443 (fee-model flip). The storage buyer's premium is
