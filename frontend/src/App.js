@@ -39,6 +39,7 @@ import './App.css';
 // active lang from the URL prefix (/en/... /fr/...), syncs i18n +
 // <html lang>, and exposes `switchLang` for real navigation on toggle.
 import { LanguageProvider } from './contexts/LanguageContext';
+import LangAwareRedirect from './components/LangAwareRedirect';
 // iter364 — Global compare-listings context + sticky bottom bar.
 import { CompareProvider } from './contexts/CompareContext';
 import CompareBar from './components/CompareBar';
@@ -631,33 +632,33 @@ const App = () => {
           {/* iter358 — 302 legacy → /en/* redirects for the top SEO-critical URLs.
               Google will pick up the new canonical fast; users with old bookmarks
               land on the correct localized URL. Non-Latin FR paths preserved. */}
-          <Route path="/marketplace" element={<Navigate to="/en/marketplace" replace />} />
+          <Route path="/marketplace" element={<LangAwareRedirect enPath="/en/marketplace" />} />
           <Route path="/marche" element={<Navigate to="/fr/marche" replace />} />
-          <Route path="/vehicle-auctions" element={<Navigate to="/en/vehicle-auctions" replace />} />
+          <Route path="/vehicle-auctions" element={<LangAwareRedirect enPath="/en/vehicle-auctions" />} />
           <Route path="/encheres-vehicules" element={<Navigate to="/fr/encheres-vehicules" replace />} />
           <Route path="/encheres-de-vehicules" element={<Navigate to="/fr/encheres-vehicules" replace />} />
-          <Route path="/storage-auctions" element={<Navigate to="/en/storage-auctions" replace />} />
+          <Route path="/storage-auctions" element={<LangAwareRedirect enPath="/en/storage-auctions" />} />
           <Route path="/encheres-entreposage" element={<Navigate to="/fr/encheres-entreposage" replace />} />
-          <Route path="/how-it-works" element={<Navigate to="/en/how-it-works" replace />} />
+          <Route path="/how-it-works" element={<LangAwareRedirect enPath="/en/how-it-works" />} />
           <Route path="/comment-ca-marche" element={<Navigate to="/fr/comment-ca-marche" replace />} />
-          <Route path="/about" element={<Navigate to="/en/about" replace />} />
-          <Route path="/about-us" element={<Navigate to="/en/about" replace />} />
+          <Route path="/about" element={<LangAwareRedirect enPath="/en/about" />} />
+          <Route path="/about-us" element={<LangAwareRedirect enPath="/en/about" />} />
           <Route path="/a-propos" element={<Navigate to="/fr/a-propos" replace />} />
-          <Route path="/pricing" element={<Navigate to="/en/pricing" replace />} />
+          <Route path="/pricing" element={<LangAwareRedirect enPath="/en/pricing" />} />
           <Route path="/tarifs" element={<Navigate to="/fr/tarifs" replace />} />
-          <Route path="/terms-of-service" element={<Navigate to="/en/terms-of-service" replace />} />
+          <Route path="/terms-of-service" element={<LangAwareRedirect enPath="/en/terms-of-service" />} />
           <Route path="/conditions-utilisation" element={<Navigate to="/fr/conditions-utilisation" replace />} />
-          <Route path="/privacy-policy" element={<Navigate to="/en/privacy-policy" replace />} />
+          <Route path="/privacy-policy" element={<LangAwareRedirect enPath="/en/privacy-policy" />} />
           <Route path="/politique-confidentialite" element={<Navigate to="/fr/politique-confidentialite" replace />} />
-          <Route path="/refund-policy" element={<Navigate to="/en/refund-policy" replace />} />
+          <Route path="/refund-policy" element={<LangAwareRedirect enPath="/en/refund-policy" />} />
           <Route path="/politique-remboursement" element={<Navigate to="/fr/politique-remboursement" replace />} />
-          <Route path="/careers" element={<Navigate to="/en/careers" replace />} />
+          <Route path="/careers" element={<LangAwareRedirect enPath="/en/careers" />} />
           <Route path="/carrieres" element={<Navigate to="/fr/carrieres" replace />} />
-          <Route path="/community" element={<Navigate to="/en/community" replace />} />
+          <Route path="/community" element={<LangAwareRedirect enPath="/en/community" />} />
           <Route path="/communaute" element={<Navigate to="/fr/communaute" replace />} />
-          <Route path="/blogs" element={<Navigate to="/en/blogs" replace />} />
+          <Route path="/blogs" element={<LangAwareRedirect enPath="/en/blogs" />} />
           <Route path="/blogues" element={<Navigate to="/fr/blogues" replace />} />
-          <Route path="/prohibited-items" element={<Navigate to="/en/prohibited-items" replace />} />
+          <Route path="/prohibited-items" element={<LangAwareRedirect enPath="/en/prohibited-items" />} />
           <Route path="/articles-interdits" element={<Navigate to="/fr/articles-interdits" replace />} />
 
           {/* Press releases live at legacy + lang-prefixed URLs (SEO). */}
@@ -694,14 +695,14 @@ const App = () => {
           <Route path="/verify-identity" element={
             <ProtectedRoute><VerificationPage /></ProtectedRoute>
           } />
-          <Route path="/how-it-works" element={<Navigate to="/en/how-it-works" replace />} />
+          <Route path="/how-it-works" element={<LangAwareRedirect enPath="/en/how-it-works" />} />
           <Route path="/blogs/:slug" element={<ErrorBoundary scope="blog-article"><BlogArticlePage /></ErrorBoundary>} />
           {/* iter261 — Public payment page (no auth) for admin-issued payment requests. */}
           <Route path="/pay/:payment_request_id" element={<PaymentPage />} />
           <Route path="/pay/:payment_request_id/success" element={<PayRequestSuccessPage />} />
-          <Route path="/community" element={<Navigate to="/en/community" replace />} />
-          <Route path="/about" element={<Navigate to="/en/about" replace />} />
-          <Route path="/about-us" element={<Navigate to="/en/about" replace />} />
+          <Route path="/community" element={<LangAwareRedirect enPath="/en/community" />} />
+          <Route path="/about" element={<LangAwareRedirect enPath="/en/about" />} />
+          <Route path="/about-us" element={<LangAwareRedirect enPath="/en/about" />} />
           <Route path="/unsubscribe" element={<UnsubscribePage />} />
           <Route path="/desabonnement" element={<UnsubscribePage />} />
           <Route path="/email-preferences" element={<EmailPreferencesPage />} />

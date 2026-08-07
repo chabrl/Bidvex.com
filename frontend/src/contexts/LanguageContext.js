@@ -64,23 +64,52 @@ export function LanguageProvider({ children }) {
     if (targetLang !== 'en' && targetLang !== 'fr') return;
     if (targetLang === lang && urlHasLangPrefix) return;
 
-    // iter363 — Language toggle 404 fix.
+    // iter363 → iter450 — Language toggle 404 fix.
     // Only navigate when the current path is language-prefix-eligible.
-    // Otherwise (authenticated/utility pages like /settings, /messages,
-    // /admin, /watchlist, /vehicle-auctions/create), just change the
-    // i18n language without navigation — no need to rewrite the URL,
-    // no risk of hitting a missing /en/* /fr/* route.
+    // Otherwise (authenticated / utility pages like /settings, /messages,
+    // /admin, /watchlist, /vehicle-auctions/create, /storage-auctions/bulk-import,
+    // /vehicle-multi-lot/create, /vehicle-multi-lot/{id}/edit, etc.), just
+    // change the i18n language without navigation.
+    //
+    // A "deep segment" (the part AFTER a mapped parent like /vehicle-auctions)
+    // is only considered language-safe when it looks like an ID (has digits,
+    // or is a UUID / long hex hash). Named sub-pages made purely of
+    // lowercase letters + hyphens (e.g. "create", "bulk-import",
+    // "for-facilities", "register-facility", "how-it-works", "browse",
+    // "edit") are NEVER language-prefix-eligible because we don't ship
+    // `/en/{parent}/{sub}` or `/fr/{parent}/{sub}` routes for them.
     const bare = stripLangPrefix(location.pathname);
+
+    const looksLikeId = (segment) => {
+      if (!segment) return false;
+      if (/\d/.test(segment)) return true;                     // has any digit
+      if (/^[a-f0-9-]{8,}$/i.test(segment)) return true;       // uuid / hex-hash
+      return false;
+    };
+
+    const isDeepIdRoute = () => {
+      const keys = Object.keys(EN_TO_FR).concat(Object.keys(FR_TO_EN));
+      for (const parent of keys) {
+        if (parent === '/') continue;
+        const prefix = parent + '/';
+        if (!bare.startsWith(prefix)) continue;
+        const tail = bare.slice(prefix.length);
+        // Only route deep IDs — the tail's FIRST segment must look like an ID.
+        const firstSeg = tail.split('/')[0];
+        return looksLikeId(firstSeg);
+      }
+      return false;
+    };
+
     const isPrefixEligible = urlHasLangPrefix
       || bare === '/'
       || bare in EN_TO_FR
       || bare in FR_TO_EN
-      // Deep-ID routes on prefix-eligible parents (e.g. /vehicle-auctions/abc123, /listing/abc, /lots/xyz)
-      || Object.keys(EN_TO_FR).some((k) => k !== '/' && bare.startsWith(k + '/'))
-      || Object.keys(FR_TO_EN).some((k) => k !== '/' && bare.startsWith(k + '/'));
+      || isDeepIdRoute();
 
     if (!isPrefixEligible) {
-      // Just change the language; keep the URL as-is.
+      // Just change the language; keep the URL as-is. Persistence is
+      // handled by i18next's `languageChanged` listener in i18n.js.
       if (i18n.language !== targetLang) i18n.changeLanguage(targetLang);
       if (typeof document !== 'undefined') document.documentElement.lang = targetLang;
       return;

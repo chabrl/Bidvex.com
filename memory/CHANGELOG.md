@@ -1,6 +1,95 @@
 # BidVex Changelog
 
 
+## Feb 8, 2026 — iter450 EN/FR Language Toggle Fix
+
+Two long-standing defects in the global language toggle plumbing are
+resolved. Nothing else was touched — translation content, bulk imports,
+routes, fee rules, and navbar layout are all identical to before.
+
+### Bug 1 — FR toggle nuked the current page on deep authenticated routes
+`components/vehicles/BulkImportLotsCSV.jsx`,
+`pages/StorageBulkImportPage.js`,
+`pages/vehicles/CreateVehicleMultiLotPage.js`,
+`pages/storage/StorageAuctionCreate.js` — all previously blew up when
+the dealer clicked FR while on `/storage-auctions/bulk-import`,
+`/vehicle-auctions/create`, or `/vehicle-multi-lot/create`.
+
+Root cause: `LanguageContext.switchLang` treated ANY path whose FIRST
+segment matched a key in `urlMap.EN_TO_FR` as language-prefix-eligible,
+so `/storage-auctions/bulk-import` was rewritten to
+`/fr/encheres-entreposage/bulk-import` — a URL that has NO registered
+route → the fallback `StripLangRedirect` bounced the user to
+`/encheres-entreposage/bulk-import` (also a 404) → user lost their work.
+
+Fix in `contexts/LanguageContext.js`: tightened the eligibility
+heuristic. A path is prefix-eligible only when:
+  1. it already carries a `/en/` or `/fr/` prefix, or
+  2. it is exactly `/`, or
+  3. the bare path is EXACTLY a key in `EN_TO_FR`/`FR_TO_EN`, or
+  4. the first tail segment under a mapped parent LOOKS LIKE AN ID
+     (`/vehicle-auctions/{uuid|numeric-id}`).
+
+Named sub-pages made of lowercase letters + hyphens (`create`,
+`bulk-import`, `for-facilities`, `register-facility`, `dashboard`,
+`edit`, `browse`, `how-it-works`) are now ineligible: the toggle just
+changes `i18n.language` in place, leaves the URL alone, and the wizard
+stays open in French. Verified against `/storage-auctions/bulk-import`,
+`/vehicle-multi-lot/create`, `/settings`, and `/watchlist`.
+
+### Bug 2 — Hard-coded `/en/*` redirects overwrote persisted FR preference
+`App.js` — 18 public routes registered a hard-coded
+`<Route path="/marketplace" element={<Navigate to="/en/marketplace" replace />} />`
+(and 17 similar). Any user with `bidvex_language='fr'` who typed the
+unprefixed URL landed on `/en/*`, which then became authoritative in
+LanguageContext and forced `i18n.changeLanguage('en')` — overwriting
+their persisted FR preference on every render.
+
+Fix — new `components/LangAwareRedirect.jsx` (thin) +
+`components/langAwareRedirectHelpers.js` (pure logic). Reads the
+persisted language from localStorage in the same order i18n.js uses
+on cold-load (`bidvex_language` → `i18nextLng`) and redirects to
+`/fr/{translated-slug}` for FR users, `/en/{same-slug}` for EN users.
+
+All 18 EN-forcing `Navigate` redirects in `App.js` swapped for
+`LangAwareRedirect`. The 6 FR-slug redirects (`/marche`, `/tarifs`,
+`/carrieres`, etc.) were left untouched — a user who types a French
+slug is explicitly asking for FR, so respect their typed intent.
+
+### Regression coverage
+`components/LangAwareRedirect.test.js` — **20/20 Jest tests passing**:
+- `computeLangAwareTarget` — 8 assertions on target selection
+  (EN persisted, FR persisted, slug translation, preserved
+  ?search/#hash, unmapped-slug fallback).
+- `readPersistedLang` — 5 assertions on the localStorage priority
+  chain (`bidvex_language` > `i18nextLng` > `'en'` default;
+  unsupported codes fall through).
+- `isPrefixEligible` heuristic — 7 assertions ensuring named
+  sub-pages (`create`, `bulk-import`, etc.) are NEVER eligible, but
+  UUID/numeric-ID deep routes still are.
+
+### Manual E2E verification (real user paths)
+- Cold load, click FR, refresh → URL `/fr`, `html.lang=fr`,
+  `localStorage.bidvex_language=fr`. **Persists.**
+- On `/storage-auctions/bulk-import`, click FR → URL stays,
+  `html.lang=fr`, wizard still visible. **The exact user complaint is
+  resolved.**
+- Persisted FR + type `/marketplace` → redirected to `/fr/marche`.
+- On `/fr/marche`, click EN → URL flips to `/en/marketplace`,
+  `html.lang=en`.
+- On `/vehicle-multi-lot/create`, click FR → URL stays,
+  `html.lang=fr`. Navigate to `/settings` → still FR
+  (screenshot shows fully-French navbar + settings page).
+
+### Untouched by this iteration (as required)
+- All translation content (`locales/en.json`, `locales/fr.json`).
+- Bulk imports (Partner, Storage, Vehicle multi-lot).
+- Routing table (only redirect targets swapped; no path added or
+  removed).
+- Fee rules (5 % storage BP, buyer_premium tables, seller_commission).
+- Navbar layout — identical DOM + test IDs.
+
+
 ## Feb 8, 2026 — iter449 Vehicle Multi-Lot Bulk Import — Review Filters
 
 Small, focused enhancement to the **Review step ONLY** of the vehicle
