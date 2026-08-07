@@ -83,6 +83,12 @@ const BulkImportLotsCSV = ({ open, onClose, eventId, fr, L, onImported }) => {
   const [createdLots, setCreatedLots] = useState([]);   // lots for Photo Studio
   const [activating, setActivating] = useState(false);
 
+  // iter449 — Review-step filters (search + Errors Only).
+  // Filters are pure view-state; they never mutate csvBaseRows or the
+  // authoritative server-side error list on `preview`.
+  const [searchQuery, setSearchQuery] = useState('');
+  const [errorsOnly, setErrorsOnly] = useState(false);
+
   const token = useMemo(() => localStorage.getItem('token'), []);
 
   // ── Load current event capacity on open ──────────────────────────
@@ -247,6 +253,34 @@ const BulkImportLotsCSV = ({ open, onClose, eventId, fr, L, onImported }) => {
       next[rowIdx] = { ...next[rowIdx], [field]: value };
       return next;
     });
+    // iter449 — Optimistically clear THIS cell's errors on `preview` so
+    // the Errors Only filter reacts immediately, without waiting for
+    // the server round-trip on blur. `refreshPreview` re-authenticates
+    // the row on blur; if the fix is still invalid the server will
+    // re-add the error.
+    // For the VIN field specifically, ALSO clear the batch- and cross-
+    // dealer-duplicate markers so the row can leave the errors-only
+    // view when the dealer fixes a VIN collision.
+    setPreview((prev) => {
+      if (!prev || !Array.isArray(prev.preview)) return prev;
+      const nextRows = prev.preview.map((r, i) => {
+        if (i !== rowIdx) return r;
+        const errs = (r.errors || []).filter((e) => {
+          if (e.field === field) return false;
+          if (field === 'vin' && (
+            e.code === 'duplicate_vin_in_batch' ||
+            e.code === 'duplicate_vin_across_dealer'
+          )) return false;
+          return true;
+        });
+        // Reflect the edit inside `normalized` so the row-search
+        // matches the newest values without waiting for the server.
+        const normalized = { ...(r.normalized || {}), [field]: value };
+        return { ...r, errors: errs, normalized };
+      });
+      const totalErrors = nextRows.reduce((n, r) => n + (r.errors?.length || 0), 0);
+      return { ...prev, preview: nextRows, total_errors: totalErrors };
+    });
   };
 
   // Debounced preview refresh on edit.
@@ -349,6 +383,21 @@ const BulkImportLotsCSV = ({ open, onClose, eventId, fr, L, onImported }) => {
 
   const totalRowsWithErrors = (preview?.preview || [])
     .filter((r) => (r.errors || []).length > 0).length;
+
+  // iter449 — Filtered subset for the Review table. We keep the
+  // ORIGINAL index (`_origIdx`) so `editCell` still targets the right
+  // row in `csvBaseRows` after filtering.
+  const previewRows = preview?.preview || [];
+  const q = searchQuery.trim().toLowerCase();
+  const filteredRows = previewRows
+    .map((pr, origIdx) => ({ pr, origIdx }))
+    .filter(({ pr }) => {
+      if (errorsOnly && (pr.errors || []).length === 0) return false;
+      if (!q) return true;
+      const n = pr.normalized || {};
+      return [n.vin, n.year, n.make, n.model, n.title]
+        .some((v) => String(v ?? '').toLowerCase().includes(q));
+    });
 
   return (
     <div
@@ -511,6 +560,53 @@ const BulkImportLotsCSV = ({ open, onClose, eventId, fr, L, onImported }) => {
                 )}
               </div>
 
+              {/* iter449 — Review filters: search + Errors Only */}
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={L(
+                    'Search VIN, year, make, model or title…',
+                    'Rechercher NIV, année, marque, modèle ou titre…'
+                  )}
+                  className="flex-1 min-w-[220px] max-w-md px-2 py-1 border border-slate-300 rounded"
+                  data-testid="bulk-import-review-search"
+                />
+                <label
+                  className="inline-flex items-center gap-1 cursor-pointer select-none"
+                  data-testid="bulk-import-review-errors-only-label"
+                >
+                  <input
+                    type="checkbox"
+                    checked={errorsOnly}
+                    onChange={(e) => setErrorsOnly(e.target.checked)}
+                    data-testid="bulk-import-review-errors-only"
+                  />
+                  <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
+                  {L('Errors only', 'Erreurs uniquement')}
+                </label>
+                <span
+                  className="px-2 py-1 rounded bg-slate-100 text-slate-700"
+                  data-testid="bulk-import-review-match-count"
+                >
+                  {L(
+                    `Showing ${filteredRows.length} of ${preview.preview.length}`,
+                    `Affichage de ${filteredRows.length} sur ${preview.preview.length}`
+                  )}
+                </span>
+                {(searchQuery || errorsOnly) && (
+                  <button
+                    type="button"
+                    onClick={() => { setSearchQuery(''); setErrorsOnly(false); }}
+                    className="text-xs text-blue-600 hover:underline"
+                    data-testid="bulk-import-review-clear-filters"
+                  >
+                    {L('Clear filters', 'Effacer les filtres')}
+                  </button>
+                )}
+              </div>
+
               <div
                 className="overflow-x-auto border border-slate-200 rounded-lg"
                 data-testid="bulk-import-preview-table"
@@ -531,7 +627,21 @@ const BulkImportLotsCSV = ({ open, onClose, eventId, fr, L, onImported }) => {
                     </tr>
                   </thead>
                   <tbody>
-                    {preview.preview.map((pr, idx) => {
+                    {filteredRows.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={10}
+                          className="p-6 text-center text-slate-500 italic"
+                          data-testid="bulk-import-review-empty"
+                        >
+                          {L(
+                            'No rows match the current filters.',
+                            'Aucune ligne ne correspond aux filtres actuels.'
+                          )}
+                        </td>
+                      </tr>
+                    ) : filteredRows.map(({ pr, origIdx }) => {
+                      const idx = origIdx;
                       const errs = pr.errors || [];
                       const hasErrs = errs.length > 0;
                       const errsForField = (f) => errs.filter((e) => e.field === f);

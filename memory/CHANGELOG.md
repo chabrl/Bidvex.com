@@ -1,6 +1,49 @@
 # BidVex Changelog
 
 
+## Feb 8, 2026 — iter449 Vehicle Multi-Lot Bulk Import — Review Filters
+
+Small, focused enhancement to the **Review step ONLY** of the vehicle
+multi-lot bulk-import wizard (`components/vehicles/BulkImportLotsCSV.jsx`).
+
+### What changed
+- **Search box** filters rows by `vin`, `year`, `make`, `model`, or
+  `title` (case-insensitive substring, matches on the normalised
+  server preview values so it also finds edits made mid-review).
+- **Errors Only** checkbox restricts the visible rows to those with
+  at least one server-returned validation error.
+- **Match count** (`Showing X of Y`) reflects both filters live.
+- **Clear filters** shortcut when either filter is active.
+- Empty-state row is shown when the filters exclude everything.
+- **Live update on fix**: `editCell` now optimistically strips the
+  touched field's server error (plus batch- and cross-dealer-VIN
+  duplicate markers when the `vin` field is edited) from the local
+  `preview` snapshot. This means the row exits the Errors Only view
+  the instant the dealer types a valid value — no waiting for the
+  server round-trip. `refreshPreview` on blur still re-authoritatively
+  re-validates the row; if the fix is still bad the server-side
+  error is re-added.
+
+### Preserved (untouched by this iteration)
+- CSV parsing rules and column contract.
+- Server-side validation, atomic all-or-none confirm, capacity math.
+- Photo upload, publish-gating, 500-per-import and 500-per-event
+  limits, per-lot 20-photo cap.
+- Partner and Storage bulk imports.
+- Fee logic (5 % storage BP, all other fee tables).
+
+### Acceptance test (500-vehicle CSV with 5 intentionally-bad rows)
+- Initial state: `Showing 500 of 500` ✔
+- Errors Only ON → `Showing 5 of 500` (rows 10, 100, 200, 350, 450) ✔
+- Errors Only + search "Honda" → `Showing 1 of 500` (row 450:
+  2020 Honda F-150 with `starting_price=0`) ✔
+- Search "F-150" (no error filter) → `Showing 69 of 500` ✔
+- Fix bad VIN on row 10 while Errors Only is ON →
+  count drops to `Showing 4 of 500` immediately, edited value
+  persists in the input ✔
+- Bilingual EN/FR error pills still render on the filtered rows ✔
+
+
 ## Feb 8, 2026 — iter448 Vehicle Multi-Lot Bulk Import — Final Acceptance Test
 
 Full no-code acceptance sweep on the iter447 wizard at real pilot
