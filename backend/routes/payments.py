@@ -946,6 +946,13 @@ async def create_auction_checkout(
         # iter441 — Storage operators can set a per-listing BP rate; if
         # present (>0) it overrides the tier-based default.
         listing_bp_override = listing.get("custom_buyer_premium_rate")
+        # iter445 — Storage BP is FIXED at 5 % platform policy. Pass 0.05
+        # explicitly so any buyer-tier discount is bypassed.
+        if (
+            listing.get("category") == "storage_locker"
+            or listing.get("listing_type") == "storage_locker"
+        ):
+            listing_bp_override = 0.05
 
         breakdown = calculate_general_checkout(
             hammer_price=hammer_price,
@@ -1045,6 +1052,12 @@ async def preview_checkout_breakdown(
         # present (>0) it overrides the tier-based default in the
         # preview breakdown too.
         listing_bp_override = listing.get("custom_buyer_premium_rate")
+        # iter445 — Storage BP is FIXED at 5 % platform policy.
+        if (
+            listing.get("category") == "storage_locker"
+            or listing.get("listing_type") == "storage_locker"
+        ):
+            listing_bp_override = 0.05
 
         breakdown = calculate_general_checkout(
             hammer_price=hammer_price,

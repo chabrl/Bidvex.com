@@ -175,6 +175,18 @@ async def apply_partner_tags(db, current_user: User, listing_dict: Dict, buyers_
         listing_dict["is_verified_firm"] = False
         listing_dict["custom_buyer_premium_rate"] = buyers_premium_rate
 
+    # iter445 — Storage listings NEVER carry a per-listing BP override.
+    # The 5 % platform buyer's premium is fixed policy (iter443 fee-model
+    # flip). Any client-sent buyers_premium_rate on a storage_locker
+    # listing is silently discarded so `calculate_general_checkout`
+    # falls back to the fixed platform default.
+    if (
+        listing_dict.get("category") == "storage_locker"
+        or listing_dict.get("listing_type") == "storage_locker"
+    ):
+        listing_dict["custom_buyer_premium_rate"] = None
+        listing_dict.pop("buyers_premium_percent", None)
+
 
 async def persist_listing(db, listing_dict: Dict, agreement_metadata: Dict) -> Dict:
     """Insert a single-item listing into MongoDB and return the clean dict."""

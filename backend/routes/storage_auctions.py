@@ -1121,7 +1121,7 @@ async def create_storage_auction(
         "currency": (payload.currency or "CAD").upper(),
         "cleanup_deadline": cleanup_deadline.isoformat(),
         # iter216 P1 — Buyer's Premium captured at listing time
-        "buyer_premium_pct": float(payload.buyer_premium_pct or 0.0),
+        "buyer_premium_pct": 5.0,  # iter445 — FIXED platform BP (client override IGNORED)
         "accepted_legal_notice": bool(payload.accepted_legal_notice),
         "accepted_legal_notice_at": _now().isoformat() if payload.accepted_legal_notice else None,
         # iter219 — Visible Content Tags (optional bilingual content guide)

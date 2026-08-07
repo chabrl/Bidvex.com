@@ -470,8 +470,13 @@ const CreateListingPage = () => {
         price_multiplied_by_quantity: !isStorageLocker
           && (Math.max(1, parseInt(quantity) || 1) > 1)
           && !!priceMultipliedByQuantity,
-        // Convert percent → rate (e.g. 15 → 0.15), null if blank (org default applies server-side)
-        buyers_premium_rate: buyersPremiumPercent !== '' ? parseFloat(buyersPremiumPercent) / 100 : null,
+        // iter445 — Storage listings ignore any client-sent BP rate;
+        // server-side enforcement guarantees the fixed 5 % platform BP
+        // regardless of this field. For non-storage flows the field is
+        // still honored (partner override, iter441).
+        buyers_premium_rate: isStorageLocker
+          ? null
+          : (buyersPremiumPercent !== '' ? parseFloat(buyersPremiumPercent) / 100 : null),
         payment_method: paymentMethod,
         // Deposit (spec Feature 1) — disabled for storage_locker (native pre-auth holds replace this)
         requires_deposit: !isStorageLocker && requiresDeposit,
@@ -1123,10 +1128,23 @@ const CreateListingPage = () => {
                 <Label htmlFor="buyers_premium_percent">{t('createListing.buyersPremium', "Buyer's Premium (%)")}
                   <InfoTip en="A fee added to the winning bid, paid by the buyer. Standard: 5%. This covers platform services." fr="Des frais ajoutés à l'enchère gagnante, payés par l'acheteur. Standard: 5%. Cela couvre les services de la plateforme." />
                 </Label>
-                {/* iter441 — Storage facility operators can now also set a
-                    per-listing BP rate (0–25%). Falls back to the
-                    platform default (5%) when left blank. */}
-                {(isPartner || isStorageLocker) ? (
+                {/* iter441 — Storage facility operators previously could set
+                    a per-listing BP rate (0–25%). iter445 REMOVED this
+                    override — storage BP is now a fixed platform policy
+                    of 5 %. Partners keep the override; storage lockers
+                    now show a read-only fixed-5% notice instead. */}
+                {isStorageLocker ? (
+                  <p
+                    className="text-sm bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-900 text-emerald-800 dark:text-emerald-200 px-3 py-2 rounded flex items-center gap-2"
+                    data-testid="bp-storage-fixed-notice"
+                  >
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5">5%</span>
+                    {t(
+                      'createListing.buyersPremiumStorageFixed',
+                      "Fixed 5% buyer's premium — charged to the winning bidder on top of the hammer. Your facility receives the full hammer and is never charged."
+                    )}
+                  </p>
+                ) : isPartner ? (
                   <>
                     <Input
                       id="buyers_premium_percent"
@@ -1134,15 +1152,13 @@ const CreateListingPage = () => {
                       step="0.5"
                       min="0"
                       max="25"
-                      placeholder={t('createListing.buyersPremiumStoragePh', 'Leave blank for platform default (5%)')}
+                      placeholder={t('createListing.buyersPremiumPartnerPh', 'Leave blank for platform default (5%)')}
                       value={buyersPremiumPercent}
                       onChange={(e) => setBuyersPremiumPercent(e.target.value)}
                       data-testid="buyers-premium-input"
                     />
                     <p className="text-xs text-muted-foreground">
-                      {isStorageLocker
-                        ? t('createListing.buyersPremiumStorageHelp', 'Set the buyer\'s premium you charge on this specific storage unit auction. Leave blank to use the BidVex platform rate (5%). Max 25%.')
-                        : t('createListing.buyersPremiumPartnerHelp')}
+                      {t('createListing.buyersPremiumPartnerHelp')}
                     </p>
                   </>
                 ) : (

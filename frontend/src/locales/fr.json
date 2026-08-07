@@ -951,6 +951,8 @@
     "buyersPremiumPartnerHelp": "Exclusivité Partenaire : définissez la commission acheteur entre 0% et 25%.",
     "buyersPremiumStoragePh": "Laissez vide pour utiliser le taux par défaut (5 %)",
     "buyersPremiumStorageHelp": "Définissez la prime d'acheteur perçue sur cette annonce de casier de stockage. Laissez vide pour utiliser le taux par défaut de BidVex (5 %). Maximum : 25 %.",
+    "buyersPremiumStorageFixed": "Prime acheteur fixe de 5 % — facturée à l'enchérisseur gagnant en plus du prix marteau. Votre facilité reçoit le prix marteau complet et n'est jamais facturée.",
+    "buyersPremiumPartnerPh": "Laissez vide pour utiliser le taux par défaut (5 %)",
     "buyersPremiumLockedNotice": "La commission acheteur est exclusive aux Partenaires. Devenez Partenaire pour la personnaliser.",
     "storageLockerOption": "📦 Casier de stockage / Unité abandonnée",
     "storageLockerDesc": "Pour les enchères de vidange de centres de libre-entreposage — l'unité entière se vend comme un seul lot. L'acheteur doit vider tout le contenu avant la date limite.",

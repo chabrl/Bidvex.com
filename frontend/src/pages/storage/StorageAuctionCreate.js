@@ -44,10 +44,9 @@ const StorageAuctionCreate = () => {
     cleanup_deadline_hours: 72,
     // ── Payment method (single) ──
     payment_method: 'stripe',
-    // ── iter216 P1 — Buyer's Premium (optional). Default 0% means the
-    // facility absorbs the full BidVex 5% commission. Setting BP passes
-    // some/all of that to the buyer.
-    buyer_premium_pct: 0,
+    // ── iter445 — Storage buyer's premium is FIXED at 5 % (platform policy).
+    // The field is no longer configurable by facilities; server ignores
+    // any client-sent value.
     // ── iter216 P1 — Legal-notice confirmation (mandatory before publish) ──
     accepted_legal_notice: false,
     // ── Currency (Spec Global Rule 1) ──
@@ -146,8 +145,8 @@ const StorageAuctionCreate = () => {
         currency: (form.currency || 'CAD').toUpperCase(),
         start_time: new Date(form.start_time).toISOString(),
         end_time: new Date(form.end_time).toISOString(),
-        // iter216 P1 — Buyer's Premium (0–20 % range enforced on input)
-        buyer_premium_pct: parseFloat(form.buyer_premium_pct) || 0,
+        // iter445 — Buyer's premium is fixed platform policy (5 %); not
+        // sent from the client. Server stamps the value regardless.
       };
       const res = await axios.post(`${API}/storage-facilities/auctions`, payload, {
         headers: { Authorization: `Bearer ${token}` },
@@ -432,36 +431,27 @@ const StorageAuctionCreate = () => {
               </div>
             </div>
 
-            {/* iter216 P1 — Buyer's Premium (BP) */}
+            {/* iter445 — Storage buyer's premium is FIXED PLATFORM POLICY.
+                The facility no longer chooses or overrides this rate; the
+                winning bidder always pays a flat 5 % on top of the hammer.
+                Kept as a read-only informational badge so operators
+                understand the fee model. */}
             <div className="rounded-lg border-2 border-blue-200 dark:border-blue-900 bg-blue-50/40 dark:bg-blue-950/20 p-4 space-y-2" data-testid="bp-section">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <Label className="text-sm font-semibold">
-                  {isFr ? "Prime de l'acheteur (PA / BP)" : "Buyer's Premium (BP)"}
+                  {isFr ? "Prime acheteur (fixe)" : "Buyer's Premium (fixed)"}
                 </Label>
-                <span className="text-xs text-muted-foreground">
-                  {isFr ? 'Optionnel — défaut 0 %' : 'Optional — default 0%'}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Input
-                  type="number"
-                  min="0"
-                  max="20"
-                  step="0.5"
-                  className="max-w-[100px]"
-                  value={form.buyer_premium_pct}
-                  onChange={e => set('buyer_premium_pct', Math.max(0, Math.min(20, parseFloat(e.target.value) || 0)))}
-                  data-testid="bp-input"
-                />
-                <span className="text-sm font-medium">%</span>
-                <span className="text-xs text-muted-foreground">
-                  {isFr ? "ajouté au prix marteau" : "added on top of the winning bid"}
+                <span
+                  className="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200 text-xs font-bold px-2 py-1"
+                  data-testid="bp-fixed-badge"
+                >
+                  5%
                 </span>
               </div>
               <p className="text-[11px] text-blue-800 dark:text-blue-300 leading-relaxed">
                 ℹ️ {isFr
-                  ? "BidVex facture à votre établissement 5 % de commission. Vous pouvez transférer une partie ou la totalité de ces frais à l'acheteur via la Prime de l'acheteur. Exemple : fixez 5 % de PA pour atteindre l'équilibre."
-                  : "BidVex charges your facility 5% commission. You may pass some or all of this to the buyer via Buyer's Premium. Example: set 5% BP to break even."}
+                  ? "BidVex facture 5 % à l'acheteur gagnant en plus du prix marteau. Votre facilité reçoit le prix marteau complet et n'est jamais facturée."
+                  : "BidVex charges the winning buyer a flat 5% on top of the hammer price. Your facility receives the full hammer price and is never charged."}
               </p>
             </div>
 

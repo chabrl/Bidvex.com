@@ -95,10 +95,16 @@ class StorageAuctionCreate(BaseModel):
     # ── CURRENCY (Spec Global Rule 1) ──
     currency: str = Field(default="CAD")  # "CAD" | "USD"
 
-    # ── iter216 P1 — Optional Buyer's Premium (0–20 %) charged on top of the
-    # hammer price. Default 0 means the facility absorbs the BidVex 5%
-    # commission entirely. Setting BP passes some/all to the buyer.
-    buyer_premium_pct: float = Field(default=0.0, ge=0.0, le=20.0)
+    # ── iter445 — Storage buyer's premium is now a FIXED PLATFORM RATE ──
+    # 5 % of the hammer price is charged to the WINNING BUYER on top of
+    # the hammer. The facility receives the FULL hammer and is NEVER
+    # invoiced (see iter443 fee-model flip). This field is intentionally
+    # NOT part of the create/update payload — any value sent by the
+    # client is silently ignored. Kept in the DB doc for read-only
+    # backward compat (always stamped to 5.0 by the route handler).
+    # Legacy: prior to iter445 this was a facility-configurable 0–20 %
+    # override; existing rows are reconciled by
+    # scripts/iter445_reconcile_storage_bp.py.
 
     # ── iter216 P1 — Legal-notice confirmation (required before publish) ──
     accepted_legal_notice: bool = False

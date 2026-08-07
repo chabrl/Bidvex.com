@@ -1079,6 +1079,14 @@ async def checkout_fee_breakdown(
         # iter441 — Storage operators can set a per-listing BP rate; the
         # /checkout-breakdown preview must honor it too.
         listing_bp_override = listing.get("custom_buyer_premium_rate")
+        # iter445 — Storage buyer's premium is FIXED at 5 % platform policy.
+        # Pass 0.05 explicitly to override any buyer-tier discount that
+        # would otherwise reduce it (e.g. vip_elite → 3.75 %).
+        if (
+            listing.get("category") == "storage_locker"
+            or listing.get("listing_type") == "storage_locker"
+        ):
+            listing_bp_override = 0.05
         breakdown = calculate_standard_checkout(hammer_price, buyer_tier, custom_buyer_premium_rate=listing_bp_override)
         breakdown["fee_model"] = "standard"
     

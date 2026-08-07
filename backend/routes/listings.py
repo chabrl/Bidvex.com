@@ -1036,6 +1036,18 @@ async def update_listing(listing_id: str, updates: Dict[str, Any], current_user:
                 )
             update_data["custom_buyer_premium_rate"] = _bp_f
 
+    # iter445 — Storage listings are locked to the fixed 5 % platform BP.
+    # Any client-sent BP override on a storage_locker listing is silently
+    # discarded so `calculate_general_checkout` uses the fixed default.
+    _is_storage = (
+        listing.get("category") == "storage_locker"
+        or listing.get("listing_type") == "storage_locker"
+        or update_data.get("category") == "storage_locker"
+        or update_data.get("listing_type") == "storage_locker"
+    )
+    if _is_storage and "custom_buyer_premium_rate" in update_data:
+        update_data["custom_buyer_premium_rate"] = None
+
     # iter250 — Sanitize broker-supplied HTML in description fields BEFORE
     # persistence (UPDATE path).
     from services.html_sanitizer import sanitize_user_html, sanitize_inline
