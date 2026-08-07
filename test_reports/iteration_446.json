@@ -1,0 +1,48 @@
+{
+  "summary": "Iter446 Storage Bulk Import wizard frontend testing — end-to-end sweep of the 5-step CSV import flow at /storage-auctions/bulk-import as verified admin (Bidvex Inc., QC). All happy-path and error scenarios rendered correctly. Wizard rendering, template download (fixed columns, no buyer_premium / no accepted_legal_notice), CSV validation (bilingual per-cell error pills), duplicate detection (both in-batch and cross-facility open drafts), legal-notice gate, draft creation, Photo Studio and publish CTA all work. Bilingual toggle showed one gap (see below).",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Language toggle from bulk-import wizard",
+        "issue": "Clicking the FR button in the navbar while on /storage-auctions/bulk-import redirects away from the page (page shows footer only, three 'Enchère introuvable' toasts fire from auction lookup calls). User loses their upload/preview state. The rest of the site works in FR (navbar/footer translate), but the wizard itself gets navigated off. Setting localStorage.bidvex_language='fr' alone before load also does NOT switch the wizard to FR — the app's i18n detector uses a different storage key, so the header/steps/pills stay in EN. Only the FR route redirect switches i18n.language.",
+        "affected_selectors": ["nav FR toggle", "storage-bulk-import-page"]
+      }
+    ],
+    "design_issues": []
+  },
+  "verified_scenarios": {
+    "wizard_render": "page-testid + stepper visible on load",
+    "step1_template_columns": "column preview text has NO 'buyer_premium' and NO 'accepted_legal_notice'",
+    "csv_download": "Downloaded CSV header contains all 19 required columns; NO buyer_premium; NO accepted_legal_notice",
+    "step2_reject_non_csv": "toast: 'Only CSV files are accepted.'",
+    "step2_reject_missing_columns": "toast: 'Missing required columns: description_en, end_time, start_time, starting_price, unit_type. Download the template.'",
+    "step2_reject_over_50_rows": "toast: 'Maximum 50 rows per import. Your file has 51.'",
+    "step3_per_cell_errors": "Observed pills: unit_size_invalid, bill96_description_fr_required, past_due_required_for_lien, deposit_amount_required, end_before_start, description_en_too_short",
+    "step3_duplicate_in_batch": "duplicate_unit_in_batch pill surfaces on the 2nd occurrence within a single upload",
+    "step3_duplicate_in_facility": "Re-uploading the same valid CSV after creating drafts surfaces 2 'duplicate_unit_in_facility' pills on the unit_number cells (with #short-id link)",
+    "step3_legal_gate": "Confirm button is disabled until storage-legal-notice-checkbox is checked; becomes enabled after check",
+    "step3_confirm_success": "Creates 2 drafts, advances to Photo Studio",
+    "step5_photo_studio": "Drafts render as storage-draft-card-<id>, each with red 'Needs 1 photo' pill; unmatched-list section present",
+    "storage_auctions_create_cta": "storage-bulk-import-cta present in /storage-auctions/create header",
+    "auth_guard_unauthenticated": "Visiting /storage-auctions/bulk-import while unauthenticated redirects to /auth (login)"
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Minor: Make the FR/EN navbar toggle preserve the current /storage-auctions/bulk-import route instead of redirecting to /fr/marketplace (or wherever). Also, consider syncing the wizard's isFr with the bidvex_language localStorage key so the QA note in the brief ('Set localStorage bidvex_language=fr') works without a toggle click."
+  ],
+  "critical_code_review_comments": [
+    "StorageBulkImportPage.js line 271: useEffect has empty dep array; if the auth token loads asynchronously the initial /pending call may fire before token is available. Not blocking (silent catch) but the returning-user pending queue may not repopulate on first paint for slower auth hydration.",
+    "StorageBulkImportPage.js: on confirm-error path (line 197) the code overwrites row errors with just the server-returned ones — any client-side per-cell errors already visible are wiped. Small UX regression risk but acceptable since server is source of truth.",
+    "StorageBulkReviewTable.jsx: t = useTranslation().t is imported but unused; can remove.",
+    "The 'FR' language toggle behaviour on this deep route needs to preserve context (see integration issue)."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "n/a (frontend-only)", "frontend": "95%" },
+  "test_credentials": "charbel911@gmail.com / Anderosli123!@# — verified QC facility owner (Bidvex Inc.). iter446_notfacility@test.com credentials NOT verified (login attempts for testbuyer@bidvex.com returned 401 in this environment, so non-facility 403 UI path was not exercised through the browser; unauthenticated redirect to /auth was verified).",
+  "seed_data_creation": "Two draft storage auctions created for facility_id=3dcb79f8-361c-4841-a918-f141470dd37d with unit_number prefix 'TESTF17793-U1', 'TESTF17793-U2' (source='csv_bulk_import', status='draft'). Neither published (no photo attached). Recommend main agent run cleanup: db.storage_auctions.updateMany({facility_id:'3dcb79f8-361c-4841-a918-f141470dd37d', unit_number:{$regex:'^TESTF'}}, {$set:{status:'cancelled'}}).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Wizard fully functional. Bilingual pill/legal text is rendered via isFr flag driven by i18next; UI FR translation for the wizard itself was not visible during this test because the navbar FR toggle navigates the user off the bulk-import route. If you want to verify FR text in-place, either (a) log in with a user whose preferred_language is fr so i18n boots to fr, or (b) run `await page.evaluate(\"() => window.i18next && window.i18next.changeLanguage('fr')\")` after the wizard loads."
+}

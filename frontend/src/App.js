@@ -122,6 +122,7 @@ const MyCleanoutsPage = lazy(() => import('./pages/storage/MyCleanoutsPage'));
 const FacilityDashboard = lazy(() => import('./pages/facility/FacilityDashboard'));
 const FacilityPublicProfile = lazy(() => import('./pages/facility/FacilityPublicProfile'));
 const StorageAuctionCreate = lazy(() => import('./pages/storage/StorageAuctionCreate'));
+const StorageBulkImportPage = lazy(() => import('./pages/StorageBulkImportPage'));
 const StorageHowItWorks = lazy(() => import('./pages/storage/StoragePolicies').then(m => ({ default: m.HowItWorks })));
 const StorageTerms = lazy(() => import('./pages/storage/StoragePolicies').then(m => ({ default: m.StorageTerms })));
 const StorageForFacilities = lazy(() => import('./pages/storage/StoragePolicies').then(m => ({ default: m.StorageForFacilities })));
@@ -1025,6 +1026,10 @@ const App = () => {
           } />
           <Route path="/storage-auctions/create" element={
             <ProtectedRoute><StorageAuctionCreate /></ProtectedRoute>
+          } />
+          {/* iter446 — Storage Facility CSV Bulk Import (5-step wizard) */}
+          <Route path="/storage-auctions/bulk-import" element={
+            <ProtectedRoute><StorageBulkImportPage /></ProtectedRoute>
           } />
           <Route path="/storage-dashboard" element={
             <ProtectedRoute><StorageDashboard /></ProtectedRoute>

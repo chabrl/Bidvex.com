@@ -1647,6 +1647,10 @@ try:
     from routes.storage_auctions import storage_router
     api_router.include_router(storage_router)
 
+    # iter446 — Storage Facility CSV Bulk Import (5-step wizard, draft-only, photo-gated)
+    from routes.storage_bulk_import import storage_bulk_import_router
+    api_router.include_router(storage_bulk_import_router)
+
     # Admin Payment Charges (strict payment system observability)
     from routes.admin_charges import admin_charges_router
     api_router.include_router(admin_charges_router)

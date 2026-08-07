@@ -13,7 +13,7 @@ import { Textarea } from '../../components/ui/textarea';
 import { Checkbox } from '../../components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { toast } from 'sonner';
-import { Loader2, Upload, ImagePlus } from 'lucide-react';
+import { Loader2, Upload, ImagePlus, FileSpreadsheet } from 'lucide-react';
 
 const API = API_BASE;
 const SIZES = ['5x5', '5x10', '10x10', '10x15', '10x20', '10x30+'];
@@ -170,13 +170,26 @@ const StorageAuctionCreate = () => {
             <h1 className="text-2xl font-bold mb-1">{t('storage.create.createNewAuction')}</h1>
             <p className="text-sm text-muted-foreground">{t('storage.create.listANewStorageUnitForAuction')}</p>
           </div>
-          {/* iter313 — Universal Save-as-Draft, visible at every step */}
-          <SaveAsDraftButton
-            type="storage"
-            formData={form}
-            draftId={form.draft_id || null}
-            onSaved={(id) => set('draft_id', id)}
-          />
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* iter446 — Storage Facility CSV Bulk Import shortcut */}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => navigate('/storage-auctions/bulk-import')}
+              className="border-cyan-500 text-cyan-700 hover:bg-cyan-50"
+              data-testid="storage-bulk-import-cta"
+            >
+              <FileSpreadsheet className="h-4 w-4 mr-2" />
+              {isFr ? 'Importer plusieurs unités (CSV)' : 'Bulk import units (CSV)'}
+            </Button>
+            {/* iter313 — Universal Save-as-Draft, visible at every step */}
+            <SaveAsDraftButton
+              type="storage"
+              formData={form}
+              draftId={form.draft_id || null}
+              onSaved={(id) => set('draft_id', id)}
+            />
+          </div>
         </div>
         <Card className="p-6">
           <form onSubmit={submit} className="space-y-4">
