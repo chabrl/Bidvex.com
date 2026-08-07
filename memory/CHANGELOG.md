@@ -1,6 +1,114 @@
 # BidVex Changelog
 
 
+## Feb 8, 2026 — iter447 Vehicle Dealer Multi-Lot CSV Bulk Import
+
+Rewrite of iter306 to give verified vehicle dealers a **proper 4-step
+CSV bulk import wizard** for Multi-Lot Auctions, matching the Partner
+(iter444) / Storage (iter446) UX contract: draft-only, photo-gated
+publish, per-cell bilingual errors, and full capacity math for
+repeat imports into the same event.
+
+### Backend — `routes/multi_lot_bulk_import.py` (rewritten module)
+
+7 endpoints, all mounted under `/api/vehicle-multi-lot-auctions/{event_id}/…`:
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET  | `.../bulk-import/capacity` | `{ used, max, remaining, editable }` — remaining vehicle capacity in the event |
+| GET  | `.../bulk-import/template` | Fixed CSV template with 2 example rows (Toyota Camry ON + Ford F-150 QC) |
+| POST | `.../bulk-import/preview` | Validate every row + surface duplicate-VIN conflicts; NO writes |
+| POST | `.../bulk-import/confirm` | ATOMIC create — all rows or none |
+| POST | `.../bulk-import` (legacy iter306) | Passthrough to `confirm` for older clients |
+
+**Rules**:
+- **500 rows per import**, **500 vehicles per event** total (repeat
+  imports honour remaining capacity; `200 existing + 300 upload` OK;
+  `200 + 350` blocked with `code="capacity_exceeded"`).
+- **ATOMIC** — a single row error blocks the whole batch. Nothing is
+  written. Preview returns per-cell errors + capacity_exceeded flag.
+- **Per-cell bilingual errors** with `{row, field, code, message_en,
+  message_fr}`. Codes: `vin_required`, `vin_length_invalid`,
+  `vin_charset_invalid`, `year_out_of_range`, `make_required`,
+  `model_required`, `starting_price_required`, `starting_price_not_positive`,
+  `starting_price_too_high`, `reserve_below_starting`,
+  `bid_increment_too_low`, `city_required`, `province_required`,
+  `province_invalid`, `title_required`, `bill96_title_fr_required`,
+  `mileage_negative`, `mileage_not_integer`.
+- **VIN duplicate detection** in three scopes:
+  1. within the uploaded batch (`duplicate_vin_in_batch`);
+  2. lots already in this event (`duplicate_vin_across_dealer`);
+  3. lots in any of the dealer's OTHER open multi-lot events + open
+     single-vehicle listings (`duplicate_vin_across_dealer`, includes
+     `conflict.event_id` for a link icon in the UI).
+  Ended / cancelled / sold auctions do NOT block reuse.
+- **Bill 96**: `title_fr` required whenever `location_province="QC"`.
+- All bulk-imported lots land as `status="draft_no_photos"`.
+
+**Photo-gate on `POST /activate`** (`routes/vehicle_multi_lot.py`):
+The event cannot go live if ANY lot has `media.length < 1`. Returns
+400 with `code="lots_missing_photos"`, count, and a bilingual message.
+
+### Frontend
+
+- **`components/vehicles/BulkImportLotsCSV.jsx`** — rewritten 4-step
+  modal wizard: Upload → Review → Photos → Done.
+  - Capacity chip in the header (`X / 500 used — Y remaining`).
+  - Client-side PapaParse + friendly column aliases (`price` →
+    `starting_price`, `city` → `location_city` etc.).
+  - Live server preview with per-cell bilingual error pills; edit
+    inline, blur re-runs the preview.
+  - Import button disabled unless `preview.can_import === true`.
+  - After successful confirm, wizard advances to Step 3 (Photo Studio).
+  - Fixed **iter306 legacy bug**: parent `handleImported` no longer
+    navigates away — the wizard now owns navigation from confirm →
+    Photo Studio → Go Live.
+- **`components/vehicles/VehicleBulkPhotoStudio.jsx`** — new Photo
+  Studio: drag-drop group upload, per-photo `POST` to
+  `/vehicle-multi-lot-auctions/{event_id}/lots/{lot_id}/photos`,
+  fuzzy filename → VIN auto-match, unmatched tray with manual
+  assignment. Per-lot pill shows red "Needs 1 photo" / green
+  "N / 20". Retains the existing **20-photo cap per lot**.
+- **`components/vehicles/vinPhotoMatcher.js`** — pure-function
+  matcher (Jest-tested):
+  1. Full 17-char VIN substring wins.
+  2. Last-8 suffix — only when EXACTLY ONE lot in the batch has that
+     suffix.
+  3. Last-6 suffix — same unambiguity rule.
+  4. **NO stock-number fallback** (per user directive: a wrong
+     automatic match is worse than requiring manual assignment).
+  Anything ambiguous or unrecognised lands in the Unmatched tray.
+
+### Tests
+
+- **`backend/tests/test_iter447_multi_lot_bulk_import.py`** — 21 pytest
+  cases covering: capacity math (`200 + 300` vs `200 + 350`), template,
+  ATOMIC all-or-none, VIN charset + length, Bill 96 title_fr, all
+  three VIN duplicate scopes, repeat imports up to 500-cap, photo-gate
+  on activate (blocked when any lot missing photos → 400 → succeeds
+  after photos injected), legacy iter306 endpoint still works,
+  non-owner 403. **21/21 passing.**
+- **`frontend/src/components/vehicles/VehicleBulkPhotoStudio.test.js`**
+  — 11 Jest cases for `matchByVin`: full-VIN, unambiguous last-8,
+  unambiguous last-6, AMBIGUOUS last-8 → null, AMBIGUOUS last-6 →
+  null, stock-number → null, random → null. **11/11 passing.**
+- Frontend E2E via `testing_agent_v3_fork` — reported 70% on first
+  pass (Steps 1 & 2 fully OK; Steps 3-4 blocked by a bug in the
+  parent's `handleImported` calling `navigate()` after import). Bug
+  fixed same iteration; Photo Studio + publish gate then verified
+  by main-agent smoke screenshot showing capacity chip
+  `2 / 500 used — 498 remaining`, per-lot red "Needs 1 photo" pills,
+  and disabled "Go Live (2 lot(s) need a photo)" button.
+
+### Explicit non-goals (untouched)
+
+- Partner CSV import (`/api/partner-pro/bulk-import/*`)
+- Storage CSV import (`/api/storage-facilities/bulk-import/*`)
+- Fee tables, buyer's-premium math
+- Auction bidding logic
+- Existing live listings
+
+
 ## Feb 8, 2026 — iter446 Storage Facility CSV Bulk Import
 
 New 5-step wizard for **verified storage facilities** to bulk-import up to

@@ -1,6 +1,32 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter447 — Vehicle Dealer Multi-Lot CSV Bulk Import (Feb 8, 2026) ✅ COMPLETE
+
+**Delivered**: Rewrote the iter306 stub into a proper 4-step wizard (Upload → Review → Photos → Done) for verified vehicle dealers to bulk-import up to **500 vehicles per CSV** into a Multi-Lot Auction event. Same UX contract as Partner (iter444) / Storage (iter446): atomic all-or-none, draft-only, photo-gated Go Live.
+
+**Backend** (`routes/multi_lot_bulk_import.py`, rewritten):
+- `GET  /api/vehicle-multi-lot-auctions/{event_id}/bulk-import/capacity`
+- `GET  /api/vehicle-multi-lot-auctions/{event_id}/bulk-import/template`
+- `POST /api/vehicle-multi-lot-auctions/{event_id}/bulk-import/preview`
+- `POST /api/vehicle-multi-lot-auctions/{event_id}/bulk-import/confirm`
+- `POST /api/vehicle-multi-lot-auctions/{event_id}/bulk-import` (legacy iter306 passthrough)
+- `POST /api/vehicle-multi-lot-auctions/{event_id}/activate` — added photo-gate
+
+**Rules**: 500 rows per import + 500 total per event. Atomic. Per-cell bilingual errors. VIN duplicate detection across 3 scopes (batch, same event, dealer's other open events + single-vehicle listings). Bill 96 title_fr for QC lots. All lots land as `draft_no_photos`. Go Live refuses if any lot has `media.length < 1`. Retains 20-photo cap per lot.
+
+**Frontend**:
+- `components/vehicles/BulkImportLotsCSV.jsx` — 4-step modal wizard, capacity chip, per-cell bilingual error pills, atomic confirm.
+- `components/vehicles/VehicleBulkPhotoStudio.jsx` — drag-drop VIN auto-match + Unmatched tray + red/green per-lot photo pill.
+- `components/vehicles/vinPhotoMatcher.js` — pure matcher (VIN-only, unambiguous last-8 / last-6, NO stock-number fallback).
+- `pages/vehicles/CreateVehicleMultiLotPage.js` — `handleImported` no longer navigates away (the fix that lets the wizard advance to Step 3/4).
+
+**Tests**: `test_iter447_multi_lot_bulk_import.py` 21/21 pytest + `VehicleBulkPhotoStudio.test.js` 11/11 Jest. Frontend E2E via testing agent flagged one parent-page navigate() bug — fixed and re-verified by smoke screenshot showing capacity chip, red/green pills, and disabled "Go Live (N lot(s) need a photo)".
+
+**Explicit non-goals**: Partner imports, Storage imports, fee rules, bidding, existing live listings — all UNTOUCHED.
+
+
+
 ## iter446 — Storage Facility CSV Bulk Import (Feb 8, 2026) ✅ COMPLETE
 
 **Delivered**: New 5-step wizard for verified storage facilities to bulk-import up to **50 storage-unit auctions per batch** at `/storage-auctions/bulk-import`, mirroring the Partner Bulk Import contract from iter444.

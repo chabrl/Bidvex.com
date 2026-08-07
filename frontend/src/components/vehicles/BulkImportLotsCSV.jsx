@@ -636,6 +636,14 @@ const BulkImportLotsCSV = ({ open, onClose, eventId, fr, L, onImported }) => {
                   'Tous les lots sont maintenant disponibles pour les enchérisseurs.'
                 )}
               </p>
+              <a
+                href={`/vehicle-multi-lot/${eventId}`}
+                className="inline-flex items-center gap-1 mt-4 text-blue-600 hover:underline text-sm"
+                data-testid="bulk-import-view-event-link"
+              >
+                {L('View event page', "Voir la page de l'événement")}
+                <ChevronRight className="h-4 w-4" />
+              </a>
             </div>
           )}
         </div>

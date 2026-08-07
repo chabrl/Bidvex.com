@@ -714,12 +714,15 @@ const CreateVehicleMultiLotPage = () => {
     }
   };
 
-  // After successful import, navigate to the created event so dealer can add photos
-  const handleImported = (data) => {
-    const eventId = data?.event_id || draftEventId;
-    if (eventId) {
-      navigate(`/vehicle-multi-lot/${eventId}`);
-    }
+  // iter447 — After a successful bulk import, the BulkImportLotsCSV modal
+  // advances internally to Step 3 (Vehicle Photo Studio) and Step 4
+  // (post Go Live). Do NOT navigate away here — that would unmount the
+  // wizard and skip the Photo Studio + publish gate. We only refresh
+  // any local counters so surrounding UI (lot count etc.) stays in
+  // sync; the wizard owns navigation from this point.
+  const handleImported = (_data) => {
+    // Intentionally left as a no-op regarding routing.
+    // The wizard's Step 3 → Step 4 handles the rest.
   };
 
   if (wizard) {
