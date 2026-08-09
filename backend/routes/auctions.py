@@ -608,7 +608,16 @@ async def process_ended_auctions():
             # Process each lot's winner
             for lot in auction.get("lots", []):
                 winner_id = lot.get("highest_bidder_id")
-                lot_final = float(lot.get("current_price", 0) or 0)
+                # iter451 — Compute the actual buyer-owed merchandise total
+                # for this lot. For per-unit lots (unit=$7, qty=2,
+                # multiply_hammer_by_quantity=True on the parent OR the
+                # lot), `lot_final = $14`, not `$7`. Preserves total-lot
+                # pricing and qty=1 behaviour.
+                from services.hammer_total import resolve_hammer_total
+                _lot_totals = resolve_hammer_total(auction, lot=lot)
+                lot_final = float(_lot_totals["hammer_total"])
+                lot_unit_price = float(_lot_totals["unit_price"])
+                lot_quantity = int(_lot_totals["quantity"])
                 lot_title = f"{auction.get('title', 'Auction')} — Lot #{lot.get('lot_number','?')}"
                 # Persist lot winner on the document for dashboard counters
                 try:
@@ -617,6 +626,11 @@ async def process_ended_auctions():
                         {"$set": {
                             "lots.$.winner_user_id": winner_id,
                             "lots.$.final_price": lot_final,
+                            # iter451 — Stamp per-unit + qty so invoices
+                            # can render `unit × qty = line_total` from
+                            # the actual winning lot data.
+                            "lots.$.winning_unit_price": lot_unit_price,
+                            "lots.$.winning_quantity": lot_quantity,
                             "lots.$.sold_at": now_str if winner_id else None,
                             "lots.$.status": "sold" if winner_id else "ended",
                         }},

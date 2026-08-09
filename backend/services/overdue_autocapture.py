@@ -40,7 +40,11 @@ def _parse(v):
 
 
 def _buyer_total(listing: Dict[str, Any]) -> float:
-    hammer = float(listing.get("final_price") or listing.get("current_price") or 0)
+    # iter451 — Use the shared merchandise-total resolver so multi-item
+    # per-unit listings (unit=$7, qty=2) auto-capture the correct $14
+    # base, not $7. Preserves total-lot pricing / qty=1 behaviour.
+    from services.hammer_total import resolve_hammer_total
+    hammer = float(resolve_hammer_total(listing)["hammer_total"])
     platform_fee = round(hammer * 0.025, 2)
     penalty = float(listing.get("late_penalty_amount") or 0)
     return round(hammer + platform_fee + penalty, 2)
@@ -316,7 +320,8 @@ async def process_overdue_autocapture(db) -> Dict[str, Any]:
                               "payment_last_attempt_at": now.isoformat(),
                               "payment_recovered_at": now.isoformat()},
                      "$unset": {"late_penalty_rate": "", "overdue_notified": ""}})
-                hammer = float(listing.get("final_price") or listing.get("current_price") or 0)
+                from services.hammer_total import resolve_hammer_total as _rht
+                hammer = float(_rht(listing)["hammer_total"])
                 from services.payment_collection import finalize_auction_payment
                 await finalize_auction_payment(
                     db, listing=listing, collection=collection,

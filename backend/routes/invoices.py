@@ -275,24 +275,43 @@ async def generate_lots_won_invoice(
         }
         await db.paddle_numbers.insert_one(paddle_record)
     
-    # Find lots won by this buyer
-    # For MVP, we'll use lots from the auction that have bids from this user
-    # In production, you'd track winning bids
-    
-    # For demo purposes, let's use first 3 lots as "won"
+    # iter451 — Invoice must reflect ACTUAL lots this buyer won, never
+    # placeholder "first N" lots. A lot is "won by this buyer" when its
+    # `winner_user_id` (or `highest_bidder_id`, legacy) matches user_id
+    # AND its status is `sold`. Each line renders `unit_price × quantity
+    # = line_total` so the template can display the multi-item math
+    # exactly (per user directive: `$7 × 2 = $14`).
+    from services.hammer_total import resolve_hammer_total
+
     lots_won = []
-    for lot in auction['lots'][:3]:  # Demo: first 3 lots
+    for lot in auction.get('lots', []):
+        lot_winner = (
+            lot.get("winner_user_id")
+            or lot.get("winner_id")
+            or lot.get("highest_bidder_id")
+        )
+        if lot_winner != user_id:
+            continue
+        # Skip lots that never resolved to a sale.
+        if lot.get("status") and lot.get("status") not in ("sold", "won"):
+            continue
+        totals = resolve_hammer_total(auction, lot=lot)
         lots_won.append({
-            "lot_number": lot['lot_number'],
-            "title": lot['title'],
-            "description": lot['description'],
-            "quantity": lot['quantity'],
-            "hammer_price": lot['current_price']  # Use current_price as hammer price
+            "lot_number": lot.get('lot_number'),
+            "title": lot.get('title') or "",
+            "description": lot.get('description') or "",
+            "quantity": totals["quantity"],
+            "unit_price": totals["unit_price"],
+            # `hammer_price` on the invoice line = unit_price × quantity
+            # so `sum(hammer_price)` at template level equals the
+            # buyer-owed merchandise subtotal.
+            "hammer_price": totals["hammer_total"],
+            "line_total": totals["hammer_total"],
         })
-    
+
     if not lots_won:
         raise HTTPException(status_code=400, detail="No lots won by this buyer")
-    
+
     # Calculate fees using the Unified Fee Engine
     buyer_subscription = buyer.get('subscription_tier', 'free')
     hammer_total = sum(lot['hammer_price'] for lot in lots_won)

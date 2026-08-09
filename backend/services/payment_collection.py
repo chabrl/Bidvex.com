@@ -292,21 +292,22 @@ async def finalize_auction_payment(
             or listing.get("winning_bidder_id") or listing.get("highest_bidder_id")
         )
         seller_id = listing.get("seller_id") or listing.get("facility_owner_id")
-        # iter312 — quantity multiplier (see docstring). Clamp to >=1
-        # because zero/null silently zero-outs the entire transaction.
-        try:
-            quantity_raw = listing.get("quantity_won") or listing.get("quantity") or 1
-            quantity = max(1, int(quantity_raw))
-        except (TypeError, ValueError):
-            quantity = 1
+        # iter312 → iter451 — Delegate to shared resolver.
+        # `hammer_override` still wins when the caller has already
+        # computed the final total (e.g. multi-item lot flow in
+        # routes/auctions.py passes the pre-multiplied lot_final).
         if hammer_override is not None:
             hammer = float(hammer_override)
+            try:
+                quantity_raw = listing.get("quantity_won") or listing.get("quantity") or 1
+                quantity = max(1, int(quantity_raw))
+            except (TypeError, ValueError):
+                quantity = 1
         else:
-            unit = float(
-                listing.get("final_price") or listing.get("current_price")
-                or listing.get("current_bid") or 0
-            )
-            hammer = round(unit * quantity, 2)
+            from services.hammer_total import resolve_hammer_total
+            _mt = resolve_hammer_total(listing)
+            hammer = float(_mt["hammer_total"])
+            quantity = int(_mt["quantity"])
         if not winner_id or hammer <= 0:
             return out
 

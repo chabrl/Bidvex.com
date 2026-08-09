@@ -752,11 +752,17 @@ async def settle_auction(
         or listing.get("highest_bidder_id")
     )
     seller_id = listing.get("seller_id")
-    hammer_price = float(
-        listing.get("final_price")
-        or listing.get("current_price")
-        or listing.get("starting_price", 0)
-    )
+    # iter451 — Single source of truth for the merchandise total. Uses
+    # `resolve_hammer_total` so a per-unit multi-item lot (unit=$7, qty=2,
+    # multiply_hammer_by_quantity=True) correctly resolves to $14 instead
+    # of leaking through as $7. Preserves existing behaviour for
+    # total-lot pricing, quantity=1, pre-multiplied prices, and Buy Now
+    # (which never enters this settlement path).
+    from services.hammer_total import resolve_hammer_total
+    _mt = resolve_hammer_total(listing)
+    hammer_price = float(_mt["hammer_total"])
+    winning_unit_price = float(_mt["unit_price"])
+    winning_quantity = int(_mt["quantity"])
     currency = (listing.get("currency") or "CAD").upper()
     end_dt = listing.get("auction_end_date") or listing.get("end_time") or datetime.now(timezone.utc)
     if isinstance(end_dt, str):
@@ -801,6 +807,15 @@ async def settle_auction(
     out["settled"] = True
     out["currency"] = currency
     out["auction_id"] = auction_id
+    # iter451 — Expose the merchandise-total breakdown so downstream
+    # callers (invoices, buyer confirmation, seller settlement) can show
+    # `unit × quantity = line total` without re-doing the math.
+    out["merchandise_total"] = {
+        "unit_price": winning_unit_price,
+        "quantity": winning_quantity,
+        "hammer_total": hammer_price,
+        "is_multiplied": bool(_mt["is_multiplied"]),
+    }
     return out
 
 

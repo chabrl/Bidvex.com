@@ -16,8 +16,22 @@ def lots_won_template(data: Dict[str, Any], lang: str = "en") -> str:
     Args:
         data: Invoice data
         lang: Language code ('en' or 'fr')
+
+    iter451 — Each lot line renders `Unit Price × Quantity = Line Total`.
+    Callers must set `lot['unit_price']` (per-unit) and `lot['hammer_price']`
+    (the ALREADY-multiplied line total = unit_price × quantity). When a
+    legacy caller omits `unit_price`, we back-derive it as
+    `hammer_price / quantity` so historical invoices still render.
     """
-    
+
+    # Ensure every lot has unit_price / hammer_price / quantity that
+    # reconcile: hammer_price == unit_price × quantity.
+    for _lot in data.get('lots', []):
+        _qty = int(_lot.get('quantity') or 1) or 1
+        if _lot.get('unit_price') in (None, ""):
+            _hp = float(_lot.get('hammer_price') or 0)
+            _lot['unit_price'] = round(_hp / _qty, 2) if _qty else _hp
+
     # Calculate totals
     hammer_total = sum(lot['hammer_price'] for lot in data['lots'])
     premium_amount = hammer_total * (data['premium_percentage'] / 100)
@@ -34,9 +48,12 @@ def lots_won_template(data: Dict[str, Any], lang: str = "en") -> str:
     total_tax = gst_on_hammer + qst_on_hammer + gst_on_premium + qst_on_premium
     grand_total = subtotal_before_tax + total_tax
     
-    # Generate lots table rows
+    # Generate lots table rows — iter451 shows `Unit × Qty = Total`.
     lots_rows = ""
     for lot in data['lots']:
+        _unit = float(lot.get('unit_price') or 0)
+        _qty = int(lot.get('quantity') or 1)
+        _line = float(lot.get('hammer_price') or 0)
         lots_rows += f"""
         <tr>
             <td style="padding: 8px; border-bottom: 1px solid #e0e0e0;">{lot['lot_number']}</td>
@@ -44,8 +61,9 @@ def lots_won_template(data: Dict[str, Any], lang: str = "en") -> str:
                 <strong>{lot['title']}</strong><br>
                 <span style="font-size: 12px; color: #666;">{lot['description'][:100]}...</span>
             </td>
-            <td style="padding: 8px; border-bottom: 1px solid #e0e0e0; text-align: center;">{lot['quantity']}</td>
-            <td style="padding: 8px; border-bottom: 1px solid #e0e0e0; text-align: right;">${lot['hammer_price']:.2f}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #e0e0e0; text-align: right;">${_unit:.2f}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #e0e0e0; text-align: center;">{_qty}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #e0e0e0; text-align: right;"><strong>${_line:.2f}</strong></td>
         </tr>
         """
     
@@ -222,10 +240,11 @@ def lots_won_template(data: Dict[str, Any], lang: str = "en") -> str:
         <table>
             <thead>
                 <tr>
-                    <th style="width: 10%;">Lot #</th>
-                    <th style="width: 50%;">Description</th>
+                    <th style="width: 8%;">Lot #</th>
+                    <th style="width: 42%;">Description</th>
+                    <th style="width: 15%; text-align: right;">Unit Price</th>
                     <th style="width: 10%; text-align: center;">Qty</th>
-                    <th style="width: 30%; text-align: right;">Hammer Price</th>
+                    <th style="width: 25%; text-align: right;">Line Total</th>
                 </tr>
             </thead>
             <tbody>
