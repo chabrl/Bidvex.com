@@ -1,0 +1,39 @@
+{
+  "verdict": "fixed",
+  "user_reported_bug": "Fix only the Seller Dashboard \"Your Listings\" status tabs and counts. The dashboard can show a non-zero count, such as Sold (1), while the selected Sold tab shows no listing. Audit and verify every tab: All, Active, Pending Review, Draft, Ended, All Ended, Sold, No Sale, Payment Collected, Payment Failed, Completed. A tab count of N must show exactly N matching results for that seller. For multi-item listings, use the relevant outcome of the actual lot. Do not rely only on an unrelated parent-listing status. Confirm the dashboard API counts and visible cards match exactly in English and French.",
+  "summary": "No relevant testing skill found. Focused verification passed: inspected the dashboard backend/frontend predicates, ran the new pytest regression suite (5 passed), ran the live preview orphan-receipt reproducer, seeded live edge cases for orphan seller_statement receipts and lot-level sold/payment/no-sale outcomes, and verified the real Seller Dashboard UI after login as charbel911@gmail.com. In both EN and FR, every requested tab badge matched the number of visible listing cards; Sold showed 10 cards when API counts.sold was 10, including the orphan receipt and lot-aware seeded cards.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter454_dashboard_tab_counts.py",
+    "/app/backend/tests/live_repro_iter454_sold_blank.py",
+    "/app/test_reports/iter454_live_status_tab_check.py",
+    "/app/test_reports/iter454_live_api_state.json"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "No blocking issue found. Note for future hardening: frontend predicates still include a couple of extra legacy checks not present in backend (for example winning_bidder_id/relisted_to paths), but current live data and seeded edge cases showed no count/card mismatch."
+  ],
+  "updated_files": [
+    "/app/test_reports/iter454_live_status_tab_check.py",
+    "/app/test_reports/iter454_live_api_state.json",
+    "/app/test_reports/bug_verification_454.json",
+    "/app/test_reports/iteration_454.json"
+  ],
+  "success_rate": {
+    "backend": "100%",
+    "frontend": "100%"
+  },
+  "seed_data_creation": "Created temporary preview DB data with prefix iter454live- covering active, pending, draft, sold, completed, no-sale, orphan receipt, lot-level winner, lot-level payment_collected, lot-level payment_failed, and Buy-Now sold_quantity cases. Cleanup completed and verified 0 iter454live listing/multi-item/receipt documents remain.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Use /app/test_reports/iter454_live_status_tab_check.py seed-verify to recreate focused live fixtures, then run the Seller Dashboard UI flow. Browser evidence in this run: EN and FR tabs All, Active, Pending Review, Draft, Ended, All Ended, Sold, No Sale, Payment Collected, Payment Failed, Completed all had badge == visible card count; Sold included iter454live-purged-receipt-listing and lot-level sold/payment cases. Cleanup mode removes the seed prefix.",
+  "rca_of_the_issue": "The original mismatch was caused by seller_statement receipts increasing sold/payment counts without corresponding rows in all_listings, plus parent-only status checks for multi-item outcomes. The verified fix materializes orphan receipts as synthetic listing rows and uses lot-aware predicates for counts and frontend filtering."
+}

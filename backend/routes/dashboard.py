@@ -62,50 +62,121 @@ async def get_seller_dashboard(
 
     all_listings = listings + multi_listings
 
-    # HOTFIX v9.1 / Fix 3 — Seller dashboard filter-tab counts.
-    # A listing is "pending_review" when it sits in any of the three
-    # review-pending statuses surfaced by the AI Watchdog or Manual Review
-    # flow: pending_ai_review, pending_admin_review, pending_review.
+    # iter454 P0 — Sold (N) blank-tab bug root cause.
+    # Historical seller_statement receipts survive listings-collection
+    # purges. Prior code incremented counts["sold"] += len(receipts) but
+    # never added anything to `all_listings`, so the frontend Sold tab
+    # rendered empty while the badge still showed N. Materialize each
+    # orphan receipt as a synthetic listing row here so counts and the
+    # visible tab feed off the same array.
+    seller_receipts = await rdb.receipts.find(
+        {"user_id": current_user.id, "type": "seller_statement"},
+        {"_id": 0},
+    ).sort("created_at", -1).to_list(500)
+    known_listing_ids = {l.get("id") for l in all_listings if l.get("id")}
+    receipt_only = [
+        r for r in seller_receipts
+        if r.get("listing_id") and r["listing_id"] not in known_listing_ids
+    ]
+    synthetic_listings = []
+    for r in receipt_only:
+        synth = {
+            "id":                  r.get("listing_id"),
+            "seller_id":           current_user.id,
+            "title":               r.get("listing_title") or "Historical sale",
+            "status":              "sold",  # by definition — receipt only exists after settlement
+            "final_price":         float(r.get("hammer_price") or 0),
+            "current_price":       float(r.get("hammer_price") or 0),
+            "net_payout_amount":   float(r.get("net_payout") or 0),
+            "payment_status":      "payment_collected",
+            "payment_collected_at": r.get("created_at"),
+            "winner_user_id":      r.get("buyer_id"),
+            "auction_end_date":    r.get("created_at"),
+            "ended_at":            r.get("created_at"),
+            "images":              [],
+            "_synthetic_from_receipt": True,
+            "receipt_id":          r.get("id"),
+        }
+        synthetic_listings.append(synth)
+    all_listings = all_listings + synthetic_listings
+    listings = listings + synthetic_listings  # so the single-listings pane also picks these up
+
+    # iter454 — Single source of truth for dashboard status predicates.
+    # Both count badges AND the frontend Sold/Ended split use the SAME
+    # logic. Multi-item listings inspect their lot outcomes, not just
+    # the parent status.
     _PENDING_STATUSES = ("pending_ai_review", "pending_admin_review", "pending_review")
-    # iter298 BUG 2/5 — `ended_no_sale` (zero-bid) + storage `unsold`
-    # join the Ended bucket.
     _ENDED_STATUSES = ("sold", "ended", "expired", "completed", "ended_no_sale", "unsold")
 
-    # iter296 P0 BUG 5 — Same union as routes/listings.py + routes/users.py:
-    # a listing is "sold" if EITHER `status: "sold"` (vehicle/storage
-    # convention) OR (`status: "ended"` + `winner_user_id` is set —
-    # marketplace + lots convention). The old code only checked the
-    # first half so the user-visible Articles Vendus / Sold Items card
-    # was stuck at 0 for marketplace listings.
-    def _is_sold(l: dict) -> bool:
+    def _lots(l):
+        return l.get("lots") if isinstance(l.get("lots"), list) else []
+
+    def _has_any_won(l):
+        # Parent-level winner (single-item + vehicle convention)
+        if l.get("winner_user_id") or l.get("winner_id") or l.get("highest_bidder_id"):
+            return True
+        # Multi-item: any lot has a winner OR any Buy-Now sold_quantity > 0
+        for lot in _lots(l):
+            if lot.get("winner_user_id") or lot.get("winner_id") or lot.get("highest_bidder_id"):
+                return True
+            if int(lot.get("sold_quantity") or 0) > 0:
+                return True
+        return False
+
+    def _has_any_payment_collected(l):
+        if l.get("payment_status") == "payment_collected":
+            return True
+        for lot in _lots(l):
+            if lot.get("payment_status") == "payment_collected":
+                return True
+        return False
+
+    def _has_any_payment_failed(l):
+        # `payment_failed_final` (overdue autocapture) is treated the same
+        # as `payment_failed` for the dashboard.
+        for status_val in (l.get("payment_status"),):
+            if status_val in ("payment_failed", "payment_failed_final"):
+                return True
+        for lot in _lots(l):
+            if lot.get("payment_status") in ("payment_failed", "payment_failed_final"):
+                return True
+        return False
+
+    def _is_sold(l):
+        # A listing is "sold" if the parent status is 'sold' OR the
+        # listing is ended AND any winner exists (parent or lot).
         if l.get("status") == "sold":
             return True
-        if l.get("status") == "ended" and l.get("winner_user_id"):
+        if l.get("status") in ("ended", "expired", "completed") and _has_any_won(l):
             return True
         return False
 
-    # iter298 BUG 3/5 — payment lifecycle splits within the Ended bucket.
-    def _is_payment_collected(l: dict) -> bool:
-        return l.get("payment_status") == "payment_collected"
+    def _is_no_sale(l):
+        if l.get("status") in ("ended_no_sale", "unsold"):
+            return True
+        if l.get("status") in ("ended", "expired") and not _has_any_won(l):
+            return True
+        return False
 
-    def _is_payment_failed(l: dict) -> bool:
-        return l.get("payment_status") == "payment_failed"
+    def _is_completed(l):
+        # Completed = buyer payment collected + pickup confirmed +
+        # (settlement finalised, which is the precondition for either flag).
+        if l.get("status") == "completed":
+            return True
+        if l.get("pickup_confirmed") is True and _has_any_payment_collected(l):
+            return True
+        return False
 
-    def _is_no_sale(l: dict) -> bool:
-        return (
-            l.get("status") in ("ended_no_sale", "unsold")
-            or (l.get("status") in ("ended", "expired") and not l.get("winner_user_id"))
-        )
-
-    active_listings = [l for l in all_listings if l.get("status") == "active"]
-    sold_listings = [l for l in all_listings if _is_sold(l)]
-    draft_listings = [l for l in all_listings if l.get("status") == "draft"]
-    pending_review_listings = [l for l in all_listings if l.get("status") in _PENDING_STATUSES]
-    ended_listings = [l for l in all_listings if l.get("status") in _ENDED_STATUSES]
-    no_sale_listings = [l for l in ended_listings if _is_no_sale(l)]
-    payment_collected_listings = [l for l in ended_listings if _is_payment_collected(l)]
-    payment_failed_listings = [l for l in ended_listings if _is_payment_failed(l)]
-    completed_listings = [l for l in all_listings if l.get("status") == "completed"]
+    active_listings           = [l for l in all_listings if l.get("status") == "active"]
+    draft_listings            = [l for l in all_listings if l.get("status") == "draft"]
+    pending_review_listings   = [l for l in all_listings if l.get("status") in _PENDING_STATUSES]
+    ended_listings            = [l for l in all_listings if l.get("status") in _ENDED_STATUSES]
+    sold_listings             = [l for l in all_listings if _is_sold(l)]
+    no_sale_listings          = [l for l in ended_listings if _is_no_sale(l)]
+    # iter454 — Payment Collected is a SUBSET of Sold. Payment Failed too.
+    payment_collected_listings = [l for l in sold_listings if _has_any_payment_collected(l)]
+    payment_failed_listings    = [l for l in sold_listings if _has_any_payment_failed(l)]
+    completed_listings         = [l for l in all_listings if _is_completed(l)]
 
     counts = {
         "total":             len(all_listings),
@@ -114,7 +185,6 @@ async def get_seller_dashboard(
         "draft":             len(draft_listings),
         "ended":             len(ended_listings),
         "sold":              len(sold_listings),
-        # iter298 BUG 5 — Ended split.
         "ended_no_sale":     len(no_sale_listings),
         "payment_collected": len(payment_collected_listings),
         "payment_failed":    len(payment_failed_listings),
@@ -167,31 +237,21 @@ async def get_seller_dashboard(
         for l in payment_collected_listings
     )
 
-    # iter367 P0 — Seller Analytics fix.
-    # `seller_statement` receipts (created by finalize_auction_payment)
-    # survive listings-collection purges and are the canonical record of
-    # completed sales. Union them into sold_count/total_sales so the
-    # dashboard KPIs remain accurate even after listings cleanup.
-    seller_receipts = await rdb.receipts.find(
-        {"user_id": current_user.id, "type": "seller_statement"},
-        {"_id": 0},
-    ).sort("created_at", -1).to_list(500)
-    known_sold_ids = {l.get("id") for l in sold_listings if l.get("id")}
-    receipt_only_sales = [r for r in seller_receipts if r.get("listing_id") and r["listing_id"] not in known_sold_ids]
-    receipt_only_total = sum(float(r.get("hammer_price") or 0) for r in receipt_only_sales)
-    receipt_only_collected = sum(float(r.get("total_charged") or r.get("hammer_price") or 0) for r in receipt_only_sales)
-    receipt_only_payout = sum(float(r.get("net_payout") or 0) for r in receipt_only_sales)
-
-    total_sales += receipt_only_total
-    collected_sales += receipt_only_collected
-    net_payout_total += receipt_only_payout
-
-    counts["sold"] += len(receipt_only_sales)
-    counts["payment_collected"] += len(receipt_only_sales)
+    # iter367/iter454 — Historical seller_statement receipts.
+    # Since iter454, orphan receipts (listing_id purged from
+    # listings/multi_item_listings) are materialized as synthetic rows
+    # in `all_listings` above. That means sold_listings /
+    # payment_collected_listings ALREADY include them, and
+    # total_sales / collected_sales / net_payout_total are correct
+    # WITHOUT any additive block. We retain the receipts array for the
+    # UI and for the dashboard "Statements" pane below.
+    receipt_only_sales: list = []
 
     return {
         "active_listings": len(active_listings),
-        "sold_listings": len(sold_listings) + len(receipt_only_sales),
+        # iter454 — receipts now live inside sold_listings via synthetic
+        # rows, so no additional receipt_only_sales adjustment here.
+        "sold_listings": len(sold_listings),
         "draft_listings": len(draft_listings),
         "total_sales": round(total_sales, 2),
         # iter298 BUG 5 — payment-collected metrics + statement links.

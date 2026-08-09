@@ -174,10 +174,19 @@ const SellerDashboard = () => {
 
   // iter298 BUG 2 — A listing qualifies for the relist actions when it
   // ended without a winner (zero bids / unsold) and wasn't already relisted.
+  // iter454 — For multi-item listings, also inspect each lot for a
+  // winner or a Buy-Now sale so we don't call a partially-sold auction
+  // "No Sale".
   const isNoSaleListing = (l) => {
     if (l?.relisted_to) return false;
     const s = l?.status;
-    const hasWinner = !!(l?.winner_user_id || l?.winner_id || l?.winning_bidder_id);
+    const parentHasWinner = !!(l?.winner_user_id || l?.winner_id || l?.winning_bidder_id);
+    const lots = Array.isArray(l?.lots) ? l.lots : [];
+    const anyLotWon = lots.some((lot) =>
+      lot?.winner_user_id || lot?.winner_id || lot?.highest_bidder_id
+      || (Number(lot?.sold_quantity) || 0) > 0
+    );
+    const hasWinner = parentHasWinner || anyLotWon;
     return (s === 'ended_no_sale' || s === 'unsold'
       || ((s === 'ended' || s === 'expired') && !hasWinner));
   };
@@ -723,6 +732,37 @@ const SellerDashboard = () => {
               const _PENDING = new Set(['pending_ai_review', 'pending_admin_review', 'pending_review']);
               // iter298 BUG 2/5 — ended bucket includes ended_no_sale + unsold.
               const _ENDED = new Set(['sold', 'ended', 'expired', 'completed', 'ended_no_sale', 'unsold']);
+              // iter454 — Multi-item lot-aware helpers so tab predicates
+              // match backend counts exactly. Never rely on the parent
+              // status alone.
+              const _lots = (l) => Array.isArray(l?.lots) ? l.lots : [];
+              const _hasAnyWon = (l) => {
+                if (l?.winner_user_id || l?.winner_id || l?.highest_bidder_id || l?.winning_bidder_id) return true;
+                return _lots(l).some((lot) =>
+                  lot?.winner_user_id || lot?.winner_id || lot?.highest_bidder_id
+                  || (Number(lot?.sold_quantity) || 0) > 0
+                );
+              };
+              const _hasAnyPaymentCollected = (l) => {
+                if (l?.payment_status === 'payment_collected') return true;
+                return _lots(l).some((lot) => lot?.payment_status === 'payment_collected');
+              };
+              const _hasAnyPaymentFailed = (l) => {
+                if (l?.payment_status === 'payment_failed' || l?.payment_status === 'payment_failed_final') return true;
+                return _lots(l).some((lot) =>
+                  lot?.payment_status === 'payment_failed' || lot?.payment_status === 'payment_failed_final'
+                );
+              };
+              const _isSold = (l) => {
+                if (l?.status === 'sold') return true;
+                if (['ended', 'expired', 'completed'].includes(l?.status) && _hasAnyWon(l)) return true;
+                return false;
+              };
+              const _isCompleted = (l) => {
+                if (l?.status === 'completed') return true;
+                if (l?.pickup_confirmed === true && _hasAnyPaymentCollected(l)) return true;
+                return false;
+              };
               const all = dashboard?.all_listings || [];
               const filtered = all.filter((l) => {
                 const s = l?.status;
@@ -732,13 +772,12 @@ const SellerDashboard = () => {
                 if (listingsFilter === 'draft') return s === 'draft';
                 if (listingsFilter === 'ended') {
                   if (!_ENDED.has(s)) return false;
-                  // iter298 BUG 5 — Ended split sub-filter.
-                  const hasWinner = !!(l?.winner_user_id || l?.winner_id || l?.winning_bidder_id);
-                  if (endedSplit === 'sold') return s === 'sold' || (s === 'ended' && hasWinner);
+                  // iter298 BUG 5 / iter454 — Ended split sub-filter.
+                  if (endedSplit === 'sold') return _isSold(l);
                   if (endedSplit === 'no_sale') return isNoSaleListing(l) || l?.relisted_to;
-                  if (endedSplit === 'payment_collected') return l?.payment_status === 'payment_collected';
-                  if (endedSplit === 'payment_failed') return l?.payment_status === 'payment_failed';
-                  if (endedSplit === 'completed') return s === 'completed';
+                  if (endedSplit === 'payment_collected') return _isSold(l) && _hasAnyPaymentCollected(l);
+                  if (endedSplit === 'payment_failed') return _isSold(l) && _hasAnyPaymentFailed(l);
+                  if (endedSplit === 'completed') return _isCompleted(l);
                   return true;
                 }
                 return true;

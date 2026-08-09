@@ -1,0 +1,74 @@
+{
+  "base_url": "https://prod-verify-2.preview.emergentagent.com",
+  "counts": {
+    "active": 1,
+    "completed": 1,
+    "draft": 1,
+    "ended": 12,
+    "ended_no_sale": 2,
+    "payment_collected": 6,
+    "payment_failed": 1,
+    "pending_review": 1,
+    "sold": 10,
+    "total": 15
+  },
+  "en_fr_counts_equal": true,
+  "seed_prefix": "iter454live-",
+  "seeded_ids_present": [
+    "iter454live-active",
+    "iter454live-completed-single",
+    "iter454live-draft",
+    "iter454live-multi-buynow-soldqty",
+    "iter454live-multi-lot-winner",
+    "iter454live-multi-nosale",
+    "iter454live-multi-payment-collected",
+    "iter454live-multi-payment-failed",
+    "iter454live-nosale",
+    "iter454live-pending",
+    "iter454live-purged-receipt-listing",
+    "iter454live-sold-single"
+  ],
+  "seller_id": "8940074d-da97-43ca-9a0b-c59d39411ed6",
+  "tab_report": {
+    "active": {
+      "count": 1,
+      "filtered_cards": 1
+    },
+    "all": {
+      "count": 15,
+      "filtered_cards": 15
+    },
+    "completed": {
+      "count": 1,
+      "filtered_cards": 1
+    },
+    "draft": {
+      "count": 1,
+      "filtered_cards": 1
+    },
+    "ended": {
+      "count": 12,
+      "filtered_cards": 12
+    },
+    "no_sale": {
+      "count": 2,
+      "filtered_cards": 2
+    },
+    "payment_collected": {
+      "count": 6,
+      "filtered_cards": 6
+    },
+    "payment_failed": {
+      "count": 1,
+      "filtered_cards": 1
+    },
+    "pending_review": {
+      "count": 1,
+      "filtered_cards": 1
+    },
+    "sold": {
+      "count": 10,
+      "filtered_cards": 10
+    }
+  }
+}
