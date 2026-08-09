@@ -1,6 +1,49 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter451 — Auction-End Quantity Calc + Full Regression Suite (Feb 8, 2026) ✅ COMPLETE
+
+**Reported by user (P0)**: Fix the auction-end quantity calculation defect for multi-item lots. `Unit price × winning quantity = hammer total` must propagate through settlement → buyer premium → processing fees → taxes → invoices → payments → seller settlement. Do NOT alter historical data or Buy Now / total-lot pricing.
+
+### Delivered
+- **Single-source resolver** — `services/hammer_total.py::resolve_hammer_total()` returns `{unit_price, quantity, hammer_total, is_multiplied, multiply_flag, already_multiplied}`. Handles `multiply_hammer_by_quantity`, `price_multiplied_by_quantity`, `quantity_won`/`quantity`, and lot > listing precedence. Clamps invalid/zero quantities to 1.
+- **Wired into 5 auction-end sites**:
+  - `services/auction_settlement.py::settle_auction` — buyer charge + seller payout basis
+  - `services/payment_collection.py` — buyer payment collection
+  - `services/overdue_autocapture.py` — overdue processing
+  - `routes/auctions.py` — multi-item lot close stamps `winning_unit_price` + `winning_quantity` on each lot
+  - `routes/invoices.py::generate_lots_won_invoice` — invoice iterates ACTUAL lots won by buyer (was placeholder "first N")
+- **Invoice PDF templates** — both `invoice_templates.py` and `invoice_templates_bilingual.py` render `Unit Price / Qty / Line Total` columns. Added `unit_price` / `line_total` bilingual EN/FR translations.
+- **Fallback PDF generator hardening** (`routes/invoices.py::generate_pdf_from_html`) — strips `<style>`, `<img>`, `<head>`, `<!DOCTYPE>`, `<script>` blocks so ReportLab paraparser doesn't choke on CSS/base64 blobs. Accepts `PosixPath` filenames. Fixed pre-existing `generate_invoice_number()` signature mismatch.
+
+### Regression suite (32 pytest + 13 live e2e — ALL PASS)
+`backend/tests/test_iter451_hammer_total.py`:
+- A. Multi-item $7×2=$14 propagates (5 tests: resolver, premium, seller commission, Stripe recovery, invoice template)
+- A5b/A5c. Bilingual invoice EN + FR renders `Unit Price / Qty / Line Total` (both variants)
+- B. Quantity of 1 → no multiplication (2 tests)
+- C. Pre-multiplied `price_multiplied_by_quantity=True` NOT re-multiplied (2 tests, includes Buy Now)
+- D. Total-lot pricing (multiply flag OFF) NOT multiplied (2 tests)
+- E. Multi-lot buyer $7×2 + $10×3 = $44 reconciles across chain
+- F. Lot values override top-level listing fields (2 tests)
+- G. Zero / None / negative / non-numeric quantity clamps to 1 (4 tests)
+- H. Broker fee engine `multiply_hammer_by_quantity` unaffected (3 tests)
+- I. Full reconciliation: hammer → premium → processing → seller payout
+- J. Duplicate calculation guard — all 5 sites import `resolve_hammer_total`; resolver defined in exactly ONE module
+- K. Historical records untouched — no migration scripts rewrite settled hammer_price; resolver has no side effects on input dicts; persisted `final_price` unchanged
+- L. Invoice-endpoint code path: `won-by-buyer` filter, sum = $44 for buyer, other-buyer + unsold lots skipped
+- M. Full reconciliation snapshot ($14 hammer → $0.70 premium → $0.56 seller commission → $13.44 net payout)
+
+`backend/tests/live_e2e_iter451_invoice_pdf.py` — full HTTP round-trip against preview backend:
+- EN: 8/8 (Unit Price header, $7.00, $10.00, $14.00, $30.00, $44.00 hammer total, qty 2, qty 3)
+- FR: 5/5 (Prix unitaire, Total ligne, $14.00, $30.00, $44.00)
+
+### Explicit non-goals honored
+- No migration of historical settled listings — resolver is read-only, prospective.
+- Broker fee engine untouched (already had its own quantity multiplier).
+- No changes to Watchdog, relisting, post-auction permissions, vehicle eligibility, Partner/Storage/Vehicle bulk imports, or unrelated flows.
+
+
+
 ## iter447 — Vehicle Dealer Multi-Lot CSV Bulk Import (Feb 8, 2026) ✅ COMPLETE
 
 **Delivered**: Rewrote the iter306 stub into a proper 4-step wizard (Upload → Review → Photos → Done) for verified vehicle dealers to bulk-import up to **500 vehicles per CSV** into a Multi-Lot Auction event. Same UX contract as Partner (iter444) / Storage (iter446): atomic all-or-none, draft-only, photo-gated Go Live.

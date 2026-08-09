@@ -63,6 +63,14 @@ TRANSLATIONS = {
         "en": "Qty",
         "fr": "Qté"
     },
+    "unit_price": {
+        "en": "Unit Price",
+        "fr": "Prix unitaire"
+    },
+    "line_total": {
+        "en": "Line Total",
+        "fr": "Total ligne"
+    },
     "hammer_price": {
         "en": "Hammer Price",
         "fr": "Prix marteau"

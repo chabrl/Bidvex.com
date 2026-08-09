@@ -95,12 +95,27 @@ def generate_pdf_from_html(html: str, output_path: str) -> str:
     from reportlab.lib.pagesizes import letter as _letter
     from reportlab.platypus import SimpleDocTemplate as _Doc, Paragraph as _P
     from reportlab.lib.styles import getSampleStyleSheet as _styles
-    doc = _Doc(output_path, pagesize=_letter)
+    doc = _Doc(str(output_path), pagesize=_letter)
     style = _styles()["Normal"]
-    # Strip the most common HTML tags so ReportLab can parse it
+    # Strip the most common HTML/CSS so ReportLab's paraparser can consume
+    # what's left. iter451 — added <style>, <img>, <!DOCTYPE>, and
+    # <head> stripping so the invoice HTML actually renders.
     import re
-    text = re.sub(r"<br\s*/?>", "<br/>", html)
-    text = re.sub(r"<(/?)(?!br|b|i|u|strong|em)[^>]+>", "", text)
+    text = html
+    # Remove <!DOCTYPE ...>, <html>/<head> shell, and full <style>/<script> blocks
+    text = re.sub(r"<!DOCTYPE[^>]*>", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"<head[^>]*>.*?</head>", "", text, flags=re.IGNORECASE | re.DOTALL)
+    text = re.sub(r"<style[^>]*>.*?</style>", "", text, flags=re.IGNORECASE | re.DOTALL)
+    text = re.sub(r"<script[^>]*>.*?</script>", "", text, flags=re.IGNORECASE | re.DOTALL)
+    # Strip inline images (base64 logo dumps break the paraparser)
+    text = re.sub(r"<img[^>]*/?>", "", text, flags=re.IGNORECASE)
+    # Normalise <br>
+    text = re.sub(r"<br\s*/?>", "<br/>", text, flags=re.IGNORECASE)
+    # Strip everything except <br/> since reportlab wants strictly-paired
+    # tags (unpaired <strong> breaks the paraparser).
+    text = re.sub(r"<(?!br\s*/?>)[^>]+>", "", text)
+    # Collapse whitespace so paragraph text stays under paraparser limits.
+    text = re.sub(r"\s+", " ", text).strip()
     doc.build([_P(text, style)])
     return output_path
 
@@ -317,8 +332,8 @@ async def generate_lots_won_invoice(
     hammer_total = sum(lot['hammer_price'] for lot in lots_won)
     buyer_fees = calculate_buyer_fees(hammer_total, buyer_subscription)
     
-    # Generate invoice number
-    invoice_number = await generate_invoice_number(auction_id)
+    # Generate invoice number (helper is sync, takes 0 args)
+    invoice_number = generate_invoice_number()
     
     # Prepare data for template with subscription-aware fees
     template_data = {
@@ -482,7 +497,7 @@ async def generate_payment_letter(
     if existing_invoice:
         invoice_number = existing_invoice['invoice_number']
     else:
-        invoice_number = await generate_invoice_number(auction_id)
+        invoice_number = generate_invoice_number()
     
     # Prepare data for template
     template_data = {
