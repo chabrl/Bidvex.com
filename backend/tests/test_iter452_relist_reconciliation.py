@@ -56,9 +56,14 @@ DB_NAME = os.environ["DB_NAME"]
 # ─────────────────────────────────────────────────────────────
 @pytest.fixture(scope="module")
 def event_loop():
-    loop = asyncio.new_event_loop()
+    """Isolated event loop per module — avoids sharing a closed loop
+    with sibling test files (see pytest-asyncio issue #38)."""
+    policy = asyncio.get_event_loop_policy()
+    loop = policy.new_event_loop()
+    asyncio.set_event_loop(loop)
     yield loop
     loop.close()
+    asyncio.set_event_loop(policy.new_event_loop())
 
 
 @pytest.fixture(scope="module")

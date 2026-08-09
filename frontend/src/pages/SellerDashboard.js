@@ -137,6 +137,9 @@ const SellerDashboard = () => {
   };
 
   // iter298 BUG 2 — One-click "Relist Now" for zero-bid ended listings.
+  // iter453 — When the backend returns status="draft" (e.g. multi-item
+  // partial re-list, or a vehicle re-list that requires standard approval),
+  // show a draft-review confirmation instead of the "live again" copy.
   const handleRelistNow = async (listing) => {
     setRelistingId(listing.id);
     try {
@@ -144,15 +147,17 @@ const SellerDashboard = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
       const fr = (i18n.language || 'en').startsWith('fr');
-      toast.success(fr
-        ? 'Annonce republiée ! Elle est de nouveau en ligne.'
-        : 'Listing relisted! It is live again.');
-      fetchDashboard();
-      if (res.data?.status === 'draft') {
-        toast.info(fr
-          ? 'Cette annonce passera par le processus d\u2019approbation standard.'
-          : 'This listing will go through the standard approval process.');
+      const isDraft = res.data?.status === 'draft';
+      if (isDraft) {
+        toast.success(fr
+          ? 'Brouillon créé pour révision. Publiez-le depuis votre tableau de bord lorsque vous êtes prêt.'
+          : 'Draft created for review. Publish it from your dashboard when ready.');
+      } else {
+        toast.success(fr
+          ? 'Annonce republiée ! Elle est de nouveau en ligne.'
+          : 'Listing relisted! It is live again.');
       }
+      fetchDashboard();
     } catch (error) {
       const detail = error.response?.data?.detail;
       const msg = typeof detail === 'string' ? detail : (detail?.message || 'Relist failed');
