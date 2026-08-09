@@ -157,17 +157,71 @@ async def relist_listing(
     elif coll_name == "multi_item_listings":
         new_doc["auction_start_date"] = now.isoformat()
         new_doc["auction_end_date"] = (now + duration).isoformat()
-        new_doc["status"] = "active" if mode == "now" else "draft"
-        # Reset per-lot bid state.
+        # iter452 — Partial-sale relist safety. A relist ALWAYS creates a
+        # reviewable draft (never auto-publishes) so the seller can review
+        # the reconciled inventory before it goes live.
+        new_doc["status"] = "draft"
+        # Reconcile per-lot inventory: subtract Buy-Now sold_quantity AND
+        # any auction-close win (winning_quantity, else lot's own quantity
+        # when a winner_user_id was stamped) from the original quantity.
+        # Skip lots where nothing remains. Drop stale sold counters so the
+        # new draft starts with a clean ledger.
         lots = []
+        omitted: list[int] = []
         for lot in doc.get("lots") or []:
+            original_qty = int(lot.get("quantity") or 0)
+            buy_now_sold = int(lot.get("sold_quantity") or 0)
+            has_bid_winner = bool(
+                lot.get("winner_user_id") or lot.get("winner_id")
+                or lot.get("highest_bidder_id")
+            )
+            auction_won_qty = 0
+            if has_bid_winner:
+                auction_won_qty = int(
+                    lot.get("winning_quantity")
+                    or lot.get("quantity_won")
+                    or lot.get("quantity")
+                    or 0
+                )
+            effective_sold = buy_now_sold + auction_won_qty
+            remaining = original_qty - effective_sold
+            if remaining <= 0:
+                omitted.append(int(lot.get("lot_number") or 0))
+                continue
             clean = {k: v for k, v in lot.items() if k not in _RESET_FIELDS}
+            # Reset per-lot bid + sale state on the new draft.
+            clean["quantity"] = remaining
+            clean["available_quantity"] = remaining
+            clean["sold_quantity"] = 0
             clean["current_price"] = lot.get("starting_price") or 0
             clean["bid_count"] = 0
             clean["status"] = "active"
+            clean["lot_status"] = "active"
             clean["lot_end_time"] = (now + duration).isoformat()
+            # Drop any lot-level winner / final-price stamps that survived
+            # the top-level _RESET_FIELDS filter but are still meaningful
+            # at the lot dict level.
+            for stale in (
+                "winner_user_id", "winner_id", "highest_bidder_id",
+                "final_price", "winning_quantity", "winning_unit_price",
+                "sold_at",
+            ):
+                clean.pop(stale, None)
             lots.append(clean)
+        if not lots:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "nothing_to_relist",
+                    "message": "Every lot is fully sold — nothing remains to relist.",
+                },
+            )
         new_doc["lots"] = lots
+        # Attach reconciliation metadata so the seller sees what changed.
+        new_doc["relist_reconciliation"] = {
+            "omitted_lot_numbers": omitted,
+            "reconciled_at": now.isoformat(),
+        }
     elif coll_name == "storage_auctions":
         new_doc["start_time"] = now.isoformat()
         new_doc["end_time"] = (now + duration).isoformat()
