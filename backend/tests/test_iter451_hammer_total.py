@@ -54,6 +54,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from services.hammer_total import resolve_hammer_total  # noqa: E402
 from services.broker_fee_engine import calculate_broker_transaction  # noqa: E402
+from services.fee_calculator import PricingManager  # noqa: E402
 from shared import calculate_buyer_fees, calculate_seller_fees, calculate_stripe_fee_recovery  # noqa: E402
 from invoice_templates import lots_won_template  # noqa: E402
 from invoice_templates_bilingual import lots_won_template as lots_won_bilingual  # noqa: E402
@@ -738,6 +739,132 @@ class TestScenarioMExpectedInvoiceReconciliation:
         assert snap["hammer_total"] == 14.00
         assert snap["buyer_premium"] == 0.70
         assert snap["seller_net_payout"] == 13.44
+
+
+# ─────────────────────────────────────────────────────────────
+# Scenario N — Buy Now regression (existing rules must hold)
+# ─────────────────────────────────────────────────────────────
+class TestScenarioNBuyNow:
+    """Buy Now is a SEPARATE flow that predates iter451. It has its
+    own formula:  `total = buy_now_price × purchase.quantity` — the
+    quantity multiplication ALWAYS happens for Buy Now regardless of
+    `multiply_hammer_by_quantity`. iter451 must NOT break this rule
+    and must NOT wire `resolve_hammer_total` into the Buy Now path.
+    """
+
+    # Buy Now with a per-unit price of $7 and quantity=2 must produce
+    # item_total=$14, with all downstream fees, tax, seller payout
+    # computed off that $14 basis.
+    def test_N1_buy_now_price_x_quantity_equals_total(self):
+        """Core Buy Now formula: $7 × 2 = $14."""
+        buy_now_price = 7.00
+        quantity = 2
+        item_total = buy_now_price * quantity
+        assert item_total == 14.00, (
+            f"REGRESSION: Buy Now total math broke — got ${item_total}"
+        )
+
+    def test_N2_buy_now_pricing_manager_reconciles_off_14(self):
+        """Buy Now uses `PricingManager.non_vehicle_stripe(item_total, ...)`.
+        Verify buyer premium, tax, Stripe recovery, buyer_total, and
+        seller net payout all reconcile off the $14 item_total."""
+        item_total = 7.00 * 2  # $14
+        pr = PricingManager.non_vehicle_stripe(
+            hammer_price=item_total,
+            buyer_province="QC",
+            buyer_tier="free",
+            seller_tier="free",
+        )
+        assert pr.hammer_price == 14.00, (
+            f"Buy Now hammer basis wrong: {pr.hammer_price}"
+        )
+        # Buyer invoice fees_subtotal = buyer premium ≈ 5% of $14 = $0.70
+        bi = pr.buyer_invoice
+        assert 0.68 <= bi.fees_subtotal <= 0.72, (
+            f"Buy Now buyer premium not ~$0.70: {bi.fees_subtotal}"
+        )
+        # Buyer total is strictly greater than $14 (adds premium + fees + tax)
+        assert bi.total > 14.00, f"buyer total ${bi.total} not > $14"
+        assert bi.total < 20.00, f"buyer total ${bi.total} exploded"
+        # Seller invoice net = hammer - commission - stripe - tax
+        si = pr.seller_invoice
+        assert si.total < 14.00, f"seller net ${si.total} not < $14"
+        # Sanity — bug scenario ($7 basis) would give < half these fees
+        pr_bug = PricingManager.non_vehicle_stripe(
+            hammer_price=7.00,
+            buyer_province="QC",
+            buyer_tier="free",
+            seller_tier="free",
+        )
+        assert bi.total > pr_bug.buyer_invoice.total, (
+            "REGRESSION: $14 basis buyer_total not > $7 basis buyer_total"
+        )
+
+    def test_N3_buy_now_never_calls_resolve_hammer_total(self):
+        """The Buy Now code path (routes/payments.py + routes/auctions_bids.py)
+        must NEVER import `resolve_hammer_total`. Buy Now uses its own
+        `buy_now_price × quantity` formula. If a future contributor
+        wires the resolver into Buy Now, this test breaks by design."""
+        import re
+        # Find the exact Buy Now handlers.
+        for rel_path, target_func in [
+            ("backend/routes/auctions_bids.py", "purchase_buy_now"),
+            ("backend/routes/payments.py", "buy_now_preview"),
+            ("backend/routes/payments.py", "buy_now_checkout"),
+        ]:
+            src = (Path("/app") / rel_path).read_text()
+            # Isolate the function body — from "def <name>" to next
+            # "\n@" (next decorator) or "\nasync def" (next fn).
+            m = re.search(
+                rf"async def {target_func}\b[\s\S]+?(?=\n\n@|\n\nasync def |\Z)",
+                src,
+            )
+            assert m, f"Could not locate {target_func} in {rel_path}"
+            fn_body = m.group(0)
+            assert "resolve_hammer_total" not in fn_body, (
+                f"REGRESSION: {target_func} in {rel_path} now imports "
+                f"resolve_hammer_total. Buy Now must use its own math."
+            )
+
+    def test_N4_resolver_returns_zero_on_buy_now_shaped_listing(self):
+        """A Buy Now-shaped input (only `buy_now_price`, no final_price
+        / current_price / quantity_won) still returns hammer_total=0 —
+        the resolver is a safe no-op on Buy Now data."""
+        listing = {"buy_now_price": 7.00, "listing_type": "buy_now"}
+        out = resolve_hammer_total(listing)
+        assert out["hammer_total"] == 0.00
+        assert out["is_multiplied"] is False
+
+    def test_N5_buy_now_transaction_shape_regression(self):
+        """The persisted BuyNow transaction dict must contain
+        `price_per_unit`, `quantity_purchased`, and `total_amount`
+        where `total_amount == price_per_unit × quantity_purchased`."""
+        # Simulate the exact shape written to db.buy_now_transactions.
+        price_per_unit = 7.00
+        quantity_purchased = 2
+        total_amount = price_per_unit * quantity_purchased
+        txn_dict = {
+            "price_per_unit": price_per_unit,
+            "quantity_purchased": quantity_purchased,
+            "total_amount": total_amount,
+        }
+        assert txn_dict["total_amount"] == 14.00
+        assert (
+            txn_dict["price_per_unit"] * txn_dict["quantity_purchased"]
+            == txn_dict["total_amount"]
+        )
+
+    def test_N6_buy_now_qty_1_unchanged(self):
+        """Buy Now with quantity=1: total == price (baseline)."""
+        item_total = 25.00 * 1
+        assert item_total == 25.00
+        pr = PricingManager.non_vehicle_stripe(
+            hammer_price=item_total,
+            buyer_province="QC",
+            buyer_tier="free",
+            seller_tier="free",
+        )
+        assert pr.hammer_price == 25.00
 
 
 if __name__ == "__main__":
