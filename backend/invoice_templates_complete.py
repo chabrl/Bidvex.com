@@ -549,14 +549,64 @@ def seller_receipt_template(data: Dict[str, Any], lang: str = "en") -> str:
     commission_rate = data.get('commission_rate', 0.0)
     commission_amount = total_hammer * (commission_rate / 100)
     
-    # Tax on commission (GST/QST) - will be 0 if commission is 0
+    # iter458 — Tax-label accuracy.
+    # If the caller (routes/invoices.py) supplies `seller_tax_lines` from
+    # the existing tax engine, use those EXACT amounts + tax types. Never
+    # infer HST from a province, never re-label HST as GST/QST, never
+    # invent a PST line. Templates NEVER modify calculation logic — only
+    # rendering.
+    #
+    # Fallback (no seller_tax_lines): keep the legacy GST/QST recompute
+    # so other older callers of this template are not broken.
+    engine_tax_lines = data.get('seller_tax_lines')
     tax_rate_gst = data.get('tax_rate_gst', 0.0) if currency == 'CAD' else 0.0
     tax_rate_qst = data.get('tax_rate_qst', 0.0) if currency == 'CAD' else 0.0
+    if engine_tax_lines is not None:
+        # Engine truth path. `engine_tax_lines` = [] means zero tax → we
+        # emit ZERO tax rows so the document doesn't display a misleading
+        # tax label or a $0 tax amount.
+        total_tax = round(sum(float(t.get('amount', 0.0)) for t in engine_tax_lines), 2)
+        # Zero the legacy rate-based amounts so nothing else in the
+        # template accidentally re-renders them.
+        gst_on_commission = 0.0
+        qst_on_commission = 0.0
+    else:
+        # Legacy behaviour (unchanged) — recompute from rates.
+        gst_on_commission = commission_amount * (tax_rate_gst / 100)
+        qst_on_commission = commission_amount * (tax_rate_qst / 100)
+        total_tax = gst_on_commission + qst_on_commission
     
-    gst_on_commission = commission_amount * (tax_rate_gst / 100)
-    qst_on_commission = commission_amount * (tax_rate_qst / 100)
-    total_tax = gst_on_commission + qst_on_commission
-    
+    # iter458 — Build the tax-row HTML from engine amounts (if provided).
+    # If `engine_tax_lines` is [] (zero tax), tax_rows_html is empty so
+    # NO misleading tax label / $0 row appears on the receipt. When the
+    # legacy fallback is in play, keep the historical GST + QST rows.
+    if engine_tax_lines is not None:
+        _fr = str(lang).lower().startswith("fr")
+        tax_rows_html = ""
+        for _tl in engine_tax_lines:
+            _label = _tl.get("label_fr") if _fr else _tl.get("label_en")
+            _rate = _tl.get("rate_pct")
+            _amount = float(_tl.get("amount", 0.0))
+            _rate_part = f" ({_rate:.3f}%)" if _rate is not None else ""
+            tax_rows_html += (
+                f"<div class=\"calc-row\">"
+                f"<span>{_label}{_rate_part}:</span>"
+                f"<span>-${_amount:.2f} {currency}</span>"
+                f"</div>"
+            )
+    else:
+        # Legacy path — hardcoded GST + QST rows (untouched).
+        tax_rows_html = (
+            f"<div class=\"calc-row\">"
+            f"<span>{t('gst_on_commission', lang, tax_rate_gst)}:</span>"
+            f"<span>-${gst_on_commission:.2f} {currency}</span>"
+            f"</div>"
+            f"<div class=\"calc-row\">"
+            f"<span>{t('qst_on_commission', lang, tax_rate_qst)}:</span>"
+            f"<span>-${qst_on_commission:.2f} {currency}</span>"
+            f"</div>"
+        )
+
     total_deductions = commission_amount + total_tax
     net_payout = total_hammer - total_deductions
     
@@ -732,15 +782,7 @@ def seller_receipt_template(data: Dict[str, Any], lang: str = "en") -> str:
                 <span>-${commission_amount:.2f} {currency}</span>
             </div>
             
-            <div class="calc-row">
-                <span>{t('gst_on_commission', lang, tax_rate_gst)}:</span>
-                <span>-${gst_on_commission:.2f} {currency}</span>
-            </div>
-            
-            <div class="calc-row">
-                <span>{t('qst_on_commission', lang, tax_rate_qst)}:</span>
-                <span>-${qst_on_commission:.2f} {currency}</span>
-            </div>
+            {tax_rows_html}
             
             <div class="calc-row subtotal">
                 <span>{t('total_deductions', lang)}:</span>
@@ -786,13 +828,46 @@ def commission_invoice_template(data: Dict[str, Any], lang: str = "en") -> str:
     currency = data.get('currency', 'CAD')
     commission_amount = data['commission_amount']
     
-    # Tax rates based on currency
+    # iter458 — Tax-label accuracy. Prefer engine-supplied `seller_tax_lines`
+    # when present so the invoice renders the ACTUAL tax type(s) returned
+    # by the tax engine (GST / QST / HST). Empty list → no tax rows.
+    # The legacy rate-based path is preserved for backward compat when
+    # older callers still pass `tax_rate_gst`/`tax_rate_qst`.
+    engine_tax_lines = data.get('seller_tax_lines')
     tax_rate_gst = data.get('tax_rate_gst', 0.0) if currency == 'CAD' else 0.0
     tax_rate_qst = data.get('tax_rate_qst', 0.0) if currency == 'CAD' else 0.0
-    
-    gst_on_commission = commission_amount * (tax_rate_gst / 100)
-    qst_on_commission = commission_amount * (tax_rate_qst / 100)
-    total_due = commission_amount + gst_on_commission + qst_on_commission
+    if engine_tax_lines is not None:
+        total_tax = round(sum(float(t.get('amount', 0.0)) for t in engine_tax_lines), 2)
+        gst_on_commission = 0.0
+        qst_on_commission = 0.0
+        _fr = str(lang).lower().startswith("fr")
+        tax_rows_html = ""
+        for _tl in engine_tax_lines:
+            _label = _tl.get("label_fr") if _fr else _tl.get("label_en")
+            _rate = _tl.get("rate_pct")
+            _amount = float(_tl.get("amount", 0.0))
+            _rate_part = f" ({_rate:.3f}%)" if _rate is not None else ""
+            tax_rows_html += (
+                f"<div class=\"total-row\">"
+                f"<span>{_label}{_rate_part}:</span>"
+                f"<span>${_amount:.2f} {currency}</span>"
+                f"</div>"
+            )
+    else:
+        gst_on_commission = commission_amount * (tax_rate_gst / 100)
+        qst_on_commission = commission_amount * (tax_rate_qst / 100)
+        total_tax = gst_on_commission + qst_on_commission
+        tax_rows_html = (
+            f"<div class=\"total-row\">"
+            f"<span>{t('gst', lang, tax_rate_gst)}:</span>"
+            f"<span>${gst_on_commission:.2f} {currency}</span>"
+            f"</div>"
+            f"<div class=\"total-row\">"
+            f"<span>{t('qst', lang, tax_rate_qst)}:</span>"
+            f"<span>${qst_on_commission:.2f} {currency}</span>"
+            f"</div>"
+        )
+    total_due = commission_amount + total_tax
     
     html = f"""
     <!DOCTYPE html>
@@ -1010,14 +1085,7 @@ def commission_invoice_template(data: Dict[str, Any], lang: str = "en") -> str:
                 <span>{t('subtotal_commission', lang)}:</span>
                 <span>${commission_amount:.2f} {currency}</span>
             </div>
-            <div class="total-row">
-                <span>{t('gst', lang, tax_rate_gst)}:</span>
-                <span>${gst_on_commission:.2f} {currency}</span>
-            </div>
-            <div class="total-row">
-                <span>{t('qst', lang, tax_rate_qst)}:</span>
-                <span>${qst_on_commission:.2f} {currency}</span>
-            </div>
+            {tax_rows_html}
             <div class="total-row grand">
                 <span>{t('total_due', lang)}:</span>
                 <span>${total_due:.2f} {currency}</span>

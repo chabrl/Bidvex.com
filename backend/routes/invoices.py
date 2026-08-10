@@ -291,6 +291,12 @@ async def _build_settled_seller_dataset(db_client, auction: Dict[str, Any], sell
         seller_tax_label = ""
         seller_tax_province = seller_prov_raw
         commission_rate_dec = 0.0
+        # iter458 — Capture per-tax-component amounts + effective rates
+        # EXACTLY as returned by the tax engine. These are used to render
+        # the tax-label section without inferring types from the province.
+        seller_gst_amount = 0.0
+        seller_qst_amount = 0.0
+        seller_hst_amount = 0.0
 
         if is_sold and hammer_total > 0:
             try:
@@ -318,6 +324,9 @@ async def _build_settled_seller_dataset(db_client, auction: Dict[str, Any], sell
             seller_tax_label = str(fee.get("seller_tax_label") or "")
             seller_tax_province = str(fee.get("seller_tax_province") or seller_prov_raw)
             commission_rate_dec = float(fee.get("seller_commission_rate") or 0.0)
+            seller_gst_amount = float(fee.get("seller_gst") or 0.0)
+            seller_qst_amount = float(fee.get("seller_qst") or 0.0)
+            seller_hst_amount = float(fee.get("seller_hst") or 0.0)
 
         settled_row = settled_by_lot.get(lot.get("lot_number"))
         settlement_status = "settled" if settled_row else ("pending_settlement" if is_sold else "not_sold")
@@ -340,6 +349,11 @@ async def _build_settled_seller_dataset(db_client, auction: Dict[str, Any], sell
             "commission_rate_pct": round(commission_rate_dec * 100, 4),
             "seller_tax_label": seller_tax_label,
             "seller_tax_province": seller_tax_province,
+            # iter458 — Exact tax-component amounts from the engine (no
+            # inference from province). Used by the tax-line renderer.
+            "seller_gst_amount": round(seller_gst_amount, 2),
+            "seller_qst_amount": round(seller_qst_amount, 2),
+            "seller_hst_amount": round(seller_hst_amount, 2),
         })
 
     sold_lots = [l for l in processed_lots if l["status"] == "sold"]
@@ -423,7 +437,93 @@ async def _build_settled_seller_dataset(db_client, auction: Dict[str, Any], sell
         "seller_tax_label": seller_tax_label,
         "seller_tax_province": seller_tax_province,
         "seller_account_type": seller_account_type,
+        # iter458 — Tax-label accuracy. Faithfully surfaces the tax
+        # components the existing engine actually returned — GST / QST /
+        # HST (and no others). The list is empty for zero-tax outcomes,
+        # so templates can suppress the tax section instead of printing
+        # a misleading zero-rate line.
+        "seller_tax_lines": _build_seller_tax_lines(processed_lots),
+        "seller_tax_engine_labels": {
+            # Canonical strings from tax_rate_config (unchanged).
+            "raw_label":     seller_tax_label,
+            "province_code": seller_tax_province,
+        },
     }
+
+
+# iter458 — Pure aggregator: sums per-lot engine amounts into named tax
+# components and emits ONLY the components that are non-zero. Never
+# converts HST ↔ GST/QST. Never infers a component from a province.
+def _build_seller_tax_lines(processed_lots: list) -> list:
+    """Aggregate per-lot engine tax amounts into a list of tax lines.
+
+    Each entry:
+        {
+          "kind":     "gst" | "qst" | "hst",
+          "label_en": "GST" | "QST" | "HST",
+          "label_fr": "TPS" | "TVQ" | "TVH",
+          "amount":   float,          # exact sum of engine per-lot amounts
+          "rate_pct": float | None,   # statutory rate from the engine's
+                                      # tax_rate_config for THIS component
+                                      # (e.g. 5.0 for QC GST, 9.975 for QC
+                                      # QST, 13.0 for ON HST). NEVER an
+                                      # invented rate; taken directly from
+                                      # services.tax_rate_config.
+        }
+
+    Rules:
+      • A component appears if AND ONLY if the engine returned a
+        positive amount for that component on at least one sold lot.
+      • No component is derived from another; no HST ↔ GST+PST
+        rewriting; no PST synthesis.
+      • Empty list means "no tax to render" (INTL / zero-rated).
+    """
+    sold = [l for l in processed_lots if l.get("status") == "sold"]
+    if not sold:
+        return []
+
+    # Read the statutory per-component rates DIRECTLY from the engine's
+    # tax rate config (not inferred, not recomputed from amounts). The
+    # engine set seller_tax_province on every sold lot; every sold lot
+    # in a single settlement carries the same province, so we use the
+    # first sold lot's province as the lookup key.
+    from services.tax_rate_config import get_tax_rate_sync
+    province_code = sold[0].get("seller_tax_province") or "INTL"
+    rates = get_tax_rate_sync(province_code)
+
+    components = [
+        ("gst", "GST", "TPS",
+         sum(l.get("seller_gst_amount", 0.0) for l in sold),
+         rates.get("gst")),
+        ("qst", "QST", "TVQ",
+         sum(l.get("seller_qst_amount", 0.0) for l in sold),
+         rates.get("qst")),
+        ("hst", "HST", "TVH",
+         sum(l.get("seller_hst_amount", 0.0) for l in sold),
+         rates.get("hst")),
+    ]
+    lines = []
+    for kind, label_en, label_fr, raw_amount, statutory_rate in components:
+        amount = round(float(raw_amount), 2)
+        if amount <= 0:
+            continue  # Never render a zero-tax label as if there were one.
+        # rate_pct is the CRA statutory rate the engine used for this
+        # exact component (e.g. QC GST = 5%, QC QST = 9.975%, ON HST =
+        # 13%). Comes verbatim from tax_rate_config — no math done here.
+        rate_pct = None
+        if statutory_rate is not None:
+            try:
+                rate_pct = round(float(statutory_rate) * 100.0, 3)
+            except (TypeError, ValueError):
+                rate_pct = None
+        lines.append({
+            "kind":     kind,
+            "label_en": label_en,
+            "label_fr": label_fr,
+            "amount":   amount,
+            "rate_pct": rate_pct,
+        })
+    return lines
 
 
 @invoices_router.get("/invoices")
@@ -1083,6 +1183,11 @@ async def generate_seller_receipt(
         "total_platform_fee": dataset["total_platform_fee"],
         "total_tax_on_fee":   dataset["total_tax_on_fee"],
         "seller_tax_province": dataset["seller_tax_province"],
+        # iter458 — Faithful tax-label rendering: pass the engine's exact
+        # per-component tax lines so the template renders the real tax
+        # type(s) (GST / QST / HST) — never inferred from province.
+        "seller_tax_lines": dataset["seller_tax_lines"],
+        "seller_tax_engine_raw_label": dataset["seller_tax_engine_labels"]["raw_label"],
         "payment_method": "Bank Transfer",
         "payment_date": "Within 5-7 business days",
         "currency": currency
@@ -1193,6 +1298,10 @@ async def generate_commission_invoice(
         "tax_rate_gst": tax_rate_gst,
         "tax_rate_qst": tax_rate_qst,
         "net_payout": net_payout,
+        # iter458 — Faithful tax-label rendering (see seller_receipt above).
+        "seller_tax_lines": dataset["seller_tax_lines"],
+        "seller_tax_engine_raw_label": dataset["seller_tax_engine_labels"]["raw_label"],
+        "seller_tax_province": dataset["seller_tax_province"],
         "due_date": "Upon Receipt",
         "currency": currency
     }
