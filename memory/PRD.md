@@ -1,6 +1,49 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter467 — Escrow Payout Verification PAUSED (Feb 9, 2026) ⏸ UNVERIFIED
+
+**Reported by user (P0 directive)**: Pause the controlled escrow payout verification. Do not create test data, run transfers, change Stripe configuration, or modify escrow code. Mark the escrow transfer path as unverified and do not deploy escrow changes.
+
+### Status: PAUSED — escrow transfer path is UNVERIFIED
+The end-to-end Stripe Connect transfer (from platform to connected seller upon pickup-code confirmation) has NOT been proven against the real preview runtime. The most recent runtime probe (iter466, read-only, no payout attempted) showed:
+- Runtime account `acct_1SXA7iBd6Wtvh7hs` (test mode, CAD, `transfers: "active"`, `payouts_enabled: true`)
+- CAD Available balance: **$0.00** (Pending $37.72)
+- The single earlier attempt (iter465) that reached `Stripe.Transfer.create` was rejected by Stripe with `insufficient_available_funds`
+
+Because the runtime account has $0 Available, the transfer creation, correct payout amount, and pickup-code re-use blocking cannot be empirically proven end-to-end. The path remains **unverified**.
+
+### Explicit HOLD list (nothing will change until user resumes)
+- ❌ No escrow test fixtures will be seeded.
+- ❌ No `Stripe.Transfer.create` will be executed against any account.
+- ❌ No Stripe configuration change (keys, connect settings, capabilities) will be made.
+- ❌ No escrow-related code in `services/escrow_service.py`, `routes/transaction_pickup_code.py`, `services/pickup_confirmation.py`, or `services/seller_payouts.py` will be modified.
+- ❌ No escrow-related change will be deployed. Any prior preview-only escrow work stays in preview.
+
+### Preserved verification scripts (kept but not run)
+The following scripts remain on disk unchanged and can be re-run WITHOUT modification once the user resumes:
+- `tests/live_verify_iter463_escrow_payout.py` — in-process credential-patch variant (deferred — user asked us not to patch credentials).
+- `tests/live_verify_iter465_running_escrow_payout.py` — running-preview HTTP variant using the actual runtime credential (recommended when resumed).
+
+### Confirmed unrelated work — untouched by this hold
+The following are preview-only and are NOT escrow-related; they remain green:
+- iter459 (Buyer Payment Letter) — 51/51 live + 7/7 pytest
+- iter460 (Duplicate Settlement Email) — 16/16 acceptance
+- iter461 (Delivery-Key Scope) — 13/13 acceptance
+- iter462 (Formal Event-Key Audit) — 18/18 audit
+
+None of these will be deployed until the user explicitly requests deploy.
+
+### Resume conditions (for reference only — action deferred to user)
+When the user is ready to resume the escrow payout verification, the following prerequisites must be true before any test is run:
+1. Runtime credential (`STRIPE_API_KEY` or `STRIPE_TEST_SECRET_KEY` per the server.py fallback) authenticates to the account intended for escrow settlement.
+2. That same account has CAD Available balance ≥ CA$14 (the smallest test payout).
+3. `capabilities.transfers = "active"` on that account.
+4. Then re-run `python /app/backend/tests/live_verify_iter465_running_escrow_payout.py`. All 10 checks are expected to pass without any code change.
+
+None of the above conditions will be checked or acted on unless the user explicitly resumes.
+
+
 ## iter466 — Read-Only Stripe Identity Preflight (Feb 9, 2026) ⛔ STOP after report
 
 **Reported by user (P0 diagnostic)**: Run a read-only Stripe identity check using the normal running preview backend configuration. No memory patch, no fixture / payment / transfer / connected-account creation, no code / secret / deployment changes, no payout attempt. Report the 5 fields only.
