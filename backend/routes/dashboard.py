@@ -247,6 +247,191 @@ async def get_seller_dashboard(
     # UI and for the dashboard "Statements" pane below.
     receipt_only_sales: list = []
 
+    # iter456 — Per-lot outcome rows for the Ended-tab splits.
+    # Each entry represents ONE card to render — a specific lot for
+    # multi-item listings, or a single-listing outcome, or a
+    # historical settlement (orphan receipt). Frontend uses this array
+    # for Sold / No Sale / Payment Collected / Payment Failed /
+    # Completed tabs so each lot's real outcome is visible on its own
+    # card. Never rely on ambiguous parent-listing rows.
+    def _outcome_status(l, lot=None):
+        # Effective status for one card.
+        parent_status = (l or {}).get("status") or ""
+        lot_dict = lot or {}
+        parent_won = bool((l or {}).get("winner_user_id")
+                          or (l or {}).get("winner_id")
+                          or (l or {}).get("highest_bidder_id"))
+        lot_won = bool(lot_dict.get("winner_user_id")
+                       or lot_dict.get("winner_id")
+                       or lot_dict.get("highest_bidder_id")
+                       or int(lot_dict.get("sold_quantity") or 0) > 0)
+        won = lot_won if lot is not None else parent_won
+        if parent_status == "sold" and (lot is None or won):
+            return "sold"
+        if parent_status == "completed" and (lot is None or won):
+            return "completed"
+        if parent_status in ("ended", "expired", "completed"):
+            return "sold" if won else "no_sale"
+        if parent_status in ("ended_no_sale", "unsold"):
+            return "no_sale"
+        return None  # not an ended outcome
+
+    def _payment_status_for_outcome(l, lot=None):
+        candidates = []
+        if lot is not None:
+            candidates.append(lot.get("payment_status"))
+        candidates.append((l or {}).get("payment_status"))
+        for c in candidates:
+            if c in ("payment_collected", "payment_failed",
+                     "payment_failed_final", "payment_pending"):
+                return c
+        return None
+
+    lot_outcomes = []
+    for l in all_listings:
+        parent_status = l.get("status") or ""
+        is_synth = bool(l.get("_synthetic_from_receipt"))
+        is_multi = isinstance(l.get("lots"), list) and len(l["lots"]) > 0
+        # A. Historical orphan receipt → one "Historical settlement" card.
+        if is_synth:
+            lot_outcomes.append({
+                "outcome_id": f"hist-{l.get('receipt_id') or l.get('id')}",
+                "listing_id": l.get("id"),
+                "listing_type": "historical",
+                "parent_title": l.get("title") or "Historical settlement",
+                "lot_number": None,
+                "lot_title": "Historical settlement",
+                "lot_description": "",
+                "quantity_sold": 1,
+                "quantity_remaining": 0,
+                "unit_price": float(l.get("final_price") or 0),
+                "hammer_total": float(l.get("final_price") or 0),
+                "outcome_status": "sold",
+                "payment_status": "payment_collected",
+                "pickup_confirmed": False,
+                "buyer_id": l.get("winner_user_id"),
+                "ended_at": l.get("ended_at") or l.get("auction_end_date"),
+                "images": [],
+                "receipt_id": l.get("receipt_id"),
+                "is_historical": True,
+                "net_payout_amount": float(l.get("net_payout_amount") or 0),
+            })
+            continue
+        # B. Only listings whose parent is ENDED produce lot outcomes.
+        if parent_status not in ("sold", "ended", "expired", "completed",
+                                 "ended_no_sale", "unsold"):
+            continue
+        # C. Single-listing outcome.
+        if not is_multi:
+            os_status = _outcome_status(l, lot=None)
+            if os_status is None:
+                continue
+            lot_outcomes.append({
+                "outcome_id": f"single-{l.get('id')}",
+                "listing_id": l.get("id"),
+                "listing_type": "single",
+                "parent_title": l.get("title") or "",
+                "lot_number": None,
+                "lot_title": l.get("title") or "",
+                "lot_description": l.get("description") or "",
+                "quantity_sold": 1 if os_status in ("sold", "completed") else 0,
+                "quantity_remaining": 0,
+                "unit_price": float(l.get("final_price")
+                                    or l.get("current_price") or 0),
+                "hammer_total": float(l.get("final_price")
+                                      or l.get("current_price") or 0),
+                "outcome_status": os_status,
+                "payment_status": _payment_status_for_outcome(l),
+                "pickup_confirmed": bool(l.get("pickup_confirmed")
+                                         or l.get("status") == "completed"),
+                "buyer_id": (l.get("winner_user_id") or l.get("winner_id")),
+                "ended_at": l.get("ended_at") or l.get("auction_end_date"),
+                "images": l.get("images") or [],
+                "receipt_id": None,
+                "is_historical": False,
+                "net_payout_amount": float(l.get("net_payout_amount") or 0),
+            })
+            continue
+        # D. Multi-item: one outcome per lot.
+        multiply = bool(l.get("multiply_hammer_by_quantity"))
+        for lot in l["lots"]:
+            os_status = _outcome_status(l, lot=lot)
+            if os_status is None:
+                continue
+            lot_num = lot.get("lot_number")
+            qty_orig = int(lot.get("quantity") or 0) or None
+            bn_sold = int(lot.get("sold_quantity") or 0)
+            auction_won = int(lot.get("winning_quantity")
+                              or lot.get("quantity_won") or 0)
+            has_bid_winner = bool(lot.get("winner_user_id")
+                                  or lot.get("winner_id")
+                                  or lot.get("highest_bidder_id"))
+            qty_sold = bn_sold + (auction_won if has_bid_winner else 0)
+            qty_remaining = (qty_orig - qty_sold) if qty_orig else None
+            unit_price = float(lot.get("winning_unit_price")
+                               or lot.get("final_price")
+                               or lot.get("current_price") or 0)
+            if os_status in ("sold", "completed"):
+                if multiply and qty_sold > 1:
+                    hammer_total = round(unit_price * qty_sold, 2)
+                else:
+                    hammer_total = round(unit_price, 2)
+            else:
+                hammer_total = 0.0
+            lot_outcomes.append({
+                "outcome_id": f"lot-{l.get('id')}-{lot_num}",
+                "listing_id": l.get("id"),
+                "listing_type": "multi_item",
+                "parent_title": l.get("title") or "",
+                "lot_number": lot_num,
+                "lot_title": lot.get("title") or "",
+                "lot_description": lot.get("description") or "",
+                "quantity_sold": qty_sold,
+                "quantity_remaining": qty_remaining,
+                "unit_price": unit_price,
+                "hammer_total": hammer_total,
+                "outcome_status": os_status,
+                "payment_status": _payment_status_for_outcome(l, lot=lot),
+                "pickup_confirmed": bool(lot.get("pickup_confirmed")
+                                         or l.get("pickup_confirmed")
+                                         or l.get("status") == "completed"),
+                "buyer_id": (lot.get("winner_user_id") or lot.get("winner_id")
+                             or l.get("winner_user_id")),
+                "ended_at": (lot.get("sold_at") or l.get("ended_at")
+                             or l.get("auction_end_date")),
+                "images": lot.get("images") or l.get("images") or [],
+                "receipt_id": None,
+                "is_historical": False,
+                "net_payout_amount": 0.0,
+            })
+
+    # iter456 — Rebuild the Ended-tab counts from outcomes so the badge
+    # count and the visible cards can never diverge.
+    def _oc_sold(o):
+        return o["outcome_status"] in ("sold", "completed")
+
+    def _oc_pc(o):
+        return _oc_sold(o) and o.get("payment_status") == "payment_collected"
+
+    def _oc_pf(o):
+        return _oc_sold(o) and o.get("payment_status") in (
+            "payment_failed", "payment_failed_final")
+
+    def _oc_completed(o):
+        return o["outcome_status"] == "completed" or (
+            _oc_sold(o) and o.get("pickup_confirmed") and o.get("payment_status")
+            == "payment_collected")
+
+    def _oc_ns(o):
+        return o["outcome_status"] == "no_sale"
+
+    counts["sold"]              = sum(1 for o in lot_outcomes if _oc_sold(o))
+    counts["ended_no_sale"]     = sum(1 for o in lot_outcomes if _oc_ns(o))
+    counts["payment_collected"] = sum(1 for o in lot_outcomes if _oc_pc(o))
+    counts["payment_failed"]    = sum(1 for o in lot_outcomes if _oc_pf(o))
+    counts["completed"]         = sum(1 for o in lot_outcomes if _oc_completed(o))
+    counts["ended"]             = sum(1 for o in lot_outcomes)
+
     return {
         "active_listings": len(active_listings),
         # iter454 — receipts now live inside sold_listings via synthetic
@@ -260,6 +445,8 @@ async def get_seller_dashboard(
         "listings": listings,
         "multi_item_listings": multi_listings,
         "all_listings": all_listings,
+        # iter456 — Per-lot outcome cards for the Ended-tab splits.
+        "lot_outcomes": lot_outcomes,
         # HOTFIX v9.1 / Fix 3 — Filter-tab counts for the seller dashboard.
         "counts": counts,
         # iter367 — Historical sales recovered from receipts.

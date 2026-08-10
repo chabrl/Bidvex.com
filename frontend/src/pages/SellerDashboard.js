@@ -764,22 +764,153 @@ const SellerDashboard = () => {
                 return false;
               };
               const all = dashboard?.all_listings || [];
+              // iter456 — When the Ended tab (or any of its split-chips) is
+              // active, render one card per LOT OUTCOME (from
+              // dashboard.lot_outcomes) rather than one ambiguous parent
+              // listing card. Non-ended tabs continue to use `all_listings`.
+              if (listingsFilter === 'ended') {
+                const outcomes = Array.isArray(dashboard?.lot_outcomes)
+                  ? dashboard.lot_outcomes
+                  : [];
+                const matches = (o) => {
+                  if (endedSplit === 'sold') {
+                    return o.outcome_status === 'sold' || o.outcome_status === 'completed';
+                  }
+                  if (endedSplit === 'no_sale') return o.outcome_status === 'no_sale';
+                  if (endedSplit === 'payment_collected') {
+                    return (o.outcome_status === 'sold' || o.outcome_status === 'completed')
+                      && o.payment_status === 'payment_collected';
+                  }
+                  if (endedSplit === 'payment_failed') {
+                    return (o.outcome_status === 'sold' || o.outcome_status === 'completed')
+                      && (o.payment_status === 'payment_failed' || o.payment_status === 'payment_failed_final');
+                  }
+                  if (endedSplit === 'completed') {
+                    return o.outcome_status === 'completed'
+                      || (o.pickup_confirmed && o.payment_status === 'payment_collected');
+                  }
+                  return true; // All Ended
+                };
+                const cards = outcomes.filter(matches);
+                return cards.length > 0 ? (
+                  <div className="space-y-4" data-testid="lot-outcomes-list">
+                    {cards.map((o) => {
+                      const isHist = o.is_historical === true;
+                      const langFr = (i18n.language || 'en').startsWith('fr');
+                      const T = (en, fr) => (langFr ? fr : en);
+                      const titleMain = isHist
+                        ? T('Historical settlement', 'Règlement historique')
+                        : o.lot_number != null
+                          ? `${T('Lot', 'Lot')} #${o.lot_number} · ${o.lot_title || T('Untitled lot', 'Lot sans titre')}`
+                          : (o.lot_title || o.parent_title);
+                      const secondaryContext = isHist
+                        ? T(
+                          `Statement ref: ${o.receipt_id || '—'}`,
+                          `Réf. relevé : ${o.receipt_id || '—'}`,
+                        )
+                        : (o.parent_title || '');
+                      // Payment badge copy
+                      const paymentBadge = (() => {
+                        if (o.payment_status === 'payment_collected') return T('Payment collected', 'Paiement collecté');
+                        if (o.payment_status === 'payment_failed'
+                            || o.payment_status === 'payment_failed_final') return T('Payment failed', 'Paiement échoué');
+                        if (o.payment_status === 'payment_pending') return T('Payment pending', 'Paiement en attente');
+                        return null;
+                      })();
+                      // Outcome badge
+                      const outcomeBadge = (() => {
+                        if (o.outcome_status === 'completed') return T('Completed', 'Terminée');
+                        if (o.outcome_status === 'sold') return T('Sold', 'Vendue');
+                        if (o.outcome_status === 'no_sale') return T('No sale', 'Invendue');
+                        return null;
+                      })();
+                      const pickupBadge = o.pickup_confirmed
+                        ? T('Pickup confirmed', 'Retrait confirmé') : null;
+                      const money = (n) => `$${Number(n || 0).toFixed(2)}`;
+                      return (
+                        <div
+                          key={o.outcome_id}
+                          className="flex flex-col sm:flex-row gap-4 p-4 border rounded-lg hover:bg-accent/50 transition-colors w-full max-w-full overflow-hidden box-border"
+                          data-testid={`lot-outcome-${o.outcome_id}`}
+                        >
+                          <div className="w-20 h-20 sm:w-[120px] sm:h-[90px] rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                            {o.images && o.images[0] ? (
+                              <img src={o.images[0]} alt={o.lot_title || o.parent_title} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                {isHist ? '🧾' : '📦'}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h3
+                              className="font-semibold text-sm sm:text-base leading-snug break-words"
+                              style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
+                              data-testid={`lot-outcome-title-${o.outcome_id}`}
+                            >
+                              {titleMain}
+                            </h3>
+                            {secondaryContext && (
+                              <p
+                                className="text-xs text-muted-foreground"
+                                data-testid={`lot-outcome-parent-${o.outcome_id}`}
+                              >
+                                {isHist ? secondaryContext : `${T('Auction', 'Enchère')}: ${secondaryContext}`}
+                              </p>
+                            )}
+                            {o.lot_description && !isHist && (
+                              <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{o.lot_description}</p>
+                            )}
+                            <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                              {outcomeBadge && (
+                                <Badge variant="secondary" data-testid={`lot-outcome-status-${o.outcome_id}`}>{outcomeBadge}</Badge>
+                              )}
+                              {paymentBadge && (
+                                <Badge className={
+                                  o.payment_status === 'payment_collected'
+                                    ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                                    : o.payment_status === 'payment_failed' || o.payment_status === 'payment_failed_final'
+                                      ? 'bg-rose-100 text-rose-800 border-rose-200'
+                                      : 'bg-amber-100 text-amber-800 border-amber-200'
+                                } data-testid={`lot-outcome-payment-${o.outcome_id}`}>{paymentBadge}</Badge>
+                              )}
+                              {pickupBadge && (
+                                <Badge className="bg-blue-100 text-blue-800 border-blue-200" data-testid={`lot-outcome-pickup-${o.outcome_id}`}>{pickupBadge}</Badge>
+                              )}
+                              {isHist && (
+                                <Badge variant="outline" data-testid={`lot-outcome-historical-${o.outcome_id}`}>{T('Historical', 'Historique')}</Badge>
+                              )}
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3 text-xs">
+                              {o.lot_number != null && (
+                                <div><span className="text-muted-foreground">{T('Qty sold', 'Qté vendue')}: </span><span className="font-medium">{o.quantity_sold}</span></div>
+                              )}
+                              {o.quantity_remaining != null && o.quantity_remaining > 0 && (
+                                <div><span className="text-muted-foreground">{T('Qty remaining', 'Qté restante')}: </span><span className="font-medium">{o.quantity_remaining}</span></div>
+                              )}
+                              <div><span className="text-muted-foreground">{T('Hammer total', 'Total marteau')}: </span><span className="font-medium">{money(o.hammer_total)}</span></div>
+                              {isHist && (
+                                <div><span className="text-muted-foreground">{T('Net payout', 'Paiement net')}: </span><span className="font-medium">{money(o.net_payout_amount)}</span></div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground" data-testid="lot-outcomes-empty">
+                    {t('dashboard.seller.no_listings_found')}
+                  </div>
+                );
+              }
+
               const filtered = all.filter((l) => {
                 const s = l?.status;
                 if (listingsFilter === 'all') return true;
                 if (listingsFilter === 'active') return s === 'active';
                 if (listingsFilter === 'pending_review') return _PENDING.has(s);
                 if (listingsFilter === 'draft') return s === 'draft';
-                if (listingsFilter === 'ended') {
-                  if (!_ENDED.has(s)) return false;
-                  // iter298 BUG 5 / iter454 — Ended split sub-filter.
-                  if (endedSplit === 'sold') return _isSold(l);
-                  if (endedSplit === 'no_sale') return isNoSaleListing(l) || l?.relisted_to;
-                  if (endedSplit === 'payment_collected') return _isSold(l) && _hasAnyPaymentCollected(l);
-                  if (endedSplit === 'payment_failed') return _isSold(l) && _hasAnyPaymentFailed(l);
-                  if (endedSplit === 'completed') return _isCompleted(l);
-                  return true;
-                }
                 return true;
               });
               return (
