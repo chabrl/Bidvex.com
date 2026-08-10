@@ -213,6 +213,7 @@ async def _progress_event(db, event: Dict[str, Any], now: datetime) -> tuple[int
                 _claim = await _sed_claim(
                     db, kind="auction_won",
                     auction_id=event["id"], user_id=winner_id,
+                    event_key=f"lot:{_slot.get('lot_number')}",
                 )
                 if not _claim:
                     return

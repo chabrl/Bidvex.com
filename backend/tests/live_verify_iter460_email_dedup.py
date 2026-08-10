@@ -165,11 +165,15 @@ async def main():
         # Seller receives EXACTLY 1 seller_sold email covering 3 sold lots
         checks.append(("Scenario 3/4 — Seller: exactly 1 seller_sold summary email",
                        tally_a.get(("send_seller_auction_sold_email", s1_email)) == 1))
-        # Buyer A wins 2 lots → payment_link is per-lot but must be gated to 1
-        checks.append(("Scenario 3 — Buyer A: exactly 1 payment_link email",
-                       tally_a.get(("send_payment_link_email", b_a_email)) == 1))
-        # Buyer B: 1 payment_link
-        checks.append(("Scenario 4 — Buyer B: exactly 1 payment_link email",
+        # Buyer A wins 2 lots → after iter461 per-lot payment_link keys,
+        # each lot's failed-charge fires its own legitimate email once.
+        # Retries of the SAME lot's SAME failure remain blocked (checked
+        # in Scenario 1/2 below).
+        checks.append(("Scenario 3 — Buyer A (2 lots): 2 payment_link emails "
+                       "(one per legitimate per-lot settlement, iter461 scope)",
+                       tally_a.get(("send_payment_link_email", b_a_email)) == 2))
+        # Buyer B: 1 lot → 1 payment_link
+        checks.append(("Scenario 4 — Buyer B (1 lot): exactly 1 payment_link email",
                        tally_a.get(("send_payment_link_email", b_b_email)) == 1))
         # Unsold lot 4 must NOT fire an auction_won email to anyone
         checks.append(("Unsold lot 4: no auction_won emails fired for missing bidder",

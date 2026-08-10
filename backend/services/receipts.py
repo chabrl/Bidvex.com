@@ -113,12 +113,16 @@ async def issue_transaction_records(
             out["receipt_id"] = rid
             if buyer and buyer.get("email"):
                 # iter460 — settlement-email dedup: one buyer_receipt email
-                # per (auction, buyer). Per-lot receipt rows are still
-                # written above; only the customer-facing email is gated.
+                # per (auction, buyer, lot). Per-lot receipt rows are still
+                # written above; each legitimate per-lot settlement email
+                # (iter461) fires once, but retries of the SAME lot's SAME
+                # settlement are still blocked by the ledger.
                 from services.settlement_email_dedup import claim_settlement_email
+                _lot_key = f"lot:{lot_number}" if lot_number is not None else ""
                 claimed = await claim_settlement_email(
                     db, kind="buyer_receipt",
                     auction_id=listing_id, user_id=buyer_id,
+                    event_key=_lot_key,
                 )
                 if claimed:
                     try:
@@ -154,12 +158,15 @@ async def issue_transaction_records(
                 out["statement_id"] = sid
                 if seller and seller.get("email"):
                     # iter460 — settlement-email dedup: one seller_statement
-                    # summary email per (auction, seller). Per-lot rows still
-                    # persist; only the email is deduped.
+                    # summary email per (auction, seller, lot). Per-lot
+                    # rows still persist; each legitimate per-lot
+                    # settlement (iter461) fires once, retries blocked.
                     from services.settlement_email_dedup import claim_settlement_email
+                    _lot_key = f"lot:{lot_number}" if lot_number is not None else ""
                     claimed = await claim_settlement_email(
                         db, kind="seller_statement",
                         auction_id=listing_id, user_id=seller_id,
+                        event_key=_lot_key,
                     )
                     if claimed:
                         try:

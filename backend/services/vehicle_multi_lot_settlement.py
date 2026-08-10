@@ -255,6 +255,7 @@ async def settle_lot(db, *, event: Dict[str, Any], lot: Dict[str, Any]) -> Dict[
                     _buyer_claim = await _sed_claim(
                         db, kind="auction_won",
                         auction_id=event_id, user_id=winner.get("id"),
+                        event_key=f"lot:{lot.get('lot_number')}",
                     )
                     if _buyer_claim:
                         await send_auction_won_email(
@@ -276,6 +277,7 @@ async def settle_lot(db, *, event: Dict[str, Any], lot: Dict[str, Any]) -> Dict[
                         _seller_claim = await _sed_claim(
                             db, kind="seller_sold",
                             auction_id=event_id, user_id=event.get("seller_id"),
+                            event_key=f"lot:{lot.get('lot_number')}",
                         )
                         if _seller_claim:
                             await send_auction_sold_email(

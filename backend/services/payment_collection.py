@@ -464,11 +464,17 @@ async def finalize_auction_payment(
 
             buyer = await db.users.find_one({"id": winner_id}, {"_id": 0}) or {}
             if buyer.get("email"):
-                # iter460 — dedup: one payment_link email per (auction, buyer)
+                # iter460 — dedup: one payment_link email per (auction, buyer, lot).
+                # iter461: per-lot event_key so a lot that legitimately fails
+                # again after a genuinely separate settlement attempt on a
+                # different lot is not incorrectly blocked. Retries of the
+                # SAME lot's SAME failed charge still resolve to the same key.
                 from services.settlement_email_dedup import claim_settlement_email as _sed_claim
+                _lot_key = f"lot:{lot_number}" if lot_number is not None else ""
                 _claim = await _sed_claim(
                     db, kind="payment_link",
                     auction_id=listing_id, user_id=winner_id,
+                    event_key=_lot_key,
                 )
                 if _claim:
                     try:
@@ -503,11 +509,14 @@ async def finalize_auction_payment(
 
             buyer = await db.users.find_one({"id": winner_id}, {"_id": 0}) or {}
             if buyer.get("email"):
-                # iter460 — dedup: one payment_failed email per (auction, buyer)
+                # iter460 — dedup: one payment_failed email per (auction, buyer, lot)
+                # iter461 — per-lot event_key.
                 from services.settlement_email_dedup import claim_settlement_email as _sed_claim
+                _lot_key = f"lot:{lot_number}" if lot_number is not None else ""
                 _claim = await _sed_claim(
                     db, kind="payment_failed",
                     auction_id=listing_id, user_id=winner_id,
+                    event_key=_lot_key,
                 )
                 if _claim:
                     try:

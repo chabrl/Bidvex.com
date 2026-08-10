@@ -1,6 +1,63 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter461 — Delivery-Key Scope Correction (Feb 9, 2026) ✅ COMPLETE
+
+**Reported by user (P0 diagnostic follow-up to iter460)**: Verify whether the delivery key `(kind, auction_id, user_id)` can suppress a legitimate later settlement email of the SAME kind on the SAME auction for the SAME buyer/seller. Test only first (no code changes). If it does, extend the key with a stable settlement identity — do not touch email content, financial logic, invoice delivery, escrow, or unrelated flows. Do not deploy.
+
+### Probe results (test-only, before any code change)
+Ran `tests/live_probe_iter461_delivery_key_scope.py`:
+  - **A — Fail → success (different kinds)**: `payment_failed` then `buyer_receipt` for the same buyer + auction was **NOT** blocked. The user's exact scenario is safe under the original key.
+  - **B — Two legitimate per-lot settlements (same kind)**: the SECOND `buyer_receipt` claim on the same `(auction, buyer)` was **blocked** by the original three-field key. **This is the over-suppression the user surfaced.**
+  - **C — Retries of the same real event**: correctly blocked.
+  - **D — Two separate auctions**: fire independently.
+
+### Root cause of over-suppression
+The original delivery key from iter460 was `(kind, auction_id, user_id)`. For once-per-auction kinds (`auction_won` aggregated at multi-item close, `seller_sold`, webhook `purchase_confirmation_*`) this was correct. For per-lot kinds (`buyer_receipt`, `seller_statement`, `payment_link`, `payment_failed`) and for the vehicle-multi-lot flow where lots close at different timestamps, distinct legitimate settlements collapse to the same key — so only the first legitimate email fires.
+
+### Delivered (minimal key-scope extension — no other changes)
+- **`services/settlement_email_dedup.py`** — extended the ledger key with a stable `event_key` field.
+  - New unique index: `(kind, auction_id, user_id, event_key)` under name `uniq_settlement_email_dispatch_v2`.
+  - The legacy three-field index is dropped at process start via `ensure_indexes()`. Existing rows are back-filled with `event_key=""` (idempotent).
+  - `claim_settlement_email(...)` now accepts `event_key: str = ""` (default preserves the once-per-auction dedup for aggregated kinds).
+- **Per-lot callers now pass `event_key=f"lot:{lot_number}"`**:
+  - `services/receipts.py` — both `buyer_receipt` and `seller_statement`.
+  - `services/payment_collection.py::finalize_auction_payment` — `payment_link` and `payment_failed`.
+  - `services/vehicle_multi_lot_settlement.py::settle_lot` — `auction_won` and `seller_sold` (lots close on different timestamps).
+  - `services/vehicle_multi_lot_scheduler.py` — `auction_won`.
+- **Aggregated multi-item flows unchanged**: `routes/auctions.py::process_ended_auctions` still passes `event_key=""` for `auction_won` and `seller_sold` — multi-item lot auctions close atomically as one settlement event, so the aggregate-per-buyer / aggregate-per-seller behaviour from iter460 is preserved.
+- **Webhook confirmations unchanged**: `_send_purchase_confirmation_emails` still uses `event_key=""` — Stripe's checkout completion is a single settlement event per invoice.
+
+### Explicit non-goals honoured
+- Email content / bilingual templates — untouched.
+- Financial logic, invoice delivery, escrow, PDF templates, Stripe / cash / e-transfer workflows — untouched.
+- iter460 aggregation behaviour for multi-item lot auction close — preserved.
+- Admin `resend_winner_notification` — untouched.
+- No frontend changes. Not deployed.
+
+### Verified
+- **iter461 acceptance** (`tests/live_verify_iter461_delivery_key_scope.py`) — **13/13 PASS**: fail→success emits both intended emails; two distinct lots each fire their own `buyer_receipt` (lot 1, lot 2, lot 3); seller statement fires per lot; retries of same lot's same event blocked; new auction independent; `auction_won` with `event_key=""` still dedupes to enforce aggregation; `auction_won` with a different `event_key` on the same `(auction, buyer)` fires independently (vehicle-multi-lot behaviour).
+- **iter460 acceptance** (`tests/live_verify_iter460_email_dedup.py`) — **16/16 PASS** with the payment_link assertion updated to reflect corrected per-lot semantics (Buyer A with 2 legit failed-charge lots receives 2 payment_link emails, not 1).
+- **iter459 regression** (`tests/live_verify_iter459_buyer_payment_letter.py`) — **51/51 PASS**.
+
+### Trigger map summary (kinds × event_key convention)
+| Kind | `event_key` | Rationale |
+|------|-------------|-----------|
+| `auction_won` (multi-item lots, single listing, single vehicle, webhook path) | `""` | Auction closes atomically — one aggregate settlement event |
+| `auction_won` (vehicle multi-lot, lots close at different timestamps) | `f"lot:{n}"` | Each lot close is a distinct settlement event |
+| `seller_sold` (aggregated flows) | `""` | Same as `auction_won` |
+| `seller_sold` (vehicle multi-lot) | `f"lot:{n}"` | Per-lot event |
+| `buyer_receipt` | `f"lot:{n}"` | Each lot's payment completion is distinct |
+| `seller_statement` | `f"lot:{n}"` | Same |
+| `payment_link` | `f"lot:{n}"` | Each lot's failed-charge → link is distinct |
+| `payment_failed` | `f"lot:{n}"` | Same |
+| `purchase_confirmation_buyer/seller` | `""` | Single Stripe checkout → single confirmation |
+
+### Follow-up (paused per user directive)
+- Escrow payout verification blocked until Stripe balance moves from Incoming → Available (user action).
+- Claude AI Models integration paused per user directive.
+
+
 ## iter460 — Duplicate Transactional Emails for Auction Settlements (Feb 9, 2026) ✅ COMPLETE
 
 **Reported by user (P0)**: Fix only duplicate transactional emails for auction settlements. Trace every current trigger, reproduce the bug, then ensure: 1 buyer email per settlement event; 1 seller summary email per settlement event; retried webhooks / scheduler retries / duplicate processing do not re-send; multi-lot buyer wins arrive as a single message (not per lot); seller summary reflects only that seller's sold lots for the settlement; separate real settlements still send their own emails; English + French preserved; no changes to email content, invoice triggers, PDF delivery, Stripe / cash / e-transfer workflows, settlement math, escrow, or unrelated notifications.
