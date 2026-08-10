@@ -206,8 +206,8 @@ TRANSLATIONS = {
         "fr": "Paiement au vendeur: {} CAD (Total marteau)<br><span style=\"font-size: 9pt; color: #666;\">Payez ce montant directement au vendeur aux enchères</span>"
     },
     "payment_bidvex_detail": {
-        "en": "Payment to BidVex: {} CAD (Premium + Taxes)<br><span style=\"font-size: 9pt; color: #666;\">This covers BidVex's 5% buyer's premium and applicable taxes</span>",
-        "fr": "Paiement à BidVex: {} CAD (Prime + Taxes)<br><span style=\"font-size: 9pt; color: #666;\">Ceci couvre la prime d'acheteur de 5% de BidVex et les taxes applicables</span>"
+        "en": "Payment to BidVex: {} CAD (Premium + Taxes)<br><span style=\"font-size: 9pt; color: #666;\">This covers BidVex's buyer's premium, payment charges, and applicable taxes</span>",
+        "fr": "Paiement à BidVex: {} CAD (Prime + Taxes)<br><span style=\"font-size: 9pt; color: #666;\">Ceci couvre la prime d'acheteur de BidVex, les frais de paiement et les taxes applicables</span>"
     },
     "complete_purchase_intro": {
         "en": "To complete your purchase, please submit the <strong>BidVex portion ({} CAD)</strong> by <strong>{}</strong> using one of the following methods:",
@@ -264,6 +264,47 @@ TRANSLATIONS = {
     "automated_notification": {
         "en": "This is an automated payment notification from BidVex",
         "fr": "Ceci est une notification de paiement automatisée de BidVex"
+    },
+    # iter459 — Payment letter per-lot table + fee/tax line labels
+    "auction_name": {
+        "en": "Auction",
+        "fr": "Enchère"
+    },
+    "lots_won_table_heading": {
+        "en": "LOTS WON",
+        "fr": "LOTS GAGNÉS"
+    },
+    "payment_charges": {
+        "en": "Payment Processing Charges",
+        "fr": "Frais de traitement du paiement"
+    },
+    "amount_due_to_bidvex": {
+        "en": "Amount Due to BidVex",
+        "fr": "Montant dû à BidVex"
+    },
+    "gst_line": {
+        "en": "GST ({}%)",
+        "fr": "TPS ({}%)"
+    },
+    "qst_line": {
+        "en": "QST ({}%)",
+        "fr": "TVQ ({}%)"
+    },
+    "hst_line": {
+        "en": "HST ({}%)",
+        "fr": "TVH ({}%)"
+    },
+    "gst_line_no_rate": {
+        "en": "GST",
+        "fr": "TPS"
+    },
+    "qst_line_no_rate": {
+        "en": "QST",
+        "fr": "TVQ"
+    },
+    "hst_line_no_rate": {
+        "en": "HST",
+        "fr": "TVH"
     },
     
     # Seller Statement

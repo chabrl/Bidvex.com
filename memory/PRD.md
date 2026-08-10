@@ -1,6 +1,32 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter459 — Buyer Payment-Letter Accuracy (Feb 9, 2026) ✅ COMPLETE
+
+**Reported by user (P0)**: Fix ONLY the buyer payment-letter accuracy for auction wins. The letter must use only lots actually won by that specific buyer — never arbitrary first lots, placeholder buyer data, sample paddle numbers, another buyer's lots, or unsold lots. For each real won lot show: Auction name, Lot number/title, Unit price, Quantity, Line total, Hammer total, existing buyer premium (and payment charges), taxes from the existing tax engine, final amount due, and Buyer paddle number. Do not change existing invoice triggers, fee/tax calculations, or unrelated documents.
+
+### Delivered
+- **New helper** `routes/invoices.py::_build_settled_buyer_dataset(db, auction, buyer_id)` — mirrors iter457 `_build_settled_seller_dataset` for the buyer side. Filters lots by `winner_user_id == buyer_id` (also legacy `winner_id` / `highest_bidder_id`), skips cancelled/removed/voided/unsold rows, resolves per-lot totals via `services.hammer_total.resolve_hammer_total` (unit × qty), then calls `services.fee_calculator.calculate_fee` ONCE with real buyer/seller province + tier + account_type to get `buyer_premium`, `buyer_premium_rate`, `buyer_stripe_recovery`, `buyer_gst/qst/hst/taxes`, `buyer_tax_label`, `buyer_total_charged` verbatim. Reads paddle from `paddle_numbers` (returns `None` if missing — never invents). Emits `buyer_tax_lines` list with only engine-positive components. Raises `HTTPException(400)` when the buyer won zero lots.
+- **Refactored** `POST /api/invoices/payment-letter/{auction_id}/{user_id}` — removed `auction['lots'][:3]` demo slice and the manual BP/GST/QST recomputation. Now uses the dataset helper; assigns a real paddle via existing `generate_paddle_number` only if the buyer has none for this auction. Accepts optional `?lang=en|fr` query param (falls back to buyer's `preferred_language`).
+- **Rewrote** `invoice_templates_complete.py::payment_letter_template` — now renders a per-lot table (Lot #, Description, Unit Price, Qty, Line Total) plus a totals panel with Hammer Total, Buyer's Premium (real %), Payment Processing Charges, dynamic GST/QST/HST rows from `tax_lines`, Amount Due to BidVex, and TOTAL DUE. Auction name + paddle surface in the recipient header. No local math anywhere in the template.
+- **Bilingual translations** — added `auction_name`, `lots_won_table_heading`, `payment_charges`, `amount_due_to_bidvex`, `gst_line`/`qst_line`/`hst_line` (with `*_no_rate` fallbacks) in `invoice_translations.py`. Softened `payment_bidvex_detail` to drop the hardcoded "5%" so premium/vip/partner tiers no longer misstate the rate in copy.
+
+### Verified end-to-end
+- **Live E2E** (`tests/live_verify_iter459_buyer_payment_letter.py`) — 51/51 checks PASS against live preview:
+  - Buyer A EN + FR letters show only Lot 1 ($100 × 1 = $100) + Lot 2 ($7 × 3 = $21), hammer_total $121.00, BP 5.00% = $6.05, GST 5.0% + QST 9.975%.
+  - Buyer B EN letter shows only Lot 3 ($50 × 2 = $100), hammer_total $100.00, real paddle 12002.
+  - Buyer A letter never contains Buyer B's name, paddle 12002, Lot 3 title, or Lot 4 (unsold).
+  - No placeholder tokens ("Test Buyer", 5051/5052/5053, or the hardcoded 3-lot demo) survive.
+- **Pytest** (`tests/test_iter459_buyer_payment_letter_dataset.py`) — 7/7 PASS: filtering, exclusion of other buyer + unsold, multi-qty math, 400 on zero lots, fee-engine verbatim, real paddle passthrough, tax-line component filtering.
+- **Backend testing subagent (iteration_459.json)** — 100% backend success, zero critical or minor issues; full regression across iter451/iter457/iter458 documents (Lots Won, Seller Statement, Seller Receipt, Commission Invoice) confirmed no regression. Fee engine + tax engine + hammer resolver produce identical outputs to iter458 (no engine files modified).
+
+### Explicit non-goals honoured
+- Fee engines, tax engines, Stripe workflows, and settlement services — untouched.
+- Buyer Invoice / Receipt / Lots Won Summary / Seller documents — untouched.
+- No email delivery, automatic invoice triggers, cash/e-transfer logic, co-branding, or escrow changes.
+- No frontend changes.
+
+
 ## iter451 — Auction-End Quantity Calc + Full Regression Suite (Feb 8, 2026) ✅ COMPLETE
 
 **Reported by user (P0)**: Fix the auction-end quantity calculation defect for multi-item lots. `Unit price × winning quantity = hammer total` must propagate through settlement → buyer premium → processing fees → taxes → invoices → payments → seller settlement. Do NOT alter historical data or Buy Now / total-lot pricing.

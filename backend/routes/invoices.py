@@ -526,6 +526,250 @@ def _build_seller_tax_lines(processed_lots: list) -> list:
     return lines
 
 
+# ══════════════════════════════════════════════════════════════════════════
+# iter459 — Buyer-document data resolver (payment letter accuracy).
+#
+# Mirrors `_build_settled_seller_dataset` but from the BUYER's perspective.
+# The payment letter MUST reflect ONLY the lots this specific buyer won,
+# never placeholder "first N", another buyer's lots, or unsold lots.
+#
+#   • Won lots        → auction.lots where winner_user_id (or legacy
+#                        winner_id / highest_bidder_id) == buyer_id AND
+#                        (status ∈ {sold, won} OR resolved hammer_total > 0
+#                         AND status not in {cancelled, removed, voided}).
+#   • Per-lot totals   → services.hammer_total.resolve_hammer_total()
+#                        (unit_price × winning_quantity math preserved).
+#   • Buyer premium    → services.fee_calculator.calculate_fee(...) with
+#     + payment charge   the seller's real account_type/tier/province and
+#     + taxes            the buyer's real province/tier — NEVER recomputed
+#                        by this module. Route matches the settlement +
+#                        checkout paths so numbers reconcile.
+#   • Paddle number    → paddle_numbers collection lookup for this buyer +
+#                        auction. Never invented / never a sample value.
+#
+# The helper is pure/read-only and safe to call from any route.
+# ══════════════════════════════════════════════════════════════════════════
+
+async def _build_settled_buyer_dataset(
+    db_client, auction: Dict[str, Any], buyer_id: str
+) -> Dict[str, Any]:
+    """Build the real won-lot dataset for the given auction + buyer.
+
+    Returns a dict with:
+        {
+          "lots": [                        # only lots this buyer WON
+            {
+              "lot_number": int|str,
+              "title": str,
+              "description": str,
+              "quantity": int,
+              "unit_price": float,
+              "line_total": float,         # unit_price × quantity
+              "hammer_price": float,       # alias of line_total for
+                                           # back-compat with older tests
+            }, ...
+          ],
+          "hammer_total": float,           # sum(line_total)
+          "buyer_premium": float,          # from fee engine
+          "buyer_premium_rate": float,     # decimal, e.g. 0.05
+          "buyer_premium_rate_pct": float, # e.g. 5.0
+          "buyer_stripe_recovery": float,  # payment-charge line from engine
+          "buyer_taxes": float,            # total tax from engine
+          "buyer_gst": float,              # per-component from engine
+          "buyer_qst": float,
+          "buyer_hst": float,
+          "buyer_tax_label": str,          # canonical label from engine
+          "buyer_tax_province": str,       # normalized province used
+          "buyer_tax_lines": [             # list of non-zero tax lines
+            {kind, label_en, label_fr, amount, rate_pct}, ...
+          ],
+          "amount_due": float,             # what buyer owes BidVex (BP +
+                                           # stripe recovery + tax) — same
+                                           # as buyer_total - hammer_total
+          "buyer_total_charged": float,    # hammer + BP + recovery + tax
+                                           # (full amount for Stripe path)
+          "buyer_name": str,               # real buyer full_name / name
+          "paddle_number": int|None,       # real paddle from paddle_numbers
+        }
+
+    Raises HTTPException(400) when the buyer won no lots on this auction.
+    Raises HTTPException(500) when the fee engine cannot resolve a policy.
+    """
+    from services.hammer_total import resolve_hammer_total
+    from services.fee_calculator import calculate_fee
+    from services.listing_seller_enrichment import resolve_seller_account_type
+
+    # ── Buyer context (province + tier for buyer's tax + BP tier) ──
+    buyer = await db_client.users.find_one({"id": buyer_id}, {"_id": 0}) or {}
+    buyer_prov = (
+        buyer.get("province")
+        or buyer.get("billing_province")
+        or auction.get("location_province")
+        or "QC"
+    )
+    buyer_tier = buyer.get("subscription_tier", "free")
+    buyer_name = (
+        (buyer.get("full_name") or buyer.get("name") or buyer.get("email") or "").strip()
+        or "Buyer"
+    )
+
+    # ── Seller context (account_type + tier + province — real fee policy) ──
+    seller_id = auction.get("seller_id") or auction.get("user_id")
+    seller = {}
+    if seller_id:
+        seller = await db_client.users.find_one({"id": seller_id}, {"_id": 0}) or {}
+    seller_tier = seller.get("subscription_tier", "free")
+    seller_prov = (
+        seller.get("province")
+        or seller.get("business_province")
+        or auction.get("location_province")
+        or buyer_prov
+    )
+    # Same context-aware routing the enrichment resolver uses so the fee
+    # engine gets the correct seller_account_type for lots auctions.
+    listing_context = "lots"
+    if (auction.get("listing_type") or auction.get("auction_type") or "").lower() == "vehicle":
+        listing_context = "vehicle"
+    seller_account_type = resolve_seller_account_type(seller, listing_context)
+
+    # ── Filter to the lots this buyer ACTUALLY won ──
+    won_rows: list = []
+    for lot in auction.get("lots", []) or []:
+        winner = (
+            lot.get("winner_user_id")
+            or lot.get("winner_id")
+            or lot.get("highest_bidder_id")
+        )
+        if winner != buyer_id:
+            continue
+        lot_status_raw = (lot.get("status") or "").lower()
+        # Skip lots that never resolved to a sale for this buyer.
+        if lot_status_raw in ("cancelled", "removed", "voided", "unsold"):
+            continue
+        totals = resolve_hammer_total(auction, lot=lot)
+        hammer_total_lot = float(totals["hammer_total"])
+        if hammer_total_lot <= 0 and lot_status_raw not in ("sold", "won"):
+            continue
+        won_rows.append({
+            "lot_number": lot.get("lot_number"),
+            "title": lot.get("title") or "",
+            "description": lot.get("description") or "",
+            "quantity": int(totals["quantity"]),
+            "unit_price": float(totals["unit_price"]),
+            "line_total": round(hammer_total_lot, 2),
+            "hammer_price": round(hammer_total_lot, 2),
+        })
+
+    if not won_rows:
+        raise HTTPException(
+            status_code=400,
+            detail="No lots won by this buyer on this auction — payment letter cannot be produced.",
+        )
+
+    # ── Aggregate hammer + run the fee engine ONCE with the real total ──
+    hammer_total = round(sum(r["line_total"] for r in won_rows), 2)
+    try:
+        fee = calculate_fee(
+            hammer_price=hammer_total,
+            auction_type=auction.get("listing_type") or auction.get("auction_type") or "lots",
+            seller_account_type=seller_account_type,
+            seller_tier=seller_tier,
+            buyer_account_type=buyer.get("account_type") or "individual",
+            buyer_tier=buyer_tier,
+            payment_method="stripe",
+            card_type="domestic",
+            buyer_province=buyer_prov,
+            seller_province=seller_prov,
+            partner_bp_rate=float(
+                auction.get("custom_buyer_premium_rate")
+                or auction.get("partner_bp_rate")
+                or 0.0
+            ),
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.error(
+            f"[buyer-docs] calculate_fee failed for auction={auction.get('id')} "
+            f"buyer={buyer_id}: {exc}"
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="fee_engine_unavailable — payment letter cannot be produced without a real fee policy",
+        )
+
+    buyer_premium = float(fee.get("buyer_premium") or 0.0)
+    buyer_premium_rate = float(fee.get("buyer_premium_rate") or 0.0)
+    buyer_stripe_recovery = float(fee.get("buyer_stripe_recovery") or 0.0)
+    buyer_taxes = float(fee.get("buyer_taxes") or 0.0)
+    buyer_gst = float(fee.get("buyer_gst") or 0.0)
+    buyer_qst = float(fee.get("buyer_qst") or 0.0)
+    buyer_hst = float(fee.get("buyer_hst") or 0.0)
+    buyer_tax_label = str(fee.get("buyer_tax_label") or "")
+    buyer_tax_province = str(fee.get("buyer_tax_province") or buyer_prov)
+    buyer_total_charged = float(fee.get("buyer_total_charged") or 0.0)
+    # Amount the buyer owes BidVex directly (BP + stripe recovery + tax).
+    # For Stripe path buyer_total_charged already includes hammer.
+    amount_due = round(buyer_premium + buyer_stripe_recovery + buyer_taxes, 2)
+
+    # ── Build tax-line list — engine amounts only; no synthesis ──
+    tax_lines: list = []
+    from services.tax_rate_config import get_tax_rate_sync
+    rates = get_tax_rate_sync(buyer_tax_province)
+    for kind, label_en, label_fr, amount, statutory_rate in (
+        ("gst", "GST", "TPS", buyer_gst, rates.get("gst")),
+        ("qst", "QST", "TVQ", buyer_qst, rates.get("qst")),
+        ("hst", "HST", "TVH", buyer_hst, rates.get("hst")),
+    ):
+        rounded = round(float(amount), 2)
+        if rounded <= 0:
+            continue
+        rate_pct = None
+        if statutory_rate is not None:
+            try:
+                rate_pct = round(float(statutory_rate) * 100.0, 3)
+            except (TypeError, ValueError):
+                rate_pct = None
+        tax_lines.append({
+            "kind":     kind,
+            "label_en": label_en,
+            "label_fr": label_fr,
+            "amount":   rounded,
+            "rate_pct": rate_pct,
+        })
+
+    # ── Real paddle number lookup (never invented) ──
+    paddle_row = await db_client.paddle_numbers.find_one({
+        "auction_id": auction.get("id"),
+        "user_id": buyer_id,
+    }, {"_id": 0, "paddle_number": 1})
+    paddle_number = paddle_row.get("paddle_number") if paddle_row else None
+
+    return {
+        "lots": won_rows,
+        "hammer_total": hammer_total,
+        "buyer_premium": round(buyer_premium, 2),
+        "buyer_premium_rate": round(buyer_premium_rate, 6),
+        "buyer_premium_rate_pct": round(buyer_premium_rate * 100, 4),
+        "buyer_stripe_recovery": round(buyer_stripe_recovery, 2),
+        "buyer_taxes": round(buyer_taxes, 2),
+        "buyer_gst": round(buyer_gst, 2),
+        "buyer_qst": round(buyer_qst, 2),
+        "buyer_hst": round(buyer_hst, 2),
+        "buyer_tax_label": buyer_tax_label,
+        "buyer_tax_province": buyer_tax_province,
+        "buyer_tax_lines": tax_lines,
+        "amount_due": amount_due,
+        "buyer_total_charged": round(buyer_total_charged, 2),
+        "buyer_name": buyer_name,
+        "buyer_email": buyer.get("email", ""),
+        "buyer_phone": buyer.get("phone", ""),
+        "buyer_company_name": buyer.get("company_name"),
+        "buyer_billing_address": buyer.get("billing_address") or buyer.get("address") or "",
+        "buyer_subscription_tier": buyer_tier,
+        "paddle_number": paddle_number,
+        "seller_account_type": seller_account_type,
+    }
+
+
 @invoices_router.get("/invoices")
 async def list_invoices(current_user: User = Depends(get_current_user)):
     """List all invoices for the current user, each with a fresh signed download URL."""
@@ -824,127 +1068,124 @@ async def generate_lots_won_invoice(
 async def generate_payment_letter(
     auction_id: str,
     user_id: str,
+    lang: Optional[str] = None,
     current_user: User = Depends(get_current_user)
 ):
     """
-    Generate Payment Letter PDF for buyer
-    Requires admin privileges or matching user_id
+    Generate Payment Letter PDF for buyer.
+
+    iter459 — Uses ONLY the lots this specific buyer actually won on this
+    auction. Fee, payment charges, and taxes come from the unified
+    fee engine (`services.fee_calculator.calculate_fee`) — never recomputed
+    locally. Paddle number is looked up from `paddle_numbers` (created via
+    the standard helper only if the buyer never received a paddle for
+    this auction).
     """
     # Check permissions
     if current_user.account_type != "admin" and getattr(current_user, "role", None) not in ("admin", "super_admin") and current_user.id != user_id:
         raise HTTPException(status_code=403, detail="Not authorized")
-    
+
     # Fetch auction
     auction = await db.multi_item_listings.find_one({"id": auction_id})
     if not auction:
         raise HTTPException(status_code=404, detail="Auction not found")
-    
-    # Fetch buyer
+
+    # Fetch buyer up-front (helper also fetches it but we need the record
+    # to honour language preference on the PDF language toggle).
     buyer = await db.users.find_one({"id": user_id})
     if not buyer:
         raise HTTPException(status_code=404, detail="User not found")
-    
-    # Get paddle number
-    paddle_record = await db.paddle_numbers.find_one({
-        "auction_id": auction_id,
-        "user_id": user_id
-    })
-    
-    if not paddle_record:
-        # Create if doesn't exist
-        paddle_num = await generate_paddle_number(auction_id)
-        paddle_record = {
+
+    # Language: explicit query param overrides buyer's preferred_language.
+    resolved_lang = (lang or buyer.get("preferred_language") or "en").lower()
+    if resolved_lang not in ("en", "fr"):
+        resolved_lang = "en"
+
+    # Real-data dataset (400 if no lots won by this buyer).
+    dataset = await _build_settled_buyer_dataset(db, auction, user_id)
+
+    # Paddle number: if none exists in paddle_numbers we assign one via
+    # the standard helper (real paddle assignment, not a placeholder).
+    paddle_number = dataset["paddle_number"]
+    if paddle_number is None:
+        paddle_number = await generate_paddle_number(auction_id)
+        await db.paddle_numbers.insert_one({
             "id": str(uuid.uuid4()),
             "auction_id": auction_id,
             "user_id": user_id,
-            "paddle_number": paddle_num,
-            "assigned_at": datetime.now(timezone.utc).isoformat()
-        }
-        await db.paddle_numbers.insert_one(paddle_record)
-    
-    # Find lots won (demo: first 3 lots)
-    lots_won = []
-    for lot in auction['lots'][:3]:
-        lots_won.append({
-            "lot_number": lot['lot_number'],
-            "title": lot['title'],
-            "hammer_price": lot['current_price']
+            "paddle_number": paddle_number,
+            "assigned_at": datetime.now(timezone.utc).isoformat(),
         })
-    
-    if not lots_won:
-        raise HTTPException(status_code=400, detail="No lots won by this buyer")
-    
-    # Calculate totals (same as Lots Won Summary)
-    hammer_total = sum(lot['hammer_price'] for lot in lots_won)
-    premium_percentage = auction.get('premium_percentage', 5.0)
-    premium_amount = hammer_total * (premium_percentage / 100)
-    subtotal = hammer_total + premium_amount
-    
-    tax_rate_gst = auction.get('tax_rate_gst', 5.0)
-    tax_rate_qst = auction.get('tax_rate_qst', 9.975)
-    
-    gst_on_hammer = hammer_total * (tax_rate_gst / 100)
-    qst_on_hammer = hammer_total * (tax_rate_qst / 100)
-    gst_on_premium = premium_amount * (tax_rate_gst / 100)
-    qst_on_premium = premium_amount * (tax_rate_qst / 100)
-    
-    total_tax = gst_on_hammer + qst_on_hammer + gst_on_premium + qst_on_premium
-    grand_total = subtotal + total_tax
-    
-    # Generate invoice number (reuse from lots won or create new)
+
+    # Reuse an existing lots_won invoice number when present so the two
+    # buyer documents share the same invoice reference. Otherwise mint a
+    # fresh one.
     existing_invoice = await db.invoices.find_one({
         "auction_id": auction_id,
         "user_id": user_id,
-        "invoice_type": "lots_won"
+        "invoice_type": "lots_won",
     })
-    
-    if existing_invoice:
-        invoice_number = existing_invoice['invoice_number']
+    invoice_number = (
+        existing_invoice["invoice_number"] if existing_invoice
+        else generate_invoice_number()
+    )
+
+    # Prepare data for template — pure data plumbing, no re-computation.
+    currency = auction.get("currency", "CAD")
+    auction_end_raw = auction.get("auction_end_date")
+    if isinstance(auction_end_raw, str):
+        try:
+            auction_end_dt = datetime.fromisoformat(auction_end_raw)
+        except ValueError:
+            auction_end_dt = datetime.now(timezone.utc)
     else:
-        invoice_number = generate_invoice_number()
-    
-    # Prepare data for template
+        auction_end_dt = auction_end_raw or datetime.now(timezone.utc)
+
     template_data = {
         "invoice_number": invoice_number,
         "buyer": {
-            "name": buyer['name'],
-            "company_name": buyer.get('company_name'),
-            "billing_address": buyer.get('billing_address', buyer.get('address')),
-            "phone": buyer['phone'],
-            "email": buyer['email']
+            "name": dataset["buyer_name"],
+            "company_name": dataset.get("buyer_company_name"),
+            "billing_address": dataset.get("buyer_billing_address", ""),
+            "phone": dataset.get("buyer_phone", ""),
+            "email": dataset.get("buyer_email", ""),
         },
-        "paddle_number": paddle_record['paddle_number'],
+        "paddle_number": paddle_number,
         "auction": {
-            "title": auction['title'],
-            "city": auction['city'],
-            "region": auction['region'],
-            "auction_end_date": datetime.fromisoformat(auction['auction_end_date']) if isinstance(auction['auction_end_date'], str) else auction['auction_end_date']
+            "title": auction["title"],
+            "city": auction.get("city", ""),
+            "region": auction.get("region", ""),
+            "auction_end_date": auction_end_dt,
         },
-        "lots_count": len(lots_won),
-        "hammer_total": hammer_total,
-        "premium_amount": premium_amount,
-        "premium_percentage": premium_percentage,
-        "total_tax": total_tax,
-        "grand_total": grand_total,
-        "payment_deadline": auction.get('payment_deadline', 'Within 14 days of auction close') if isinstance(auction.get('payment_deadline'), str) else "Within 14 days of auction close"
+        # iter459 — Per-lot lines (unit price × qty = line total).
+        "lots": dataset["lots"],
+        "lots_count": len(dataset["lots"]),
+        # Real totals from the fee engine.
+        "hammer_total": dataset["hammer_total"],
+        "premium_amount": dataset["buyer_premium"],
+        "premium_percentage": dataset["buyer_premium_rate_pct"],
+        "stripe_recovery": dataset["buyer_stripe_recovery"],
+        "total_tax": dataset["buyer_taxes"],
+        "tax_lines": dataset["buyer_tax_lines"],
+        "buyer_tax_label": dataset["buyer_tax_label"],
+        "buyer_tax_province": dataset["buyer_tax_province"],
+        "amount_due": dataset["amount_due"],
+        "grand_total": dataset["buyer_total_charged"],
+        "payment_deadline": auction.get("payment_deadline")
+            if isinstance(auction.get("payment_deadline"), str)
+            else "Within 14 days of auction close",
+        "currency": currency,
     }
-    
-    # Generate HTML using bilingual template
-    # Use buyer's preferred language if available
-    lang = buyer.get('preferred_language', 'en')
-    currency = auction.get('currency', 'CAD')
-    template_data['currency'] = currency
-    template_data['lots_count'] = len(lots_won)
-    
+
+    # Render bilingual HTML.
     from invoice_templates_complete import payment_letter_template
-    html_content = payment_letter_template(template_data, lang=lang)
-    
-    # Generate PDF and persist to cloud storage
+    html_content = payment_letter_template(template_data, lang=resolved_lang)
+
+    # Generate PDF and persist to cloud storage.
     import tempfile
     from services.cloud_storage import store_invoice_pdf, generate_signed_url
 
     invoice_id = str(uuid.uuid4())
-
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
         tmp_path = Path(tmp.name)
     generate_pdf_from_html(html_content, tmp_path)
@@ -954,7 +1195,7 @@ async def generate_payment_letter(
     storage_path = await store_invoice_pdf(invoice_id, pdf_bytes, subfolder="payment_letter")
     download_url = generate_signed_url(invoice_id)
 
-    # Save invoice record
+    # Save invoice record.
     invoice_record = {
         "id": invoice_id,
         "invoice_number": invoice_number,
@@ -964,17 +1205,21 @@ async def generate_payment_letter(
         "storage_path": storage_path,
         "download_url": download_url,
         "generated_date": datetime.now(timezone.utc).isoformat(),
-        "status": "generated"
+        "status": "generated",
+        "language": resolved_lang,
     }
     await db.invoices.insert_one(invoice_record)
-    
+
     return {
         "success": True,
         "invoice_number": invoice_number,
         "download_url": download_url,
-        "paddle_number": paddle_record['paddle_number'],
-        "amount_due": grand_total,
-        "message": "Payment letter generated successfully"
+        "paddle_number": paddle_number,
+        "amount_due": dataset["amount_due"],
+        "grand_total": dataset["buyer_total_charged"],
+        "hammer_total": dataset["hammer_total"],
+        "lots_count": len(dataset["lots"]),
+        "message": "Payment letter generated successfully",
     }
 
 

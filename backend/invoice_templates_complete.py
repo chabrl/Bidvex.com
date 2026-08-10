@@ -15,15 +15,64 @@ def payment_letter_template(data: Dict[str, Any], lang: str = "en") -> str:
     Generate HTML for Payment Letter PDF
     Bilingual support: English (en) / French (fr)
     Currency support: CAD / USD
+
+    iter459 — Renders ONLY the lots this specific buyer won.
+    Every fee, payment-charge, tax, and amount-due value is passed in from
+    the unified fee engine (`services.fee_calculator.calculate_fee`) via
+    the route layer — this template never recomputes financial math.
     """
-    
+
     currency = data.get('currency', 'CAD')
     hammer_total = data['hammer_total']
     premium_amount = data['premium_amount']
+    premium_percentage = data.get('premium_percentage', 0.0)
+    stripe_recovery = data.get('stripe_recovery', 0.0)
     total_tax = data['total_tax']
+    amount_due = data.get('amount_due', premium_amount + stripe_recovery + total_tax)
     grand_total = data['grand_total']
     payment_deadline = data.get('payment_deadline', 'Within 14 days of auction close')
-    
+    tax_lines = data.get('tax_lines') or []
+
+    # ── iter459 — Per-lot table rows (real won lots only) ──────────────
+    lot_rows_html = ""
+    for lot in data.get('lots', []) or []:
+        line_total = lot.get('line_total', lot.get('hammer_price', 0.0))
+        unit_price = lot.get('unit_price', line_total)
+        quantity = int(lot.get('quantity', 1) or 1)
+        title = lot.get('title') or ''
+        description = (lot.get('description') or '')[:120]
+        lot_rows_html += f"""
+        <tr>
+            <td style="padding: 8px; border-bottom: 1px solid #e0e0e0; vertical-align: top;">{lot.get('lot_number', '')}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #e0e0e0; vertical-align: top;">
+                <strong>{title}</strong>
+                {f'<br><span style="font-size: 9pt; color: #666;">{description}</span>' if description else ''}
+            </td>
+            <td style="padding: 8px; border-bottom: 1px solid #e0e0e0; text-align: right; vertical-align: top;">${unit_price:.2f}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #e0e0e0; text-align: center; vertical-align: top;">{quantity}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #e0e0e0; text-align: right; vertical-align: top;">${line_total:.2f}</td>
+        </tr>
+        """
+
+    # ── iter459 — Tax breakdown rows using engine-supplied lines ───────
+    tax_rows_html = ""
+    for tl in tax_lines:
+        kind = tl.get('kind')
+        rate_pct = tl.get('rate_pct')
+        amount = float(tl.get('amount') or 0.0)
+        if rate_pct is not None:
+            label_key = f"{kind}_line"
+            label = t(label_key, lang, rate_pct)
+        else:
+            label_key = f"{kind}_line_no_rate"
+            label = t(label_key, lang)
+        tax_rows_html += f"""
+        <div class="totals-row">
+            <span>{label}:</span>
+            <span>${amount:.2f}</span>
+        </div>
+        """
+
     html = f"""
     <!DOCTYPE html>
     <html>
@@ -89,6 +138,41 @@ def payment_letter_template(data: Dict[str, Any], lang: str = "en") -> str:
             }}
             .letter-body p {{
                 margin: 15px 0;
+            }}
+            .lots-table {{
+                width: 100%;
+                border-collapse: collapse;
+                margin: 20px 0;
+                font-size: 10pt;
+            }}
+            .lots-table th {{
+                background: #009BFF;
+                color: white;
+                padding: 10px 8px;
+                text-align: left;
+                font-weight: bold;
+            }}
+            .totals-panel {{
+                background: #f9f9f9;
+                padding: 15px 20px;
+                border-radius: 4px;
+                margin: 20px 0;
+            }}
+            .totals-row {{
+                display: flex;
+                justify-content: space-between;
+                padding: 5px 0;
+                border-bottom: 1px solid #e0e0e0;
+                font-size: 10pt;
+            }}
+            .totals-row.grand-total {{
+                font-weight: bold;
+                font-size: 13pt;
+                color: #009BFF;
+                border-top: 2px solid #009BFF;
+                border-bottom: none;
+                padding-top: 10px;
+                margin-top: 10px;
             }}
             .highlight-box {{
                 background: #e7f3ff;
@@ -179,6 +263,7 @@ def payment_letter_template(data: Dict[str, Any], lang: str = "en") -> str:
             <p><strong>{data['buyer']['name']}</strong></p>
             {f"<p>{data['buyer']['company_name']}</p>" if data['buyer'].get('company_name') else ""}
             <p>{data['buyer'].get('billing_address', data['buyer'].get('address', ''))}</p>
+            <p>{t('auction_name', lang)}: <strong>{data['auction']['title']}</strong></p>
             <p>{t('paddle_number', lang)}: <strong>{data['paddle_number']}</strong></p>
         </div>
 
@@ -187,11 +272,51 @@ def payment_letter_template(data: Dict[str, Any], lang: str = "en") -> str:
         </div>
 
         <div class="letter-body">
-            <p>{t('dear', lang, data['buyer']['name'].split()[0])}</p>
+            <p>{t('dear', lang, data['buyer']['name'].split()[0] if data['buyer'].get('name') else '')}</p>
 
             <p>
                 {t('congratulations_intro', lang, data['lots_count'], data['auction']['title'], data['auction']['auction_end_date'].strftime('%B %d, %Y'))}
             </p>
+
+            <h3 style="color: #009BFF; margin-top: 30px;">{t('lots_won_table_heading', lang)}</h3>
+            <table class="lots-table">
+                <thead>
+                    <tr>
+                        <th style="width: 8%;">{t('lot_number', lang)}</th>
+                        <th style="width: 42%;">{t('description', lang)}</th>
+                        <th style="width: 15%; text-align: right;">{t('unit_price', lang)}</th>
+                        <th style="width: 10%; text-align: center;">{t('quantity', lang)}</th>
+                        <th style="width: 25%; text-align: right;">{t('line_total', lang)}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {lot_rows_html}
+                </tbody>
+            </table>
+
+            <div class="totals-panel">
+                <div class="totals-row">
+                    <span>{t('hammer_total', lang)}:</span>
+                    <span>${hammer_total:.2f} {currency}</span>
+                </div>
+                <div class="totals-row">
+                    <span>{t('buyers_premium', lang)} ({premium_percentage:.2f}%):</span>
+                    <span>${premium_amount:.2f} {currency}</span>
+                </div>
+                <div class="totals-row">
+                    <span>{t('payment_charges', lang)}:</span>
+                    <span>${stripe_recovery:.2f} {currency}</span>
+                </div>
+                {tax_rows_html}
+                <div class="totals-row">
+                    <span>{t('amount_due_to_bidvex', lang)}:</span>
+                    <span>${amount_due:.2f} {currency}</span>
+                </div>
+                <div class="totals-row grand-total">
+                    <span>{t('total_due', lang)}:</span>
+                    <span>${grand_total:.2f} {currency}</span>
+                </div>
+            </div>
 
             <div class="highlight-box">
                 <h3>{t('payment_information', lang)}</h3>
@@ -199,21 +324,21 @@ def payment_letter_template(data: Dict[str, Any], lang: str = "en") -> str:
                 <p style="margin: 5px 0;">{t('your_paddle_number', lang)}: <strong>{data['paddle_number']}</strong></p>
                 <p class="amount-due">${grand_total:.2f} {currency}</p>
                 <p style="font-size: 10pt; color: #666; margin: 0;">
-                    {t('includes_details', lang, data.get('premium_percentage', 5.0))}
+                    {t('includes_details', lang, f'{premium_percentage:.2f}')}
                 </p>
             </div>
-            
+
             <div class="important">
                 <strong>{t('important_two_part_payment', lang)}</strong>
                 <p style="margin: 10px 0 5px 0;">{t('payment_split_intro', lang)}</p>
                 <ol style="margin: 5px 0; padding-left: 20px;">
                     <li style="margin: 5px 0;">{t('payment_seller_detail', lang, f'${hammer_total:.2f} {currency}')}</li>
-                    <li style="margin: 5px 0;">{t('payment_bidvex_detail', lang, f'${premium_amount + total_tax:.2f} {currency}')}</li>
+                    <li style="margin: 5px 0;">{t('payment_bidvex_detail', lang, f'${amount_due:.2f} {currency}')}</li>
                 </ol>
             </div>
 
             <p>
-                {t('complete_purchase_intro', lang, f'${premium_amount + total_tax:.2f} {currency}', payment_deadline)}
+                {t('complete_purchase_intro', lang, f'${amount_due:.2f} {currency}', payment_deadline)}
             </p>
 
             <div class="payment-methods">
@@ -233,7 +358,7 @@ def payment_letter_template(data: Dict[str, Any], lang: str = "en") -> str:
 
             <div class="closing">
                 <p>{t('closing_thank_you', lang)}</p>
-                
+
                 <div class="signature">
                     <p><strong>{t('sincerely', lang)}</strong></p>
                     <p>{t('bidvex_team', lang)}</p>
@@ -258,7 +383,7 @@ def payment_letter_template(data: Dict[str, Any], lang: str = "en") -> str:
     </body>
     </html>
     """
-    
+
     return html
 
 
