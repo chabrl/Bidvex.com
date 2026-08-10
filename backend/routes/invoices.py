@@ -122,6 +122,310 @@ def generate_pdf_from_html(html: str, output_path: str) -> str:
 invoices_router = APIRouter(tags=["Invoices"])
 
 
+# ══════════════════════════════════════════════════════════════════════════
+# iter457 — Seller-document data resolver (shared by seller_statement,
+# seller_receipt, commission_invoice + the auction-complete summary email).
+#
+# Replaces the previous "first 3 lots are sold, buyer='Test Buyer', paddle=
+# 5051+i, commission_rate=0.0 by default" placeholders. Every field the
+# templates render now comes from real settled data:
+#
+#   • Sold vs unsold        → lot.status ∈ {sold, won} OR lot.winner_user_id
+#                              set AND resolved hammer_total > 0
+#   • Buyer name + paddle   → users + paddle_numbers collections keyed on
+#                              the actual winner_user_id per lot
+#   • Quantity + hammer     → services.hammer_total.resolve_hammer_total
+#                              (supports unit × quantity multi-item math)
+#   • Fee + tax on fee      → services.fee_calculator.calculate_fee(...)
+#                              (CRA Place-of-Supply; NEVER silently zero
+#                              — a zero fee only appears when the real
+#                              seller_account_type policy is zero, e.g.
+#                              storage_facility on the seller side)
+#   • Settlement status     → receipts collection with
+#                              type="seller_statement" per lot_number
+#
+# The helper is pure/read-only and safe to call from any route.
+# ══════════════════════════════════════════════════════════════════════════
+
+async def _build_settled_seller_dataset(db_client, auction: Dict[str, Any], seller_id: str) -> Dict[str, Any]:
+    """Build the real settled-lot dataset for the given auction + seller.
+
+    Returns a dict with:
+        {
+          "lots": [                 # every lot on the auction — sold OR unsold
+             {
+               "lot_number": int|str,
+               "title": str,
+               "description": str,
+               "status": "sold"|"unsold",
+               "quantity": int,     # actual settled quantity
+               "unit_price": float,
+               "hammer_price": float,           # unit × qty
+               "buyer_name": str|None,          # real buyer or None
+               "paddle_number": int|None,       # real paddle or None
+               "platform_fee": float,           # from fee engine
+               "seller_tax_on_fee": float,      # from fee engine
+               "net_payout": float,             # from fee engine
+               "settlement_status": "settled"|"pending_settlement",
+               "settled_at": str|None,          # ISO if settled
+             },
+             ...
+          ],
+          "sold_lots": [ ... subset with status='sold' ... ],
+          "unsold_lots": [ ... subset with status='unsold' ... ],
+          "total_hammer": float,          # sum(sold_lots.hammer_price)
+          "total_platform_fee": float,    # sum(sold_lots.platform_fee)
+          "total_tax_on_fee": float,      # sum(sold_lots.seller_tax_on_fee)
+          "total_net_payout": float,      # sum(sold_lots.net_payout)
+          # Rates surfaced for the templates that render "%".
+          "commission_rate_pct": float,   # e.g. 4.0 or 2.5 — sourced from
+                                          # calculate_fee(); NEVER a silent 0
+          "commission_rate_source": str,  # "fee_engine" | "storage_facility_zero"
+          "tax_rate_gst_pct": float,      # 5.0 for QC, effective HST for HST provinces
+          "tax_rate_qst_pct": float,      # 9.975 for QC, else 0.0
+          "seller_tax_label": str,        # e.g. "GST+QST @ QC" for audit
+          "seller_tax_province": str,     # normalized province used for tax
+        }
+
+    Raises HTTPException(500) when the fee-engine cannot resolve a real
+    policy (defensive — should never occur since calculate_fee is total).
+    """
+    from services.hammer_total import resolve_hammer_total
+    from services.fee_calculator import calculate_fee
+
+    # ── Seller context (province + tier + account_type — real fee policy) ──
+    seller = await db_client.users.find_one({"id": seller_id}, {"_id": 0}) or {}
+    seller_tier = seller.get("subscription_tier", "free")
+    seller_prov_raw = (
+        seller.get("province")
+        or seller.get("business_province")
+        or auction.get("location_province")
+        or "QC"
+    )
+    # Account-type dispatch — mirrors the settlement engine's routing.
+    if seller.get("is_partner"):
+        seller_account_type = "partner"
+    elif seller.get("is_vehicle_dealer"):
+        seller_account_type = "vehicle_dealer"
+    elif seller.get("is_storage_facility"):
+        seller_account_type = "storage_facility"
+    elif seller.get("account_type") == "enterprise":
+        seller_account_type = "enterprise"
+    else:
+        seller_account_type = "individual"
+
+    # ── Buyer/paddle lookup cache (avoid N+1 queries) ──
+    winner_ids = set()
+    for lot in auction.get("lots", []) or []:
+        w = lot.get("winner_user_id") or lot.get("winner_id") or lot.get("highest_bidder_id")
+        if w:
+            winner_ids.add(w)
+
+    users_by_id: Dict[str, Dict[str, Any]] = {}
+    if winner_ids:
+        async for u in db_client.users.find(
+            {"id": {"$in": list(winner_ids)}},
+            {"_id": 0, "id": 1, "name": 1, "full_name": 1, "email": 1,
+             "province": 1, "subscription_tier": 1},
+        ):
+            users_by_id[u["id"]] = u
+
+    paddles_by_uid: Dict[str, int] = {}
+    if winner_ids:
+        async for p in db_client.paddle_numbers.find(
+            {"auction_id": auction.get("id"), "user_id": {"$in": list(winner_ids)}},
+            {"_id": 0, "user_id": 1, "paddle_number": 1},
+        ):
+            paddles_by_uid[p["user_id"]] = p.get("paddle_number")
+
+    # ── Settled-receipt lookup: presence of a seller_statement receipt row
+    #    for (listing_id=auction.id, lot_number=X, user_id=seller_id) means
+    #    payment was collected + funds accounted for. Absence → pending.
+    settled_by_lot: Dict[Any, Dict[str, Any]] = {}
+    async for r in db_client.receipts.find(
+        {"listing_id": auction.get("id"), "user_id": seller_id, "type": "seller_statement"},
+        {"_id": 0, "lot_number": 1, "created_at": 1, "transaction_id": 1,
+         "platform_fee": 1, "taxes": 1, "net_payout": 1, "hammer_price": 1},
+    ):
+        settled_by_lot[r.get("lot_number")] = r
+
+    # ── Iterate every lot; classify sold vs unsold using REAL data only ──
+    processed_lots: list = []
+    for lot in auction.get("lots", []) or []:
+        winner_id = (
+            lot.get("winner_user_id")
+            or lot.get("winner_id")
+            or lot.get("highest_bidder_id")
+        )
+        lot_status_raw = (lot.get("status") or "").lower()
+
+        totals = resolve_hammer_total(auction, lot=lot)
+        hammer_total = float(totals["hammer_total"])
+        unit_price = float(totals["unit_price"])
+        quantity = int(totals["quantity"])
+
+        # A lot is SOLD when there's both a winner AND a positive hammer.
+        # Status field is authoritative when present, else infer from winner+price.
+        is_sold = False
+        if lot_status_raw in ("sold", "won"):
+            is_sold = winner_id is not None and hammer_total > 0
+        elif winner_id and hammer_total > 0 and lot_status_raw not in ("cancelled", "removed", "voided"):
+            is_sold = True
+
+        # Buyer context (only when there's a real winner).
+        buyer_name = None
+        paddle_number = None
+        buyer_prov = None
+        buyer_tier = "free"
+        if is_sold and winner_id:
+            u = users_by_id.get(winner_id) or {}
+            buyer_name = (u.get("full_name") or u.get("name") or u.get("email") or "").strip() or None
+            paddle_number = paddles_by_uid.get(winner_id)
+            buyer_prov = (u.get("province") or seller_prov_raw)
+            buyer_tier = u.get("subscription_tier") or "free"
+
+        # Per-lot fee via the fee engine — the ONLY source. Never silent zero.
+        platform_fee = 0.0
+        seller_tax_on_fee = 0.0
+        net_payout = 0.0
+        seller_tax_label = ""
+        seller_tax_province = seller_prov_raw
+        commission_rate_dec = 0.0
+
+        if is_sold and hammer_total > 0:
+            try:
+                fee = calculate_fee(
+                    hammer_price=hammer_total,
+                    auction_type=auction.get("listing_type") or auction.get("auction_type") or "lots",
+                    seller_account_type=seller_account_type,
+                    seller_tier=seller_tier,
+                    buyer_account_type="individual",
+                    buyer_tier=buyer_tier,
+                    payment_method="stripe",
+                    card_type="domestic",
+                    buyer_province=buyer_prov or seller_prov_raw,
+                    seller_province=seller_prov_raw,
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.error(f"[seller-docs] calculate_fee failed for auction={auction.get('id')} lot={lot.get('lot_number')}: {exc}")
+                raise HTTPException(
+                    status_code=500,
+                    detail="fee_engine_unavailable — seller document cannot be produced without a real fee policy",
+                )
+            platform_fee = float(fee.get("seller_commission") or 0.0)
+            seller_tax_on_fee = float(fee.get("seller_taxes") or 0.0)
+            net_payout = float(fee.get("seller_payout") or 0.0)
+            seller_tax_label = str(fee.get("seller_tax_label") or "")
+            seller_tax_province = str(fee.get("seller_tax_province") or seller_prov_raw)
+            commission_rate_dec = float(fee.get("seller_commission_rate") or 0.0)
+
+        settled_row = settled_by_lot.get(lot.get("lot_number"))
+        settlement_status = "settled" if settled_row else ("pending_settlement" if is_sold else "not_sold")
+
+        processed_lots.append({
+            "lot_number": lot.get("lot_number"),
+            "title": lot.get("title") or "",
+            "description": lot.get("description") or "",
+            "status": "sold" if is_sold else "unsold",
+            "quantity": quantity if is_sold else 0,
+            "unit_price": unit_price if is_sold else 0.0,
+            "hammer_price": hammer_total if is_sold else 0.0,
+            "buyer_name": buyer_name,
+            "paddle_number": paddle_number,
+            "platform_fee": round(platform_fee, 2),
+            "seller_tax_on_fee": round(seller_tax_on_fee, 2),
+            "net_payout": round(net_payout, 2),
+            "settlement_status": settlement_status,
+            "settled_at": (settled_row or {}).get("created_at"),
+            "commission_rate_pct": round(commission_rate_dec * 100, 4),
+            "seller_tax_label": seller_tax_label,
+            "seller_tax_province": seller_tax_province,
+        })
+
+    sold_lots = [l for l in processed_lots if l["status"] == "sold"]
+    unsold_lots = [l for l in processed_lots if l["status"] == "unsold"]
+
+    total_hammer = round(sum(l["hammer_price"] for l in sold_lots), 2)
+    total_platform_fee = round(sum(l["platform_fee"] for l in sold_lots), 2)
+    total_tax_on_fee = round(sum(l["seller_tax_on_fee"] for l in sold_lots), 2)
+    total_net_payout = round(sum(l["net_payout"] for l in sold_lots), 2)
+
+    # Effective commission rate for the summary templates. For a
+    # multi-lot settlement the rate is identical across sold lots (same
+    # seller/tier/province), so we take the first sold-lot's rate. If no
+    # lots sold, we still expose the rate the fee engine WOULD apply
+    # (probe with $1 hammer) — never silent zero when policy is non-zero.
+    if sold_lots:
+        commission_rate_pct = sold_lots[0]["commission_rate_pct"]
+        commission_rate_source = "fee_engine"
+        first_sold = sold_lots[0]
+        # Derive display tax rates from actual fee-engine numbers so QC's
+        # 5% + 9.975% split is preserved and other-province HST rolls up
+        # into `tax_rate_gst_pct` (with QST=0) for the current templates.
+        eff_tax_pct = 0.0
+        if first_sold["platform_fee"] > 0:
+            eff_tax_pct = (first_sold["seller_tax_on_fee"] / first_sold["platform_fee"]) * 100.0
+        if first_sold["seller_tax_province"] == "QC":
+            tax_rate_gst_pct = 5.0
+            tax_rate_qst_pct = 9.975
+        else:
+            tax_rate_gst_pct = round(eff_tax_pct, 4)
+            tax_rate_qst_pct = 0.0
+        seller_tax_label = first_sold["seller_tax_label"]
+        seller_tax_province = first_sold["seller_tax_province"]
+    else:
+        # Probe the fee engine so we still emit the true policy rate.
+        try:
+            from services.fee_calculator import calculate_fee as _cf
+            probe = _cf(
+                hammer_price=100.0,
+                auction_type=auction.get("listing_type") or "lots",
+                seller_account_type=seller_account_type,
+                seller_tier=seller_tier,
+                buyer_account_type="individual",
+                buyer_tier="free",
+                payment_method="stripe",
+                card_type="domestic",
+                buyer_province=seller_prov_raw,
+                seller_province=seller_prov_raw,
+            )
+            commission_rate_pct = round(float(probe.get("seller_commission_rate") or 0.0) * 100, 4)
+            commission_rate_source = "fee_engine"
+            seller_tax_label = str(probe.get("seller_tax_label") or "")
+            seller_tax_province = str(probe.get("seller_tax_province") or seller_prov_raw)
+        except Exception as exc:  # noqa: BLE001
+            logger.error(f"[seller-docs] fee-engine probe failed: {exc}")
+            raise HTTPException(
+                status_code=500,
+                detail="fee_engine_unavailable — seller document cannot be produced without a real fee policy",
+            )
+        if seller_account_type == "storage_facility":
+            commission_rate_source = "storage_facility_zero"
+        if seller_tax_province == "QC":
+            tax_rate_gst_pct = 5.0
+            tax_rate_qst_pct = 9.975
+        else:
+            tax_rate_gst_pct = 0.0
+            tax_rate_qst_pct = 0.0
+
+    return {
+        "lots": processed_lots,
+        "sold_lots": sold_lots,
+        "unsold_lots": unsold_lots,
+        "total_hammer": total_hammer,
+        "total_platform_fee": total_platform_fee,
+        "total_tax_on_fee": total_tax_on_fee,
+        "total_net_payout": total_net_payout,
+        "commission_rate_pct": commission_rate_pct,
+        "commission_rate_source": commission_rate_source,
+        "tax_rate_gst_pct": tax_rate_gst_pct,
+        "tax_rate_qst_pct": tax_rate_qst_pct,
+        "seller_tax_label": seller_tax_label,
+        "seller_tax_province": seller_tax_province,
+        "seller_account_type": seller_account_type,
+    }
+
+
 @invoices_router.get("/invoices")
 async def list_invoices(current_user: User = Depends(get_current_user)):
     """List all invoices for the current user, each with a fresh signed download URL."""
@@ -604,7 +908,14 @@ async def generate_seller_statement(
     current_user: User = Depends(get_current_user)
 ):
     """Generate Seller Statement PDF"""
-    if current_user.account_type != "admin" and current_user.id != seller_id:
+    # iter457 — Include role-based admin bypass so super_admin (which
+    # doesn't carry account_type="admin") can generate on behalf of a
+    # seller. Aligns with the buyer `lots-won` endpoint check.
+    if (
+        current_user.account_type != "admin"
+        and getattr(current_user, "role", None) not in ("admin", "super_admin")
+        and current_user.id != seller_id
+    ):
         raise HTTPException(status_code=403, detail="Not authorized")
     
     auction = await db.multi_item_listings.find_one({"id": auction_id})
@@ -615,22 +926,27 @@ async def generate_seller_statement(
     if not seller:
         raise HTTPException(status_code=404, detail="Seller not found")
     
-    # Prepare lots with buyer info (demo: mark first 3 as sold)
-    lots_data = []
-    for i, lot in enumerate(auction['lots']):
-        lot_info = {
-            "lot_number": lot['lot_number'],
-            "title": lot['title'],
-            "description": lot['description'],
-            "status": "sold" if i < 3 else "unsold"
+    # iter457 — Real settled-data resolver (was: "demo: mark first 3 as sold").
+    dataset = await _build_settled_seller_dataset(db, auction, seller_id)
+    lots_data = [
+        {
+            "lot_number":   l["lot_number"],
+            "title":        l["title"],
+            "description":  l["description"],
+            "status":       l["status"],
+            "quantity":     l["quantity"],
+            "unit_price":   l["unit_price"],
+            "hammer_price": l["hammer_price"],
+            "buyer_name":   l["buyer_name"],
+            "paddle_number": l["paddle_number"],
+            # Per-lot financial detail (required per user directive)
+            "platform_fee":       l["platform_fee"],
+            "seller_tax_on_fee":  l["seller_tax_on_fee"],
+            "net_payout":         l["net_payout"],
+            "settlement_status":  l["settlement_status"],
         }
-        
-        if i < 3:  # Sold lots
-            lot_info["hammer_price"] = lot['current_price']
-            lot_info["buyer_name"] = "Test Buyer"
-            lot_info["paddle_number"] = 5051 + i
-        
-        lots_data.append(lot_info)
+        for l in dataset["lots"]
+    ]
     
     # Use seller's preferred language if available
     lang = seller.get('preferred_language', 'en')
@@ -652,7 +968,16 @@ async def generate_seller_statement(
             "auction_end_date": datetime.fromisoformat(auction['auction_end_date']) if isinstance(auction['auction_end_date'], str) else auction['auction_end_date']
         },
         "lots": lots_data,
-        "commission_rate": auction.get('commission_rate', 0.0),
+        # iter457 — Rate comes from the real fee engine, never a silent zero
+        # from a missing `auction.commission_rate` field.
+        "commission_rate":         dataset["commission_rate_pct"],
+        "commission_rate_source":  dataset["commission_rate_source"],
+        "seller_tax_province":     dataset["seller_tax_province"],
+        # Per-doc totals + tax breakdown so the seller can reconcile.
+        "total_hammer_sold":       dataset["total_hammer"],
+        "total_platform_fee":      dataset["total_platform_fee"],
+        "total_tax_on_fee":        dataset["total_tax_on_fee"],
+        "total_net_payout":        dataset["total_net_payout"],
         "currency": currency,
         "statement_number": f"STMT-{auction_id[:8]}"
     }
@@ -702,7 +1027,14 @@ async def generate_seller_receipt(
     current_user: User = Depends(get_current_user)
 ):
     """Generate Seller Receipt PDF"""
-    if current_user.account_type != "admin" and current_user.id != seller_id:
+    # iter457 — Include role-based admin bypass so super_admin (which
+    # doesn't carry account_type="admin") can generate on behalf of a
+    # seller. Aligns with the buyer `lots-won` endpoint check.
+    if (
+        current_user.account_type != "admin"
+        and getattr(current_user, "role", None) not in ("admin", "super_admin")
+        and current_user.id != seller_id
+    ):
         raise HTTPException(status_code=403, detail="Not authorized")
     
     auction = await db.multi_item_listings.find_one({"id": auction_id})
@@ -713,8 +1045,10 @@ async def generate_seller_receipt(
     if not seller:
         raise HTTPException(status_code=404, detail="Seller not found")
     
-    # Calculate totals (demo: first 3 lots sold)
-    total_hammer = sum(lot['current_price'] for lot in auction['lots'][:3])
+    # iter457 — Real settled totals (was: demo "first 3 lots sold").
+    dataset = await _build_settled_seller_dataset(db, auction, seller_id)
+    total_hammer = dataset["total_hammer"]
+    lots_sold_count = len(dataset["sold_lots"])
     
     # Use seller's preferred language if available
     lang = seller.get('preferred_language', 'en')
@@ -734,11 +1068,21 @@ async def generate_seller_receipt(
             "auction_end_date": datetime.fromisoformat(auction['auction_end_date']) if isinstance(auction['auction_end_date'], str) else auction['auction_end_date']
         },
         "total_lots": len(auction['lots']),
-        "lots_sold": 3,
+        "lots_sold": lots_sold_count,
         "total_hammer": total_hammer,
-        "commission_rate": auction.get('commission_rate', 0.0),
-        "tax_rate_gst": auction.get('tax_rate_gst', 0.0),
-        "tax_rate_qst": auction.get('tax_rate_qst', 0.0),
+        # iter457 — Rates + taxes sourced from the fee engine. A zero rate
+        # only ever appears when the real seller policy is zero (e.g.
+        # storage_facility). Never a silent default.
+        "commission_rate":  dataset["commission_rate_pct"],
+        "tax_rate_gst":     dataset["tax_rate_gst_pct"],
+        "tax_rate_qst":     dataset["tax_rate_qst_pct"],
+        # Pre-computed net payout + fee totals to keep template arithmetic
+        # in agreement with the fee engine (belt & braces — the template
+        # will still recompute, but on rates from the fee engine).
+        "net_payout":       dataset["total_net_payout"],
+        "total_platform_fee": dataset["total_platform_fee"],
+        "total_tax_on_fee":   dataset["total_tax_on_fee"],
+        "seller_tax_province": dataset["seller_tax_province"],
         "payment_method": "Bank Transfer",
         "payment_date": "Within 5-7 business days",
         "currency": currency
@@ -790,7 +1134,14 @@ async def generate_commission_invoice(
     current_user: User = Depends(get_current_user)
 ):
     """Generate Commission Invoice PDF (BidVex to Seller)"""
-    if current_user.account_type != "admin" and current_user.id != seller_id:
+    # iter457 — Include role-based admin bypass so super_admin (which
+    # doesn't carry account_type="admin") can generate on behalf of a
+    # seller. Aligns with the buyer `lots-won` endpoint check.
+    if (
+        current_user.account_type != "admin"
+        and getattr(current_user, "role", None) not in ("admin", "super_admin")
+        and current_user.id != seller_id
+    ):
         raise HTTPException(status_code=403, detail="Not authorized")
     
     auction = await db.multi_item_listings.find_one({"id": auction_id})
@@ -801,17 +1152,19 @@ async def generate_commission_invoice(
     if not seller:
         raise HTTPException(status_code=404, detail="Seller not found")
     
-    # Calculate totals
-    total_hammer = sum(lot['current_price'] for lot in auction['lots'][:3])
-    commission_rate = auction.get('commission_rate', 0.0)
-    commission_amount = total_hammer * (commission_rate / 100)
-    
-    # Calculate net payout
-    tax_rate_gst = auction.get('tax_rate_gst', 5.0)
-    tax_rate_qst = auction.get('tax_rate_qst', 9.975)
-    gst = commission_amount * (tax_rate_gst / 100)
-    qst = commission_amount * (tax_rate_qst / 100)
-    net_payout = total_hammer - commission_amount - gst - qst
+    # iter457 — Real settled totals + real fee policy (was: hardcoded slice
+    # `auction['lots'][:3]`, silent-zero commission_rate, and static
+    # tax_rate defaults).
+    dataset = await _build_settled_seller_dataset(db, auction, seller_id)
+    total_hammer = dataset["total_hammer"]
+    lots_sold_count = len(dataset["sold_lots"])
+    commission_rate = dataset["commission_rate_pct"]
+    commission_amount = dataset["total_platform_fee"]
+    tax_rate_gst = dataset["tax_rate_gst_pct"]
+    tax_rate_qst = dataset["tax_rate_qst_pct"]
+    gst = round(commission_amount * (tax_rate_gst / 100), 2)
+    qst = round(commission_amount * (tax_rate_qst / 100), 2)
+    net_payout = dataset["total_net_payout"]
     
     invoice_number = f"BV-COMM-{datetime.now().year}-{auction_id[:8]}-0001"
     
@@ -834,7 +1187,7 @@ async def generate_commission_invoice(
             "auction_end_date": datetime.fromisoformat(auction['auction_end_date']) if isinstance(auction['auction_end_date'], str) else auction['auction_end_date']
         },
         "total_hammer": total_hammer,
-        "lots_sold": 3,
+        "lots_sold": lots_sold_count,
         "commission_rate": commission_rate,
         "commission_amount": commission_amount,
         "tax_rate_gst": tax_rate_gst,
@@ -931,12 +1284,14 @@ async def complete_auction_and_send_documents(
     
     # ===== SELLER DOCUMENTS =====
     try:
-        # Calculate seller totals
-        total_hammer = sum(lot['current_price'] for lot in auction['lots'][:3])  # Demo: first 3 sold
-        lots_sold = 3
-        commission_rate = auction.get('commission_rate', 0.0)
-        commission_amount = total_hammer * (commission_rate / 100)
-        net_payout = total_hammer - commission_amount
+        # iter457 — Real settled totals for the summary email (was
+        # `sum(...for lot in auction['lots'][:3])` and `lots_sold = 3`).
+        dataset = await _build_settled_seller_dataset(db, auction, seller_id)
+        total_hammer = dataset["total_hammer"]
+        lots_sold = len(dataset["sold_lots"])
+        commission_rate = dataset["commission_rate_pct"]
+        commission_amount = dataset["total_platform_fee"]
+        net_payout = dataset["total_net_payout"]
         
         seller_pdf_paths = {}
         
