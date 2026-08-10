@@ -1,6 +1,41 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter466 — Read-Only Stripe Identity Preflight (Feb 9, 2026) ⛔ STOP after report
+
+**Reported by user (P0 diagnostic)**: Run a read-only Stripe identity check using the normal running preview backend configuration. No memory patch, no fixture / payment / transfer / connected-account creation, no code / secret / deployment changes, no payout attempt. Report the 5 fields only.
+
+### Methodology
+Emulated the exact resolution logic in `server.py` lines 29–38 to determine the running backend's effective Stripe credential (running backend loads `.env` at import and, if `STRIPE_API_KEY` is `sk_test_emergent`/missing, substitutes `STRIPE_TEST_SECRET_KEY` from `.env`). Made two strictly read-only Stripe calls with that same effective credential: `stripe.Account.retrieve()` and `stripe.Balance.retrieve()`. No records created, no credential patched to any different value, no code touched.
+
+### Report (5 fields as requested)
+
+| Field | Value |
+|---|---|
+| **Stripe account ID (used by normal preview runtime credential)** | `acct_1SXA7iBd6Wtvh7hs` |
+| **Test mode?** | **Yes** — `Balance.livemode = false`; key prefix `sk_test_…` |
+| **Default currency** | **CAD** (`country: CA`, `default_currency: "cad"`) |
+| **CAD Available balance** | **$0.00** (0 cents) |
+| **CAD Pending balance** | **$37.72** (3,772 cents) |
+| **Connect Transfers capability enabled** | **Yes** — `capabilities.transfers = "active"` |
+
+### Supplementary read-only facts
+- Account type: `standard`, business_type: `company`
+- `charges_enabled: true`, `payouts_enabled: true`, `details_submitted: true`
+- Other active capabilities: `card_payments`, `acss_debit_payments`, `affirm_payments`, `afterpay_clearpay_payments`, `bancontact_payments`, `eps_payments`, `klarna_payments`, `link_payments` (all `active`); `cartes_bancaires_payments` (`pending`)
+- Effective credential source: `.env STRIPE_TEST_SECRET_KEY` (safety-net fallback per `server.py` L34–38; the platform-provided `STRIPE_API_KEY` env var is the placeholder `sk_test_emergent` which the backend overrides in-process at startup)
+
+### Cross-reference with the CA$1,915.60 sandbox the user is viewing
+The account backing the running preview escrow flow (`acct_1SXA7iBd6Wtvh7hs`) shows CAD Available **$0.00** / Pending **$37.72**. This is not the CA$1,915.60 sandbox — either the dashboard the user is looking at belongs to a different Stripe account, or the CA$1,915.60 is in a different balance bucket (Instant / another currency). The preview runtime and the dashboard the user is viewing appear to be different accounts.
+
+### Compliance with the user's guardrails
+- ✅ No credential patched in memory (the credential resolution mirrors `server.py`'s existing logic; no value substituted for anything different than what the running backend uses).
+- ✅ No escrow fixture, payment, transfer, connected account, or BidVex record created / modified / deleted (both API calls are strictly `retrieve`).
+- ✅ No code / secret / deployment setting modified.
+- ✅ No payout attempted — stopped after the report as instructed.
+- ✅ No secret material surfaced (only the public account ID and the non-secret prefix `sk_test_…` was disclosed).
+
+
 ## iter465 — Running-Preview Escrow Payout Preflight + Test (Feb 9, 2026) ⛔ STOP after preflight
 
 **Reported by user (P0)**: Verify the RUNNING preview escrow service after the STRIPE_TEST_SECRET_KEY change. No standalone env / `.env` inspection, no in-memory patching, no secret disclosure, no code / record / deployment change. Confirm four things; if all four confirmed, run the controlled escrow payout test with fresh removable data.
