@@ -86,8 +86,22 @@ export function SellerEscrowPanel() {
   useEffect(() => { fetchEscrows(); }, [fetchEscrows]);
 
   const handleConfirmPickup = async (auctionId) => {
-    const code = (codeInputs[auctionId] || '').trim().toUpperCase();
-    if (code.length !== 6) { toast.error(fr ? 'Le code doit contenir 6 caractères' : 'Code must be 6 characters'); return; }
+    // iter455 — Accept the canonical BVX-XXXXXXXX code (or a legacy 6-char
+    // code) with any casing / hyphens / spaces. Normalize before sending
+    // so the backend receives the exact same string in every case.
+    const raw = codeInputs[auctionId] || '';
+    const normalized = raw.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (normalized.length < 6) {
+      toast.error(fr
+        ? 'Entrez le code complet figurant sur le reçu de l\u2019acheteur (ex. BVX-XXXXXXXX).'
+        : 'Enter the full pickup code from the buyer\u2019s receipt (e.g. BVX-XXXXXXXX).');
+      return;
+    }
+    // If the buyer's code has the BVX prefix, restore the canonical
+    // hyphen so the backend audit trail records the exact-format value.
+    const code = normalized.startsWith('BVX') && normalized.length === 11
+      ? `BVX-${normalized.slice(3)}`
+      : normalized;
     setSubmitting(prev => ({ ...prev, [auctionId]: true }));
     try {
       const res = await axios.post(`${API}/escrow/seller/confirm-pickup`, { auction_id: auctionId, code }, { headers: { Authorization: `Bearer ${token}` } });
@@ -149,16 +163,36 @@ export function SellerEscrowPanel() {
                 <div className="border-t pt-4 mt-2" data-testid={`pickup-entry-${escrow.auction_id}`}>
                   <div className="flex items-center gap-2 mb-3">
                     <Key className="h-4 w-4 text-amber-500" />
-                    <p className="text-sm font-medium">{fr ? 'Entrez le code de retrait de l\'acheteur' : 'Enter buyer\'s pickup code'}</p>
+                    <p className="text-sm font-medium">{fr ? "Entrez le code de retrait complet de l'acheteur (ex. BVX-XXXXXXXX)" : "Enter the buyer's full pickup code (e.g. BVX-XXXXXXXX)"}</p>
                     {remaining && <Badge variant="outline" className="text-xs ml-auto"><Clock className="h-3 w-3 mr-1" />{remaining} {fr ? 'restant' : 'left'}</Badge>}
                   </div>
                   <div className="flex gap-2">
-                    <Input value={codeInputs[escrow.auction_id] || ''} onChange={e => setCodeInputs(prev => ({ ...prev, [escrow.auction_id]: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6) }))} placeholder="XXXXXX" maxLength={6} className="font-mono text-lg tracking-[0.3em] text-center uppercase w-44" disabled={isSubmitting} data-testid={`pickup-code-input-${escrow.auction_id}`} />
-                    <Button onClick={() => handleConfirmPickup(escrow.auction_id)} disabled={isSubmitting || (codeInputs[escrow.auction_id] || '').length !== 6} className="gap-2" data-testid={`confirm-pickup-btn-${escrow.auction_id}`}>
+                    <Input
+                      value={codeInputs[escrow.auction_id] || ''}
+                      onChange={e => setCodeInputs(prev => ({
+                        ...prev,
+                        // iter455 — Accept BVX-XXXXXXXX and legacy 6-char.
+                        // Uppercase everything, keep letters, digits, and
+                        // one hyphen. Cap length at 20 to defensively
+                        // absorb pasted whitespace / stray characters.
+                        [escrow.auction_id]: e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 20),
+                      }))}
+                      placeholder="BVX-XXXXXXXX"
+                      maxLength={20}
+                      className="font-mono text-lg tracking-[0.15em] text-center uppercase w-64"
+                      disabled={isSubmitting}
+                      data-testid={`pickup-code-input-${escrow.auction_id}`}
+                    />
+                    <Button
+                      onClick={() => handleConfirmPickup(escrow.auction_id)}
+                      disabled={isSubmitting || (codeInputs[escrow.auction_id] || '').replace(/[^A-Z0-9]/gi, '').length < 6}
+                      className="gap-2"
+                      data-testid={`confirm-pickup-btn-${escrow.auction_id}`}
+                    >
                       {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}{fr ? 'Confirmer' : 'Confirm'}
                     </Button>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-2">{fr ? 'Demandez à l\'acheteur de vous montrer son code de retrait.' : 'Ask the buyer to show you their pickup code. Enter it above to release your funds.'}</p>
+                  <p className="text-xs text-muted-foreground mt-2">{fr ? "Demandez à l'acheteur son code de retrait complet (ex. BVX-XXXXXXXX) et collez-le ici pour libérer vos fonds. La casse, les tirets et les espaces sont ignorés." : "Ask the buyer for their full pickup code (e.g. BVX-XXXXXXXX) and paste it here to release your funds. Case, hyphens, and spaces are ignored."}</p>
                 </div>
               )}
 
