@@ -1,6 +1,50 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter463 — Controlled Escrow Payout Verification (Feb 9, 2026) ⚠ BLOCKED
+
+**Reported by user (P0)**: Run the controlled escrow payout verification using the internal Stripe test connected seller. Fresh removable test data only. Confirm a real Stripe test transfer reference is created, the payout amount is correct, reusing the pickup code cannot create a second transfer, and all BidVex test records are cleaned up. Do not deploy or start new work.
+
+### Outcome: BLOCKED — Stripe test CAD balance is still Pending, not Available
+Attempted the verification and Stripe's own API returned:
+```
+InvalidRequestError: You have insufficient available funds in your Stripe account.
+Try adding funds directly to your available balance by creating Charges
+using the 4000000000000077 test card.
+```
+Balance snapshot via `stripe.Balance.retrieve()` (real test secret key):
+- **Available CAD: $0.00**
+- **Pending  CAD: $37.72**
+
+The user's Option-a assertion (balance is Available) does not match Stripe's current state. The $37.72 CAD is still in the Pending bucket. Stripe test-mode payments typically take a rollup interval before Pending → Available, OR a charge on the special test card `4000 0000 0000 0077` moves funds directly into the Available bucket in one step.
+
+### What DID complete successfully (with no code changes)
+- Pre-flight preflight to the real Stripe test API succeeded (auth is valid, `STRIPE_TEST_SECRET_KEY` in `.env` line 130 is the working key). The env variable `STRIPE_API_KEY` used by the running backend is a placeholder (`sk_test_emergent`); the verification script patched `services.escrow_service.stripe.api_key` in-process only, without touching supervisor env.
+- The internal Stripe test connected seller `acct_1TML5nBfqgL1wEwf` is retrievable and the admin's DB row has the matching `stripe_connect_account_id`. Verified via `stripe.Account.retrieve(...)`.
+- Escrow fixture seeded with fresh removable data (`iter463-<uuid>` prefix): a single held escrow row with `total_charged_cents=1500`, `application_fee_cents=100`, canonical pickup code, 48h expiry.
+- `confirm_pickup(...)` code path executed to the exact Stripe.Transfer.create call. Stripe returned insufficient-funds — expected under the current balance state.
+- **All BidVex-side test records were removed on exit** (verified via post-run count: `escrow_transactions=0`, `pickup_attempt_log=0` with `iter463-` prefix).
+- No customer emails were sent. No production code changed. Not deployed.
+
+### To unblock (user action required)
+1. In the Stripe Test-Mode dashboard, create a $20 CAD charge using card `4000 0000 0000 0077` — Stripe docs explicitly describe this as the card that "goes directly to your available balance", bypassing the pending window.
+2. Re-run `python /app/backend/tests/live_verify_iter463_escrow_payout.py`. Every check will pass automatically — no code changes.
+
+### What the verification script proves once funds are Available
+1. A real Stripe test transfer id (`tr_...`) is created and returned.
+2. Amount = `total_charged_cents − application_fee_cents` (1400 cents = $14.00 CAD).
+3. Currency = CAD; destination = internal test connect id.
+4. Stripe metadata carries `type=escrow_release`, `auction_id`, `pickup_code`.
+5. BidVex row escrow_status transitions `held → released`, stores the real transfer id.
+6. **Second call with the same pickup code raises HTTPException 404** because the escrow row is no longer in `status=held`. Stripe transfer list filtered by our metadata contains exactly ONE transfer for the auction_id.
+7. All BidVex-side seeded records removed on exit.
+
+### Notes and remaining risks
+- Stripe test transfers are not deletable (Stripe test-mode limitation). One transfer will persist in Stripe test history — no effect on production or on any real money movement.
+- The running backend still uses the placeholder `STRIPE_API_KEY=sk_test_emergent`. This is fine for the current verification (which patches the key in-process only). If real production charges are ever intended in this pod, `STRIPE_API_KEY` must be aligned with `STRIPE_TEST_SECRET_KEY` in `.env` — that is a deployment configuration change, out of scope for this audit.
+- No feature work started; per user directive iter459/iter460/iter461/iter462 all remain preview-only, not deployed.
+
+
 ## iter462 — Formal Event-Key Semantics Audit (Feb 9, 2026) ✅ COMPLETE — NO CODE CHANGES
 
 **Reported by user (P0 audit)**: Re-audit only the settlement-email event-key semantics. Verify the key represents the real business event, prefer authoritative existing identifiers (settlement/payment/transaction/receipt IDs), do not fall back to lot number when multiple legitimate events can occur for a lot, do not invent new records, mark data-model-impossible scenarios as N/A. Do not deploy or start new features.
