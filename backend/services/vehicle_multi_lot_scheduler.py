@@ -191,25 +191,42 @@ async def _progress_event(db, event: Dict[str, Any], now: datetime) -> tuple[int
 
     # iter294 P1 — Lot-won notifications. Fire AFTER the write so the
     # buyer-facing page sees status=sold before the email arrives.
+    # iter460 — dedup gate: one buyer email per (event, buyer). Settle_lot
+    # also fires an auction_won email under the same "auction_won" claim
+    # so this fan-out and settle_lot's email cannot both send; whichever
+    # runs first wins the claim.
     if just_sold:
         try:
             from services.emails import email_marketplace as _en
+            from services.settlement_email_dedup import claim_settlement_email as _sed_claim
             import asyncio as _aio
-            for slot in just_sold:
-                winner_id = slot.get("winner_user_id")
+
+            async def _sched_email_gated(_slot):
+                winner_id = _slot.get("winner_user_id")
                 if not winner_id:
-                    continue
-                w = await db.users.find_one({"id": winner_id}, {"email": 1, "first_name": 1, "_id": 0})
-                if not w or not w.get("email"):
-                    continue
-                _aio.create_task(_en.send_auction_won_email(
-                    winner_email=w["email"],
-                    winner_name=w.get("first_name") or "",
-                    item_title=f"Lot #{slot.get('lot_number', '?')} — {slot.get('title', event.get('title', 'Multi-Lot Auction'))}",
-                    final_price=float(slot.get("current_bid") or 0),
+                    return
+                _w = await db.users.find_one(
+                    {"id": winner_id}, {"email": 1, "first_name": 1, "_id": 0}
+                )
+                if not _w or not _w.get("email"):
+                    return
+                _claim = await _sed_claim(
+                    db, kind="auction_won",
+                    auction_id=event["id"], user_id=winner_id,
+                )
+                if not _claim:
+                    return
+                await _en.send_auction_won_email(
+                    winner_email=_w["email"],
+                    winner_name=_w.get("first_name") or "",
+                    item_title=f"Lot #{_slot.get('lot_number', '?')} — {_slot.get('title', event.get('title', 'Multi-Lot Auction'))}",
+                    final_price=float(_slot.get("current_bid") or 0),
                     listing_id=event["id"],
                     is_vehicle=True,
-                ))
+                )
+
+            for slot in just_sold:
+                _aio.create_task(_sched_email_gated(slot))
         except Exception as _e:
             logger.warning(f"multi-lot lot_won email failed: {_e}")
 

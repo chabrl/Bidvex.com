@@ -456,6 +456,16 @@ async def lifespan(app):
     except Exception as exc:  # noqa: BLE001
         logger.warning(f"[iter283-payments-audit] stripe_events index skipped: {exc}")
 
+    # iter460 — Settlement email dedup ledger unique index.
+    # Enforces "one email per (kind, auction_id, user_id)" across all
+    # settlement trigger sites (scheduler, webhook, retry, admin).
+    try:
+        from services.settlement_email_dedup import ensure_indexes as _sed_idx
+        await _sed_idx(db)
+        logger.info("[iter460] settlement_email_dispatches unique index ensured")
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(f"[iter460] settlement_email_dispatches index skipped: {exc}")
+
     # iter283-payments-audit Mission 1B — Backfill Stripe Customers
     # for users missing `stripe_customer_id`. Idempotent — only acts
     # on users without an existing customer record.

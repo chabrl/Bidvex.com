@@ -334,65 +334,79 @@ async def process_ended_auctions():
                     # Winner email (Bug 5A)
                     try:
                         if winner and winner.get("email"):
-                            from services.emails.email_marketplace import send_auction_won_email
-                            # Seller-held platform fee estimate (best-effort, non-blocking)
-                            _plat_fee = 0.0
-                            try:
-                                from services.fee_calculator import PricingManager
-                                buyer_user = winner if winner else None
-                                buyer_tier = (buyer_user or {}).get("subscription_tier", "free") if buyer_user else "free"
-                                seller_tier = (seller or {}).get("subscription_tier", "free") if seller else "free"
-                                buyer_province = (buyer_user or {}).get("province") if buyer_user else "QC"
-                                pr = PricingManager.non_vehicle_stripe(final_price, buyer_province or "QC", buyer_tier, seller_tier)
-                                _plat_fee = float(pr.buyer_invoice.fees_subtotal or 0)
-                            except Exception:
-                                pass
-                            await send_auction_won_email(
-                                to_email=winner["email"],
-                                to_name=winner.get("name", "Winner"),
-                                item_name=listing.get("title", "Item"),
-                                auction_id=listing_id,
-                                hammer_price=final_price,
-                                platform_fee=_plat_fee,
-                                is_vehicle=(_auction_type == "vehicle"),
+                            # iter460 — dedup gate: one auction_won email per (auction, buyer)
+                            from services.settlement_email_dedup import claim_settlement_email as _sed_claim
+                            _claim = await _sed_claim(
+                                db, kind="auction_won",
+                                auction_id=listing_id, user_id=winner_id,
                             )
+                            if _claim:
+                                from services.emails.email_marketplace import send_auction_won_email
+                                # Seller-held platform fee estimate (best-effort, non-blocking)
+                                _plat_fee = 0.0
+                                try:
+                                    from services.fee_calculator import PricingManager
+                                    buyer_user = winner if winner else None
+                                    buyer_tier = (buyer_user or {}).get("subscription_tier", "free") if buyer_user else "free"
+                                    seller_tier = (seller or {}).get("subscription_tier", "free") if seller else "free"
+                                    buyer_province = (buyer_user or {}).get("province") if buyer_user else "QC"
+                                    pr = PricingManager.non_vehicle_stripe(final_price, buyer_province or "QC", buyer_tier, seller_tier)
+                                    _plat_fee = float(pr.buyer_invoice.fees_subtotal or 0)
+                                except Exception:
+                                    pass
+                                await send_auction_won_email(
+                                    to_email=winner["email"],
+                                    to_name=winner.get("name", "Winner"),
+                                    item_name=listing.get("title", "Item"),
+                                    auction_id=listing_id,
+                                    hammer_price=final_price,
+                                    platform_fee=_plat_fee,
+                                    is_vehicle=(_auction_type == "vehicle"),
+                                )
                     except Exception as win_err:
                         logger.warning(f"[auction-end] winner email failed: {win_err}")
 
                     # Seller sold email (Bug 5B)
                     try:
                         if seller and seller.get("email"):
-                            from services.emails.email_vehicles import (
-                                send_seller_auction_sold_email,
+                            # iter460 — dedup gate: one seller_sold email per (auction, seller)
+                            from services.settlement_email_dedup import claim_settlement_email as _sed_claim
+                            _claim = await _sed_claim(
+                                db, kind="seller_sold",
+                                auction_id=listing_id, user_id=seller_id,
                             )
-                            # Seller commission (best-effort)
-                            _commission = 0.0
-                            _net_payout = final_price
-                            try:
-                                from services.fee_calculator import PricingManager
-                                seller_tier = (seller or {}).get("subscription_tier", "free") if seller else "free"
-                                buyer_province = "QC"
-                                pr2 = PricingManager.non_vehicle_stripe(final_price, buyer_province, "free", seller_tier)
-                                if pr2.seller_invoice:
-                                    _commission = float(pr2.seller_invoice.fees_subtotal or 0)
-                                    _net_payout = float(pr2.seller_invoice.total or (final_price - _commission))
-                            except Exception:
-                                pass
-                            # Privacy-preserving bidder alias
-                            winner_raw = (winner.get("name") if winner else "") or (winner.get("email", "").split("@")[0] if winner else "") or "Winner"
-                            _parts = winner_raw.split()
-                            _alias = f"{_parts[0]} {_parts[1][0]}." if len(_parts) >= 2 else _parts[0]
-                            await send_seller_auction_sold_email(
-                                seller_email=seller["email"],
-                                seller_name=seller.get("name", "Seller"),
-                                listing_title=listing.get("title", "Item"),
-                                listing_id=listing_id,
-                                hammer_price=final_price,
-                                platform_fee=_commission,
-                                net_payout=_net_payout,
-                                winning_bidder_alias=_alias,
-                                auction_type=_auction_type,
-                            )
+                            if _claim:
+                                from services.emails.email_vehicles import (
+                                    send_seller_auction_sold_email,
+                                )
+                                # Seller commission (best-effort)
+                                _commission = 0.0
+                                _net_payout = final_price
+                                try:
+                                    from services.fee_calculator import PricingManager
+                                    seller_tier = (seller or {}).get("subscription_tier", "free") if seller else "free"
+                                    buyer_province = "QC"
+                                    pr2 = PricingManager.non_vehicle_stripe(final_price, buyer_province, "free", seller_tier)
+                                    if pr2.seller_invoice:
+                                        _commission = float(pr2.seller_invoice.fees_subtotal or 0)
+                                        _net_payout = float(pr2.seller_invoice.total or (final_price - _commission))
+                                except Exception:
+                                    pass
+                                # Privacy-preserving bidder alias
+                                winner_raw = (winner.get("name") if winner else "") or (winner.get("email", "").split("@")[0] if winner else "") or "Winner"
+                                _parts = winner_raw.split()
+                                _alias = f"{_parts[0]} {_parts[1][0]}." if len(_parts) >= 2 else _parts[0]
+                                await send_seller_auction_sold_email(
+                                    seller_email=seller["email"],
+                                    seller_name=seller.get("name", "Seller"),
+                                    listing_title=listing.get("title", "Item"),
+                                    listing_id=listing_id,
+                                    hammer_price=final_price,
+                                    platform_fee=_commission,
+                                    net_payout=_net_payout,
+                                    winning_bidder_alias=_alias,
+                                    auction_type=_auction_type,
+                                )
                     except Exception as sold_err:
                         logger.warning(f"[auction-end] seller-sold email failed: {sold_err}")
 
@@ -603,7 +617,18 @@ async def process_ended_auctions():
             # iter296 P0 BUG 2/3/4 — Lot-level emails + bilingual platform
             # notifications for the multi-item-listing flow. Mirrors the
             # single-listing branch above.
+            # iter460 — Buyer/seller SETTLEMENT SUMMARY emails are deduped:
+            # per-lot loop still runs bookkeeping + platform notifications
+            # + auction-won conversation, but the customer-facing emails
+            # are sent ONCE per (auction, buyer) and ONCE per (auction,
+            # seller) after the loop, aggregating multi-lot wins.
             from services.notifications_i18n import create_notification
+            from services.settlement_email_dedup import claim_settlement_email as _iter460_claim
+
+            # winner_id → {"lots": [(lot_number, title, hammer_price)], "hammer_total": float}
+            _iter460_buyer_wins: Dict[str, Dict[str, Any]] = {}
+            # seller_id → {"lots": [(lot_number, title, hammer_price)], "hammer_total": float}
+            _iter460_seller_sales: Dict[str, Dict[str, Any]] = {}
 
             # Process each lot's winner
             for lot in auction.get("lots", []):
@@ -670,45 +695,29 @@ async def process_ended_auctions():
                                   "amount": lot_final, "action_url": "/seller/dashboard"},
                         )
 
-                        # Winner + seller emails (best-effort, non-blocking)
-                        try:
-                            if winner and winner.get("email"):
-                                from services.emails.email_marketplace import send_auction_won_email
-                                await send_auction_won_email(
-                                    to_email=winner["email"],
-                                    to_name=winner.get("name", "Winner"),
-                                    item_name=lot_title,
-                                    auction_id=auction_id,
-                                    hammer_price=lot_final,
-                                    platform_fee=0.0,
-                                    is_vehicle=False,
-                                )
-                        except Exception as we_err:
-                            logger.warning(f"[lots-end] winner email failed: {we_err}")
-                        try:
-                            if seller and seller.get("email"):
-                                from services.emails.email_vehicles import (
-                                    send_seller_auction_sold_email,
-                                )
-                                # Best-effort 2.5% platform fee math
-                                _comm = round(lot_final * 0.025, 2)
-                                _net  = round(lot_final - _comm, 2)
-                                _w_raw = (winner.get("name") if winner else "") or "Winner"
-                                _parts = _w_raw.split()
-                                _alias = f"{_parts[0]} {_parts[1][0]}." if len(_parts) >= 2 else _parts[0]
-                                await send_seller_auction_sold_email(
-                                    seller_email=seller["email"],
-                                    seller_name=seller.get("name", "Seller"),
-                                    listing_title=lot_title,
-                                    listing_id=auction_id,
-                                    hammer_price=lot_final,
-                                    platform_fee=_comm,
-                                    net_payout=_net,
-                                    winning_bidder_alias=_alias,
-                                    auction_type="marketplace",
-                                )
-                        except Exception as se_err:
-                            logger.warning(f"[lots-end] seller-sold email failed: {se_err}")
+                        # Winner + seller emails (best-effort, non-blocking).
+                        # iter460 — collect for aggregate dispatch after the loop;
+                        # per-lot summary emails are the source of the duplicate bug.
+                        _iter460_buyer_wins.setdefault(winner_id, {
+                            "email": (winner or {}).get("email"),
+                            "name": (winner or {}).get("name") or "Winner",
+                            "lots": [],
+                            "hammer_total": 0.0,
+                        })
+                        _iter460_buyer_wins[winner_id]["lots"].append(
+                            (lot.get("lot_number"), lot_title, lot_final)
+                        )
+                        _iter460_buyer_wins[winner_id]["hammer_total"] += float(lot_final or 0.0)
+                        _iter460_seller_sales.setdefault(seller_id, {
+                            "email": (seller or {}).get("email"),
+                            "name": (seller or {}).get("name") or "Seller",
+                            "lots": [],
+                            "hammer_total": 0.0,
+                        })
+                        _iter460_seller_sales[seller_id]["lots"].append(
+                            (lot.get("lot_number"), lot_title, lot_final)
+                        )
+                        _iter460_seller_sales[seller_id]["hammer_total"] += float(lot_final or 0.0)
 
                         # iter298 BUG 3/4 — Per-lot automatic charge at
                         # lot close + payment lifecycle + receipts.
@@ -750,6 +759,79 @@ async def process_ended_auctions():
                             )
                     except Exception as e:
                         logger.error(f"Failed to process winner for {auction_id} lot {lot['lot_number']}: {e}")
+
+            # iter460 — AGGREGATE settlement summary emails (one per unique
+            # buyer, one per unique seller). Sent AFTER the per-lot loop
+            # so multi-lot buyers/sellers receive a single message that
+            # reflects their actual portfolio of wins/sales, not one
+            # duplicate per lot. Dedup ledger prevents any second call
+            # (retry / re-drive / manual admin trigger) from re-sending.
+            for _bwid, _bw in _iter460_buyer_wins.items():
+                if not _bw.get("email"):
+                    continue
+                _claim = await _iter460_claim(
+                    db, kind="auction_won", auction_id=auction_id, user_id=_bwid,
+                )
+                if not _claim:
+                    continue
+                try:
+                    from services.emails.email_marketplace import send_auction_won_email
+                    _lot_count = len(_bw["lots"])
+                    _primary_title = (
+                        f"{auction.get('title', 'Auction')} — {_lot_count} lot(s)"
+                        if _lot_count > 1
+                        else _bw["lots"][0][1]
+                    )
+                    await send_auction_won_email(
+                        to_email=_bw["email"],
+                        to_name=_bw["name"],
+                        item_name=_primary_title,
+                        auction_id=auction_id,
+                        hammer_price=round(_bw["hammer_total"], 2),
+                        platform_fee=0.0,
+                        is_vehicle=False,
+                    )
+                except Exception as _we_err:  # noqa: BLE001
+                    logger.warning(f"[lots-end] aggregate winner email failed for {_bwid}: {_we_err}")
+
+            for _swid, _sw in _iter460_seller_sales.items():
+                if not _sw.get("email"):
+                    continue
+                _claim = await _iter460_claim(
+                    db, kind="seller_sold", auction_id=auction_id, user_id=_swid,
+                )
+                if not _claim:
+                    continue
+                try:
+                    from services.emails.email_vehicles import send_seller_auction_sold_email
+                    _lot_count = len(_sw["lots"])
+                    _title = (
+                        f"{auction.get('title', 'Auction')} — {_lot_count} lot(s) sold"
+                        if _lot_count > 1
+                        else _sw["lots"][0][1]
+                    )
+                    _hammer_total = round(_sw["hammer_total"], 2)
+                    _comm = round(_hammer_total * 0.025, 2)
+                    _net = round(_hammer_total - _comm, 2)
+                    # Multi-buyer alias: use first winner's alias; multi-buyer
+                    # sales are already conveyed by the aggregate lot count.
+                    _buyer_first = next(iter(_iter460_buyer_wins.values()), None)
+                    _alias_raw = (_buyer_first or {}).get("name", "Winner") or "Winner"
+                    _parts = _alias_raw.split()
+                    _alias = f"{_parts[0]} {_parts[1][0]}." if len(_parts) >= 2 else _parts[0]
+                    await send_seller_auction_sold_email(
+                        seller_email=_sw["email"],
+                        seller_name=_sw["name"],
+                        listing_title=_title,
+                        listing_id=auction_id,
+                        hammer_price=_hammer_total,
+                        platform_fee=_comm,
+                        net_payout=_net,
+                        winning_bidder_alias=_alias,
+                        auction_type="marketplace",
+                    )
+                except Exception as _se_err:  # noqa: BLE001
+                    logger.warning(f"[lots-end] aggregate seller-sold email failed for {_swid}: {_se_err}")
 
             processed_count += 1
 

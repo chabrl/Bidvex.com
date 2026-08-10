@@ -236,38 +236,57 @@ async def settle_lot(db, *, event: Dict[str, Any], lot: Dict[str, Any]) -> Dict[
                 summary["invoice_number"] = invoice["invoice_number"]
 
                 # Fire emails (best-effort; never block settlement).
+                # iter460 — dedup gate: one buyer + one seller email per
+                # (event_id, user_id). Vehicle multi-lot events close per
+                # lot; the first sold lot fires the buyer's / seller's
+                # notification; subsequent lots on the same event are
+                # suppressed so the buyer never receives N duplicates.
                 try:
                     from services.emails.email_marketplace import (
                         send_auction_won_email,
                         send_auction_sold_email,
                     )
                     from services.emails.email_system import send_invoice_created_email
+                    from services.settlement_email_dedup import claim_settlement_email as _sed_claim
+                    # Invoice-created email is an INVOICE trigger (out of
+                    # scope per user directive) — do NOT gate it here.
                     await send_invoice_created_email(invoice)
-                    await send_auction_won_email(
-                        to_email=winner.get("email"),
-                        to_name=winner.get("full_name") or winner.get("name") or winner.get("email") or "",
-                        auction_id=invoice["id"],
-                        item_name=invoice["vehicle_title"],
-                        hammer_price=invoice["hammer_price"],
-                        platform_fee=invoice["platform_fee"],
-                        seller_name=(seller.get("full_name") or seller.get("business_name")
-                                     or seller.get("email") or "Seller"),
-                        seller_contact=(seller.get("phone") or seller.get("email")
-                                        or "Available in your BidVex dashboard"),
-                        is_vehicle=True,
-                        buyer_province=invoice["buyer_province"],
-                        payment_deadline=None,
+
+                    _buyer_claim = await _sed_claim(
+                        db, kind="auction_won",
+                        auction_id=event_id, user_id=winner.get("id"),
                     )
-                    if seller.get("email"):
-                        await send_auction_sold_email(
-                            seller_email=seller.get("email"),
+                    if _buyer_claim:
+                        await send_auction_won_email(
+                            to_email=winner.get("email"),
+                            to_name=winner.get("full_name") or winner.get("name") or winner.get("email") or "",
+                            auction_id=invoice["id"],
+                            item_name=invoice["vehicle_title"],
+                            hammer_price=invoice["hammer_price"],
+                            platform_fee=invoice["platform_fee"],
                             seller_name=(seller.get("full_name") or seller.get("business_name")
                                          or seller.get("email") or "Seller"),
-                            vehicle_title=invoice["vehicle_title"],
-                            final_price=invoice["hammer_price"],
-                            commission=0.0,
-                            net_payout=invoice["hammer_price"],
+                            seller_contact=(seller.get("phone") or seller.get("email")
+                                            or "Available in your BidVex dashboard"),
+                            is_vehicle=True,
+                            buyer_province=invoice["buyer_province"],
+                            payment_deadline=None,
                         )
+                    if seller.get("email"):
+                        _seller_claim = await _sed_claim(
+                            db, kind="seller_sold",
+                            auction_id=event_id, user_id=event.get("seller_id"),
+                        )
+                        if _seller_claim:
+                            await send_auction_sold_email(
+                                seller_email=seller.get("email"),
+                                seller_name=(seller.get("full_name") or seller.get("business_name")
+                                             or seller.get("email") or "Seller"),
+                                vehicle_title=invoice["vehicle_title"],
+                                final_price=invoice["hammer_price"],
+                                commission=0.0,
+                                net_payout=invoice["hammer_price"],
+                            )
                 except Exception as e:  # noqa: BLE001
                     logger.warning(f"[multi_lot_settle] email dispatch failed: {e}")
 

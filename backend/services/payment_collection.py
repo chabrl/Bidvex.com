@@ -464,15 +464,22 @@ async def finalize_auction_payment(
 
             buyer = await db.users.find_one({"id": winner_id}, {"_id": 0}) or {}
             if buyer.get("email"):
-                try:
-                    from services.emails.email_system import send_payment_link_email
-                    await send_payment_link_email(
-                        buyer=buyer, listing_title=title, listing_id=listing_id,
-                        total_due=buyer_total, payment_link_url=link_url,
-                        deadline_iso=deadline,
-                    )
-                except Exception as e:  # noqa: BLE001
-                    logger.warning(f"[payment-collection] payment-link email failed: {e}")
+                # iter460 — dedup: one payment_link email per (auction, buyer)
+                from services.settlement_email_dedup import claim_settlement_email as _sed_claim
+                _claim = await _sed_claim(
+                    db, kind="payment_link",
+                    auction_id=listing_id, user_id=winner_id,
+                )
+                if _claim:
+                    try:
+                        from services.emails.email_system import send_payment_link_email
+                        await send_payment_link_email(
+                            buyer=buyer, listing_title=title, listing_id=listing_id,
+                            total_due=buyer_total, payment_link_url=link_url,
+                            deadline_iso=deadline,
+                        )
+                    except Exception as e:  # noqa: BLE001
+                        logger.warning(f"[payment-collection] payment-link email failed: {e}")
             try:
                 await create_notification(
                     db, user_id=winner_id, kind="payment_link_sent",
@@ -496,14 +503,21 @@ async def finalize_auction_payment(
 
             buyer = await db.users.find_one({"id": winner_id}, {"_id": 0}) or {}
             if buyer.get("email"):
-                try:
-                    from services.emails.email_system import send_payment_failed_email
-                    await send_payment_failed_email(
-                        buyer=buyer, listing_title=title, listing_id=listing_id,
-                        amount=total_charged or hammer,
-                    )
-                except Exception as e:  # noqa: BLE001
-                    logger.warning(f"[payment-collection] failure email failed: {e}")
+                # iter460 — dedup: one payment_failed email per (auction, buyer)
+                from services.settlement_email_dedup import claim_settlement_email as _sed_claim
+                _claim = await _sed_claim(
+                    db, kind="payment_failed",
+                    auction_id=listing_id, user_id=winner_id,
+                )
+                if _claim:
+                    try:
+                        from services.emails.email_system import send_payment_failed_email
+                        await send_payment_failed_email(
+                            buyer=buyer, listing_title=title, listing_id=listing_id,
+                            amount=total_charged or hammer,
+                        )
+                    except Exception as e:  # noqa: BLE001
+                        logger.warning(f"[payment-collection] failure email failed: {e}")
             try:
                 await create_notification(
                     db, user_id=winner_id, kind="payment_failed",

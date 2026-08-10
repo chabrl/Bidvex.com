@@ -1779,7 +1779,12 @@ async def _handle_checkout_completed(db, session):
 
 
 async def _send_purchase_confirmation_emails(db, listing, buyer_id, breakdown, invoice_id):
-    """Send confirmation emails to buyer and seller after successful purchase"""
+    """Send confirmation emails to buyer and seller after successful purchase.
+
+    iter460 — Each side is gated by the settlement_email_dispatches ledger
+    so retried Stripe webhooks (Stripe retries indefinitely on non-2xx)
+    never re-fire buyer/seller confirmations for the same listing.
+    """
     try:
         # Get buyer and seller info
         buyer = await db.users.find_one({"id": buyer_id})
@@ -1791,35 +1796,47 @@ async def _send_purchase_confirmation_emails(db, listing, buyer_id, breakdown, i
         
         # Import email service (SendGrid)
         from services.email_service import send_email
+        from services.settlement_email_dedup import claim_settlement_email as _sed_claim
         
-        # Send buyer confirmation
-        await send_email(
-            to_email=buyer.get("email"),
-            subject=f"Payment Confirmed - {listing.get('title', 'Auction Item')}",
-            template="purchase_confirmation",
-            data={
-                "buyer_name": buyer.get("name", "Buyer"),
-                "item_title": listing.get("title"),
-                "hammer_price": breakdown.get("hammer_price"),
-                "buyer_total": breakdown.get("buyer_total"),
-                "invoice_id": invoice_id,
-                "seller_name": seller.get("name")
-            }
+        # Send buyer confirmation (deduped)
+        _buyer_claim = await _sed_claim(
+            db, kind="purchase_confirmation_buyer",
+            auction_id=listing.get("id") or "", user_id=buyer_id or "",
         )
+        if _buyer_claim:
+            await send_email(
+                to_email=buyer.get("email"),
+                subject=f"Payment Confirmed - {listing.get('title', 'Auction Item')}",
+                template="purchase_confirmation",
+                data={
+                    "buyer_name": buyer.get("name", "Buyer"),
+                    "item_title": listing.get("title"),
+                    "hammer_price": breakdown.get("hammer_price"),
+                    "buyer_total": breakdown.get("buyer_total"),
+                    "invoice_id": invoice_id,
+                    "seller_name": seller.get("name")
+                }
+            )
         
-        # Send seller notification
-        await send_email(
-            to_email=seller.get("email"),
-            subject=f"Sale Complete - {listing.get('title', 'Auction Item')}",
-            template="sale_notification",
-            data={
-                "seller_name": seller.get("name", "Seller"),
-                "item_title": listing.get("title"),
-                "hammer_price": breakdown.get("hammer_price"),
-                "seller_payout": breakdown.get("seller_payout"),
-                "buyer_name": buyer.get("name")
-            }
+        # Send seller notification (deduped)
+        _seller_claim = await _sed_claim(
+            db, kind="purchase_confirmation_seller",
+            auction_id=listing.get("id") or "",
+            user_id=listing.get("seller_id") or "",
         )
+        if _seller_claim:
+            await send_email(
+                to_email=seller.get("email"),
+                subject=f"Sale Complete - {listing.get('title', 'Auction Item')}",
+                template="sale_notification",
+                data={
+                    "seller_name": seller.get("name", "Seller"),
+                    "item_title": listing.get("title"),
+                    "hammer_price": breakdown.get("hammer_price"),
+                    "seller_payout": breakdown.get("seller_payout"),
+                    "buyer_name": buyer.get("name")
+                }
+            )
         
         logger.info(f"Sent purchase confirmation emails for listing {listing['id']}")
         

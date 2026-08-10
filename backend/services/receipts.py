@@ -112,13 +112,27 @@ async def issue_transaction_records(
                                           "user_id": buyer_id})
             out["receipt_id"] = rid
             if buyer and buyer.get("email"):
-                try:
-                    from services.emails.email_system import send_buyer_receipt_email
-                    await send_buyer_receipt_email(
-                        buyer=buyer, receipt={**base, "id": rid},
+                # iter460 — settlement-email dedup: one buyer_receipt email
+                # per (auction, buyer). Per-lot receipt rows are still
+                # written above; only the customer-facing email is gated.
+                from services.settlement_email_dedup import claim_settlement_email
+                claimed = await claim_settlement_email(
+                    db, kind="buyer_receipt",
+                    auction_id=listing_id, user_id=buyer_id,
+                )
+                if claimed:
+                    try:
+                        from services.emails.email_system import send_buyer_receipt_email
+                        await send_buyer_receipt_email(
+                            buyer=buyer, receipt={**base, "id": rid},
+                        )
+                    except Exception as e:  # noqa: BLE001
+                        logger.warning(f"[receipts] buyer receipt email failed for {listing_id}: {e}")
+                else:
+                    logger.info(
+                        f"[receipts] buyer receipt email suppressed by dedup "
+                        f"for {listing_id} lot {lot_number} buyer {buyer_id}"
                     )
-                except Exception as e:  # noqa: BLE001
-                    logger.warning(f"[receipts] buyer receipt email failed for {listing_id}: {e}")
     except Exception as e:  # noqa: BLE001
         logger.error(f"[receipts] buyer receipt failed for {listing_id}: {e}")
 
@@ -139,15 +153,29 @@ async def issue_transaction_records(
                 })
                 out["statement_id"] = sid
                 if seller and seller.get("email"):
-                    try:
-                        from services.emails.email_system import send_seller_statement_email
-                        await send_seller_statement_email(
-                            seller=seller,
-                            statement={**base, "id": sid,
-                                       "buyer_first_name": _first_name(buyer)},
+                    # iter460 — settlement-email dedup: one seller_statement
+                    # summary email per (auction, seller). Per-lot rows still
+                    # persist; only the email is deduped.
+                    from services.settlement_email_dedup import claim_settlement_email
+                    claimed = await claim_settlement_email(
+                        db, kind="seller_statement",
+                        auction_id=listing_id, user_id=seller_id,
+                    )
+                    if claimed:
+                        try:
+                            from services.emails.email_system import send_seller_statement_email
+                            await send_seller_statement_email(
+                                seller=seller,
+                                statement={**base, "id": sid,
+                                           "buyer_first_name": _first_name(buyer)},
+                            )
+                        except Exception as e:  # noqa: BLE001
+                            logger.warning(f"[receipts] seller statement email failed for {listing_id}: {e}")
+                    else:
+                        logger.info(
+                            f"[receipts] seller statement email suppressed by dedup "
+                            f"for {listing_id} lot {lot_number} seller {seller_id}"
                         )
-                    except Exception as e:  # noqa: BLE001
-                        logger.warning(f"[receipts] seller statement email failed for {listing_id}: {e}")
     except Exception as e:  # noqa: BLE001
         logger.error(f"[receipts] seller statement failed for {listing_id}: {e}")
 

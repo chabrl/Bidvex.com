@@ -207,34 +207,49 @@ async def process_ended_auction(db, vehicle_listing: dict) -> AuctionEndResult:
                           "action_url": "/seller/dashboard"},
                 )
             if winner_user and winner_user.get("email"):
-                # Vehicle BP = 0%; platform fee = 2.5% surfaced for clarity.
-                _plat = round(float(final_price) * 0.025, 2)
-                await send_auction_won_email(
-                    to_email=winner_user["email"],
-                    to_name=winner_user.get("name") or winner_user.get("full_name") or "Winner",
-                    item_name=_veh_title,
-                    auction_id=vehicle_listing["id"],
-                    hammer_price=float(final_price),
-                    platform_fee=_plat,
-                    is_vehicle=True,
+                # iter460 — dedup: one auction_won per (vehicle, buyer)
+                from services.settlement_email_dedup import claim_settlement_email as _sed_claim
+                _claim = await _sed_claim(
+                    db, kind="auction_won",
+                    auction_id=vehicle_listing["id"], user_id=winner_id,
                 )
+                if _claim:
+                    # Vehicle BP = 0%; platform fee = 2.5% surfaced for clarity.
+                    _plat = round(float(final_price) * 0.025, 2)
+                    await send_auction_won_email(
+                        to_email=winner_user["email"],
+                        to_name=winner_user.get("name") or winner_user.get("full_name") or "Winner",
+                        item_name=_veh_title,
+                        auction_id=vehicle_listing["id"],
+                        hammer_price=float(final_price),
+                        platform_fee=_plat,
+                        is_vehicle=True,
+                    )
             if seller_user and seller_user.get("email"):
-                _comm = round(float(final_price) * 0.025, 2)
-                _net  = float(final_price) - _comm
-                _w_raw = (winner_user.get("name") if winner_user else "") or "Winner"
-                _parts = _w_raw.split()
-                _alias = f"{_parts[0]} {_parts[1][0]}." if len(_parts) >= 2 else _parts[0]
-                await send_seller_auction_sold_email(
-                    seller_email=seller_user["email"],
-                    seller_name=seller_user.get("name") or seller_user.get("full_name") or "Seller",
-                    listing_title=_veh_title,
-                    listing_id=vehicle_listing["id"],
-                    hammer_price=float(final_price),
-                    platform_fee=_comm,
-                    net_payout=_net,
-                    winning_bidder_alias=_alias,
-                    auction_type="vehicle",
+                # iter460 — dedup: one seller_sold per (vehicle, seller)
+                from services.settlement_email_dedup import claim_settlement_email as _sed_claim2
+                _claim2 = await _sed_claim2(
+                    db, kind="seller_sold",
+                    auction_id=vehicle_listing["id"],
+                    user_id=vehicle_listing.get("seller_user_id") or vehicle_listing.get("seller_id") or "",
                 )
+                if _claim2:
+                    _comm = round(float(final_price) * 0.025, 2)
+                    _net  = float(final_price) - _comm
+                    _w_raw = (winner_user.get("name") if winner_user else "") or "Winner"
+                    _parts = _w_raw.split()
+                    _alias = f"{_parts[0]} {_parts[1][0]}." if len(_parts) >= 2 else _parts[0]
+                    await send_seller_auction_sold_email(
+                        seller_email=seller_user["email"],
+                        seller_name=seller_user.get("name") or seller_user.get("full_name") or "Seller",
+                        listing_title=_veh_title,
+                        listing_id=vehicle_listing["id"],
+                        hammer_price=float(final_price),
+                        platform_fee=_comm,
+                        net_payout=_net,
+                        winning_bidder_alias=_alias,
+                        auction_type="vehicle",
+                    )
         except Exception as e_notif:
             logger.warning(f"[vehicle-end] notif/email dispatch failed: {e_notif}")
         

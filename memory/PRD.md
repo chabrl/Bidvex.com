@@ -1,6 +1,66 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter460 — Duplicate Transactional Emails for Auction Settlements (Feb 9, 2026) ✅ COMPLETE
+
+**Reported by user (P0)**: Fix only duplicate transactional emails for auction settlements. Trace every current trigger, reproduce the bug, then ensure: 1 buyer email per settlement event; 1 seller summary email per settlement event; retried webhooks / scheduler retries / duplicate processing do not re-send; multi-lot buyer wins arrive as a single message (not per lot); seller summary reflects only that seller's sold lots for the settlement; separate real settlements still send their own emails; English + French preserved; no changes to email content, invoice triggers, PDF delivery, Stripe / cash / e-transfer workflows, settlement math, escrow, or unrelated notifications.
+
+### Root cause (reproduced with `tests/live_repro_iter460_duplicate_emails.py`)
+Two independent causes fanned duplicates out to buyers and sellers:
+1. **Per-lot fan-out in multi-item + vehicle-multi-lot flows.** `routes/auctions.py::process_ended_auctions` and `services/vehicle_multi_lot_settlement.py` iterated `auction.lots[]` and fired `send_auction_won_email`, `send_seller_auction_sold_email`, `send_auction_sold_email`, plus receipt/statement emails **per lot**. A buyer winning 5 lots received 5 emails; a seller with 5 sold lots got 5 identical "you sold" emails.
+2. **No cross-trigger dedup.** Scheduler retries, Stripe webhook re-drives, and duplicated `finalize_auction_payment` calls each ran independently. Only `services/receipts.py` had per-lot receipt dedup (by `(listing_id, lot_number, type, user_id)`), which was too fine-grained — every distinct lot still emailed the buyer again.
+
+### Trigger map (7 sites, all now deduped)
+| # | File | Old behaviour | Fix |
+|---|------|---------------|-----|
+| T1 | `routes/auctions.py::process_ended_auctions` single listing | 1 buyer + 1 seller email | Gated by ledger |
+| T2 | `routes/auctions.py::process_ended_auctions` multi-item lots | **N buyer + N seller emails** | Aggregated per-buyer + per-seller after loop; ledger claim before send |
+| T3 | `services/vehicle_multi_lot_settlement.py::settle_lot` | N buyer + N seller emails | Ledger-gated per `(event, user)` |
+| T4 | `services/vehicle_multi_lot_scheduler.py` post-write fan-out | N buyer emails | Ledger-gated |
+| T5 | `services/vehicle_auction_handler.py` single vehicle | 1 buyer + 1 seller | Ledger-gated |
+| T6 | `services/receipts.py::issue_transaction_records` (called per-lot by T2/T3) | N buyer receipt + N seller statement emails | Per-lot receipt ROWS still persist; emails ledger-gated to 1 per `(auction, user)` |
+| T7 | `services/payment_collection.py::finalize_auction_payment` payment-link + failure branches | Repeated on retry | Ledger-gated |
+| T8 | `routes/webhooks.py::_send_purchase_confirmation_emails` | Repeated on webhook retries | Ledger-gated (separate `_buyer` / `_seller` kinds) |
+| — | `routes/settlement.py::resend_winner_notification` | ADMIN-EXPLICIT, rate-limited to 3 | Untouched — intentional user action |
+
+### Delivered
+- **New dedup helper** `services/settlement_email_dedup.py`:
+  - Collection `settlement_email_dispatches` with a UNIQUE compound index on `(kind, auction_id, user_id)` ensured at server startup (`server.py`).
+  - `claim_settlement_email(db, *, kind, auction_id, user_id)` — atomic insert; returns `True` on first claim (caller sends the email), `False` on `DuplicateKeyError` (caller must skip). Non-fatal: fails open on other DB errors so real settlement notifications are never lost.
+  - Recognised kinds: `auction_won`, `seller_sold`, `buyer_receipt`, `seller_statement`, `payment_link`, `payment_failed`, `purchase_confirmation_buyer`, `purchase_confirmation_seller`.
+- **`routes/auctions.py`** (multi-item): per-lot loop now collects `_iter460_buyer_wins` and `_iter460_seller_sales` maps. After the loop, one `send_auction_won_email` per unique winner (with aggregate hammer + `"— N lot(s)"` title) and one `send_seller_auction_sold_email` per unique seller. All wrapped in the ledger claim.
+- **`routes/auctions.py`** (single listing): each buyer/seller send wrapped in `claim_settlement_email(...)`.
+- **`services/vehicle_multi_lot_settlement.py`**, **`vehicle_multi_lot_scheduler.py`**, **`vehicle_auction_handler.py`**: buyer/seller settlement emails ledger-gated per `(event_id, user_id)`. Invoice-created email (`send_invoice_created_email`) NOT gated — user directive excluded invoice triggers.
+- **`services/receipts.py::issue_transaction_records`**: buyer receipt + seller statement emails gated per `(auction, user)`; per-lot receipt/statement ROWS still persist (financial ledger untouched).
+- **`services/payment_collection.py::finalize_auction_payment`**: payment-link and payment-failure emails gated per `(auction, buyer)`.
+- **`routes/webhooks.py::_send_purchase_confirmation_emails`**: buyer + seller SendGrid template sends gated with distinct kinds.
+
+### Explicit non-goals honoured
+- Email content / bilingual templates — untouched (EN + FR preserved).
+- Invoice triggers, PDF generation, `send_invoice_created_email` — untouched.
+- Stripe charge idempotency (`services/payment_idempotency`) — untouched.
+- Cash / e-transfer flows, settlement calculations, escrow — untouched.
+- `resend_winner_notification` (admin-explicit) — untouched, still capped at 3.
+- No frontend changes.
+
+### Verified end-to-end
+- **Reproduction** (`tests/live_repro_iter460_duplicate_emails.py`) — BEFORE fix: Buyer A got 2× auction_won + 2× payment_link, seller got 3× seller_sold. AFTER fix: every count is exactly 1.
+- **Acceptance** (`tests/live_verify_iter460_email_dedup.py`) — 16/16 checks PASS covering all 6 user-mandated scenarios:
+  1. Duplicated settlement trigger → zero re-sends
+  2. Scheduler retry (tick 2 + tick 3) → zero re-sends
+  3. Multi-lot buyer (2 winning lots) → exactly 1 aggregated buyer email
+  4. Two different buyers on same auction → each gets exactly 1 email
+  5. Two separate settlements → each fires its own emails independently; the other auction's buyers are not touched
+  6. `finalize_auction_payment` webhook re-drive (3× same event) → ≤1 buyer_receipt and ≤1 seller_statement email
+  Plus: unsold lot never fires an auction_won email, seller receives exactly 1 summary covering the 3 sold lots, ledger records ≥6 dispatch rows across the two settlements.
+- **iter459 regression** — Live E2E (51/51 buyer payment letter EN+FR) + pytest (7/7 dataset) still PASS after these changes.
+
+### Remaining risks
+- **Vehicle-multi-lot buyers who win lots across separate scheduler ticks** receive ONE first-notification email at the FIRST lot's close (subsequent lots on the same event are ledger-suppressed). The buyer's aggregate view is captured in the iter459 buyer payment letter which reflects all their real won lots. Full "aggregate across ticks" refactor would require queuing a delayed email dispatcher — deferred as it would touch scheduler ordering.
+- **Ledger fail-open**: if the ledger insert fails with a non-duplicate DB error the helper allows the send (never drops a real settlement email). Trade-off documented in the module docstring.
+- **`send_invoice_created_email`** in vehicle multi-lot is not gated per user directive (invoice trigger, out of scope). Vehicle multi-lot events still send one invoice-created email per lot; that is by design (each lot has its own invoice).
+
+
 ## iter459 — Buyer Payment-Letter Accuracy (Feb 9, 2026) ✅ COMPLETE
 
 **Reported by user (P0)**: Fix ONLY the buyer payment-letter accuracy for auction wins. The letter must use only lots actually won by that specific buyer — never arbitrary first lots, placeholder buyer data, sample paddle numbers, another buyer's lots, or unsold lots. For each real won lot show: Auction name, Lot number/title, Unit price, Quantity, Line total, Hammer total, existing buyer premium (and payment charges), taxes from the existing tax engine, final amount due, and Buyer paddle number. Do not change existing invoice triggers, fee/tax calculations, or unrelated documents.
