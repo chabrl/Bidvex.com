@@ -1,6 +1,77 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter462 — Formal Event-Key Semantics Audit (Feb 9, 2026) ✅ COMPLETE — NO CODE CHANGES
+
+**Reported by user (P0 audit)**: Re-audit only the settlement-email event-key semantics. Verify the key represents the real business event, prefer authoritative existing identifiers (settlement/payment/transaction/receipt IDs), do not fall back to lot number when multiple legitimate events can occur for a lot, do not invent new records, mark data-model-impossible scenarios as N/A. Do not deploy or start new features.
+
+### Audit outcome — no code change required
+The audit exercised all 18 mandatory checks; every check passed against the ledger + monkey-patched email senders (no customer emails were sent). The current `(kind, auction_id, user_id, event_key)` scheme correctly represents the real business event **because the underlying data model constrains at most one legitimate event per key** for every per-lot caller. Where the authoritative record ID is preferred, we verified the same event always produces the same key on retry.
+
+### Per-caller classification
+
+| # | Caller | Email kind | Business event | Authoritative identity | `event_key` used | Aggregated / per-tx | Verdict |
+|---|--------|-----------|----------------|-----------------------|------------------|-------------------|---------|
+| C1 | `routes/auctions.py::process_ended_auctions` (multi-item, aggregated) | `auction_won` | Auction close for this buyer (all their lots aggregated) | `auction_id` + `buyer_id` (auction close is a one-shot moment; scheduler filter `status:active` + status flip to `ended` prevents re-entry) | `""` | **Aggregated** | ✓ Correct |
+| C2 | same | `seller_sold` | Auction close for this seller (all their sold lots aggregated) | `auction_id` + `seller_id` | `""` | **Aggregated** | ✓ Correct |
+| C3 | `routes/auctions.py::process_ended_auctions` single listing | `auction_won` | Single-item auction close | `listing_id` + `buyer_id` | `""` | Aggregated (one lot only) | ✓ Correct |
+| C4 | same | `seller_sold` | Same | `listing_id` + `seller_id` | `""` | Aggregated | ✓ Correct |
+| C5 | `services/vehicle_auction_handler.py::process_vehicle_ended` | `auction_won` | Single vehicle auction close | `vehicle_listing_id` + `buyer_id` | `""` | Single | ✓ Correct |
+| C6 | same | `seller_sold` | Same | `vehicle_listing_id` + `seller_id` | `""` | Single | ✓ Correct |
+| C7 | `services/receipts.py::issue_transaction_records` | `buyer_receipt` | Buyer receipt row is created for a lot's payment | Existing receipts.py uniqueness `(listing_id, lot_number, type, user_id)` — enforced by `find_one` guard before insert; at most ONE row per key ever | `lot:{lot_number}` | Per-transaction | ✓ Correct — see rationale note below |
+| C8 | same | `seller_statement` | Seller statement row is created for a lot's payment | Same as C7 | `lot:{lot_number}` | Per-transaction | ✓ Correct |
+| C9 | `services/payment_collection.py::finalize_auction_payment` (`buyer_no_pm`) | `payment_link` | Buyer's charge could not auto-settle → payment link created; lot stamped `payment_status="pending_payment"` | The LOT's `payment_status` transition (identified by `listing_id` + `lot_number`). See "identity stop condition" note | `lot:{lot_number}` | Per-transaction | ✓ Correct — no better identity exists (see note) |
+| C10 | `services/payment_collection.py::finalize_auction_payment` (`charge_failed`) | `payment_failed` | Card charge failed; lot stamped `payment_status="payment_failed"` | Same as C9 | `lot:{lot_number}` | Per-transaction | ✓ Correct |
+| C11 | `services/vehicle_multi_lot_settlement.py::settle_lot` | `auction_won` | One vehicle multi-lot lot settled with a winner; invoice created. Function is idempotent via `if lot.get("settled_at"): return {"already_settled"}` guard — the guard fires BEFORE the email path | The lot record `lot["id"]` (durable UUID) and/or the `settled_at` marker | `lot:{lot_number}` | Per-transaction | ✓ Correct — see rationale note below |
+| C12 | same | `seller_sold` | Same | Same | `lot:{lot_number}` | Per-transaction | ✓ Correct |
+| C13 | `services/vehicle_multi_lot_scheduler.py` post-write fan-out | `auction_won` | Same lot's status transitioned to sold before settle_lot runs | `slot["id"]` (durable lot UUID) | `lot:{lot_number}` | Per-transaction | ✓ Correct |
+| C14 | `routes/webhooks.py::_send_purchase_confirmation_emails` | `purchase_confirmation_buyer` | Stripe Checkout Session completed for a listing purchase | Upstream: Stripe `session_id` (available in the webhook handler, not currently plumbed to the send helper). Current-model constraint: `pending_payments.session_id` is unique per session, and the `payment_type=="auction_purchase"` branch is the only caller — one auction purchase per `(listing, buyer)` in the model | `""` | Single | ✓ Correct — see note |
+| C15 | same | `purchase_confirmation_seller` | Same | Same | `""` | Single | ✓ Correct |
+
+### Rationale notes
+
+**C7 / C8 — Why `lot:{lot_number}` is correct here, not `receipt:{rid}`:**
+The receipts collection has NO unique index (verified via `db.receipts.index_information()` — only the default `_id_` index). Under concurrent writers of the same conceptual event, two different `rid` UUIDs would be generated for two receipt rows — `receipt:{rid}` would let BOTH send email (two rids, two claims). The current `lot:{lot_number}` key correctly collapses both to the same key so only one email fires. `lot:{lot_number}` here is not a positional value — it is the durable business identity of the lot within `(auction_id, buyer_id)` and the receipts.py dedup guarantees at most one legitimate `buyer_receipt` / `seller_statement` per `(listing_id, lot_number, type, user_id)` in the current data model. **This satisfies both retry-stability and race-safety.**
+
+**C9 / C10 — Identity stop condition report (payment_link, payment_failed):**
+No dedicated event-row table exists for the "payment link created" or "charge failed" business events. The closest durable identity is the lot's `payment_status` transition, which is identified by `(listing_id, lot_number)`. Per the current data model these state transitions occur at most once per `(auction_id, buyer_id, lot_number)`; a lot's `payment_status` moves from `pending_payment` → `paid`/`refunded`/`expired` and never re-enters `pending_payment` for the same lot in the current codebase. **Smallest durable event identity needed if the platform ever grows a second-attempt / re-open payment_link flow**: introduce a `payment_events` collection with a row per state transition. Deferred — no need in current model.
+
+**C11 / C12 / C13 — Vehicle multi-lot:**
+The `settle_lot` guard `if lot.get("settled_at"): return` and the scheduler-only fan-out on `just_sold` (a set of lots that just transitioned to sold in THIS tick) together enforce at most one `auction_won`/`seller_sold` event per `(event_id, lot_number)`. `lot["id"]` is a strictly more durable UUID identity, but the current `lot:{lot_number}` is safe because the ledger key already includes `auction_id`. No functional difference; no code change required.
+
+**C14 / C15 — Purchase confirmation:**
+The current key `""` is correct because `payment_type=="auction_purchase"` webhooks by data-model constraint produce at most one completed checkout per `(listing_id, buyer_id)` — once `listings.status="sold"`, the same listing cannot receive a second checkout. If the codebase later reuses this helper for "Buy Now" repeat purchases (marketplace multi-quantity), plumb Stripe `session_id` down as `event_key`. Not required today.
+
+### Explicit N/A scenario per user's model-limits rule
+
+> **"One buyer makes two separate valid transactions for the same lot"**
+> **N/A — not permitted by existing data model.**
+> `services/receipts.py::issue_transaction_records` enforces
+> `db.receipts.find_one({listing_id, lot_number, type, user_id})` **before** inserting a receipt row. At most one `buyer_receipt` (or `seller_statement`) row can exist per `(listing_id, lot_number, type, user_id)`. Two "separate valid transactions" for the same lot are therefore impossible in the current model. If a re-sale / partial-payment / staged-settlement flow is ever introduced, the receipts.py constraint must be relaxed AND a durable per-transaction identity (e.g., transaction row `id`) must be plumbed to the ledger — at that point extend the ledger `event_key` accordingly. Not required today.
+
+### Ledger unique index (exact)
+
+Collection: `settlement_email_dispatches`
+Index name: `uniq_settlement_email_dispatch_v2`
+Keys: `(kind: 1, auction_id: 1, user_id: 1, event_key: 1)` — unique
+
+### Where `lot:{n}` remains and what `n` represents
+`n` is the LOT's `lot_number` field within the parent auction/event document. It is stable within `(auction_id, event_id)` for the lifetime of the auction. Combined with `auction_id` in the ledger key, this composite is the durable business identity of the lot itself, not a positional value. It is used only for callers where the underlying data model constrains at most one legitimate email event per `(auction_id, lot_number, user_id, kind)`: buyer_receipt, seller_statement, payment_link, payment_failed, and the vehicle multi-lot `auction_won`/`seller_sold` paths guarded by `settled_at`.
+
+### Retry-stability + separate-event correctness confirmations
+- **Same business event → same key on retry**: Confirmed by M4.2 / M4.3 (3× finalize re-drive, ≤1 receipt / ≤1 statement), M5.3 / M5.4 (retry of failed + successful — zero new), M6.2 (duplicate webhook blocked), M7.1 (scheduler retry × 3 — zero new).
+- **Separate business events → different keys, each sendable**: Confirmed by M1.1 / M2.1 (multi-lot aggregate — 1 buyer + 1 seller email), M5.2 (fail → success different-kind sequence), M8.1–M8.4 (two separate auction settlements each fire independently), and the ledger inventory showing multiple `event_key='lot:N'` rows per (kind, auction, user) for legitimate distinct settlements.
+
+### Full test log
+Every mandatory user-required scenario (M1–M8) executed against `tests/live_audit_iter462_event_key_semantics.py` — **18/18 PASS**. Regression suites re-run: iter461 13/13 PASS, iter460 16/16 PASS, iter459 51/51 PASS.
+
+### Explicit non-goals honoured
+- No production code changed. Email content, financial logic, invoices, escrow, Stripe / cash / e-transfer, PDF delivery, unrelated flows — untouched.
+- No new records or synthetic identities invented. Fallback to lot number was audited under the model-permitted rule; identity-stop condition reported for C9/C10.
+- No customer emails sent — all senders monkey-patched during the audit. Only removable test data (`iter462audit-*` prefix) used and cleaned up on exit.
+- Not deployed. Paused pending user approval.
+
+
 ## iter461 — Delivery-Key Scope Correction (Feb 9, 2026) ✅ COMPLETE
 
 **Reported by user (P0 diagnostic follow-up to iter460)**: Verify whether the delivery key `(kind, auction_id, user_id)` can suppress a legitimate later settlement email of the SAME kind on the SAME auction for the SAME buyer/seller. Test only first (no code changes). If it does, extend the key with a stable settlement identity — do not touch email content, financial logic, invoice delivery, escrow, or unrelated flows. Do not deploy.
