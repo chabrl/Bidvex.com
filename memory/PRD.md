@@ -1,6 +1,84 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter474 — Dashboard Financial-Document Access (Feb 11, 2026) ✅ COMPLETE — PREVIEW-ONLY, NOT DEPLOYED
+
+**Reported by user (P0)**: Build ONLY dashboard financial document access for EXISTING documents. Buyer "My Purchases" and Seller "sales/payouts" get a per-row Documents popover showing Download Invoice / Receipt / Payment Letter (buyer) and Download Statement / Seller Receipt / Commission Invoice (seller). Every download uses the existing authorized document source and generates a complete absolute HTTPS signed link. Ownership enforced server-side from the actual document + settlement record — never solely from a browser-supplied receipt id. Buyer never retrieves seller docs; seller never retrieves another seller's docs. Multiple lot rows of the SAME order reuse the SAME order-level invoice / statement — no duplicate PDFs. Bilingual EN/FR. Unsupported gaps rendered as "Not available yet / Non disponible pour le moment". No new document types, no auto-email flow, no changes to document contents / email delivery / payments / Stripe / escrow / fees / taxes / production data / deployment. Not deployed.
+
+### Step 1 — Document Source Audit (mandatory, before any code)
+
+| Section | Buyer Invoice PDF | Buyer Payment Letter | Seller Statement PDF | Seller Receipt PDF | Commission Invoice PDF |
+|---|---|---|---|---|---|
+| **marketplace** | ✅ `db.invoices.type=marketplace_purchase` (webhook auto) | ❌ | ❌ | ❌ | ❌ |
+| **lots** (multi_item_listings) | ✅ `db.invoices.invoice_type=lots_won` (order-level, one PDF for multi-lot) | ✅ `db.invoices.invoice_type=payment_letter` | ✅ `db.invoices.invoice_type=seller_statement` (order-level) | ✅ `db.invoices.invoice_type=seller_receipt` | ✅ `db.invoices.invoice_type=commission_invoice` |
+| **vehicles** | ✅ `db.invoices.invoice_type=vehicle_fees` (webhook auto) | ❌ | ❌ | ❌ | ❌ |
+| **storage** | ❌ | ❌ | ❌ | ❌ | ❌ |
+
+Buyer receipt as a distinct PDF does NOT exist for any section — `db.receipts` rows are JSON only. Rendered as "Not available yet" per user directive (no fabricated receipt-PDF renderer). No auto-email delivery invented for any gap.
+
+### Delivered (backend)
+
+- **`routes/dashboard.py` — new endpoint `GET /api/dashboard/documents/purchase?section&listing_id&lot_number`**:
+  Ownership gate 1 (receipt): `db.receipts.find_one({user_id: current_user.id, type: "buyer_receipt", section, listing_id, [lot_number]})` — 403 otherwise.
+  Ownership gate 2 (document): candidate PDF in `db.invoices` must carry `buyer_id/user_id == current_user.id`.
+  Signed URL is generated ONLY after both gates pass, via existing `services.cloud_storage.generate_signed_url(id)`. Multi-lot detection sets `label_key="order_invoice"` and `multi_lot=true` so the UI renders "Order Invoice / Facture de commande".
+- **`routes/dashboard.py` — new endpoint `GET /api/dashboard/documents/sale?section&listing_id`**:
+  Ownership gate 1 (receipt): `db.receipts.find_one({user_id: current_user.id, type: "seller_statement", section, listing_id})` — 403 otherwise.
+  Ownership gate 2 (auction): for section=lots, `multi_item_listings.seller_id` must match.
+  Ownership gate 3 (document): each candidate invoice in `db.invoices` must carry `user_id == current_user.id`.
+  Multi-lot detection sets `label_key="settlement_statement"` so the UI renders "Settlement Statement / Relevé de règlement".
+- **`routes/dashboard.py`** — enriched `lot_outcomes[]` with a `section` field (`marketplace` / `lots` / historical-inherited) so the frontend can pass the correct section to the endpoint without guessing.
+
+### Delivered (frontend)
+
+- **`frontend/src/components/DocumentsPopover.js`** — NEW reusable component. Lazy-loads on open. Renders one entry per document kind; available ones are absolute-HTTPS anchor tags (open in new tab), unavailable ones are strikethrough disabled rows with bilingual "Not available yet / Non disponible pour le moment". Multi-lot footer note: "This document covers multiple lots of the same order / Ce document couvre plusieurs lots de la même commande." All elements carry `data-testid` (`documents-btn-*`, `documents-popover-*`, `document-link-*`, `document-unavailable-*`, `documents-multi-lot-note-*`, `documents-error-*`).
+- **`frontend/src/pages/BuyerDashboard.js`** — DocumentsPopover added to each paid `won_items_detail` row (`w.payment_status === 'payment_collected'`), section from `w.section`, listing from `w.listing_id`, lot from `w.lot_number`.
+- **`frontend/src/pages/SellerDashboard.js`** — DocumentsPopover added to each lot-outcome and historical-settlement card when `o.payment_status === 'payment_collected'` or `isHist`, section from `o.section` with legacy fallback (`multi_item` → `lots`).
+
+### Guardrails honoured
+
+- No changes to document PDF content / templates / renderers / issuer / co-branding.
+- No auto-email flow invented for unsupported gaps.
+- No changes to payments, Stripe, escrow, fees, taxes, invoices content, receipts JSON semantics, email delivery.
+- No production data touched. Preview seed prefix `iter474ui-*`, cleanup script provided.
+- **Not deployed.**
+
+### Verified end-to-end
+
+- **`tests/live_verify_iter474_dashboard_documents.py`** — **18/18 PASS**:
+  - T1 buyer × 4 sections: correct available/unavailable per audit matrix, multi_lot=true on lots, label_key=`order_invoice` on multi-lot.
+  - **T2 (critical)**: multi-lot Lots 1/2/3 → **all 3 return the SAME order-level `invoice_id`** (no duplicate PDFs).
+  - **T3 (authorization)**: cross-buyer Buyer B → 403 on Buyer A's row.
+  - **T4 (authorization)**: buyer calling seller endpoint → 403.
+  - T5 seller lots: statement + seller_receipt + commission_invoice all available, `settlement_statement` label, `multi_lot=true`.
+  - T5b seller marketplace / vehicles / storage: 200 with all three unavailable (gaps G3–G5 correctly surfaced).
+  - **T6 (authorization)**: cross-seller Seller B → 403 on Seller A's sale.
+  - T7a signed URL is absolute HTTPS, valid host, contains `/api/invoices/download/{id}?expires=…&sig=…`.
+  - T7b click-through → 200 `application/pdf`.
+  - **T8**: expired `expires` timestamp → 403.
+  - **T9**: forged / wrong signature → 403.
+  - T10 EN + FR round trip: label_key stable regardless of `?lang=`.
+- **UI screenshots** (inline in conversation):
+  - Buyer dashboard FR — multi-lot popover shows "Télécharger la facture de commande" + "Télécharger la lettre de paiement" + strikethrough "Télécharger le reçu" + multi-lot note.
+  - Buyer dashboard FR — vehicle popover shows "Télécharger la facture de commande" (BV-VEH-*) + 2× unavailable.
+  - Seller dashboard FR — multi-lot popover shows "Télécharger le relevé de règlement" + "Télécharger le reçu du vendeur" + "Télécharger la facture de commission" + multi-lot note.
+
+### Report
+
+- Full audit + matrices + security guarantees: `/app/test_reports/iter474_dashboard_documents_report.md`
+- JSON: `/app/test_reports/iter474_dashboard_documents.json`
+- Removable seed script: `/app/backend/tests/seed_iter474_documents_matrix.py` (with `--cleanup`)
+- Verification harness: `/app/backend/tests/live_verify_iter474_dashboard_documents.py`
+
+### Preview env note (not a code issue)
+
+Backend runtime `APP_URL` currently resolves to a stale preview host (`1a5f2821-…`) different from the caller-facing preview host (`prod-verify-2.…`). The resolver correctly emits absolute HTTPS URLs — they simply point at the stale host. T7b click-through was verified with `expires + sig + invoice_id` preserved while rewriting host. Production will resolve through `FRONTEND_URL=https://bidvex.com` at deploy time.
+
+### Not deployed
+
+Preview-only per user directive. Awaiting user go-ahead before any deploy.
+
+
 ## iter473 — Absolute HTTPS URL in Emailed Document Links (Feb 10, 2026) ✅ COMPLETE — PREVIEW-ONLY, NOT DEPLOYED
 
 **Reported by user (P0)**: Preview test emails contained `http:///api/invoices/download/…` — hostless. Every emailed document link must be an absolute HTTPS URL built from the active environment's configured public base URL. No hardcoded preview/production domain. Preserve signed path + expiry + signature exactly. Do not modify document content, calculations, recipients, payment logic, Stripe, escrow, production data, or deployment settings. Do not deploy.

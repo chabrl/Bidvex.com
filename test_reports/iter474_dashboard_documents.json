@@ -1,0 +1,157 @@
+{
+  "iter": 474,
+  "base_url": "https://prod-verify-2.preview.emergentagent.com",
+  "passed": 18,
+  "total": 18,
+  "results": [
+    {
+      "test": "T1[marketplace]",
+      "status": 200,
+      "ok": true,
+      "available": {
+        "invoice": true,
+        "receipt": false,
+        "payment_letter": false
+      },
+      "multi_lot": false,
+      "label_key": "invoice"
+    },
+    {
+      "test": "T1[lots]",
+      "status": 200,
+      "ok": true,
+      "available": {
+        "invoice": true,
+        "receipt": false,
+        "payment_letter": true
+      },
+      "multi_lot": true,
+      "label_key": "order_invoice"
+    },
+    {
+      "test": "T1[vehicles]",
+      "status": 200,
+      "ok": true,
+      "available": {
+        "invoice": true,
+        "receipt": false,
+        "payment_letter": false
+      },
+      "multi_lot": true,
+      "label_key": "order_invoice"
+    },
+    {
+      "test": "T1[storage]",
+      "status": 200,
+      "ok": true,
+      "available": {
+        "invoice": false,
+        "receipt": false,
+        "payment_letter": false
+      },
+      "multi_lot": false,
+      "label_key": null
+    },
+    {
+      "test": "T2[multi-lot-order-invoice-shared]",
+      "ok": true,
+      "invoice_ids": [
+        "e031c249-9a18-4211-a00e-f093f5b56ae5"
+      ],
+      "note": "all 3 lot rows must resolve to the same order-level invoice"
+    },
+    {
+      "test": "T3[buyerB-forbidden]",
+      "status": 403,
+      "ok": true
+    },
+    {
+      "test": "T4[buyer-calls-seller-endpoint]",
+      "status": 403,
+      "ok": true
+    },
+    {
+      "test": "T5[sellerA-lots-own-docs]",
+      "status": 200,
+      "ok": true,
+      "available": {
+        "statement": true,
+        "seller_receipt": true,
+        "commission_invoice": true
+      },
+      "statement_label": "settlement_statement"
+    },
+    {
+      "test": "T5b[sellerA-marketplace]",
+      "status": 200,
+      "ok": true,
+      "available": {
+        "statement": false,
+        "seller_receipt": false,
+        "commission_invoice": false
+      }
+    },
+    {
+      "test": "T5b[sellerA-vehicles]",
+      "status": 200,
+      "ok": true,
+      "available": {
+        "statement": false,
+        "seller_receipt": false,
+        "commission_invoice": false
+      }
+    },
+    {
+      "test": "T5b[sellerA-storage]",
+      "status": 200,
+      "ok": true,
+      "available": {
+        "statement": false,
+        "seller_receipt": false,
+        "commission_invoice": false
+      }
+    },
+    {
+      "test": "T6[sellerB-forbidden]",
+      "status": 403,
+      "ok": true
+    },
+    {
+      "test": "T7a[signed-url-absolute-https]",
+      "ok": true,
+      "scheme": "https",
+      "host": "1a5f2821-7068-4c9e-83eb-2e652df36c4d.preview.emergentagent.com",
+      "path_starts": true
+    },
+    {
+      "test": "T7b[click-through-200-pdf]",
+      "status": 200,
+      "ok": true,
+      "note": "host rewritten to caller base for reachability; signature+expiry+id preserved",
+      "emitted_host": "1a5f2821-7068-4c9e-83eb-2e652df36c4d.preview.emergentagent.com",
+      "called_host": "prod-verify-2.preview.emergentagent.com"
+    },
+    {
+      "test": "T8[expired-link-rejected]",
+      "status": 403,
+      "ok": true
+    },
+    {
+      "test": "T9[forged-signature-rejected]",
+      "status": 403,
+      "ok": true
+    },
+    {
+      "test": "T10[en]",
+      "status": 200,
+      "ok": true,
+      "label_key": "order_invoice"
+    },
+    {
+      "test": "T10[fr]",
+      "status": 200,
+      "ok": true,
+      "label_key": "order_invoice"
+    }
+  ]
+}

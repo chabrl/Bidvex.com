@@ -294,10 +294,26 @@ async def get_seller_dashboard(
         is_multi = isinstance(l.get("lots"), list) and len(l["lots"]) > 0
         # A. Historical orphan receipt → one "Historical settlement" card.
         if is_synth:
+            # iter474 — Historical receipts carry their original section
+            # so the seller Documents popover can call the correct
+            # `/documents/sale` endpoint. Fall back to `lots` for legacy
+            # rows without a section (multi-item was the original source).
+            _hist_section = "lots"
+            try:
+                _hr = await rdb.receipts.find_one(
+                    {"id": l.get("receipt_id"), "user_id": current_user.id,
+                     "type": "seller_statement"},
+                    {"_id": 0, "section": 1},
+                )
+                if _hr and _hr.get("section"):
+                    _hist_section = _hr["section"]
+            except Exception:  # noqa: BLE001
+                pass
             lot_outcomes.append({
                 "outcome_id": f"hist-{l.get('receipt_id') or l.get('id')}",
                 "listing_id": l.get("id"),
                 "listing_type": "historical",
+                "section": _hist_section,
                 "parent_title": l.get("title") or "Historical settlement",
                 "lot_number": None,
                 "lot_title": "Historical settlement",
@@ -330,6 +346,7 @@ async def get_seller_dashboard(
                 "outcome_id": f"single-{l.get('id')}",
                 "listing_id": l.get("id"),
                 "listing_type": "single",
+                "section": "marketplace",
                 "parent_title": l.get("title") or "",
                 "lot_number": None,
                 "lot_title": l.get("title") or "",
@@ -382,6 +399,7 @@ async def get_seller_dashboard(
                 "outcome_id": f"lot-{l.get('id')}-{lot_num}",
                 "listing_id": l.get("id"),
                 "listing_type": "multi_item",
+                "section": "lots",
                 "parent_title": l.get("title") or "",
                 "lot_number": lot_num,
                 "lot_title": lot.get("title") or "",
@@ -966,3 +984,279 @@ async def mark_pickup_notification_read(
         query["id"] = notification_id
     res = await _db.pickup_notifications.update_many(query, {"$set": {"read": True}})
     return {"ok": True, "marked": res.modified_count}
+
+
+# ═════════════════════════════════════════════════════════════════════
+# iter474 — Dashboard financial-document access (read-only wrappers
+# around the EXISTING authorized document sources in `db.invoices`).
+#
+# Design rules (per user directive):
+#   • Every existing-document lookup is filtered on the DOCUMENT's own
+#     buyer/seller/user field — not on a receipt id supplied by the
+#     browser. A buyer never receives a seller doc, a seller never
+#     receives another seller's doc.
+#   • The signed download URL is generated ONLY AFTER the ownership
+#     check passes. It uses the existing signed-URL machinery in
+#     `services.cloud_storage.generate_signed_url` (absolute HTTPS,
+#     expires + sig).
+#   • For multi-lot orders every lot row of the SAME order re-uses the
+#     SAME order-level invoice / statement — no duplicate PDFs are
+#     generated. Label = `order_invoice` / `settlement_statement` when
+#     the underlying document covers multiple lots.
+#   • Sections/roles/document-kinds without an existing generator are
+#     returned as `{available: false, reason: "not_supported_for_section"}`
+#     — never fabricated.
+# ═════════════════════════════════════════════════════════════════════
+
+_UNSUPPORTED = {"available": False, "reason": "not_supported_for_section"}
+
+
+def _empty_doc_shape_buyer() -> Dict[str, Any]:
+    return {
+        "invoice":        dict(_UNSUPPORTED),
+        "receipt":        dict(_UNSUPPORTED),
+        "payment_letter": dict(_UNSUPPORTED),
+    }
+
+
+def _empty_doc_shape_seller() -> Dict[str, Any]:
+    return {
+        "statement":          dict(_UNSUPPORTED),
+        "seller_receipt":     dict(_UNSUPPORTED),
+        "commission_invoice": dict(_UNSUPPORTED),
+    }
+
+
+def _multi_lot_hint(auction_lots_count: int) -> bool:
+    """Return True when this order covers > 1 lot — used by the UI to
+    render `Order Invoice` / `Settlement Statement` labels."""
+    return bool(auction_lots_count and auction_lots_count > 1)
+
+
+@dashboard_router.get("/documents/purchase")
+async def get_buyer_purchase_documents(
+    section: str,
+    listing_id: str,
+    lot_number: Optional[int] = None,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    """Return the download availability for existing buyer financial
+    documents for a single paid purchase row.
+
+    Ownership gate:
+      • Requires a `db.receipts` row with `user_id == current_user.id`,
+        `type == "buyer_receipt"`, matching `(section, listing_id, lot_number)`.
+      • Additionally, the underlying invoice document must belong to the
+        same buyer (`buyer_id` or `user_id` field on the invoice).
+
+    Signed URL is generated only after both gates pass.
+    """
+    if not credentials:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    from fastapi import HTTPException
+    from services.cloud_storage import generate_signed_url
+
+    current_user = await _get_current_user(credentials)
+    buyer_id = current_user.id
+    rdb = _db_read if _db_read is not None else _db
+
+    if section not in ("marketplace", "lots", "vehicles", "storage"):
+        raise HTTPException(status_code=400, detail="Invalid section")
+
+    # ── Ownership gate 1: buyer must have a paid receipt for this row.
+    receipt_q: Dict[str, Any] = {
+        "user_id":    buyer_id,
+        "type":       "buyer_receipt",
+        "section":    section,
+        "listing_id": listing_id,
+    }
+    if lot_number is not None:
+        receipt_q["lot_number"] = lot_number
+    receipt = await rdb.receipts.find_one(receipt_q, {"_id": 0})
+    if not receipt:
+        # Do NOT reveal whether another user's receipt exists — 403.
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    docs = _empty_doc_shape_buyer()
+
+    # Detect multi-lot orders so the UI can render "Order Invoice"
+    # instead of "Invoice" when the same PDF covers multiple lots.
+    multi_lot = False
+    if section == "lots":
+        auction = await rdb.multi_item_listings.find_one(
+            {"id": listing_id}, {"_id": 0, "lots": 1}
+        )
+        lots_arr = (auction or {}).get("lots") or []
+        multi_lot = _multi_lot_hint(len(lots_arr))
+    elif section == "vehicles":
+        vehicle_auction = await rdb.vehicle_listings.find_one(
+            {"id": listing_id}, {"_id": 0, "lots": 1}
+        )
+        lots_arr = (vehicle_auction or {}).get("lots") or []
+        multi_lot = _multi_lot_hint(len(lots_arr))
+
+    # ── MARKETPLACE (single-item): db.invoices type=marketplace_purchase
+    if section == "marketplace":
+        inv = await rdb.invoices.find_one({
+            "type":       "marketplace_purchase",
+            "listing_id": listing_id,
+            "buyer_id":   buyer_id,           # document-level ownership
+        }, {"_id": 0})
+        if inv and inv.get("id"):
+            docs["invoice"] = {
+                "available":     True,
+                "signed_url":    generate_signed_url(inv["id"]),
+                "invoice_number": inv.get("invoice_number", ""),
+                "label_key":     "invoice",
+                "multi_lot":     False,
+            }
+
+    # ── MULTI-LOT (multi_item_listings): invoice_type=lots_won + payment_letter
+    elif section == "lots":
+        inv = await rdb.invoices.find_one({
+            "invoice_type": "lots_won",
+            "auction_id":   listing_id,
+            "user_id":      buyer_id,          # document-level ownership
+        }, {"_id": 0})
+        if inv and inv.get("id"):
+            docs["invoice"] = {
+                "available":     True,
+                "signed_url":    generate_signed_url(inv["id"]),
+                "invoice_number": inv.get("invoice_number", ""),
+                "label_key":     "order_invoice" if multi_lot else "invoice",
+                "multi_lot":     multi_lot,
+            }
+        pl = await rdb.invoices.find_one({
+            "invoice_type": "payment_letter",
+            "auction_id":   listing_id,
+            "user_id":      buyer_id,
+        }, {"_id": 0})
+        if pl and pl.get("id"):
+            docs["payment_letter"] = {
+                "available":     True,
+                "signed_url":    generate_signed_url(pl["id"]),
+                "invoice_number": pl.get("invoice_number", ""),
+                "label_key":     "payment_letter",
+            }
+
+    # ── VEHICLES: invoice_type=vehicle_fees (buyer fees invoice)
+    elif section == "vehicles":
+        # Two shapes observed in db.invoices — try both.
+        inv = await rdb.invoices.find_one({
+            "$or": [
+                {"invoice_type": "vehicle_fees", "auction_id": listing_id,
+                 "buyer_id": buyer_id},
+                {"type": "vehicle_fees", "auction_id": listing_id,
+                 "buyer_id": buyer_id},
+            ]
+        }, {"_id": 0})
+        if inv and inv.get("id"):
+            docs["invoice"] = {
+                "available":     True,
+                "signed_url":    generate_signed_url(inv["id"]),
+                "invoice_number": inv.get("invoice_number", ""),
+                "label_key":     "order_invoice" if multi_lot else "invoice",
+                "multi_lot":     multi_lot,
+            }
+
+    # ── STORAGE: no PDF generator wired currently — stays unsupported.
+
+    return {
+        "section":     section,
+        "listing_id":  listing_id,
+        "lot_number":  lot_number,
+        "multi_lot":   multi_lot,
+        "documents":   docs,
+    }
+
+
+@dashboard_router.get("/documents/sale")
+async def get_seller_sale_documents(
+    section: str,
+    listing_id: str,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    """Return the download availability for existing seller financial
+    documents for a single sale / settlement.
+
+    Ownership gate:
+      • Requires a `db.receipts` row with `user_id == current_user.id`,
+        `type == "seller_statement"`, matching `(section, listing_id)`.
+      • The underlying invoice document must also belong to the same
+        seller (`user_id` / `seller_id`).
+
+    Signed URL is generated only after both gates pass. Order-level
+    statements are shared across multiple lots of the same sale — no
+    duplicate PDFs.
+    """
+    if not credentials:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    from fastapi import HTTPException
+    from services.cloud_storage import generate_signed_url
+
+    current_user = await _get_current_user(credentials)
+    seller_id = current_user.id
+    rdb = _db_read if _db_read is not None else _db
+
+    if section not in ("marketplace", "lots", "vehicles", "storage"):
+        raise HTTPException(status_code=400, detail="Invalid section")
+
+    # ── Ownership gate 1: seller must have at least one seller_statement
+    # receipt row for this listing (any lot).
+    seller_receipt = await rdb.receipts.find_one({
+        "user_id":    seller_id,
+        "type":       "seller_statement",
+        "section":    section,
+        "listing_id": listing_id,
+    }, {"_id": 0})
+    if not seller_receipt:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    docs = _empty_doc_shape_seller()
+
+    # Multi-lot detection for "Settlement Statement" labelling.
+    multi_lot = False
+    if section == "lots":
+        auction = await rdb.multi_item_listings.find_one(
+            {"id": listing_id}, {"_id": 0, "lots": 1, "seller_id": 1}
+        )
+        # Extra ownership pin: the auction itself must belong to this
+        # seller — otherwise we refuse even if a stray receipt row
+        # exists for another seller.
+        if auction and auction.get("seller_id") not in (seller_id, None):
+            raise HTTPException(status_code=403, detail="Not authorized")
+        lots_arr = (auction or {}).get("lots") or []
+        multi_lot = _multi_lot_hint(len(lots_arr))
+
+    # Only multi-lot (multi_item_listings) currently has these three
+    # PDF generators. Other sections stay unsupported per audit.
+    if section == "lots":
+        for doc_kind, inv_type, label_key in (
+            ("statement",         "seller_statement",   "settlement_statement" if multi_lot else "statement"),
+            ("seller_receipt",    "seller_receipt",     "seller_receipt"),
+            ("commission_invoice","commission_invoice", "commission_invoice"),
+        ):
+            inv = await rdb.invoices.find_one({
+                "invoice_type": inv_type,
+                "auction_id":   listing_id,
+                "user_id":      seller_id,        # document-level ownership
+            }, {"_id": 0})
+            if inv and inv.get("id"):
+                docs[doc_kind] = {
+                    "available":     True,
+                    "signed_url":    generate_signed_url(inv["id"]),
+                    "invoice_number": inv.get("invoice_number", ""),
+                    "label_key":     label_key,
+                    "multi_lot":     multi_lot,
+                }
+
+    return {
+        "section":     section,
+        "listing_id":  listing_id,
+        "multi_lot":   multi_lot,
+        "documents":   docs,
+    }

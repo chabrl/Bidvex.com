@@ -33,6 +33,8 @@ import StripeConnectBanner from '../components/StripeConnectBanner';
 // iter239 Mission 5 — Seller "Promote" modal.
 import PromoteListingModal from '../components/PromoteListingModal';
 import { Sparkles, RefreshCw, Pencil, Receipt } from 'lucide-react';
+// iter474 — Per-row Documents access (statement / receipt / commission invoice)
+import { DocumentsPopover } from '../components/DocumentsPopover';
 
 const API = API_BASE;
 
@@ -893,6 +895,22 @@ const SellerDashboard = () => {
                                 <div><span className="text-muted-foreground">{T('Net payout', 'Paiement net')}: </span><span className="font-medium">{money(o.net_payout_amount)}</span></div>
                               )}
                             </div>
+                            {/* iter474 — Documents access for this sale.
+                                Only rendered when payment has been
+                                collected (so seller_statement receipt
+                                exists) OR the row is a historical
+                                settlement (receipt row is the source of
+                                truth). */}
+                            {(o.payment_status === 'payment_collected' || isHist) && (
+                              <div className="mt-3 flex items-center gap-2">
+                                <DocumentsPopover
+                                  role="sale"
+                                  section={o.section || (o.listing_type === 'multi_item' ? 'lots' : 'marketplace')}
+                                  listingId={o.listing_id}
+                                  testIdSuffix={o.outcome_id}
+                                />
+                              </div>
+                            )}
                           </div>
                         </div>
                       );

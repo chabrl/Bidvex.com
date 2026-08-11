@@ -212,3 +212,14 @@ blog tile anchors, and pricing CTAs.
 - Admin (created for landing-page tests): `iter373_lp_admin@bidvex.com` / `Iter373LP!`
 - Regular user (for 403 admin-gate tests): `iter373_lp_user@bidvex.com` / `Iter373LPUser!`
 - Both seeded idempotently by `tests/test_iter373_landing_pages.py`.
+
+
+## 🆕 iter474 — Dashboard document access cross-user test accounts (Feb 11, 2026)
+Seeded by `python /app/backend/tests/seed_iter474_documents_matrix.py`
+(idempotent; cleanup via `... --cleanup`). Buyer A / Seller A reuse the
+canonical `testbuyer@bidvex.com` / `testseller@bidvex.com` credentials.
+Two additional accounts prove cross-user ownership rejection:
+- Cross buyer: `iter474_buyer_b@test.com` / `IterTestPwd!123`
+- Cross seller: `iter474_seller_b@test.com` / `IterTestPwd!123`
+Both are role=user. Used only for T3/T6 authorization tests — they own
+no seeded purchases or sales.

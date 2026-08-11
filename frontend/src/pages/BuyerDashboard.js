@@ -19,6 +19,8 @@ import InfoTip from '../components/InfoTip';
 import PendingPaymentsCard from '../components/PendingPaymentsCard';
 // iter302 Directive 2 — buyer Settle Payment flow
 import SettlePaymentModal from '../components/SettlePaymentModal';
+// iter474 — Per-row Documents access (invoice / receipt / payment letter)
+import { DocumentsPopover } from '../components/DocumentsPopover';
 
 const API = API_BASE;
 
@@ -757,6 +759,20 @@ const PurchasesAndReceiptsCard = ({ wonItems, onRefresh }) => {
                     <KeyRound className="h-3 w-3 mr-1" />
                     {fr ? 'Code' : 'Code'}: {w.pickup_code}
                   </Badge>
+                )}
+                {/* iter474 — Documents popover: lazily fetches existing
+                    buyer documents for this row (Invoice, Receipt,
+                    Payment Letter). Multiple lot rows on the same order
+                    reuse the SAME order-level invoice — no duplicate
+                    generation. */}
+                {w.payment_status === 'payment_collected' && (
+                  <DocumentsPopover
+                    role="purchase"
+                    section={w.section || 'marketplace'}
+                    listingId={w.listing_id}
+                    lotNumber={w.lot_number ?? null}
+                    testIdSuffix={`${w.listing_id}${isMultiLot ? '-lot' + w.lot_number : ''}`}
+                  />
                 )}
                 <Button
                   size="sm"
