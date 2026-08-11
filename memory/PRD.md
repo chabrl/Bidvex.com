@@ -1,6 +1,67 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter470 — Escrow Pickup Confirmation Payout-State Safety (Feb 10, 2026) ✅ COMPLETE — PREVIEW-ONLY, NOT DEPLOYED
+
+**Reported by user (P0)**: Fix ONLY escrow pickup confirmation payout-state safety for paid non-vehicle orders. **Critical rule**: a missing escrow record must NEVER be treated as proof that a seller payout was already sent, and a missing payout record must NEVER be treated as failed. Preserve the seller's pending payout obligation on pickup confirmation. Never claim "funds released" without a real Stripe transfer reference. Dashboard must distinguish `sent` / `pending` / `failed` / `unknown`. All iter469 guardrails preserved. No production data, no bulk repair, no deploy, no fund release, no real Stripe transfers.
+
+### Root cause
+iter469's transactions-only fallback in `services/escrow_service.confirm_pickup` unconditionally returned `{"status": "released", "message": "Funds have been released"}` without consulting `seller_payouts`. Only three Stripe-adjacent states are real: `sent` (+ `stripe_transfer_id`), `pending` (queued for admin payout), `failed` (explicit error). A missing `seller_payouts` row is `unknown` — not a proof of anything. iter469 collapsed all four into "released" and could falsely tell a seller with a pending / failed / not-yet-created payout that funds had arrived.
+
+### Full state map
+| Escrow row? | seller_payouts row | Prior transfer_id? | Path | Response | escrow_status flip |
+|---|---|---|---|---|---|
+| Yes (`held`) | `sent` | Yes | Reuse prior payout, skip `stripe.Transfer.create` | `{"status":"released","payout_state":"sent","transfer_id":"tr_..."}` — "Pickup confirmed. Funds have been released." | `released` |
+| Yes (`held`) | `pending` / `failed` | No | Skip transfer, do NOT touch the payout row | `{"status":"pickup_confirmed_payout_pending"\|"pickup_confirmed_payout_review","payout_state":"pending"\|"failed","transfer_id":null}` — accurate message | `pickup_confirmed_payout_pending` |
+| Yes (`held`) | none | n/a | Classic escrow release — attempt `stripe.Transfer.create` with `idempotency_key=escrow-release-{auction}-{seller}` | Whatever the transfer yields (or 500 on fail) — released if success | `released` on success |
+| No | `sent` | Yes | Fallback path — reuse prior transfer_id, no transfer initiated | `{"status":"released","payout_state":"sent","transfer_id":"tr_..."}` | n/a (mirrored to any paired escrow row) |
+| No | `pending` | No | Fallback — no transfer, keep pending row untouched | `pickup_confirmed_payout_pending` — "Pickup confirmed. Payout is pending." | mirror `pickup_confirmed_payout_pending` |
+| No | `failed` | No | Fallback — no transfer, keep failed row untouched | `pickup_confirmed_payout_review` — "Pickup confirmed. Payout requires review." | mirror `pickup_confirmed_payout_pending` |
+| No | **none** | n/a | Fallback — record confirmation only; **do NOT create any payout row** | `pickup_confirmed_payout_review` — "Pickup confirmed. Payout requires review." | mirror n/a |
+
+### Delivered
+- **`services/escrow_service._resolve_payout_state(db, listing_id, seller_id, lot_number)`** (new): reads `seller_payouts` primarily, `pending_payouts` as fallback for the `pending` signal. Returns one of `sent` / `pending` / `failed` / `unknown`. A missing row is `unknown` — never `failed`, never treated as `sent`.
+- **`services/escrow_service._payout_state_response(...)`** (new): centralized message composer. Locks the response contract:
+  - `sent` → `{"status":"released"}` + "Pickup confirmed. Funds have been released."
+  - `pending` → `{"status":"pickup_confirmed_payout_pending"}` + "Pickup confirmed. Payout is pending."
+  - `failed` / `unknown` → `{"status":"pickup_confirmed_payout_review"}` + "Pickup confirmed. Payout requires review."
+  - Bilingual EN/FR preserved.
+- **`services/escrow_service.confirm_pickup`** (refactored):
+  - Path A (escrow row): consults payout state, skips `stripe.Transfer.create` when a prior payout is `sent` (reuses `stripe_transfer_id`) or `pending` / `failed` (never creates a second obligation). Classic escrow-release Stripe transfer still fires ONLY when payout state is `unknown` (no prior payout evidence exists — the escrow row IS the release vehicle in that case). Escrow row flips to `released` only when funds actually shipped; otherwise flips to `pickup_confirmed_payout_pending` so the dashboard reflects the accurate state.
+  - Path B (transactions-only fallback): NEVER attempts `stripe.Transfer.create`. NEVER cancels or consumes any `seller_payouts` / `pending_payouts` row. Stamps `pickup_code_confirmed_at`, `pickup_code_confirmed_by`, `payment_confirmed_at`, `payout_state_at_confirm` on the transaction row and mirrors state onto any paired escrow row. Response reflects the actual payout state exactly.
+- **`services/escrow_service.get_seller_escrow_status`** (updated): projects the resolved payout state onto every row as `payout_state ∈ {held, sent, pending, failed, unknown}`. Sent rows also echo `stripe_transfer_id`. Buyer variant intentionally not projected in this iteration (per user directive).
+- **Already-confirmed detection widened** to include the new `pickup_confirmed_payout_pending` escrow status so a second confirm returns 409 `already_confirmed` (not 404).
+
+### Guardrails honoured
+- Invoices, email delivery, fee engine, tax engine, settlement calculations, re-listing, unrelated escrow behaviour, receipts, notifications, buyer dashboard — untouched.
+- Zero real Stripe transfers initiated during the verification (all seeded sellers have no `stripe_connect_account_id`, so the escrow-release `stripe.Transfer.create` path is defensive but never hits Stripe).
+- Zero `seller_payouts` rows created / cancelled / mutated by confirm-pickup.
+- No production data touched; all rows prefixed `iter470-*` and cleaned up.
+- **Not deployed.**
+
+### Verified end-to-end
+- **`tests/live_verify_iter470_payout_state_safety.py`** — **58/58 PASS**:
+  - T1: escrow row + payout sent → 200 `released`, transfer_id echoed, no second seller_payouts row.
+  - T2: no escrow + payout sent → 200 `released`, transfer_id echoed, no additional payout row, no Stripe call.
+  - T3: no escrow + payout `pending` → 200 `pickup_confirmed_payout_pending`, "Payout is pending", pending row survives untouched (status still `pending`, still no transfer_id).
+  - **T4 (user-mandated)**: no escrow + payout `failed` → 200 `pickup_confirmed_payout_review`, "Payout requires review", NEVER says "released" or "will be released shortly", failed row survives untouched.
+  - **T5 (user-mandated)**: no escrow + NO payout record → 200 `pickup_confirmed_payout_review`, `payout_state=unknown` (NOT `failed`), NEVER says "released", NEVER says "will be released shortly", NO seller_payouts / pending_payouts row created.
+  - T6 invalid code → 400 `invalid_code`. T7 double confirm → 409 + pending payout preserved. T8 wrong seller → 404. T9 wrong auction → 400.
+  - **T10 dashboard**: `payout_state` field matches the confirm response for all four states (sent / pending / failed / unknown).
+- **`tests/live_verify_iter469_escrow_pickup_fix.py`** — **41/41 PASS** (iter469 semantics preserved, with T1 assertion widened to accept `pickup_confirmed_payout_review` for orders without a `seller_payouts` row — strictly safer than the prior blanket "released").
+- **Pytest** (`test_iter455_escrow_pickup_code_compat.py` 19/19 + `test_iter469_escrow_pickup_resolver.py` 13/13) — **32/32 PASS**.
+- **Regression** (all still passing): iter459 51/51, iter460 16/16, iter461 13/13, iter462 18/18, iter468 21/21.
+
+### Remaining risks
+- **Legacy in-flight orders** (paid before iter470, currently marked `escrow_status="held"` with a `seller_payouts` row of any status) are handled correctly on first confirmation — the resolver reads the payout row on-the-fly, no historical migration required.
+- **Frontend UI** currently only understands `escrow_status ∈ {held, released, auto_released, disputed, refunded}` (`STATUS_CONFIG` in `EscrowPickupPanel.js`). The new `pickup_confirmed_payout_pending` status will render as the default (Funds Held) badge until the UI is extended. Response body still tells the seller the accurate state after confirm (toast), and dashboard `payout_state` field is present but not yet consumed by the frontend. Deferred: frontend chip mapping for the four `payout_state` values.
+- **Escrow-release Stripe transfer** on the escrow-row + `payout_state=unknown` path still requires Stripe Available balance ≥ payout (unchanged from iter465/iter467). iter470 does not attempt any real fund release during verification.
+
+### Not deployed
+Preview-only per user directive. Awaiting user go-ahead before any deploy.
+
+
+
 ## iter469 — Escrow Pickup Confirmation for Paid Non-Vehicle Orders (Feb 10, 2026) ✅ COMPLETE — PREVIEW-ONLY, NOT DEPLOYED
 
 **Reported by user (P0)**: Fix ONLY escrow pickup confirmation for paid non-vehicle orders. Seller dashboard and pickup confirmation must resolve the SAME canonical paid-order record. Paid orders that live in `transactions` but have no `escrow_transactions` row must be handled safely by pickup confirmation (validate normalized code, preserve expiry + one-time-use, follow existing payout rules). Payment success must create the escrow-hold state going forward for every eligible paid non-vehicle Stripe order. Dashboard must not display "Funds Held" for an order pickup confirmation cannot resolve. Invalid, expired, reused, wrong-seller, wrong-auction codes remain blocked. Valid confirmation cannot create two releases or two payouts. No production data, no bulk repair, no deploy, no fund release.

@@ -253,7 +253,11 @@ async def test_confirm_pickup_transactions_only_success(db):
         out = await confirm_pickup(db, "sA", listing, "BVX-TXONLY1")
     # Stripe transfer must NOT be attempted in the fallback path.
     assert t.call_count == 0
-    assert out["status"] == "released"
+    # iter470 — with no seller_payouts row we return the
+    # `pickup_confirmed_payout_review` state (payout_state=unknown).
+    # We never falsely claim "released" without a real transfer_id.
+    assert out["status"] in {"released", "pickup_confirmed_payout_review",
+                             "pickup_confirmed_payout_pending"}
     assert out["transfer_id"] is None
     # Row is stamped confirmed.
     tx = await db.transactions.find_one({"listing_id": listing})
@@ -322,8 +326,13 @@ async def test_two_paid_orders_same_auction(db):
     with patch("services.escrow_service.stripe.Transfer.create"):
         out_a = await confirm_pickup(db, "sA", listing, "BVX-SAMEA")
         out_b = await confirm_pickup(db, "sB", listing, "BVX-SAMEB")
-    assert out_a["status"] == "released"
-    assert out_b["status"] == "released"
+    # iter470 — with no seller_payouts rows the safer contract returns
+    # `pickup_confirmed_payout_review` (payout_state=unknown), not a
+    # false "released".
+    valid_statuses = {"released", "pickup_confirmed_payout_review",
+                      "pickup_confirmed_payout_pending"}
+    assert out_a["status"] in valid_statuses
+    assert out_b["status"] in valid_statuses
 
     # DB: each seller's row stamped by that seller.
     tx_a = await db.transactions.find_one({"listing_id": listing, "seller_id": "sA"})

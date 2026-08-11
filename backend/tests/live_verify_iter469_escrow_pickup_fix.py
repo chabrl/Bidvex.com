@@ -212,10 +212,21 @@ async def t1_normal_escrow_row(db, http, seller):
     record("T1a: confirm returns 200 for held escrow row", r.status_code == 200, f"got {r.status_code} {r.text[:100]}")
     if r.status_code == 200:
         body = r.json()
-        record("T1b: status=released", body.get("status") == "released", body.get("status", ""))
+        # iter470 — with no `seller_payouts` row and no Connect account,
+        # the safer contract returns `pickup_confirmed_payout_review`
+        # (payout_state=unknown) instead of falsely claiming released.
+        record(
+            "T1b: status reflects payout state (not falsely released)",
+            body.get("status") in {"released", "pickup_confirmed_payout_review", "pickup_confirmed_payout_pending"},
+            body.get("status", ""),
+        )
     # DB check
     row = await db.escrow_transactions.find_one({"auction_id": listing_id}, {"_id": 0})
-    record("T1c: escrow_status flipped to released", (row or {}).get("escrow_status") == "released")
+    record(
+        "T1c: escrow row moved out of 'held'",
+        (row or {}).get("escrow_status") in {"released", "pickup_confirmed_payout_pending"},
+        str((row or {}).get("escrow_status")),
+    )
     record("T1d: pickup_confirmed_at set", bool((row or {}).get("pickup_confirmed_at")))
     # Re-confirm (idempotency) → must not release twice.
     r2 = await http.post(

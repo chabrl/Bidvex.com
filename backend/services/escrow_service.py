@@ -209,6 +209,106 @@ async def _resolve_paid_order_record(
     return None, None
 
 
+# ── iter470 — Payout-state resolver ────────────────────────────────
+#
+# Four distinct states — a missing payout row is NOT "failed":
+#   * ``sent``    — real ``stripe_transfer_id`` on the seller_payouts row
+#   * ``pending`` — seller_payouts row exists with status ``pending`` /
+#                   ``payout_pending`` (or a pending_payouts queue row
+#                   exists) but no transfer reference
+#   * ``failed``  — seller_payouts row exists with an explicit failure
+#                   status (``failed`` / ``error``)
+#   * ``unknown`` — NO payout record exists yet for this listing
+#                   (payout not created, missing evidence — not
+#                   equivalent to failed)
+#
+# Critical rule (per iter470 directive): a missing escrow record must
+# NEVER be treated as proof that a seller payout was already sent, and
+# a missing payout record must NEVER be treated as failed.
+
+async def _resolve_payout_state(
+    db, *, listing_id: str, seller_id: str, lot_number=None,
+):
+    """Return ``(state, payout_row)`` where ``state`` is one of
+    ``sent`` / ``pending`` / ``failed`` / ``unknown``.
+
+    Consults the ``seller_payouts`` collection primarily (written by
+    ``services/seller_payouts.process_seller_payout``). Falls back to
+    the ``pending_payouts`` queue for the pending signal.
+    """
+    query = {"listing_id": listing_id, "seller_id": seller_id}
+    if lot_number is not None:
+        query["lot_number"] = lot_number
+    payout = await db.seller_payouts.find_one(query, {"_id": 0})
+    if payout:
+        status = str(payout.get("status") or "").lower()
+        transfer_id = payout.get("stripe_transfer_id")
+        if status == "sent" and transfer_id:
+            return "sent", payout
+        if status in {"pending", "payout_pending"}:
+            return "pending", payout
+        if status in {"failed", "error"}:
+            return "failed", payout
+        # Unexpected state — err on the side of caution, treat as unknown.
+        return "unknown", payout
+
+    # No seller_payouts row — check the pending_payouts queue (older
+    # `finalize_auction_payment` fallback wrote here first).
+    pending_query = {"listing_id": listing_id, "seller_id": seller_id}
+    if lot_number is not None:
+        pending_query["lot_number"] = lot_number
+    pending_row = await db.pending_payouts.find_one(pending_query, {"_id": 0})
+    if pending_row:
+        return "pending", pending_row
+
+    return "unknown", None
+
+
+def _payout_state_response(*, payout_state, amount_cad, transfer_id):
+    """Compose the confirm-pickup response body for a given payout state.
+
+    Messages are deliberately narrow (no promises about timing when the
+    payout has not shipped) so the seller UI reflects the exact state.
+    """
+    amount_str = f"${float(amount_cad):.2f} CAD"
+    if payout_state == "sent" and transfer_id:
+        return {
+            "status": "released",
+            "payout_state": "sent",
+            "transfer_id": transfer_id,
+            "amount_released": amount_str,
+            "message_en": "Pickup confirmed. Funds have been released.",
+            "message_fr": "Retrait confirmé. Les fonds ont été libérés.",
+        }
+    if payout_state == "pending":
+        return {
+            "status": "pickup_confirmed_payout_pending",
+            "payout_state": "pending",
+            "transfer_id": None,
+            "amount_pending": amount_str,
+            "message_en": "Pickup confirmed. Payout is pending.",
+            "message_fr": "Retrait confirmé. Le versement est en attente.",
+        }
+    if payout_state == "failed":
+        return {
+            "status": "pickup_confirmed_payout_review",
+            "payout_state": "failed",
+            "transfer_id": None,
+            "amount_pending": amount_str,
+            "message_en": "Pickup confirmed. Payout requires review.",
+            "message_fr": "Retrait confirmé. Le versement doit être vérifié.",
+        }
+    # unknown / not created
+    return {
+        "status": "pickup_confirmed_payout_review",
+        "payout_state": "unknown",
+        "transfer_id": None,
+        "amount_pending": amount_str,
+        "message_en": "Pickup confirmed. Payout requires review.",
+        "message_fr": "Retrait confirmé. Le versement doit être vérifié.",
+    }
+
+
 async def confirm_pickup(db, seller_id: str, auction_id: str, code: str) -> dict:
     """
     Seller enters the pickup code. Validates and releases funds.
@@ -269,12 +369,17 @@ async def confirm_pickup(db, seller_id: str, auction_id: str, code: str) -> dict
                 {
                     "auction_id": auction_id,
                     "seller_id": seller_id,
-                    "escrow_status": {"$in": ["released", "auto_released", "refunded"]},
+                    "escrow_status": {"$in": [
+                        "released", "auto_released", "refunded",
+                        # iter470 — this new state also counts as
+                        # already-confirmed for one-time-use rules.
+                        "pickup_confirmed_payout_pending",
+                    ]},
                 },
-                {"_id": 0, "funds_released_at": 1, "escrow_status": 1},
+                {"_id": 0, "funds_released_at": 1, "escrow_status": 1, "pickup_confirmed_at": 1},
             )
             if already_esc:
-                already = {"pickup_code_confirmed_at": already_esc.get("funds_released_at")}
+                already = {"pickup_code_confirmed_at": already_esc.get("funds_released_at") or already_esc.get("pickup_confirmed_at")}
         if already:
             raise HTTPException(status_code=409, detail={
                 "error": "already_confirmed",
@@ -319,46 +424,79 @@ async def confirm_pickup(db, seller_id: str, auction_id: str, code: str) -> dict
 
     # ── Path A: escrow_transactions canonical row ─────────────────
     if source == "escrow":
+        # iter470 — Consult payout state FIRST. Never attempt a second
+        # Stripe transfer if a prior `seller_payouts` row already carries
+        # a real transfer reference. Never claim "funds released" for
+        # pending / failed payout states.
+        lot_no = record.get("lot_number")
+        payout_state, payout_row = await _resolve_payout_state(
+            db, listing_id=record.get("listing_id") or auction_id,
+            seller_id=seller_id, lot_number=lot_no,
+        )
+
         seller = await db.users.find_one({"id": seller_id}, {"_id": 0, "stripe_connect_account_id": 1})
         connect_id = (seller or {}).get("stripe_connect_account_id")
         seller_payout_cents = record["total_charged_cents"] - record["application_fee_cents"]
 
-        transfer_id = None
-        if connect_id and seller_payout_cents > 0:
-            try:
-                transfer = stripe.Transfer.create(
-                    amount=seller_payout_cents,
-                    currency="cad",
-                    destination=connect_id,
-                    metadata={
-                        "type": "escrow_release",
-                        "auction_id": auction_id,
-                        "pickup_code": code,
-                        "released_by": "seller_code_entry",
-                    },
-                    idempotency_key=f"escrow-release-{auction_id}-{seller_id}",
-                )
-                transfer_id = transfer.id
-            except Exception as e:
-                logger.error(f"[ESCROW] Transfer failed for {auction_id}: {e}")
-                raise HTTPException(status_code=500, detail="Transfer failed. Please contact support.")
+        if payout_state == "sent":
+            # A prior payout already shipped funds. Reuse its transfer id
+            # and skip `stripe.Transfer.create` entirely.
+            transfer_id = (payout_row or {}).get("stripe_transfer_id")
+        elif payout_state in {"pending", "failed"}:
+            # Do NOT create a second payout obligation. The existing
+            # pending/failed payout survives untouched.
+            transfer_id = None
+        else:
+            # payout_state == "unknown" — no payout record exists yet.
+            # For the ESCROW row path this is the classic "release funds
+            # via escrow" flow: attempt Stripe transfer. For the
+            # transactions-only fallback we never attempt a transfer
+            # here (that path is handled in Path B below and has no
+            # escrow-hold guarantee that funds are on-platform).
+            transfer_id = None
+            if connect_id and seller_payout_cents > 0:
+                try:
+                    transfer = stripe.Transfer.create(
+                        amount=seller_payout_cents,
+                        currency="cad",
+                        destination=connect_id,
+                        metadata={
+                            "type": "escrow_release",
+                            "auction_id": auction_id,
+                            "pickup_code": code,
+                            "released_by": "seller_code_entry",
+                        },
+                        idempotency_key=f"escrow-release-{auction_id}-{seller_id}",
+                    )
+                    transfer_id = transfer.id
+                except Exception as e:
+                    logger.error(f"[ESCROW] Transfer failed for {auction_id}: {e}")
+                    raise HTTPException(status_code=500, detail="Transfer failed. Please contact support.")
 
         now = datetime.now(timezone.utc).isoformat()
-        # One-time-use: filter by held status so a concurrent second
-        # confirm cannot double-flip the row.
+        # iter470 — Only mark the escrow row `released` when funds
+        # actually shipped (transfer_id from Stripe now, OR reused from
+        # a prior `sent` payout row). Otherwise flip to
+        # `pickup_confirmed_payout_pending` so the dashboard reflects
+        # the accurate state.
+        funds_shipped = bool(transfer_id) or payout_state == "sent"
+        target_status = "released" if funds_shipped else "pickup_confirmed_payout_pending"
+        update_fields = {
+            "escrow_status": target_status,
+            "stripe_transfer_id": transfer_id,
+            "pickup_code_entered_at": now,
+            "pickup_confirmed_at": now,
+            "updated_at": now,
+            "payout_state": "sent" if funds_shipped else payout_state,
+        }
+        if funds_shipped:
+            update_fields["funds_released_at"] = now
         result = await db.escrow_transactions.update_one(
             {"auction_id": auction_id, "seller_id": seller_id, "escrow_status": "held"},
-            {"$set": {
-                "escrow_status": "released",
-                "stripe_transfer_id": transfer_id,
-                "pickup_code_entered_at": now,
-                "pickup_confirmed_at": now,
-                "funds_released_at": now,
-                "updated_at": now,
-            }},
+            {"$set": update_fields},
         )
         # Also stamp the paired transactions row (if any) so the union
-        # dashboard reflects "released" consistently.
+        # dashboard reflects the confirmation state consistently.
         try:
             await db.transactions.update_many(
                 {
@@ -390,20 +528,34 @@ async def confirm_pickup(db, seller_id: str, auction_id: str, code: str) -> dict
                 "message_fr": "Ce code a déjà été confirmé.",
             })
 
-        logger.info(f"[ESCROW] Released funds for {auction_id}, transfer={transfer_id}")
-        return {
-            "status": "released",
-            "transfer_id": transfer_id,
-            "amount_released": f"${seller_payout_cents / 100:.2f} CAD",
-            "message_en": "Pickup confirmed. Funds have been released to your account.",
-            "message_fr": "Retrait confirmé. Les fonds ont été libérés sur votre compte.",
-        }
+        # iter470 — Return the accurate response based on actual payout
+        # state. Never say "released" without a real transfer_id.
+        amount_cad = seller_payout_cents / 100
+        effective_state = "sent" if funds_shipped else payout_state
+        response = _payout_state_response(
+            payout_state=effective_state,
+            amount_cad=amount_cad,
+            transfer_id=transfer_id,
+        )
+        logger.info(
+            f"[ESCROW] escrow-path confirm for {auction_id} — payout_state={effective_state} "
+            f"transfer={transfer_id or 'none'} amount={amount_cad:.2f}"
+        )
+        return response
 
     # ── Path B: transactions-only fallback (no escrow row) ────────
-    # Funds were already dispatched at settlement time via
-    # ``services/seller_payouts.process_seller_payout``. This path only
-    # records the pickup confirmation and enforces one-time-use — it
-    # does NOT trigger a second Stripe transfer.
+    # Funds MAY OR MAY NOT have been dispatched at settlement time via
+    # ``services/seller_payouts.process_seller_payout``. Never assume
+    # released — consult the payout state and return an accurate
+    # message. This path records the pickup confirmation and enforces
+    # one-time-use; it does NOT trigger a Stripe transfer and does NOT
+    # cancel any pending payout obligation.
+    lot_no = record.get("lot_number")
+    payout_state, payout_row = await _resolve_payout_state(
+        db, listing_id=record.get("listing_id") or auction_id,
+        seller_id=seller_id, lot_number=lot_no,
+    )
+
     now = datetime.now(timezone.utc).isoformat()
     result = await db.transactions.update_one(
         {
@@ -417,6 +569,7 @@ async def confirm_pickup(db, seller_id: str, auction_id: str, code: str) -> dict
             "pickup_code_confirmed_by": seller_id,
             "payment_confirmed": True,
             "payment_confirmed_at": now,
+            "payout_state_at_confirm": payout_state,
         }},
     )
     if result.modified_count == 0:
@@ -428,33 +581,42 @@ async def confirm_pickup(db, seller_id: str, auction_id: str, code: str) -> dict
 
     # Mirror onto any paired escrow_transactions row that could exist
     # (should be zero rows in this fallback path — but if a race
-    # created one after resolution, keep it consistent).
+    # created one after resolution, keep it consistent). Never mark
+    # released without a real transfer id from the payout row.
     try:
+        funds_shipped_via_prior_payout = (
+            payout_state == "sent" and bool((payout_row or {}).get("stripe_transfer_id"))
+        )
+        esc_status = "released" if funds_shipped_via_prior_payout else "pickup_confirmed_payout_pending"
+        esc_fields = {
+            "escrow_status": esc_status,
+            "pickup_code_entered_at": now,
+            "pickup_confirmed_at": now,
+            "updated_at": now,
+            "payout_state": "sent" if funds_shipped_via_prior_payout else payout_state,
+        }
+        if funds_shipped_via_prior_payout:
+            esc_fields["funds_released_at"] = now
+            esc_fields["stripe_transfer_id"] = (payout_row or {}).get("stripe_transfer_id")
         await db.escrow_transactions.update_many(
             {"auction_id": auction_id, "seller_id": seller_id, "escrow_status": "held"},
-            {"$set": {
-                "escrow_status": "released",
-                "pickup_code_entered_at": now,
-                "pickup_confirmed_at": now,
-                "funds_released_at": now,
-                "updated_at": now,
-            }},
+            {"$set": esc_fields},
         )
     except Exception as e:  # noqa: BLE001
         logger.warning(f"[ESCROW] escrow mirror update failed for {auction_id}: {e}")
 
-    logger.info(
-        f"[ESCROW] transaction-fallback confirm for {auction_id} — record.id={record.get('id')} "
-        f"(funds already dispatched at settlement, no new Stripe transfer)"
-    )
     hammer = float(record.get("hammer_price") or record.get("amount") or 0)
-    return {
-        "status": "released",
-        "transfer_id": None,
-        "amount_released": f"${hammer:.2f} CAD",
-        "message_en": "Pickup confirmed. Funds have been released to your account.",
-        "message_fr": "Retrait confirmé. Les fonds ont été libérés sur votre compte.",
-    }
+    transfer_id = (payout_row or {}).get("stripe_transfer_id") if payout_state == "sent" else None
+    response = _payout_state_response(
+        payout_state=payout_state,
+        amount_cad=hammer,
+        transfer_id=transfer_id,
+    )
+    logger.info(
+        f"[ESCROW] transaction-fallback confirm for {auction_id} — payout_state={payout_state} "
+        f"transfer={transfer_id or 'none'} (no new Stripe transfer, no payout obligation removed)"
+    )
+    return response
 
 
 async def _log_failed_attempt(db, auction_id: str, seller_id: str, attempted_code: str):
@@ -583,6 +745,11 @@ async def get_seller_escrow_status(db, seller_id: str) -> list:
     iter367 P0 — Union with `transactions` collection (see buyer variant).
     Seller CAN see the pickup code once the escrow is held (for confirming
     pickup with the buyer in person), matching legacy behaviour.
+
+    iter470 — Projects the actual payout state onto each row so the UI
+    can distinguish ``held`` / ``pending`` / ``failed`` / ``sent``. A
+    missing ``seller_payouts`` row is reported as ``unknown``; it is
+    NOT reported as ``sent`` and NOT reported as ``failed``.
     """
     escrows = await db.escrow_transactions.find(
         {"seller_id": seller_id},
@@ -617,6 +784,26 @@ async def get_seller_escrow_status(db, seller_id: str) -> list:
             "item_type": "non_vehicle",
         })
         seen.add(aid)
+
+    # iter470 — Project actual payout state onto every row (both
+    # escrow-native and transactions-union). This gives the dashboard
+    # a truthful ``payout_state`` field alongside the legacy
+    # ``escrow_status``.
+    for row in escrows:
+        try:
+            state, payout_row = await _resolve_payout_state(
+                db,
+                listing_id=row.get("listing_id") or row.get("auction_id"),
+                seller_id=seller_id,
+                lot_number=row.get("lot_number"),
+            )
+            row["payout_state"] = state
+            if state == "sent" and payout_row:
+                row["stripe_transfer_id"] = payout_row.get("stripe_transfer_id")
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[ESCROW] payout state projection failed for {row.get('auction_id')}: {e}")
+            row.setdefault("payout_state", "unknown")
+
     return escrows
 
 
