@@ -1,0 +1,1168 @@
+{
+  "iter": "477-visual-qa",
+  "passed": 192,
+  "total": 192,
+  "pdf_output_dir": "/tmp/iter477_pdf_qa",
+  "results": [
+    {
+      "pdf": "01_storage_buyer_invoice_en",
+      "check": "valid_pdf_magic",
+      "ok": true,
+      "bytes": 2521357,
+      "pages": 1
+    },
+    {
+      "pdf": "01_storage_buyer_invoice_en",
+      "check": "bidvex_letterhead",
+      "ok": true
+    },
+    {
+      "pdf": "01_storage_buyer_invoice_en",
+      "check": "bidvex_gst_present",
+      "ok": true
+    },
+    {
+      "pdf": "01_storage_buyer_invoice_en",
+      "check": "bidvex_qst_present",
+      "ok": true
+    },
+    {
+      "pdf": "01_storage_buyer_invoice_en",
+      "check": "buyer_block_present",
+      "ok": true
+    },
+    {
+      "pdf": "01_storage_buyer_invoice_en",
+      "check": "seller_block_present",
+      "ok": true
+    },
+    {
+      "pdf": "01_storage_buyer_invoice_en",
+      "check": "no_sentinel_artifacts",
+      "ok": true,
+      "matches": {
+        "None": false,
+        "null": false,
+        "undefined": false,
+        "NaN": false
+      }
+    },
+    {
+      "pdf": "01_storage_buyer_invoice_en",
+      "check": "cad_currency_format",
+      "ok": true,
+      "first_match": "CA$200.00"
+    },
+    {
+      "pdf": "01_storage_buyer_invoice_en",
+      "check": "label_present::STORAGE INVOICE",
+      "ok": true,
+      "snippet": "STORAGE INVOICE"
+    },
+    {
+      "pdf": "01_storage_buyer_invoice_en",
+      "check": "label_present::BUYER",
+      "ok": true,
+      "snippet": "BUYER"
+    },
+    {
+      "pdf": "01_storage_buyer_invoice_en",
+      "check": "label_present::SELLER / DEALER",
+      "ok": true,
+      "snippet": "SELLER / DEALER"
+    },
+    {
+      "pdf": "01_storage_buyer_invoice_en",
+      "check": "label_present::Hammer Price Subtotal",
+      "ok": true,
+      "snippet": "Hammer Price Subtotal"
+    },
+    {
+      "pdf": "01_storage_buyer_invoice_en",
+      "check": "label_present::Hammer GST (5%)",
+      "ok": true,
+      "snippet": "Hammer GST (5%)"
+    },
+    {
+      "pdf": "01_storage_buyer_invoice_en",
+      "check": "label_present::Hammer QST (9.975%)",
+      "ok": true,
+      "snippet": "Hammer QST (9.975%)"
+    },
+    {
+      "pdf": "01_storage_buyer_invoice_en",
+      "check": "label_present::Buyer's Premium",
+      "ok": true,
+      "snippet": "Buyer's Premium"
+    },
+    {
+      "pdf": "01_storage_buyer_invoice_en",
+      "check": "label_present::BidVex Service Fee",
+      "ok": true,
+      "snippet": "BidVex Service Fee"
+    },
+    {
+      "pdf": "01_storage_buyer_invoice_en",
+      "check": "label_present::Stripe Card Processing Fee",
+      "ok": true,
+      "snippet": "Stripe Card Processing Fee"
+    },
+    {
+      "pdf": "01_storage_buyer_invoice_en",
+      "check": "label_present::GRAND TOTAL PAID",
+      "ok": true,
+      "snippet": "GRAND TOTAL PAID"
+    },
+    {
+      "pdf": "01_storage_buyer_invoice_en",
+      "check": "label_present::CA$269.65",
+      "ok": true,
+      "snippet": "CA$269.65"
+    },
+    {
+      "pdf": "01_storage_buyer_invoice_en",
+      "check": "label_present::CA$200.00",
+      "ok": true,
+      "snippet": "CA$200.00"
+    },
+    {
+      "pdf": "01_storage_buyer_invoice_en",
+      "check": "label_present::CA$10.00",
+      "ok": true,
+      "snippet": "CA$10.00"
+    },
+    {
+      "pdf": "01_storage_buyer_invoice_en",
+      "check": "label_present::CA$19.95",
+      "ok": true,
+      "snippet": "CA$19.95"
+    },
+    {
+      "pdf": "01_storage_buyer_invoice_en",
+      "check": "label_present::CA$20.00",
+      "ok": true,
+      "snippet": "CA$20.00"
+    },
+    {
+      "pdf": "01_storage_buyer_invoice_en",
+      "check": "label_present::CA$8.00",
+      "ok": true,
+      "snippet": "CA$8.00"
+    },
+    {
+      "pdf": "01_storage_buyer_invoice_en",
+      "check": "label_present::CA$7.50",
+      "ok": true,
+      "snippet": "CA$7.50"
+    },
+    {
+      "pdf": "01_storage_buyer_invoice_en",
+      "check": "label_present::QA Buyer Corp.",
+      "ok": true,
+      "snippet": "QA Buyer Corp."
+    },
+    {
+      "pdf": "01_storage_buyer_invoice_en",
+      "check": "label_present::Logo Seller Inc.",
+      "ok": true,
+      "snippet": "Logo Seller Inc."
+    },
+    {
+      "pdf": "02_storage_buyer_invoice_fr",
+      "check": "valid_pdf_magic",
+      "ok": true,
+      "bytes": 2521417,
+      "pages": 1
+    },
+    {
+      "pdf": "02_storage_buyer_invoice_fr",
+      "check": "bidvex_letterhead",
+      "ok": true
+    },
+    {
+      "pdf": "02_storage_buyer_invoice_fr",
+      "check": "bidvex_gst_present",
+      "ok": true
+    },
+    {
+      "pdf": "02_storage_buyer_invoice_fr",
+      "check": "bidvex_qst_present",
+      "ok": true
+    },
+    {
+      "pdf": "02_storage_buyer_invoice_fr",
+      "check": "buyer_block_present",
+      "ok": true
+    },
+    {
+      "pdf": "02_storage_buyer_invoice_fr",
+      "check": "seller_block_present",
+      "ok": true
+    },
+    {
+      "pdf": "02_storage_buyer_invoice_fr",
+      "check": "no_sentinel_artifacts",
+      "ok": true,
+      "matches": {
+        "None": false,
+        "null": false,
+        "undefined": false,
+        "NaN": false
+      }
+    },
+    {
+      "pdf": "02_storage_buyer_invoice_fr",
+      "check": "cad_currency_format",
+      "ok": true,
+      "first_match": "CA$200.00"
+    },
+    {
+      "pdf": "02_storage_buyer_invoice_fr",
+      "check": "label_present::FACTURE DE CASIER",
+      "ok": true,
+      "snippet": "FACTURE DE CASIER"
+    },
+    {
+      "pdf": "02_storage_buyer_invoice_fr",
+      "check": "label_present::ACHETEUR",
+      "ok": true,
+      "snippet": "ACHETEUR"
+    },
+    {
+      "pdf": "02_storage_buyer_invoice_fr",
+      "check": "label_present::VENDEUR / CONCESSIONNAIRE",
+      "ok": true,
+      "snippet": "VENDEUR / CONCESSIONNAIRE"
+    },
+    {
+      "pdf": "02_storage_buyer_invoice_fr",
+      "check": "label_present::Sous-total marteau",
+      "ok": true,
+      "snippet": "Sous-total marteau"
+    },
+    {
+      "pdf": "02_storage_buyer_invoice_fr",
+      "check": "label_present::TPS marteau (5\u00a0%)",
+      "ok": true,
+      "snippet": "TPS marteau (5\u00a0%)"
+    },
+    {
+      "pdf": "02_storage_buyer_invoice_fr",
+      "check": "label_present::TVQ marteau (9,975\u00a0%)",
+      "ok": true,
+      "snippet": "TVQ marteau (9,975\u00a0%)"
+    },
+    {
+      "pdf": "02_storage_buyer_invoice_fr",
+      "check": "label_present::Prime d'acheteur",
+      "ok": true,
+      "snippet": "Prime d'acheteur"
+    },
+    {
+      "pdf": "02_storage_buyer_invoice_fr",
+      "check": "label_present::TOTAL PAY\u00c9",
+      "ok": true,
+      "snippet": "TOTAL PAY\u00c9"
+    },
+    {
+      "pdf": "02_storage_buyer_invoice_fr",
+      "check": "label_present::CA$269.65",
+      "ok": true,
+      "snippet": "CA$269.65"
+    },
+    {
+      "pdf": "03_universal_receipt_mkt_with_logo",
+      "check": "valid_pdf_magic",
+      "ok": true,
+      "bytes": 2522207,
+      "pages": 2
+    },
+    {
+      "pdf": "03_universal_receipt_mkt_with_logo",
+      "check": "bidvex_letterhead",
+      "ok": true
+    },
+    {
+      "pdf": "03_universal_receipt_mkt_with_logo",
+      "check": "bidvex_gst_present",
+      "ok": true
+    },
+    {
+      "pdf": "03_universal_receipt_mkt_with_logo",
+      "check": "bidvex_qst_present",
+      "ok": true
+    },
+    {
+      "pdf": "03_universal_receipt_mkt_with_logo",
+      "check": "buyer_block_present",
+      "ok": true
+    },
+    {
+      "pdf": "03_universal_receipt_mkt_with_logo",
+      "check": "seller_block_present",
+      "ok": true
+    },
+    {
+      "pdf": "03_universal_receipt_mkt_with_logo",
+      "check": "no_sentinel_artifacts",
+      "ok": true,
+      "matches": {
+        "None": false,
+        "null": false,
+        "undefined": false,
+        "NaN": false
+      }
+    },
+    {
+      "pdf": "03_universal_receipt_mkt_with_logo",
+      "check": "cad_currency_format",
+      "ok": true,
+      "first_match": "CA$200.00"
+    },
+    {
+      "pdf": "03_universal_receipt_mkt_with_logo",
+      "check": "label_present::RECEIPT",
+      "ok": true,
+      "snippet": "RECEIPT"
+    },
+    {
+      "pdf": "03_universal_receipt_mkt_with_logo",
+      "check": "label_present::BUYER",
+      "ok": true,
+      "snippet": "BUYER"
+    },
+    {
+      "pdf": "03_universal_receipt_mkt_with_logo",
+      "check": "label_present::SELLER / DEALER",
+      "ok": true,
+      "snippet": "SELLER / DEALER"
+    },
+    {
+      "pdf": "03_universal_receipt_mkt_with_logo",
+      "check": "label_present::Hammer Price Subtotal",
+      "ok": true,
+      "snippet": "Hammer Price Subtotal"
+    },
+    {
+      "pdf": "03_universal_receipt_mkt_with_logo",
+      "check": "label_present::GRAND TOTAL PAID",
+      "ok": true,
+      "snippet": "GRAND TOTAL PAID"
+    },
+    {
+      "pdf": "03_universal_receipt_mkt_with_logo",
+      "check": "label_present::CA$269.65",
+      "ok": true,
+      "snippet": "CA$269.65"
+    },
+    {
+      "pdf": "03_universal_receipt_mkt_with_logo",
+      "check": "label_present::CA$200.00",
+      "ok": true,
+      "snippet": "CA$200.00"
+    },
+    {
+      "pdf": "03_universal_receipt_mkt_with_logo",
+      "check": "label_present::QA Buyer Corp.",
+      "ok": true,
+      "snippet": "QA Buyer Corp."
+    },
+    {
+      "pdf": "03_universal_receipt_mkt_with_logo",
+      "check": "label_present::Logo Seller Inc.",
+      "ok": true,
+      "snippet": "Logo Seller Inc."
+    },
+    {
+      "pdf": "03_universal_receipt_mkt_with_logo",
+      "check": "label_present::iter477qa_buyer@test.com",
+      "ok": true,
+      "snippet": "iter477qa_buyer@test.com"
+    },
+    {
+      "pdf": "03_universal_receipt_mkt_with_logo",
+      "check": "label_present::iter477qa_seller_logo@test.com",
+      "ok": true,
+      "snippet": "iter477qa_seller_logo@test.com"
+    },
+    {
+      "pdf": "04_universal_receipt_mkt_no_logo",
+      "check": "valid_pdf_magic",
+      "ok": true,
+      "bytes": 2520174,
+      "pages": 1
+    },
+    {
+      "pdf": "04_universal_receipt_mkt_no_logo",
+      "check": "bidvex_letterhead",
+      "ok": true
+    },
+    {
+      "pdf": "04_universal_receipt_mkt_no_logo",
+      "check": "bidvex_gst_present",
+      "ok": true
+    },
+    {
+      "pdf": "04_universal_receipt_mkt_no_logo",
+      "check": "bidvex_qst_present",
+      "ok": true
+    },
+    {
+      "pdf": "04_universal_receipt_mkt_no_logo",
+      "check": "buyer_block_present",
+      "ok": true
+    },
+    {
+      "pdf": "04_universal_receipt_mkt_no_logo",
+      "check": "seller_block_present",
+      "ok": true
+    },
+    {
+      "pdf": "04_universal_receipt_mkt_no_logo",
+      "check": "no_sentinel_artifacts",
+      "ok": true,
+      "matches": {
+        "None": false,
+        "null": false,
+        "undefined": false,
+        "NaN": false
+      }
+    },
+    {
+      "pdf": "04_universal_receipt_mkt_no_logo",
+      "check": "cad_currency_format",
+      "ok": true,
+      "first_match": "CA$200.00"
+    },
+    {
+      "pdf": "04_universal_receipt_mkt_no_logo",
+      "check": "label_present::RECEIPT",
+      "ok": true,
+      "snippet": "RECEIPT"
+    },
+    {
+      "pdf": "04_universal_receipt_mkt_no_logo",
+      "check": "label_present::BUYER",
+      "ok": true,
+      "snippet": "BUYER"
+    },
+    {
+      "pdf": "04_universal_receipt_mkt_no_logo",
+      "check": "label_present::SELLER / DEALER",
+      "ok": true,
+      "snippet": "SELLER / DEALER"
+    },
+    {
+      "pdf": "04_universal_receipt_mkt_no_logo",
+      "check": "label_present::Plain Seller Ltd.",
+      "ok": true,
+      "snippet": "Plain Seller Ltd."
+    },
+    {
+      "pdf": "04_universal_receipt_mkt_no_logo",
+      "check": "label_present::GRAND TOTAL PAID",
+      "ok": true,
+      "snippet": "GRAND TOTAL PAID"
+    },
+    {
+      "pdf": "04_universal_receipt_mkt_no_logo",
+      "check": "label_present::CA$269.65",
+      "ok": true,
+      "snippet": "CA$269.65"
+    },
+    {
+      "pdf": "05_universal_receipt_multi_lot_3",
+      "check": "valid_pdf_magic",
+      "ok": true,
+      "bytes": 2522436,
+      "pages": 2
+    },
+    {
+      "pdf": "05_universal_receipt_multi_lot_3",
+      "check": "bidvex_letterhead",
+      "ok": true
+    },
+    {
+      "pdf": "05_universal_receipt_multi_lot_3",
+      "check": "bidvex_gst_present",
+      "ok": true
+    },
+    {
+      "pdf": "05_universal_receipt_multi_lot_3",
+      "check": "bidvex_qst_present",
+      "ok": true
+    },
+    {
+      "pdf": "05_universal_receipt_multi_lot_3",
+      "check": "buyer_block_present",
+      "ok": true
+    },
+    {
+      "pdf": "05_universal_receipt_multi_lot_3",
+      "check": "seller_block_present",
+      "ok": true
+    },
+    {
+      "pdf": "05_universal_receipt_multi_lot_3",
+      "check": "no_sentinel_artifacts",
+      "ok": true,
+      "matches": {
+        "None": false,
+        "null": false,
+        "undefined": false,
+        "NaN": false
+      }
+    },
+    {
+      "pdf": "05_universal_receipt_multi_lot_3",
+      "check": "cad_currency_format",
+      "ok": true,
+      "first_match": "CA$200.00"
+    },
+    {
+      "pdf": "05_universal_receipt_multi_lot_3",
+      "check": "label_present::RECEIPT",
+      "ok": true,
+      "snippet": "RECEIPT"
+    },
+    {
+      "pdf": "05_universal_receipt_multi_lot_3",
+      "check": "label_present::GRAND TOTAL PAID",
+      "ok": true,
+      "snippet": "GRAND TOTAL PAID"
+    },
+    {
+      "pdf": "05_universal_receipt_multi_lot_3",
+      "check": "label_present::CA$808.95",
+      "ok": true,
+      "snippet": "CA$808.95"
+    },
+    {
+      "pdf": "05_universal_receipt_multi_lot_3",
+      "check": "label_present::CA$600.00",
+      "ok": true,
+      "snippet": "CA$600.00"
+    },
+    {
+      "pdf": "05_universal_receipt_multi_lot_3",
+      "check": "label_present::QA 3-lot #1",
+      "ok": true,
+      "snippet": "QA 3-lot #1"
+    },
+    {
+      "pdf": "05_universal_receipt_multi_lot_3",
+      "check": "label_present::QA 3-lot #2",
+      "ok": true,
+      "snippet": "QA 3-lot #2"
+    },
+    {
+      "pdf": "05_universal_receipt_multi_lot_3",
+      "check": "label_present::QA 3-lot #3",
+      "ok": true,
+      "snippet": "QA 3-lot #3"
+    },
+    {
+      "pdf": "05_universal_receipt_multi_lot_3",
+      "check": "label_present::Lots included",
+      "ok": true,
+      "snippet": "Lots included"
+    },
+    {
+      "pdf": "05_universal_receipt_multi_lot_3",
+      "check": "label_present::3",
+      "ok": true,
+      "snippet": "3"
+    },
+    {
+      "pdf": "06_universal_receipt_12_lot_multipage",
+      "check": "valid_pdf_magic",
+      "ok": true,
+      "bytes": 2523346,
+      "pages": 2
+    },
+    {
+      "pdf": "06_universal_receipt_12_lot_multipage",
+      "check": "multi_page_present",
+      "ok": true,
+      "pages": 2
+    },
+    {
+      "pdf": "06_universal_receipt_12_lot_multipage",
+      "check": "bidvex_letterhead",
+      "ok": true
+    },
+    {
+      "pdf": "06_universal_receipt_12_lot_multipage",
+      "check": "bidvex_gst_present",
+      "ok": true
+    },
+    {
+      "pdf": "06_universal_receipt_12_lot_multipage",
+      "check": "bidvex_qst_present",
+      "ok": true
+    },
+    {
+      "pdf": "06_universal_receipt_12_lot_multipage",
+      "check": "buyer_block_present",
+      "ok": true
+    },
+    {
+      "pdf": "06_universal_receipt_12_lot_multipage",
+      "check": "seller_block_present",
+      "ok": true
+    },
+    {
+      "pdf": "06_universal_receipt_12_lot_multipage",
+      "check": "no_sentinel_artifacts",
+      "ok": true,
+      "matches": {
+        "None": false,
+        "null": false,
+        "undefined": false,
+        "NaN": false
+      }
+    },
+    {
+      "pdf": "06_universal_receipt_12_lot_multipage",
+      "check": "cad_currency_format",
+      "ok": true,
+      "first_match": "CA$200.00"
+    },
+    {
+      "pdf": "06_universal_receipt_12_lot_multipage",
+      "check": "label_present::RECEIPT",
+      "ok": true,
+      "snippet": "RECEIPT"
+    },
+    {
+      "pdf": "06_universal_receipt_12_lot_multipage",
+      "check": "label_present::GRAND TOTAL PAID",
+      "ok": true,
+      "snippet": "GRAND TOTAL PAID"
+    },
+    {
+      "pdf": "06_universal_receipt_12_lot_multipage",
+      "check": "label_present::CA$3,235.80",
+      "ok": true,
+      "snippet": "CA$3,235.80"
+    },
+    {
+      "pdf": "06_universal_receipt_12_lot_multipage",
+      "check": "label_present::CA$2,400.00",
+      "ok": true,
+      "snippet": "CA$2,400.00"
+    },
+    {
+      "pdf": "06_universal_receipt_12_lot_multipage",
+      "check": "label_present::QA Big 12-lot #1",
+      "ok": true,
+      "snippet": "QA Big 12-lot #1"
+    },
+    {
+      "pdf": "06_universal_receipt_12_lot_multipage",
+      "check": "label_present::QA Big 12-lot #12",
+      "ok": true,
+      "snippet": "QA Big 12-lot #12"
+    },
+    {
+      "pdf": "07_seller_statement_mkt_en",
+      "check": "valid_pdf_magic",
+      "ok": true,
+      "bytes": 2520102,
+      "pages": 1
+    },
+    {
+      "pdf": "07_seller_statement_mkt_en",
+      "check": "bidvex_letterhead",
+      "ok": true
+    },
+    {
+      "pdf": "07_seller_statement_mkt_en",
+      "check": "bidvex_gst_present",
+      "ok": true
+    },
+    {
+      "pdf": "07_seller_statement_mkt_en",
+      "check": "bidvex_qst_present",
+      "ok": true
+    },
+    {
+      "pdf": "07_seller_statement_mkt_en",
+      "check": "buyer_block_present",
+      "ok": true
+    },
+    {
+      "pdf": "07_seller_statement_mkt_en",
+      "check": "seller_block_present",
+      "ok": true
+    },
+    {
+      "pdf": "07_seller_statement_mkt_en",
+      "check": "no_sentinel_artifacts",
+      "ok": true,
+      "matches": {
+        "None": false,
+        "null": false,
+        "undefined": false,
+        "NaN": false
+      }
+    },
+    {
+      "pdf": "07_seller_statement_mkt_en",
+      "check": "cad_currency_format",
+      "ok": true,
+      "first_match": "CA$200.00"
+    },
+    {
+      "pdf": "07_seller_statement_mkt_en",
+      "check": "label_present::MARKETPLACE SELLER STATEMENT",
+      "ok": true,
+      "snippet": "MARKETPLACE SELLER STATEMENT"
+    },
+    {
+      "pdf": "07_seller_statement_mkt_en",
+      "check": "label_present::BUYER",
+      "ok": true,
+      "snippet": "BUYER"
+    },
+    {
+      "pdf": "07_seller_statement_mkt_en",
+      "check": "label_present::SELLER / DEALER",
+      "ok": true,
+      "snippet": "SELLER / DEALER"
+    },
+    {
+      "pdf": "07_seller_statement_mkt_en",
+      "check": "label_present::Hammer Total (Gross)",
+      "ok": true,
+      "snippet": "Hammer Total (Gross)"
+    },
+    {
+      "pdf": "07_seller_statement_mkt_en",
+      "check": "label_present::Seller Commission",
+      "ok": true,
+      "snippet": "Seller Commission"
+    },
+    {
+      "pdf": "07_seller_statement_mkt_en",
+      "check": "label_present::Commission GST (5%)",
+      "ok": true,
+      "snippet": "Commission GST (5%)"
+    },
+    {
+      "pdf": "07_seller_statement_mkt_en",
+      "check": "label_present::Commission QST (9.975%)",
+      "ok": true,
+      "snippet": "Commission QST (9.975%)"
+    },
+    {
+      "pdf": "07_seller_statement_mkt_en",
+      "check": "label_present::NET PAYOUT",
+      "ok": true,
+      "snippet": "NET PAYOUT"
+    },
+    {
+      "pdf": "07_seller_statement_mkt_en",
+      "check": "label_present::CA$218.45",
+      "ok": true,
+      "snippet": "CA$218.45"
+    },
+    {
+      "pdf": "07_seller_statement_mkt_en",
+      "check": "label_present::CA$10.00",
+      "ok": true,
+      "snippet": "CA$10.00"
+    },
+    {
+      "pdf": "07_seller_statement_mkt_en",
+      "check": "label_present::CA$0.50",
+      "ok": true,
+      "snippet": "CA$0.50"
+    },
+    {
+      "pdf": "07_seller_statement_mkt_en",
+      "check": "label_present::CA$1.00",
+      "ok": true,
+      "snippet": "CA$1.00"
+    },
+    {
+      "pdf": "07_seller_statement_mkt_en",
+      "check": "label_present::QA Buyer Corp.",
+      "ok": true,
+      "snippet": "QA Buyer Corp."
+    },
+    {
+      "pdf": "07_seller_statement_mkt_en",
+      "check": "label_present::Logo Seller Inc.",
+      "ok": true,
+      "snippet": "Logo Seller Inc."
+    },
+    {
+      "pdf": "08_commission_invoice_mkt_en",
+      "check": "valid_pdf_magic",
+      "ok": true,
+      "bytes": 2519951,
+      "pages": 1
+    },
+    {
+      "pdf": "08_commission_invoice_mkt_en",
+      "check": "bidvex_letterhead",
+      "ok": true
+    },
+    {
+      "pdf": "08_commission_invoice_mkt_en",
+      "check": "bidvex_gst_present",
+      "ok": true
+    },
+    {
+      "pdf": "08_commission_invoice_mkt_en",
+      "check": "bidvex_qst_present",
+      "ok": true
+    },
+    {
+      "pdf": "08_commission_invoice_mkt_en",
+      "check": "buyer_block_present",
+      "ok": true
+    },
+    {
+      "pdf": "08_commission_invoice_mkt_en",
+      "check": "seller_block_present",
+      "ok": true
+    },
+    {
+      "pdf": "08_commission_invoice_mkt_en",
+      "check": "no_sentinel_artifacts",
+      "ok": true,
+      "matches": {
+        "None": false,
+        "null": false,
+        "undefined": false,
+        "NaN": false
+      }
+    },
+    {
+      "pdf": "08_commission_invoice_mkt_en",
+      "check": "cad_currency_format",
+      "ok": true,
+      "first_match": "CA$200.00"
+    },
+    {
+      "pdf": "08_commission_invoice_mkt_en",
+      "check": "label_present::MARKETPLACE COMMISSION INVOICE",
+      "ok": true,
+      "snippet": "MARKETPLACE COMMISSION INVOICE"
+    },
+    {
+      "pdf": "08_commission_invoice_mkt_en",
+      "check": "label_present::Seller Commission",
+      "ok": true,
+      "snippet": "Seller Commission"
+    },
+    {
+      "pdf": "08_commission_invoice_mkt_en",
+      "check": "label_present::Commission GST",
+      "ok": true,
+      "snippet": "Commission GST"
+    },
+    {
+      "pdf": "08_commission_invoice_mkt_en",
+      "check": "label_present::Commission QST",
+      "ok": true,
+      "snippet": "Commission QST"
+    },
+    {
+      "pdf": "08_commission_invoice_mkt_en",
+      "check": "label_present::NET PAYOUT",
+      "ok": true,
+      "snippet": "NET PAYOUT"
+    },
+    {
+      "pdf": "08_commission_invoice_mkt_en",
+      "check": "label_present::CA$10.00",
+      "ok": true,
+      "snippet": "CA$10.00"
+    },
+    {
+      "pdf": "08_commission_invoice_mkt_en",
+      "check": "label_present::CA$0.50",
+      "ok": true,
+      "snippet": "CA$0.50"
+    },
+    {
+      "pdf": "08_commission_invoice_mkt_en",
+      "check": "label_present::CA$1.00",
+      "ok": true,
+      "snippet": "CA$1.00"
+    },
+    {
+      "pdf": "08_commission_invoice_mkt_en",
+      "check": "label_present::CA$218.45",
+      "ok": true,
+      "snippet": "CA$218.45"
+    },
+    {
+      "pdf": "09_seller_statement_vehicle_en",
+      "check": "valid_pdf_magic",
+      "ok": true,
+      "bytes": 2520091,
+      "pages": 1
+    },
+    {
+      "pdf": "09_seller_statement_vehicle_en",
+      "check": "bidvex_letterhead",
+      "ok": true
+    },
+    {
+      "pdf": "09_seller_statement_vehicle_en",
+      "check": "bidvex_gst_present",
+      "ok": true
+    },
+    {
+      "pdf": "09_seller_statement_vehicle_en",
+      "check": "bidvex_qst_present",
+      "ok": true
+    },
+    {
+      "pdf": "09_seller_statement_vehicle_en",
+      "check": "buyer_block_present",
+      "ok": true
+    },
+    {
+      "pdf": "09_seller_statement_vehicle_en",
+      "check": "seller_block_present",
+      "ok": true
+    },
+    {
+      "pdf": "09_seller_statement_vehicle_en",
+      "check": "no_sentinel_artifacts",
+      "ok": true,
+      "matches": {
+        "None": false,
+        "null": false,
+        "undefined": false,
+        "NaN": false
+      }
+    },
+    {
+      "pdf": "09_seller_statement_vehicle_en",
+      "check": "cad_currency_format",
+      "ok": true,
+      "first_match": "CA$200.00"
+    },
+    {
+      "pdf": "09_seller_statement_vehicle_en",
+      "check": "label_present::VEHICLE SELLER STATEMENT",
+      "ok": true,
+      "snippet": "VEHICLE SELLER STATEMENT"
+    },
+    {
+      "pdf": "09_seller_statement_vehicle_en",
+      "check": "label_present::2020 QA Sedan (VIN QA123)",
+      "ok": true,
+      "snippet": "2020 QA Sedan (VIN QA123)"
+    },
+    {
+      "pdf": "09_seller_statement_vehicle_en",
+      "check": "label_present::NET PAYOUT",
+      "ok": true,
+      "snippet": "NET PAYOUT"
+    },
+    {
+      "pdf": "09_seller_statement_vehicle_en",
+      "check": "label_present::CA$218.45",
+      "ok": true,
+      "snippet": "CA$218.45"
+    },
+    {
+      "pdf": "10_seller_statement_storage_fr",
+      "check": "valid_pdf_magic",
+      "ok": true,
+      "bytes": 2520064,
+      "pages": 1
+    },
+    {
+      "pdf": "10_seller_statement_storage_fr",
+      "check": "bidvex_letterhead",
+      "ok": true
+    },
+    {
+      "pdf": "10_seller_statement_storage_fr",
+      "check": "bidvex_gst_present",
+      "ok": true
+    },
+    {
+      "pdf": "10_seller_statement_storage_fr",
+      "check": "bidvex_qst_present",
+      "ok": true
+    },
+    {
+      "pdf": "10_seller_statement_storage_fr",
+      "check": "buyer_block_present",
+      "ok": true
+    },
+    {
+      "pdf": "10_seller_statement_storage_fr",
+      "check": "seller_block_present",
+      "ok": true
+    },
+    {
+      "pdf": "10_seller_statement_storage_fr",
+      "check": "no_sentinel_artifacts",
+      "ok": true,
+      "matches": {
+        "None": false,
+        "null": false,
+        "undefined": false,
+        "NaN": false
+      }
+    },
+    {
+      "pdf": "10_seller_statement_storage_fr",
+      "check": "cad_currency_format",
+      "ok": true,
+      "first_match": "CA$200.00"
+    },
+    {
+      "pdf": "10_seller_statement_storage_fr",
+      "check": "label_present::RELEV\u00c9 VENDEUR",
+      "ok": true,
+      "snippet": "RELEV\u00c9 VENDEUR"
+    },
+    {
+      "pdf": "10_seller_statement_storage_fr",
+      "check": "label_present::PAIEMENT NET",
+      "ok": true,
+      "snippet": "PAIEMENT NET"
+    },
+    {
+      "pdf": "10_seller_statement_storage_fr",
+      "check": "label_present::CA$218.45",
+      "ok": true,
+      "snippet": "CA$218.45"
+    },
+    {
+      "pdf": "10_seller_statement_storage_fr",
+      "check": "label_present::Marteau brut",
+      "ok": true,
+      "snippet": "Marteau brut"
+    },
+    {
+      "pdf": "10_seller_statement_storage_fr",
+      "check": "label_present::Commission vendeur",
+      "ok": true,
+      "snippet": "Commission vendeur"
+    },
+    {
+      "pdf": "10_seller_statement_storage_fr",
+      "check": "label_present::TPS sur commission",
+      "ok": true,
+      "snippet": "TPS sur commission"
+    },
+    {
+      "pdf": "10_seller_statement_storage_fr",
+      "check": "label_present::TVQ sur commission",
+      "ok": true,
+      "snippet": "TVQ sur commission"
+    },
+    {
+      "pdf": "11_universal_receipt_historical",
+      "check": "valid_pdf_magic",
+      "ok": true,
+      "bytes": 2520132,
+      "pages": 1
+    },
+    {
+      "pdf": "11_universal_receipt_historical",
+      "check": "bidvex_letterhead",
+      "ok": true
+    },
+    {
+      "pdf": "11_universal_receipt_historical",
+      "check": "bidvex_gst_present",
+      "ok": true
+    },
+    {
+      "pdf": "11_universal_receipt_historical",
+      "check": "bidvex_qst_present",
+      "ok": true
+    },
+    {
+      "pdf": "11_universal_receipt_historical",
+      "check": "buyer_block_present",
+      "ok": true
+    },
+    {
+      "pdf": "11_universal_receipt_historical",
+      "check": "seller_block_present",
+      "ok": true
+    },
+    {
+      "pdf": "11_universal_receipt_historical",
+      "check": "no_sentinel_artifacts",
+      "ok": true,
+      "matches": {
+        "None": false,
+        "null": false,
+        "undefined": false,
+        "NaN": false
+      }
+    },
+    {
+      "pdf": "11_universal_receipt_historical",
+      "check": "cad_currency_format",
+      "ok": true,
+      "first_match": "CA$150.00"
+    },
+    {
+      "pdf": "11_universal_receipt_historical",
+      "check": "dash_placeholder_present",
+      "ok": true
+    },
+    {
+      "pdf": "11_universal_receipt_historical",
+      "check": "historical_no_fabricated_hammer_gst",
+      "ok": true,
+      "found_amount": null
+    },
+    {
+      "pdf": "11_universal_receipt_historical",
+      "check": "historical_no_fabricated_hammer_qst",
+      "ok": true,
+      "found_amount": null
+    },
+    {
+      "pdf": "11_universal_receipt_historical",
+      "check": "label_present::RECEIPT",
+      "ok": true,
+      "snippet": "RECEIPT"
+    },
+    {
+      "pdf": "11_universal_receipt_historical",
+      "check": "label_present::GRAND TOTAL PAID",
+      "ok": true,
+      "snippet": "GRAND TOTAL PAID"
+    },
+    {
+      "pdf": "11_universal_receipt_historical",
+      "check": "label_present::CA$150.00",
+      "ok": true,
+      "snippet": "CA$150.00"
+    },
+    {
+      "pdf": "11_universal_receipt_historical",
+      "check": "label_present::CA$184.47",
+      "ok": true,
+      "snippet": "CA$184.47"
+    },
+    {
+      "pdf": "11_universal_receipt_historical",
+      "check": "forbidden_amount_absent::CA$7.50",
+      "ok": true
+    },
+    {
+      "pdf": "11_universal_receipt_historical",
+      "check": "forbidden_amount_absent::CA$14.96",
+      "ok": true
+    }
+  ]
+}

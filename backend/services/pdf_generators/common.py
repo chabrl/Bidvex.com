@@ -159,7 +159,7 @@ class DocumentSpec:
 def _make_styles():
     styles = getSampleStyleSheet()
     styles.add(ParagraphStyle(
-        name="DocTitle", fontSize=22, textColor=PRIMARY_COLOR,
+        name="DocTitle", fontSize=20, leading=24, textColor=PRIMARY_COLOR,
         fontName="Helvetica-Bold", spaceAfter=4,
     ))
     styles.add(ParagraphStyle(
@@ -269,7 +269,29 @@ def render_document(spec: DocumentSpec) -> bytes:
         headers = list(
             spec.line_headers_fr if spec.lang == "fr" else spec.line_headers_en
         )
-        rows = [headers] + [list(r) for r in spec.line_rows]
+        # iter477 QA fix — wrap DATA cells in Paragraphs so long lot titles
+        # word-wrap inside their column instead of overflowing into the
+        # adjacent Hammer / Total column. Headers stay as plain strings so
+        # the bold/white styling still applies via TableStyle.
+        cell_style = ParagraphStyle(
+            name="LineCell", fontSize=9, leading=11,
+            textColor=SECONDARY_COLOR,
+        )
+        cell_style_right = ParagraphStyle(
+            name="LineCellRight", fontSize=9, leading=11,
+            textColor=SECONDARY_COLOR, alignment=TA_RIGHT,
+        )
+        wrapped_rows = []
+        for row in spec.line_rows:
+            r = list(row)
+            for i, val in enumerate(r):
+                if isinstance(val, str):
+                    # Right-align the last column (typically "Total" or
+                    # "Net payout") to match the header alignment.
+                    style = cell_style_right if i == len(r) - 1 else cell_style
+                    r[i] = Paragraph(val.replace("&", "&amp;"), style)
+            wrapped_rows.append(r)
+        rows = [headers] + wrapped_rows
         cw = _column_widths_for(len(headers))
         line_tbl = Table(rows, colWidths=cw, repeatRows=1)
         line_tbl.setStyle(TableStyle([
@@ -278,7 +300,7 @@ def render_document(spec: DocumentSpec) -> bytes:
             ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
             ("FONTSIZE", (0, 0), (-1, 0), 10),
             ("FONTSIZE", (0, 1), (-1, -1), 9),
-            ("ALIGN", (-1, 0), (-1, -1), "RIGHT"),
+            ("ALIGN", (-1, 0), (-1, 0), "RIGHT"),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ("GRID", (0, 0), (-1, -1), 0.4, BORDER_COLOR),
             ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, LIGHT_GRAY]),

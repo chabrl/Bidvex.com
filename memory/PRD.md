@@ -91,6 +91,22 @@ For the historical receipt (150.00 hammer, no itemized fields), the rendered PDF
 Preview-only per user directive. Awaiting user go-ahead before any deploy.
 
 
+### iter477 addendum — Visual PDF QA (Feb 11, 2026) ✅ 192/192 PASS
+
+**Purpose**: Beyond the byte-exact reconciliation check, verify every PDF actually LOOKS correct — logo positioning, party blocks, table alignment, page breaks, currency formatting, EN/FR labels, no orphan artifacts.
+
+- **Harness**: `backend/tests/live_verify_iter477_pdf_visual_qa.py` — seeds 7 fixture scenarios (marketplace with logo, marketplace no-logo, storage, vehicles, 3-lot multi-lot, 12-lot multi-page, historical aggregate-only), generates 11 PDFs across all buyer + seller document types × EN + FR, renders every page to PNG via PyMuPDF, and asserts 192 programmatic checks against extracted text (letterhead, GST/QST, party blocks, sentinel scan for `None`/`null`/`undefined`/`NaN`, CAD format, dash placeholder, anti-synthesis guard, required labels per doc).
+- **Visual defects found during QA + fixed in-place** (2 real production issues):
+  1. **Line-item text overflow** — long lot titles (>60 chars) in the 5-column line-item table bled into the "Hammer" column because raw strings don't word-wrap inside ReportLab tables. Fix: wrapped each data cell in a `Paragraph` object with a fixed 9pt cell style (right-aligned last column). Multi-page table now word-wraps cleanly and repeats the header row on page 2 (`repeatRows=1` preserved). Files: `services/pdf_generators/common.py::render_document`.
+  2. **DocTitle overlap on long titles** — bilingual doc titles like `RELEVÉ VENDEUR — CASIER` at fontSize=22 with default leading collided with themselves on wrap. Fix: reduced DocTitle to fontSize=20 + explicit leading=24. Files: `services/pdf_generators/common.py::_make_styles`.
+- **PDF types inspected**: Storage Buyer Invoice (EN + FR), Universal Receipt (marketplace + vehicles + storage + lots) × (with-logo + no-logo variants), Multi-lot 3-lot buyer, Multi-page 12-lot buyer (2 pages), Marketplace/Vehicle/Storage Seller Statement, Marketplace Commission Invoice, Historical aggregate-only buyer receipt.
+- **Test transaction IDs**: `iter477qa-{mkt-logo, mkt-nolog, sto, lots-3, lots-12, veh, hist}-*` (auto-generated hex suffixes, cleaned up on exit).
+- **Rendered PNGs saved** at `/tmp/iter477_pdf_qa/` (11 PDFs + 14 pages) — persisted so reviewers can pull them.
+- **JSON report**: `/app/test_reports/iter477_pdf_visual_qa.json` — 192/192 PASS.
+- **Anti-synthesis proof (visual)**: historical receipt PDF shows `Fee model: legacy · aggregate` in the meta rows and every itemized line renders `—` (em-dash placeholder) rather than a fabricated 5%/9.975% split of the aggregate total. The footer disclaimer states: "Fields marked '—' were not persisted at the time of the original settlement."
+- **Regression proof**: after the visual QA fixes, the byte-exact reconciliation harness (`live_verify_iter477_pdf_reconciliation.py`) still reports **49/49 PASS** with buyer_delta_cents=0 and seller_delta_cents=0. Financial values unchanged; layout improvements only.
+
+
 ## iter475 — Full PDF Generation Engines for All Sections & Roles (Feb 11, 2026) ✅ COMPLETE — PREVIEW-ONLY, NOT DEPLOYED
 
 **Reported by user (P0)**: In the deployed environment, buyer & seller dashboards showed every Documents-popover option disabled with "Not available yet" for Storage buyer invoice, Universal receipt (all sections), and Marketplace/Vehicle/Storage seller statement + receipt + commission invoice. Close every gap by building real PDF generators + endpoint wiring + reconciliation against settlement data. No changes to document CONTENT of the existing multi-lot flows, email delivery, payments, Stripe, escrow, fees, taxes, or production data.
