@@ -516,7 +516,28 @@ def _iter350_partner(
         seller_stripe_fee=_r(stripe_recovery),
         seller_commission_total=_r(partner_owes),
     )
-    return result.to_dict()
+    out = result.to_dict()
+    # ── iter480 Phase 3 canonical BidVex Platform Fee split ──
+    # The Partner Platform Fee has always been $3 (=3% × hammer) but was
+    # persisted under the `seller_commission` field name because the
+    # FeeResult dataclass predates the canonical separation.  These
+    # additive keys expose the same numeric value under its correct
+    # economic name so downstream persistence + PDF renderers can
+    # display "BidVex Platform Fee" instead of "Seller Commission".
+    # No financial value changes; ``seller_commission`` remains
+    # populated for backward compatibility with iter476 receipts,
+    # existing PDF paths, and every legacy consumer.
+    out["bidvex_platform_fee_rate"]   = float(PARTNER_PLATFORM_RATE)
+    out["bidvex_platform_fee_amount"] = _r(bidvex_fee)
+    out["bidvex_platform_fee_gst"]    = _r(tax_bd["gst"])
+    out["bidvex_platform_fee_qst"]    = _r(tax_bd["qst"])
+    # Canonical "true" seller commission for Partner sales is $0 —
+    # exposed here so callers building the new normalized receipt
+    # (iter480+) can persist seller_commission=0 while keeping the
+    # legacy field populated.  Auction settlement DOES NOT read this
+    # in Phase 3 (backward compat wins); it is available for Phase 4.
+    out["canonical_seller_commission_for_partner"] = 0.0
+    return out
 
 
 # ─── iter350 route: vehicle dealer (non-custodial) ──────────────────────

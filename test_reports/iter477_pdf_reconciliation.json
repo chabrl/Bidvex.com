@@ -17,7 +17,7 @@
     {
       "test": "T1.marketplace-buyer-receipt-generated",
       "ok": true,
-      "bytes": 2520122
+      "bytes": 2520126
     },
     {
       "test": "T1.marketplace-buyer-itemized-lines-present",
@@ -44,7 +44,7 @@
     {
       "test": "T1.marketplace-buyer-party-block",
       "ok": true,
-      "sample_text": "BidVex Inc. | 103-761 Chalifoux Street, Sherbrooke, QC, J1G 0A8 | 1-800-BIDVEX \u00b7 billing@bidvex.com | www.bidvex.com | GST 706766367RT0001 \u00b7 QST 1233530880TQ0001 | RECEIPT | No. BV-RCPT-268AA7E4 | Issued: Aug 11, 2"
+      "sample_text": "BidVex Inc. | 103-761 Chalifoux Street, Sherbrooke, QC, J1G 0A8 | 1-800-BIDVEX \u00b7 billing@bidvex.com | www.bidvex.com | GST 706766367RT0001 \u00b7 QST 1233530880TQ0001 | RECEIPT | No. BV-RCPT-FF4BED22 | Issued: Aug 11, 2"
     },
     {
       "test": "T1.marketplace-seller-party-block",
@@ -53,7 +53,7 @@
     {
       "test": "T1.vehicles-buyer-receipt-generated",
       "ok": true,
-      "bytes": 2520106
+      "bytes": 2520108
     },
     {
       "test": "T1.vehicles-buyer-itemized-lines-present",
@@ -80,7 +80,7 @@
     {
       "test": "T1.vehicles-buyer-party-block",
       "ok": true,
-      "sample_text": "BidVex Inc. | 103-761 Chalifoux Street, Sherbrooke, QC, J1G 0A8 | 1-800-BIDVEX \u00b7 billing@bidvex.com | www.bidvex.com | GST 706766367RT0001 \u00b7 QST 1233530880TQ0001 | RECEIPT | No. BV-RCPT-202A4E2D | Issued: Aug 11, 2"
+      "sample_text": "BidVex Inc. | 103-761 Chalifoux Street, Sherbrooke, QC, J1G 0A8 | 1-800-BIDVEX \u00b7 billing@bidvex.com | www.bidvex.com | GST 706766367RT0001 \u00b7 QST 1233530880TQ0001 | RECEIPT | No. BV-RCPT-488DF8FD | Issued: Aug 11, 2"
     },
     {
       "test": "T1.vehicles-seller-party-block",
@@ -89,7 +89,7 @@
     {
       "test": "T1.storage-buyer-receipt-generated",
       "ok": true,
-      "bytes": 2520119
+      "bytes": 2520131
     },
     {
       "test": "T1.storage-buyer-itemized-lines-present",
@@ -116,7 +116,7 @@
     {
       "test": "T1.storage-buyer-party-block",
       "ok": true,
-      "sample_text": "BidVex Inc. | 103-761 Chalifoux Street, Sherbrooke, QC, J1G 0A8 | 1-800-BIDVEX \u00b7 billing@bidvex.com | www.bidvex.com | GST 706766367RT0001 \u00b7 QST 1233530880TQ0001 | RECEIPT | No. BV-RCPT-20475125 | Issued: Aug 11, 2"
+      "sample_text": "BidVex Inc. | 103-761 Chalifoux Street, Sherbrooke, QC, J1G 0A8 | 1-800-BIDVEX \u00b7 billing@bidvex.com | www.bidvex.com | GST 706766367RT0001 \u00b7 QST 1233530880TQ0001 | RECEIPT | No. BV-RCPT-A445A0FF | Issued: Aug 11, 2"
     },
     {
       "test": "T1.storage-seller-party-block",
@@ -125,7 +125,7 @@
     {
       "test": "T1.lots-buyer-receipt-generated",
       "ok": true,
-      "bytes": 2520645
+      "bytes": 2520638
     },
     {
       "test": "T1.lots-buyer-itemized-lines-present",
@@ -152,7 +152,7 @@
     {
       "test": "T1.lots-buyer-party-block",
       "ok": true,
-      "sample_text": "BidVex Inc. | 103-761 Chalifoux Street, Sherbrooke, QC, J1G 0A8 | 1-800-BIDVEX \u00b7 billing@bidvex.com | www.bidvex.com | GST 706766367RT0001 \u00b7 QST 1233530880TQ0001 | RECEIPT | No. BV-RCPT-E8DBA90E | Issued: Aug 11, 2"
+      "sample_text": "BidVex Inc. | 103-761 Chalifoux Street, Sherbrooke, QC, J1G 0A8 | 1-800-BIDVEX \u00b7 billing@bidvex.com | www.bidvex.com | GST 706766367RT0001 \u00b7 QST 1233530880TQ0001 | RECEIPT | No. BV-RCPT-5901FB29 | Issued: Aug 11, 2"
     },
     {
       "test": "T1.lots-seller-party-block",

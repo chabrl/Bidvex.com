@@ -609,14 +609,43 @@ def build_itemized_rows_for_seller(
                     total += Decimal(str(v))
         return money(total, currency=currency)
 
+    # ── iter480 Phase 3 canonical BidVex Platform Fee split ──
+    # If any receipt in the group has a non-zero bidvex_platform_fee_amount
+    # (currently only Partner sales), render "BidVex Platform Fee" rows
+    # in place of the ambiguously-named "Seller Commission" rows so the
+    # persisted economic concept is displayed correctly.  Historical
+    # receipts predate this field — they fall back to the legacy
+    # "Seller Commission" label without any numeric change.
+    bidvex_platform_fee_present = any(
+        (r.get("bidvex_platform_fee_amount") or 0) not in (0, 0.0, None, "")
+        for r in rows
+    )
+
+    if bidvex_platform_fee_present:
+        commission_rows = [
+            ("BidVex Platform Fee",   "Frais de plateforme BidVex",
+             _sum_or_blank("bidvex_platform_fee_amount"), False),
+            ("Platform Fee GST (5%)", "TPS sur frais BidVex (5 %)",
+             _sum_or_blank("bidvex_platform_fee_gst"),    False),
+            ("Platform Fee QST (9.975%)", "TVQ sur frais BidVex (9,975 %)",
+             _sum_or_blank("bidvex_platform_fee_qst"),    False),
+        ]
+    else:
+        commission_rows = [
+            ("Seller Commission",   "Commission vendeur",
+             _sum_or_blank("seller_commission"), False),
+            ("Commission GST (5%)", "TPS sur commission (5 %)",
+             _sum_or_blank("seller_commission_gst"), False),
+            ("Commission QST (9.975%)", "TVQ sur commission (9,975 %)",
+             _sum_or_blank("seller_commission_qst"), False),
+        ]
+
     return [
         ("Hammer Total (Gross)", "Marteau brut",
          sum_field(rows, "hammer_price"), False),
         ("Hammer GST Collected", "TPS marteau collectée", _sum_or_blank("hammer_gst"), False),
         ("Hammer QST Collected", "TVQ marteau collectée", _sum_or_blank("hammer_qst"), False),
-        ("Seller Commission",   "Commission vendeur",     _sum_or_blank("seller_commission"), False),
-        ("Commission GST (5%)", "TPS sur commission (5 %)",     _sum_or_blank("seller_commission_gst"), False),
-        ("Commission QST (9.975%)", "TVQ sur commission (9,975 %)", _sum_or_blank("seller_commission_qst"), False),
+        *commission_rows,
         ("Other Deductions",    "Autres retenues",        _sum_or_blank("other_deductions"), False),
         ("Stripe Card Processing Fee", "Frais de traitement Stripe", _stripe_seller_sum(), False),
         ("NET PAYOUT",          "PAIEMENT NET",

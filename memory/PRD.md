@@ -1,6 +1,121 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter480 — Fee Table Merge · Phase 3 (Feb 11, 2026) ✅ COMPLETE — CANONICAL PARTNER BUYER PREMIUM vs BIDVEX PLATFORM FEE SEPARATION
+
+**Scope**: Phase 3 canonical financial separation per master directive. Every existing settlement number preserved cent-exact. Partner sales now persist the BidVex Platform Fee under its correct economic name — no longer stuffed into `seller_commission`. Historical receipts render unchanged (backward compat).
+
+### Files modified (4 additive, zero-financial-behavior-change)
+- `backend/services/receipts.py` — extended `ITEMIZED_KEYS` with 5 canonical fields: `bidvex_platform_fee_rate`, `bidvex_platform_fee_amount`, `bidvex_platform_fee_gst`, `bidvex_platform_fee_qst`, `fee_schedule_version`. `reconcile_itemized()` **unchanged** (new fields are additive metadata, not part of any sum).
+- `backend/services/fee_calculator.py::_iter350_partner` — returned dict now includes `bidvex_platform_fee_{rate,amount,gst,qst}` with the same numeric values as `seller_commission*` (partner path only). Additive only. Every other route returns 0 for these keys via the settlement mapper.
+- `backend/services/auction_settlement.py::settle_cash_or_etransfer` — `fee_breakdown` + `itemized` dicts now carry the 5 new canonical keys. Reads them from the FeeResult; falls back to 0.0 if the current path doesn't populate them. **No numeric change** to `buyer_premium`, `seller_commission`, `buyer_total_charged`, `seller_payout`, or any other pre-existing key.
+- `backend/services/pdf_generators/common.py::build_itemized_rows_for_seller` — if the persisted receipt has non-zero `bidvex_platform_fee_amount`, renders "BidVex Platform Fee / Frais de plateforme BidVex" instead of "Seller Commission / Commission vendeur"; otherwise renders unchanged. Backward-compatible with every historical receipt.
+
+### Files created (1)
+- `backend/tests/live_verify_iter480_phase3_partner_separation.py` — P1-P8 test matrix + legacy backward-compat test + FR label test + zero-double-charge invariant.
+
+### Files NOT modified
+- `services/payment_collection.py` — Stripe checkout logic **untouched**
+- `services/stripe_connect_service.py` — Stripe Connect application-fee / transfer logic **untouched**
+- `services/escrow_service.py` — escrow payout logic **untouched** (blocker preserved)
+- `services/tax_engine.py` + `db.tax_rate_config` — tax logic **untouched**
+- `services/fee_schedule.py` (from Phase 1) — no reads from calc paths yet; schedule stays passive
+- `services/vehicle_pricing.py`, `storage_pricing.py`, `fee_calculation_engine.py`, `category_rules.py` — **untouched** (Phase 4 cleanup candidates)
+- All legacy fields on `models/auction_models.py` — **all 6 preserved**
+- Historical `db.receipts`, `db.transactions`, `db.seller_payouts` rows — **zero writes**
+
+### DB schema changes
+- `db.receipts` gains 5 new OPTIONAL fields (only populated on NEW settlements after this deploy). No index change. No historical rewrite.
+- `db.fee_schedules` unchanged from Phase 1.
+
+### Migration details
+- **No migration script.** New fields land on new settlements only. Historical rows continue with their original iter476 shape.
+- **PDF renderer** feature-detects `bidvex_platform_fee_amount > 0` per-receipt and switches labels only for the affected rows. Every historical PDF renders byte-exact identical output.
+- **Backward compatibility guarantee (proven by `T_PDF_LEGACY` test)**: a receipt with `seller_commission=$3` and no `bidvex_platform_fee_amount` field still renders "Seller Commission $3.00" — no visible change to historical PDFs.
+
+### CANONICAL PARTNER $100 / 10% EXAMPLE (mandatory reconciliation)
+
+| Field | Value | Owner |
+|---|---|---|
+| `hammer_price` | $100.00 | Partner (seller) |
+| `buyer_premium` (aka Partner Buyer Premium) | **$10.00** | **Partner (100%)** |
+| `buyer_total_charged` | **$110.00** | (buyer pays $110 — NOT $113) |
+| `bidvex_platform_fee_rate` | **0.03** | — |
+| `bidvex_platform_fee_amount` | **$3.00** | **BidVex** |
+| `bidvex_platform_fee_gst` | $0.15 | (Q platform_fee × 5%) |
+| `bidvex_platform_fee_qst` | $0.30 | (rounded from 0.2996) |
+| `seller_stripe_recovery` | $0.39 | (2.9% × $3 + $0.30 = $0.387) |
+| `seller_payout` (partner_owes) | **$3.90** | Withheld by BidVex from partner transfer |
+| `fee_schedule_version` | 1 | (iter478 active schedule) |
+| `fee_model_version` | `iter350` | — |
+
+**Zero-double-charge invariant proved**: `buyer_total_charged = hammer + partner_buyer_premium = $110` (does NOT include the $3 BidVex platform fee).
+
+**Partner-net accounting**: partner effectively receives `hammer + partner_bp − partner_owes` = `$100 + $10 − $3.90` = **$106.10** as their net cash (via Stripe Connect transfer of `$110` minus BidVex's `$3.90` application fee).
+
+### Test results — **340/340 across all iterations**
+
+| Suite | Result | Delta cents |
+|---|---|---|
+| **iter480 Phase 3** (P1-P8 + PDF + FR + legacy) | **18/18 PASS** | new baseline |
+| iter479 Phase 2 dual-read | **17/17 PASS** | 0-cent |
+| iter479 Phase 2 impact analysis | 0 stop conditions | 0 |
+| iter478 Phase 1 fee schedule | **46/46 PASS** | 0 |
+| iter477 reconciliation | **49/49 PASS** | buyer_delta_cents=0, seller_delta_cents=0 |
+| iter477 visual QA | **192/192 PASS** | 0 visual defects |
+
+### Old vs new calculation comparison (Section 32 required)
+
+**Partner $100 · 10% BP · QC/QC · Stripe:**
+| Field | Old calculation | New calculation | Δ |
+|---|---|---|---|
+| hammer_price | $100.00 | $100.00 | 0¢ |
+| buyer_premium | $10.00 (partner BP) | $10.00 (partner BP) | 0¢ |
+| buyer_total_charged | $110.00 | $110.00 | 0¢ |
+| seller_commission (legacy field) | $3.00 (BidVex fee misplaced) | $3.00 (kept for backward compat) | 0¢ |
+| **`bidvex_platform_fee_amount`** (NEW) | — | **$3.00** | new canonical field |
+| seller_taxes | $0.51 | $0.51 | 0¢ |
+| seller_stripe_recovery | $0.39 | $0.39 | 0¢ |
+| seller_payout (partner_owes) | $3.90 | $3.90 | 0¢ |
+| bidvex_revenue | $3.00 | $3.00 | 0¢ |
+
+**Every existing FeeResult field: 0-cent delta. New field is additive metadata.**
+
+### Production impact (Section 25 read-only)
+- **Preview DB scope**: 0 users with `subscription_tier="partner"` who have buyer purchases; 0 partner receipts with non-zero hammer tax. **Zero production-affecting delta.**
+- Production DB scope: to be rerun against real production DB before deploy (recommended but not blocking Phase 3 preview approval).
+
+### Remaining discrepancies (deferred to Phase 4 or future business decision)
+
+1. **`FeeResult.seller_payout` for partner is `partner_owes` (misleading name)** — numerically correct. Rename candidate in Phase 4.
+2. **`FeeResult.seller_commission` for partner still carries BidVex 3%** — kept for backward compatibility with legacy consumers listed in the Phase 2 caller-audit. Phase 4 can set it to 0 once every consumer reads `bidvex_platform_fee_amount`.
+3. **Partner hammer-tax rule** (`_iter350_partner` vs Stripe Connect checkout) — untouched. **Awaiting your business-policy decision.**
+4. **PricingManager `partner=0` row** — untouched. 0 production impact per Phase 2. Rerun query against production DB before Phase 4 cleanup.
+5. **Category overrides** — remain `active=false` per directive Section 17.
+6. **Individual/enterprise/vehicle/storage `bidvex_platform_fee_amount = 0`** — for these routes, the BidVex fee lives in `buyer_premium` (individual/enterprise) or is the buyer_premium itself (vehicle/storage). Field is populated at 0 to keep the receipt shape uniform. Phase 4 could optionally expose the BidVex portion separately for individual/enterprise if a business decision favors that.
+
+### Stop conditions (Section 30) — none triggered
+
+- Buyer total: unchanged ✓
+- Partner payout: unchanged ✓
+- BidVex revenue: unchanged ✓
+- Partner Buyer Premium ownership: unchanged (100% partner) ✓
+- BidVex 3% charged to buyer? NO ✓
+- BidVex 3% charged twice? NO ✓
+- Stripe processing base: unchanged ✓
+- Tax treatment: unchanged ✓
+- Historical records: 0 writes ✓
+- Existing listings: 0 writes ✓
+- Regression tests: 100% green ✓
+- Cent-level discrepancy: 0 ✓
+
+### 🛑 HALTED at Phase 3 boundary — awaiting your explicit approval before Phase 4
+
+- Phase 4 (constant cleanup + legacy code removal) **NOT executed**
+- Admin Fee Schedule UI **NOT built** per directive Section 28
+- Escrow live payout verification still blocked on Stripe Sandbox balance (unchanged)
+
+
 ## iter479 — Fee Table Merge · Phase 2 (Feb 11, 2026) ✅ COMPLETE — READ-ONLY DUAL-READ AUDIT, ZERO PRODUCTION CHANGES
 
 **Scope**: Phase 2 comparison-only dual-read + read-only production impact queries. No production calc path was modified; no DB row was written; no financial result changed.

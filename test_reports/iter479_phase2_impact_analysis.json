@@ -1,6 +1,6 @@
 {
   "iter": "479-phase2-read-only-impact-analysis",
-  "generated_at": "2026-08-11T22:42:47.110915+00:00",
+  "generated_at": "2026-08-11T23:14:36.649666+00:00",
   "query_1_pricingmanager_partner_zero": {
     "test": "1.pricingmanager_partner_zero_impact",
     "authoritative_source": "PricingManager.BUYER_PREMIUM_RATES[\"partner\"] = 0",

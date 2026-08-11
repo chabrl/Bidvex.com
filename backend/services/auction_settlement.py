@@ -308,6 +308,19 @@ async def settle_cash_or_etransfer(
         "buyer_premium_rate": float(fee.get("buyer_premium_rate", 0)),
         "seller_commission_rate": float(fee.get("seller_commission_rate", 0)),
         "seller_is_tax_registered": False,
+        # ── iter480 Phase 3 canonical BidVex Platform Fee split ──
+        # For Partner sales, `bidvex_platform_fee_amount` carries the
+        # SAME numeric value as `seller_commission` (both = 3% × hammer).
+        # For every other route it is 0.  PDF renderers can now read the
+        # correct economic column for Partner sales instead of
+        # mislabeling BidVex revenue as "Seller Commission".
+        # No numeric change: iter476 reconciliation is unchanged because
+        # the reconciler does NOT include these fields in its sums.
+        "bidvex_platform_fee_rate":   float(fee.get("bidvex_platform_fee_rate", 0.0)),
+        "bidvex_platform_fee_amount": float(fee.get("bidvex_platform_fee_amount", 0.0)),
+        "bidvex_platform_fee_gst":    float(fee.get("bidvex_platform_fee_gst", 0.0)),
+        "bidvex_platform_fee_qst":    float(fee.get("bidvex_platform_fee_qst", 0.0)),
+        "fee_schedule_version":       1,   # iter478 v1 active schedule
     }
     # Snapshot the itemized block once (before promo discounts) so the
     # persisted receipt reflects the authoritative pre-discount split.
@@ -322,6 +335,10 @@ async def settle_cash_or_etransfer(
             "other_deductions",
             "buyer_premium_rate", "seller_commission_rate",
             "seller_is_tax_registered",
+            # iter480 Phase 3 canonical fields (additive)
+            "bidvex_platform_fee_rate", "bidvex_platform_fee_amount",
+            "bidvex_platform_fee_gst",  "bidvex_platform_fee_qst",
+            "fee_schedule_version",
         )
     }
 

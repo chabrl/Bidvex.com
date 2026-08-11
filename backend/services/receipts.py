@@ -46,6 +46,18 @@ ITEMIZED_KEYS = (
     # canonical bidvex tax numbers snapshot at issuance (helps audit
     # reconciliation on the exact rates applied)
     "bidvex_gst_number", "bidvex_qst_number",
+    # ── iter480 Phase 3 canonical BidVex Platform Fee split ──
+    # For Partner sales the BidVex 3% platform fee historically lived
+    # inside `seller_commission`.  Those fields carry the same numeric
+    # value AS `seller_commission*` for partner receipts and 0 for
+    # every other route.  Reconciliation is UNCHANGED — the new fields
+    # are additive metadata used only by PDF renderers to distinguish
+    # BidVex-owned revenue from seller-owned deductions.
+    "bidvex_platform_fee_rate",
+    "bidvex_platform_fee_amount",
+    "bidvex_platform_fee_gst",
+    "bidvex_platform_fee_qst",
+    "fee_schedule_version",
 )
 
 

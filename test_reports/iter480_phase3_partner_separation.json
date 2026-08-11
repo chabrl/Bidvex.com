@@ -1,0 +1,114 @@
+{
+  "iter": "480-phase3-partner-separation",
+  "passed": 18,
+  "total": 18,
+  "canonical_partner_100_10pct_example": {
+    "hammer_price": 100.0,
+    "buyer_premium": 10.0,
+    "buyer_total_charged": 110.0,
+    "bidvex_platform_fee_amount": 3.0,
+    "bidvex_platform_fee_rate": 0.03,
+    "seller_payout_partner_owes": 3.9,
+    "seller_stripe_recovery": 0.39,
+    "seller_taxes": 0.51
+  },
+  "results": [
+    {
+      "test": "P1.partner_10pct_buyer_pays_partner_BP_only",
+      "ok": true,
+      "buyer_premium": 10.0,
+      "total": 110.0
+    },
+    {
+      "test": "P1.partner_10pct_bidvex_platform_fee_is_3.00",
+      "ok": true,
+      "platform": 3.0,
+      "legacy_seller_commission": 3.0
+    },
+    {
+      "test": "P1.partner_10pct_buyer_does_NOT_pay_platform_fee",
+      "ok": true,
+      "note": "buyer_total = hammer + partner BP; the 3% platform fee is NOT included"
+    },
+    {
+      "test": "P2.partner_15pct",
+      "ok": true,
+      "buyer_premium": 15.0,
+      "platform_fee": 3.0
+    },
+    {
+      "test": "P3.partner_18pct_custom",
+      "ok": true
+    },
+    {
+      "test": "P4.immutable_snapshot_survives_schedule_change",
+      "ok": true,
+      "note": "listing_override wins Priority 2; schedule.partner.default 5% is Priority 4",
+      "resolved": 0.1
+    },
+    {
+      "test": "P5.partner_pro_rates_from_schedule",
+      "ok": true,
+      "bp": 0.0375,
+      "sc": 0.03
+    },
+    {
+      "test": "P6.no_double_charge_of_platform_fee",
+      "ok": true,
+      "buyer_total": 110.0
+    },
+    {
+      "test": "P7.partner_net_accounts_for_platform_fee",
+      "ok": true,
+      "seller_payout": 3.9,
+      "components": {
+        "bidvex_platform_fee": 3.0,
+        "seller_stripe_recovery": 0.39,
+        "seller_taxes": 0.51
+      }
+    },
+    {
+      "test": "P8.partner_bp_vs_platform_fee_distinct_fields",
+      "ok": true,
+      "bp": 10.0,
+      "platform": 3.0
+    },
+    {
+      "test": "T_PDF_1.buyer_receipt_shows_buyer_premium",
+      "ok": true,
+      "snippet": "BidVex Inc. | 103-761 Chalifoux Street, Sherbrooke, QC, J1G 0A8 | 1-800-BIDVEX \u00b7 billing@bidvex.com | www.bidvex.com | GST 706766367RT0001 \u00b7 QST 1233530880TQ0001 | RECEIPT | No. BV-RCPT-59435DC7 | Issued: Aug 11, 2"
+    },
+    {
+      "test": "T_PDF_2.buyer_receipt_does_NOT_show_bidvex_platform_fee_as_buyer_charge",
+      "ok": true,
+      "note": "Partner Platform Fee is a Partner cost, not a buyer charge"
+    },
+    {
+      "test": "T_PDF_3.buyer_total_paid_is_110_not_113",
+      "ok": true
+    },
+    {
+      "test": "T_PDF_4.seller_statement_shows_BidVex_Platform_Fee_label",
+      "ok": true,
+      "snippet": "0\nHammer GST Collected\nCA$0.00\nHammer QST Collected\nCA$0.00\nBidVex Platform Fee\nCA$3.00\nPlatform Fee GST (5%)\nCA$0.00\nPlatform Fee QST (9.9"
+    },
+    {
+      "test": "T_PDF_5.seller_statement_does_NOT_show_ambiguous_Seller_Commission",
+      "ok": true,
+      "note": "Partner path: BidVex fee is NOT a seller commission"
+    },
+    {
+      "test": "T_PDF_6.commission_invoice_itemized_shows_BidVex_Platform_Fee",
+      "ok": true
+    },
+    {
+      "test": "T_PDF_7.fr_seller_statement_uses_Frais_de_plateforme_BidVex",
+      "ok": true
+    },
+    {
+      "test": "T_PDF_LEGACY.legacy_receipt_still_shows_Seller_Commission",
+      "ok": true,
+      "note": "Historical partner receipts render unchanged \u2014 backward compat preserved"
+    }
+  ]
+}
