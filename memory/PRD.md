@@ -1,6 +1,64 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter468 — Final Document Delivery for Confirmed Stripe Auction Payments (Feb 9, 2026) ✅ COMPLETE — PREVIEW-ONLY, NOT DEPLOYED
+
+**Reported by user (P0)**: On confirmed Stripe auction payments only, automatically deliver ONE buyer email with ONE secure link to the buyer's final paid invoice and ONE seller email with ONE secure link to the seller's settlement statement. Retry-safe, EN/FR preserved, BidVex issuer, no partner co-branding, no PDF attachments, no cash/e-transfer/escrow/fee/tax changes. Not deployed.
+
+### Trace (mandatory, before code change)
+Existing infrastructure discovered and reused verbatim (no financial calc / no document data change):
+- **Buyer paid invoice PDF**: `routes/invoices.py::generate_lots_won_invoice` — real settled data via iter451/iter459.
+- **Seller settlement statement PDF**: `routes/invoices.py::generate_seller_statement` — real settled data via iter457.
+- **Signed URLs**: `services/cloud_storage.py::generate_signed_url`.
+- **Idempotency ledger**: `services/settlement_email_dedup.py` (iter460–iter462).
+- **Confirmed-Stripe trigger points**:
+  1. `services/payment_collection.py::finalize_auction_payment` — success branch when `buyer_charge` is present with a valid Stripe reference.
+  2. `routes/webhooks.py::_handle_checkout_completed` — `checkout.session.completed` with `payment_type == "auction_purchase"`.
+- **Gap**: the two existing PDFs were already generated but the confirmation emails did NOT include a secure link back to them. Buyer receipt / seller statement emails were inline HTML with no link.
+
+### Delivered
+- **New service `services/final_document_delivery.py`** — `deliver_final_documents(db, *, auction_id, buyer_id, seller_id, payment_method, buyer_charge, listing_title)`. Strict eligibility guard: only proceeds when `payment_method ∈ {stripe, stripe_checkout, stripe_pi}` AND `buyer_charge` carries a stripe_pi/stripe_session_id/stripe_payment_intent_id. Anything else (failed, pending, cancelled, cash, e-transfer, unconfirmed) → skipped with a reason label. Fetch-or-generate for both PDFs (reuses existing generators; retrieves stored invoice if already generated).
+- **Two new bilingual email templates in `services/emails/email_system.py`**:
+  - `send_buyer_final_invoice_link_email(buyer, invoice_link, invoice_number, listing_title, amount_paid_display)` — "Your final invoice is ready" / "Votre facture finale est prête" with a single CTA button linking to the signed URL. `data-testid="buyer-final-invoice-link"`.
+  - `send_seller_settlement_link_email(seller, statement_link, statement_number, listing_title, net_payout_display)` — "Your settlement statement is ready" / "Votre relevé de règlement est prêt". `data-testid="seller-final-statement-link"`.
+- **Two new ledger kinds** added to `services/settlement_email_dedup.py` VALID_KINDS: `final_document_buyer_link` and `final_document_seller_link`. Both use `event_key=""` — one link email per side per settlement.
+- **Wiring** (non-blocking):
+  - `services/payment_collection.py::finalize_auction_payment` success branch → calls `deliver_final_documents(...)` after receipts + notifications + affiliate accrual complete. Failures log warnings and never raise.
+  - `routes/webhooks.py::_handle_checkout_completed` (auction_purchase branch) → same call after listing state update + PDF generation.
+
+### Guardrails honoured
+- **Financial calculations, tax engine, fee engine, invoice-data content** — untouched. Reused existing `generate_lots_won_invoice` and `generate_seller_statement` verbatim.
+- **PDF layout / co-branding / issuer** — untouched. BidVex remains the sole issuer; no partner co-branding.
+- **No PDF attachments** — email carries the secure signed URL only.
+- **Excluded payment methods**: `cash`, `etransfer`, `""` (unspecified), and any Stripe-labelled call missing `buyer_charge` — all short-circuit at the eligibility guard.
+- **Bilingual EN/FR preserved** — new templates use `_detect_language(recipient)` (same helper as existing bilingual emails).
+- **Escrow / fee / tax / cash / e-transfer flows** — no changes made to these paths.
+- **Not deployed**. Preview-only.
+
+### Verified end-to-end
+- **`tests/live_verify_iter468_final_document_delivery.py`** — **21/21 PASS**:
+  - M1 (confirmed Stripe multi-lot payment): buyer gets exactly one link email, seller gets exactly one link email, both PDFs persist in `db.invoices`, ledger holds one row per side.
+  - M2 (duplicate payment event / retry): second `deliver_final_documents` call fires zero emails, suppression reason = `duplicate_claim`.
+  - M3 (four excluded scenarios): `buyer_charge=None`, `payment_method="cash"`, `payment_method="etransfer"`, `payment_method="stripe"` + empty `buyer_charge` → all skipped with suppression reason `not_confirmed_stripe`. Zero emails fired.
+  - M4 (independent buyer settlement on same auction): Buyer B receives own email; seller does NOT re-fire (already claimed by first settlement — seller statement PDF aggregates all sold lots).
+  - Ledger inventory verified: 3 rows for one auction (1 seller + 2 buyers).
+- **Regression** (all still passing): iter459 51/51, iter460 16/16, iter461 13/13, iter462 18/18.
+
+### Delivery trigger map (final)
+| Trigger site | Fires `deliver_final_documents` with `payment_method=…` | Buyer link | Seller link | Retry-safe? |
+|---|---|---|---|---|
+| `services/payment_collection.py::finalize_auction_payment` (success branch, `buyer_charge` present) | `"stripe"` + `buyer_charge={"stripe_pi": …}` | ✓ one per buyer per auction | ✓ one per seller per auction | ✓ (ledger `final_document_*_link`) |
+| `routes/webhooks.py::_handle_checkout_completed` (`payment_type=="auction_purchase"`) | `"stripe_checkout"` + `buyer_charge={"stripe_session_id": …}` | ✓ | ✓ | ✓ (same ledger) |
+| Same helpers called with `cash` / `etransfer` / unconfirmed | Skipped at eligibility guard | — | — | N/A |
+| Failed payment paths (`buyer_charge=None`) | Never reached — `finalize_auction_payment` success branch is only entered when `buyer_charge` is truthy | — | — | N/A |
+
+### Remaining risks
+- **Stripe production runtime credential**: iter466 read-only probe showed the running preview backend authenticates to `acct_1SXA7iBd6Wtvh7hs` (test mode, CAD Available $0). This delivery works regardless of Available balance because it doesn't move funds — it only generates PDFs and sends links. So it is safe to run against the current preview runtime.
+- **Escrow transfer path** — still marked UNVERIFIED per iter467; iter468 does not touch escrow.
+- **Vehicle multi-lot invoice generation**: `deliver_final_documents` currently calls `generate_lots_won_invoice` which handles multi-item `lots` auctions. Vehicle multi-lot (`vehicle_multi_lot_settlement`) has its own invoice creation path. If vehicle multi-lot settlements route through `finalize_auction_payment`, the delivery will still fire — but the buyer invoice retrieval would fall back to generating a new one via the multi-item generator. Vehicle-specific final invoice link delivery could be added when needed; not in scope for this iteration.
+- **`_send_purchase_confirmation_emails` in webhook path** already sends a purchase confirmation. iter468 ADDS a separate secure-link email on top. This is by design — the confirmation email is transactional acknowledgement; the link email is document delivery. Both are gated by the ledger (different kinds), so retries don't multiply either.
+
+
 ## iter467 — Escrow Payout Verification PAUSED (Feb 9, 2026) ⏸ UNVERIFIED
 
 **Reported by user (P0 directive)**: Pause the controlled escrow payout verification. Do not create test data, run transfers, change Stripe configuration, or modify escrow code. Mark the escrow transfer path as unverified and do not deploy escrow changes.

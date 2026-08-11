@@ -1819,3 +1819,119 @@ async def send_listing_rejected_email(
         html_content=_base_template(content, heading),
     )
 
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# iter468 — Final document delivery for confirmed Stripe auction payments.
+# BidVex is the current document issuer. No partner co-branding, no PDF
+# attachments, no cash / e-transfer / escrow / fee / tax changes.
+# Bilingual EN/FR preserved via the standard `_detect_language` helper.
+# ══════════════════════════════════════════════════════════════════════════
+
+async def send_buyer_final_invoice_link_email(
+    *, buyer: dict, invoice_link: str, invoice_number: str,
+    listing_title: str, amount_paid_display: str,
+) -> Dict[str, Any]:
+    """One buyer email with ONE secure link to the buyer's final paid
+    invoice. Content mirrors the existing receipt copy tone — no new
+    financial data, no attachment, just a stable signed link the buyer
+    can revisit to view / download their paid invoice PDF.
+    """
+    lang = _detect_language(buyer)
+    if lang == "fr":
+        heading = "Votre facture finale est pr&ecirc;te"
+        greeting = f"Bonjour {buyer.get('name', '')},"
+        body = (
+            f"Votre paiement pour <strong>{listing_title}</strong> a &eacute;t&eacute; confirm&eacute;. "
+            f"Vous pouvez consulter et t&eacute;l&eacute;charger votre facture finale (n° "
+            f"<strong>{invoice_number}</strong>) via le lien s&eacute;curis&eacute; ci-dessous."
+        )
+        total_label = f"Total pay&eacute;&nbsp;: <strong>{amount_paid_display}</strong>"
+        cta = "Consulter ma facture"
+        note = ("Ce lien est priv&eacute; et sp&eacute;cifique &agrave; votre compte. "
+                "Veuillez ne pas le partager.")
+        subject = f"BidVex — Votre facture pour {listing_title}"
+    else:
+        heading = "Your final invoice is ready"
+        greeting = f"Hi {buyer.get('name', '')},"
+        body = (
+            f"Your payment for <strong>{listing_title}</strong> has been confirmed. "
+            f"You can view and download your final invoice (No "
+            f"<strong>{invoice_number}</strong>) via the secure link below."
+        )
+        total_label = f"Total paid: <strong>{amount_paid_display}</strong>"
+        cta = "View my invoice"
+        note = "This link is private and specific to your account. Please do not share it."
+        subject = f"BidVex — Your invoice for {listing_title}"
+
+    content = f"""
+    <h2 style="margin: 0 0 20px 0; color: #0f172a;">{heading}</h2>
+    <p style="color: #475569; line-height: 1.6;">{greeting}</p>
+    <p style="color: #475569; line-height: 1.6;">{body}</p>
+    <p style="color: #0f172a; font-size: 15px; margin: 20px 0;">{total_label}</p>
+    <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 30px auto;">
+      <tr><td align="center" style="background-color: #0B2545; padding: 14px 30px; border-radius: 8px;">
+        <a href="{invoice_link}" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px;" data-testid="buyer-final-invoice-link">{cta}</a>
+      </td></tr>
+    </table>
+    <p style="color: #94a3b8; font-size: 12px; line-height: 1.5; margin-top: 24px;">{note}</p>
+    """
+    return await _send_via_unified(
+        to_email=buyer["email"],
+        subject=subject,
+        html_content=_base_template(content, heading),
+    )
+
+
+async def send_seller_settlement_link_email(
+    *, seller: dict, statement_link: str, statement_number: str,
+    listing_title: str, net_payout_display: str,
+) -> Dict[str, Any]:
+    """One seller email with ONE secure link to the seller's settlement
+    statement. Mirrors the existing statement email tone; no new financial
+    data, no attachment, just the secure signed link.
+    """
+    lang = _detect_language(seller)
+    if lang == "fr":
+        heading = "Votre relev&eacute; de r&egrave;glement est pr&ecirc;t"
+        greeting = f"Bonjour {seller.get('name', '')},"
+        body = (
+            f"Le paiement pour <strong>{listing_title}</strong> a &eacute;t&eacute; confirm&eacute;. "
+            f"Votre relev&eacute; de r&egrave;glement (n° <strong>{statement_number}</strong>) "
+            f"est disponible via le lien s&eacute;curis&eacute; ci-dessous."
+        )
+        net_label = f"Versement net&nbsp;: <strong>{net_payout_display}</strong>"
+        cta = "Consulter mon relev&eacute;"
+        note = ("Ce lien est priv&eacute; et sp&eacute;cifique &agrave; votre compte. "
+                "Veuillez ne pas le partager.")
+        subject = f"BidVex — Votre relev&eacute; de r&egrave;glement — {listing_title}"
+    else:
+        heading = "Your settlement statement is ready"
+        greeting = f"Hi {seller.get('name', '')},"
+        body = (
+            f"Payment for <strong>{listing_title}</strong> has been confirmed. "
+            f"Your settlement statement (No <strong>{statement_number}</strong>) "
+            f"is available via the secure link below."
+        )
+        net_label = f"Net payout: <strong>{net_payout_display}</strong>"
+        cta = "View my statement"
+        note = "This link is private and specific to your account. Please do not share it."
+        subject = f"BidVex — Your settlement statement — {listing_title}"
+
+    content = f"""
+    <h2 style="margin: 0 0 20px 0; color: #0f172a;">{heading}</h2>
+    <p style="color: #475569; line-height: 1.6;">{greeting}</p>
+    <p style="color: #475569; line-height: 1.6;">{body}</p>
+    <p style="color: #0f172a; font-size: 15px; margin: 20px 0;">{net_label}</p>
+    <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 30px auto;">
+      <tr><td align="center" style="background-color: #0B2545; padding: 14px 30px; border-radius: 8px;">
+        <a href="{statement_link}" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px;" data-testid="seller-final-statement-link">{cta}</a>
+      </td></tr>
+    </table>
+    <p style="color: #94a3b8; font-size: 12px; line-height: 1.5; margin-top: 24px;">{note}</p>
+    """
+    return await _send_via_unified(
+        to_email=seller["email"],
+        subject=subject,
+        html_content=_base_template(content, heading),
+    )

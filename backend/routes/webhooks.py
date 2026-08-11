@@ -1482,6 +1482,24 @@ async def _handle_checkout_completed(db, session):
             # Generate and store PDF invoice
             await _generate_and_store_invoice(db, listing, buyer_id, breakdown, invoice_id)
 
+            # iter468 — Deliver final documents (buyer paid invoice link +
+            # seller settlement statement link) for this confirmed
+            # Stripe auction purchase. Dedup-safe on webhook retries.
+            try:
+                from services.final_document_delivery import deliver_final_documents
+                await deliver_final_documents(
+                    db,
+                    auction_id=listing_id,
+                    buyer_id=buyer_id,
+                    seller_id=listing.get("seller_id"),
+                    payment_method="stripe_checkout",
+                    buyer_charge={"stripe_session_id": session_id,
+                                  "stripe_payment_intent_id": session.get("payment_intent")},
+                    listing_title=listing.get("title"),
+                )
+            except Exception as e:
+                logger.warning(f"[iter468 webhook] final-doc delivery failed: {e}")
+
             # ── Affiliate Cash-Back Payout ──
             try:
                 from services.connect_payment_engine import process_affiliate_payout

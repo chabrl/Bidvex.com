@@ -53,6 +53,10 @@ VALID_KINDS = {
     "payment_failed",
     "purchase_confirmation_buyer",
     "purchase_confirmation_seller",
+    # iter468 — Final document delivery for confirmed Stripe auction
+    # payments. One secure-link email per side per settlement.
+    "final_document_buyer_link",
+    "final_document_seller_link",
 }
 
 

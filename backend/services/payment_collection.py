@@ -443,6 +443,25 @@ async def finalize_auction_payment(
             except Exception as e:  # noqa: BLE001
                 logger.warning(f"[payment-collection] affiliate commission accrual failed: {e}")
 
+            # iter468 — Final document delivery for confirmed Stripe
+            # auction payments. Sends ONE buyer email (secure invoice
+            # link) + ONE seller email (secure statement link). Gated by
+            # the settlement email dedup ledger so retries never send a
+            # second email. Non-blocking: any failure logs and returns.
+            try:
+                from services.final_document_delivery import deliver_final_documents
+                await deliver_final_documents(
+                    db,
+                    auction_id=listing_id,
+                    buyer_id=winner_id,
+                    seller_id=seller_id,
+                    payment_method="stripe",
+                    buyer_charge=buyer_charge,
+                    listing_title=title,
+                )
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"[payment-collection] iter468 final-doc delivery failed: {e}")
+
             return out
 
         # ── NO PAYMENT METHOD → Payment link, 72h deadline (iter302) ──
