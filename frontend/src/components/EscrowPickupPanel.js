@@ -16,12 +16,83 @@ import {
 
 const API = API_BASE;
 
-const STATUS_CONFIG = {
-  held: { label_en: 'Funds Held', label_fr: 'Fonds détenus', color: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300', icon: Lock },
-  released: { label_en: 'Released', label_fr: 'Libérés', color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300', icon: CheckCircle2 },
-  auto_released: { label_en: 'Auto-Released', label_fr: 'Auto-libérés', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300', icon: Clock },
-  disputed: { label_en: 'Disputed', label_fr: 'En litige', color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300', icon: AlertTriangle },
-  refunded: { label_en: 'Refunded', label_fr: 'Remboursé', color: 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300', icon: XCircle },
+// ── iter470 — Payout-state badge config ────────────────────────────
+// The seller escrow API projects `payout_state ∈ { held, sent, pending,
+// failed, unknown, disputed, refunded, auto_released }` onto every row.
+// This config drives badge, card status, and confirmation feedback so
+// they always agree. Never show "Funds Released" unless the backend
+// reports `payout_state === 'sent'`.
+const PAYOUT_STATUS_CONFIG = {
+  held: {
+    label_en: 'Funds Held', label_fr: 'Fonds détenus',
+    color: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
+    icon: Lock,
+  },
+  sent: {
+    label_en: 'Funds Released', label_fr: 'Fonds libérés',
+    color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+    icon: CheckCircle2,
+  },
+  pending: {
+    label_en: 'Payout Pending', label_fr: 'Versement en attente',
+    color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+    icon: Clock,
+  },
+  failed: {
+    label_en: 'Payout Requires Review', label_fr: 'Versement à vérifier',
+    color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
+    icon: AlertTriangle,
+  },
+  unknown: {
+    label_en: 'Payout Requires Review', label_fr: 'Versement à vérifier',
+    color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
+    icon: AlertTriangle,
+  },
+  auto_released: {
+    label_en: 'Auto-Released', label_fr: 'Auto-libérés',
+    color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+    icon: Clock,
+  },
+  disputed: {
+    label_en: 'Disputed', label_fr: 'En litige',
+    color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+    icon: AlertTriangle,
+  },
+  refunded: {
+    label_en: 'Refunded', label_fr: 'Remboursé',
+    color: 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300',
+    icon: XCircle,
+  },
+};
+
+// Legacy alias so buyer-side + other consumers keep working unchanged.
+const STATUS_CONFIG = PAYOUT_STATUS_CONFIG;
+
+/**
+ * iter470 — Resolve the effective display state for a seller escrow row.
+ *
+ * Order of precedence:
+ * 1. `escrow_status === 'disputed'` → disputed (locked)
+ * 2. `escrow_status === 'refunded'` → refunded (locked)
+ * 3. `escrow_status === 'held'` → held (funds on-platform, awaiting pickup)
+ * 4. Otherwise use `payout_state` (populated by iter470 backend).
+ *    - `sent` (real Stripe transfer id present on the row) → Funds Released
+ *    - `pending` (queued payout row exists) → Payout Pending
+ *    - `failed` (explicit payout failure) → Payout Requires Review
+ *    - `unknown` (no payout row exists) → Payout Requires Review
+ *
+ * Never returns `sent` unless the backend reported it — a missing
+ * `payout_state` degrades to `unknown`, never to `sent`.
+ */
+const resolveDisplayState = (escrow) => {
+  const s = escrow?.escrow_status;
+  if (s === 'disputed') return 'disputed';
+  if (s === 'refunded') return 'refunded';
+  if (s === 'held') return 'held';
+  if (s === 'auto_released') return 'auto_released';
+  const p = escrow?.payout_state;
+  if (p === 'sent' || p === 'pending' || p === 'failed') return p;
+  return 'unknown';
 };
 
 const timeRemaining = (expiresAt) => {
@@ -105,11 +176,31 @@ export function SellerEscrowPanel() {
     setSubmitting(prev => ({ ...prev, [auctionId]: true }));
     try {
       const res = await axios.post(`${API}/escrow/seller/confirm-pickup`, { auction_id: auctionId, code }, { headers: { Authorization: `Bearer ${token}` } });
-      toast.success(fr ? res.data.message_fr : res.data.message_en);
+      // iter470 — Toast variant must match the payout state so the
+      // seller's feedback agrees with the card badge/status.
+      const state = res.data?.payout_state;
+      const msg = fr ? res.data?.message_fr : res.data?.message_en;
+      if (state === 'sent') {
+        toast.success(msg);
+      } else if (state === 'pending') {
+        (toast.info ? toast.info : toast)(msg);
+      } else if (state === 'failed' || state === 'unknown') {
+        (toast.warning ? toast.warning : toast)(msg);
+      } else {
+        toast.success(msg);
+      }
       fetchEscrows();
     } catch (err) {
       const detail = err.response?.data?.detail;
-      toast.error(typeof detail === 'object' ? (fr ? detail.message_fr : detail.message_en) : detail || 'Error');
+      // Only echo backend-provided bilingual messages. Never surface
+      // raw error strings, stack traces, or internal identifiers.
+      if (detail && typeof detail === 'object') {
+        toast.error(fr ? (detail.message_fr || detail.message_en) : (detail.message_en || detail.message_fr));
+      } else if (typeof detail === 'string' && detail.length > 0 && detail.length < 200) {
+        toast.error(detail);
+      } else {
+        toast.error(fr ? 'Une erreur s\u2019est produite. Veuillez réessayer.' : 'An error occurred. Please try again.');
+      }
     } finally { setSubmitting(prev => ({ ...prev, [auctionId]: false })); }
   };
 
@@ -130,11 +221,14 @@ export function SellerEscrowPanel() {
   return (
     <div className="space-y-4" data-testid="seller-escrow-panel">
       {escrows.map(escrow => {
-        const config = STATUS_CONFIG[escrow.escrow_status] || STATUS_CONFIG.held;
+        // iter470 — Render badge + card status + notice using the same
+        // resolved display state (payout-state aware).
+        const displayState = resolveDisplayState(escrow);
+        const config = PAYOUT_STATUS_CONFIG[displayState] || PAYOUT_STATUS_CONFIG.unknown;
         const StatusIcon = config.icon;
-        const remaining = escrow.escrow_status === 'held' ? timeRemaining(escrow.pickup_code_expires_at) : null;
-        const isHeld = escrow.escrow_status === 'held';
-        const isDisputed = escrow.escrow_status === 'disputed';
+        const remaining = displayState === 'held' ? timeRemaining(escrow.pickup_code_expires_at) : null;
+        const isHeld = displayState === 'held';
+        const isDisputed = displayState === 'disputed';
         const isSubmitting = submitting[escrow.auction_id];
 
         return (
@@ -149,7 +243,14 @@ export function SellerEscrowPanel() {
                     <p className="text-xs text-muted-foreground">{new Date(escrow.created_at).toLocaleDateString(fr ? 'fr-CA' : 'en-CA', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
                   </div>
                 </div>
-                <Badge className={config.color} data-testid={`escrow-status-${escrow.auction_id}`}><StatusIcon className="h-3 w-3 mr-1" />{fr ? config.label_fr : config.label_en}</Badge>
+                <Badge
+                  className={config.color}
+                  data-testid={`escrow-status-${escrow.auction_id}`}
+                  data-payout-state={displayState}
+                >
+                  <StatusIcon className="h-3 w-3 mr-1" />
+                  {fr ? config.label_fr : config.label_en}
+                </Badge>
               </div>
 
               {/* Amounts */}
@@ -207,14 +308,74 @@ export function SellerEscrowPanel() {
                 </div>
               )}
 
-              {/* RELEASED */}
-              {escrow.escrow_status === 'released' && (
-                <div className="border-t pt-3 mt-2 flex items-center gap-2 text-green-600"><CheckCircle2 className="h-4 w-4" /><p className="text-sm font-medium">{fr ? 'Fonds libérés sur votre compte' : 'Funds released to your account'}{escrow.funds_released_at && ` — ${new Date(escrow.funds_released_at).toLocaleString(fr ? 'fr-CA' : 'en-CA')}`}</p></div>
+              {/* SENT (Funds Released) — real Stripe transfer completed. */}
+              {displayState === 'sent' && (
+                <div
+                  className="border-t pt-3 mt-2 flex items-center gap-2 text-green-600"
+                  data-testid={`funds-released-notice-${escrow.auction_id}`}
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                  <p className="text-sm font-medium">
+                    {fr ? 'Fonds libérés sur votre compte' : 'Funds released to your account'}
+                    {escrow.funds_released_at && ` — ${new Date(escrow.funds_released_at).toLocaleString(fr ? 'fr-CA' : 'en-CA')}`}
+                  </p>
+                </div>
+              )}
+
+              {/* PENDING (Payout Pending) — pickup confirmed, funds not yet moved. */}
+              {displayState === 'pending' && (
+                <div
+                  className="border-t pt-3 mt-2 bg-blue-50 dark:bg-blue-950/20 -mx-5 -mb-5 px-5 pb-5 rounded-b-lg"
+                  data-testid={`payout-pending-notice-${escrow.auction_id}`}
+                >
+                  <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                    <Clock className="h-4 w-4" />
+                    <p className="text-sm font-semibold">
+                      {fr ? 'Retrait confirmé. Le versement est en attente.' : 'Pickup confirmed. Payout is pending.'}
+                    </p>
+                  </div>
+                  <p className="text-xs text-blue-700/80 dark:text-blue-300/80 mt-1">
+                    {fr
+                      ? 'Le versement sera traité par BidVex. Vous recevrez une confirmation lorsque les fonds seront envoyés.'
+                      : 'Your payout will be processed by BidVex. You will be notified when the funds are sent.'}
+                  </p>
+                </div>
+              )}
+
+              {/* FAILED / UNKNOWN (Payout Requires Review) — never say "funds released". */}
+              {(displayState === 'failed' || displayState === 'unknown') && (
+                <div
+                  className="border-t pt-3 mt-2 bg-orange-50 dark:bg-orange-950/20 -mx-5 -mb-5 px-5 pb-5 rounded-b-lg"
+                  data-testid={`payout-review-notice-${escrow.auction_id}`}
+                >
+                  <div className="flex items-center gap-2 text-orange-700 dark:text-orange-300">
+                    <AlertTriangle className="h-4 w-4" />
+                    <p className="text-sm font-semibold">
+                      {fr ? 'Retrait confirmé. Le versement doit être vérifié.' : 'Pickup confirmed. Payout requires review.'}
+                    </p>
+                  </div>
+                  <p className="text-xs text-orange-700/80 dark:text-orange-300/80 mt-1">
+                    {fr
+                      ? 'Notre équipe examine votre dossier de versement. Nous vous contacterons dès que possible.'
+                      : 'Our team is reviewing your payout. We will follow up shortly.'}
+                  </p>
+                </div>
               )}
 
               {/* AUTO-RELEASED */}
-              {escrow.escrow_status === 'auto_released' && (
-                <div className="border-t pt-3 mt-2 flex items-center gap-2 text-blue-600"><Clock className="h-4 w-4" /><p className="text-sm">{fr ? 'Fonds auto-libérés après 48 heures' : 'Funds auto-released after 48 hours'}</p></div>
+              {displayState === 'auto_released' && (
+                <div className="border-t pt-3 mt-2 flex items-center gap-2 text-blue-600">
+                  <Clock className="h-4 w-4" />
+                  <p className="text-sm">{fr ? 'Fonds auto-libérés après 48 heures' : 'Funds auto-released after 48 hours'}</p>
+                </div>
+              )}
+
+              {/* REFUNDED */}
+              {displayState === 'refunded' && (
+                <div className="border-t pt-3 mt-2 flex items-center gap-2 text-slate-600">
+                  <XCircle className="h-4 w-4" />
+                  <p className="text-sm">{fr ? 'Remboursé' : 'Refunded'}</p>
+                </div>
               )}
             </CardContent>
           </Card>

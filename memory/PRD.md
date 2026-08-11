@@ -1,6 +1,55 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter470-UI — Escrow & Pickup Payout-State Presentation (Feb 10, 2026) ✅ COMPLETE — PREVIEW-ONLY, NOT DEPLOYED
+
+**Reported by user (P0)**: Fix ONLY the seller Escrow & Pickup panel's payout-state presentation. Badge, card status, and confirmation toast must all use the same `payout_state` returned by iter470's backend contract. Held → "Funds Held". Confirmed + pending → "Payout Pending". Confirmed + sent (real transfer id) → "Funds Released". Confirmed + failed OR unknown → "Payout Requires Review". Never show "Funds Released" unless a real transfer reference is present. Bilingual EN/FR preserved. Do not expose payment secrets, full transaction IDs, or internal error details. No changes to escrow confirmation logic, payout logic, Stripe, calculations, invoices, emails, fees, taxes, historical records, or unrelated dashboard features. Not deployed.
+
+### Trace (mandatory, before code change)
+- Backend `GET /api/escrow/seller/status` (iter470) now projects `payout_state ∈ { held, sent, pending, failed, unknown, disputed, refunded, auto_released }` onto every row.
+- Backend `POST /api/escrow/seller/confirm-pickup` (iter470) returns `{"status", "payout_state", "transfer_id", "amount_released"|"amount_pending", "message_en", "message_fr"}` where `status` is one of `released` / `pickup_confirmed_payout_pending` / `pickup_confirmed_payout_review`.
+- `frontend/src/components/EscrowPickupPanel.js::SellerEscrowPanel` was rendering the badge from the legacy `escrow_status` only (mapped through the old `STATUS_CONFIG` covering `held/released/auto_released/disputed/refunded`). It had no representation for `pending` / `failed` / `unknown`, so any of those degraded silently to the amber "Funds Held" default badge — a UX contradiction with the backend's accurate response.
+- Toast used `toast.success(...)` for every non-4xx response regardless of state.
+
+### Delivered (frontend only — no backend edits in this iteration)
+- **`components/EscrowPickupPanel.js::PAYOUT_STATUS_CONFIG`** (new): centralized bilingual EN/FR label + Tailwind class + Lucide icon for each of the 8 payout states — `held / sent / pending / failed / unknown / auto_released / disputed / refunded`. Legacy `STATUS_CONFIG` name kept as an alias so any other consumer stays working.
+- **`resolveDisplayState(escrow)`** (new pure helper): deterministic single source of truth for badge, card status, and toast selection. Precedence: `disputed` > `refunded` > `held` > `auto_released` > `payout_state ∈ {sent, pending, failed}` > `unknown`. A missing `payout_state` degrades to `unknown`, never to `sent` or `failed`.
+- **Badge** (`data-testid="escrow-status-{auction_id}"`): now driven by `resolveDisplayState`. Also exposes `data-payout-state="{state}"` for automation.
+- **Card body / notice per state**:
+  - `held` (unchanged): pickup code input + expiry countdown.
+  - `disputed` (unchanged): red block, no actions.
+  - `sent`: green "Funds released to your account" + timestamp (`data-testid="funds-released-notice-{auction_id}"`).
+  - `pending`: blue "Pickup confirmed. Payout is pending." + sub-line "Your payout will be processed by BidVex. You will be notified when the funds are sent." (`data-testid="payout-pending-notice-{auction_id}"`).
+  - `failed` / `unknown`: orange "Pickup confirmed. Payout requires review." + sub-line "Our team is reviewing your payout. We will follow up shortly." (`data-testid="payout-review-notice-{auction_id}"`).
+  - `auto_released` / `refunded`: existing states.
+- **Confirmation toast**: variant now matches state — `toast.success` for `sent`, `toast.info` for `pending`, `toast.warning` for `failed` / `unknown`. Message text still comes verbatim from the backend's `message_en` / `message_fr` so badge + card + toast agree.
+- **Error toast hardening**: only surfaces backend-provided bilingual `detail.message_en` / `detail.message_fr`, or a short (< 200 char) `detail` string, or the generic bilingual fallback. Never echoes raw backend error strings, stack traces, transfer IDs, or PII.
+
+### Guardrails honoured (per user directive)
+- No changes to `services/escrow_service.py`, `services/payment_collection.py`, `services/seller_payouts.py`, or any Stripe / payout / calculation code.
+- Bilingual EN/FR preserved — every new label / notice includes both `label_en` + `label_fr` and both sub-lines are translated.
+- **No payment secrets / no full transfer IDs / no internal error details** exposed in the UI. Verified in the seeded state screenshots: `Funds Released` card shows only "Funds released to your account" with a timestamp; the `stripe_transfer_id` returned by the API is intentionally NOT rendered.
+- No changes to invoices, emails, fees, taxes, historical records, receipts, buyer-side panel, or any other dashboard tab.
+- **Not deployed** — preview-only.
+
+### Verified in preview (with screenshots)
+- Seeded 5 removable escrow rows (`iter470ui-*`) for `testseller@bidvex.com` covering all five states.
+- API assertion (`GET /api/escrow/seller/status`) confirmed all five rows carry the correct `payout_state`.
+- Screenshot **EN**: `/tmp/iter470_seller_escrow_en.png` — every badge visible: `Funds Held` (amber), `Payout Requires Review` × 2 (orange), `Payout Pending` (blue), `Funds Released` (green). Cards show accurate sub-notices.
+- Screenshot **FR**: `/tmp/iter470_seller_escrow_fr.png` — every badge translated: `Fonds détenus`, `Versement à vérifier` × 2, `Versement en attente`, `Fonds libérés`. Sub-notices translated ("Le versement sera traité par BidVex…", "Notre équipe examine votre dossier…").
+- Automation-level check: 5/5 badges have `data-payout-state` attribute matching the API-projected state; badge text matches the config; no `Funds Released` label ever appears for `pending` / `failed` / `unknown`.
+- Backend regressions (unchanged in this iteration): iter470 58/58, iter469 41/41, iter455 + iter469 pytest 32/32.
+
+### Remaining risks
+- **Escrow-status vocabulary**: iter470 backend introduced `escrow_status="pickup_confirmed_payout_pending"` for confirmed-but-not-shipped rows. The frontend now uses `resolveDisplayState` — driven mostly by `payout_state` — so this new value maps cleanly. The old `escrow_status="released"` still works (falls through to `payout_state` for the actual chip).
+- **Buyer-side panel** (`BuyerEscrowPanel`) intentionally NOT projected in this iteration (per user directive). Buyer view still displays the legacy `Funds Held` / `Released` states from `escrow_status`. Deferred as a separate follow-up.
+- **Sonner variant support**: `toast.info` and `toast.warning` are available in modern sonner versions; defensive fallback to plain `toast(msg)` used just in case.
+
+### Not deployed
+Preview-only per user directive. Awaiting user go-ahead before any deploy.
+
+
+
 ## iter470 — Escrow Pickup Confirmation Payout-State Safety (Feb 10, 2026) ✅ COMPLETE — PREVIEW-ONLY, NOT DEPLOYED
 
 **Reported by user (P0)**: Fix ONLY escrow pickup confirmation payout-state safety for paid non-vehicle orders. **Critical rule**: a missing escrow record must NEVER be treated as proof that a seller payout was already sent, and a missing payout record must NEVER be treated as failed. Preserve the seller's pending payout obligation on pickup confirmation. Never claim "funds released" without a real Stripe transfer reference. Dashboard must distinguish `sent` / `pending` / `failed` / `unknown`. All iter469 guardrails preserved. No production data, no bulk repair, no deploy, no fund release, no real Stripe transfers.
