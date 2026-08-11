@@ -1,0 +1,15 @@
+[phases.frontend]
+name = "Build React frontend"
+cmds = [
+  "cd frontend && npm install && npm run build"
+]
+
+[phases.backend]
+name = "Install Python dependencies"
+cmds = [
+  "cd backend && pip install -r requirements.txt"
+]
+dependsOn = ["frontend"]
+
+[deploy]
+cmd = "cd backend && uvicorn server:app --host 0.0.0.0 --port 8000 --workers 1"
