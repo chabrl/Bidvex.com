@@ -1,6 +1,45 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter475 — Full PDF Generation Engines for All Sections & Roles (Feb 11, 2026) ✅ COMPLETE — PREVIEW-ONLY, NOT DEPLOYED
+
+**Reported by user (P0)**: In the deployed environment, buyer & seller dashboards showed every Documents-popover option disabled with "Not available yet" for Storage buyer invoice, Universal receipt (all sections), and Marketplace/Vehicle/Storage seller statement + receipt + commission invoice. Close every gap by building real PDF generators + endpoint wiring + reconciliation against settlement data. No changes to document CONTENT of the existing multi-lot flows, email delivery, payments, Stripe, escrow, fees, taxes, or production data.
+
+### Delivered
+- **`services/pdf_generators/`** (new package) — one shared renderer (`common.py::render_document` + `DocumentSpec`) that consumes a pure data description and emits PDF bytes. Every calculator method is a pure sum over the `db.receipts` field; no fee/tax/commission recomputation happens anywhere in this module.
+- **`universal_receipt.py`** — one PDF template renders a BidVex buyer receipt for any of the 4 sections (marketplace / lots / vehicles / storage). Multi-lot orders are aggregated into one order-level receipt.
+- **`sections.py`** — nine section-specific generators: storage buyer invoice + (marketplace/vehicles/storage) × (statement, seller receipt, commission invoice).
+- **`routes/dashboard.py::_fetch_or_generate_invoice`** — idempotent cache-or-generate helper. If a `db.invoices` row already exists for `(invoice_type, listing_id, owner)`, returns its signed URL. Otherwise calls the generator, uploads via `cloud_storage.store_invoice_pdf`, persists the row, then returns the signed URL.
+- **`GET /api/dashboard/documents/purchase`** — now auto-generates storage buyer invoice + universal receipt for every section on first hit; owner-only + admin-bypass authz preserved.
+- **`GET /api/dashboard/documents/sale`** — now auto-generates the three seller PDFs for marketplace / vehicles / storage on first hit; multi-lot lots section continues to use the pre-existing legacy generator (unchanged).
+- **Frontend**: no changes needed — `DocumentsPopover` already flips from disabled to active when the backend returns `available: true`.
+
+### Guardrails honoured
+- **No new math**: `services/pdf_generators/common.py::sum_field` is a pure Decimal accumulator over `db.receipts` rows. Never multiplies, divides, adds tax, or computes commission.
+- **Reconciliation verified**: every buyer PDF's TOTAL equals `Σ receipts.total_charged`; every seller statement's NET PAYOUT equals `Σ receipts.net_payout`. Confirmed empirically via pypdf text extraction against 7 different (section × role) documents.
+- **Owner-only + cross-user 403**: buyer/seller endpoints require the caller to own a corresponding `db.receipts` row (buyer_receipt for buyer endpoint, seller_statement for seller endpoint) plus a matching `seller_id` on the listing for multi-lot vehicle/storage sales. Verified 403 on Buyer B → Buyer A rows and Seller B → Seller A sale.
+- **Idempotent**: repeated hits for the same document return the same `invoice_id`; no duplicate PDFs are generated across multi-lot rows.
+- **Absolute HTTPS signed URLs**: every download URL is generated via existing `cloud_storage.generate_signed_url` (absolute HTTPS, `expires + sig`, no localhost, no relative paths).
+- **No email / payment / Stripe / escrow / fees / taxes / production data changes**. The only new writes are cached PDFs into `db.invoices`.
+- **Not deployed.**
+
+### Verified end-to-end
+- **`tests/live_verify_iter475_new_pdf_generators.py`** — **62/62 PASS**:
+  - Availability: 14 previously-missing documents now report `available: true` for their owner.
+  - HTTP: 28 signed-URL click-throughs → 200 `application/pdf` with `%PDF-` magic bytes.
+  - Absolute HTTPS: 28/28 URLs verified https + no localhost + `/api/invoices/download/{id}?expires=…&sig=…`.
+  - Reconciliation: 7 reconciliations verified against `db.receipts` (buyer total_charged and seller net_payout).
+  - Idempotency: same storage buyer invoice returned on repeated request (same `invoice_id`).
+  - Cross-user 403: Buyer B → Buyer A row, Seller B → Seller A sale.
+  - Bilingual: EN + FR both return 200 with `available: true`.
+- **UI screenshots** (inline in conversation):
+  - Buyer Storage popover now shows Invoice + Universal Receipt active (previously all disabled).
+  - Seller Historical settlement popover now shows Statement + Seller Receipt + Commission Invoice active (previously all disabled — matches the exact row the user's screenshot flagged).
+
+### Not deployed
+Preview-only per user directive. Awaiting redeploy to push to production.
+
+
 ## iter474 — Dashboard Financial-Document Access (Feb 11, 2026) ✅ COMPLETE — PREVIEW-ONLY, NOT DEPLOYED
 
 **Reported by user (P0)**: Build ONLY dashboard financial document access for EXISTING documents. Buyer "My Purchases" and Seller "sales/payouts" get a per-row Documents popover showing Download Invoice / Receipt / Payment Letter (buyer) and Download Statement / Seller Receipt / Commission Invoice (seller). Every download uses the existing authorized document source and generates a complete absolute HTTPS signed link. Ownership enforced server-side from the actual document + settlement record — never solely from a browser-supplied receipt id. Buyer never retrieves seller docs; seller never retrieves another seller's docs. Multiple lot rows of the SAME order reuse the SAME order-level invoice / statement — no duplicate PDFs. Bilingual EN/FR. Unsupported gaps rendered as "Not available yet / Non disponible pour le moment". No new document types, no auto-email flow, no changes to document contents / email delivery / payments / Stripe / escrow / fees / taxes / production data / deployment. Not deployed.

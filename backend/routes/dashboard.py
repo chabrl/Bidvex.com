@@ -1033,11 +1033,107 @@ def _multi_lot_hint(auction_lots_count: int) -> bool:
     return bool(auction_lots_count and auction_lots_count > 1)
 
 
+# ═════════════════════════════════════════════════════════════════════
+# iter475 — Fetch-or-generate helper. Idempotent: if an `db.invoices`
+# row already exists for (invoice_type, listing/auction key, owner),
+# return its signed URL. Otherwise call the requested generator, store
+# the PDF in cloud storage, persist the invoice row, then return.
+# ═════════════════════════════════════════════════════════════════════
+
+async def _fetch_or_generate_invoice(
+    db,
+    *,
+    invoice_type: str,          # e.g. "storage_buyer_invoice"
+    listing_id: str,
+    owner_id: str,
+    owner_field: str,           # "buyer_id" for buyer docs, "user_id" for seller
+    generator,                  # callable → PDF bytes
+    generator_kwargs: Dict[str, Any],
+    label_key: str,
+    multi_lot: bool = False,
+    subfolder: Optional[str] = None,
+    section: Optional[str] = None,
+    lot_number: Optional[int] = None,
+) -> Dict[str, Any]:
+    """Return `{available, signed_url, invoice_number, label_key, multi_lot}`.
+
+    If no receipt / no generator output, returns the _UNSUPPORTED shape.
+    """
+    from services.cloud_storage import (
+        generate_signed_url, store_invoice_pdf,
+    )
+    import uuid as _uuid
+    from datetime import datetime as _dt, timezone as _tz
+
+    # 1. Cached?
+    q: Dict[str, Any] = {"invoice_type": invoice_type,
+                         owner_field: owner_id}
+    # We accept EITHER auction_id OR listing_id shapes (existing invoices
+    # were persisted with `auction_id` for multi-lot flows).
+    q["$or"] = [{"auction_id": listing_id}, {"listing_id": listing_id}]
+    if lot_number is not None:
+        q["lot_number"] = lot_number
+    existing = await db.invoices.find_one(q, {"_id": 0})
+    if existing and existing.get("id"):
+        return {
+            "available":     True,
+            "signed_url":    generate_signed_url(existing["id"]),
+            "invoice_number": existing.get("invoice_number", ""),
+            "label_key":     label_key,
+            "multi_lot":     multi_lot,
+        }
+
+    # 2. Generate
+    try:
+        pdf_bytes = await generator(db, **generator_kwargs)
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[iter475] generator {generator.__name__} failed: {e}")
+        return dict(_UNSUPPORTED)
+    if not pdf_bytes:
+        return dict(_UNSUPPORTED)
+
+    # 3. Store + persist
+    invoice_id = str(_uuid.uuid4())
+    sub = subfolder or invoice_type
+    storage_path = await store_invoice_pdf(invoice_id, pdf_bytes, subfolder=sub)
+
+    # Deterministic invoice number so the same document keeps the same
+    # identifier across regenerations.
+    inv_num = f"BV-{invoice_type[:6].upper()}-{listing_id[-6:].upper()}-{owner_id[-4:].upper()}"
+
+    row = {
+        "id":              invoice_id,
+        "invoice_type":    invoice_type,
+        owner_field:       owner_id,
+        "auction_id":      listing_id,       # normalized key
+        "listing_id":      listing_id,       # duplicated for compatibility
+        "invoice_number":  inv_num,
+        "storage_path":    storage_path,
+        "generated_date":  _dt.now(_tz.utc).isoformat(),
+        "status":          "generated",
+        "language":        generator_kwargs.get("lang", "en"),
+    }
+    if section:
+        row["section"] = section
+    if lot_number is not None:
+        row["lot_number"] = lot_number
+    await db.invoices.insert_one(row)
+
+    return {
+        "available":     True,
+        "signed_url":    generate_signed_url(invoice_id),
+        "invoice_number": inv_num,
+        "label_key":     label_key,
+        "multi_lot":     multi_lot,
+    }
+
+
 @dashboard_router.get("/documents/purchase")
 async def get_buyer_purchase_documents(
     section: str,
     listing_id: str,
     lot_number: Optional[int] = None,
+    lang: str = "en",
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
     """Return the download availability for existing buyer financial
@@ -1057,7 +1153,14 @@ async def get_buyer_purchase_documents(
 
     from fastapi import HTTPException
     from services.cloud_storage import generate_signed_url
+    from services.pdf_generators.universal_receipt import (
+        generate_universal_receipt,
+    )
+    from services.pdf_generators.sections import (
+        generate_storage_buyer_invoice,
+    )
 
+    lang = "fr" if str(lang).lower().startswith("fr") else "en"
     current_user = await _get_current_user(credentials)
     buyer_id = current_user.id
     rdb = _db_read if _db_read is not None else _db
@@ -1161,7 +1264,44 @@ async def get_buyer_purchase_documents(
                 "multi_lot":     multi_lot,
             }
 
-    # ── STORAGE: no PDF generator wired currently — stays unsupported.
+    # ── STORAGE (iter475): dedicated storage_buyer_invoice PDF
+    elif section == "storage":
+        docs["invoice"] = await _fetch_or_generate_invoice(
+            rdb,
+            invoice_type="storage_buyer_invoice",
+            listing_id=listing_id,
+            owner_id=buyer_id,
+            owner_field="buyer_id",
+            generator=generate_storage_buyer_invoice,
+            generator_kwargs={
+                "listing_id": listing_id, "user_id": buyer_id, "lang": lang,
+            },
+            label_key="invoice",
+            multi_lot=False,
+            section="storage",
+        )
+
+    # ── UNIVERSAL RECEIPT (iter475): available for every section as
+    # long as the buyer has a paid receipt (which the ownership gate
+    # above already required).
+    docs["receipt"] = await _fetch_or_generate_invoice(
+        rdb,
+        invoice_type=f"universal_receipt_{section}",
+        listing_id=listing_id,
+        owner_id=buyer_id,
+        owner_field="buyer_id",
+        generator=_universal_receipt_wrapper,
+        generator_kwargs={
+            "section": section, "listing_id": listing_id,
+            "user_id": buyer_id, "lang": lang,
+            # NOTE: lot_number intentionally omitted so the receipt is
+            # ORDER-LEVEL — one receipt aggregates every lot of the
+            # same order (no duplicate PDF per lot).
+        },
+        label_key="receipt",
+        multi_lot=multi_lot,
+        section=section,
+    )
 
     return {
         "section":     section,
@@ -1172,10 +1312,20 @@ async def get_buyer_purchase_documents(
     }
 
 
+async def _universal_receipt_wrapper(db, **kwargs):
+    """Local shim so the fetch-or-generate helper can call the universal
+    receipt generator with a uniform (db, **kwargs) signature."""
+    from services.pdf_generators.universal_receipt import (
+        generate_universal_receipt,
+    )
+    return await generate_universal_receipt(db, **kwargs)
+
+
 @dashboard_router.get("/documents/sale")
 async def get_seller_sale_documents(
     section: str,
     listing_id: str,
+    lang: str = "en",
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
     """Return the download availability for existing seller financial
@@ -1197,7 +1347,9 @@ async def get_seller_sale_documents(
 
     from fastapi import HTTPException
     from services.cloud_storage import generate_signed_url
+    from services.pdf_generators import sections as pdfsec
 
+    lang = "fr" if str(lang).lower().startswith("fr") else "en"
     current_user = await _get_current_user(credentials)
     seller_id = current_user.id
     rdb = _db_read if _db_read is not None else _db
@@ -1224,16 +1376,20 @@ async def get_seller_sale_documents(
         auction = await rdb.multi_item_listings.find_one(
             {"id": listing_id}, {"_id": 0, "lots": 1, "seller_id": 1}
         )
-        # Extra ownership pin: the auction itself must belong to this
-        # seller — otherwise we refuse even if a stray receipt row
-        # exists for another seller.
         if auction and auction.get("seller_id") not in (seller_id, None):
             raise HTTPException(status_code=403, detail="Not authorized")
         lots_arr = (auction or {}).get("lots") or []
         multi_lot = _multi_lot_hint(len(lots_arr))
+    elif section == "vehicles":
+        vauction = await rdb.vehicle_listings.find_one(
+            {"id": listing_id}, {"_id": 0, "lots": 1, "seller_id": 1}
+        )
+        if vauction and vauction.get("seller_id") not in (seller_id, None):
+            raise HTTPException(status_code=403, detail="Not authorized")
+        lots_arr = (vauction or {}).get("lots") or []
+        multi_lot = _multi_lot_hint(len(lots_arr))
 
-    # Only multi-lot (multi_item_listings) currently has these three
-    # PDF generators. Other sections stay unsupported per audit.
+    # ── LOTS (multi_item_listings): existing legacy generators
     if section == "lots":
         for doc_kind, inv_type, label_key in (
             ("statement",         "seller_statement",   "settlement_statement" if multi_lot else "statement"),
@@ -1243,7 +1399,7 @@ async def get_seller_sale_documents(
             inv = await rdb.invoices.find_one({
                 "invoice_type": inv_type,
                 "auction_id":   listing_id,
-                "user_id":      seller_id,        # document-level ownership
+                "user_id":      seller_id,
             }, {"_id": 0})
             if inv and inv.get("id"):
                 docs[doc_kind] = {
@@ -1253,6 +1409,79 @@ async def get_seller_sale_documents(
                     "label_key":     label_key,
                     "multi_lot":     multi_lot,
                 }
+
+    # ── MARKETPLACE seller (iter475)
+    elif section == "marketplace":
+        docs["statement"] = await _fetch_or_generate_invoice(
+            rdb, invoice_type="mkt_seller_statement",
+            listing_id=listing_id, owner_id=seller_id, owner_field="user_id",
+            generator=pdfsec.generate_marketplace_seller_statement,
+            generator_kwargs={"listing_id": listing_id, "seller_id": seller_id, "lang": lang},
+            label_key="statement", section="marketplace",
+        )
+        docs["seller_receipt"] = await _fetch_or_generate_invoice(
+            rdb, invoice_type="mkt_seller_receipt",
+            listing_id=listing_id, owner_id=seller_id, owner_field="user_id",
+            generator=pdfsec.generate_marketplace_seller_receipt,
+            generator_kwargs={"listing_id": listing_id, "seller_id": seller_id, "lang": lang},
+            label_key="seller_receipt", section="marketplace",
+        )
+        docs["commission_invoice"] = await _fetch_or_generate_invoice(
+            rdb, invoice_type="mkt_commission_invoice",
+            listing_id=listing_id, owner_id=seller_id, owner_field="user_id",
+            generator=pdfsec.generate_marketplace_seller_commission_invoice,
+            generator_kwargs={"listing_id": listing_id, "seller_id": seller_id, "lang": lang},
+            label_key="commission_invoice", section="marketplace",
+        )
+
+    # ── VEHICLES seller (iter475)
+    elif section == "vehicles":
+        docs["statement"] = await _fetch_or_generate_invoice(
+            rdb, invoice_type="veh_seller_statement",
+            listing_id=listing_id, owner_id=seller_id, owner_field="user_id",
+            generator=pdfsec.generate_vehicle_seller_statement,
+            generator_kwargs={"listing_id": listing_id, "seller_id": seller_id, "lang": lang},
+            label_key="settlement_statement" if multi_lot else "statement",
+            multi_lot=multi_lot, section="vehicles",
+        )
+        docs["seller_receipt"] = await _fetch_or_generate_invoice(
+            rdb, invoice_type="veh_seller_receipt",
+            listing_id=listing_id, owner_id=seller_id, owner_field="user_id",
+            generator=pdfsec.generate_vehicle_seller_receipt,
+            generator_kwargs={"listing_id": listing_id, "seller_id": seller_id, "lang": lang},
+            label_key="seller_receipt", section="vehicles",
+        )
+        docs["commission_invoice"] = await _fetch_or_generate_invoice(
+            rdb, invoice_type="veh_commission_invoice",
+            listing_id=listing_id, owner_id=seller_id, owner_field="user_id",
+            generator=pdfsec.generate_vehicle_seller_commission_invoice,
+            generator_kwargs={"listing_id": listing_id, "seller_id": seller_id, "lang": lang},
+            label_key="commission_invoice", section="vehicles",
+        )
+
+    # ── STORAGE seller (iter475)
+    elif section == "storage":
+        docs["statement"] = await _fetch_or_generate_invoice(
+            rdb, invoice_type="sto_seller_statement",
+            listing_id=listing_id, owner_id=seller_id, owner_field="user_id",
+            generator=pdfsec.generate_storage_seller_statement,
+            generator_kwargs={"listing_id": listing_id, "seller_id": seller_id, "lang": lang},
+            label_key="statement", section="storage",
+        )
+        docs["seller_receipt"] = await _fetch_or_generate_invoice(
+            rdb, invoice_type="sto_seller_receipt",
+            listing_id=listing_id, owner_id=seller_id, owner_field="user_id",
+            generator=pdfsec.generate_storage_seller_receipt,
+            generator_kwargs={"listing_id": listing_id, "seller_id": seller_id, "lang": lang},
+            label_key="seller_receipt", section="storage",
+        )
+        docs["commission_invoice"] = await _fetch_or_generate_invoice(
+            rdb, invoice_type="sto_commission_invoice",
+            listing_id=listing_id, owner_id=seller_id, owner_field="user_id",
+            generator=pdfsec.generate_storage_seller_commission_invoice,
+            generator_kwargs={"listing_id": listing_id, "seller_id": seller_id, "lang": lang},
+            label_key="commission_invoice", section="storage",
+        )
 
     return {
         "section":     section,

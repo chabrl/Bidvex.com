@@ -1,0 +1,440 @@
+{
+  "iter": 475,
+  "base_url": "https://prod-verify-2.preview.emergentagent.com",
+  "passed": 62,
+  "total": 62,
+  "buyer_expected_totals": {
+    "marketplace": "120.0",
+    "lots": "360.0",
+    "vehicles": "120.0",
+    "storage": "120.0"
+  },
+  "results": [
+    {
+      "test": "BUYER-marketplace-available",
+      "ok": true,
+      "status": 200,
+      "expected": [
+        "invoice",
+        "receipt"
+      ],
+      "got": [
+        "invoice",
+        "receipt"
+      ]
+    },
+    {
+      "test": "BUYER-marketplace-invoice-abshttps",
+      "ok": true
+    },
+    {
+      "test": "BUYER-marketplace-invoice-clickthrough",
+      "ok": true,
+      "status": 200,
+      "ctype": "application/pdf"
+    },
+    {
+      "test": "BUYER-marketplace-receipt-abshttps",
+      "ok": true
+    },
+    {
+      "test": "BUYER-marketplace-receipt-clickthrough",
+      "ok": true,
+      "status": 200,
+      "ctype": "application/pdf"
+    },
+    {
+      "test": "BUYER-marketplace-receipt-reconcile",
+      "ok": true,
+      "expected_total": "120.00",
+      "found_amounts": [
+        "120.00",
+        "100.00",
+        "5.00",
+        "14.98",
+        "0.00",
+        "120.00"
+      ]
+    },
+    {
+      "test": "BUYER-lots-available",
+      "ok": true,
+      "status": 200,
+      "expected": [
+        "invoice",
+        "receipt",
+        "payment_letter"
+      ],
+      "got": [
+        "invoice",
+        "receipt",
+        "payment_letter"
+      ]
+    },
+    {
+      "test": "BUYER-lots-invoice-abshttps",
+      "ok": true
+    },
+    {
+      "test": "BUYER-lots-invoice-clickthrough",
+      "ok": true,
+      "status": 200,
+      "ctype": "application/pdf"
+    },
+    {
+      "test": "BUYER-lots-receipt-abshttps",
+      "ok": true
+    },
+    {
+      "test": "BUYER-lots-receipt-clickthrough",
+      "ok": true,
+      "status": 200,
+      "ctype": "application/pdf"
+    },
+    {
+      "test": "BUYER-lots-receipt-reconcile",
+      "ok": true,
+      "expected_total": "360.00",
+      "found_amounts": [
+        "120.00",
+        "300.00",
+        "15.00",
+        "44.92",
+        "0.00",
+        "360.00"
+      ]
+    },
+    {
+      "test": "BUYER-lots-payment_letter-abshttps",
+      "ok": true
+    },
+    {
+      "test": "BUYER-lots-payment_letter-clickthrough",
+      "ok": true,
+      "status": 200,
+      "ctype": "application/pdf"
+    },
+    {
+      "test": "BUYER-vehicles-available",
+      "ok": true,
+      "status": 200,
+      "expected": [
+        "invoice",
+        "receipt"
+      ],
+      "got": [
+        "invoice",
+        "receipt"
+      ]
+    },
+    {
+      "test": "BUYER-vehicles-invoice-abshttps",
+      "ok": true
+    },
+    {
+      "test": "BUYER-vehicles-invoice-clickthrough",
+      "ok": true,
+      "status": 200,
+      "ctype": "application/pdf"
+    },
+    {
+      "test": "BUYER-vehicles-receipt-abshttps",
+      "ok": true
+    },
+    {
+      "test": "BUYER-vehicles-receipt-clickthrough",
+      "ok": true,
+      "status": 200,
+      "ctype": "application/pdf"
+    },
+    {
+      "test": "BUYER-vehicles-receipt-reconcile",
+      "ok": true,
+      "expected_total": "120.00",
+      "found_amounts": [
+        "120.00",
+        "100.00",
+        "5.00",
+        "14.98",
+        "0.00",
+        "120.00"
+      ]
+    },
+    {
+      "test": "BUYER-storage-available",
+      "ok": true,
+      "status": 200,
+      "expected": [
+        "invoice",
+        "receipt"
+      ],
+      "got": [
+        "invoice",
+        "receipt"
+      ]
+    },
+    {
+      "test": "BUYER-storage-invoice-abshttps",
+      "ok": true
+    },
+    {
+      "test": "BUYER-storage-invoice-clickthrough",
+      "ok": true,
+      "status": 200,
+      "ctype": "application/pdf"
+    },
+    {
+      "test": "BUYER-storage-receipt-abshttps",
+      "ok": true
+    },
+    {
+      "test": "BUYER-storage-receipt-clickthrough",
+      "ok": true,
+      "status": 200,
+      "ctype": "application/pdf"
+    },
+    {
+      "test": "BUYER-storage-receipt-reconcile",
+      "ok": true,
+      "expected_total": "120.00",
+      "found_amounts": [
+        "120.00",
+        "100.00",
+        "5.00",
+        "14.98",
+        "0.00",
+        "120.00"
+      ]
+    },
+    {
+      "test": "BUYER-storage-invoice-idempotent",
+      "ok": true,
+      "path": "/api/invoices/download/da0351a2-ea6c-4753-9e15-c9650abfed11"
+    },
+    {
+      "test": "BUYER-crossuser-403",
+      "ok": true,
+      "status": 403
+    },
+    {
+      "test": "SELLER-lots-available",
+      "ok": true,
+      "status": 200,
+      "expected": [
+        "statement",
+        "seller_receipt",
+        "commission_invoice"
+      ],
+      "got": [
+        "statement",
+        "seller_receipt",
+        "commission_invoice"
+      ]
+    },
+    {
+      "test": "SELLER-lots-statement-abshttps",
+      "ok": true
+    },
+    {
+      "test": "SELLER-lots-statement-clickthrough",
+      "ok": true,
+      "status": 200
+    },
+    {
+      "test": "SELLER-lots-seller_receipt-abshttps",
+      "ok": true
+    },
+    {
+      "test": "SELLER-lots-seller_receipt-clickthrough",
+      "ok": true,
+      "status": 200
+    },
+    {
+      "test": "SELLER-lots-commission_invoice-abshttps",
+      "ok": true
+    },
+    {
+      "test": "SELLER-lots-commission_invoice-clickthrough",
+      "ok": true,
+      "status": 200
+    },
+    {
+      "test": "SELLER-marketplace-available",
+      "ok": true,
+      "status": 200,
+      "expected": [
+        "statement",
+        "seller_receipt",
+        "commission_invoice"
+      ],
+      "got": [
+        "statement",
+        "seller_receipt",
+        "commission_invoice"
+      ]
+    },
+    {
+      "test": "SELLER-marketplace-statement-abshttps",
+      "ok": true
+    },
+    {
+      "test": "SELLER-marketplace-statement-clickthrough",
+      "ok": true,
+      "status": 200
+    },
+    {
+      "test": "SELLER-marketplace-statement-reconcile",
+      "ok": true,
+      "expected_net_payout": "95.00",
+      "sample": [
+        "95.00",
+        "100.00",
+        "5.00",
+        "14.98",
+        "0.00",
+        "95.00"
+      ]
+    },
+    {
+      "test": "SELLER-marketplace-seller_receipt-abshttps",
+      "ok": true
+    },
+    {
+      "test": "SELLER-marketplace-seller_receipt-clickthrough",
+      "ok": true,
+      "status": 200
+    },
+    {
+      "test": "SELLER-marketplace-commission_invoice-abshttps",
+      "ok": true
+    },
+    {
+      "test": "SELLER-marketplace-commission_invoice-clickthrough",
+      "ok": true,
+      "status": 200
+    },
+    {
+      "test": "SELLER-vehicles-available",
+      "ok": true,
+      "status": 200,
+      "expected": [
+        "statement",
+        "seller_receipt",
+        "commission_invoice"
+      ],
+      "got": [
+        "statement",
+        "seller_receipt",
+        "commission_invoice"
+      ]
+    },
+    {
+      "test": "SELLER-vehicles-statement-abshttps",
+      "ok": true
+    },
+    {
+      "test": "SELLER-vehicles-statement-clickthrough",
+      "ok": true,
+      "status": 200
+    },
+    {
+      "test": "SELLER-vehicles-statement-reconcile",
+      "ok": true,
+      "expected_net_payout": "95.00",
+      "sample": [
+        "95.00",
+        "100.00",
+        "5.00",
+        "14.98",
+        "0.00",
+        "95.00"
+      ]
+    },
+    {
+      "test": "SELLER-vehicles-seller_receipt-abshttps",
+      "ok": true
+    },
+    {
+      "test": "SELLER-vehicles-seller_receipt-clickthrough",
+      "ok": true,
+      "status": 200
+    },
+    {
+      "test": "SELLER-vehicles-commission_invoice-abshttps",
+      "ok": true
+    },
+    {
+      "test": "SELLER-vehicles-commission_invoice-clickthrough",
+      "ok": true,
+      "status": 200
+    },
+    {
+      "test": "SELLER-storage-available",
+      "ok": true,
+      "status": 200,
+      "expected": [
+        "statement",
+        "seller_receipt",
+        "commission_invoice"
+      ],
+      "got": [
+        "statement",
+        "seller_receipt",
+        "commission_invoice"
+      ]
+    },
+    {
+      "test": "SELLER-storage-statement-abshttps",
+      "ok": true
+    },
+    {
+      "test": "SELLER-storage-statement-clickthrough",
+      "ok": true,
+      "status": 200
+    },
+    {
+      "test": "SELLER-storage-statement-reconcile",
+      "ok": true,
+      "expected_net_payout": "95.00",
+      "sample": [
+        "95.00",
+        "100.00",
+        "5.00",
+        "14.98",
+        "0.00",
+        "95.00"
+      ]
+    },
+    {
+      "test": "SELLER-storage-seller_receipt-abshttps",
+      "ok": true
+    },
+    {
+      "test": "SELLER-storage-seller_receipt-clickthrough",
+      "ok": true,
+      "status": 200
+    },
+    {
+      "test": "SELLER-storage-commission_invoice-abshttps",
+      "ok": true
+    },
+    {
+      "test": "SELLER-storage-commission_invoice-clickthrough",
+      "ok": true,
+      "status": 200
+    },
+    {
+      "test": "SELLER-crossseller-403",
+      "ok": true,
+      "status": 403
+    },
+    {
+      "test": "BUYER-storage-lang=en",
+      "ok": true
+    },
+    {
+      "test": "BUYER-storage-lang=fr",
+      "ok": true
+    }
+  ]
+}
