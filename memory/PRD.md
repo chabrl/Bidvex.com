@@ -1,6 +1,38 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter472 — Financial Document Delivery QA Audit (Feb 10, 2026) ✅ COMPLETE — PREVIEW-ONLY, READ-ONLY AUDIT
+
+**Directive**: Preview-only QA audit of every buyer + seller financial document. Send all synthetic emails to `charbel911@gmail.com` (Gmail `+alias` per synthetic user, single inbox). No admin CC/BCC added, no doc/template/delivery/payment/stripe/escrow/fee/tax/production/deployment change. Report gaps only — do not build missing flows.
+
+### Result
+- Full inventory of **10 buyer/seller documents** produced (§1 of `/app/test_reports/iter472_document_delivery_qa_report.md`).
+- **53/53 dispatches PASS**, **16/16 dedup PASS**, **16/16 secure-link resolutions PASS (200 application/pdf)**, **3/3 non-Stripe guard suppressions PASS**.
+- Bilingual EN/FR templates render correctly (screenshots at `/tmp/iter472_email_buyer_{en,fr}.png` + `_seller_fr.png`).
+- Zero production data touched. All `iter472-*` prefixed rows removed on exit.
+
+### Gaps identified (report only — not built)
+- G1–G3: `generate_payment_letter`, `generate_seller_receipt`, `generate_commission_invoice` have PDF + secure link but **no auto-email**.
+- G4–G5: iter468 `_fetch_or_generate_*` only handles **multi-item lots**; marketplace / vehicles / storage buyers/sellers currently suppress with `no_invoice_available` unless a section-specific generator is added.
+- G6: no email templates exist for payment letter / seller receipt / commission invoice.
+- G7: storage seller commission invoice is inline HTML only (no signed link parity with iter468).
+
+### Recommendation for buyer/seller download-button task (§8)
+- Buyer dashboard "My Purchases" → per-row **Download Invoice** button hitting the existing `generate_lots_won_invoice` endpoint; return signed `download_url`.
+- Seller dashboard statements panel → **Download Statement / Seller Receipt / Commission Invoice** buttons using the same generators + signed URL flow.
+- Pass current `i18n.language` as `?lang=` for FR alignment.
+- Cache by `(auction_id, user_id, invoice_type, lang)` via the existing `db.invoices` unique key.
+- Reuse endpoint's existing owner-only + admin-bypass authz.
+- Bilingual copy: "Download invoice / statement" / "Télécharger la facture / le relevé".
+
+### Artifacts
+- Report (markdown): `/app/test_reports/iter472_document_delivery_qa_report.md`
+- JSON dispatch log: `/app/test_reports/iter472_document_delivery_qa.json`
+- Live audit script: `/app/backend/tests/live_qa_iter472_document_delivery.py`
+- EN/FR email screenshots: `/tmp/iter472_email_buyer_en.png`, `/tmp/iter472_email_buyer_fr.png`, `/tmp/iter472_email_seller_fr.png`
+
+
+
 ## iter471 — Buyer Dashboard "My Purchases" Completeness (Feb 10, 2026) ✅ COMPLETE — PREVIEW-ONLY, NOT DEPLOYED
 
 **Reported by user (P0)**: Fix ONLY Buyer Dashboard My Purchases completeness. A paid buyer receipt must create ONE visible My Purchases row for that buyer. Multi-lot wins must show the actual won lot as a distinct row (with parent auction name as secondary context, lot number, lot title, quantity, hammer total, payment status, pickup status, order reference). No duplicates. No cross-buyer leakage. Cover marketplace, multi-lot (lots), vehicle multi-lot, and storage sections. No changes to payments, fees, taxes, invoices, email delivery, escrow, seller dashboards, historical records, or unrelated dashboard features. No deploy.

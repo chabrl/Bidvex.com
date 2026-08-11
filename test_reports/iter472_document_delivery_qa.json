@@ -1,0 +1,739 @@
+{
+  "started_at": "2026-08-11T14:51:53.823854+00:00",
+  "backend_url": "https://prod-verify-2.preview.emergentagent.com",
+  "qa_inbox": "charbel911@gmail.com",
+  "inventory": [
+    {
+      "document": "Buyer receipt (inline HTML)",
+      "fn": "services.emails.email_system.send_buyer_receipt_email",
+      "trigger": "services.receipts.issue_transaction_records \u2014 called by every settled payment path (marketplace/lots/vehicles/storage)",
+      "recipient": "Buyer",
+      "sections": "marketplace, lots, vehicles, storage",
+      "en_fr": "Yes (auto via `buyer.preferred_language`)",
+      "auto_generated": "Yes",
+      "auto_emailed": "Yes",
+      "delivery": "Inline HTML email content (no attachment, no separate PDF link)"
+    },
+    {
+      "document": "Seller statement (inline HTML)",
+      "fn": "services.emails.email_system.send_seller_statement_email",
+      "trigger": "services.receipts.issue_transaction_records \u2014 same as buyer_receipt",
+      "recipient": "Seller",
+      "sections": "marketplace, lots, vehicles, storage",
+      "en_fr": "Yes",
+      "auto_generated": "Yes",
+      "auto_emailed": "Yes",
+      "delivery": "Inline HTML email content"
+    },
+    {
+      "document": "Buyer final invoice link (iter468)",
+      "fn": "services.emails.email_system.send_buyer_final_invoice_link_email",
+      "trigger": "services.final_document_delivery.deliver_final_documents \u2014 fires ONLY for CONFIRMED Stripe auction payments",
+      "recipient": "Buyer",
+      "sections": "Currently multi-item lots only (calls generate_lots_won_invoice) \u2014 marketplace/vehicles/storage fall through with 'no_invoice_available'",
+      "en_fr": "Yes",
+      "auto_generated": "Yes (lots_won invoice)",
+      "auto_emailed": "Yes",
+      "delivery": "Secure signed link to PDF (via services.cloud_storage.generate_signed_url)"
+    },
+    {
+      "document": "Seller settlement link (iter468)",
+      "fn": "services.emails.email_system.send_seller_settlement_link_email",
+      "trigger": "services.final_document_delivery.deliver_final_documents \u2014 same",
+      "recipient": "Seller",
+      "sections": "Currently multi-item lots only (calls generate_seller_statement); others suppressed",
+      "en_fr": "Yes",
+      "auto_generated": "Yes",
+      "auto_emailed": "Yes",
+      "delivery": "Secure signed link to PDF"
+    },
+    {
+      "document": "Buyer payment letter",
+      "fn": "routes.invoices.generate_payment_letter (POST /api/invoices/payment-letter/{auction_id}/{user_id})",
+      "trigger": "MANUAL \u2014 API POST endpoint; also invoked by the admin bulk `documents_generated` flow",
+      "recipient": "Buyer",
+      "sections": "multi-item lots (multi_item_listings)",
+      "en_fr": "Yes (query `lang=` or buyer.preferred_language)",
+      "auto_generated": "On demand",
+      "auto_emailed": "NO \u2014 GAP",
+      "delivery": "Dashboard / API response secure signed link"
+    },
+    {
+      "document": "Seller receipt",
+      "fn": "routes.invoices.generate_seller_receipt (POST /api/invoices/seller-receipt/{auction_id}/{seller_id})",
+      "trigger": "MANUAL \u2014 API POST endpoint",
+      "recipient": "Seller",
+      "sections": "multi-item lots",
+      "en_fr": "Yes",
+      "auto_generated": "On demand",
+      "auto_emailed": "NO \u2014 GAP",
+      "delivery": "Dashboard / API response secure signed link"
+    },
+    {
+      "document": "Commission invoice",
+      "fn": "routes.invoices.generate_commission_invoice (POST /api/invoices/commission-invoice/{auction_id}/{seller_id})",
+      "trigger": "MANUAL \u2014 API POST endpoint",
+      "recipient": "Seller",
+      "sections": "multi-item lots",
+      "en_fr": "Yes",
+      "auto_generated": "On demand",
+      "auto_emailed": "NO \u2014 GAP",
+      "delivery": "Dashboard / API response secure signed link"
+    },
+    {
+      "document": "Storage seller commission invoice",
+      "fn": "services.emails.email_marketplace.send_storage_seller_commission_invoice",
+      "trigger": "Storage auction settlement flow",
+      "recipient": "Storage facility (seller)",
+      "sections": "storage only",
+      "en_fr": "Yes (inline i18n)",
+      "auto_generated": "Yes",
+      "auto_emailed": "Yes",
+      "delivery": "Inline HTML email content"
+    },
+    {
+      "document": "Buyer charge confirmation",
+      "fn": "services.emails.email_system.send_charge_confirmation_email",
+      "trigger": "Post-charge collection",
+      "recipient": "Buyer",
+      "sections": "all",
+      "en_fr": "Yes",
+      "auto_generated": "Yes",
+      "auto_emailed": "Yes",
+      "delivery": "Inline HTML"
+    },
+    {
+      "document": "Seller payout confirmation",
+      "fn": "services.emails.email_system.send_payout_confirmation_email",
+      "trigger": "Post-payout dispatch",
+      "recipient": "Seller",
+      "sections": "all",
+      "en_fr": "Yes",
+      "auto_generated": "Yes",
+      "auto_emailed": "Yes",
+      "delivery": "Inline HTML"
+    }
+  ],
+  "dispatch_results": [
+    {
+      "name": "[marketplace][en][M-EN][lot=None] issue_transaction_records \u2192 buyer_receipt + seller_statement",
+      "ok": true,
+      "detail": "{\"receipt_id\": \"b4d901a5-f8d6-493e-ad27-5920794ef3c5\", \"statement_id\": \"154b5d85-8b5c-42b3-a837-ac6af8776a18\"}",
+      "link": ""
+    },
+    {
+      "name": "[marketplace][fr][M-FR][lot=None] issue_transaction_records \u2192 buyer_receipt + seller_statement",
+      "ok": true,
+      "detail": "{\"receipt_id\": \"798b970c-a65d-4bb0-8f9d-56d0d5632041\", \"statement_id\": \"218b3796-25cc-4ffc-8fff-cdc1456ba925\"}",
+      "link": ""
+    },
+    {
+      "name": "[lots][en][L-EN][lot=1] issue_transaction_records \u2192 buyer_receipt + seller_statement",
+      "ok": true,
+      "detail": "{\"receipt_id\": \"1bda27c4-874b-4008-9fda-2c7e041f77bc\", \"statement_id\": \"9f7ffc90-7410-455a-9b81-fd6ab3a610b0\"}",
+      "link": ""
+    },
+    {
+      "name": "[lots][en][L-EN][lot=2] issue_transaction_records \u2192 buyer_receipt + seller_statement",
+      "ok": true,
+      "detail": "{\"receipt_id\": \"604e8c7f-1813-48de-98e3-924d82e335b8\", \"statement_id\": \"28a09423-0919-4d38-9ad8-b1b4eaedc1a1\"}",
+      "link": ""
+    },
+    {
+      "name": "[lots][fr][L-FR][lot=1] issue_transaction_records \u2192 buyer_receipt + seller_statement",
+      "ok": true,
+      "detail": "{\"receipt_id\": \"ff8dd35a-e649-426e-9e79-ac9181fa28b9\", \"statement_id\": \"1785a866-2d8b-4e13-90fe-d93d877df7f2\"}",
+      "link": ""
+    },
+    {
+      "name": "[lots][fr][L-FR][lot=2] issue_transaction_records \u2192 buyer_receipt + seller_statement",
+      "ok": true,
+      "detail": "{\"receipt_id\": \"37000e3f-6280-4b0a-9a73-f0216b478a12\", \"statement_id\": \"8304cedc-12c1-4af1-a660-76e43654bcec\"}",
+      "link": ""
+    },
+    {
+      "name": "[vehicles][en][V-EN][lot=None] issue_transaction_records \u2192 buyer_receipt + seller_statement",
+      "ok": true,
+      "detail": "{\"receipt_id\": \"68066c40-9420-4e6a-a8b9-c25499aba2c1\", \"statement_id\": \"b23a6fe2-194e-4a85-bb4b-6ea7c9905fb9\"}",
+      "link": ""
+    },
+    {
+      "name": "[vehicles][fr][V-FR][lot=None] issue_transaction_records \u2192 buyer_receipt + seller_statement",
+      "ok": true,
+      "detail": "{\"receipt_id\": \"79130cde-bb80-4c22-9637-e25bdf146b57\", \"statement_id\": \"7fade068-bac4-4532-8544-1137c27ba138\"}",
+      "link": ""
+    },
+    {
+      "name": "[storage][en][S-EN][lot=None] issue_transaction_records \u2192 buyer_receipt + seller_statement",
+      "ok": true,
+      "detail": "{\"receipt_id\": \"291d10d8-38b2-4d0f-9a6f-5a19668e0912\", \"statement_id\": \"1a539456-ac04-407b-abfd-7ecb421244e8\"}",
+      "link": ""
+    },
+    {
+      "name": "[storage][fr][S-FR][lot=None] issue_transaction_records \u2192 buyer_receipt + seller_statement",
+      "ok": true,
+      "detail": "{\"receipt_id\": \"0662e677-4e0c-4e30-974d-c5d60e54de56\", \"statement_id\": \"8577d945-94ce-4148-a5d6-29b822edc7ee\"}",
+      "link": ""
+    },
+    {
+      "name": "[lots][en][L-EN] deliver_final_documents eligibility",
+      "ok": true,
+      "detail": "{\"eligible\": true, \"buyer_email_sent\": true, \"buyer_email_suppressed_reason\": null, \"seller_email_sent\": true, \"seller_email_suppressed_reason\": null}",
+      "link": ""
+    },
+    {
+      "name": "[lots][en][L-EN] buyer final invoice link email sent",
+      "ok": true,
+      "detail": "suppressed_reason=None",
+      "link": "/api/invoices/download/3c5fbb2b-bba2-4f9d-935b-c39174609494?expires=1786463524&sig=e116de29c3e08fb1f834494671036b691f3c4d41f0c39ae205fd05b1105c08ff"
+    },
+    {
+      "name": "[lots][en][L-EN] seller settlement link email sent",
+      "ok": true,
+      "detail": "suppressed_reason=None",
+      "link": "/api/invoices/download/42c641e7-d650-4732-877f-842b7b34e2ca?expires=1786463525&sig=1019af973a083c177194911e291ecc68a9787711e1844042d47e409972efbcc7"
+    },
+    {
+      "name": "secure link buyer[en] \u2192 /api/invoices/download/3c5fbb2b-bba2-4f9d-935b-c39174609494?\u2026",
+      "ok": true,
+      "detail": "status=200 type=application/pdf",
+      "link": ""
+    },
+    {
+      "name": "secure link seller[en] \u2192 /api/invoices/download/42c641e7-d650-4732-877f-842b7b34e2ca?\u2026",
+      "ok": true,
+      "detail": "status=200 type=application/pdf",
+      "link": ""
+    },
+    {
+      "name": "[lots][fr][L-FR] deliver_final_documents eligibility",
+      "ok": true,
+      "detail": "{\"eligible\": true, \"buyer_email_sent\": true, \"buyer_email_suppressed_reason\": null, \"seller_email_sent\": true, \"seller_email_suppressed_reason\": null}",
+      "link": ""
+    },
+    {
+      "name": "[lots][fr][L-FR] buyer final invoice link email sent",
+      "ok": true,
+      "detail": "suppressed_reason=None",
+      "link": "/api/invoices/download/aae7881e-e566-4d2f-9c4a-e36284dac91b?expires=1786463527&sig=53d07ce0926262cdda6997023c99e09b825462dfeda8b747260212ec43e8af36"
+    },
+    {
+      "name": "[lots][fr][L-FR] seller settlement link email sent",
+      "ok": true,
+      "detail": "suppressed_reason=None",
+      "link": "/api/invoices/download/0831f716-7a7e-4084-baf9-afdd4eb64396?expires=1786463527&sig=e1862536ad0cd398ace5af82d027c8bb21595c971c09bbb857f50de77eeab88b"
+    },
+    {
+      "name": "secure link buyer[fr] \u2192 /api/invoices/download/aae7881e-e566-4d2f-9c4a-e36284dac91b?\u2026",
+      "ok": true,
+      "detail": "status=200 type=application/pdf",
+      "link": ""
+    },
+    {
+      "name": "secure link seller[fr] \u2192 /api/invoices/download/0831f716-7a7e-4084-baf9-afdd4eb64396?\u2026",
+      "ok": true,
+      "detail": "status=200 type=application/pdf",
+      "link": ""
+    },
+    {
+      "name": "[marketplace][en][M-EN] deliver_final_documents eligibility",
+      "ok": true,
+      "detail": "{\"eligible\": true, \"buyer_email_sent\": true, \"buyer_email_suppressed_reason\": null, \"seller_email_sent\": true, \"seller_email_suppressed_reason\": null}",
+      "link": ""
+    },
+    {
+      "name": "[marketplace][en][M-EN] buyer final invoice link email sent",
+      "ok": true,
+      "detail": "suppressed_reason=None",
+      "link": "/api/invoices/download/147d5b56-6e0d-4aa9-a148-e3a056c3c0bd?expires=1786463529&sig=a41c1083ab91f0ab0d0167f2a1bcf577e3f7bae2fdd21c31d58bd1e0e62c84de"
+    },
+    {
+      "name": "[marketplace][en][M-EN] seller settlement link email sent",
+      "ok": true,
+      "detail": "suppressed_reason=None",
+      "link": "/api/invoices/download/db305d51-4247-42e3-90b2-b5201190132e?expires=1786463529&sig=aa2afe8a2da8d2e18f93561ac3809f2202d3700721ab220c1858d6283c7c74d5"
+    },
+    {
+      "name": "secure link buyer[en] \u2192 /api/invoices/download/147d5b56-6e0d-4aa9-a148-e3a056c3c0bd?\u2026",
+      "ok": true,
+      "detail": "status=200 type=application/pdf",
+      "link": ""
+    },
+    {
+      "name": "secure link seller[en] \u2192 /api/invoices/download/db305d51-4247-42e3-90b2-b5201190132e?\u2026",
+      "ok": true,
+      "detail": "status=200 type=application/pdf",
+      "link": ""
+    },
+    {
+      "name": "[marketplace][fr][M-FR] deliver_final_documents eligibility",
+      "ok": true,
+      "detail": "{\"eligible\": true, \"buyer_email_sent\": true, \"buyer_email_suppressed_reason\": null, \"seller_email_sent\": true, \"seller_email_suppressed_reason\": null}",
+      "link": ""
+    },
+    {
+      "name": "[marketplace][fr][M-FR] buyer final invoice link email sent",
+      "ok": true,
+      "detail": "suppressed_reason=None",
+      "link": "/api/invoices/download/449f59a0-a52e-4035-9f00-d6a8f915d636?expires=1786463531&sig=afd6c2b6b54b671a208a69e5a1d3628742859d09d940d22765bb2e36bbf71d8a"
+    },
+    {
+      "name": "[marketplace][fr][M-FR] seller settlement link email sent",
+      "ok": true,
+      "detail": "suppressed_reason=None",
+      "link": "/api/invoices/download/b6428118-eabd-499b-881b-fc677c3e14f0?expires=1786463531&sig=12b7e1c51e3335b1b69aa1f164250c4c2cdf314c8b6d37f506631b6fd2c6c6ac"
+    },
+    {
+      "name": "secure link buyer[fr] \u2192 /api/invoices/download/449f59a0-a52e-4035-9f00-d6a8f915d636?\u2026",
+      "ok": true,
+      "detail": "status=200 type=application/pdf",
+      "link": ""
+    },
+    {
+      "name": "secure link seller[fr] \u2192 /api/invoices/download/b6428118-eabd-499b-881b-fc677c3e14f0?\u2026",
+      "ok": true,
+      "detail": "status=200 type=application/pdf",
+      "link": ""
+    },
+    {
+      "name": "[vehicles][en][V-EN] deliver_final_documents eligibility",
+      "ok": true,
+      "detail": "{\"eligible\": true, \"buyer_email_sent\": true, \"buyer_email_suppressed_reason\": null, \"seller_email_sent\": true, \"seller_email_suppressed_reason\": null}",
+      "link": ""
+    },
+    {
+      "name": "[vehicles][en][V-EN] buyer final invoice link email sent",
+      "ok": true,
+      "detail": "suppressed_reason=None",
+      "link": "/api/invoices/download/7e07a19a-ea6b-4753-9aa3-7fb15003e810?expires=1786463533&sig=15e3bc71f3566bff9786448717fc9b6e55e7b1f2aeadb1110f1a11eeaa610a4e"
+    },
+    {
+      "name": "[vehicles][en][V-EN] seller settlement link email sent",
+      "ok": true,
+      "detail": "suppressed_reason=None",
+      "link": "/api/invoices/download/720c344d-41ee-45ae-9f12-1994b96e67be?expires=1786463533&sig=63612cbaa71a74002bf8cd73178d9e23a78d551553fbde01c47022356e08f2f1"
+    },
+    {
+      "name": "secure link buyer[en] \u2192 /api/invoices/download/7e07a19a-ea6b-4753-9aa3-7fb15003e810?\u2026",
+      "ok": true,
+      "detail": "status=200 type=application/pdf",
+      "link": ""
+    },
+    {
+      "name": "secure link seller[en] \u2192 /api/invoices/download/720c344d-41ee-45ae-9f12-1994b96e67be?\u2026",
+      "ok": true,
+      "detail": "status=200 type=application/pdf",
+      "link": ""
+    },
+    {
+      "name": "[vehicles][fr][V-FR] deliver_final_documents eligibility",
+      "ok": true,
+      "detail": "{\"eligible\": true, \"buyer_email_sent\": true, \"buyer_email_suppressed_reason\": null, \"seller_email_sent\": true, \"seller_email_suppressed_reason\": null}",
+      "link": ""
+    },
+    {
+      "name": "[vehicles][fr][V-FR] buyer final invoice link email sent",
+      "ok": true,
+      "detail": "suppressed_reason=None",
+      "link": "/api/invoices/download/15bd6144-4dbb-4aeb-916b-0edecf96a89b?expires=1786463535&sig=1426903059635122b88f63105f024665c18be274150b969375e1b5c35b746738"
+    },
+    {
+      "name": "[vehicles][fr][V-FR] seller settlement link email sent",
+      "ok": true,
+      "detail": "suppressed_reason=None",
+      "link": "/api/invoices/download/6d18e61f-ed39-482f-a8bc-f3da8c93dede?expires=1786463535&sig=c0c9b6c107f61524b266908b4d1dc208db561ed100969d3d371b89f369a33b31"
+    },
+    {
+      "name": "secure link buyer[fr] \u2192 /api/invoices/download/15bd6144-4dbb-4aeb-916b-0edecf96a89b?\u2026",
+      "ok": true,
+      "detail": "status=200 type=application/pdf",
+      "link": ""
+    },
+    {
+      "name": "secure link seller[fr] \u2192 /api/invoices/download/6d18e61f-ed39-482f-a8bc-f3da8c93dede?\u2026",
+      "ok": true,
+      "detail": "status=200 type=application/pdf",
+      "link": ""
+    },
+    {
+      "name": "[storage][en][S-EN] deliver_final_documents eligibility",
+      "ok": true,
+      "detail": "{\"eligible\": true, \"buyer_email_sent\": true, \"buyer_email_suppressed_reason\": null, \"seller_email_sent\": true, \"seller_email_suppressed_reason\": null}",
+      "link": ""
+    },
+    {
+      "name": "[storage][en][S-EN] buyer final invoice link email sent",
+      "ok": true,
+      "detail": "suppressed_reason=None",
+      "link": "/api/invoices/download/43d8d743-8c29-4983-a39d-9a9ec6f9a836?expires=1786463537&sig=7b817758434950a0bb7cd49e87ba56af0e6d77b7cb995520ee6f9b9d56d152ce"
+    },
+    {
+      "name": "[storage][en][S-EN] seller settlement link email sent",
+      "ok": true,
+      "detail": "suppressed_reason=None",
+      "link": "/api/invoices/download/24b82eee-f1c9-4aca-922f-29571ebe88af?expires=1786463537&sig=63d5e6545ae6187745272113552e2c23f75ab0bea53b1374725880bc02102fd0"
+    },
+    {
+      "name": "secure link buyer[en] \u2192 /api/invoices/download/43d8d743-8c29-4983-a39d-9a9ec6f9a836?\u2026",
+      "ok": true,
+      "detail": "status=200 type=application/pdf",
+      "link": ""
+    },
+    {
+      "name": "secure link seller[en] \u2192 /api/invoices/download/24b82eee-f1c9-4aca-922f-29571ebe88af?\u2026",
+      "ok": true,
+      "detail": "status=200 type=application/pdf",
+      "link": ""
+    },
+    {
+      "name": "[storage][fr][S-FR] deliver_final_documents eligibility",
+      "ok": true,
+      "detail": "{\"eligible\": true, \"buyer_email_sent\": true, \"buyer_email_suppressed_reason\": null, \"seller_email_sent\": true, \"seller_email_suppressed_reason\": null}",
+      "link": ""
+    },
+    {
+      "name": "[storage][fr][S-FR] buyer final invoice link email sent",
+      "ok": true,
+      "detail": "suppressed_reason=None",
+      "link": "/api/invoices/download/fe4da882-d54d-4eb0-9f92-7f7ccddb3b4c?expires=1786463539&sig=b248ad4ec4b780b0ea81f02ec3968fc35f1dfb343e0768d6c256b0c551ce0e70"
+    },
+    {
+      "name": "[storage][fr][S-FR] seller settlement link email sent",
+      "ok": true,
+      "detail": "suppressed_reason=None",
+      "link": "/api/invoices/download/a0c09c36-adff-4099-8a2d-55290ce8e90d?expires=1786463539&sig=865747996f97d20718dc8735a755cd08c8a7a6917987dd0b039d97664cba8894"
+    },
+    {
+      "name": "secure link buyer[fr] \u2192 /api/invoices/download/fe4da882-d54d-4eb0-9f92-7f7ccddb3b4c?\u2026",
+      "ok": true,
+      "detail": "status=200 type=application/pdf",
+      "link": ""
+    },
+    {
+      "name": "secure link seller[fr] \u2192 /api/invoices/download/a0c09c36-adff-4099-8a2d-55290ce8e90d?\u2026",
+      "ok": true,
+      "detail": "status=200 type=application/pdf",
+      "link": ""
+    },
+    {
+      "name": "non-stripe guard: payment_method='cash' charge=None eligible=False",
+      "ok": true,
+      "detail": "{\"eligible\": false, \"buyer_email_sent\": false, \"buyer_email_suppressed_reason\": \"not_confirmed_stripe\", \"seller_email_sent\": false, \"seller_email_suppressed_reason\": \"not_confirmed_stripe\"}",
+      "link": ""
+    },
+    {
+      "name": "non-stripe guard: payment_method='etransfer' charge=None eligible=False",
+      "ok": true,
+      "detail": "{\"eligible\": false, \"buyer_email_sent\": false, \"buyer_email_suppressed_reason\": \"not_confirmed_stripe\", \"seller_email_sent\": false, \"seller_email_suppressed_reason\": \"not_confirmed_stripe\"}",
+      "link": ""
+    },
+    {
+      "name": "non-stripe guard: payment_method='stripe' charge=None eligible=False",
+      "ok": true,
+      "detail": "{\"eligible\": false, \"buyer_email_sent\": false, \"buyer_email_suppressed_reason\": \"not_confirmed_stripe\", \"seller_email_sent\": false, \"seller_email_suppressed_reason\": \"not_confirmed_stripe\"}",
+      "link": ""
+    }
+  ],
+  "secure_link_results": [
+    {
+      "label": "lots/en/L-EN/buyer[en]",
+      "url": "/api/invoices/download/3c5fbb2b-bba2-4f9d-935b-c39174609494?expires=1786463524&sig=e116de29c3e08fb1f834494671036b691f3c4d41f0c39ae205fd05b1105c08ff",
+      "status": 200,
+      "content_type": "application/pdf",
+      "ok": true
+    },
+    {
+      "label": "lots/en/L-EN/seller[en]",
+      "url": "/api/invoices/download/42c641e7-d650-4732-877f-842b7b34e2ca?expires=1786463525&sig=1019af973a083c177194911e291ecc68a9787711e1844042d47e409972efbcc7",
+      "status": 200,
+      "content_type": "application/pdf",
+      "ok": true
+    },
+    {
+      "label": "lots/fr/L-FR/buyer[fr]",
+      "url": "/api/invoices/download/aae7881e-e566-4d2f-9c4a-e36284dac91b?expires=1786463527&sig=53d07ce0926262cdda6997023c99e09b825462dfeda8b747260212ec43e8af36",
+      "status": 200,
+      "content_type": "application/pdf",
+      "ok": true
+    },
+    {
+      "label": "lots/fr/L-FR/seller[fr]",
+      "url": "/api/invoices/download/0831f716-7a7e-4084-baf9-afdd4eb64396?expires=1786463527&sig=e1862536ad0cd398ace5af82d027c8bb21595c971c09bbb857f50de77eeab88b",
+      "status": 200,
+      "content_type": "application/pdf",
+      "ok": true
+    },
+    {
+      "label": "marketplace/en/M-EN/buyer[en]",
+      "url": "/api/invoices/download/147d5b56-6e0d-4aa9-a148-e3a056c3c0bd?expires=1786463529&sig=a41c1083ab91f0ab0d0167f2a1bcf577e3f7bae2fdd21c31d58bd1e0e62c84de",
+      "status": 200,
+      "content_type": "application/pdf",
+      "ok": true
+    },
+    {
+      "label": "marketplace/en/M-EN/seller[en]",
+      "url": "/api/invoices/download/db305d51-4247-42e3-90b2-b5201190132e?expires=1786463529&sig=aa2afe8a2da8d2e18f93561ac3809f2202d3700721ab220c1858d6283c7c74d5",
+      "status": 200,
+      "content_type": "application/pdf",
+      "ok": true
+    },
+    {
+      "label": "marketplace/fr/M-FR/buyer[fr]",
+      "url": "/api/invoices/download/449f59a0-a52e-4035-9f00-d6a8f915d636?expires=1786463531&sig=afd6c2b6b54b671a208a69e5a1d3628742859d09d940d22765bb2e36bbf71d8a",
+      "status": 200,
+      "content_type": "application/pdf",
+      "ok": true
+    },
+    {
+      "label": "marketplace/fr/M-FR/seller[fr]",
+      "url": "/api/invoices/download/b6428118-eabd-499b-881b-fc677c3e14f0?expires=1786463531&sig=12b7e1c51e3335b1b69aa1f164250c4c2cdf314c8b6d37f506631b6fd2c6c6ac",
+      "status": 200,
+      "content_type": "application/pdf",
+      "ok": true
+    },
+    {
+      "label": "vehicles/en/V-EN/buyer[en]",
+      "url": "/api/invoices/download/7e07a19a-ea6b-4753-9aa3-7fb15003e810?expires=1786463533&sig=15e3bc71f3566bff9786448717fc9b6e55e7b1f2aeadb1110f1a11eeaa610a4e",
+      "status": 200,
+      "content_type": "application/pdf",
+      "ok": true
+    },
+    {
+      "label": "vehicles/en/V-EN/seller[en]",
+      "url": "/api/invoices/download/720c344d-41ee-45ae-9f12-1994b96e67be?expires=1786463533&sig=63612cbaa71a74002bf8cd73178d9e23a78d551553fbde01c47022356e08f2f1",
+      "status": 200,
+      "content_type": "application/pdf",
+      "ok": true
+    },
+    {
+      "label": "vehicles/fr/V-FR/buyer[fr]",
+      "url": "/api/invoices/download/15bd6144-4dbb-4aeb-916b-0edecf96a89b?expires=1786463535&sig=1426903059635122b88f63105f024665c18be274150b969375e1b5c35b746738",
+      "status": 200,
+      "content_type": "application/pdf",
+      "ok": true
+    },
+    {
+      "label": "vehicles/fr/V-FR/seller[fr]",
+      "url": "/api/invoices/download/6d18e61f-ed39-482f-a8bc-f3da8c93dede?expires=1786463535&sig=c0c9b6c107f61524b266908b4d1dc208db561ed100969d3d371b89f369a33b31",
+      "status": 200,
+      "content_type": "application/pdf",
+      "ok": true
+    },
+    {
+      "label": "storage/en/S-EN/buyer[en]",
+      "url": "/api/invoices/download/43d8d743-8c29-4983-a39d-9a9ec6f9a836?expires=1786463537&sig=7b817758434950a0bb7cd49e87ba56af0e6d77b7cb995520ee6f9b9d56d152ce",
+      "status": 200,
+      "content_type": "application/pdf",
+      "ok": true
+    },
+    {
+      "label": "storage/en/S-EN/seller[en]",
+      "url": "/api/invoices/download/24b82eee-f1c9-4aca-922f-29571ebe88af?expires=1786463537&sig=63d5e6545ae6187745272113552e2c23f75ab0bea53b1374725880bc02102fd0",
+      "status": 200,
+      "content_type": "application/pdf",
+      "ok": true
+    },
+    {
+      "label": "storage/fr/S-FR/buyer[fr]",
+      "url": "/api/invoices/download/fe4da882-d54d-4eb0-9f92-7f7ccddb3b4c?expires=1786463539&sig=b248ad4ec4b780b0ea81f02ec3968fc35f1dfb343e0768d6c256b0c551ce0e70",
+      "status": 200,
+      "content_type": "application/pdf",
+      "ok": true
+    },
+    {
+      "label": "storage/fr/S-FR/seller[fr]",
+      "url": "/api/invoices/download/a0c09c36-adff-4099-8a2d-55290ce8e90d?expires=1786463539&sig=865747996f97d20718dc8735a755cd08c8a7a6917987dd0b039d97664cba8894",
+      "status": 200,
+      "content_type": "application/pdf",
+      "ok": true
+    }
+  ],
+  "duplicate_dedup_results": [
+    {
+      "scenario": "buyer_receipt+seller_statement retry [marketplace][en]",
+      "buyer_ledger_before": 1,
+      "buyer_ledger_after": 1,
+      "seller_ledger_before": 1,
+      "seller_ledger_after": 1,
+      "dedup_ok": true
+    },
+    {
+      "scenario": "buyer_receipt+seller_statement retry [marketplace][fr]",
+      "buyer_ledger_before": 1,
+      "buyer_ledger_after": 1,
+      "seller_ledger_before": 1,
+      "seller_ledger_after": 1,
+      "dedup_ok": true
+    },
+    {
+      "scenario": "buyer_receipt+seller_statement retry [lots][en]",
+      "buyer_ledger_before": 2,
+      "buyer_ledger_after": 2,
+      "seller_ledger_before": 2,
+      "seller_ledger_after": 2,
+      "dedup_ok": true
+    },
+    {
+      "scenario": "buyer_receipt+seller_statement retry [lots][fr]",
+      "buyer_ledger_before": 2,
+      "buyer_ledger_after": 2,
+      "seller_ledger_before": 2,
+      "seller_ledger_after": 2,
+      "dedup_ok": true
+    },
+    {
+      "scenario": "buyer_receipt+seller_statement retry [vehicles][en]",
+      "buyer_ledger_before": 1,
+      "buyer_ledger_after": 1,
+      "seller_ledger_before": 1,
+      "seller_ledger_after": 1,
+      "dedup_ok": true
+    },
+    {
+      "scenario": "buyer_receipt+seller_statement retry [vehicles][fr]",
+      "buyer_ledger_before": 1,
+      "buyer_ledger_after": 1,
+      "seller_ledger_before": 1,
+      "seller_ledger_after": 1,
+      "dedup_ok": true
+    },
+    {
+      "scenario": "buyer_receipt+seller_statement retry [storage][en]",
+      "buyer_ledger_before": 1,
+      "buyer_ledger_after": 1,
+      "seller_ledger_before": 1,
+      "seller_ledger_after": 1,
+      "dedup_ok": true
+    },
+    {
+      "scenario": "buyer_receipt+seller_statement retry [storage][fr]",
+      "buyer_ledger_before": 1,
+      "buyer_ledger_after": 1,
+      "seller_ledger_before": 1,
+      "seller_ledger_after": 1,
+      "dedup_ok": true
+    },
+    {
+      "scenario": "deliver_final_documents retry [lots][en]",
+      "buyer_ledger_before": 1,
+      "buyer_ledger_after": 1,
+      "seller_ledger_before": 1,
+      "seller_ledger_after": 1,
+      "second_call_result": {
+        "eligible": true,
+        "buyer_email_sent": false,
+        "buyer_email_suppressed_reason": "duplicate_claim",
+        "seller_email_sent": false,
+        "seller_email_suppressed_reason": "duplicate_claim"
+      },
+      "dedup_ok": true
+    },
+    {
+      "scenario": "deliver_final_documents retry [lots][fr]",
+      "buyer_ledger_before": 1,
+      "buyer_ledger_after": 1,
+      "seller_ledger_before": 1,
+      "seller_ledger_after": 1,
+      "second_call_result": {
+        "eligible": true,
+        "buyer_email_sent": false,
+        "buyer_email_suppressed_reason": "duplicate_claim",
+        "seller_email_sent": false,
+        "seller_email_suppressed_reason": "duplicate_claim"
+      },
+      "dedup_ok": true
+    },
+    {
+      "scenario": "deliver_final_documents retry [marketplace][en]",
+      "buyer_ledger_before": 1,
+      "buyer_ledger_after": 1,
+      "seller_ledger_before": 1,
+      "seller_ledger_after": 1,
+      "second_call_result": {
+        "eligible": true,
+        "buyer_email_sent": false,
+        "buyer_email_suppressed_reason": "duplicate_claim",
+        "seller_email_sent": false,
+        "seller_email_suppressed_reason": "duplicate_claim"
+      },
+      "dedup_ok": true
+    },
+    {
+      "scenario": "deliver_final_documents retry [marketplace][fr]",
+      "buyer_ledger_before": 1,
+      "buyer_ledger_after": 1,
+      "seller_ledger_before": 1,
+      "seller_ledger_after": 1,
+      "second_call_result": {
+        "eligible": true,
+        "buyer_email_sent": false,
+        "buyer_email_suppressed_reason": "duplicate_claim",
+        "seller_email_sent": false,
+        "seller_email_suppressed_reason": "duplicate_claim"
+      },
+      "dedup_ok": true
+    },
+    {
+      "scenario": "deliver_final_documents retry [vehicles][en]",
+      "buyer_ledger_before": 1,
+      "buyer_ledger_after": 1,
+      "seller_ledger_before": 1,
+      "seller_ledger_after": 1,
+      "second_call_result": {
+        "eligible": true,
+        "buyer_email_sent": false,
+        "buyer_email_suppressed_reason": "duplicate_claim",
+        "seller_email_sent": false,
+        "seller_email_suppressed_reason": "duplicate_claim"
+      },
+      "dedup_ok": true
+    },
+    {
+      "scenario": "deliver_final_documents retry [vehicles][fr]",
+      "buyer_ledger_before": 1,
+      "buyer_ledger_after": 1,
+      "seller_ledger_before": 1,
+      "seller_ledger_after": 1,
+      "second_call_result": {
+        "eligible": true,
+        "buyer_email_sent": false,
+        "buyer_email_suppressed_reason": "duplicate_claim",
+        "seller_email_sent": false,
+        "seller_email_suppressed_reason": "duplicate_claim"
+      },
+      "dedup_ok": true
+    },
+    {
+      "scenario": "deliver_final_documents retry [storage][en]",
+      "buyer_ledger_before": 1,
+      "buyer_ledger_after": 1,
+      "seller_ledger_before": 1,
+      "seller_ledger_after": 1,
+      "second_call_result": {
+        "eligible": true,
+        "buyer_email_sent": false,
+        "buyer_email_suppressed_reason": "duplicate_claim",
+        "seller_email_sent": false,
+        "seller_email_suppressed_reason": "duplicate_claim"
+      },
+      "dedup_ok": true
+    },
+    {
+      "scenario": "deliver_final_documents retry [storage][fr]",
+      "buyer_ledger_before": 1,
+      "buyer_ledger_after": 1,
+      "seller_ledger_before": 1,
+      "seller_ledger_after": 1,
+      "second_call_result": {
+        "eligible": true,
+        "buyer_email_sent": false,
+        "buyer_email_suppressed_reason": "duplicate_claim",
+        "seller_email_sent": false,
+        "seller_email_suppressed_reason": "duplicate_claim"
+      },
+      "dedup_ok": true
+    }
+  ],
+  "gaps": [],
+  "finished_at": "2026-08-11T14:52:20.962650+00:00"
+}
