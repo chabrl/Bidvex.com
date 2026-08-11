@@ -1,6 +1,64 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter471 — Buyer Dashboard "My Purchases" Completeness (Feb 10, 2026) ✅ COMPLETE — PREVIEW-ONLY, NOT DEPLOYED
+
+**Reported by user (P0)**: Fix ONLY Buyer Dashboard My Purchases completeness. A paid buyer receipt must create ONE visible My Purchases row for that buyer. Multi-lot wins must show the actual won lot as a distinct row (with parent auction name as secondary context, lot number, lot title, quantity, hammer total, payment status, pickup status, order reference). No duplicates. No cross-buyer leakage. Cover marketplace, multi-lot (lots), vehicle multi-lot, and storage sections. No changes to payments, fees, taxes, invoices, email delivery, escrow, seller dashboards, historical records, or unrelated dashboard features. No deploy.
+
+### Source map (audit)
+| Section | Listing collection | Paid record | Lot resolver |
+|---|---|---|---|
+| marketplace | `listings` | `receipts` (`type=buyer_receipt`, `lot_number=null`, `section=marketplace`) | `listings.title` |
+| lots | `multi_item_listings` | `receipts` (per lot, `section=lots`) | `multi_item_listings.lots[k].title` + `.quantity`; parent = `.title` |
+| vehicles | `vehicle_listings` | `receipts` (per lot, `section=vehicles`) | `vehicle_listings.lots[k].title/description`; parent = `.title` |
+| storage | `storage_auctions` | `receipts` (`section=storage`) | `storage_auctions.title` |
+
+### Root cause
+`routes/dashboard.py::get_buyer_dashboard` built `won_items_detail` from `listings.winner_user_id` and de-duplicated `receipts_by_listing` by `listing_id` only. Multi-lot auctions store one lot-scoped receipt per (`listing_id`, `lot_number`) — the dedup collapsed them into a single row. Only ONE lot ever surfaced per multi-lot auction. Vehicle multi-lot + storage inherited the same bug. `receipt.listing_title` was also being used as the primary title, which for multi-lot is a per-lot copy that may differ from the section-native lot title in the parent doc.
+
+### De-duplication identity
+`(section, listing_id, lot_number)` — per user directive. `section` is included because `listing_id` uniqueness is not enforced across the four listing collections (marketplace / multi_item_listings / vehicle_listings / storage_auctions); this composite key prevents cross-section collapse even if two collections happen to share an id. `lot_number=null` for single-item sections.
+
+### Delivered (backend + frontend)
+- **`routes/dashboard.py`** — Refactored `won_items_detail` builder:
+  1. Reads authoritative `buyer_receipt` rows for the current user.
+  2. Batches parent-listing lookups per section (`_SECTION_COLLECTIONS = {marketplace: listings, lots: multi_item_listings, vehicles: vehicle_listings, storage: storage_auctions}`) so lot resolution runs O(1) after one round trip per section.
+  3. **Section-aware lot resolver** `_resolve_lot(section, parent, lot_number)` returns `{lot_title, lot_description, quantity, parent_listing_title}` from the correct source per section. `receipt.listing_title` is used ONLY as a title fallback when the lot doc is unavailable.
+  4. Emits one row per receipt with fields: `section`, `listing_id`, `lot_number`, `title` (primary), `lot_title`, `parent_listing_title`, `quantity`, `hammer_price`, `total_charged`, `currency`, `payment_status="payment_collected"`, `pickup_confirmed`, `pickup_confirmed_at`, `pickup_code`, `order_number`, `receipt_id`, `sold_at`.
+  5. Merges unpaid single-item wins from `listings.winner_user_id` under the same `(section, listing_id, null)` dedup, so pending-payment surfaces are preserved.
+  6. Merges historical `won_auctions` under the same section-aware dedup key.
+- **`frontend/src/pages/BuyerDashboard.js::PurchasesAndReceiptsCard`** — Renders each row using the composite key `${section}::${listing_id}::${lot_number ?? '0'}` (React key), shows `Lot #N · lot_title` primary + `Auction: parent_listing_title` secondary for multi-lot, adds `Qty: N` and `Order: BVX-XXXXXXXX` chips when present, preserves all existing badges (payment status, pickup confirmed/pending, pickup code, Settle Payment button). Bilingual EN/FR strings adjusted so "Lot #", "Auction/Enchère", "Qty/Qté", "Order/Cmd" all localize.
+
+### Guardrails honoured
+- **Cross-buyer isolation**: `receipts.find({"user_id": current_user.id, "type": "buyer_receipt"})` — no receipt from another user is ever consulted. Verified end-to-end (T3 in live suite).
+- **Section-aware dedup**: two rows with the same `listing_id` across different sections do NOT collapse (T6).
+- **`receipt.listing_title` used as fallback only** — when the parent doc's `lots` array carries a title, that wins (T2c, T4c).
+- **Unpaid wins**: existing single-item behavior preserved. Multi-lot unpaid wins are NOT surfaced in this iteration (per user directive; separate task).
+- **Seller-side rows** intentionally NOT added to My Purchases.
+- No changes to payments, fees, taxes, invoices, email delivery, escrow, seller dashboards, historical records.
+- **Not deployed.**
+
+### Verified end-to-end
+- **`tests/live_verify_iter471_my_purchases_completeness.py`** — **39/39 PASS**:
+  - T1: paid single-item marketplace → 1 row, title from listings.title, `lot_number=null`, `payment_collected`, correct hammer + total + order_number.
+  - T2: paid multi-lot lots auction, Buyer A wins lots 1/2/3 → 3 distinct rows, `lot_number` correct, `lot_title` from `multi_item_listings.lots[k].title` (NOT from receipt.listing_title fallback), `quantity=3` on lot 2 (from parent), `parent_listing_title` = event title, order numbers all present (parent-auction-scoped per production receipt semantics).
+  - T3: Buyer B wins lot 4 in the SAME auction → 1 row in B's dashboard, 0 leak into A. Buyer A re-check still shows only lots 1/2/3.
+  - T4: paid vehicle multi-lot → 2 rows for lots 1 and 3, titles from `vehicle_listings.lots[k].title`, section=vehicles.
+  - T5: paid storage → 1 row, title from `storage_auctions.title`, section=storage.
+  - **T6 (section-aware dedup identity)**: Two seed rows sharing the SAME listing_id across `marketplace` and `storage` → both surface as distinct rows.
+- **UI screenshots** (EN + FR): 6 rows visible on `/buyer/dashboard` — Storage · single-item marketplace · 1 vehicle lot · 3 multi-item lots. Multi-lot rows show `Lot #N · Title` primary + `Auction: Parent` secondary, plus `Qty:` and `Order:` chips. FR translates to `Enchère: · Qté · Cmd:`.
+
+### Remaining limitations
+- **Unpaid multi-lot wins** are NOT surfaced in the buyer dashboard (deferred to a separate iteration per user directive). Only the single-item pending payment flow is preserved from the legacy `listings.winner_user_id` path.
+- **Historical vehicle-only settlements** (pre-receipts) that never issued a `buyer_receipt` will still surface only via `won_auctions` fallback (existing behaviour) without lot titles. No bulk repair performed per user directive.
+- **Order number sharing**: `services/receipts.py` derives `order_number` from `listing_id` only, so all lots inside the same multi-lot auction share one order id (`BVX-XXXXXXXX`). This is production behaviour; the UI surfaces the shared order chip per row for traceability.
+- **Document email QA** kept as a separate task per user directive.
+
+### Not deployed
+Preview-only per user directive. Awaiting user go-ahead before any deploy.
+
+
+
 ## iter470-UI — Escrow & Pickup Payout-State Presentation (Feb 10, 2026) ✅ COMPLETE — PREVIEW-ONLY, NOT DEPLOYED
 
 **Reported by user (P0)**: Fix ONLY the seller Escrow & Pickup panel's payout-state presentation. Badge, card status, and confirmation toast must all use the same `payout_state` returned by iter470's backend contract. Held → "Funds Held". Confirmed + pending → "Payout Pending". Confirmed + sent (real transfer id) → "Funds Released". Confirmed + failed OR unknown → "Payout Requires Review". Never show "Funds Released" unless a real transfer reference is present. Bilingual EN/FR preserved. Do not expose payment secrets, full transaction IDs, or internal error details. No changes to escrow confirmation logic, payout logic, Stripe, calculations, invoices, emails, fees, taxes, historical records, or unrelated dashboard features. Not deployed.

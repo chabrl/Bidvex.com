@@ -664,21 +664,66 @@ const PurchasesAndReceiptsCard = ({ wonItems, onRefresh }) => {
       <CardContent className="space-y-3">
         {wonItems.map((w) => {
           const badge = PAYMENT_BADGES[w.payment_status] || PAYMENT_BADGES.pending_payment;
+          // iter471 — Compose a stable de-duplicated key that mirrors
+          // the backend's (section, listing_id, lot_number) identity so
+          // React never keys two distinct purchase rows on the same
+          // listing_id (multi-lot wins by the same buyer).
+          const rowKey = `${w.section || 'sec'}::${w.listing_id}::${w.lot_number ?? '0'}`;
+          const isMultiLot = w.lot_number !== null && w.lot_number !== undefined;
+          const primaryTitle = isMultiLot
+            ? `${fr ? 'Lot' : 'Lot'} #${w.lot_number}${w.lot_title ? ' · ' + w.lot_title : ''}`
+            : (w.title || (fr ? 'Article' : 'Item'));
+          const secondaryParent = isMultiLot ? (w.parent_listing_title || w.title) : null;
+          const displayAmount = w.total_charged != null && w.total_charged > 0
+            ? w.total_charged
+            : w.final_price;
           return (
             <div
-              key={w.listing_id}
+              key={rowKey}
               className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 border rounded-lg"
-              data-testid={`won-item-${w.listing_id}`}
+              data-testid={`won-item-${w.listing_id}${isMultiLot ? '-lot' + w.lot_number : ''}`}
+              data-section={w.section || 'marketplace'}
+              data-lot-number={w.lot_number ?? ''}
             >
               <div className="min-w-0">
-                <p className="font-semibold text-sm truncate">{w.title}</p>
+                <p className="font-semibold text-sm truncate" data-testid={`purchase-primary-title-${rowKey}`}>
+                  {primaryTitle}
+                </p>
+                {secondaryParent && (
+                  <p
+                    className="text-xs text-muted-foreground truncate"
+                    data-testid={`purchase-parent-${rowKey}`}
+                  >
+                    {fr ? 'Enchère' : 'Auction'}: {secondaryParent}
+                  </p>
+                )}
                 <p className="text-xs text-muted-foreground">
-                  {formatCurrency(w.final_price)} CAD
+                  {formatCurrency(displayAmount)} {w.currency || 'CAD'}
                   {w.sold_at ? ` · ${new Date(w.sold_at).toLocaleDateString()}` : ''}
                 </p>
+                <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                  {w.quantity != null && Number(w.quantity) > 0 && (
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] py-0 h-5"
+                      data-testid={`purchase-qty-${rowKey}`}
+                    >
+                      {fr ? 'Qté' : 'Qty'}: {w.quantity}
+                    </Badge>
+                  )}
+                  {w.order_number && (
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] py-0 h-5 font-mono"
+                      data-testid={`purchase-order-${rowKey}`}
+                    >
+                      {fr ? 'Cmd' : 'Order'}: {w.order_number}
+                    </Badge>
+                  )}
+                </div>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
-                <Badge className={`border text-xs ${badge.cls}`} data-testid={`payment-status-${w.listing_id}`}>
+                <Badge className={`border text-xs ${badge.cls}`} data-testid={`payment-status-${w.listing_id}${isMultiLot ? '-lot' + w.lot_number : ''}`}>
                   {fr ? badge.fr : badge.en}
                 </Badge>
                 {w.pickup_confirmed ? (
@@ -697,7 +742,7 @@ const PurchasesAndReceiptsCard = ({ wonItems, onRefresh }) => {
                     size="sm"
                     className="h-7 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-full px-3"
                     onClick={() => setSettleFor(w.listing_id)}
-                    data-testid={`settle-payment-btn-${w.listing_id}`}
+                    data-testid={`settle-payment-btn-${w.listing_id}${isMultiLot ? '-lot' + w.lot_number : ''}`}
                   >
                     <CreditCard className="h-3.5 w-3.5 mr-1" />
                     {fr ? 'Régler le paiement' : 'Settle Payment'}
@@ -707,7 +752,7 @@ const PurchasesAndReceiptsCard = ({ wonItems, onRefresh }) => {
                 {w.payment_status === 'payment_collected' && w.pickup_code && (
                   <Badge
                     className="border text-xs bg-indigo-100 text-indigo-800 border-indigo-300 font-mono"
-                    data-testid={`pickup-code-${w.listing_id}`}
+                    data-testid={`pickup-code-${w.listing_id}${isMultiLot ? '-lot' + w.lot_number : ''}`}
                   >
                     <KeyRound className="h-3 w-3 mr-1" />
                     {fr ? 'Code' : 'Code'}: {w.pickup_code}

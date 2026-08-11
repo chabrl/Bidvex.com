@@ -5,7 +5,7 @@ User-facing dashboard endpoints for buyers and sellers.
 
 from fastapi import APIRouter, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from typing import Optional
+from typing import Any, Dict, List, Optional
 import logging
 
 logger = logging.getLogger(__name__)
@@ -495,6 +495,94 @@ async def get_buyer_dashboard(
     ).sort("created_at", -1).to_list(200)
     receipts_by_listing = {r["listing_id"]: r for r in buyer_receipts if r.get("listing_id")}
 
+    # iter471 — Paid-purchase resolution across all four sections.
+    #
+    # Authoritative source: each `receipts` row where
+    # `type=buyer_receipt` AND `user_id=me`. Each row represents ONE
+    # paid purchase result — one per lot for multi-lot auctions, one per
+    # auction for single-item.
+    #
+    # De-duplication identity: `(section, listing_id, lot_number)`.
+    # `section` is included because `listing_id` is not enforced
+    # globally-unique across the four listing collections (marketplace,
+    # multi_item_listings, vehicle_listings, storage_auctions). We fall
+    # back to the receipt's own section field, then to any lot doc
+    # already resolved for that listing.
+    #
+    # Section-aware lot title / quantity / parent auction resolution:
+    #   • marketplace → listings.title (no lot concept)
+    #   • lots        → multi_item_listings.lots[k].title + .quantity
+    #                   ; parent title = multi_item_listings.title
+    #   • vehicles    → vehicle_listings.lots[k].title (or .description)
+    #                   ; parent title = vehicle_listings.title
+    #   • storage     → storage_auctions.title (single-lot)
+    # `receipt.listing_title` is used ONLY as a fallback when the lot
+    # doc cannot be resolved.
+
+    _SECTION_COLLECTIONS = {
+        "marketplace": "listings",
+        "lots": "multi_item_listings",
+        "vehicles": "vehicle_listings",
+        "storage": "storage_auctions",
+    }
+
+    # Batch-fetch every parent listing referenced by a paid receipt so
+    # the lot resolver runs O(1) per receipt after this step.
+    _parent_docs: Dict[str, Dict[str, Any]] = {}
+    _ids_by_section: Dict[str, set] = {}
+    for r in buyer_receipts:
+        sec = str(r.get("section") or "marketplace")
+        _ids_by_section.setdefault(sec, set()).add(r.get("listing_id"))
+    for sec, ids in _ids_by_section.items():
+        coll = _SECTION_COLLECTIONS.get(sec, "listings")
+        try:
+            docs = await rdb[coll].find(
+                {"id": {"$in": [i for i in ids if i]}},
+                {"_id": 0},
+            ).to_list(len(ids) or 1)
+            for d in docs:
+                _parent_docs[f"{sec}::{d.get('id')}"] = d
+        except Exception:  # noqa: BLE001
+            # Defensive — a section collection may be missing in some
+            # deployments; the receipt-side fallbacks still yield a
+            # usable purchase row.
+            continue
+
+    def _resolve_lot(section: str, parent: Optional[Dict[str, Any]],
+                    lot_number: Optional[Any]) -> Dict[str, Any]:
+        """Return a dict with the section-native lot title, quantity,
+        and parent auction title. Missing keys are absent (not None) so
+        the caller's downstream fallback logic stays clean."""
+        if not parent:
+            return {}
+        # Multi-lot sections
+        if section in ("lots", "vehicles"):
+            lots = parent.get("lots") or []
+            if lot_number is not None and lots:
+                try:
+                    target = int(lot_number)
+                except (TypeError, ValueError):
+                    target = lot_number
+                for lot in lots:
+                    if lot.get("lot_number") == target or lot.get("lot_number") == lot_number:
+                        return {
+                            "lot_title": lot.get("title") or lot.get("description") or lot.get("name"),
+                            "lot_description": lot.get("description"),
+                            "quantity": lot.get("quantity"),
+                            "parent_listing_title": parent.get("title") or parent.get("event_title"),
+                        }
+            # No lot_number, or lot not found — surface parent title only.
+            return {"parent_listing_title": parent.get("title") or parent.get("event_title")}
+        # Single-item sections (marketplace, storage)
+        return {
+            "parent_listing_title": parent.get("title"),
+        }
+
+    def _payment_status_from_receipt(r: Dict[str, Any]) -> str:
+        # A buyer_receipt row is only ever issued after payment_collected
+        # (see services/receipts.issue_transaction_records call sites).
+        return "payment_collected"
+
     # Fetch watchlist items
     watchlist_items = await rdb.watchlist.find(
         {"user_id": current_user.id}, {"_id": 0}
@@ -554,20 +642,98 @@ async def get_buyer_dashboard(
             {"_id": 0, "id": 1, "listing_id": 1},
         ).to_list(200)
     receipt_by_listing = {r["listing_id"]: r["id"] for r in receipt_rows}
-    won_items_detail = []
-    for l in won_listings:
+
+    # iter471 — Build the paid-purchase rows from the authoritative
+    # `receipts` collection first. Each buyer_receipt row → one
+    # visible My Purchases result. De-dup identity is
+    # `(section, listing_id, lot_number)`.
+    won_items_detail: List[Dict[str, Any]] = []
+    _seen_keys: set = set()
+    for r in buyer_receipts:
+        listing_id = r.get("listing_id")
+        if not listing_id:
+            continue
+        section = str(r.get("section") or "marketplace")
+        lot_number = r.get("lot_number")
+        dedupe_key = (section, listing_id, lot_number)
+        if dedupe_key in _seen_keys:
+            continue
+        _seen_keys.add(dedupe_key)
+
+        parent = _parent_docs.get(f"{section}::{listing_id}")
+        lot_ctx = _resolve_lot(section, parent, lot_number)
+
+        # Primary title precedence:
+        #   1. Section-native lot title (lots/vehicles multi-lot only)
+        #   2. Parent-listing title (marketplace/storage/single)
+        #   3. Receipt's own listing_title (fallback)
+        primary_title = (
+            lot_ctx.get("lot_title")
+            or lot_ctx.get("parent_listing_title")
+            or r.get("listing_title")
+            or "Auction item"
+        )
+        # Pickup confirmation stamped on the paired listing doc (if any).
+        pickup_confirmed = bool((parent or {}).get("pickup_confirmed"))
+        pickup_confirmed_at = (parent or {}).get("pickup_confirmed_at")
+
         won_items_detail.append({
-            "listing_id": l["id"],
+            "section": section,
+            "listing_id": listing_id,
+            "lot_number": lot_number,
+            "title": primary_title,
+            "lot_title": lot_ctx.get("lot_title"),
+            "parent_listing_title": lot_ctx.get("parent_listing_title"),
+            "quantity": lot_ctx.get("quantity") or r.get("quantity"),
+            "final_price": r.get("hammer_price") or 0,
+            "hammer_price": r.get("hammer_price") or 0,
+            "total_charged": r.get("total_charged") or 0,
+            "currency": r.get("currency") or "CAD",
+            "payment_status": _payment_status_from_receipt(r),
+            "payment_link_url": None,
+            "pickup_confirmed": pickup_confirmed,
+            "pickup_confirmed_at": pickup_confirmed_at,
+            "pickup_code": r.get("pickup_code"),
+            "order_number": r.get("order_number"),
+            "receipt_id": r.get("id"),
+            "sold_at": r.get("created_at"),
+        })
+
+    # iter471 — Merge remaining `listings.winner_user_id` wins that
+    # DON'T yet have a receipt (unpaid single-item wins) — preserves
+    # the existing pending-payment surface. Multi-lot unpaid wins are
+    # deliberately NOT surfaced here (out of scope for this iteration
+    # per user directive).
+    for l in won_listings:
+        listing_id = l.get("id")
+        if not listing_id:
+            continue
+        section = str(l.get("section") or "marketplace")
+        dedupe_key = (section, listing_id, None)
+        if dedupe_key in _seen_keys:
+            continue
+        _seen_keys.add(dedupe_key)
+        won_items_detail.append({
+            "section": section,
+            "listing_id": listing_id,
+            "lot_number": None,
             "title": l.get("title", "Item"),
+            "lot_title": None,
+            "parent_listing_title": None,
+            "quantity": l.get("quantity"),
             "final_price": l.get("final_price") or l.get("current_price") or 0,
-            "payment_status": l.get("payment_status") or ("pending_payment" if not l.get("payment_collected_at") else "payment_collected"),
+            "hammer_price": l.get("final_price") or l.get("current_price") or 0,
+            "total_charged": None,
+            "currency": l.get("currency") or "CAD",
+            "payment_status": l.get("payment_status") or (
+                "pending_payment" if not l.get("payment_collected_at") else "payment_collected"
+            ),
             "payment_link_url": l.get("payment_link_url"),
             "pickup_confirmed": bool(l.get("pickup_confirmed")),
             "pickup_confirmed_at": l.get("pickup_confirmed_at"),
-            # iter302 Directive 2 — winner-only surface (this endpoint only
-            # returns listings won by the current user).
             "pickup_code": l.get("pickup_code"),
-            "receipt_id": receipt_by_listing.get(l["id"]),
+            "order_number": None,
+            "receipt_id": receipt_by_listing.get(listing_id),
             "sold_at": l.get("sold_at") or l.get("ended_at"),
         })
 
@@ -647,27 +813,41 @@ async def get_buyer_dashboard(
 
     # iter367 — Merge historical won_auctions into won_items_detail so
     # they display even when the source listing has been purged.
-    seen_ids = {w["listing_id"] for w in won_items_detail}
+    # iter471 — Uses section-aware dedup identity `(section, listing_id, lot_number)`
+    # to match the receipt-first enumeration above.
     for w in won_auctions_docs:
         lid = w.get("listing_id")
-        if not lid or lid in seen_ids:
+        if not lid:
             continue
+        section = str(w.get("section") or "marketplace")
+        lot_no = w.get("lot_number")
+        dedupe_key = (section, lid, lot_no)
+        if dedupe_key in _seen_keys:
+            continue
+        _seen_keys.add(dedupe_key)
         receipt = receipts_by_listing.get(lid) or {}
         won_items_detail.append({
+            "section": section,
             "listing_id": lid,
+            "lot_number": lot_no,
             "title": w.get("listing_title") or "Auction item",
+            "lot_title": None,
+            "parent_listing_title": None,
             "listing_image": w.get("listing_image"),
+            "quantity": w.get("quantity"),
             "final_price": receipt.get("hammer_price") or w.get("winning_bid") or 0,
+            "hammer_price": receipt.get("hammer_price") or w.get("winning_bid") or 0,
+            "total_charged": receipt.get("total_charged"),
+            "currency": w.get("currency", "CAD"),
             "payment_status": "payment_collected" if receipt.get("id") else "pending_payment",
             "payment_link_url": None,
             "pickup_confirmed": False,
             "pickup_confirmed_at": None,
             "pickup_code": receipt.get("pickup_code"),
+            "order_number": receipt.get("order_number"),
             "receipt_id": receipt.get("id"),
             "sold_at": w.get("won_at"),
-            "currency": w.get("currency", "CAD"),
         })
-        seen_ids.add(lid)
 
     deposits = await rdb.bidding_deposits.find(
         {"user_id": current_user.id}, {"_id": 0}
