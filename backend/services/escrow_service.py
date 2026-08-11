@@ -148,6 +148,67 @@ async def create_escrow_hold(
     return escrow
 
 
+async def _resolve_paid_order_record(
+    db, *, auction_id: str, seller_id: str
+):
+    """iter469 — Canonical paid-order resolver.
+
+    The transaction/order row is the canonical paid-order identity;
+    ``pickup_code`` is the buyer's authorization credential. Both the
+    seller dashboard (``get_seller_escrow_status``) and pickup
+    confirmation must resolve the SAME record for ``(auction_id,
+    seller_id)`` before validating the buyer's code.
+
+    Returns a tuple ``(source, record)`` where ``source`` is
+    ``"escrow"`` (canonical row in ``escrow_transactions``) or
+    ``"transaction"`` (fallback row in ``transactions``). When neither
+    collection has a match, returns ``(None, None)``.
+
+    Guardrails (per iter469 directive):
+    - Enforces seller identity as a matching constraint — the caller
+      cannot resolve another seller's order via ``auction_id`` alone.
+    - Ignores rows that are already released / auto-released / refunded
+      (one-time-use) so the caller can decide the correct error code.
+    - Ignores confirmed transactions (``pickup_code_confirmed_at``
+      set) for the same reason.
+    """
+    esc = await db.escrow_transactions.find_one(
+        {
+            "auction_id": auction_id,
+            "seller_id": seller_id,
+            "escrow_status": {"$in": ["held", "disputed"]},
+        },
+        {"_id": 0},
+    )
+    if esc:
+        return "escrow", esc
+
+    # Fallback — a paid `transactions` row seeded by
+    # `services/payment_collection.finalize_auction_payment` that never
+    # got a matching `escrow_transactions` row. Match seller identity
+    # via either the top-level `seller_id` or `pickup_code_seller_id`
+    # (the code-lookup index). Rows already stamped
+    # `pickup_code_confirmed_at` are treated as consumed (one-time-use).
+    tx = await db.transactions.find_one(
+        {
+            "$or": [
+                {"listing_id": auction_id},
+                {"pickup_code_listing_id": auction_id},
+                {"auction_id": auction_id},
+            ],
+            "pickup_code": {"$exists": True, "$ne": None},
+            "$and": [
+                {"$or": [{"seller_id": seller_id}, {"pickup_code_seller_id": seller_id}]},
+                {"$or": [{"pickup_code_confirmed_at": None}, {"pickup_code_confirmed_at": {"$exists": False}}]},
+            ],
+        },
+        {"_id": 0},
+    )
+    if tx:
+        return "transaction", tx
+    return None, None
+
+
 async def confirm_pickup(db, seller_id: str, auction_id: str, code: str) -> dict:
     """
     Seller enters the pickup code. Validates and releases funds.
@@ -157,6 +218,19 @@ async def confirm_pickup(db, seller_id: str, auction_id: str, code: str) -> dict
     non-alphanumeric + uppercase) before comparison so `BVX-ARKC661T`,
     `bvxarkc661t`, `BVX ARKC 661T`, and legacy 6-char codes all match
     when the underlying alphanumeric matches.
+
+    iter469 — Resolves the canonical paid-order record for
+    ``(auction_id, seller_id)`` BEFORE validating the buyer's code.
+    The pickup code is the buyer's authorization credential — it is
+    NOT the record identity. If the paid order lives in the
+    ``transactions`` collection (no ``escrow_transactions`` row,
+    happens for orders settled via
+    ``services/payment_collection.finalize_auction_payment`` prior to
+    the forward fix), we still validate the code, expiry, and
+    one-time-use rules, and follow the existing payout rules — but we
+    do NOT trigger a second Stripe transfer because
+    ``process_seller_payout`` already dispatched the funds at
+    settlement time.
     """
     input_norm = normalize_pickup_code(code)
     if not input_norm:
@@ -166,27 +240,58 @@ async def confirm_pickup(db, seller_id: str, auction_id: str, code: str) -> dict
             "message_fr": "Entrez le code de retrait figurant sur le reçu de l'acheteur (ex. BVX-XXXXXXXX).",
         })
 
-    escrow = await db.escrow_transactions.find_one(
-        {"auction_id": auction_id, "escrow_status": "held"},
-        {"_id": 0},
+    # ── Canonical resolution ─────────────────────────────────────
+    source, record = await _resolve_paid_order_record(
+        db, auction_id=auction_id, seller_id=seller_id,
     )
-    if not escrow:
+    if not record:
+        # No held escrow AND no unconfirmed transaction row → 404. Also
+        # covers the wrong-seller / wrong-auction cases (the resolver
+        # filters by both). We additionally check whether an already-
+        # confirmed row exists for this (auction, seller) so the seller
+        # sees an "already confirmed" error instead of a generic 404.
+        already = await db.transactions.find_one(
+            {
+                "$or": [
+                    {"listing_id": auction_id},
+                    {"pickup_code_listing_id": auction_id},
+                    {"auction_id": auction_id},
+                ],
+                "$and": [
+                    {"$or": [{"seller_id": seller_id}, {"pickup_code_seller_id": seller_id}]},
+                ],
+                "pickup_code_confirmed_at": {"$ne": None},
+            },
+            {"_id": 0, "pickup_code_confirmed_at": 1},
+        )
+        if not already:
+            already_esc = await db.escrow_transactions.find_one(
+                {
+                    "auction_id": auction_id,
+                    "seller_id": seller_id,
+                    "escrow_status": {"$in": ["released", "auto_released", "refunded"]},
+                },
+                {"_id": 0, "funds_released_at": 1, "escrow_status": 1},
+            )
+            if already_esc:
+                already = {"pickup_code_confirmed_at": already_esc.get("funds_released_at")}
+        if already:
+            raise HTTPException(status_code=409, detail={
+                "error": "already_confirmed",
+                "confirmed_at": already.get("pickup_code_confirmed_at"),
+                "message_en": "This pickup code was already confirmed.",
+                "message_fr": "Ce code a déjà été confirmé.",
+            })
         raise HTTPException(status_code=404, detail={
             "error": "escrow_not_found",
             "message_en": "No active escrow found for this auction.",
             "message_fr": "Aucun dépôt actif trouvé pour cette enchère.",
         })
 
-    if escrow["seller_id"] != seller_id:
-        raise HTTPException(status_code=403, detail={
-            "error": "not_your_listing",
-            "message_en": "You are not the seller for this auction.",
-            "message_fr": "Vous n'êtes pas le vendeur de cette enchère.",
-        })
-
-    stored_norm = normalize_pickup_code(escrow.get("pickup_code", ""))
-    if stored_norm != input_norm:
-        await _log_failed_attempt(db, escrow["auction_id"], seller_id, input_norm)
+    # ── Code validation (only AFTER canonical resolution) ────────
+    stored_norm = normalize_pickup_code(record.get("pickup_code", ""))
+    if not stored_norm or stored_norm != input_norm:
+        await _log_failed_attempt(db, auction_id, seller_id, input_norm)
         raise HTTPException(status_code=400, detail={
             "error": "invalid_code",
             "message_en": "Invalid pickup code. Please ask the buyer to check their email.",
@@ -194,60 +299,159 @@ async def confirm_pickup(db, seller_id: str, auction_id: str, code: str) -> dict
         })
     # Use the stored (canonical) code for downstream ops so audit trails
     # record the exact value that was on the receipt.
-    code = escrow["pickup_code"]
+    code = record["pickup_code"]
 
-    expires_at = escrow.get("pickup_code_expires_at", "")
-    if isinstance(expires_at, str):
-        expires_at = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
-    if datetime.now(timezone.utc) > expires_at:
-        raise HTTPException(status_code=410, detail={
-            "error": "code_expired",
-            "message_en": "This pickup code has expired. Funds have been auto-released.",
-            "message_fr": "Ce code de retrait a expiré. Les fonds ont été libérés automatiquement.",
-        })
+    # ── Expiry (best-effort, only when the record carries an expiry) ──
+    expires_at_raw = record.get("pickup_code_expires_at")
+    if expires_at_raw:
+        expires_at = expires_at_raw
+        if isinstance(expires_at, str):
+            try:
+                expires_at = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
+            except ValueError:
+                expires_at = None
+        if isinstance(expires_at, datetime) and datetime.now(timezone.utc) > expires_at:
+            raise HTTPException(status_code=410, detail={
+                "error": "code_expired",
+                "message_en": "This pickup code has expired. Funds have been auto-released.",
+                "message_fr": "Ce code de retrait a expiré. Les fonds ont été libérés automatiquement.",
+            })
 
-    # Execute Stripe transfer to seller
-    seller = await db.users.find_one({"id": seller_id}, {"_id": 0, "stripe_connect_account_id": 1})
-    connect_id = (seller or {}).get("stripe_connect_account_id")
-    seller_payout_cents = escrow["total_charged_cents"] - escrow["application_fee_cents"]
+    # ── Path A: escrow_transactions canonical row ─────────────────
+    if source == "escrow":
+        seller = await db.users.find_one({"id": seller_id}, {"_id": 0, "stripe_connect_account_id": 1})
+        connect_id = (seller or {}).get("stripe_connect_account_id")
+        seller_payout_cents = record["total_charged_cents"] - record["application_fee_cents"]
 
-    transfer_id = None
-    if connect_id and seller_payout_cents > 0:
+        transfer_id = None
+        if connect_id and seller_payout_cents > 0:
+            try:
+                transfer = stripe.Transfer.create(
+                    amount=seller_payout_cents,
+                    currency="cad",
+                    destination=connect_id,
+                    metadata={
+                        "type": "escrow_release",
+                        "auction_id": auction_id,
+                        "pickup_code": code,
+                        "released_by": "seller_code_entry",
+                    },
+                    idempotency_key=f"escrow-release-{auction_id}-{seller_id}",
+                )
+                transfer_id = transfer.id
+            except Exception as e:
+                logger.error(f"[ESCROW] Transfer failed for {auction_id}: {e}")
+                raise HTTPException(status_code=500, detail="Transfer failed. Please contact support.")
+
+        now = datetime.now(timezone.utc).isoformat()
+        # One-time-use: filter by held status so a concurrent second
+        # confirm cannot double-flip the row.
+        result = await db.escrow_transactions.update_one(
+            {"auction_id": auction_id, "seller_id": seller_id, "escrow_status": "held"},
+            {"$set": {
+                "escrow_status": "released",
+                "stripe_transfer_id": transfer_id,
+                "pickup_code_entered_at": now,
+                "pickup_confirmed_at": now,
+                "funds_released_at": now,
+                "updated_at": now,
+            }},
+        )
+        # Also stamp the paired transactions row (if any) so the union
+        # dashboard reflects "released" consistently.
         try:
-            transfer = stripe.Transfer.create(
-                amount=seller_payout_cents,
-                currency="cad",
-                destination=connect_id,
-                metadata={
-                    "type": "escrow_release",
-                    "auction_id": auction_id,
-                    "pickup_code": code,
-                    "released_by": "seller_code_entry",
+            await db.transactions.update_many(
+                {
+                    "$or": [
+                        {"listing_id": auction_id},
+                        {"pickup_code_listing_id": auction_id},
+                        {"auction_id": auction_id},
+                    ],
+                    "$and": [
+                        {"$or": [{"seller_id": seller_id}, {"pickup_code_seller_id": seller_id}]},
+                    ],
+                    "pickup_code_confirmed_at": None,
                 },
+                {"$set": {
+                    "pickup_code_confirmed_at": now,
+                    "pickup_code_confirmed_by": seller_id,
+                    "payment_confirmed": True,
+                }},
             )
-            transfer_id = transfer.id
-        except Exception as e:
-            logger.error(f"[ESCROW] Transfer failed for {auction_id}: {e}")
-            raise HTTPException(status_code=500, detail="Transfer failed. Please contact support.")
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[ESCROW] transactions mirror update failed for {auction_id}: {e}")
 
+        if result.modified_count == 0:
+            # Row was already released by a concurrent confirm — treat as
+            # one-time-use and return the already-confirmed error.
+            raise HTTPException(status_code=409, detail={
+                "error": "already_confirmed",
+                "message_en": "This pickup code was already confirmed.",
+                "message_fr": "Ce code a déjà été confirmé.",
+            })
+
+        logger.info(f"[ESCROW] Released funds for {auction_id}, transfer={transfer_id}")
+        return {
+            "status": "released",
+            "transfer_id": transfer_id,
+            "amount_released": f"${seller_payout_cents / 100:.2f} CAD",
+            "message_en": "Pickup confirmed. Funds have been released to your account.",
+            "message_fr": "Retrait confirmé. Les fonds ont été libérés sur votre compte.",
+        }
+
+    # ── Path B: transactions-only fallback (no escrow row) ────────
+    # Funds were already dispatched at settlement time via
+    # ``services/seller_payouts.process_seller_payout``. This path only
+    # records the pickup confirmation and enforces one-time-use — it
+    # does NOT trigger a second Stripe transfer.
     now = datetime.now(timezone.utc).isoformat()
-    await db.escrow_transactions.update_one(
-        {"auction_id": auction_id, "escrow_status": "held"},
+    result = await db.transactions.update_one(
+        {
+            "id": record["id"],
+            # One-time-use guard: refuse if a concurrent confirm already
+            # stamped this row.
+            "pickup_code_confirmed_at": None,
+        },
         {"$set": {
-            "escrow_status": "released",
-            "stripe_transfer_id": transfer_id,
-            "pickup_code_entered_at": now,
-            "pickup_confirmed_at": now,
-            "funds_released_at": now,
-            "updated_at": now,
+            "pickup_code_confirmed_at": now,
+            "pickup_code_confirmed_by": seller_id,
+            "payment_confirmed": True,
+            "payment_confirmed_at": now,
         }},
     )
+    if result.modified_count == 0:
+        raise HTTPException(status_code=409, detail={
+            "error": "already_confirmed",
+            "message_en": "This pickup code was already confirmed.",
+            "message_fr": "Ce code a déjà été confirmé.",
+        })
 
-    logger.info(f"[ESCROW] Released funds for {auction_id}, transfer={transfer_id}")
+    # Mirror onto any paired escrow_transactions row that could exist
+    # (should be zero rows in this fallback path — but if a race
+    # created one after resolution, keep it consistent).
+    try:
+        await db.escrow_transactions.update_many(
+            {"auction_id": auction_id, "seller_id": seller_id, "escrow_status": "held"},
+            {"$set": {
+                "escrow_status": "released",
+                "pickup_code_entered_at": now,
+                "pickup_confirmed_at": now,
+                "funds_released_at": now,
+                "updated_at": now,
+            }},
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[ESCROW] escrow mirror update failed for {auction_id}: {e}")
+
+    logger.info(
+        f"[ESCROW] transaction-fallback confirm for {auction_id} — record.id={record.get('id')} "
+        f"(funds already dispatched at settlement, no new Stripe transfer)"
+    )
+    hammer = float(record.get("hammer_price") or record.get("amount") or 0)
     return {
         "status": "released",
-        "transfer_id": transfer_id,
-        "amount_released": f"${seller_payout_cents / 100:.2f} CAD",
+        "transfer_id": None,
+        "amount_released": f"${hammer:.2f} CAD",
         "message_en": "Pickup confirmed. Funds have been released to your account.",
         "message_fr": "Retrait confirmé. Les fonds ont été libérés sur votre compte.",
     }

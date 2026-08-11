@@ -321,8 +321,14 @@ class TestScenarioE_NoReusedRelease:
                            return_value=MagicMock(id="MUST_NOT_TRANSFER")):
                     with pytest.raises(HTTPException) as exc:
                         await confirm_pickup(db, seller_id, auction_id, code)
-                # Not a "held" escrow → 404 escrow_not_found
-                assert exc.value.status_code == 404
+                # iter469 — canonical resolver now returns 409
+                # `already_confirmed` for a released row (was 404
+                # `escrow_not_found`). One-time-use is still enforced;
+                # the more precise semantic helps the seller UI show a
+                # "already confirmed" message instead of "not found".
+                assert exc.value.status_code in (404, 409), (
+                    f"expected 404 or 409, got {exc.value.status_code}"
+                )
                 # Ensure no second transfer happened (no state mutation)
                 row = await db.escrow_transactions.find_one(
                     {"auction_id": auction_id})

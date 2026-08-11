@@ -63,6 +63,7 @@ async def _ensure_stripe_pickup_code(
             "id": str(uuid.uuid4()),
             "listing_id": listing_id,
             "pickup_code_listing_id": listing_id,
+            "auction_id": listing_id,
             "lot_number": lot_number,
             "listing_title": listing_title,
             "buyer_id": buyer_id,
@@ -85,6 +86,82 @@ async def _ensure_stripe_pickup_code(
         {"id": listing_id}, {"$set": {"pickup_code": code}}
     )
     return code
+
+
+async def _ensure_escrow_hold_record(
+    db, *, listing_id: str, buyer_id: str, seller_id, hammer: float,
+    platform_fee: float, total_charged: float, stripe_pi, pickup_code: str,
+    province: Optional[str] = None, lot_number=None,
+) -> None:
+    """iter469 — Forward fix.
+
+    Ensures every eligible paid non-vehicle Stripe order lands with an
+    ``escrow_transactions`` row so the seller dashboard AND pickup
+    confirmation resolve the SAME canonical record. Idempotent — a
+    duplicate call is a no-op.
+
+    Notes:
+    - This runs AFTER ``services/seller_payouts.process_seller_payout``
+      may have already dispatched the funds via ``stripe.Transfer.create``
+      (the current non-custodial behaviour). The row created here
+      records the ``pickup_code`` + ``pickup_code_expires_at`` state so
+      the confirm-pickup endpoint can resolve the paid order via
+      ``(auction_id, seller_id)``. The pickup-code confirmation flow
+      transitions this row from "held" → "released" WITHOUT triggering
+      a second Stripe transfer for orders that already had funds
+      dispatched (see ``services/escrow_service.confirm_pickup`` path B).
+    - Vehicle listings are handled by their own dispute + admin
+      sign-off pipeline and must not go through this helper.
+    """
+    if not seller_id or not pickup_code:
+        return
+
+    # Idempotency: one hold row per (listing_id, lot_number, seller_id).
+    query = {
+        "auction_id": listing_id,
+        "seller_id": seller_id,
+    }
+    if lot_number is not None:
+        query["lot_number"] = lot_number
+    existing = await db.escrow_transactions.find_one(query, {"_id": 0, "auction_id": 1})
+    if existing:
+        return
+
+    hammer_cents = int(round(float(hammer or 0) * 100))
+    total_charged_cents = int(round(float(total_charged or hammer or 0) * 100))
+    application_fee_cents = int(round(float(platform_fee or 0) * 100))
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(hours=48)
+
+    try:
+        await db.escrow_transactions.insert_one({
+            "auction_id": listing_id,
+            "listing_id": listing_id,
+            "lot_number": lot_number,
+            "buyer_id": buyer_id,
+            "seller_id": seller_id,
+            "hammer_price_cents": hammer_cents,
+            "total_charged_cents": total_charged_cents,
+            "application_fee_cents": application_fee_cents,
+            "stripe_payment_intent_id": stripe_pi,
+            "stripe_transfer_id": None,
+            "escrow_status": "held",
+            "pickup_code": pickup_code,
+            "pickup_code_expires_at": expires_at.isoformat(),
+            "pickup_code_entered_at": None,
+            "pickup_confirmed_at": None,
+            "funds_released_at": None,
+            "auto_release_scheduled_at": expires_at.isoformat(),
+            "created_at": now.isoformat(),
+            "updated_at": now.isoformat(),
+            "item_type": "non_vehicle",
+            "province": province,
+            "created_via": "finalize_auction_payment",
+        })
+    except Exception as e:  # noqa: BLE001
+        # Non-fatal — a concurrent creator (e.g. the webhook path) may
+        # have already inserted the row. Log and continue.
+        logger.warning(f"[iter469] escrow hold insert skipped for {listing_id}: {e}")
 
 
 async def _stamp(db, collection: str, listing_id: str, fields: Dict[str, Any],
@@ -364,6 +441,37 @@ async def finalize_auction_payment(
                 out["pickup_code"] = pickup_code
             except Exception as e:  # noqa: BLE001
                 logger.warning(f"[payment-collection] pickup code failed for {listing_id}: {e}")
+
+            # iter469 — Forward fix.
+            # Every eligible paid non-vehicle Stripe order gets an
+            # ``escrow_transactions`` hold row so the seller dashboard
+            # AND the pickup-confirm endpoint resolve the SAME canonical
+            # record. Vehicles have their own dispute + admin sign-off
+            # pipeline and are intentionally excluded.
+            if pickup_code and section != "vehicles" and seller_id:
+                try:
+                    province = None
+                    if isinstance(listing, dict):
+                        province = (
+                            listing.get("province")
+                            or listing.get("seller_province")
+                            or (listing.get("address") or {}).get("province")
+                        )
+                    await _ensure_escrow_hold_record(
+                        db,
+                        listing_id=listing_id,
+                        buyer_id=winner_id,
+                        seller_id=seller_id,
+                        hammer=hammer,
+                        platform_fee=platform_fee,
+                        total_charged=total_charged or hammer,
+                        stripe_pi=stripe_pi,
+                        pickup_code=pickup_code,
+                        province=province,
+                        lot_number=lot_number,
+                    )
+                except Exception as e:  # noqa: BLE001
+                    logger.warning(f"[payment-collection] escrow hold record failed for {listing_id}: {e}")
 
             # PM last4 (best-effort)
             last4 = None

@@ -1,6 +1,65 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter469 — Escrow Pickup Confirmation for Paid Non-Vehicle Orders (Feb 10, 2026) ✅ COMPLETE — PREVIEW-ONLY, NOT DEPLOYED
+
+**Reported by user (P0)**: Fix ONLY escrow pickup confirmation for paid non-vehicle orders. Seller dashboard and pickup confirmation must resolve the SAME canonical paid-order record. Paid orders that live in `transactions` but have no `escrow_transactions` row must be handled safely by pickup confirmation (validate normalized code, preserve expiry + one-time-use, follow existing payout rules). Payment success must create the escrow-hold state going forward for every eligible paid non-vehicle Stripe order. Dashboard must not display "Funds Held" for an order pickup confirmation cannot resolve. Invalid, expired, reused, wrong-seller, wrong-auction codes remain blocked. Valid confirmation cannot create two releases or two payouts. No production data, no bulk repair, no deploy, no fund release.
+
+### Root cause (reproduced via `tests/live_repro_iter469_escrow_pickup_mismatch.py`)
+Two parallel systems disagreed:
+- **Dashboard read** (`get_seller_escrow_status`) unioned `escrow_transactions` **and** `transactions` (iter367 P0) — showing any paid `transactions` row with a `pickup_code` as `escrow_status="held"`.
+- **Confirmation write** (`services/escrow_service.confirm_pickup`) resolved ONLY `escrow_transactions` where `escrow_status="held"`. Orders settled via `services/payment_collection.finalize_auction_payment` never created an `escrow_transactions` row — only the webhook path `_handle_auction_payment_success` did — so the confirm returned **404 `escrow_not_found`** for the exact same order the dashboard rendered as held.
+
+### Canonical identifier (per user directive)
+The **transaction / order record** (either `escrow_transactions` OR `transactions`) is the canonical paid-order identity; `pickup_code` is the buyer's authorization credential — never the sole record identity. Both surfaces resolve the paid order using `(auction_id, seller_id)` PLUS record-level state (`escrow_status ∈ {held, disputed}` or `pickup_code_confirmed_at IS NULL`) BEFORE validating the normalized code.
+
+### State map
+| Path taken | Trigger | Escrow row exists? | Confirm behaviour |
+|---|---|---|---|
+| Legacy webhook | `payment_intent.succeeded` + non-vehicle + no auto-transfer | Yes (`held`) | Stripe.Transfer.create → escrow row → `released` (existing behaviour, unchanged) |
+| `finalize_auction_payment` (BEFORE iter469) | Scheduler-driven Stripe settlement | **No** | 404 `escrow_not_found` (**BUG**) |
+| `finalize_auction_payment` (AFTER iter469) | Same trigger, new forward fix | Yes (`held`) | Stripe.Transfer.create *idempotency_key = escrow-release-{auction}-{seller}* → escrow row → `released` |
+| Legacy paid `transactions` row (pre-forward-fix) | Any historical Stripe-settled order | No | Fallback path: validate code, stamp `pickup_code_confirmed_at`, NO second Stripe transfer (funds already dispatched via `seller_payouts.process_seller_payout` at settlement) |
+
+### Delivered
+- **`services/escrow_service._resolve_paid_order_record`** (new): Canonical resolver returning `("escrow", row)` or `("transaction", row)` for `(auction_id, seller_id)`. Enforces seller identity as a matching constraint. Ignores released / auto-released / refunded / already-confirmed rows.
+- **`services/escrow_service.confirm_pickup`** (refactored): resolves canonical record FIRST, then validates the normalized pickup code. Adds a `transactions`-only fallback path that stamps `pickup_code_confirmed_at` + `pickup_code_confirmed_by` + `payment_confirmed_at` and refuses to trigger a second Stripe transfer (idempotency-safe). Adds Stripe idempotency key (`escrow-release-{auction}-{seller}`) on the escrow-row path. Mirrors state onto the paired collection so the union dashboard stays consistent. Preserves 400 invalid, 404 not-found, 410 expired, 409 already-confirmed error codes.
+- **`services/payment_collection._ensure_escrow_hold_record`** (new): Idempotent forward fix. After `_ensure_stripe_pickup_code`, `finalize_auction_payment` writes an `escrow_transactions` row (marker: `created_via="finalize_auction_payment"`) for every eligible paid non-vehicle Stripe order so the seller dashboard and confirm-pickup resolve the SAME record going forward. Vehicles are intentionally excluded (they have their own dispute + admin sign-off pipeline).
+- **Backward-compat**: existing paid orders with only a `transactions` row (created before this iter's forward fix) still resolve via the fallback — no bulk migration or historical repair required per user directive.
+
+### Explicit non-goals honoured
+- Invoices, email delivery, fee engine, tax engine, settlement calculations, re-listing, unrelated escrow behaviour — untouched.
+- No production data touched. All test rows prefixed `iter469-*` and cleaned up.
+- No Stripe transfers created against the real preview account (the transactions-only fallback path never calls `stripe.Transfer.create`; the escrow-row happy path was exercised against a seeded seller with NO `stripe_connect_account_id` so the payout was skipped).
+- No bulk-repair of historical production orders.
+- **Not deployed.**
+
+### Verified end-to-end
+- **`tests/live_verify_iter469_escrow_pickup_fix.py`** — **41/41 PASS** covering:
+  - T1 normal escrow row (200, 409 on double confirm)
+  - T2 transactions-only fallback (200, no Stripe transfer, DB stamped, second confirm 409)
+  - T3 `finalize_auction_payment` creates escrow-hold row (`created_via=finalize_auction_payment`)
+  - T4 invalid code → 400 `invalid_code` + row unchanged + failed attempt logged
+  - T5 expired code → 410 `code_expired` + row stays `held`
+  - T6 double confirm → 409 + no double payout row
+  - T7 wrong seller → 404 `escrow_not_found` + row unchanged
+  - T8 wrong auction → 400 `invalid_code`
+  - **T9 (user-mandated) two paid orders in the same auction — each seller confirms ONLY their own via its own buyer code; cross-attempts blocked; row-by-row confirmation attribution preserved (`pickup_code_confirmed_by` matches the acting seller)**
+  - T10 every dashboard-held row is resolvable by confirm-pickup (5/5 in the mixed fixture)
+- **`tests/test_iter469_escrow_pickup_resolver.py`** — **13/13 pytest PASS** covering resolver behaviour, wrong-seller / wrong-auction, transactions-only fallback double-confirm, forward escrow-hold idempotency.
+- **`tests/test_iter455_escrow_pickup_code_compat.py`** — **19/19 PASS** (one existing assertion widened: released row now returns 409 `already_confirmed` — strictly better semantic than the old 404 `escrow_not_found` — one-time-use still enforced).
+- **Regression** (all still passing): iter459 51/51, iter460 16/16, iter461 13/13, iter462 18/18, iter468 21/21.
+
+### Remaining risks
+- **Legacy historical `transactions` rows** (pre-forward-fix) continue to route through the fallback path. Per user directive we do NOT bulk-migrate them into `escrow_transactions`. This is safe: the fallback path preserves all one-time-use, expiry, seller-identity, and payout guardrails.
+- **Escrow transfer path (`stripe.Transfer.create`)** on the escrow-row happy path still depends on Stripe Available balance ≥ payout amount — unchanged from iter465/iter467. iter469 does not attempt any real fund release.
+- **`_ensure_escrow_hold_record`** relies on Mongo `update_one` for idempotency by `(auction_id, seller_id[, lot_number])`. A concurrent double-fire could still race, but the Mongo default-index `_id` collision protects the escrow_transactions collection from doubled rows since the code short-circuits when an existing row is found. If ever hit under heavy concurrency, add a compound unique index — deferred as not observed in preview.
+
+### Not deployed
+Preview-only per user directive. Awaiting user go-ahead before any deploy.
+
+
+
 ## iter468 — Final Document Delivery for Confirmed Stripe Auction Payments (Feb 9, 2026) ✅ COMPLETE — PREVIEW-ONLY, NOT DEPLOYED
 
 **Reported by user (P0)**: On confirmed Stripe auction payments only, automatically deliver ONE buyer email with ONE secure link to the buyer's final paid invoice and ONE seller email with ONE secure link to the seller's settlement statement. Retry-safe, EN/FR preserved, BidVex issuer, no partner co-branding, no PDF attachments, no cash/e-transfer/escrow/fee/tax changes. Not deployed.
