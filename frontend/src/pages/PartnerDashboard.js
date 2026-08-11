@@ -18,6 +18,7 @@ import axios from 'axios';
 import EmailCreditPurchase from '../components/EmailCreditPurchase';
 import PartnerLicenseCard from '../components/PartnerLicenseCard';
 import InfoTip from '../components/InfoTip';
+import BusinessSettingsCard from '../components/BusinessSettingsCard';
 import { Input } from '../components/ui/input';
 
 const API = API_BASE;
@@ -363,6 +364,14 @@ export default function PartnerDashboard() {
               >
                 📦 {t('partnerDashboard.listSingleItem', 'List a Single Item')}
               </Button>
+              {/* iter477 — Shared Business & Billing Profile (logo + tax IDs
+                  that appear on every invoice / receipt / statement). */}
+              <BusinessSettingsCard variant="partner" />
+            </div>
+          )}
+          {!isFeePaid && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <BusinessSettingsCard variant="partner" />
             </div>
           )}
         </div>

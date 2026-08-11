@@ -20,6 +20,7 @@ import FacilityAuctions from './FacilityAuctions';
 import FacilityAnalytics from './FacilityAnalytics';
 import FacilityPromotions from './FacilityPromotions';
 import FacilityRatings from './FacilityRatings';
+import BusinessSettingsCard from '../../components/BusinessSettingsCard';
 
 const API = process.env.REACT_APP_BACKEND_URL || '';
 
@@ -188,7 +189,20 @@ export default function FacilityDashboard() {
           {activeTab === 'settings' && (
             <Card>
               <CardHeader><CardTitle>Settings</CardTitle></CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
+                {/* iter477 — Shared Business & Billing Profile (logo + tax IDs
+                    that appear on every invoice / receipt / statement). */}
+                <div className="border rounded-lg p-4 bg-slate-50 dark:bg-slate-800/50">
+                  <p className="text-sm font-medium mb-1">
+                    {lang === 'fr' ? 'Profil de facturation' : 'Business & Billing Profile'}
+                  </p>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    {lang === 'fr'
+                      ? 'Ces informations et votre logo apparaissent sur chaque facture, reçu et relevé émis pour votre installation.'
+                      : 'These details and your logo appear on every invoice, receipt, and statement issued for your facility.'}
+                  </p>
+                  <BusinessSettingsCard variant="facility" />
+                </div>
                 <p className="text-sm text-muted-foreground">
                   Facility account settings are managed from your{' '}
                   <NavLink to="/profile" className="text-blue-600 underline">profile page</NavLink>.

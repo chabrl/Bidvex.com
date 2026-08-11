@@ -20,6 +20,7 @@ import SEO from '../components/SEO';
 import MyVehiclesModule from '../components/vehicles/MyVehiclesModule';
 import SalesPerformanceModule from '../components/vehicles/SalesPerformanceModule';
 import SettlementsModule from '../components/vehicles/SettlementsModule';
+import BusinessSettingsCard from '../components/BusinessSettingsCard';
 
 const VehicleDashboardPage = () => {
   const { i18n } = useTranslation();
@@ -72,7 +73,7 @@ const VehicleDashboardPage = () => {
           <div className="rounded-2xl p-3 bg-gradient-to-br from-blue-500 to-indigo-600 shadow-md">
             <Car className="h-8 w-8 text-white" />
           </div>
-          <div>
+          <div className="flex-1 min-w-0">
             <h1
               className="text-3xl font-bold text-slate-900 dark:text-slate-100 tracking-tight"
               data-testid="vehicle-dashboard-heading"
@@ -80,6 +81,12 @@ const VehicleDashboardPage = () => {
               {T.heading}
             </h1>
             <p className="mt-1 text-slate-600 dark:text-slate-400">{T.subheading}</p>
+          </div>
+          {/* iter477 — Shared Business & Billing Profile trigger.
+              Logo + tax IDs edited here appear on every dealer-issued
+              invoice, receipt, statement and commission document. */}
+          <div className="flex-shrink-0">
+            <BusinessSettingsCard variant="dealer" />
           </div>
         </header>
 

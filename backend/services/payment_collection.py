@@ -396,6 +396,35 @@ async def finalize_auction_payment(
         processing = float(fee.get("buyer_stripe_fee") or 0)
         total_charged = float(fee.get("buyer_total_charged") or 0)
         net_payout = round(hammer - float(fee.get("seller_commission") or platform_fee), 2)
+        # iter476 — pull the ITEMIZED breakdown authoritatively computed
+        # by the settlement pipeline (see stripe_connect_service.
+        # CheckoutBreakdown).  The settle_* helpers dump the breakdown
+        # into settlement["itemized"] whenever they call the calculator.
+        itemized_block = settlement.get("itemized") or None
+        # If the settlement helper didn't provide `itemized` but the
+        # fee_breakdown dict happens to already carry the itemized
+        # columns (some vertical-specific helpers do), accept those.
+        if not itemized_block and any(
+            k in fee for k in (
+                "hammer_gst", "hammer_qst",
+                "buyer_premium_gst", "buyer_premium_qst",
+                "service_fee", "seller_commission_gst",
+            )
+        ):
+            itemized_block = {
+                k: fee[k]
+                for k in (
+                    "hammer_gst", "hammer_qst",
+                    "buyer_premium", "buyer_premium_gst", "buyer_premium_qst",
+                    "service_fee", "service_fee_gst", "service_fee_qst",
+                    "stripe_fee", "stripe_fee_charged_to",
+                    "seller_commission", "seller_commission_gst", "seller_commission_qst",
+                    "other_deductions",
+                    "buyer_premium_rate", "seller_commission_rate",
+                    "seller_is_tax_registered",
+                )
+                if k in fee
+            }
         from services.notifications_i18n import create_notification
 
         # ── SUCCESS ───────────────────────────────────────────────────
@@ -490,6 +519,7 @@ async def finalize_auction_payment(
                 total_charged=total_charged or None, payment_method_last4=last4,
                 transaction_id=stripe_pi, net_payout=net_payout, lot_number=lot_number,
                 pickup_code=pickup_code,
+                itemized=itemized_block,   # iter476
             )
             out.update(records)
             await _stamp(db, collection, listing_id, {

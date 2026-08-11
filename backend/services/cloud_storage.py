@@ -168,6 +168,40 @@ async def store_invoice_pdf(invoice_id: str, pdf_data: bytes, subfolder: str = "
         raise
 
 
+# iter476 — Public logo storage (for seller / partner / dealer / facility
+# business branding). Public-read ACL so the resulting URL can be linked
+# directly from dashboards + embedded into PDFs without a signed
+# redirect. The path includes the owner id so no other business can
+# overwrite another's asset without going through the authorized route.
+
+async def store_business_logo(
+    owner_id: str, file_bytes: bytes, content_type: str, ext: str,
+) -> tuple[str, str]:
+    """Upload a business logo. Returns (storage_path, public_url)."""
+    import uuid as _uuid
+    key = f"{APP_NAME}/business_logos/{owner_id}/{_uuid.uuid4().hex}.{ext.lstrip('.')}"
+    _put_object(key, file_bytes, content_type, acl="public-read")
+    # Public URL: same bucket, same key, canonical S3 endpoint
+    endpoint = os.environ.get("S3_ENDPOINT_URL") or "https://s3.amazonaws.com"
+    endpoint = endpoint.rstrip("/")
+    if endpoint.startswith("http://") or endpoint.startswith("https://"):
+        public_url = f"{endpoint}/{S3_BUCKET}/{key}"
+    else:
+        public_url = f"https://{endpoint}/{S3_BUCKET}/{key}"
+    logger.info(f"Business logo uploaded: {key} ({len(file_bytes)} bytes)")
+    return key, public_url
+
+
+async def delete_business_logo(storage_path: str) -> bool:
+    """Delete a previously uploaded business logo (best-effort)."""
+    return _delete_object(storage_path)
+
+
+async def retrieve_business_logo(storage_path: str) -> bytes | None:
+    """Fetch a business logo blob for PDF embedding."""
+    return _get_object(storage_path)
+
+
 async def retrieve_invoice_pdf(storage_path: str) -> bytes | None:
     """Download a stored PDF from S3."""
     try:

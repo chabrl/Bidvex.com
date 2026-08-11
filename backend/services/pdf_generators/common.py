@@ -100,6 +100,29 @@ class DocumentSpec:
     party_phone:    str = ""
     party_address:  str = ""
 
+    # iter476 — Complete BUYER + SELLER identification (both parties on
+    # every document, side-by-side). All fields are read verbatim from
+    # `db.users`. Omit any field to render blank rather than fabricate.
+    buyer_name:     str = ""
+    buyer_email:    str = ""
+    buyer_phone:    str = ""
+    buyer_address:  str = ""
+    buyer_gst:      str = ""
+    buyer_qst:      str = ""
+    buyer_tax_number: str = ""
+
+    seller_name:    str = ""
+    seller_email:   str = ""
+    seller_phone:   str = ""
+    seller_address: str = ""
+    seller_gst:     str = ""
+    seller_qst:     str = ""
+    seller_tax_number: str = ""
+    # bytes of the seller's logo (from S3) — rendered ONLY on
+    # buyer-facing documents
+    seller_logo_bytes: Optional[bytes] = None
+    show_seller_logo: bool = False
+
     # Settlement / listing meta (rendered as a two-column detail table)
     meta_rows:      List[Tuple[str, str, str]] = field(default_factory=list)
     # (label_en, label_fr, value_str)  — value already formatted by caller
@@ -112,6 +135,12 @@ class DocumentSpec:
     # Totals table (pre-formatted key/value pairs)
     totals:          List[Tuple[str, str, str]] = field(default_factory=list)
     # (label_en, label_fr, value_str)
+
+    # iter476 — itemized breakdown rows sourced verbatim from the
+    # settlement record.  Structure: list of (label_en, label_fr,
+    # amount_str_or_blank, is_bold).  Blank amounts render as "—" so
+    # historical (pre-iter476) receipts render truthfully.
+    itemized_rows: List[Tuple[str, str, str, bool]] = field(default_factory=list)
 
     # Footer note (short, bilingual)
     footer_en:      str = "Questions? Contact service@bidvex.com"
@@ -157,60 +186,69 @@ def _make_styles():
 def render_document(spec: DocumentSpec) -> bytes:
     """Render a DocumentSpec to PDF bytes.  Deterministic — same spec in,
     same layout out.  No side effects, no DB reads."""
+    from services.pdf_generators.branding import (
+        bidvex_letterhead_table, party_block, two_party_row,
+    )
+
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
         buf, pagesize=letter,
-        leftMargin=0.75 * inch, rightMargin=0.75 * inch,
-        topMargin=0.5 * inch, bottomMargin=0.5 * inch,
+        leftMargin=0.6 * inch, rightMargin=0.6 * inch,
+        topMargin=0.45 * inch, bottomMargin=0.45 * inch,
     )
     styles = _make_styles()
     elems: List[Any] = []
 
-    # ── Header: BidVex block + document title
+    # ── iter476: BidVex letterhead + document title row ──
+    elems.append(bidvex_letterhead_table(styles))
     title = spec.title_fr if spec.lang == "fr" else spec.title_en
-    header_data = [[
-        Paragraph(f"<b>{PLATFORM_NAME}</b>", styles["Detail"]),
+    title_row = Table([[
         Paragraph(f"<b>{title}</b>", styles["DocTitle"]),
-    ], [
         Paragraph(
-            f"{PLATFORM_ADDRESS}<br/>{PLATFORM_PHONE}<br/>"
-            f"{PLATFORM_EMAIL}<br/>{PLATFORM_WEBSITE}",
-            styles["Tiny"],
-        ),
-        Paragraph(
-            f"{L(spec, 'No.', 'N°')} {spec.document_id}<br/>"
-            f"{L(spec, 'Issued', 'Émis')}: {dt_str(spec.document_date)}",
+            f"<font size='9' color='gray'>{L(spec, 'No.', 'N°')}</font> "
+            f"<b>{spec.document_id}</b><br/>"
+            f"<font size='9' color='gray'>{L(spec, 'Issued', 'Émis')}: "
+            f"{dt_str(spec.document_date)}</font>",
             styles["Detail"],
         ),
-    ]]
-    header = Table(header_data, colWidths=[4 * inch, 3 * inch])
-    header.setStyle(TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("ALIGN", (1, 0), (1, -1), "RIGHT"),
-        ("BOTTOMPADDING", (0, 0), (-1, 0), 4),
+    ]], colWidths=[4.2 * inch, 2.8 * inch])
+    title_row.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("ALIGN", (1, 0), (1, 0), "RIGHT"),
+        ("LINEBELOW", (0, 0), (-1, -1), 1.2, PRIMARY_COLOR),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
     ]))
-    elems.append(header)
-    elems.append(Spacer(1, 0.15 * inch))
+    elems.append(title_row)
+    elems.append(Spacer(1, 0.12 * inch))
 
-    # ── Party block
-    party_lbl = L(spec, spec.party_label_en, spec.party_label_fr)
-    party_body: List[str] = []
-    if spec.party_name:
-        party_body.append(f"<b>{spec.party_name}</b>")
-    if spec.party_email:
-        party_body.append(spec.party_email)
-    if spec.party_phone:
-        party_body.append(spec.party_phone)
-    if spec.party_address:
-        party_body.append(spec.party_address)
-    if party_body:
-        elems.append(Paragraph(party_lbl, styles["SectionTitle"]))
-        elems.append(Paragraph("<br/>".join(party_body), styles["Detail"]))
+    # ── iter476: BUYER + SELLER side-by-side (both parties on ALL docs) ──
+    buyer_blk = party_block(
+        styles,
+        title_en="BUYER", title_fr="ACHETEUR", lang=spec.lang,
+        name=spec.buyer_name, address=spec.buyer_address,
+        phone=spec.buyer_phone, email=spec.buyer_email,
+        gst=spec.buyer_gst, qst=spec.buyer_qst,
+        tax_number=spec.buyer_tax_number,
+    )
+    seller_blk = party_block(
+        styles,
+        title_en="SELLER / DEALER", title_fr="VENDEUR / CONCESSIONNAIRE",
+        lang=spec.lang,
+        name=spec.seller_name, address=spec.seller_address,
+        phone=spec.seller_phone, email=spec.seller_email,
+        gst=spec.seller_gst, qst=spec.seller_qst,
+        tax_number=spec.seller_tax_number,
+        logo_bytes=spec.seller_logo_bytes if spec.show_seller_logo else None,
+    )
+    elems.append(two_party_row(buyer_blk, seller_blk))
+    elems.append(Spacer(1, 0.12 * inch))
 
     # ── Meta rows
     if spec.meta_rows:
         elems.append(Paragraph(
-            L(spec, "DETAILS", "DÉTAILS"), styles["SectionTitle"]))
+            L(spec, "DOCUMENT DETAILS", "DÉTAILS DU DOCUMENT"),
+            styles["SectionTitle"]))
         meta_data = [
             [
                 Paragraph(L(spec, en, fr), styles["Detail"]),
@@ -250,8 +288,48 @@ def render_document(spec: DocumentSpec) -> bytes:
         elems.append(Spacer(1, 0.12 * inch))
         elems.append(line_tbl)
 
-    # ── Totals table
-    if spec.totals:
+    # ── iter476: itemized financial breakdown (transparent auction
+    # settlement layout).  Every row is populated ONLY from the persisted
+    # settlement record — blank fields render as "—" (never fabricated).
+    if spec.itemized_rows:
+        elems.append(Spacer(1, 0.15 * inch))
+        elems.append(Paragraph(
+            L(spec, "ITEMIZED SETTLEMENT BREAKDOWN",
+              "DÉTAIL DU RÈGLEMENT"),
+            styles["SectionTitle"]))
+        it_data = []
+        for (en, fr, val, is_bold) in spec.itemized_rows:
+            label = L(spec, en, fr)
+            v = val or "—"
+            if is_bold:
+                it_data.append([
+                    Paragraph(f"<b>{label}</b>", styles["Detail"]),
+                    Paragraph(f"<b>{v}</b>", styles["Detail"]),
+                ])
+            else:
+                it_data.append([
+                    Paragraph(label, styles["Detail"]),
+                    Paragraph(v, styles["Detail"]),
+                ])
+        it_tbl = Table(it_data, colWidths=[4.6 * inch, 2.4 * inch])
+        # Style: subtle GRID, TOTAL rows highlighted
+        s = [
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+            ("LINEBELOW", (0, 0), (-1, -1), 0.25, colors.HexColor("#e5e7eb")),
+            ("TOPPADDING", (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ]
+        for i, (_, _, _, is_bold) in enumerate(spec.itemized_rows):
+            if is_bold:
+                s.append(("BACKGROUND", (0, i), (-1, i), LIGHT_GRAY))
+                s.append(("LINEABOVE", (0, i), (-1, i), 1, PRIMARY_COLOR))
+        it_tbl.setStyle(TableStyle(s))
+        elems.append(it_tbl)
+
+    # ── Totals table (only rendered when no itemized breakdown is used;
+    # kept for backward compatibility with the seller-receipt generator).
+    if spec.totals and not spec.itemized_rows:
         totals_data = [
             [
                 Paragraph(L(spec, en, fr), styles["Detail"]),
@@ -273,7 +351,7 @@ def render_document(spec: DocumentSpec) -> bytes:
         elems.append(totals_tbl)
 
     # ── Legal footer (always includes GST/QST + issuer)
-    elems.append(Spacer(1, 0.2 * inch))
+    elems.append(Spacer(1, 0.18 * inch))
     legal = Paragraph(
         f"{PLATFORM_NAME} — GST {PLATFORM_GST} · QST {PLATFORM_QST}",
         styles["Tiny"],
@@ -380,3 +458,145 @@ def latest_currency(rows: List[Dict[str, Any]]) -> str:
         if c:
             return c
     return "CAD"
+
+
+# ═══════════════════════════════════════════════════════════════════
+#  iter476 — Party details + itemized-breakdown helpers.
+# ═══════════════════════════════════════════════════════════════════
+
+def party_from_user(user: Dict[str, Any]) -> Dict[str, str]:
+    """Extract the canonical BUYER/SELLER identification block from a
+    `db.users` row.  Handles both legacy and iter476-extended profiles."""
+    if not user:
+        return {"name": "", "email": "", "phone": "", "address": "",
+                "gst": "", "qst": "", "tax_number": ""}
+    name = (
+        user.get("company_name") or user.get("business_name")
+        or user.get("name") or user.get("full_name") or user.get("email") or ""
+    )
+    return {
+        "name":       name,
+        "email":      user.get("email") or "",
+        "phone":      user.get("phone") or "",
+        "address":    user.get("business_address")
+                      or user.get("address") or "",
+        "gst":        user.get("gst_number") or "",
+        "qst":        user.get("qst_number") or "",
+        "tax_number": user.get("tax_number") or "",
+    }
+
+
+def build_itemized_rows_for_buyer(
+    rows: List[Dict[str, Any]], *, currency: str, lang: str = "en",
+) -> List[Tuple[str, str, str, bool]]:
+    """Assemble the itemized-breakdown rows for a BUYER document.
+
+    Sums are pure — each column is summed verbatim across `rows`. When a
+    column is entirely missing on the source receipts (historical
+    pre-iter476 rows), the value is rendered as "—" so the reader can
+    see the field wasn't captured.  We NEVER split an aggregate to
+    invent an itemized value.
+    """
+    def _sum_or_blank(field: str) -> str:
+        total = Decimal("0")
+        any_populated = False
+        for r in rows:
+            v = r.get(field)
+            if v is None or v == "":
+                continue
+            try:
+                total += Decimal(str(v))
+                any_populated = True
+            except Exception:  # noqa: BLE001
+                continue
+        if not any_populated:
+            return "—"
+        return money(total, currency=currency)
+
+    # buyer stripe fee only shows if any row marks it as buyer-charged
+    stripe_field_populated = any(
+        r.get("stripe_fee") is not None and
+        str(r.get("stripe_fee_charged_to") or "").lower() == "buyer"
+        for r in rows
+    )
+
+    def _stripe_sum() -> str:
+        if not stripe_field_populated:
+            return "—"
+        total = Decimal("0")
+        for r in rows:
+            if str(r.get("stripe_fee_charged_to") or "").lower() == "buyer":
+                v = r.get("stripe_fee")
+                if v is not None:
+                    total += Decimal(str(v))
+        return money(total, currency=currency)
+
+    out: List[Tuple[str, str, str, bool]] = [
+        ("Hammer Price Subtotal", "Sous-total marteau",
+         sum_field(rows, "hammer_price"), False),
+        ("Hammer GST (5%)", "TPS marteau (5 %)",     _sum_or_blank("hammer_gst"), False),
+        ("Hammer QST (9.975%)", "TVQ marteau (9,975 %)", _sum_or_blank("hammer_qst"), False),
+        ("Buyer's Premium", "Prime d'acheteur",       _sum_or_blank("buyer_premium"), False),
+        ("Buyer's Premium GST (5%)", "TPS sur prime (5 %)",     _sum_or_blank("buyer_premium_gst"), False),
+        ("Buyer's Premium QST (9.975%)", "TVQ sur prime (9,975 %)", _sum_or_blank("buyer_premium_qst"), False),
+        ("BidVex Service Fee", "Frais de service BidVex", _sum_or_blank("service_fee"), False),
+        ("Service Fee GST (5%)", "TPS sur frais (5 %)",     _sum_or_blank("service_fee_gst"), False),
+        ("Service Fee QST (9.975%)", "TVQ sur frais (9,975 %)", _sum_or_blank("service_fee_qst"), False),
+        ("Stripe Card Processing Fee", "Frais de traitement Stripe", _stripe_sum(), False),
+        ("GRAND TOTAL PAID", "TOTAL PAYÉ",
+         sum_field(rows, "total_charged"), True),
+    ]
+    return out
+
+
+def build_itemized_rows_for_seller(
+    rows: List[Dict[str, Any]], *, currency: str, lang: str = "en",
+) -> List[Tuple[str, str, str, bool]]:
+    """Assemble the itemized-breakdown rows for a SELLER document
+    (statement / commission invoice)."""
+    def _sum_or_blank(field: str) -> str:
+        total = Decimal("0")
+        any_populated = False
+        for r in rows:
+            v = r.get(field)
+            if v is None or v == "":
+                continue
+            try:
+                total += Decimal(str(v))
+                any_populated = True
+            except Exception:  # noqa: BLE001
+                continue
+        if not any_populated:
+            return "—"
+        return money(total, currency=currency)
+
+    stripe_seller_populated = any(
+        r.get("stripe_fee") is not None and
+        str(r.get("stripe_fee_charged_to") or "").lower() == "seller"
+        for r in rows
+    )
+
+    def _stripe_seller_sum() -> str:
+        if not stripe_seller_populated:
+            return "—"
+        total = Decimal("0")
+        for r in rows:
+            if str(r.get("stripe_fee_charged_to") or "").lower() == "seller":
+                v = r.get("stripe_fee")
+                if v is not None:
+                    total += Decimal(str(v))
+        return money(total, currency=currency)
+
+    return [
+        ("Hammer Total (Gross)", "Marteau brut",
+         sum_field(rows, "hammer_price"), False),
+        ("Hammer GST Collected", "TPS marteau collectée", _sum_or_blank("hammer_gst"), False),
+        ("Hammer QST Collected", "TVQ marteau collectée", _sum_or_blank("hammer_qst"), False),
+        ("Seller Commission",   "Commission vendeur",     _sum_or_blank("seller_commission"), False),
+        ("Commission GST (5%)", "TPS sur commission (5 %)",     _sum_or_blank("seller_commission_gst"), False),
+        ("Commission QST (9.975%)", "TVQ sur commission (9,975 %)", _sum_or_blank("seller_commission_qst"), False),
+        ("Other Deductions",    "Autres retenues",        _sum_or_blank("other_deductions"), False),
+        ("Stripe Card Processing Fee", "Frais de traitement Stripe", _stripe_seller_sum(), False),
+        ("NET PAYOUT",          "PAIEMENT NET",
+         sum_field(rows, "net_payout"), True),
+    ]

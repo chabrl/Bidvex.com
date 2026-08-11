@@ -1,22 +1,8 @@
-"""iter475 — Section-specific document PDFs.
+"""iter475/476 — Section-specific document PDFs.
 
-Each generator returns PDF bytes.  Every dollar figure is read verbatim
-from `db.receipts` (never recomputed).
-
-Generators:
-  * `generate_storage_buyer_invoice`  — storage section buyer invoice
-  * `generate_marketplace_seller_statement` — marketplace seller
-    statement (aggregates one seller's marketplace `seller_statement`
-    receipts on a single-item listing)
-  * `generate_marketplace_seller_receipt`   — marketplace seller receipt
-  * `generate_vehicle_seller_statement`     — vehicle-auction seller
-    statement (per vehicle multi-lot event, aggregates all lots owned by
-    the seller)
-  * `generate_vehicle_seller_receipt`       — vehicle-auction seller
-    receipt
-  * `generate_vehicle_seller_commission_invoice` — vehicle-auction seller
-    commission invoice
-  * `generate_storage_seller_statement` / _receipt / _commission_invoice
+Every generator returns PDF bytes. Every dollar figure is read verbatim
+from `db.receipts` (never recomputed). iter476: both parties + itemized
+breakdown + BidVex letterhead + optional seller logo on buyer docs.
 """
 from __future__ import annotations
 
@@ -26,7 +12,10 @@ from typing import Any, Dict, List, Optional
 from services.pdf_generators.common import (
     DocumentSpec, render_document, money, sum_field, latest_currency,
     load_receipts_for_seller, load_receipts_for_buyer,
+    party_from_user, build_itemized_rows_for_buyer,
+    build_itemized_rows_for_seller,
 )
+from services.pdf_generators.branding import resolve_seller_logo_bytes
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -34,9 +23,6 @@ from services.pdf_generators.common import (
 # ═══════════════════════════════════════════════════════════════════
 
 def _stable_doc_id(prefix: str, listing_id: str, user_id: str) -> str:
-    """Deterministic invoice number so re-generation returns the same
-    identifier and `db.invoices` unique-index (section, listing, user,
-    invoice_type) can dedupe safely."""
     return f"{prefix}-{listing_id[-6:].upper()}-{user_id[-4:].upper()}"
 
 
@@ -44,13 +30,68 @@ async def _fetch_user(db, user_id: str) -> Dict[str, Any]:
     return (await db.users.find_one({"id": user_id}, {"_id": 0}) or {})
 
 
-def _party(user: Dict[str, Any]) -> Dict[str, str]:
-    return {
-        "party_name":    user.get("name") or user.get("email") or "",
-        "party_email":   user.get("email") or "",
-        "party_phone":   user.get("phone") or "",
-        "party_address": user.get("address") or "",
+async def _resolve_counterparty(
+    db, *, section: str, listing_id: str, my_id: str, my_role: str,
+    receipts: List[Dict[str, Any]],
+) -> Optional[str]:
+    """Given the current caller (buyer or seller) find the counterparty
+    id from either the receipts themselves or the listing document."""
+    # Try the receipts first (some receipts stamp buyer_id / seller_id
+    # explicitly).
+    for r in receipts:
+        cp = r.get("seller_id" if my_role == "buyer" else "buyer_id")
+        if cp and cp != my_id:
+            return cp
+    listing_col = {
+        "marketplace": "listings",
+        "lots": "multi_item_listings",
+        "vehicles": "vehicle_listings",
+        "storage": "storage_auctions",
+    }.get(section, "listings")
+    doc = await db[listing_col].find_one(
+        {"id": listing_id},
+        {"_id": 0, "seller_id": 1, "facility_owner_id": 1,
+         "winner_user_id": 1, "winning_bidder_id": 1,
+         "highest_bidder_id": 1},
+    ) or {}
+    if my_role == "buyer":
+        return doc.get("seller_id") or doc.get("facility_owner_id")
+    return (doc.get("winner_user_id") or doc.get("winning_bidder_id")
+            or doc.get("highest_bidder_id"))
+
+
+async def _build_two_party_kwargs(
+    db, *, section: str, listing_id: str,
+    buyer_id: Optional[str], seller_id: Optional[str],
+    show_seller_logo: bool,
+) -> Dict[str, Any]:
+    """Return the buyer/seller identification block kwargs used by every
+    iter476-standard DocumentSpec."""
+    buyer = await _fetch_user(db, buyer_id) if buyer_id else {}
+    seller = await _fetch_user(db, seller_id) if seller_id else {}
+    bp = party_from_user(buyer)
+    sp = party_from_user(seller)
+    kwargs = {
+        "buyer_name":       bp["name"],
+        "buyer_email":      bp["email"],
+        "buyer_phone":      bp["phone"],
+        "buyer_address":    bp["address"],
+        "buyer_gst":        bp["gst"],
+        "buyer_qst":        bp["qst"],
+        "buyer_tax_number": bp["tax_number"],
+        "seller_name":      sp["name"],
+        "seller_email":     sp["email"],
+        "seller_phone":     sp["phone"],
+        "seller_address":   sp["address"],
+        "seller_gst":       sp["gst"],
+        "seller_qst":       sp["qst"],
+        "seller_tax_number": sp["tax_number"],
+        "seller_logo_bytes": None,
+        "show_seller_logo": show_seller_logo,
     }
+    if show_seller_logo and seller_id:
+        kwargs["seller_logo_bytes"] = await resolve_seller_logo_bytes(db, seller_id)
+    return kwargs
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -66,13 +107,19 @@ async def generate_storage_buyer_invoice(
     if not rows:
         return None
 
-    buyer = await _fetch_user(db, user_id)
     listing = await db.storage_auctions.find_one(
         {"id": listing_id}, {"_id": 0, "title": 1, "facility_id": 1,
-                             "facility_name": 1, "location": 1}
+                             "facility_name": 1, "location": 1,
+                             "seller_id": 1, "facility_owner_id": 1}
     ) or {}
     currency = latest_currency(rows)
     first = rows[0]
+
+    seller_id = listing.get("seller_id") or listing.get("facility_owner_id")
+    party_kw = await _build_two_party_kwargs(
+        db, section="storage", listing_id=listing_id,
+        buyer_id=user_id, seller_id=seller_id, show_seller_logo=True,
+    )
 
     meta_rows = [
         ("Auction",     "Enchère",     listing.get("title") or listing_id),
@@ -90,13 +137,7 @@ async def generate_storage_buyer_invoice(
         money(r.get("total_charged"), currency=currency),
     ] for r in rows]
 
-    totals = [
-        ("Hammer subtotal", "Sous-total marteau", sum_field(rows, "hammer_price")),
-        ("Platform fee",    "Frais de plateforme", sum_field(rows, "platform_fee")),
-        ("Taxes",           "Taxes",               sum_field(rows, "taxes")),
-        ("Processing fee",  "Frais de traitement", sum_field(rows, "processing_fee")),
-        ("TOTAL DUE / PAID","TOTAL DÛ / PAYÉ",     sum_field(rows, "total_charged")),
-    ]
+    itemized = build_itemized_rows_for_buyer(rows, currency=currency, lang=lang)
 
     spec = DocumentSpec(
         title_en="STORAGE INVOICE",
@@ -104,14 +145,12 @@ async def generate_storage_buyer_invoice(
         document_id=_stable_doc_id("BV-STO-INV", listing_id, user_id),
         document_date=first.get("created_at") or datetime.now(timezone.utc),
         lang=lang,
-        party_label_en="BILL TO",
-        party_label_fr="FACTURER À",
-        **_party(buyer),
+        **party_kw,
         meta_rows=meta_rows,
         line_headers_en=line_headers_en,
         line_headers_fr=line_headers_fr,
         line_rows=line_rows,
-        totals=totals,
+        itemized_rows=itemized,
     )
     return render_document(spec)
 
@@ -131,12 +170,21 @@ async def _generate_generic_seller_statement(
     )
     if not rows:
         return None
-    seller = await _fetch_user(db, seller_id)
     listing = await db[listing_collection].find_one(
         {"id": listing_id}, {"_id": 0, "title": 1}
     ) or {}
     currency = latest_currency(rows)
     first = rows[0]
+
+    buyer_id = await _resolve_counterparty(
+        db, section=section, listing_id=listing_id, my_id=seller_id,
+        my_role="seller", receipts=rows,
+    )
+    party_kw = await _build_two_party_kwargs(
+        db, section=section, listing_id=listing_id,
+        buyer_id=buyer_id, seller_id=seller_id,
+        show_seller_logo=False,   # seller-facing doc → no seller logo overlay
+    )
 
     meta_rows = [
         ("Section", "Section", f"{section_label_en} · {section_label_fr}"
@@ -156,13 +204,7 @@ async def _generate_generic_seller_statement(
         money(r.get("net_payout"), currency=currency),
     ] for r in rows]
 
-    totals = [
-        ("Hammer subtotal", "Sous-total marteau", sum_field(rows, "hammer_price")),
-        ("Platform commission", "Commission de plateforme", sum_field(rows, "platform_fee")),
-        ("Taxes on commission", "Taxes sur commission", sum_field(rows, "taxes")),
-        ("Processing fee",  "Frais de traitement", sum_field(rows, "processing_fee")),
-        ("NET PAYOUT",      "PAIEMENT NET",       sum_field(rows, "net_payout")),
-    ]
+    itemized = build_itemized_rows_for_seller(rows, currency=currency, lang=lang)
 
     spec = DocumentSpec(
         title_en=title_en,
@@ -170,22 +212,21 @@ async def _generate_generic_seller_statement(
         document_id=_stable_doc_id("BV-STMT", listing_id, seller_id),
         document_date=first.get("created_at") or datetime.now(timezone.utc),
         lang=lang,
-        party_label_en="PAYEE",
-        party_label_fr="BÉNÉFICIAIRE",
-        **_party(seller),
+        **party_kw,
         meta_rows=meta_rows,
         line_headers_en=line_headers_en,
         line_headers_fr=line_headers_fr,
         line_rows=line_rows,
-        totals=totals,
+        itemized_rows=itemized,
         disclaimer_en=(
             "Payout is issued through your registered payout method. "
-            "See the seller receipt for a payment confirmation."
+            "See the seller receipt for a payment confirmation. Amounts "
+            "shown as '—' were not persisted at the time of settlement."
         ),
         disclaimer_fr=(
             "Le paiement est effectué via votre méthode de versement "
-            "enregistrée. Consultez le reçu du vendeur pour la "
-            "confirmation de paiement."
+            "enregistrée. Les montants affichés « — » n'ont pas été "
+            "enregistrés au moment du règlement."
         ),
     )
     return render_document(spec)
@@ -212,19 +253,23 @@ async def _generate_generic_seller_receipt(
     currency = latest_currency(rows)
     first = rows[0]
 
+    buyer_id = await _resolve_counterparty(
+        db, section=section, listing_id=listing_id, my_id=seller_id,
+        my_role="seller", receipts=rows,
+    )
+    party_kw = await _build_two_party_kwargs(
+        db, section=section, listing_id=listing_id,
+        buyer_id=buyer_id, seller_id=seller_id,
+        show_seller_logo=False,
+    )
+
     meta_rows = [
         ("Auction",  "Enchère",  listing.get("title") or listing_id),
         ("Payout method", "Méthode de versement", seller.get("payout_method") or "Stripe Connect"),
         ("Reference", "Référence", first.get("payout_reference") or first.get("order_number") or "—"),
     ]
 
-    totals = [
-        ("Hammer settled", "Marteau réglé",  sum_field(rows, "hammer_price")),
-        ("Commission withheld", "Commission retenue", sum_field(rows, "platform_fee")),
-        ("Taxes on commission", "Taxes sur commission", sum_field(rows, "taxes")),
-        ("Processing withheld", "Traitement retenu", sum_field(rows, "processing_fee")),
-        ("NET PAID TO SELLER", "PAYÉ AU VENDEUR", sum_field(rows, "net_payout")),
-    ]
+    itemized = build_itemized_rows_for_seller(rows, currency=currency, lang=lang)
 
     spec = DocumentSpec(
         title_en=title_en,
@@ -232,17 +277,15 @@ async def _generate_generic_seller_receipt(
         document_id=_stable_doc_id("BV-SRCPT", listing_id, seller_id),
         document_date=first.get("created_at") or datetime.now(timezone.utc),
         lang=lang,
-        party_label_en="PAID TO",
-        party_label_fr="PAYÉ À",
-        **_party(seller),
+        **party_kw,
         meta_rows=meta_rows,
-        totals=totals,
+        itemized_rows=itemized,
     )
     return render_document(spec)
 
 
 # ═══════════════════════════════════════════════════════════════════
-#  Seller Commission Invoice (marketplace / vehicles / storage)
+#  Seller Commission Invoice
 # ═══════════════════════════════════════════════════════════════════
 
 async def _generate_generic_commission_invoice(
@@ -255,12 +298,21 @@ async def _generate_generic_commission_invoice(
     )
     if not rows:
         return None
-    seller = await _fetch_user(db, seller_id)
     listing = await db[listing_collection].find_one(
         {"id": listing_id}, {"_id": 0, "title": 1}
     ) or {}
     currency = latest_currency(rows)
     first = rows[0]
+
+    buyer_id = await _resolve_counterparty(
+        db, section=section, listing_id=listing_id, my_id=seller_id,
+        my_role="seller", receipts=rows,
+    )
+    party_kw = await _build_two_party_kwargs(
+        db, section=section, listing_id=listing_id,
+        buyer_id=buyer_id, seller_id=seller_id,
+        show_seller_logo=False,
+    )
 
     meta_rows = [
         ("Auction",  "Enchère",  listing.get("title") or listing_id),
@@ -268,21 +320,23 @@ async def _generate_generic_commission_invoice(
         ("Line items","Lignes",   str(len(rows))),
     ]
 
-    line_headers_en = ["Lot", "Hammer", "Commission", "Tax on comm.", "Total"]
-    line_headers_fr = ["Lot", "Marteau", "Commission", "Taxe sur comm.", "Total"]
-    line_rows = [[
-        "—" if r.get("lot_number") is None else str(r["lot_number"]),
-        money(r.get("hammer_price"), currency=currency),
-        money(r.get("platform_fee"), currency=currency),
-        money(r.get("taxes"), currency=currency),
-        money((float(r.get("platform_fee") or 0) + float(r.get("taxes") or 0)), currency=currency),
-    ] for r in rows]
+    line_headers_en = ["Lot", "Hammer", "Commission", "Comm. tax", "Total"]
+    line_headers_fr = ["Lot", "Marteau", "Commission", "Taxe comm.", "Total"]
+    line_rows = []
+    for r in rows:
+        comm = r.get("seller_commission")
+        comm_gst = r.get("seller_commission_gst")
+        comm_qst = r.get("seller_commission_qst")
+        line_rows.append([
+            "—" if r.get("lot_number") is None else str(r["lot_number"]),
+            money(r.get("hammer_price"), currency=currency),
+            money(comm, currency=currency) if comm is not None else "—",
+            money((float(comm_gst or 0) + float(comm_qst or 0)), currency=currency) if (comm_gst or comm_qst) is not None else "—",
+            money((float(comm or 0) + float(comm_gst or 0) + float(comm_qst or 0)), currency=currency) if comm is not None else "—",
+        ])
 
-    totals = [
-        ("Total commission",    "Commission totale",   sum_field(rows, "platform_fee")),
-        ("Total tax",           "Taxes totales",       sum_field(rows, "taxes")),
-        ("AMOUNT WITHHELD",     "MONTANT RETENU",      sum_field(rows, "platform_fee")),  # note
-    ]
+    # Reuse the seller itemized helper (shows commission, taxes, net)
+    itemized = build_itemized_rows_for_seller(rows, currency=currency, lang=lang)
 
     spec = DocumentSpec(
         title_en=title_en,
@@ -290,21 +344,19 @@ async def _generate_generic_commission_invoice(
         document_id=_stable_doc_id("BV-COMM", listing_id, seller_id),
         document_date=first.get("created_at") or datetime.now(timezone.utc),
         lang=lang,
-        party_label_en="BILLED TO",
-        party_label_fr="FACTURÉ À",
-        **_party(seller),
+        **party_kw,
         meta_rows=meta_rows,
         line_headers_en=line_headers_en,
         line_headers_fr=line_headers_fr,
         line_rows=line_rows,
-        totals=totals,
+        itemized_rows=itemized,
         disclaimer_en=(
             "This commission was withheld from your gross hammer proceeds. "
             "See the seller statement for the net payout."
         ),
         disclaimer_fr=(
             "Cette commission a été retenue sur votre marteau brut. "
-            "Consultez le relevé de règlement du vendeur pour le montant net."
+            "Consultez le relevé du vendeur pour le montant net."
         ),
     )
     return render_document(spec)

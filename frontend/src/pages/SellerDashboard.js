@@ -35,6 +35,8 @@ import PromoteListingModal from '../components/PromoteListingModal';
 import { Sparkles, RefreshCw, Pencil, Receipt } from 'lucide-react';
 // iter474 — Per-row Documents access (statement / receipt / commission invoice)
 import { DocumentsPopover } from '../components/DocumentsPopover';
+// iter476 — Shared Business Settings / Billing Profile (logo + tax IDs)
+import BusinessSettingsCard from '../components/BusinessSettingsCard';
 
 const API = API_BASE;
 
@@ -299,6 +301,9 @@ const SellerDashboard = () => {
               <Mail className="mr-1.5 sm:mr-2 h-4 w-4 flex-shrink-0" />
               <span className="truncate">{t('dashboard.seller.clientMarketing', 'Marketing')}</span>
             </Button>
+            {/* iter476/477 — Shared Business & Billing Profile (logo + tax IDs
+                that appear on every invoice / receipt / statement) */}
+            <BusinessSettingsCard variant="seller" />
           </div>
         </div>
 

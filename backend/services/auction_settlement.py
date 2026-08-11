@@ -284,6 +284,45 @@ async def settle_cash_or_etransfer(
         "seller_tax_label": fee.get("seller_tax_label", ""),
         "seller_tax_province": fee.get("seller_tax_province", seller_prov),
         "seller_payout": float(fee["seller_payout"]),
+        # ── iter476 itemized snapshot (populated from the same authoritative FeeResult) ──
+        # BUYER SIDE — hammer tax is NOT collected here (individual/enterprise
+        # sellers don't have BidVex collect hammer GST/QST; that only applies
+        # to certain business paths and is handled by other verticals).
+        "hammer_gst": 0.0,
+        "hammer_qst": 0.0,
+        "buyer_premium_gst": float(fee.get("buyer_gst", 0)),
+        "buyer_premium_qst": float(fee.get("buyer_qst", 0)),
+        # Service fee (BidVex platform service) is bundled inside
+        # buyer_premium for the individual/enterprise route — expose it
+        # as 0/none to avoid double-counting.
+        "service_fee": 0.0,
+        "service_fee_gst": 0.0,
+        "service_fee_qst": 0.0,
+        "stripe_fee": float(fee.get("buyer_stripe_recovery", 0)),
+        "stripe_fee_charged_to": "buyer",   # buyer bears the gross-up
+        # SELLER SIDE
+        "seller_commission_gst": float(fee.get("seller_gst", 0)),
+        "seller_commission_qst": float(fee.get("seller_qst", 0)),
+        "other_deductions": float(fee.get("seller_stripe_recovery", 0)),
+        # Meta
+        "buyer_premium_rate": float(fee.get("buyer_premium_rate", 0)),
+        "seller_commission_rate": float(fee.get("seller_commission_rate", 0)),
+        "seller_is_tax_registered": False,
+    }
+    # Snapshot the itemized block once (before promo discounts) so the
+    # persisted receipt reflects the authoritative pre-discount split.
+    result["itemized"] = {
+        k: result["fee_breakdown"][k]
+        for k in (
+            "hammer_gst", "hammer_qst",
+            "buyer_premium", "buyer_premium_gst", "buyer_premium_qst",
+            "service_fee", "service_fee_gst", "service_fee_qst",
+            "stripe_fee", "stripe_fee_charged_to",
+            "seller_commission", "seller_commission_gst", "seller_commission_qst",
+            "other_deductions",
+            "buyer_premium_rate", "seller_commission_rate",
+            "seller_is_tax_registered",
+        )
     }
 
     # iter244 Mission 1 — Apply active promotion overrides at settlement.

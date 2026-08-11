@@ -1,0 +1,363 @@
+{
+  "iter": 477,
+  "passed": 49,
+  "total": 49,
+  "fixture": {
+    "buyer_total_paid": "269.65",
+    "seller_net_payout": "218.45"
+  },
+  "results": [
+    {
+      "test": "pre-check-fixture-reconciles",
+      "ok": true,
+      "buyer_delta_cents": 0,
+      "seller_delta_cents": 0,
+      "reasons": []
+    },
+    {
+      "test": "T1.marketplace-buyer-receipt-generated",
+      "ok": true,
+      "bytes": 2520072
+    },
+    {
+      "test": "T1.marketplace-buyer-itemized-lines-present",
+      "ok": true,
+      "missing": [],
+      "expected_grand_total": "269.65",
+      "sample_amounts": [
+        "20.00",
+        "1.00",
+        "2.00",
+        "8.00",
+        "0.40",
+        "0.80",
+        "7.50",
+        "269.65"
+      ]
+    },
+    {
+      "test": "T1.marketplace-buyer-db-vs-pdf-total-exact",
+      "ok": true,
+      "db_total": "269.65",
+      "pdf_total": "269.65"
+    },
+    {
+      "test": "T1.marketplace-buyer-party-block",
+      "ok": true,
+      "sample_text": "BidVex Inc. | 103-761 Chalifoux Street, Sherbrooke, QC, J1G 0A8 | 1-800-BIDVEX \u00b7 billing@bidvex.com | www.bidvex.com | GST 706766367RT0001 \u00b7 QST 1233530880TQ0001 | RECEIPT | No. BV-RCPT-7BBF3178 | Issued: Aug 11, 2"
+    },
+    {
+      "test": "T1.marketplace-seller-party-block",
+      "ok": true
+    },
+    {
+      "test": "T1.vehicles-buyer-receipt-generated",
+      "ok": true,
+      "bytes": 2520071
+    },
+    {
+      "test": "T1.vehicles-buyer-itemized-lines-present",
+      "ok": true,
+      "missing": [],
+      "expected_grand_total": "269.65",
+      "sample_amounts": [
+        "20.00",
+        "1.00",
+        "2.00",
+        "8.00",
+        "0.40",
+        "0.80",
+        "7.50",
+        "269.65"
+      ]
+    },
+    {
+      "test": "T1.vehicles-buyer-db-vs-pdf-total-exact",
+      "ok": true,
+      "db_total": "269.65",
+      "pdf_total": "269.65"
+    },
+    {
+      "test": "T1.vehicles-buyer-party-block",
+      "ok": true,
+      "sample_text": "BidVex Inc. | 103-761 Chalifoux Street, Sherbrooke, QC, J1G 0A8 | 1-800-BIDVEX \u00b7 billing@bidvex.com | www.bidvex.com | GST 706766367RT0001 \u00b7 QST 1233530880TQ0001 | RECEIPT | No. BV-RCPT-2953B580 | Issued: Aug 11, 2"
+    },
+    {
+      "test": "T1.vehicles-seller-party-block",
+      "ok": true
+    },
+    {
+      "test": "T1.storage-buyer-receipt-generated",
+      "ok": true,
+      "bytes": 2520078
+    },
+    {
+      "test": "T1.storage-buyer-itemized-lines-present",
+      "ok": true,
+      "missing": [],
+      "expected_grand_total": "269.65",
+      "sample_amounts": [
+        "20.00",
+        "1.00",
+        "2.00",
+        "8.00",
+        "0.40",
+        "0.80",
+        "7.50",
+        "269.65"
+      ]
+    },
+    {
+      "test": "T1.storage-buyer-db-vs-pdf-total-exact",
+      "ok": true,
+      "db_total": "269.65",
+      "pdf_total": "269.65"
+    },
+    {
+      "test": "T1.storage-buyer-party-block",
+      "ok": true,
+      "sample_text": "BidVex Inc. | 103-761 Chalifoux Street, Sherbrooke, QC, J1G 0A8 | 1-800-BIDVEX \u00b7 billing@bidvex.com | www.bidvex.com | GST 706766367RT0001 \u00b7 QST 1233530880TQ0001 | RECEIPT | No. BV-RCPT-99B0C67E | Issued: Aug 11, 2"
+    },
+    {
+      "test": "T1.storage-seller-party-block",
+      "ok": true
+    },
+    {
+      "test": "T1.lots-buyer-receipt-generated",
+      "ok": true,
+      "bytes": 2520596
+    },
+    {
+      "test": "T1.lots-buyer-itemized-lines-present",
+      "ok": true,
+      "missing": [],
+      "expected_grand_total": "539.30",
+      "sample_amounts": [
+        "40.00",
+        "2.00",
+        "4.00",
+        "16.00",
+        "0.80",
+        "1.60",
+        "15.00",
+        "539.30"
+      ]
+    },
+    {
+      "test": "T1.lots-buyer-db-vs-pdf-total-exact",
+      "ok": true,
+      "db_total": "539.30",
+      "pdf_total": "539.30"
+    },
+    {
+      "test": "T1.lots-buyer-party-block",
+      "ok": true,
+      "sample_text": "BidVex Inc. | 103-761 Chalifoux Street, Sherbrooke, QC, J1G 0A8 | 1-800-BIDVEX \u00b7 billing@bidvex.com | www.bidvex.com | GST 706766367RT0001 \u00b7 QST 1233530880TQ0001 | RECEIPT | No. BV-RCPT-FCE76775 | Issued: Aug 11, 2"
+    },
+    {
+      "test": "T1.lots-seller-party-block",
+      "ok": true
+    },
+    {
+      "test": "T5.storage-buyer-invoice-generated",
+      "ok": true
+    },
+    {
+      "test": "T5.storage-buyer-invoice-grand-total-exact",
+      "ok": true,
+      "expected": "269.65",
+      "sample_amounts": [
+        "2.00",
+        "8.00",
+        "0.40",
+        "0.80",
+        "7.50",
+        "269.65"
+      ]
+    },
+    {
+      "test": "T6.marketplace-seller-statement-generated",
+      "ok": true
+    },
+    {
+      "test": "T6.marketplace-seller-itemized-lines-present",
+      "ok": true,
+      "missing": [],
+      "expected_net": "218.45",
+      "sample": [
+        "200.00",
+        "10.00",
+        "19.95",
+        "10.00",
+        "0.50",
+        "1.00",
+        "0.00",
+        "218.45"
+      ]
+    },
+    {
+      "test": "T6.marketplace-seller-db-vs-pdf-net-exact",
+      "ok": true,
+      "db_net": "218.45",
+      "pdf_net": "218.45"
+    },
+    {
+      "test": "T7.marketplace-seller-receipt-generated",
+      "ok": true
+    },
+    {
+      "test": "T8.marketplace-seller-commission-invoice-generated",
+      "ok": true
+    },
+    {
+      "test": "T7.marketplace-seller-receipt-net-exact",
+      "ok": true,
+      "expected": "218.45"
+    },
+    {
+      "test": "T8.marketplace-seller-commission-invoice-commission-exact",
+      "ok": true,
+      "expected": "10.00"
+    },
+    {
+      "test": "T6.vehicles-seller-statement-generated",
+      "ok": true
+    },
+    {
+      "test": "T6.vehicles-seller-itemized-lines-present",
+      "ok": true,
+      "missing": [],
+      "expected_net": "218.45",
+      "sample": [
+        "200.00",
+        "10.00",
+        "19.95",
+        "10.00",
+        "0.50",
+        "1.00",
+        "0.00",
+        "218.45"
+      ]
+    },
+    {
+      "test": "T6.vehicles-seller-db-vs-pdf-net-exact",
+      "ok": true,
+      "db_net": "218.45",
+      "pdf_net": "218.45"
+    },
+    {
+      "test": "T7.vehicles-seller-receipt-generated",
+      "ok": true
+    },
+    {
+      "test": "T8.vehicles-seller-commission-invoice-generated",
+      "ok": true
+    },
+    {
+      "test": "T7.vehicles-seller-receipt-net-exact",
+      "ok": true,
+      "expected": "218.45"
+    },
+    {
+      "test": "T8.vehicles-seller-commission-invoice-commission-exact",
+      "ok": true,
+      "expected": "10.00"
+    },
+    {
+      "test": "T6.storage-seller-statement-generated",
+      "ok": true
+    },
+    {
+      "test": "T6.storage-seller-itemized-lines-present",
+      "ok": true,
+      "missing": [],
+      "expected_net": "218.45",
+      "sample": [
+        "200.00",
+        "10.00",
+        "19.95",
+        "10.00",
+        "0.50",
+        "1.00",
+        "0.00",
+        "218.45"
+      ]
+    },
+    {
+      "test": "T6.storage-seller-db-vs-pdf-net-exact",
+      "ok": true,
+      "db_net": "218.45",
+      "pdf_net": "218.45"
+    },
+    {
+      "test": "T7.storage-seller-receipt-generated",
+      "ok": true
+    },
+    {
+      "test": "T8.storage-seller-commission-invoice-generated",
+      "ok": true
+    },
+    {
+      "test": "T7.storage-seller-receipt-net-exact",
+      "ok": true,
+      "expected": "218.45"
+    },
+    {
+      "test": "T8.storage-seller-commission-invoice-commission-exact",
+      "ok": true,
+      "expected": "10.00"
+    },
+    {
+      "test": "T9.historical-buyer-receipt-generated",
+      "ok": true
+    },
+    {
+      "test": "T9.historical-shows-dash-placeholder",
+      "ok": true
+    },
+    {
+      "test": "T9.historical-aggregate-total-exact",
+      "ok": true,
+      "has_hammer": true,
+      "has_total": true
+    },
+    {
+      "test": "T9.historical-no-synthesis-of-itemized-fields",
+      "ok": true,
+      "fab_gst_present": false,
+      "fab_qst_present": false,
+      "found": [
+        "150.00",
+        "184.47",
+        "150.00",
+        "184.47"
+      ]
+    },
+    {
+      "test": "T10.itemized-row-persisted",
+      "ok": true,
+      "row_keys": [
+        "bidvex_gst_number",
+        "bidvex_qst_number",
+        "buyer_premium",
+        "buyer_premium_gst",
+        "buyer_premium_qst",
+        "buyer_premium_rate",
+        "created_at",
+        "currency",
+        "hammer_gst",
+        "hammer_price",
+        "hammer_qst",
+        "id",
+        "itemized_reconciled",
+        "itemized_version",
+        "iter477_seed",
+        "listing_id",
+        "listing_title",
+        "lot_number",
+        "net_payout",
+        "order_number"
+      ]
+    }
+  ]
+}

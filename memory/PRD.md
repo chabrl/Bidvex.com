@@ -1,6 +1,96 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter477 — Shared Business Settings Card Wiring + Strict PDF Reconciliation (Feb 11, 2026) ✅ COMPLETE — PREVIEW-ONLY, NOT DEPLOYED
+
+**Reported by user (P0)**: (1) Wire the newly-created shared `BusinessSettingsCard.jsx` (iter476) into the remaining three dashboards (Partner, Vehicle Dealer, Storage Facility) in addition to the Seller Dashboard. Follow this UX rule: if the dashboard has an existing Settings area, place it there; otherwise, put a clearly visible "Business & Logo" button in the header/top action area. Do not create a new tab just for this feature. Same shared component + modal across all four dashboards; consistent experience even if the trigger location differs slightly. (2) Prove strict PDF ↔ DB financial reconciliation on every new itemized PDF (buyer + seller, all four sections). No synthesis of historical breakdown values. For historical rows, preserve authoritative aggregate totals and render missing itemized fields as "—". Buyer: itemized components → exact `total_charged`. Seller: gross ± deductions → exact `net_payout`. If anything doesn't reconcile, stop and report the discrepancy rather than modifying the financial result to make the PDF balance.
+
+### Delivered (frontend — shared BusinessSettingsCard trigger placement)
+
+| Dashboard | File | Trigger location |
+|---|---|---|
+| Seller | `frontend/src/pages/SellerDashboard.js` | Top header action row, next to "Marketing" button (`variant="seller"`) |
+| Partner | `frontend/src/pages/PartnerDashboard.js` | Top header action row, next to "Create Lot / Single Item"; also rendered for fee-locked partners so billing profile can be prepared before annual fee is paid (`variant="partner"`) |
+| Vehicle Dealer | `frontend/src/pages/VehicleDashboardPage.jsx` | Top-right of the `<header>` block next to the "Manage your vehicle listings…" subheading (`variant="dealer"`) |
+| Storage Facility | `frontend/src/pages/facility/FacilityDashboard.jsx` | Inside the existing **Settings** tab (`variant="facility"`), wrapped in a "Business & Billing Profile" panel that explains the field's purpose |
+
+All triggers use the same `<BusinessSettingsCard variant=…/>` component from `frontend/src/components/BusinessSettingsCard.jsx` (iter476) — no duplication.
+
+### Delivered (backend — no changes needed)
+
+The `routes/business_settings.py` endpoint set from iter476 is unchanged. Verified live on preview via curl:
+- `GET /api/business-settings/me` → 200 (returns business profile, populated from `db.users`)
+- `PUT /api/business-settings/me` → 200 (owner-only; sanitizes tax IDs to `[A-Za-z0-9\-\s/]{0,32}`)
+- `PUT` with empty body → 400 `No fields to update`
+- Unauthorized → 401 (no token, invalid token)
+- `POST /api/business-settings/me/logo` (multipart) → 200 with public `logo_url` on Cloudflare R2
+- `POST` with `text/plain` file → 400 `Unsupported logo type`
+- `DELETE /api/business-settings/me/logo` → 200 `ok: true`
+
+### Delivered (strict PDF ↔ DB reconciliation)
+
+- **`backend/tests/live_verify_iter477_pdf_reconciliation.py`** — Runs the PDF generators IN-PROCESS (bypassing HTTP) so every dollar amount can be extracted from the rendered PDF with `pypdf` and compared byte-exact to the persisted `db.receipts` row. Idempotent: seeds `iter477-*` fixtures on entry, cleans them on exit. Never touches production data.
+- **Fixture reconciliation** (per lot): hammer 200.00, hammer GST 10.00, hammer QST 19.95, buyer premium 20.00, BP GST 1.00, BP QST 2.00, service fee 8.00, SF GST 0.40, SF QST 0.80, Stripe fee 7.50 (buyer). Seller commission 10.00, comm GST 0.50, comm QST 1.00. → **Buyer total_charged = CA$269.65 exact, Seller net_payout = CA$218.45 exact.** Verified against `services.receipts.reconcile_itemized` before persistence (buyer_delta_cents=0, seller_delta_cents=0).
+- **Historical fixture** (aggregate-only): hammer 150.00, taxes 22.42, total 184.47, net 142.50 — NO itemized fields.
+
+### Reconciliation results — **49/49 PASS**
+
+| Test group | Result |
+|---|---|
+| Pre-check — fixture itself reconciles via `reconcile_itemized` | ✅ 1/1 |
+| Universal Receipt (buyer) — Marketplace / Vehicles / Storage / Lots (multi-lot × 2 lots) | ✅ 5-line checks × 4 sections = 20/20 |
+| Storage Buyer Invoice (dedicated section endpoint) | ✅ 2/2 |
+| Seller Statement — Marketplace / Vehicles / Storage | ✅ 3-check × 3 sections = 9/9 |
+| Seller Receipt (net payout matches) — 3 sections | ✅ 6/6 |
+| Seller Commission Invoice (commission line matches) — 3 sections | ✅ 6/6 |
+| Historical row (aggregate-only) — dash placeholder + aggregate total + NO synthesis | ✅ 3/3 |
+| Itemized row persistence roundtrip (all 22 keys survive DB write) | ✅ 1/1 |
+| Multi-lot aggregation — 2 lots × iter477 fixture = CA$539.30 (verified byte-exact) | ✅ 1/1 |
+| **Anti-synthesis guard** (historical row must NOT invent hammer_gst = 5% × 150 = 7.50 or hammer_qst = 9.975% × 150 = 14.96) | ✅ passes — neither fabricated amount appears in rendered PDF |
+
+### Anti-synthesis proof
+
+For the historical receipt (150.00 hammer, no itemized fields), the rendered PDF contains:
+- `CA$150.00` (persisted hammer_price) ✓
+- `CA$184.47` (persisted total_charged) ✓
+- **NEITHER** `CA$7.50` (would-be 5% GST fabrication) **NOR** `CA$14.96` (would-be 9.975% QST fabrication)
+- Instead: every itemized row shows "—" (em-dash placeholder) per the `build_itemized_rows_for_buyer` "any_populated" guard.
+
+### Guardrails honoured
+
+- **No financial calculation changes.** `services/pdf_generators/*` only sums persisted receipt fields; never recomputes fees, taxes, or commissions.
+- **No changes to escrow / Stripe / payment collection / invoice content.** Preview-only.
+- **No production data touched.** All test rows prefixed `iter477-` and cleaned up on exit.
+- **Bilingual EN/FR preserved** — dialog + trigger button labels translate; PDF renderer honours `lang="en"` / `lang="fr"`.
+- **Owner-only ACL preserved** — `/api/business-settings/me` scopes every operation to `current_user.id`.
+- **Not deployed.**
+
+### Screenshots
+
+- `/tmp/iter477_seller_dashboard.png` — Seller Dashboard with "Entreprise et logo" button in header action row (FR locale).
+- `/tmp/iter477_vehicle_dashboard.png` — Vehicle Dashboard with "Business & Logo" button top-right of the header block.
+- `/tmp/iter477_facility_dashboard.png` — Facility Dashboard, Settings tab, showing "Business & Billing Profile" panel with description + "Business & Logo" trigger.
+- `/tmp/iter477_partner_dashboard.png` — Partner Dashboard with "Business & Logo" button in the header action row next to "Create a Lot Auction" / "List a Single Item".
+- `/tmp/iter477_business_dialog.png` — Modal open showing the full form (Business Name, Address, Phone, GST, QST, Tax number, Logo upload).
+
+### Files changed
+
+- `frontend/src/pages/SellerDashboard.js` — mounted `<BusinessSettingsCard variant="seller"/>` (import was pre-existing from iter476)
+- `frontend/src/pages/PartnerDashboard.js` — added import + `<BusinessSettingsCard variant="partner"/>` in both fee-paid and fee-locked branches
+- `frontend/src/pages/facility/FacilityDashboard.jsx` — added import + panel in the existing Settings tab
+- `frontend/src/pages/VehicleDashboardPage.jsx` — added import + trigger in header
+- `backend/tests/live_verify_iter477_pdf_reconciliation.py` — **NEW** in-process reconciliation harness
+- `test_reports/iter477_pdf_reconciliation.json` — 49/49 PASS report
+
+### Blocked (unchanged from iter467)
+
+- **Escrow payout live verification** still blocked on Stripe Sandbox CAD Available balance ≥ CA$14. Not touched in this iteration.
+
+### Not deployed
+
+Preview-only per user directive. Awaiting user go-ahead before any deploy.
+
+
 ## iter475 — Full PDF Generation Engines for All Sections & Roles (Feb 11, 2026) ✅ COMPLETE — PREVIEW-ONLY, NOT DEPLOYED
 
 **Reported by user (P0)**: In the deployed environment, buyer & seller dashboards showed every Documents-popover option disabled with "Not available yet" for Storage buyer invoice, Universal receipt (all sections), and Marketplace/Vehicle/Storage seller statement + receipt + commission invoice. Close every gap by building real PDF generators + endpoint wiring + reconciliation against settlement data. No changes to document CONTENT of the existing multi-lot flows, email delivery, payments, Stripe, escrow, fees, taxes, or production data.
