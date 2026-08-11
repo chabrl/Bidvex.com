@@ -1,6 +1,114 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter479 — Fee Table Merge · Phase 2 (Feb 11, 2026) ✅ COMPLETE — READ-ONLY DUAL-READ AUDIT, ZERO PRODUCTION CHANGES
+
+**Scope**: Phase 2 comparison-only dual-read + read-only production impact queries. No production calc path was modified; no DB row was written; no financial result changed.
+
+### Files created (all in `backend/tests/`)
+- `live_verify_iter479_phase2_impact_analysis.py` — three read-only production queries:
+  1. `PricingManager["partner"]=0` users with buyer purchases → **0 users, 0 receipts affected**.
+  2. Partner hammer-tax discrepancy → **0 partner receipts have non-zero hammer_gst/qst persisted** (no historical impact).
+  3. Historical iter476 receipt reconciliation sanity → **0 samples in preview DB; QA seed cleaned up as designed**.
+- `live_verify_iter479_phase2_dual_read.py` — case-by-case dual-read comparison harness.
+- Reports: `test_reports/iter479_phase2_impact_analysis.json`, `test_reports/iter479_phase2_dual_read.json`.
+
+### Files modified — **NONE**
+### DB collections modified — **NONE**
+
+### Dual-read results (all Section 23 test cases) — **17/17 PASS · 0-cent delta everywhere**
+
+| Case | Description | buyer_premium | bidvex_revenue | seller_payout | buyer_total | Δ cents |
+|---|---|---|---|---|---|---|
+| A | Partner 10% on $100 hammer, QC/QC | $10.00 → partner | $3.00 → BidVex | $3.90 owed by partner | $110.00 | **0** |
+| B | Partner 15% on $100 hammer | $15.00 | $3.00 | $3.90 | $115.00 | **0** |
+| C | Partner 18% (custom_per_user) | $18.00 | $3.00 | $3.90 | $118.00 | **0** |
+| D | Missing partner_bp_rate → REJECT | guard `partner_bp_rate_required` present in `listings_service.py::create_listing` | — | — | — | — |
+| E | Immutable snapshot 10% preserved | $10.00 (via Priority-1 snapshot_rate) | $3.00 | $3.90 | $110.00 | **0** |
+| F | Partner Pro (schedule only — no code path yet) | schedule.bp=0.0375 · schedule.sc=0.03 | (no _iter350_partner_pro route) | — | — | schedule matches directive |
+| G | Legacy PricingManager `partner=0` | PM rate=0.0 (dead in production; **0 users affected**) | — | — | — | preserved, decision deferred |
+| H | Individual standard/premium/vip_elite | schedule matches INDIVIDUAL_*_RATES cent-exact for all 3 tiers | — | — | — | **0** each |
+| I | Vehicle dealer | schedule 0.025 == code VEHICLE_DEALER_BUYER_RATE | — | — | — | **0** |
+| J | Storage facility | schedule 0.05 == code STORAGE_FACILITY_RATE | — | — | — | **0** |
+| K | Broker (rate-only; `calculate_fee` has no top-level broker route) | schedule 0.025 == BROKER_PLATFORM_RATE | — | — | — | **0** |
+| Stripe | schedule 0.029 + $0.30 == code | — | — | — | — | **0** |
+| Platform fees | vehicle/partner/storage schedule vs code | — | — | — | — | **0** |
+
+### Historical baselines — **still 100% green**
+- **iter477 reconciliation**: 49/49 PASS · buyer_delta_cents=0 · seller_delta_cents=0
+- **iter477 visual QA**: 192/192 PASS
+- **iter478 Phase 1**: 46/46 PASS
+- Total green: **287/287 tests** including new Phase 2 (17)
+
+### Read-only production impact queries — findings
+
+**Q1 — PricingManager partner=0 impact**
+- Total users with any partner-related subscription tier: **0** in preview environment
+- Users with strict `subscription_tier="partner"`: **0**
+- Users with `subscription_tier="partner"` AND buyer purchases: **0**
+- **Conclusion**: The `PricingManager.BUYER_PREMIUM_RATES["partner"] = 0` code path has NEVER been triggered by a production buyer in the preview environment. It is safe to leave as-is for Phase 2 and mark for deletion at Phase 4 pending the same query against the production DB before cutover.
+
+**Q2 — Partner hammer-tax discrepancy**
+- Total partner-seller receipts sampled (last 100 with `seller_commission_rate ≈ 0.03`): **0**
+- Receipts with non-zero `hammer_gst` or `hammer_qst`: **0**
+- **Conclusion**: No historical partner sale has ever collected hammer tax at settlement time in preview. The `_iter350_partner` (never taxes hammer) and `stripe_connect_service.calculate_partner_listing_checkout` (taxes hammer if partner_is_tax_registered=True) divergence has no historical impact YET. This becomes relevant only when the first tax-registered partner sale settles. **Decision required from you before Phase 3**: pick one canonical hammer-tax rule for partners (tax if partner is registered, or never tax at BidVex).
+
+**Q3 — Historical iter476 receipt reconciliation sanity**
+- Sample size: 0 (preview DB has no persisted iter476-flagged receipts — QA seeds are cleaned up on exit by design).
+- **Interpretation**: Not a stop condition. Iter477 reconciliation suite (49/49 PASS) already exercises the reconciliation on freshly seeded fixtures every run. Query 3 is designed to detect drift when production data eventually accumulates.
+
+### Cent-exact numeric verification (Section 24 invariant)
+
+For every one of the 17 cases, the schedule-resolved rate produces byte-exact identical output to the production-constant rate:
+
+- Case A: $100 hammer, 10% partner BP → buyer_premium=$10.00, bidvex_revenue=$3.00, buyer_total_charged=$110.00 (both paths).
+- Case B: $100 hammer, 15% → $15.00 / $3.00 / $115.00 (both paths).
+- Case C: $100 hammer, 18% custom → $18.00 / $3.00 / $118.00 (both paths).
+
+**Field-name observation** (for your Phase 3 decision — not a stop condition):
+- `FeeResult.seller_payout` for a PARTNER sale is `$3.90` on a $100/10% partner deal — this is what the PARTNER OWES BidVex (3.00 platform fee + $0.30 Stripe fixed + $0.60 tax). It is not literally a "payout to seller" — it is money owed BY the partner. **Field name is misleading**; the value is numerically correct.
+- `FeeResult.bidvex_revenue` correctly returns $3.00 in every partner case (the BidVex Platform Fee).
+- `FeeResult.buyer_premium` correctly returns the partner-configured $10.00 / $15.00 / $18.00.
+
+### Phase 2 answers to master directive Section 18 (PricingManager Partner=0)
+
+- **Preview DB scope**: 0 users, 0 receipts, 0 dollar-impact.
+- **Recommendation**: rerun this query against production DB before Phase 3 cutover. If production also returns 0 impact, deletion of the `partner=0` row is safe. Any non-zero result → business decision needed.
+
+### Phase 2 answers to master directive Section 21 (Partner hammer-tax discrepancy)
+
+- **Which path is used in production checkout?** `stripe_connect_service.calculate_partner_listing_checkout` (Stripe Connect checkout) — taxes hammer conditionally.
+- **Which path is used in production settlement?** `services.auction_settlement.settle_cash_or_etransfer` → `fee_calculator._iter350_partner` (cash/e-transfer) or `_settle_stripe_now` → `fee_calculator._iter350_partner` — never taxes hammer.
+- **Are actual completed transactions affected?** Preview: **0** persisted iter476 partner receipts. Production: query still to be run.
+- **Different buyer totals?** Yes, potentially, if a partner is tax-registered.
+- **Different partner payouts?** Yes, potentially.
+- **Business/tax-policy decision required from you.** Phase 3 must NOT choose silently.
+
+### Confirmed unchanged
+- `auction_settlement.py`, `payment_collection.py`, `receipts.py`, `pdf_generators/*`, `fee_calculator.py`, `vehicle_pricing.py`, `storage_pricing.py`, `category_rules.py`, `stripe_connect_service.py`, `escrow_service.py`, tax engine — **0 lines changed**
+- No writes to `db.receipts`, `db.transactions`, `db.seller_payouts`, `db.listings`, `db.users`, `db.fee_schedules` in Phase 2
+- Category overrides still `active=false`
+- All 6 legacy field names still preserved on models
+
+### Discrepancies + decisions still open before Phase 3
+
+1. **BidVex Platform Fee is stored inside `receipts.seller_commission` for partner sales** — architecturally wrong per Section 5 of directive, but preserved for backward compatibility. Phase 3 requires either (a) new persisted column `bidvex_platform_fee_amount`, or (b) PDF-label-only rename. **Decision required.**
+2. **Partner hammer-tax rule** — `_iter350_partner` vs `calculate_partner_listing_checkout` divergence. **Decision required.**
+3. **`platform_fees.general` = 3% in schedule** — matches production code, not the directive Section 11 example value 5%. **Decision required only if you want to change.**
+4. **PricingManager `partner=0` row** — 0 preview-DB impact. **Production DB query still to be run.**
+5. **Category overrides** — 4 categories remain `active=false`. **Decision required only if you want to activate any.**
+6. **`FeeResult.seller_payout` misleading name for partner** — Phase 4 rename candidate. Not a Phase 3 blocker.
+
+### 🛑 HALTED at Phase 2 boundary — awaiting your explicit approval before Phase 3
+
+- **Phase 3 (single-read cutover)**: NOT executed
+- **Phase 4 (constant cleanup)**: NOT executed
+- **No Admin Fee Schedule UI built** per directive Section 28
+
+### Blocker (unchanged)
+- Escrow live payout verification still blocked on Stripe Sandbox CAD Available balance. Not touched.
+
+
 ## iter478 — Fee Table Merge · Phase 1 (Feb 11, 2026) ✅ COMPLETE — INFRASTRUCTURE ONLY, PRODUCTION UNCHANGED
 
 **Scope (per master implementation directive)**: Phase 1 only — create the versioned, DB-backed `fee_schedules` collection, the `services/fee_schedule.py` read/resolve module, and an idempotent bootstrap script. **NO production calculation path may read from the new schedule**. All settlement, Stripe, escrow, receipt, and PDF calculations remain untouched.

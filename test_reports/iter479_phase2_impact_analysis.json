@@ -1,0 +1,35 @@
+{
+  "iter": "479-phase2-read-only-impact-analysis",
+  "generated_at": "2026-08-11T22:42:47.110915+00:00",
+  "query_1_pricingmanager_partner_zero": {
+    "test": "1.pricingmanager_partner_zero_impact",
+    "authoritative_source": "PricingManager.BUYER_PREMIUM_RATES[\"partner\"] = 0",
+    "total_users_with_partner_related_tier": 0,
+    "users_with_strict_subscription_tier_partner": 0,
+    "users_with_partner_tier_and_buyer_purchases": 0,
+    "sample_impacted_users": [],
+    "interpretation": "PricingManager's `partner`=0 buyer premium row is keyed by the BUYER's `subscription_tier`, not the seller's account type. It is only hit when a buyer whose subscription_tier is literally 'partner' checks out through PricingManager.non_vehicle_stripe or connect_payment_engine.  If `users_with_partner_tier_and_buyer_purchases == 0` no production settlement has ever been affected."
+  },
+  "query_2_partner_hammer_tax_discrepancy": {
+    "test": "2.partner_hammer_tax_discrepancy",
+    "code_paths_compared": {
+      "iter350_partner": "services.fee_calculator._iter350_partner \u2014 never taxes hammer. buyer_gst/buyer_qst always == tax_on(bidvex_fee+stripe_recovery, partner_prov). hammer_gst/hammer_qst never populated.",
+      "checkout_partner": "services.stripe_connect_service.calculate_partner_listing_checkout \u2014 taxes hammer IF partner_is_tax_registered=True. Otherwise 0."
+    },
+    "sample_partner_receipts_last_100": 0,
+    "receipts_with_nonzero_hammer_tax": 0,
+    "receipts_without_hammer_tax": 0,
+    "with_hammer_tax_sample": [],
+    "without_hammer_tax_sample": [],
+    "interpretation": "If `receipts_with_nonzero_hammer_tax == 0`, no production partner sale has ever collected hammer tax via the settlement path.  This means the CheckoutBreakdown 'if partner_is_tax_registered' branch has never been exercised on a persisted receipt, OR the auction_settlement path (which uses _iter350_partner and drops hammer_gst=0.0) is the authoritative production path.  Either way, no behavior change is authorized in Phase 2 \u2014 this is a business/tax-policy decision for you to make in Phase 3."
+  },
+  "query_3_historical_receipt_sanity": {
+    "test": "3.historical_receipt_reconciliation_sanity",
+    "sample_size": 0,
+    "reconciles": 0,
+    "does_not_reconcile": 0,
+    "detail": [],
+    "interpretation": "Every persisted iter476 itemized receipt is expected to reconcile (reconcile_itemized runs on write).  A drop below 100% would indicate that a persisted row has been mutated after settlement \u2014 which is a STOP condition."
+  },
+  "stop_conditions_detected": []
+}

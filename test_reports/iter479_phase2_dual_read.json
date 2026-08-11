@@ -1,0 +1,596 @@
+{
+  "iter": "479-phase2-dual-read",
+  "passed": 17,
+  "total": 17,
+  "cases": {
+    "A_partner_10pct": {
+      "deltas": {
+        "hammer_price": {
+          "current": 100.0,
+          "schedule": 100.0,
+          "cent_delta": 0
+        },
+        "buyer_premium": {
+          "current": 10.0,
+          "schedule": 10.0,
+          "cent_delta": 0
+        },
+        "buyer_premium_rate": {
+          "current": 0.1,
+          "schedule": 0.1,
+          "equal": true
+        },
+        "buyer_stripe_recovery": {
+          "current": 0.0,
+          "schedule": 0.0,
+          "cent_delta": 0
+        },
+        "buyer_taxes": {
+          "current": 0.0,
+          "schedule": 0.0,
+          "cent_delta": 0
+        },
+        "buyer_total_charged": {
+          "current": 110.0,
+          "schedule": 110.0,
+          "cent_delta": 0
+        },
+        "buyer_stripe_cents": {
+          "current": 11000.0,
+          "schedule": 11000.0,
+          "cent_delta": 0
+        },
+        "seller_commission": {
+          "current": 3.0,
+          "schedule": 3.0,
+          "cent_delta": 0
+        },
+        "seller_commission_rate": {
+          "current": 0.03,
+          "schedule": 0.03,
+          "equal": true
+        },
+        "seller_stripe_recovery": {
+          "current": 0.39,
+          "schedule": 0.39,
+          "cent_delta": 0
+        },
+        "seller_taxes": {
+          "current": 0.51,
+          "schedule": 0.51,
+          "cent_delta": 0
+        },
+        "seller_payout": {
+          "current": 3.9,
+          "schedule": 3.9,
+          "cent_delta": 0
+        },
+        "bidvex_revenue": {
+          "current": 3.0,
+          "schedule": 3.0,
+          "cent_delta": 0
+        }
+      },
+      "non_zero_cent_deltas": {},
+      "non_matching_rates": {},
+      "reconciles_exact": true,
+      "resolved_bp_rate": 0.1,
+      "a_current_result": {
+        "hammer_price": 100.0,
+        "buyer_premium": 10.0,
+        "buyer_premium_rate": 0.1,
+        "buyer_stripe_recovery": 0.0,
+        "buyer_taxes": 0.0,
+        "buyer_total_charged": 110.0,
+        "buyer_stripe_cents": 11000,
+        "seller_commission": 3.0,
+        "seller_commission_rate": 0.03,
+        "seller_stripe_recovery": 0.39,
+        "seller_taxes": 0.51,
+        "seller_payout": 3.9,
+        "bidvex_revenue": 3.0
+      },
+      "b_schedule_result": {
+        "hammer_price": 100.0,
+        "buyer_premium": 10.0,
+        "buyer_premium_rate": 0.1,
+        "buyer_stripe_recovery": 0.0,
+        "buyer_taxes": 0.0,
+        "buyer_total_charged": 110.0,
+        "buyer_stripe_cents": 11000,
+        "seller_commission": 3.0,
+        "seller_commission_rate": 0.03,
+        "seller_stripe_recovery": 0.39,
+        "seller_taxes": 0.51,
+        "seller_payout": 3.9,
+        "bidvex_revenue": 3.0
+      }
+    },
+    "B_partner_15pct": {
+      "deltas": {
+        "hammer_price": {
+          "current": 100.0,
+          "schedule": 100.0,
+          "cent_delta": 0
+        },
+        "buyer_premium": {
+          "current": 15.0,
+          "schedule": 15.0,
+          "cent_delta": 0
+        },
+        "buyer_premium_rate": {
+          "current": 0.15,
+          "schedule": 0.15,
+          "equal": true
+        },
+        "buyer_stripe_recovery": {
+          "current": 0.0,
+          "schedule": 0.0,
+          "cent_delta": 0
+        },
+        "buyer_taxes": {
+          "current": 0.0,
+          "schedule": 0.0,
+          "cent_delta": 0
+        },
+        "buyer_total_charged": {
+          "current": 115.0,
+          "schedule": 115.0,
+          "cent_delta": 0
+        },
+        "buyer_stripe_cents": {
+          "current": 11500.0,
+          "schedule": 11500.0,
+          "cent_delta": 0
+        },
+        "seller_commission": {
+          "current": 3.0,
+          "schedule": 3.0,
+          "cent_delta": 0
+        },
+        "seller_commission_rate": {
+          "current": 0.03,
+          "schedule": 0.03,
+          "equal": true
+        },
+        "seller_stripe_recovery": {
+          "current": 0.39,
+          "schedule": 0.39,
+          "cent_delta": 0
+        },
+        "seller_taxes": {
+          "current": 0.51,
+          "schedule": 0.51,
+          "cent_delta": 0
+        },
+        "seller_payout": {
+          "current": 3.9,
+          "schedule": 3.9,
+          "cent_delta": 0
+        },
+        "bidvex_revenue": {
+          "current": 3.0,
+          "schedule": 3.0,
+          "cent_delta": 0
+        }
+      },
+      "non_zero_cent_deltas": {},
+      "non_matching_rates": {},
+      "reconciles_exact": true,
+      "resolved_bp_rate": 0.15,
+      "a_current_result": {
+        "hammer_price": 100.0,
+        "buyer_premium": 15.0,
+        "buyer_premium_rate": 0.15,
+        "buyer_stripe_recovery": 0.0,
+        "buyer_taxes": 0.0,
+        "buyer_total_charged": 115.0,
+        "buyer_stripe_cents": 11500,
+        "seller_commission": 3.0,
+        "seller_commission_rate": 0.03,
+        "seller_stripe_recovery": 0.39,
+        "seller_taxes": 0.51,
+        "seller_payout": 3.9,
+        "bidvex_revenue": 3.0
+      },
+      "b_schedule_result": {
+        "hammer_price": 100.0,
+        "buyer_premium": 15.0,
+        "buyer_premium_rate": 0.15,
+        "buyer_stripe_recovery": 0.0,
+        "buyer_taxes": 0.0,
+        "buyer_total_charged": 115.0,
+        "buyer_stripe_cents": 11500,
+        "seller_commission": 3.0,
+        "seller_commission_rate": 0.03,
+        "seller_stripe_recovery": 0.39,
+        "seller_taxes": 0.51,
+        "seller_payout": 3.9,
+        "bidvex_revenue": 3.0
+      }
+    },
+    "C_partner_18pct_custom": {
+      "deltas": {
+        "hammer_price": {
+          "current": 100.0,
+          "schedule": 100.0,
+          "cent_delta": 0
+        },
+        "buyer_premium": {
+          "current": 18.0,
+          "schedule": 18.0,
+          "cent_delta": 0
+        },
+        "buyer_premium_rate": {
+          "current": 0.18,
+          "schedule": 0.18,
+          "equal": true
+        },
+        "buyer_stripe_recovery": {
+          "current": 0.0,
+          "schedule": 0.0,
+          "cent_delta": 0
+        },
+        "buyer_taxes": {
+          "current": 0.0,
+          "schedule": 0.0,
+          "cent_delta": 0
+        },
+        "buyer_total_charged": {
+          "current": 118.0,
+          "schedule": 118.0,
+          "cent_delta": 0
+        },
+        "buyer_stripe_cents": {
+          "current": 11800.0,
+          "schedule": 11800.0,
+          "cent_delta": 0
+        },
+        "seller_commission": {
+          "current": 3.0,
+          "schedule": 3.0,
+          "cent_delta": 0
+        },
+        "seller_commission_rate": {
+          "current": 0.03,
+          "schedule": 0.03,
+          "equal": true
+        },
+        "seller_stripe_recovery": {
+          "current": 0.39,
+          "schedule": 0.39,
+          "cent_delta": 0
+        },
+        "seller_taxes": {
+          "current": 0.51,
+          "schedule": 0.51,
+          "cent_delta": 0
+        },
+        "seller_payout": {
+          "current": 3.9,
+          "schedule": 3.9,
+          "cent_delta": 0
+        },
+        "bidvex_revenue": {
+          "current": 3.0,
+          "schedule": 3.0,
+          "cent_delta": 0
+        }
+      },
+      "non_zero_cent_deltas": {},
+      "non_matching_rates": {},
+      "reconciles_exact": true,
+      "resolved_bp_rate": 0.18,
+      "a_current_result": {
+        "hammer_price": 100.0,
+        "buyer_premium": 18.0,
+        "buyer_premium_rate": 0.18,
+        "buyer_stripe_recovery": 0.0,
+        "buyer_taxes": 0.0,
+        "buyer_total_charged": 118.0,
+        "buyer_stripe_cents": 11800,
+        "seller_commission": 3.0,
+        "seller_commission_rate": 0.03,
+        "seller_stripe_recovery": 0.39,
+        "seller_taxes": 0.51,
+        "seller_payout": 3.9,
+        "bidvex_revenue": 3.0
+      },
+      "b_schedule_result": {
+        "hammer_price": 100.0,
+        "buyer_premium": 18.0,
+        "buyer_premium_rate": 0.18,
+        "buyer_stripe_recovery": 0.0,
+        "buyer_taxes": 0.0,
+        "buyer_total_charged": 118.0,
+        "buyer_stripe_cents": 11800,
+        "seller_commission": 3.0,
+        "seller_commission_rate": 0.03,
+        "seller_stripe_recovery": 0.39,
+        "seller_taxes": 0.51,
+        "seller_payout": 3.9,
+        "bidvex_revenue": 3.0
+      }
+    },
+    "E_partner_10pct_snapshot": {
+      "deltas": {
+        "hammer_price": {
+          "current": 100.0,
+          "schedule": 100.0,
+          "cent_delta": 0
+        },
+        "buyer_premium": {
+          "current": 10.0,
+          "schedule": 10.0,
+          "cent_delta": 0
+        },
+        "buyer_premium_rate": {
+          "current": 0.1,
+          "schedule": 0.1,
+          "equal": true
+        },
+        "buyer_stripe_recovery": {
+          "current": 0.0,
+          "schedule": 0.0,
+          "cent_delta": 0
+        },
+        "buyer_taxes": {
+          "current": 0.0,
+          "schedule": 0.0,
+          "cent_delta": 0
+        },
+        "buyer_total_charged": {
+          "current": 110.0,
+          "schedule": 110.0,
+          "cent_delta": 0
+        },
+        "buyer_stripe_cents": {
+          "current": 11000.0,
+          "schedule": 11000.0,
+          "cent_delta": 0
+        },
+        "seller_commission": {
+          "current": 3.0,
+          "schedule": 3.0,
+          "cent_delta": 0
+        },
+        "seller_commission_rate": {
+          "current": 0.03,
+          "schedule": 0.03,
+          "equal": true
+        },
+        "seller_stripe_recovery": {
+          "current": 0.39,
+          "schedule": 0.39,
+          "cent_delta": 0
+        },
+        "seller_taxes": {
+          "current": 0.51,
+          "schedule": 0.51,
+          "cent_delta": 0
+        },
+        "seller_payout": {
+          "current": 3.9,
+          "schedule": 3.9,
+          "cent_delta": 0
+        },
+        "bidvex_revenue": {
+          "current": 3.0,
+          "schedule": 3.0,
+          "cent_delta": 0
+        }
+      },
+      "non_zero_cent_deltas": {},
+      "non_matching_rates": {},
+      "reconciles_exact": true,
+      "resolved_bp_rate": 0.1,
+      "a_current_result": {
+        "hammer_price": 100.0,
+        "buyer_premium": 10.0,
+        "buyer_premium_rate": 0.1,
+        "buyer_stripe_recovery": 0.0,
+        "buyer_taxes": 0.0,
+        "buyer_total_charged": 110.0,
+        "buyer_stripe_cents": 11000,
+        "seller_commission": 3.0,
+        "seller_commission_rate": 0.03,
+        "seller_stripe_recovery": 0.39,
+        "seller_taxes": 0.51,
+        "seller_payout": 3.9,
+        "bidvex_revenue": 3.0
+      },
+      "b_schedule_result": {
+        "hammer_price": 100.0,
+        "buyer_premium": 10.0,
+        "buyer_premium_rate": 0.1,
+        "buyer_stripe_recovery": 0.0,
+        "buyer_taxes": 0.0,
+        "buyer_total_charged": 110.0,
+        "buyer_stripe_cents": 11000,
+        "seller_commission": 3.0,
+        "seller_commission_rate": 0.03,
+        "seller_stripe_recovery": 0.39,
+        "seller_taxes": 0.51,
+        "seller_payout": 3.9,
+        "bidvex_revenue": 3.0
+      }
+    },
+    "D_missing_partner_bp_rate_rejected": {
+      "guard_string_present": true,
+      "guard_location": "services/listings_service.py::create_listing",
+      "reconciles_exact": true
+    },
+    "F_partner_pro": {
+      "schedule_bp": 0.0375,
+      "schedule_sc": 0.03,
+      "expected_bp": 0.0375,
+      "expected_sc": 0.03,
+      "reconciles_exact": true,
+      "note": "No _iter350_partner_pro code path currently exists.  Schedule correctly holds the canonical values; Phase 3 will add the code path that consumes them."
+    },
+    "G_pricingmanager_partner_zero": {
+      "pricingmanager_partner_bp_rate": 0.0,
+      "schedule_partner_buyer_tier": "<raises: FeeScheduleResolutionError>",
+      "action_required": "The PricingManager 0% path is only hit if a BUYER has subscription_tier='partner'.  Impact-analysis Q1 showed 0 such users have BUYER purchases in production.  Schedule intentionally does NOT define a 'partner' buyer tier \u2014 Phase 3 cutover must drop this legacy path via an explicit business decision, not a silent replacement.",
+      "reconciles_exact": true
+    },
+    "H_individual_standard_standard": {
+      "code_bp_rate": 0.05,
+      "schedule_bp_rate": 0.05,
+      "bp_rate_matches": true,
+      "code_sc_rate": 0.04,
+      "schedule_sc_rate": 0.04,
+      "sc_rate_matches": true,
+      "current_result": {
+        "hammer_price": 100.0,
+        "buyer_premium": 5.0,
+        "buyer_premium_rate": 0.05,
+        "buyer_stripe_recovery": 0.45,
+        "buyer_taxes": 0.82,
+        "buyer_total_charged": 106.27,
+        "buyer_stripe_cents": 10627,
+        "seller_commission": 4.0,
+        "seller_commission_rate": 0.04,
+        "seller_stripe_recovery": 0.42,
+        "seller_taxes": 0.66,
+        "seller_payout": 94.92,
+        "bidvex_revenue": 9.0
+      },
+      "reconciles_exact": true
+    },
+    "H_individual_premium_premium": {
+      "code_bp_rate": 0.035,
+      "schedule_bp_rate": 0.035,
+      "bp_rate_matches": true,
+      "code_sc_rate": 0.025,
+      "schedule_sc_rate": 0.025,
+      "sc_rate_matches": true,
+      "current_result": {
+        "hammer_price": 100.0,
+        "buyer_premium": 3.5,
+        "buyer_premium_rate": 0.035,
+        "buyer_stripe_recovery": 0.4,
+        "buyer_taxes": 0.58,
+        "buyer_total_charged": 104.48,
+        "buyer_stripe_cents": 10448,
+        "seller_commission": 2.5,
+        "seller_commission_rate": 0.025,
+        "seller_stripe_recovery": 0.37,
+        "seller_taxes": 0.43,
+        "seller_payout": 96.7,
+        "bidvex_revenue": 6.0
+      },
+      "reconciles_exact": true
+    },
+    "H_individual_vip_elite_vip_elite": {
+      "code_bp_rate": 0.03,
+      "schedule_bp_rate": 0.03,
+      "bp_rate_matches": true,
+      "code_sc_rate": 0.02,
+      "schedule_sc_rate": 0.02,
+      "sc_rate_matches": true,
+      "current_result": {
+        "hammer_price": 100.0,
+        "buyer_premium": 3.0,
+        "buyer_premium_rate": 0.03,
+        "buyer_stripe_recovery": 0.39,
+        "buyer_taxes": 0.51,
+        "buyer_total_charged": 103.9,
+        "buyer_stripe_cents": 10390,
+        "seller_commission": 2.0,
+        "seller_commission_rate": 0.02,
+        "seller_stripe_recovery": 0.36,
+        "seller_taxes": 0.35,
+        "seller_payout": 97.29,
+        "bidvex_revenue": 5.0
+      },
+      "reconciles_exact": true
+    },
+    "I_vehicle_dealer": {
+      "code_rate": 0.025,
+      "schedule_rate": 0.025,
+      "rate_matches": true,
+      "current_result": {
+        "hammer_price": 100.0,
+        "buyer_premium": 2.5,
+        "buyer_premium_rate": 0.025,
+        "buyer_stripe_recovery": 0.37,
+        "buyer_taxes": 0.43,
+        "buyer_total_charged": 3.3,
+        "buyer_stripe_cents": 330,
+        "seller_commission": 0.0,
+        "seller_commission_rate": 0.0,
+        "seller_stripe_recovery": 0.0,
+        "seller_taxes": 0.0,
+        "seller_payout": 100.0,
+        "bidvex_revenue": 2.5
+      },
+      "reconciles_exact": true
+    },
+    "J_storage_facility": {
+      "code_rate": 0.05,
+      "schedule_rate": 0.05,
+      "rate_matches": true,
+      "current_result": {
+        "hammer_price": 100.0,
+        "buyer_premium": 5.0,
+        "buyer_premium_rate": 0.05,
+        "buyer_stripe_recovery": 0.45,
+        "buyer_taxes": 0.82,
+        "buyer_total_charged": 106.27,
+        "buyer_stripe_cents": 10627,
+        "seller_commission": 0.0,
+        "seller_commission_rate": 0.0,
+        "seller_stripe_recovery": 0.0,
+        "seller_taxes": 0.0,
+        "seller_payout": 100.0,
+        "bidvex_revenue": 5.0
+      },
+      "reconciles_exact": true
+    },
+    "K_broker_rate_only": {
+      "code_rate": 0.025,
+      "schedule_rate": 0.025,
+      "rate_matches": true,
+      "note": "calculate_fee has no top-level 'broker' route; verified via constant.",
+      "reconciles_exact": true
+    },
+    "Stripe_schedule_vs_code": {
+      "schedule_percent": "0.029",
+      "code_percent": "0.029",
+      "schedule_fixed_cad": "0.30",
+      "code_fixed_cad": "0.30",
+      "reconciles_exact": true
+    },
+    "PlatformFees_vehicle": {
+      "schedule": 0.025,
+      "code": 0.025,
+      "reconciles_exact": true
+    },
+    "PlatformFees_partner": {
+      "schedule": 0.03,
+      "code": 0.03,
+      "reconciles_exact": true
+    },
+    "PlatformFees_storage": {
+      "schedule": 0.05,
+      "code": 0.05,
+      "reconciles_exact": true
+    }
+  },
+  "baselines": {
+    "iter477_reconciliation": {
+      "rc": 0,
+      "found_49_49": true
+    },
+    "iter477_visual_qa": {
+      "rc": 0,
+      "found_192_192": true
+    },
+    "iter478_phase1": {
+      "rc": 0,
+      "found_46_46": true
+    }
+  },
+  "stop_conditions_detected": []
+}
