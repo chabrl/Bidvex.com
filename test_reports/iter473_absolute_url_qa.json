@@ -1,0 +1,970 @@
+{
+  "backend_url": "https://prod-verify-2.preview.emergentagent.com",
+  "qa_inbox": "charbel911@gmail.com",
+  "checks": [
+    {
+      "name": "T1a: PUBLIC_BASE_URL wins over APP_URL",
+      "ok": true,
+      "detail": "https://qa.example.com"
+    },
+    {
+      "name": "T1b: falls back to APP_URL",
+      "ok": true,
+      "detail": "https://other.example.com"
+    },
+    {
+      "name": "T1c: skips localhost -> uses FRONTEND_URL",
+      "ok": true,
+      "detail": "https://frontend.example.com"
+    },
+    {
+      "name": "T1d: skips 127.0.0.1",
+      "ok": true,
+      "detail": "https://frontend.example.com"
+    },
+    {
+      "name": "T1e: skips non-http(s) scheme",
+      "ok": true,
+      "detail": "https://frontend.example.com"
+    },
+    {
+      "name": "T1f: returns empty when no host configured",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T2a: starts with https://",
+      "ok": true,
+      "detail": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/test-abc?e"
+    },
+    {
+      "name": "T2b: no `http:///` empty host",
+      "ok": true,
+      "detail": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/test-abc?e"
+    },
+    {
+      "name": "T2c: no localhost",
+      "ok": true,
+      "detail": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/test-abc?e"
+    },
+    {
+      "name": "T2d: includes /api/invoices/download/test-abc",
+      "ok": true,
+      "detail": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/test-abc?expires=1786464923&sig=b2a81ae78a44df7c9c48b5e3fae881214f252656dbca98b4c653b50c61f301b4"
+    },
+    {
+      "name": "T2e: has expires + sig query",
+      "ok": true,
+      "detail": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/test-abc?expires=1786464923&sig=b2a81ae78a44df7c9c48b5e3fae881214f252656dbca98b4c653b50c61f301b4"
+    },
+    {
+      "name": "T3a [lots][en][buyer]: href present",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3b [lots][en][buyer]: absolute HTTPS",
+      "ok": true,
+      "detail": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/c7fbaa84-d"
+    },
+    {
+      "name": "T3c [lots][en][buyer]: no http:///",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3d [lots][en][buyer]: no localhost/127.0.0.1",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3e [lots][en][buyer]: has /api/invoices/download/",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3f [lots][en][buyer]: has expires + sig",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3a [lots][en][seller]: href present",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3b [lots][en][seller]: absolute HTTPS",
+      "ok": true,
+      "detail": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/952d0784-4"
+    },
+    {
+      "name": "T3c [lots][en][seller]: no http:///",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3d [lots][en][seller]: no localhost/127.0.0.1",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3e [lots][en][seller]: has /api/invoices/download/",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3f [lots][en][seller]: has expires + sig",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3a [lots][fr][buyer]: href present",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3b [lots][fr][buyer]: absolute HTTPS",
+      "ok": true,
+      "detail": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/835f5f12-f"
+    },
+    {
+      "name": "T3c [lots][fr][buyer]: no http:///",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3d [lots][fr][buyer]: no localhost/127.0.0.1",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3e [lots][fr][buyer]: has /api/invoices/download/",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3f [lots][fr][buyer]: has expires + sig",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3a [lots][fr][seller]: href present",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3b [lots][fr][seller]: absolute HTTPS",
+      "ok": true,
+      "detail": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/0db6e042-6"
+    },
+    {
+      "name": "T3c [lots][fr][seller]: no http:///",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3d [lots][fr][seller]: no localhost/127.0.0.1",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3e [lots][fr][seller]: has /api/invoices/download/",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3f [lots][fr][seller]: has expires + sig",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3a [marketplace][en][buyer]: href present",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3b [marketplace][en][buyer]: absolute HTTPS",
+      "ok": true,
+      "detail": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/d3fd7eeb-b"
+    },
+    {
+      "name": "T3c [marketplace][en][buyer]: no http:///",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3d [marketplace][en][buyer]: no localhost/127.0.0.1",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3e [marketplace][en][buyer]: has /api/invoices/download/",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3f [marketplace][en][buyer]: has expires + sig",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3a [marketplace][en][seller]: href present",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3b [marketplace][en][seller]: absolute HTTPS",
+      "ok": true,
+      "detail": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/f36f2483-f"
+    },
+    {
+      "name": "T3c [marketplace][en][seller]: no http:///",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3d [marketplace][en][seller]: no localhost/127.0.0.1",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3e [marketplace][en][seller]: has /api/invoices/download/",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3f [marketplace][en][seller]: has expires + sig",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3a [marketplace][fr][buyer]: href present",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3b [marketplace][fr][buyer]: absolute HTTPS",
+      "ok": true,
+      "detail": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/e88111fe-5"
+    },
+    {
+      "name": "T3c [marketplace][fr][buyer]: no http:///",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3d [marketplace][fr][buyer]: no localhost/127.0.0.1",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3e [marketplace][fr][buyer]: has /api/invoices/download/",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3f [marketplace][fr][buyer]: has expires + sig",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3a [marketplace][fr][seller]: href present",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3b [marketplace][fr][seller]: absolute HTTPS",
+      "ok": true,
+      "detail": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/d21d5a9b-1"
+    },
+    {
+      "name": "T3c [marketplace][fr][seller]: no http:///",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3d [marketplace][fr][seller]: no localhost/127.0.0.1",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3e [marketplace][fr][seller]: has /api/invoices/download/",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3f [marketplace][fr][seller]: has expires + sig",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3a [vehicles][en][buyer]: href present",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3b [vehicles][en][buyer]: absolute HTTPS",
+      "ok": true,
+      "detail": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/54c031e6-0"
+    },
+    {
+      "name": "T3c [vehicles][en][buyer]: no http:///",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3d [vehicles][en][buyer]: no localhost/127.0.0.1",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3e [vehicles][en][buyer]: has /api/invoices/download/",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3f [vehicles][en][buyer]: has expires + sig",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3a [vehicles][en][seller]: href present",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3b [vehicles][en][seller]: absolute HTTPS",
+      "ok": true,
+      "detail": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/96a7c2dd-2"
+    },
+    {
+      "name": "T3c [vehicles][en][seller]: no http:///",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3d [vehicles][en][seller]: no localhost/127.0.0.1",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3e [vehicles][en][seller]: has /api/invoices/download/",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3f [vehicles][en][seller]: has expires + sig",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3a [vehicles][fr][buyer]: href present",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3b [vehicles][fr][buyer]: absolute HTTPS",
+      "ok": true,
+      "detail": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/69acaf20-3"
+    },
+    {
+      "name": "T3c [vehicles][fr][buyer]: no http:///",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3d [vehicles][fr][buyer]: no localhost/127.0.0.1",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3e [vehicles][fr][buyer]: has /api/invoices/download/",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3f [vehicles][fr][buyer]: has expires + sig",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3a [vehicles][fr][seller]: href present",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3b [vehicles][fr][seller]: absolute HTTPS",
+      "ok": true,
+      "detail": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/e1d4a8d2-f"
+    },
+    {
+      "name": "T3c [vehicles][fr][seller]: no http:///",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3d [vehicles][fr][seller]: no localhost/127.0.0.1",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3e [vehicles][fr][seller]: has /api/invoices/download/",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3f [vehicles][fr][seller]: has expires + sig",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3a [storage][en][buyer]: href present",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3b [storage][en][buyer]: absolute HTTPS",
+      "ok": true,
+      "detail": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/f8d17d54-4"
+    },
+    {
+      "name": "T3c [storage][en][buyer]: no http:///",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3d [storage][en][buyer]: no localhost/127.0.0.1",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3e [storage][en][buyer]: has /api/invoices/download/",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3f [storage][en][buyer]: has expires + sig",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3a [storage][en][seller]: href present",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3b [storage][en][seller]: absolute HTTPS",
+      "ok": true,
+      "detail": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/e5aa4715-2"
+    },
+    {
+      "name": "T3c [storage][en][seller]: no http:///",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3d [storage][en][seller]: no localhost/127.0.0.1",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3e [storage][en][seller]: has /api/invoices/download/",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3f [storage][en][seller]: has expires + sig",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3a [storage][fr][buyer]: href present",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3b [storage][fr][buyer]: absolute HTTPS",
+      "ok": true,
+      "detail": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/bd6e24e4-3"
+    },
+    {
+      "name": "T3c [storage][fr][buyer]: no http:///",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3d [storage][fr][buyer]: no localhost/127.0.0.1",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3e [storage][fr][buyer]: has /api/invoices/download/",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3f [storage][fr][buyer]: has expires + sig",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3a [storage][fr][seller]: href present",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3b [storage][fr][seller]: absolute HTTPS",
+      "ok": true,
+      "detail": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/04071137-a"
+    },
+    {
+      "name": "T3c [storage][fr][seller]: no http:///",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3d [storage][fr][seller]: no localhost/127.0.0.1",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3e [storage][fr][seller]: has /api/invoices/download/",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T3f [storage][fr][seller]: has expires + sig",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "T4 [lots][en][buyer] click \u2192 200 PDF",
+      "ok": true,
+      "detail": "status=200 type=application/pdf"
+    },
+    {
+      "name": "T4 [lots][en][seller] click \u2192 200 PDF",
+      "ok": true,
+      "detail": "status=200 type=application/pdf"
+    },
+    {
+      "name": "T4 [lots][fr][buyer] click \u2192 200 PDF",
+      "ok": true,
+      "detail": "status=200 type=application/pdf"
+    },
+    {
+      "name": "T4 [lots][fr][seller] click \u2192 200 PDF",
+      "ok": true,
+      "detail": "status=200 type=application/pdf"
+    },
+    {
+      "name": "T4 [marketplace][en][buyer] click \u2192 200 PDF",
+      "ok": true,
+      "detail": "status=200 type=application/pdf"
+    },
+    {
+      "name": "T4 [marketplace][en][seller] click \u2192 200 PDF",
+      "ok": true,
+      "detail": "status=200 type=application/pdf"
+    },
+    {
+      "name": "T4 [marketplace][fr][buyer] click \u2192 200 PDF",
+      "ok": true,
+      "detail": "status=200 type=application/pdf"
+    },
+    {
+      "name": "T4 [marketplace][fr][seller] click \u2192 200 PDF",
+      "ok": true,
+      "detail": "status=200 type=application/pdf"
+    },
+    {
+      "name": "T4 [vehicles][en][buyer] click \u2192 200 PDF",
+      "ok": true,
+      "detail": "status=200 type=application/pdf"
+    },
+    {
+      "name": "T4 [vehicles][en][seller] click \u2192 200 PDF",
+      "ok": true,
+      "detail": "status=200 type=application/pdf"
+    },
+    {
+      "name": "T4 [vehicles][fr][buyer] click \u2192 200 PDF",
+      "ok": true,
+      "detail": "status=200 type=application/pdf"
+    },
+    {
+      "name": "T4 [vehicles][fr][seller] click \u2192 200 PDF",
+      "ok": true,
+      "detail": "status=200 type=application/pdf"
+    },
+    {
+      "name": "T4 [storage][en][buyer] click \u2192 200 PDF",
+      "ok": true,
+      "detail": "status=200 type=application/pdf"
+    },
+    {
+      "name": "T4 [storage][en][seller] click \u2192 200 PDF",
+      "ok": true,
+      "detail": "status=200 type=application/pdf"
+    },
+    {
+      "name": "T4 [storage][fr][buyer] click \u2192 200 PDF",
+      "ok": true,
+      "detail": "status=200 type=application/pdf"
+    },
+    {
+      "name": "T4 [storage][fr][seller] click \u2192 200 PDF",
+      "ok": true,
+      "detail": "status=200 type=application/pdf"
+    },
+    {
+      "name": "T5a: expired signature returns 401/403/410",
+      "ok": true,
+      "detail": "got 403"
+    },
+    {
+      "name": "T5b: expired signature does NOT return 200",
+      "ok": true,
+      "detail": "got 403"
+    },
+    {
+      "name": "T6a: forged signature (A's sig on B's id) rejected",
+      "ok": true,
+      "detail": "got 403"
+    },
+    {
+      "name": "T6b: forged does NOT return 200",
+      "ok": true,
+      "detail": "got 403"
+    }
+  ],
+  "hrefs": [
+    {
+      "section": "lots",
+      "lang": "en",
+      "role": "buyer",
+      "href": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/c7fbaa84-d00e-4148-8edd-0145f66850e8?expires=1786464924&sig=e3ebb612a42d2241ae2391ac5abdca411424e1b74d529d48e5b4ae7b3e6e35ae",
+      "to_email": "charbel911+iter473-buyer-L-EN-9dfd@gmail.com",
+      "subject": "BidVex \u2014 Your invoice for iter473 LOTS EN \u2014 L-EN"
+    },
+    {
+      "section": "lots",
+      "lang": "en",
+      "role": "seller",
+      "href": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/952d0784-422c-40ae-a84e-9fc65a12259a?expires=1786464924&sig=69044b7ec713192b7b1944af8a50b0563592aabc9b790f6448012aad2bc3e2c3",
+      "to_email": "charbel911+iter473-seller-L-EN-d936@gmail.com",
+      "subject": "BidVex \u2014 Your settlement statement \u2014 iter473 LOTS EN \u2014 L-EN"
+    },
+    {
+      "section": "lots",
+      "lang": "fr",
+      "role": "buyer",
+      "href": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/835f5f12-f967-4478-bada-06b0b1769365?expires=1786464925&sig=1055066b6fbf62f6a57e43b581d8cc484125d7f66202825c9c49fa3f7fdb10a6",
+      "to_email": "charbel911+iter473-buyer-L-FR-2aeb@gmail.com",
+      "subject": "BidVex \u2014 Votre facture pour iter473 LOTS FR \u2014 L-FR"
+    },
+    {
+      "section": "lots",
+      "lang": "fr",
+      "role": "seller",
+      "href": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/0db6e042-6db5-488c-b1bc-f19a1ea49fa3?expires=1786464925&sig=7706f6b9c40203112d495496b1bc7aaf3a8c272190f1b7d255db04cdc54634bc",
+      "to_email": "charbel911+iter473-seller-L-FR-4c45@gmail.com",
+      "subject": "BidVex \u2014 Votre relev&eacute; de r&egrave;glement \u2014 iter473 LOTS FR \u2014 L-FR"
+    },
+    {
+      "section": "marketplace",
+      "lang": "en",
+      "role": "buyer",
+      "href": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/d3fd7eeb-b506-463b-b89f-01bd30d11762?expires=1786464926&sig=602fe2b7dd274cc0d826a1aa4008feb07b9afe26677a2eca5fa55c4c77c14907",
+      "to_email": "charbel911+iter473-buyer-M-EN-59e0@gmail.com",
+      "subject": "BidVex \u2014 Your invoice for iter473 MARKETPLACE EN \u2014 M-EN"
+    },
+    {
+      "section": "marketplace",
+      "lang": "en",
+      "role": "seller",
+      "href": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/f36f2483-f0a8-4d96-8f54-dbe289b22783?expires=1786464926&sig=0fbb2c7d2392fcd5d517b3e17167ed164ffc68bd13235551efca5ccda88a1bfc",
+      "to_email": "charbel911+iter473-seller-M-EN-6146@gmail.com",
+      "subject": "BidVex \u2014 Your settlement statement \u2014 iter473 MARKETPLACE EN \u2014 M-EN"
+    },
+    {
+      "section": "marketplace",
+      "lang": "fr",
+      "role": "buyer",
+      "href": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/e88111fe-5c4b-46a0-ae53-8ed692fdded3?expires=1786464927&sig=7912853b622f3ed8315a10a54cb161c47851272e1660ab93bc12c8fe798753eb",
+      "to_email": "charbel911+iter473-buyer-M-FR-4de8@gmail.com",
+      "subject": "BidVex \u2014 Votre facture pour iter473 MARKETPLACE FR \u2014 M-FR"
+    },
+    {
+      "section": "marketplace",
+      "lang": "fr",
+      "role": "seller",
+      "href": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/d21d5a9b-1f6b-474d-807d-f98e8db4d731?expires=1786464927&sig=39df4abc9d97ed3afa8729843ec7398332b7642db5356604daed21d022d5b523",
+      "to_email": "charbel911+iter473-seller-M-FR-f814@gmail.com",
+      "subject": "BidVex \u2014 Votre relev&eacute; de r&egrave;glement \u2014 iter473 MARKETPLACE FR \u2014 M-FR"
+    },
+    {
+      "section": "vehicles",
+      "lang": "en",
+      "role": "buyer",
+      "href": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/54c031e6-0ede-48e1-b1c5-7d1ce9498e07?expires=1786464928&sig=cb9c90c234061c2de4a67bb42409e63fe6880b60b8faecb873240d953bcf2854",
+      "to_email": "charbel911+iter473-buyer-V-EN-2508@gmail.com",
+      "subject": "BidVex \u2014 Your invoice for iter473 VEHICLES EN \u2014 V-EN"
+    },
+    {
+      "section": "vehicles",
+      "lang": "en",
+      "role": "seller",
+      "href": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/96a7c2dd-265d-4a0c-93f6-cfc542775b06?expires=1786464928&sig=a10d07d30fd981fd9648527b47cb71dfb3b1d956a134829e8a2edc4580487d5f",
+      "to_email": "charbel911+iter473-seller-V-EN-4285@gmail.com",
+      "subject": "BidVex \u2014 Your settlement statement \u2014 iter473 VEHICLES EN \u2014 V-EN"
+    },
+    {
+      "section": "vehicles",
+      "lang": "fr",
+      "role": "buyer",
+      "href": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/69acaf20-346b-4b8b-8d0a-62d2394521f0?expires=1786464929&sig=90d8b67e64664e70305137928a881dab948ef1922daf407c73dcb38becc1146f",
+      "to_email": "charbel911+iter473-buyer-V-FR-d4c4@gmail.com",
+      "subject": "BidVex \u2014 Votre facture pour iter473 VEHICLES FR \u2014 V-FR"
+    },
+    {
+      "section": "vehicles",
+      "lang": "fr",
+      "role": "seller",
+      "href": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/e1d4a8d2-f183-4d6b-8f81-308a0dad8cbb?expires=1786464929&sig=06046b7a2d55d5c0c2e371a32ba6a25786cfef742b0ad943a20a79f3ecc31a5e",
+      "to_email": "charbel911+iter473-seller-V-FR-678c@gmail.com",
+      "subject": "BidVex \u2014 Votre relev&eacute; de r&egrave;glement \u2014 iter473 VEHICLES FR \u2014 V-FR"
+    },
+    {
+      "section": "storage",
+      "lang": "en",
+      "role": "buyer",
+      "href": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/f8d17d54-4606-47f0-a366-4509e6f97a3b?expires=1786464930&sig=bb83edc9e6bdcaec2ca4f621c294fb96720910dc9b22c6ea7e05287c9007412c",
+      "to_email": "charbel911+iter473-buyer-S-EN-47fd@gmail.com",
+      "subject": "BidVex \u2014 Your invoice for iter473 STORAGE EN \u2014 S-EN"
+    },
+    {
+      "section": "storage",
+      "lang": "en",
+      "role": "seller",
+      "href": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/e5aa4715-2b0a-490b-a2ed-a70c254ef25b?expires=1786464930&sig=cc02c351f18a95b0cd4d72e15fc9c8484a78316d6c930881a969f6b9eecd6ba3",
+      "to_email": "charbel911+iter473-seller-S-EN-a13b@gmail.com",
+      "subject": "BidVex \u2014 Your settlement statement \u2014 iter473 STORAGE EN \u2014 S-EN"
+    },
+    {
+      "section": "storage",
+      "lang": "fr",
+      "role": "buyer",
+      "href": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/bd6e24e4-383b-4896-8fe5-7dc2da604133?expires=1786464931&sig=bcb925d8408e71caf34d50d7af109a5ab843a3b269243610a99cb0de5fcc18fb",
+      "to_email": "charbel911+iter473-buyer-S-FR-7670@gmail.com",
+      "subject": "BidVex \u2014 Votre facture pour iter473 STORAGE FR \u2014 S-FR"
+    },
+    {
+      "section": "storage",
+      "lang": "fr",
+      "role": "seller",
+      "href": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/04071137-a4db-4029-a2e5-9e4bed95e138?expires=1786464931&sig=3086d9ec36b740def23e8f8c003db4b7eac9103d63a5a78dd75a7044b9a563d4",
+      "to_email": "charbel911+iter473-seller-S-FR-f6c3@gmail.com",
+      "subject": "BidVex \u2014 Votre relev&eacute; de r&egrave;glement \u2014 iter473 STORAGE FR \u2014 S-FR"
+    }
+  ],
+  "click_through": [
+    {
+      "section": "lots",
+      "lang": "en",
+      "role": "buyer",
+      "href": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/c7fbaa84-d00e-4148-8edd-0145f66850e8?expires=1786464924&sig=e3ebb612a42d2241ae2391ac5abdca411424e1b74d529d48e5b4ae7b3e6e35ae",
+      "to_email": "charbel911+iter473-buyer-L-EN-9dfd@gmail.com",
+      "subject": "BidVex \u2014 Your invoice for iter473 LOTS EN \u2014 L-EN",
+      "status": 200,
+      "content_type": "application/pdf",
+      "ok": true
+    },
+    {
+      "section": "lots",
+      "lang": "en",
+      "role": "seller",
+      "href": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/952d0784-422c-40ae-a84e-9fc65a12259a?expires=1786464924&sig=69044b7ec713192b7b1944af8a50b0563592aabc9b790f6448012aad2bc3e2c3",
+      "to_email": "charbel911+iter473-seller-L-EN-d936@gmail.com",
+      "subject": "BidVex \u2014 Your settlement statement \u2014 iter473 LOTS EN \u2014 L-EN",
+      "status": 200,
+      "content_type": "application/pdf",
+      "ok": true
+    },
+    {
+      "section": "lots",
+      "lang": "fr",
+      "role": "buyer",
+      "href": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/835f5f12-f967-4478-bada-06b0b1769365?expires=1786464925&sig=1055066b6fbf62f6a57e43b581d8cc484125d7f66202825c9c49fa3f7fdb10a6",
+      "to_email": "charbel911+iter473-buyer-L-FR-2aeb@gmail.com",
+      "subject": "BidVex \u2014 Votre facture pour iter473 LOTS FR \u2014 L-FR",
+      "status": 200,
+      "content_type": "application/pdf",
+      "ok": true
+    },
+    {
+      "section": "lots",
+      "lang": "fr",
+      "role": "seller",
+      "href": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/0db6e042-6db5-488c-b1bc-f19a1ea49fa3?expires=1786464925&sig=7706f6b9c40203112d495496b1bc7aaf3a8c272190f1b7d255db04cdc54634bc",
+      "to_email": "charbel911+iter473-seller-L-FR-4c45@gmail.com",
+      "subject": "BidVex \u2014 Votre relev&eacute; de r&egrave;glement \u2014 iter473 LOTS FR \u2014 L-FR",
+      "status": 200,
+      "content_type": "application/pdf",
+      "ok": true
+    },
+    {
+      "section": "marketplace",
+      "lang": "en",
+      "role": "buyer",
+      "href": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/d3fd7eeb-b506-463b-b89f-01bd30d11762?expires=1786464926&sig=602fe2b7dd274cc0d826a1aa4008feb07b9afe26677a2eca5fa55c4c77c14907",
+      "to_email": "charbel911+iter473-buyer-M-EN-59e0@gmail.com",
+      "subject": "BidVex \u2014 Your invoice for iter473 MARKETPLACE EN \u2014 M-EN",
+      "status": 200,
+      "content_type": "application/pdf",
+      "ok": true
+    },
+    {
+      "section": "marketplace",
+      "lang": "en",
+      "role": "seller",
+      "href": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/f36f2483-f0a8-4d96-8f54-dbe289b22783?expires=1786464926&sig=0fbb2c7d2392fcd5d517b3e17167ed164ffc68bd13235551efca5ccda88a1bfc",
+      "to_email": "charbel911+iter473-seller-M-EN-6146@gmail.com",
+      "subject": "BidVex \u2014 Your settlement statement \u2014 iter473 MARKETPLACE EN \u2014 M-EN",
+      "status": 200,
+      "content_type": "application/pdf",
+      "ok": true
+    },
+    {
+      "section": "marketplace",
+      "lang": "fr",
+      "role": "buyer",
+      "href": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/e88111fe-5c4b-46a0-ae53-8ed692fdded3?expires=1786464927&sig=7912853b622f3ed8315a10a54cb161c47851272e1660ab93bc12c8fe798753eb",
+      "to_email": "charbel911+iter473-buyer-M-FR-4de8@gmail.com",
+      "subject": "BidVex \u2014 Votre facture pour iter473 MARKETPLACE FR \u2014 M-FR",
+      "status": 200,
+      "content_type": "application/pdf",
+      "ok": true
+    },
+    {
+      "section": "marketplace",
+      "lang": "fr",
+      "role": "seller",
+      "href": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/d21d5a9b-1f6b-474d-807d-f98e8db4d731?expires=1786464927&sig=39df4abc9d97ed3afa8729843ec7398332b7642db5356604daed21d022d5b523",
+      "to_email": "charbel911+iter473-seller-M-FR-f814@gmail.com",
+      "subject": "BidVex \u2014 Votre relev&eacute; de r&egrave;glement \u2014 iter473 MARKETPLACE FR \u2014 M-FR",
+      "status": 200,
+      "content_type": "application/pdf",
+      "ok": true
+    },
+    {
+      "section": "vehicles",
+      "lang": "en",
+      "role": "buyer",
+      "href": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/54c031e6-0ede-48e1-b1c5-7d1ce9498e07?expires=1786464928&sig=cb9c90c234061c2de4a67bb42409e63fe6880b60b8faecb873240d953bcf2854",
+      "to_email": "charbel911+iter473-buyer-V-EN-2508@gmail.com",
+      "subject": "BidVex \u2014 Your invoice for iter473 VEHICLES EN \u2014 V-EN",
+      "status": 200,
+      "content_type": "application/pdf",
+      "ok": true
+    },
+    {
+      "section": "vehicles",
+      "lang": "en",
+      "role": "seller",
+      "href": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/96a7c2dd-265d-4a0c-93f6-cfc542775b06?expires=1786464928&sig=a10d07d30fd981fd9648527b47cb71dfb3b1d956a134829e8a2edc4580487d5f",
+      "to_email": "charbel911+iter473-seller-V-EN-4285@gmail.com",
+      "subject": "BidVex \u2014 Your settlement statement \u2014 iter473 VEHICLES EN \u2014 V-EN",
+      "status": 200,
+      "content_type": "application/pdf",
+      "ok": true
+    },
+    {
+      "section": "vehicles",
+      "lang": "fr",
+      "role": "buyer",
+      "href": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/69acaf20-346b-4b8b-8d0a-62d2394521f0?expires=1786464929&sig=90d8b67e64664e70305137928a881dab948ef1922daf407c73dcb38becc1146f",
+      "to_email": "charbel911+iter473-buyer-V-FR-d4c4@gmail.com",
+      "subject": "BidVex \u2014 Votre facture pour iter473 VEHICLES FR \u2014 V-FR",
+      "status": 200,
+      "content_type": "application/pdf",
+      "ok": true
+    },
+    {
+      "section": "vehicles",
+      "lang": "fr",
+      "role": "seller",
+      "href": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/e1d4a8d2-f183-4d6b-8f81-308a0dad8cbb?expires=1786464929&sig=06046b7a2d55d5c0c2e371a32ba6a25786cfef742b0ad943a20a79f3ecc31a5e",
+      "to_email": "charbel911+iter473-seller-V-FR-678c@gmail.com",
+      "subject": "BidVex \u2014 Votre relev&eacute; de r&egrave;glement \u2014 iter473 VEHICLES FR \u2014 V-FR",
+      "status": 200,
+      "content_type": "application/pdf",
+      "ok": true
+    },
+    {
+      "section": "storage",
+      "lang": "en",
+      "role": "buyer",
+      "href": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/f8d17d54-4606-47f0-a366-4509e6f97a3b?expires=1786464930&sig=bb83edc9e6bdcaec2ca4f621c294fb96720910dc9b22c6ea7e05287c9007412c",
+      "to_email": "charbel911+iter473-buyer-S-EN-47fd@gmail.com",
+      "subject": "BidVex \u2014 Your invoice for iter473 STORAGE EN \u2014 S-EN",
+      "status": 200,
+      "content_type": "application/pdf",
+      "ok": true
+    },
+    {
+      "section": "storage",
+      "lang": "en",
+      "role": "seller",
+      "href": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/e5aa4715-2b0a-490b-a2ed-a70c254ef25b?expires=1786464930&sig=cc02c351f18a95b0cd4d72e15fc9c8484a78316d6c930881a969f6b9eecd6ba3",
+      "to_email": "charbel911+iter473-seller-S-EN-a13b@gmail.com",
+      "subject": "BidVex \u2014 Your settlement statement \u2014 iter473 STORAGE EN \u2014 S-EN",
+      "status": 200,
+      "content_type": "application/pdf",
+      "ok": true
+    },
+    {
+      "section": "storage",
+      "lang": "fr",
+      "role": "buyer",
+      "href": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/bd6e24e4-383b-4896-8fe5-7dc2da604133?expires=1786464931&sig=bcb925d8408e71caf34d50d7af109a5ab843a3b269243610a99cb0de5fcc18fb",
+      "to_email": "charbel911+iter473-buyer-S-FR-7670@gmail.com",
+      "subject": "BidVex \u2014 Votre facture pour iter473 STORAGE FR \u2014 S-FR",
+      "status": 200,
+      "content_type": "application/pdf",
+      "ok": true
+    },
+    {
+      "section": "storage",
+      "lang": "fr",
+      "role": "seller",
+      "href": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/04071137-a4db-4029-a2e5-9e4bed95e138?expires=1786464931&sig=3086d9ec36b740def23e8f8c003db4b7eac9103d63a5a78dd75a7044b9a563d4",
+      "to_email": "charbel911+iter473-seller-S-FR-f6c3@gmail.com",
+      "subject": "BidVex \u2014 Votre relev&eacute; de r&egrave;glement \u2014 iter473 STORAGE FR \u2014 S-FR",
+      "status": 200,
+      "content_type": "application/pdf",
+      "ok": true
+    }
+  ],
+  "cross_user_replay": [
+    {
+      "original_A": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/c7fbaa84-d",
+      "forged": "https://prod-verify-2.preview.emergentagent.com/api/invoices/download/835f5f12-f",
+      "status": 403
+    }
+  ],
+  "expiry_rejection": [
+    {
+      "status": 403,
+      "body": "{\"detail\":\"Link expired or invalid signature\"}"
+    }
+  ],
+  "resolver_precedence": {
+    "r1": "https://qa.example.com",
+    "r2": "https://other.example.com",
+    "r3": "https://frontend.example.com",
+    "r4": "https://frontend.example.com",
+    "r5": "https://frontend.example.com",
+    "r6": ""
+  }
+}

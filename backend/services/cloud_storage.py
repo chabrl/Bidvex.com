@@ -99,7 +99,47 @@ def generate_signed_url(invoice_id: str, expiry_seconds: int = DEFAULT_EXPIRY_SE
     expires = int(time.time()) + expiry_seconds
     payload = f"{invoice_id}:{expires}"
     sig = _sign(payload)
-    return f"{base_url}/api/invoices/download/{invoice_id}?expires={expires}&sig={sig}"
+    # iter473 — Resolve absolute public base URL when the caller does
+    # not pass one explicitly. The signed path + expiry + signature
+    # are preserved exactly — only the host prefix is filled in.
+    effective_base = (base_url or _resolve_public_base_url() or "").rstrip("/")
+    return f"{effective_base}/api/invoices/download/{invoice_id}?expires={expires}&sig={sig}"
+
+
+# iter473 — Public base URL resolver for absolute emailed document
+# links. Reads from environment in this precedence:
+#   1. PUBLIC_BASE_URL   (explicit override; set in .env when needed)
+#   2. APP_URL           (backend-facing public host, used elsewhere)
+#   3. FRONTEND_URL      (React frontend public host)
+#   4. REACT_APP_BACKEND_URL (fallback — same value on this platform)
+#
+# Never hardcodes a preview / production domain. Rejects blank,
+# `localhost`, `127.0.0.1`, and non-http(s) values so a malformed
+# env variable never poisons an emailed link. When nothing resolves,
+# returns "" and logs a warning — the caller receives a relative
+# path (existing behaviour) instead of a silently wrong absolute URL.
+_INVALID_HOST_TOKENS = ("localhost", "127.0.0.1", "0.0.0.0")
+
+
+def _resolve_public_base_url() -> str:
+    for var in ("PUBLIC_BASE_URL", "APP_URL", "FRONTEND_URL", "REACT_APP_BACKEND_URL"):
+        v = os.environ.get(var, "").strip()
+        if not v:
+            continue
+        v = v.rstrip("/")
+        low = v.lower()
+        if not (low.startswith("http://") or low.startswith("https://")):
+            continue
+        if any(tok in low for tok in _INVALID_HOST_TOKENS):
+            # Local dev host — safe to skip; try the next var.
+            continue
+        return v
+    logger.warning(
+        "[cloud_storage] no public base URL configured "
+        "(PUBLIC_BASE_URL / APP_URL / FRONTEND_URL / REACT_APP_BACKEND_URL) — "
+        "signed URLs will be relative"
+    )
+    return ""
 
 
 def verify_signature(invoice_id: str, expires: int, sig: str) -> bool:

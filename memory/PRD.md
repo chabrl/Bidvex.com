@@ -1,6 +1,62 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter473 — Absolute HTTPS URL in Emailed Document Links (Feb 10, 2026) ✅ COMPLETE — PREVIEW-ONLY, NOT DEPLOYED
+
+**Reported by user (P0)**: Preview test emails contained `http:///api/invoices/download/…` — hostless. Every emailed document link must be an absolute HTTPS URL built from the active environment's configured public base URL. No hardcoded preview/production domain. Preserve signed path + expiry + signature exactly. Do not modify document content, calculations, recipients, payment logic, Stripe, escrow, production data, or deployment settings. Do not deploy.
+
+### Root cause (traced)
+`services/cloud_storage.py::generate_signed_url(invoice_id, expiry_seconds=…, base_url="")` had `base_url` defaulting to `""` — the caller was responsible for supplying the host. All 15+ callers (`services/final_document_delivery.py` at lines 89 and 149, plus every `routes/invoices.py` invocation) called it WITHOUT a `base_url`, so the returned URL was **hostless**: `/api/invoices/download/{id}?expires=…&sig=…`. When that string landed in an email `<a href>`, the recipient's client rendered it as `http:///api/…` (empty host, http:// scheme prepended by the client — not by our code).
+
+### Base URL source (per user directive)
+The resolver `services/cloud_storage._resolve_public_base_url()` reads env vars in this precedence — **never hardcodes a domain**:
+1. `PUBLIC_BASE_URL` (explicit override — deploy-time)
+2. `APP_URL` (backend-facing public host)
+3. `FRONTEND_URL` (React frontend public host) — present in preview `.env`
+4. `REACT_APP_BACKEND_URL` (fallback — same value in this platform)
+
+Rejected on-sight: blank, non-`http(s)://` schemes, `localhost`, `127.0.0.1`, `0.0.0.0`. When no valid host resolves, the function logs a WARNING and returns `""` so the URL is relative (existing behaviour) — never a silently wrong absolute value.
+
+### Delivered (one surgical change)
+- **`services/cloud_storage.py::generate_signed_url`** — When the caller does not pass an explicit `base_url`, resolve from env via `_resolve_public_base_url()`. The signed path + `expires` + `sig` are preserved exactly. One line changed inside the existing function; every one of the 15+ downstream callers now emits absolute HTTPS URLs automatically without any of them being edited.
+
+### Guardrails honoured
+- No changes to `services/final_document_delivery.py`, `routes/invoices.py`, email templates (`services/emails/email_system.py`), payment logic, Stripe, escrow, fees, taxes, or document content.
+- Signed path + expiry + signature preserved bit-for-bit.
+- No production data touched. All synthetic rows prefixed `iter473-*` and cleaned on exit.
+- Recipient email addresses unchanged — synthetic recipients used `charbel911+iter473-*@gmail.com` (Gmail `+alias`) → single QA inbox.
+- **Not deployed.**
+
+### Verified in preview
+- **`tests/live_verify_iter473_absolute_url.py`** — **127/127 checks PASS**:
+  - T1: resolver precedence (PUBLIC_BASE_URL > APP_URL > FRONTEND_URL > REACT_APP_BACKEND_URL), rejects `localhost` / `127.0.0.1` / non-http(s), returns `""` when no host configured. 6/6.
+  - T2: `generate_signed_url()` output is absolute HTTPS, no `http:///`, no `localhost`, keeps `/api/invoices/download/{id}` + `expires` + `sig`. 5/5.
+  - T3: full delivery matrix marketplace / lots / vehicles / storage × EN + FR × buyer + seller = 16 emails; every `<a href data-testid="buyer-final-invoice-link">` / `seller-final-statement-link` is absolute HTTPS with valid host, no `http:///`, no `localhost`, has expected path + query. 96/96 assertions.
+  - T4: click-through — every one of the 16 captured hrefs resolves to `200 application/pdf` from the running backend. 16/16.
+  - **T5**: expired signature rejected — `403 Link expired or invalid signature`. 2/2.
+  - **T6**: cross-user replay defence — signature bound to `invoice_id` in the payload, so swapping the ID while keeping A's `sig` produces `403` (the HMAC check fails). Recipient B cannot open recipient A's document. 2/2.
+- **Visual evidence** (`/tmp/iter473_email_buyer_en.png`, `_fr.png`):
+  - EN: `View my invoice` CTA → `https://prod-verify-2.preview.emergentagent.com/api/invoices/download/239f84c7-…?expires=…&sig=…`
+  - FR: `Consulter ma facture` CTA → same absolute HTTPS host, same secure query.
+- **Regressions**: iter472 (document delivery QA) — dispatch results still 53/53; secure-link results still 16/16 (now with absolute hosts).
+- **JSON report**: `/app/test_reports/iter473_absolute_url_qa.json`.
+
+### Production configuration requirements
+Preview works today because `/app/backend/.env` sets `FRONTEND_URL=https://prod-verify-2.preview.emergentagent.com` (rank #3 in the resolver precedence). For production, ensure **at least one** of the following env vars is set on the deployed backend before it starts serving traffic:
+| Priority | Variable | Recommended production value | Notes |
+|---|---|---|---|
+| 1 | `PUBLIC_BASE_URL` | `https://launchapp-4-r-1774886029.emergent.host` (or your custom domain) | Explicit override — most predictable |
+| 2 | `APP_URL` | same as above | Already referenced by other services |
+| 3 | `FRONTEND_URL` | same as above | Fallback |
+| 4 | `REACT_APP_BACKEND_URL` | same as above | Last-resort fallback (already required for the frontend build) |
+
+If none of these is set at production start, the WARNING `[cloud_storage] no public base URL configured…` will appear in backend logs and emailed links will fall back to the relative-path shape (broken but log-visible for immediate ops response). This is safer than silently baking in a wrong domain.
+
+### Not deployed
+Preview-only per user directive. Awaiting user go-ahead + production env var confirmation before any deploy.
+
+
+
 ## iter472 — Financial Document Delivery QA Audit (Feb 10, 2026) ✅ COMPLETE — PREVIEW-ONLY, READ-ONLY AUDIT
 
 **Directive**: Preview-only QA audit of every buyer + seller financial document. Send all synthetic emails to `charbel911@gmail.com` (Gmail `+alias` per synthetic user, single inbox). No admin CC/BCC added, no doc/template/delivery/payment/stripe/escrow/fee/tax/production/deployment change. Report gaps only — do not build missing flows.
