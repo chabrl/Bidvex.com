@@ -1,6 +1,178 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter478 — Fee Table Merge · Phase 1 (Feb 11, 2026) ✅ COMPLETE — INFRASTRUCTURE ONLY, PRODUCTION UNCHANGED
+
+**Scope (per master implementation directive)**: Phase 1 only — create the versioned, DB-backed `fee_schedules` collection, the `services/fee_schedule.py` read/resolve module, and an idempotent bootstrap script. **NO production calculation path may read from the new schedule**. All settlement, Stripe, escrow, receipt, and PDF calculations remain untouched.
+
+### Files created
+- `backend/services/fee_schedule.py` — read/resolve module. Public API: `get_active_schedule(db)`, `resolve_buyer_premium_rate(...)`, `resolve_seller_commission_rate(...)`, `resolve_platform_fee_rate(...)`, `resolve_stripe(...)`, `category_override(...)`. Enforces Decimal-fraction unit; rejects percent-style values (5.0) and any rate outside `[0, 0.5]`.
+- `backend/scripts/iter478_bootstrap_fee_schedule.py` — idempotent bootstrap. Modes: default (upsert if unchanged, refuse if drifted), `--verify` (compare, no writes), `--force` (overwrite drifted row).
+- `backend/tests/live_verify_iter478_fee_schedule_bootstrap.py` — 46 checks covering every requirement in directive Section 21 + Section 24 STOP conditions.
+
+### Files modified
+- None. Zero production calculation module was touched.
+
+### DB collection/schema created
+- `db.fee_schedules` — new collection, indexed on `id` at the doc level. Row shape (persisted with Decimals stringified for BSON-round-trip safety):
+  - `id`, `version`, `effective_from`, `is_active`, `updated_at`, `updated_by`, `notes`
+  - `buyer_premium.{individual,enterprise,partner,partner_pro,vehicle_dealer,storage_facility,broker}` → per seller_account_type table
+  - `seller_commission.{...}` → same axes
+  - `platform_fees.{general,vehicle,partner,broker,storage}`
+  - `stripe.{percent,fixed_cad}`
+  - `affiliate_commission_rate`
+  - `category_overrides.{restaurant_equipment,bankrupt_inventory,general_lots,industrial_equipment}` — all `active: false`
+  - `tier_aliases` → `{free→standard, basic→standard, starter→standard, vip→vip_elite}`
+
+### Exact bootstrapped rates (Decimal fractions)
+
+| Path | Rate | Source constant |
+|---|---|---|
+| `buyer_premium.individual.standard` | `0.05` | `pricing_config.BUYER_PREMIUM_RATES["standard"]` |
+| `buyer_premium.individual.premium` | `0.035` | `pricing_config.BUYER_PREMIUM_RATES["premium"]` |
+| `buyer_premium.individual.vip_elite` | `0.03` | `pricing_config.BUYER_PREMIUM_RATES["vip_elite"]` |
+| `buyer_premium.enterprise.*` | *(mirrors individual)* | same |
+| `buyer_premium.partner.default` | `0.05` | `pricing_config.BUYER_PREMIUM_RATES["partner"]` |
+| `buyer_premium.partner_pro.default` | `0.0375` | `pricing_config.BUYER_PREMIUM_RATES["partner_pro"]` |
+| `buyer_premium.vehicle_dealer.default` | `0.025` | `fee_calculator.VEHICLE_DEALER_BUYER_RATE` |
+| `buyer_premium.storage_facility.default` | `0.05` | `fee_calculator.STORAGE_FACILITY_RATE` |
+| `buyer_premium.broker.default` | `0.025` | `fee_calculator.BROKER_PLATFORM_RATE` |
+| `seller_commission.individual.standard` | `0.04` | `pricing_config.SELLER_COMMISSION_RATES["standard"]` |
+| `seller_commission.individual.premium` | `0.025` | ~ |
+| `seller_commission.individual.vip_elite` | `0.02` | ~ |
+| `seller_commission.partner.platform_fee_rate` | `0.030` | `fee_calculator.PARTNER_PLATFORM_RATE` |
+| `seller_commission.partner_pro.seller_commission_rate` | `0.03` | `pricing_config.SELLER_COMMISSION_RATES["partner_pro"]` |
+| `seller_commission.vehicle_dealer.seller_pays` | `0` | seller pays no commission on hammer |
+| `seller_commission.storage_facility.seller_pays` | `0` | facility keeps full hammer |
+| `platform_fees.general` | `0.03` | `pricing_config.PLATFORM_FEE_GENERAL` (public-display only; not a live settlement rate) |
+| `platform_fees.vehicle` | `0.025` | `pricing_config.PLATFORM_FEE_VEHICLE` |
+| `platform_fees.partner` | `0.030` | `fee_calculator.PARTNER_PLATFORM_RATE` |
+| `platform_fees.broker` | `0.025` | `fee_calculator.BROKER_PLATFORM_RATE` |
+| `platform_fees.storage` | `0.050` | `fee_calculator.STORAGE_FACILITY_RATE` |
+| `stripe.percent` | `0.029` | `pricing_config.STRIPE_PROCESSING_RATE` |
+| `stripe.fixed_cad` | `0.30` | `pricing_config.STRIPE_PROCESSING_FIXED` |
+| `affiliate_commission_rate` | `0.03` | `fee_calculator.AFFILIATE_COMMISSION_RATE` |
+| `category_overrides.restaurant_equipment` | `0.05` (active=**false**) | `category_rules.COMMISSION_RATES` |
+| `category_overrides.bankrupt_inventory` | `0.04` (active=**false**) | ~ |
+| `category_overrides.industrial_equipment` | `0.045` (active=**false**) | ~ |
+| `category_overrides.general_lots` | `0.05` (active=**false**) | ~ |
+
+### Partner Buyer Premium precedence (implemented in `resolve_buyer_premium_rate`)
+
+1. **Immutable snapshot** (`snapshot_rate`) — always wins.
+2. **Listing-specific partner override** (`listing_override`) — reads `listings.partner_bp_rate` or `listings.custom_buyer_premium_rate` (field names documented on the schedule row).
+3. **User-specific override** (`custom_per_user`) — reads `users.custom_premium_rate`.
+4. **Partner default** from active schedule — currently `0.05`.
+5. **No silent fallback** — if none apply, `FeeScheduleResolutionError` is raised.
+
+### Partner Pro handling
+
+- Buyer premium `0.0375` (3.75%), seller commission `0.03` (3%) both preserved as Decimal fractions.
+- Only NEW `partner_pro` listings/users will consult the schedule (after Phase 3). Existing users/listings are grandfathered by design — schedule is not read yet.
+
+### Category-override status
+
+**All four entries `active=false`** (Section 15). The `category_override(schedule, category=…)` helper explicitly returns `None` for every entry so Phase 2 dual-read cannot accidentally consult them. Test T9b proves this. Category-rate constants remain in `services/category_rules.py` untouched.
+
+### Decimal representation enforcement
+
+- Every rate persisted is a Decimal fraction (validated on write via `_validate_rate`).
+- Percent-style value (`5.0`) → `FeeScheduleValidationError` (test T10a proves this).
+- Reads always return `Decimal` type (test T10b proves this on every tier).
+- BSON round-trip: Decimals stored as strings, loader re-hydrates through `Decimal(str)` for byte-exact round-trip.
+
+### Bootstrap / idempotency
+
+- **Fresh run**: inserts row with `version=1`.
+- **Second run** (no drift): prints `already up to date · no-op`, does not touch the row.
+- **Verify run**: `python scripts/iter478_bootstrap_fee_schedule.py --verify` reports zero drift.
+- **Drifted disk row** (someone manually edited): script refuses to overwrite; requires `--force`.
+- Exactly ONE row per `id="fee_schedule_v1"` (test T1d + T11 prove this).
+
+### Tests executed
+
+| # | Test | Result |
+|---|---|---|
+| T0 | No production calc path imports `services.fee_schedule` | ✅ (0 illegal importers among 17 production modules) |
+| T1a/b/c/d | Bootstrap runs, is idempotent, --verify OK, single row | ✅ 4/4 |
+| T2 | Schedule loads from Mongo cleanly | ✅ |
+| T3 | Individual buyer premium matches `pricing_config` | ✅ (5% / 3.5% / 3%) |
+| T4 | Individual seller commission matches `pricing_config` | ✅ (4% / 2.5% / 2%) |
+| T5 | Partner default = 5% (Section 21 T2) | ✅ |
+| T6a/b | Partner Pro = 3.75% BP / 3% SC (Section 21 T3) | ✅ |
+| T7a/b/c/d | Vehicle 2.5%, Storage 5%, seller_pays=0 both | ✅ 4/4 |
+| T8a/b/c/d/e | Partner precedence: snapshot → listing_override → custom_per_user → default; 10/15/18% preserved | ✅ 7/7 |
+| T9a/b | Category overrides preserved, all `active=false`, helper returns None | ✅ 5/5 |
+| T10a/b | Percent-style rejected, Decimal type enforced | ✅ 4/4 |
+| T11 | Idempotency — single row after multiple runs | ✅ |
+| T12a/b/c | Existing `calculate_fee()` unchanged (iter350 model version, BP=$10.00, SC=$8.00 on $200 hammer) | ✅ 3/3 |
+| T13 | Stripe matches `pricing_config` (2.9% + $0.30) | ✅ |
+| T14a/b/c/d | Platform fees match production for vehicle/general/partner/broker | ✅ 4/4 |
+| T15a/b | No silent fallback on unknown tier or account_type | ✅ 2/2 |
+| T16 | Historical iter476 receipts untouched | ✅ |
+| T17a/b | PricingManager `partner=0` still in code; schedule partner is NOT 0 | ✅ 2/2 |
+| T18 | Stored rate is Decimal-string, round-trips byte-exact | ✅ |
+| **Total** | **46/46 PASS** — `/app/test_reports/iter478_fee_schedule_bootstrap.json` |  |
+
+### Regression tests (pre-existing suites)
+
+| Suite | Result |
+|---|---|
+| `live_verify_iter477_pdf_reconciliation.py` (byte-exact) | ✅ **49/49 PASS** — buyer_delta_cents=0, seller_delta_cents=0 |
+| `live_verify_iter477_pdf_visual_qa.py` (192 checks) | ✅ **192/192 PASS** |
+| Server import + route count (1400 routes) | ✅ unchanged |
+
+### Repository caller/import findings (for future Phase 4 cleanup)
+
+- `services/fee_calculator.py::PricingManager` block (lines 1078-1562) is imported by 8 production files: `vehicle_invoice.py`, `vehicle_multi_lot_settlement.py`, `connect_payment_engine.py` (3 locations), `routes/fees.py`, `routes/admin_config.py` (2 locations). Cannot be removed without Phase 2/3 audit.
+- `services/vehicle_pricing.py::BUYER_PREMIUM_RATES / SELLER_COMMISSION_RATES / PLATFORM_FEE_RATE` are imported by `services/fee_calculator.py::_pm_calculate_taxes` at PricingManager module load — same constraint.
+- `services/storage_pricing.py::BUYER_PREMIUM_RATE / SELLER_COMMISSION_RATE` used by `services/storage_pricing_service.py` and admin storage flows.
+- `services/category_rules.py::COMMISSION_RATES` — grep shows NO consumer in `services/auction_settlement.py`, `services/fee_calculator.py`, or `services/payment_collection.py`; category-specific seller commissions are **effectively dead code today**. The tier rate is what actually ships in settlements.
+- `services/fee_calculation_engine.py` — separate legacy engine, still exposed via `routes/payments_fees.py`. Phase 2 dual-read must confirm it produces cent-for-cent parity with `calculate_fee()`.
+
+### Confirmed: no production financial calculation path reads the new schedule
+
+Static grep across all 17 production calculation/settlement/PDF/receipt modules (test T0) → **0 imports** of `services.fee_schedule`. Only consumers: `scripts/iter478_bootstrap_fee_schedule.py` (writer) and `tests/live_verify_iter478_fee_schedule_bootstrap.py` (reader).
+
+### Confirmed: no changes to
+
+- `services/auction_settlement.py` — 0 lines changed
+- `services/payment_collection.py` — 0 lines changed
+- `services/receipts.py` — 0 lines changed
+- `services/pdf_generators/*.py` — 0 lines changed (iter477 layout fixes kept, no rate change)
+- `services/fee_calculator.py` — 0 lines changed
+- `services/vehicle_pricing.py`, `storage_pricing.py`, `category_rules.py` — 0 lines changed
+- Stripe / escrow code paths — untouched (blocker preserved per iter467)
+- Historical `db.receipts`, `db.transactions`, `db.seller_payouts` — 0 rows written
+- Any existing listing rate field — untouched (listings and pending settlements grandfathered)
+
+### Discrepancies / risks discovered (for Phase 2 investigation)
+
+1. **`PricingManager.BUYER_PREMIUM_RATES["partner"] = Decimal("0")`** (`fee_calculator.py` line 1106) — Legacy PricingManager path treats a **buyer with a partner subscription** as paying 0% buyer premium. This differs from the schedule's `partner: 0.05` (which describes a **partner as seller** with a partner-selected BP). Master directive Section 3 says the 0% behavior is NOT authoritative, but Section 24 requires flagging any code that depends on it. **Consumers**: `vehicle_invoice.py`, `connect_payment_engine.py`, `routes/fees.py::/api/fees/breakdown`, `routes/admin_config.py`. Phase 2 must verify whether any live production settlement flows through this path with a partner-buyer, and if so, whether the 0% is intended or a bug that iter350 corrected. **Phase 1 status**: preserved in code, NOT copied into schedule (schedule uses `pricing_config` value = 5%). No behavior change.
+
+2. **`platform_fees.general = 0.03`** — Master directive Section 11 example says `general: 0.05`, but the authoritative code (`pricing_config.PLATFORM_FEE_GENERAL`) says `0.03`. This constant is only used by the public **display** endpoint `/api/pricing/summary` (not by any settlement path), so bootstrapping the authoritative code value (3%) preserves existing behavior. If the intent is a future change to 5%, that should be a Phase 2 admin-edit rather than a Phase 1 code drift. **Phase 1 status**: bootstrapped at 3% per code; flagged.
+
+3. **`category_rules.COMMISSION_RATES` is dead code in settlement paths** — Grep shows no consumer in `auction_settlement.py`, `payment_collection.py`, `fee_calculator.py`, or `receipts.py`. The table exists but is never applied to a settled auction today. Bootstrapped as `active=false` per directive Section 15; behavior change deferred to a future decision item.
+
+4. **Field-name / units inconsistency on `models/auction_models.py`** — 6 competing field names (`buyer_premium_rate` fraction / `buyers_premium_percent` percent / `custom_buyer_premium_rate` fraction / `partner_bp_rate` fraction / `premium_percentage` percent / `commission_rate` percent). Phase 1 does not touch models. Phase 2 must define which field the resolver reads for `listing_override` (proposed: prefer `partner_bp_rate` → `custom_buyer_premium_rate` → `buyer_premium_rate`).
+
+### STOP Conditions Encountered — Fully Reported
+
+- **None resulted in Phase 1 code changes.** Discrepancies #1 (`partner=0`), #2 (`general=3%` vs directive `5%`), and #3 (dead-code categories) are reported here for your Phase 2 decision. No production financial behavior changed.
+
+### Blocked (unchanged)
+
+- Escrow live payout verification (iter467) — still blocked on Stripe Sandbox CAD Available balance. **Not touched.**
+
+### Not deployed
+
+Preview-only per user directive.
+
+### Phase 1 stopping point
+
+**HALT.** Phase 2 (dual-read assertion), Phase 3 (single-read cutover), and Phase 4 (constant cleanup) are NOT executed. Awaiting explicit approval before proceeding.
+
+
 ## iter477 — Shared Business Settings Card Wiring + Strict PDF Reconciliation (Feb 11, 2026) ✅ COMPLETE — PREVIEW-ONLY, NOT DEPLOYED
 
 **Reported by user (P0)**: (1) Wire the newly-created shared `BusinessSettingsCard.jsx` (iter476) into the remaining three dashboards (Partner, Vehicle Dealer, Storage Facility) in addition to the Seller Dashboard. Follow this UX rule: if the dashboard has an existing Settings area, place it there; otherwise, put a clearly visible "Business & Logo" button in the header/top action area. Do not create a new tab just for this feature. Same shared component + modal across all four dashboards; consistent experience even if the trigger location differs slightly. (2) Prove strict PDF ↔ DB financial reconciliation on every new itemized PDF (buyer + seller, all four sections). No synthesis of historical breakdown values. For historical rows, preserve authoritative aggregate totals and render missing itemized fields as "—". Buyer: itemized components → exact `total_charged`. Seller: gross ± deductions → exact `net_payout`. If anything doesn't reconcile, stop and report the discrepancy rather than modifying the financial result to make the PDF balance.

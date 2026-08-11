@@ -171,7 +171,7 @@
       "pdf": "02_storage_buyer_invoice_fr",
       "check": "valid_pdf_magic",
       "ok": true,
-      "bytes": 2521417,
+      "bytes": 2521418,
       "pages": 1
     },
     {
@@ -274,7 +274,7 @@
       "pdf": "03_universal_receipt_mkt_with_logo",
       "check": "valid_pdf_magic",
       "ok": true,
-      "bytes": 2522207,
+      "bytes": 2522204,
       "pages": 2
     },
     {
@@ -389,7 +389,7 @@
       "pdf": "04_universal_receipt_mkt_no_logo",
       "check": "valid_pdf_magic",
       "ok": true,
-      "bytes": 2520174,
+      "bytes": 2520169,
       "pages": 1
     },
     {
@@ -474,7 +474,7 @@
       "pdf": "05_universal_receipt_multi_lot_3",
       "check": "valid_pdf_magic",
       "ok": true,
-      "bytes": 2522436,
+      "bytes": 2522432,
       "pages": 2
     },
     {
@@ -577,7 +577,7 @@
       "pdf": "06_universal_receipt_12_lot_multipage",
       "check": "valid_pdf_magic",
       "ok": true,
-      "bytes": 2523346,
+      "bytes": 2523350,
       "pages": 2
     },
     {
@@ -668,7 +668,7 @@
       "pdf": "07_seller_statement_mkt_en",
       "check": "valid_pdf_magic",
       "ok": true,
-      "bytes": 2520102,
+      "bytes": 2520098,
       "pages": 1
     },
     {
@@ -977,7 +977,7 @@
       "pdf": "10_seller_statement_storage_fr",
       "check": "valid_pdf_magic",
       "ok": true,
-      "bytes": 2520064,
+      "bytes": 2520062,
       "pages": 1
     },
     {
@@ -1068,7 +1068,7 @@
       "pdf": "11_universal_receipt_historical",
       "check": "valid_pdf_magic",
       "ok": true,
-      "bytes": 2520132,
+      "bytes": 2520137,
       "pages": 1
     },
     {

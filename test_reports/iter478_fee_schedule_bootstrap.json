@@ -1,0 +1,294 @@
+{
+  "iter": "478-phase1-fee-schedule-bootstrap",
+  "passed": 46,
+  "total": 46,
+  "schedule_snapshot": {
+    "id": "fee_schedule_v1",
+    "version": 1,
+    "individual_buyer_premium": {
+      "standard": "0.05",
+      "premium": "0.035",
+      "vip_elite": "0.03"
+    },
+    "individual_seller_commission": {
+      "standard": "0.04",
+      "premium": "0.025",
+      "vip_elite": "0.02"
+    },
+    "partner_default_bp": "0.05",
+    "partner_pro_bp": "0.0375",
+    "partner_pro_sc": "0.03",
+    "vehicle_dealer_bp": "0.025",
+    "storage_facility_bp": "0.050",
+    "stripe": {
+      "percent": "0.029",
+      "fixed_cad": "0.30"
+    },
+    "category_overrides_active": {
+      "restaurant_equipment": false,
+      "bankrupt_inventory": false,
+      "general_lots": false,
+      "industrial_equipment": false
+    }
+  },
+  "results": [
+    {
+      "test": "T0.no_production_calc_path_imports_fee_schedule",
+      "ok": true,
+      "illegal_importers": []
+    },
+    {
+      "test": "T1a.bootstrap_first_run_ok",
+      "ok": true,
+      "stdout": "[iter478] \u2139  fee_schedule_v1 already up to date (version=1).  no-op.\n",
+      "stderr": ""
+    },
+    {
+      "test": "T1b.bootstrap_second_run_is_noop",
+      "ok": true,
+      "stdout": "[iter478] \u2139  fee_schedule_v1 already up to date (version=1).  no-op.\n"
+    },
+    {
+      "test": "T1c.bootstrap_verify_reports_zero_drift",
+      "ok": true,
+      "stdout": "[iter478] \u2705  disk schedule matches code exactly.\n"
+    },
+    {
+      "test": "T1d.exactly_one_active_row",
+      "ok": true,
+      "row_count": 1
+    },
+    {
+      "test": "T2.schedule_loaded",
+      "ok": true
+    },
+    {
+      "test": "T3.individual_buyer_premium_matches_pricing_config",
+      "ok": true,
+      "resolved": {
+        "standard": "0.05",
+        "premium": "0.035",
+        "vip_elite": "0.03"
+      },
+      "pricing_config": {
+        "standard": "0.05",
+        "premium": "0.035",
+        "vip_elite": "0.03"
+      }
+    },
+    {
+      "test": "T4.individual_seller_commission_matches_pricing_config",
+      "ok": true,
+      "resolved": {
+        "standard": "0.04",
+        "premium": "0.025",
+        "vip_elite": "0.02"
+      }
+    },
+    {
+      "test": "T5.partner_default_is_5_percent",
+      "ok": true,
+      "resolved": "0.05"
+    },
+    {
+      "test": "T6a.partner_pro_buyer_premium_is_3.75_percent",
+      "ok": true,
+      "resolved": "0.0375"
+    },
+    {
+      "test": "T6b.partner_pro_seller_commission_is_3_percent",
+      "ok": true,
+      "resolved": "0.03"
+    },
+    {
+      "test": "T7a.vehicle_dealer_default_is_2.5_percent",
+      "ok": true,
+      "resolved": "0.025"
+    },
+    {
+      "test": "T7b.storage_facility_default_is_5_percent",
+      "ok": true,
+      "resolved": "0.050"
+    },
+    {
+      "test": "T7c.vehicle_dealer_seller_pays_0",
+      "ok": true,
+      "resolved": "0"
+    },
+    {
+      "test": "T7d.storage_facility_seller_pays_0",
+      "ok": true,
+      "resolved": "0"
+    },
+    {
+      "test": "T8a.partner_listing_override_wins_over_custom_and_default",
+      "ok": true,
+      "resolved": "0.10"
+    },
+    {
+      "test": "T8b.partner_custom_per_user_wins_over_default",
+      "ok": true,
+      "resolved": "0.18"
+    },
+    {
+      "test": "T8c.partner_falls_through_to_default_only_when_no_overrides",
+      "ok": true,
+      "resolved": "0.05"
+    },
+    {
+      "test": "T8d.partner_listing_override_0.10_is_preserved",
+      "ok": true,
+      "resolved": "0.10"
+    },
+    {
+      "test": "T8d.partner_listing_override_0.15_is_preserved",
+      "ok": true,
+      "resolved": "0.15"
+    },
+    {
+      "test": "T8d.partner_listing_override_0.18_is_preserved",
+      "ok": true,
+      "resolved": "0.18"
+    },
+    {
+      "test": "T8e.snapshot_rate_wins_over_everything",
+      "ok": true,
+      "resolved": "0.077"
+    },
+    {
+      "test": "T9a.category_override_preserved::restaurant_equipment",
+      "ok": true,
+      "node": {
+        "seller_commission_rate": "0.05",
+        "active": false,
+        "source": "services.category_rules.COMMISSION_RATES",
+        "notes": "Category-specific rate mirrored from services.category_rules; explicitly NOT authoritative in Phase 1. Seller-tier rate wins."
+      }
+    },
+    {
+      "test": "T9a.category_override_preserved::bankrupt_inventory",
+      "ok": true,
+      "node": {
+        "seller_commission_rate": "0.04",
+        "active": false,
+        "source": "services.category_rules.COMMISSION_RATES",
+        "notes": "Category-specific rate mirrored from services.category_rules; explicitly NOT authoritative in Phase 1. Seller-tier rate wins."
+      }
+    },
+    {
+      "test": "T9a.category_override_preserved::industrial_equipment",
+      "ok": true,
+      "node": {
+        "seller_commission_rate": "0.045",
+        "active": false,
+        "source": "services.category_rules.COMMISSION_RATES",
+        "notes": "Category-specific rate mirrored from services.category_rules; explicitly NOT authoritative in Phase 1. Seller-tier rate wins."
+      }
+    },
+    {
+      "test": "T9a.category_override_preserved::general_lots",
+      "ok": true,
+      "node": {
+        "seller_commission_rate": "0.05",
+        "active": false,
+        "source": "services.category_rules.COMMISSION_RATES",
+        "notes": "Category-specific rate mirrored from services.category_rules; explicitly NOT authoritative in Phase 1. Seller-tier rate wins."
+      }
+    },
+    {
+      "test": "T9b.category_override_helper_returns_None_for_all",
+      "ok": true
+    },
+    {
+      "test": "T10a.percent_style_rejected",
+      "ok": true
+    },
+    {
+      "test": "T10b.rate_is_Decimal_type::standard",
+      "ok": true,
+      "type": "Decimal"
+    },
+    {
+      "test": "T10b.rate_is_Decimal_type::premium",
+      "ok": true,
+      "type": "Decimal"
+    },
+    {
+      "test": "T10b.rate_is_Decimal_type::vip_elite",
+      "ok": true,
+      "type": "Decimal"
+    },
+    {
+      "test": "T11.bootstrap_idempotent_single_row",
+      "ok": true,
+      "row_count": 1
+    },
+    {
+      "test": "T12a.calculate_fee_still_returns_iter350_model",
+      "ok": true,
+      "fee_model_version": "iter350"
+    },
+    {
+      "test": "T12b.calculate_fee_buyer_premium_unchanged",
+      "ok": true,
+      "buyer_premium": 10.0
+    },
+    {
+      "test": "T12c.calculate_fee_seller_commission_unchanged",
+      "ok": true,
+      "seller_commission": 8.0
+    },
+    {
+      "test": "T13.stripe_matches_pricing_config",
+      "ok": true,
+      "percent": "0.029",
+      "fixed_cad": "0.30"
+    },
+    {
+      "test": "T14a.platform_fees_vehicle_matches",
+      "ok": true
+    },
+    {
+      "test": "T14b.platform_fees_general_matches",
+      "ok": true
+    },
+    {
+      "test": "T14c.platform_fees_partner_matches",
+      "ok": true
+    },
+    {
+      "test": "T14d.platform_fees_broker_matches",
+      "ok": true
+    },
+    {
+      "test": "T15a.no_silent_fallback_on_unknown_tier",
+      "ok": true
+    },
+    {
+      "test": "T15b.no_silent_fallback_on_unknown_account_type",
+      "ok": true
+    },
+    {
+      "test": "T16.itemized_iter476_receipts_still_present",
+      "ok": true,
+      "found": false
+    },
+    {
+      "test": "T17a.pricingmanager_still_has_partner_zero_bp",
+      "ok": true,
+      "pricing_manager_partner_bp": "0"
+    },
+    {
+      "test": "T17b.schedule_partner_default_is_NOT_zero",
+      "ok": true,
+      "note": "Schedule uses pricing_config.BUYER_PREMIUM_RATES[partner]=5%."
+    },
+    {
+      "test": "T18.stored_rate_is_decimal_string",
+      "ok": true,
+      "stored": "0.05",
+      "stored_type": "str"
+    }
+  ],
+  "illegal_fee_schedule_importers": []
+}
