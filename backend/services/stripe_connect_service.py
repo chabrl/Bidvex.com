@@ -140,7 +140,6 @@ class CheckoutBreakdown:
     fees_tax_total: Decimal
     
     total_tax: Decimal
-    
     # Processing fee (Stripe 2.9% + $0.30)
     processing_fee: Decimal
     processing_fee_display: Decimal  # Visible to buyer
@@ -166,6 +165,27 @@ class CheckoutBreakdown:
     # dict of `None` means the caller did not run the canonical engine
     # (legacy path — remove such callers in P7).
     payment_processing: Optional[Dict[str, Any]] = None
+
+    # ── iter482 P3.1 — CRA Place-of-Supply canonical tax split ──
+    # Split the aggregate `fees_tax_total` into (a) tax on buyer premium
+    # (buyer bears — Place-of-Supply is the BUYER's province, they are
+    # the recipient of the BP service) and (b) tax on seller commission
+    # (seller bears — Place-of-Supply is the SELLER's province, they are
+    # the recipient of the SC service).  This lets the buyer_total match
+    # `fee_calculator.calculate_fee()` cent-exact and prevents the buyer
+    # from being over-charged for the seller's business-input tax.
+    #
+    # Post-P3.1, the buyer's line-item math is:
+    #   buyer_total = hammer + BP + bp_tax_total (+ hammer_tax if seller registered)
+    # And the seller's math is:
+    #   seller_payout = hammer − SC − sc_tax_total (+ hammer_tax if registered)
+    # BidVex `application_fee` still retains BP + SC + fees_tax_total.
+    gst_on_bp: Decimal = Decimal("0")
+    qst_on_bp: Decimal = Decimal("0")
+    bp_tax_total: Decimal = Decimal("0")
+    gst_on_sc: Decimal = Decimal("0")
+    qst_on_sc: Decimal = Decimal("0")
+    sc_tax_total: Decimal = Decimal("0")
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary with serializable types"""
@@ -263,15 +283,38 @@ def calculate_general_checkout(
         gst_on_hammer = Decimal("0")
         qst_on_hammer = Decimal("0")
     hammer_tax_total = gst_on_hammer + qst_on_hammer
-    
-    # BidVex fees tax (always applies)
-    gst_on_fees = _round_currency(bidvex_fees_subtotal * GST_RATE)
-    qst_on_fees = _round_currency(bidvex_fees_subtotal * QST_RATE)
-    fees_tax_total = gst_on_fees + qst_on_fees
-    
-    total_tax = hammer_tax_total + fees_tax_total
-    
-    # Subtotal before processing fee
+
+    # ── iter482 P3.1 — Split BidVex-fee tax by CRA Place-of-Supply ──
+    # Buyer premium is a service supplied to the BUYER → buyer bears tax
+    # on BP.  Seller commission is a service supplied to the SELLER →
+    # seller bears tax on SC (deducted from seller_payout).  BidVex still
+    # collects the full tax and remits it — the aggregate
+    # `fees_tax_total` remains BP-tax + SC-tax.
+    #
+    # Rounding: per-line GST/QST rounding (matches CRA and Revenu
+    # Québec remittance practice — each tax is reported separately at
+    # cent precision).  `bp_tax_total = gst_on_bp + qst_on_bp` so that
+    # every receipt line sums exactly to its category subtotal.  The
+    # sister calculator `fee_calculator._iter350_individual` is updated
+    # in the same iter482 P3.1 pass to use per-line rounding for
+    # `buyer_taxes` — both paths now reconcile cent-exact.
+    gst_on_bp = _round_currency(buyer_premium * GST_RATE)
+    qst_on_bp = _round_currency(buyer_premium * QST_RATE)
+    bp_tax_total = gst_on_bp + qst_on_bp
+
+    gst_on_sc = _round_currency(seller_commission * GST_RATE)
+    qst_on_sc = _round_currency(seller_commission * QST_RATE)
+    sc_tax_total = gst_on_sc + qst_on_sc
+
+    # Aggregate tax on all BidVex fees — BidVex remits this to government
+    gst_on_fees = gst_on_bp + gst_on_sc
+    qst_on_fees = qst_on_bp + qst_on_sc
+    fees_tax_total = bp_tax_total + sc_tax_total
+
+    # Buyer only pays hammer_tax (if applicable) + tax on BP
+    total_tax = hammer_tax_total + bp_tax_total
+
+    # Subtotal before processing fee — CRA-canonical (buyer bears NO tax on SC)
     subtotal_before_processing = hammer + buyer_premium + total_tax
 
     # ── iter482 P3 — Canonical payment_cost_engine snapshot ──
@@ -294,15 +337,18 @@ def calculate_general_checkout(
     buyer_total = gross_amount
     
     # Stripe parameters
-    # Application fee = BidVex fees (premium + commission) + tax on fees
+    # Application fee = BidVex fees (premium + commission) + full fees tax
+    # BidVex retains all its fees and remits the tax on BOTH.
     application_fee = buyer_premium + seller_commission + fees_tax_total
-    
-    # What seller receives = Hammer - commission + hammer tax (if business)
-    seller_payout = hammer - seller_commission
-    seller_receives_tax = hammer_tax_total  # Tax collected on seller's behalf
-    
-    # Transfer to seller = hammer - commission + hammer_tax (if business seller)
-    # The hammer tax goes to seller who must remit it to government
+
+    # ── iter482 P3.1 — Seller payout now deducts tax on SC (CRA-canonical) ──
+    # Seller loses SC AND its GST/QST (business input tax on BidVex's
+    # commission service).  BidVex remits sc_tax_total to government.
+    seller_payout = hammer - seller_commission - sc_tax_total
+    seller_receives_tax = hammer_tax_total  # Tax collected on seller's behalf (hammer only)
+
+    # Transfer to seller Connect = seller_payout + hammer_tax (if business)
+    # The hammer tax goes to seller who must remit it to government.
     transfer_amount = seller_payout + seller_receives_tax
     
     return CheckoutBreakdown(
@@ -344,6 +390,13 @@ def calculate_general_checkout(
         seller_payout=seller_payout,
         seller_receives_tax=seller_receives_tax,
         payment_processing=_pp,
+        # iter482 P3.1 — CRA Place-of-Supply canonical split
+        gst_on_bp=gst_on_bp,
+        qst_on_bp=qst_on_bp,
+        bp_tax_total=bp_tax_total,
+        gst_on_sc=gst_on_sc,
+        qst_on_sc=qst_on_sc,
+        sc_tax_total=sc_tax_total,
     )
 
 

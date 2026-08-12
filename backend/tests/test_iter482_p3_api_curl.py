@@ -48,14 +48,16 @@ def test_individual_100_qc_tiers(tier):
     _assert_pp_legally_gated(d)
 
 
-# ---- Historical $7.00 hammer premium tier: must be 7.29 NOT 7.64 ----
+# ---- Historical $7.00 hammer premium tier: must be 7.28 NOT 7.64 ----
 def test_historical_7dollar_hammer_premium_no_phantom_031():
     d = _get(hammer_price=7, auction_type="marketplace",
              seller_account_type="individual", seller_tier="premium",
              buyer_tier="premium", buyer_province="QC", seller_province="QC")
-    assert d["buyer_total_charged"] == 7.29, (
+    # iter482 P3.1 — per-line CRA rounding: bp_tax = gst $0.01 + qst $0.02 = $0.03
+    # buyer_total = hammer $7.00 + BP $0.25 + bp_tax $0.03 = $7.28
+    assert d["buyer_total_charged"] == 7.28, (
         f"REGRESSION: buyer_total_charged={d['buyer_total_charged']} "
-        f"expected 7.29 (must NEVER be 7.64)"
+        f"expected 7.28 (must NEVER be 7.64)"
     )
     assert d["buyer_total_charged"] != 7.64
     _assert_buyer_stripe_zero(d)

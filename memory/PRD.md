@@ -1,6 +1,84 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter482 — Phase P3.1 Cross-Calculator Reconciliation (Feb 12, 2026) ✅ COMPLETE — PREVIEW ONLY · DO NOT DEPLOY
+
+**Scope**: Root-cause and eliminate the $0.02 divergence between `calculate_fee()` (Path A, CRA/iter350) and `calculate_general_checkout()` (Path B, Stripe session builder) for the same $7.00/premium/premium/QC/QC scenario.
+
+### Root cause (traced cent-by-cent)
+`calculate_general_checkout` was applying tax to a POOLED `bidvex_fees_subtotal = BP + SC = $0.43` and charging the **buyer** for the whole tax pool. Combined-rate rounding gave $0.06 buyer tax vs. Path A's per-line $0.03 on BP only. Two bugs stacked:
+1. **Tax-base bug** — Buyer was paying tax on the *seller's* commission (violates CRA Place-of-Supply §142.1).
+2. **Rounding-methodology bug** — Combined-rate vs. per-line rounding disagreed at small amounts (CRA/RQ remittance uses per-line rounding).
+
+### Files modified
+- `backend/services/stripe_connect_service.py::calculate_general_checkout` — split `fees_tax_total` into `bp_tax_total` (buyer bears) + `sc_tax_total` (deducted from seller_payout). Per-line GST/QST rounding. Added 6 new fields to `CheckoutBreakdown`: `gst_on_bp`, `qst_on_bp`, `bp_tax_total`, `gst_on_sc`, `qst_on_sc`, `sc_tax_total`.
+- `backend/services/fee_calculator.py::_iter350_individual` — switched `buyer_taxes` and `seller_taxes` to per-line GST+QST+HST rounded sum (was combined-rate).
+- `backend/tests/test_iter482_p0_repairs.py` — c5 `10635→10575`, c6 `12133→12073`, c10 historical `731→728` + cross-calculator reconciliation assertion.
+- `backend/tests/test_iter482_golden_matrix.py` — Individual matrix values updated to per-line rounding golden.
+- `backend/tests/test_iter482_p3_fee_calculator_canonical.py` — historical case expects `$7.28`.
+- `backend/tests/test_iter482_p3_api_curl.py` — historical API expects `$7.28`.
+
+### Files created
+- `backend/tests/test_iter482_p31_reconciliation.py` — 38 tests: cross-calculator agreement (Path A ↔ Path B) across 15 scenarios × 3 tiers, internal receipt invariants, destination-charge math, Partner-path untouched proof.
+- `backend/tests/test_iter482_p31_api_smoke.py` (added by testing agent) — 40 live API assertions.
+
+### Cent-exact reconciliation (post-P3.1)
+| Scenario | Path A (`calculate_fee`) | Path B (`calculate_general_checkout`) | Match |
+|---|---|---|---|
+| **$7.00 premium/premium (historical bug)** | **$7.28** | **$7.28** | ✅ |
+| $100 standard/standard | $105.75 | $105.75 | ✅ |
+| $100 premium/premium | $104.03 | $104.03 | ✅ |
+| $100 vip_elite/vip_elite | $103.45 | $103.45 | ✅ |
+| $1000 standard/standard | $1057.49 | $1057.49 | ✅ |
+| $12345.67 standard/standard | $13055.38 | $13055.38 | ✅ |
+| $12345.67 premium/premium | $12842.48 | $12842.48 | ✅ |
+
+**Historical progression**: $7.64 (phantom $0.31 surcharge — P0/P2 removed) → $7.33 (illustrative in directive) → $7.31 (P3 combined-rate double-tax bug) → **$7.29** (P3 combined-rate CRA fix) → **$7.28** (P3.1 per-line CRA final).
+
+### Where the $0.02 went
+| Actor | Before P3.1 (buggy) | After P3.1 (canonical) | Δ |
+|---|---|---|---|
+| Buyer pays | $7.31 (BP + fees_tax on BP+SC pool) | **$7.28** (BP + bp_tax only) | **−$0.02** ($0.02 refunded to buyer) |
+| BidVex app_fee | $0.49 (BP + SC + tax_on_pool) | $0.49 (BP + SC + bp_tax + sc_tax) | 0 |
+| Seller payout | $6.82 (hammer − SC) | **$6.79** (hammer − SC − sc_tax) | **−$0.03** (seller now pays own business input tax on commission) |
+| BidVex tax remitted | $0.06 (combined-rate rounded) | $0.06 (bp_tax $0.03 + sc_tax $0.03, per-line) | 0 |
+
+Balance: charge−app_fee = seller transfer holds at every step (Stripe destination-charge equation intact).
+
+### Test results — **196/196 PASS** + 40 live API
+| Suite | Tests | Result |
+|---|---|---|
+| iter482 P0 golden repairs | 10 | ✅ |
+| iter482 golden matrix (expanded) | 40 | ✅ |
+| iter482 P2 payment cost engine | 46 | ✅ |
+| iter482 P3 fee_calculator canonical | 16 | ✅ |
+| iter482 P3 API curl | 15 | ✅ |
+| iter482 refund engine | 7 | ✅ |
+| **iter482 P3.1 cross-calc reconciliation (new)** | **38** | **✅** |
+| **iter482 P3.1 API smoke (new by testing agent)** | **40** | **✅** |
+| iter482 total baseline | **196** | **✅** |
+| iter482 live API smoke | 40 | ✅ |
+
+### Guardrails honoured
+- **DO NOT DEPLOY** — preview only.
+- Partner listings untouched: $100 @ 10% BP = $110 exact, BidVex 3% platform fee preserved.
+- E-10 buyer-tier neutrality proven again.
+- L-1 through L-9 legal gate remains CLOSED.
+- No production data touched.
+- No refunds or emails executed.
+- Model A₁ topology unchanged (`on_behalf_of`, `transfer_data.destination`, `application_fee_amount`).
+- Stripe `livemode=false` throughout.
+
+### One authoritative payer-facing processing field
+`payment_processing.amount_cents` remains the ONE source of truth (= $0 while L-1 closed). Legacy `stripe_processing_fee`, `buyer_stripe_recovery`, `processing_fee` all return $0 for buyer paths. Seller-side `seller_stripe_recovery` retained ONLY for B2B seller-commission recovery (documented for P5+ cleanup).
+
+### 🛑 HALTED at P3.1 boundary
+Phases P4 (Partner post-auction billing), P5 (refund + Gate 3 sandbox proof), P6 (tax engine merge), P7 (200-case matrix), P8 (peripheral flows), P9 (final audit + deploy gate) — **NOT executed**.
+
+---
+
+
+
 ## iter482 — Phase P3 Checkout Wiring & $0.31 Frontend Fix (Feb 12, 2026) ✅ COMPLETE — PREVIEW ONLY · DO NOT DEPLOY
 
 **Scope**: P3 wires the canonical `services/payment_cost_engine.py` (P2) into every buyer-facing calculator, eliminating the phantom $0.31 Stripe surcharge. Buyer-side Stripe recovery is now fail-closed to $0 across all seller types until L-1 legal review clears the jurisdiction. ONE authoritative field — `payment_processing.amount_cents` — is the sole payer-facing processing amount.

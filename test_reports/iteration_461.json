@@ -1,0 +1,33 @@
+{
+  "summary": "iter482 P3.1 backend validation. Full iter482 pytest suite = 196/196 PASS (zero regressions). New API-level smoke suite (test_iter482_p31_api_smoke.py, 40 tests) validates cent-exact reconciliation on Path A (/api/fees/v2/preview) + L-1 payment_processing gating across 13 scenarios × 3 dimensions (L-1 gate, buyer math, seller math). Historical $7 hammer / premium+premium case confirmed at exactly $7.28 (728 cents) — never $7.64/$7.31/$7.29. Cross-endpoint API-level test of Path B (/api/payments/checkout/preview/{listing_id}) not driven because it requires the caller to be the auction winner (only accepts listings where current user won); the equivalent calculator-level Path A==Path B reconciliation is fully verified by the 38-test test_iter482_p31_reconciliation.py suite (all pass).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter482_p31_reconciliation.py",
+    "/app/backend/tests/test_iter482_p31_api_smoke.py",
+    "/app/backend/tests/test_iter482_p0_repairs.py",
+    "/app/backend/tests/test_iter482_golden_matrix.py",
+    "/app/backend/tests/test_iter482_p3_fee_calculator_canonical.py",
+    "/app/backend/tests/test_iter482_p3_api_curl.py",
+    "/app/backend/tests/test_iter482_p2_payment_cost_engine.py",
+    "/app/backend/tests/test_iter482_refund_engine.py",
+    "/app/test_reports/pytest/iter482_p31_full.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "P3.1 fix in stripe_connect_service.calculate_general_checkout correctly moves seller-commission tax out of buyer_total and into seller_payout deduction (Place-of-Supply §142.1). Verified by 40 API smoke assertions + 38 internal reconciliation tests.",
+    "Per-line CRA rounding (gst/qst rounded per component before summation) is now consistent between fee_calculator._iter350_individual and calculate_general_checkout — this is the source of the previous $0.02 divergence.",
+    "L-1 gate: payment_processing.amount_cents === 0 across all 13 sampled scenarios and legal_gate_status='REQUIRES_TAX_LEGAL_REVIEW'; frontend safe to hide Processing row.",
+    "Note: /api/payments/checkout/preview/{listing_id} requires the authenticated user to be the listing's winner. There is no direct hammer_price override path — this endpoint cannot be smoke-tested cross-scenario without seeding a completed auction. The 38-test P3.1 reconciliation suite is the authoritative Path A vs Path B check."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter482_p31_api_smoke.py (new, 40 tests)"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "not tested (backend-only request)"},
+  "test_credentials": "testbuyer@bidvex.com / TestBuyer2026! (login OK; cannot exercise checkout preview without a won listing)",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "iter482 total suite is 196/196. A new API smoke file test_iter482_p31_api_smoke.py adds 40 live API assertions (13 scenarios × L-1 gate + buyer math + seller math + historical $7 exact). Historical case golden value: buyer_stripe_cents==728, buyer_total_charged==7.28. Do NOT expect 7.64/7.31/7.29 — those are named regression sentinels. To exercise Path B via API you'd need to seed a completed auction where testbuyer is the winner_id.",
+  "rca of the issue": "Prior $0.02 divergence between Path A (calculate_fee) and Path B (calculate_general_checkout): Path B was computing GST+QST on a pooled (BP+SC) tax base with combined-rate rounding, effectively (a) charging the buyer for the seller's business-input tax on commission and (b) losing 1 cent to combined-rate rounding vs per-component CRA remittance rounding. Fix: split fees_tax into bp_tax_total (buyer bears, on their BP only) and sc_tax_total (deducted from seller_payout, on seller's SC only), and use per-line GST/QST rounding matching Revenu Québec remittance practice. Verified: 196/196 unit tests + 40/40 live API tests."
+}

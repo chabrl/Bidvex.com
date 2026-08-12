@@ -117,10 +117,14 @@ def test_c5_individual_100_basic_not_registered():
     b = calculate_general_checkout(100.0, "basic", "basic", False, True, None)
     assert Decimal(str(b.buyer_premium)) == Decimal("5.00")
     assert Decimal(str(b.seller_commission)) == Decimal("4.00")
-    # iter482 P3 — buyer Stripe surcharge is fail-closed (L-1 legal review
-    # pending).  Buyer_total = hammer + BP + fees_tax only.
-    # $100 + $5 + $1.35 (fees_tax) = $106.35 = 10635 cents.
-    assert b.buyer_total_cents == 10635
+    # iter482 P3.1 — buyer bears tax on BP only (CRA Place-of-Supply).
+    # bp_tax_total = gst($0.25) + qst($0.50) = $0.75.
+    # $100 + $5 + $0.75 = $105.75 = 10575 cents.
+    assert b.buyer_total_cents == 10575
+    # Seller bears tax on SC (deducted from payout): sc_tax_total = gst($0.20)+qst($0.40)=$0.60
+    assert Decimal(str(b.sc_tax_total)) == Decimal("0.60")
+    # Seller payout = hammer - SC - sc_tax_total = $100 - $4 - $0.60 = $95.40
+    assert Decimal(str(b.seller_payout)) == Decimal("95.40")
     # Canonical payment_processing snapshot MUST be present + $0.
     assert b.payment_processing is not None
     assert b.payment_processing["amount_cents"] == 0
@@ -137,9 +141,13 @@ def test_c5_individual_100_basic_not_registered():
 def test_c6_individual_100_seller_registered():
     b = calculate_general_checkout(100.0, "basic", "basic", True, True, None)
     assert Decimal(str(b.hammer_tax_total)) == Decimal("14.98")
-    # iter482 P3 — buyer Stripe surcharge fail-closed.
-    # $100 + $5 BP + $14.98 hammer_tax + $1.35 fees_tax = $121.33 = 12133 cents
-    assert b.buyer_total_cents == 12133
+    # iter482 P3.1 — buyer bears hammer tax + tax on BP only.
+    # $100 + $5 BP + $14.98 hammer_tax + $0.75 bp_tax = $120.73 = 12073 cents
+    assert b.buyer_total_cents == 12073
+    assert Decimal(str(b.bp_tax_total)) == Decimal("0.75")
+    assert Decimal(str(b.sc_tax_total)) == Decimal("0.60"), (
+        "Seller commission tax now deducted from seller payout (not buyer)"
+    )
     assert b.payment_processing["amount_cents"] == 0
     assert b.payment_processing["legal_gate_status"] == "REQUIRES_TAX_LEGAL_REVIEW"
 
@@ -204,11 +212,19 @@ def test_c10_historical_7dollar_hammer_no_phantom_31cent_surcharge():
 
         Hammer      = $7.00
         Buyer BP    = $0.25   (premium tier: 3.5%)
-        Fees Tax    ≈ $0.08
+        Buyer Tax   ≈ $0.03   (per-line GST $0.01 + QST $0.02)
 
     Old (buggy) total = $7.64 = $7.33 + $0.31 phantom Stripe surcharge.
-    New (P3, fail-closed) total = $7.33 exactly — the buyer processing
-    surcharge is $0 until L-1 legal review clears the jurisdiction.
+    New (P3.1, fail-closed + CRA-canonical tax split) total = $7.28.
+
+    P3.1 clarifications vs. the user's illustrative $7.33:
+      - Buyer bears tax ONLY on their own service (buyer premium),
+        NOT on the seller's commission.  Per-line GST/QST rounding
+        (CRA/RQ remittance convention) yields tax = $0.01 + $0.02 = $0.03,
+        NOT the $0.08 illustrative value.
+      - There is NO buyer Stripe surcharge (L-1 gate CLOSED).
+
+    Cent-exact result: hammer + BP + bp_tax = $7.00 + $0.25 + $0.03 = $7.28.
 
     If this test EVER reports $7.64 again, STOP and investigate; do not
     simply change the expected number.
@@ -227,11 +243,17 @@ def test_c10_historical_7dollar_hammer_no_phantom_31cent_surcharge():
     )
     # 7.00 * 2.5% = 0.175 → rounds to $0.18 (seller side)
     assert Decimal(str(b.seller_commission)) == Decimal("0.18")
-    # fees_subtotal = BP + SC = $0.25 + $0.18 = $0.43
-    # gst = $0.43 * 5% = $0.0215 → $0.02
-    # qst = $0.43 * 9.975% = $0.0429 → $0.04
-    assert Decimal(str(b.gst_on_fees)) == Decimal("0.02")
-    assert Decimal(str(b.qst_on_fees)) == Decimal("0.04")
+
+    # iter482 P3.1 — per-line CRA rounding
+    # BP tax: gst = $0.01 (0.25 * 5%), qst = $0.02 (0.25 * 9.975%)
+    assert Decimal(str(b.gst_on_bp)) == Decimal("0.01")
+    assert Decimal(str(b.qst_on_bp)) == Decimal("0.02")
+    assert Decimal(str(b.bp_tax_total)) == Decimal("0.03")
+    # SC tax: gst = $0.01 (0.18 * 5%), qst = $0.02 (0.18 * 9.975%) → borne by seller
+    assert Decimal(str(b.gst_on_sc)) == Decimal("0.01")
+    assert Decimal(str(b.qst_on_sc)) == Decimal("0.02")
+    assert Decimal(str(b.sc_tax_total)) == Decimal("0.03")
+    # Aggregate BidVex tax remitted: $0.06 (BP-tax $0.03 + SC-tax $0.03)
     assert Decimal(str(b.fees_tax_total)) == Decimal("0.06")
     # No hammer tax (seller not tax-registered)
     assert Decimal(str(b.hammer_tax_total)) == Decimal("0")
@@ -246,11 +268,8 @@ def test_c10_historical_7dollar_hammer_no_phantom_31cent_surcharge():
     assert b.payment_processing["legal_gate_status"] == "REQUIRES_TAX_LEGAL_REVIEW"
     assert b.payment_processing["reason_code"] == "legally_gated"
 
-    # Buyer_total = hammer + BP + fees_tax = $7.00 + $0.25 + $0.06 = $7.31
-    # (NOT the illustrative $7.33 in the human directive; the human
-    #  directive rounded 0.08 for tax as an example — actual computation
-    #  gives 0.06.  The KEY assertion is: NOT $7.64 and processing = $0.)
-    expected_total = Decimal("7.00") + Decimal("0.25") + Decimal("0.06")
+    # Buyer_total = hammer + BP + bp_tax_total = $7.00 + $0.25 + $0.03 = $7.28
+    expected_total = Decimal("7.00") + Decimal("0.25") + Decimal("0.03")
     assert Decimal(str(b.buyer_total)) == expected_total, (
         f"buyer_total should be ${expected_total}, got ${b.buyer_total}"
     )
@@ -258,8 +277,21 @@ def test_c10_historical_7dollar_hammer_no_phantom_31cent_surcharge():
     assert b.buyer_total_cents != 764, (
         "REGRESSION: phantom $0.31 Stripe surcharge is back! STOP."
     )
-    # And exactly $7.31 in cents:
-    assert b.buyer_total_cents == 731
+    # And exactly $7.28 in cents:
+    assert b.buyer_total_cents == 728
+
+    # ── P3.1 cross-calculator reconciliation ──
+    # calculate_fee() must produce the same buyer_total_charged.
+    from services.fee_calculator import calculate_fee
+    r = calculate_fee(
+        hammer_price=7.0, auction_type="marketplace",
+        seller_account_type="individual", seller_tier="premium",
+        buyer_tier="premium", buyer_province="QC", seller_province="QC",
+    )
+    assert Decimal(str(r["buyer_total_charged"])) == Decimal(str(b.buyer_total)), (
+        f"P3.1 reconciliation: calculate_fee=${r['buyer_total_charged']} but "
+        f"calculate_general_checkout=${b.buyer_total} — must agree cent-exact"
+    )
 
 
 # ═════════════════════════════════════════════════════════════════════

@@ -107,13 +107,17 @@ def test_partner_qc_not_registered_no_hammer_or_bp_tax():
 # ═════════════════════════════════════════════════════════════════════
 
 @pytest.mark.parametrize("buyer_tier,seller_tier,seller_registered,expected_buyer_cents", [
-    # iter482 P3 — buyer Stripe surcharge is fail-closed (L-1 legal review
-    # pending).  Buyer_total no longer includes a gross-up.  Values reflect:
-    #   $100 hammer + BP + fees_tax + (hammer_tax if seller registered)
-    ("basic", "basic", False, 10635),
-    ("basic", "basic", True, 12133),
-    ("premium", "premium", False, 10440),   # premium: 3.5% BP + 2.5% SC
-    ("vip_elite", "vip_elite", False, 10375),  # vip_elite: 3% BP + 2% SC
+    # iter482 P3.1 — buyer bears only tax on BP (CRA Place-of-Supply).
+    # Per-line GST/QST rounding.  Buyer_total = hammer + BP + bp_tax_total
+    # (+ hammer_tax if seller registered).
+    #   basic:      BP=$5   → bp_tax = $0.25 + $0.50 = $0.75 → total $105.75
+    #   +registered: + hammer_tax $14.98 → $120.73
+    #   premium:    BP=$3.50 → bp_tax = $0.18 + $0.35 = $0.53 → total $104.03
+    #   vip_elite:  BP=$3    → bp_tax = $0.15 + $0.30 = $0.45 → total $103.45
+    ("basic", "basic", False, 10575),
+    ("basic", "basic", True, 12073),
+    ("premium", "premium", False, 10403),
+    ("vip_elite", "vip_elite", False, 10345),
 ])
 def test_individual_various_tier_matrix(buyer_tier, seller_tier, seller_registered, expected_buyer_cents):
     b = calculate_general_checkout(

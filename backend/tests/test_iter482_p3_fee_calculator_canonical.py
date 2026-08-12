@@ -103,8 +103,9 @@ def test_historical_7_64_never_reemerges():
     )
     assert _pp(r)["amount_cents"] == 0
     # The buyer_total_charged must reflect: hammer + BP + buyer_tax (no processing)
-    # 7.00 + 0.25 + tax_on(0.25) = 7.29 (tax_on 0.25 @ QC = $0.04)
-    assert Decimal(str(r["buyer_total_charged"])) == Decimal("7.29")
+    # 7.00 + 0.25 + tax_on(0.25) = 7.28
+    # (per-line rounding: gst $0.01 + qst $0.02 = $0.03 buyer tax)
+    assert Decimal(str(r["buyer_total_charged"])) == Decimal("7.28")
     # Explicit anti-regression: NEVER $7.64
     total_cents = int((Decimal(str(r["buyer_total_charged"])) * 100).quantize(Decimal("1")))
     assert total_cents != 764, "phantom $0.31 back → STOP"

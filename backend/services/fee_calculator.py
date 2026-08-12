@@ -456,13 +456,18 @@ def _iter350_individual(
         buyer_premium, buyer_prov, payment=payment
     )
     buyer_tax_bd  = tax_on(buyer_premium + buyer_sr, buyer_prov)
-    buyer_total   = _q(hammer + buyer_premium + buyer_sr + buyer_tax_bd["total"])
+    # iter482 P3.1 — Use per-line GST+QST+HST sum for buyer_taxes so
+    # gst + qst + hst == taxes exactly.  Matches CRA/RQ remittance
+    # practice and reconciles cent-exact with `calculate_general_checkout`.
+    buyer_tax_total = _q(buyer_tax_bd["gst"] + buyer_tax_bd["qst"] + buyer_tax_bd["hst"])
+    buyer_total   = _q(hammer + buyer_premium + buyer_sr + buyer_tax_total)
 
     # ── Seller side (taxed at seller's province) ──
     seller_commission = _q(hammer * sc_rate)
     seller_sr         = calculate_stripe_recovery(seller_commission)
     seller_tax_bd     = tax_on(seller_commission + seller_sr, seller_prov)
-    seller_payout     = _q(hammer - seller_commission - seller_sr - seller_tax_bd["total"])
+    seller_tax_total  = _q(seller_tax_bd["gst"] + seller_tax_bd["qst"] + seller_tax_bd["hst"])
+    seller_payout     = _q(hammer - seller_commission - seller_sr - seller_tax_total)
 
     # Routing flags
     charge_buyer_via_stripe = payment == "stripe"
@@ -478,19 +483,19 @@ def _iter350_individual(
         buyer_gst=_r(buyer_tax_bd["gst"]),
         buyer_qst=_r(buyer_tax_bd["qst"]),
         buyer_hst=_r(buyer_tax_bd["hst"]),
-        buyer_taxes=_r(buyer_tax_bd["total"]),
+        buyer_taxes=_r(buyer_tax_total),
         buyer_tax_label=str(buyer_tax_bd["label"]),
         buyer_tax_province=str(buyer_tax_bd["province"]),
-        buyer_subtotal=_r(buyer_total if charge_buyer_via_stripe else buyer_premium + buyer_sr + buyer_tax_bd["total"]),
-        buyer_total_charged=_r(buyer_total if charge_buyer_via_stripe else buyer_premium + buyer_sr + buyer_tax_bd["total"]),
-        buyer_stripe_cents=int(((buyer_total if charge_buyer_via_stripe else buyer_premium + buyer_sr + buyer_tax_bd["total"]) * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP)),
+        buyer_subtotal=_r(buyer_total if charge_buyer_via_stripe else buyer_premium + buyer_sr + buyer_tax_total),
+        buyer_total_charged=_r(buyer_total if charge_buyer_via_stripe else buyer_premium + buyer_sr + buyer_tax_total),
+        buyer_stripe_cents=int(((buyer_total if charge_buyer_via_stripe else buyer_premium + buyer_sr + buyer_tax_total) * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP)),
         seller_commission=_r(seller_commission),
         seller_commission_rate=float(sc_rate),
         seller_stripe_recovery=_r(seller_sr),
         seller_gst=_r(seller_tax_bd["gst"]),
         seller_qst=_r(seller_tax_bd["qst"]),
         seller_hst=_r(seller_tax_bd["hst"]),
-        seller_taxes=_r(seller_tax_bd["total"]),
+        seller_taxes=_r(seller_tax_total),
         seller_tax_label=str(seller_tax_bd["label"]),
         seller_tax_province=str(seller_tax_bd["province"]),
         seller_payout=_r(seller_payout),
@@ -508,7 +513,7 @@ def _iter350_individual(
         tax_rate=float(buyer_tax_bd["combined_rate"]),
         buyer_stripe_fee=_r(buyer_sr),
         seller_stripe_fee=_r(seller_sr),
-        seller_commission_total=_r(seller_commission + seller_sr + seller_tax_bd["total"]),
+        seller_commission_total=_r(seller_commission + seller_sr + seller_tax_total),
     )
     out = result.to_dict()
     # iter482 P3 — attach canonical payment_processing.v1 snapshot.
