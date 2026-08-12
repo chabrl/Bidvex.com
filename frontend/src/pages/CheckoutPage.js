@@ -828,15 +828,22 @@ const CheckoutPage = () => {
                       {formatCurrency(isWinnerFlow ? winnerPreview?.hammer_price : breakdown?.hammer_price)}
                     </span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between" data-testid="checkout-summary-fees-taxes">
                     <span className="text-slate-600 dark:text-slate-400">
                       {isFrench ? 'Frais + Taxes' : 'Fees + Taxes'}
                     </span>
-                    <span>
+                    <span data-testid="checkout-summary-fees-taxes-amount">
+                      {/* iter482 finalization — canonical breakdown keys.
+                          Backend returns `total_tax` (aggregate GST+QST+HST)
+                          and `hammer_tax_total` only when the seller is
+                          tax-registered.  The old field names
+                          `fees_tax_total`/`hammer_tax_total` never
+                          existed in the response and caused the
+                          sidebar to under-count by the tax portion. */}
                       {formatCurrency(
-                        (breakdown?.buyer_premium || 0) + 
-                        (breakdown?.platform_fee || 0) + 
-                        (breakdown?.fees_tax_total || 0) +
+                        (breakdown?.buyer_premium || 0) +
+                        (breakdown?.platform_fee || 0) +
+                        (breakdown?.total_tax || 0) +
                         (breakdown?.hammer_tax_total || 0)
                       )}
                     </span>

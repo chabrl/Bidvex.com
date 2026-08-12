@@ -1,5 +1,43 @@
 # BidVex — Auction Marketplace PRD
 
+## iter482 — Finalization Pass (Feb 12, 2026) ✅ LAUNCH-READY (TEST MODE) · DO NOT DEPLOY
+
+**Focused audit** of Stripe processing correctness, actual fee reconciliation, billing documents (buyer receipt / seller statement / seller receipt / commission invoice / partner multi-lot invoice), PDF generation, and end-to-end payment consistency. Reused all existing P4/P5/P5.1 architecture — no new calculators, no redesign.
+
+### What was verified
+- **Chain reconciliation cent-for-cent** on the canonical `$100 Individual seller / CA card` scenario: Checkout ↔ Backend ↔ PaymentIntent ↔ BalanceTransaction ↔ Receipt ↔ Seller Statement ↔ PDF all equal $107.98 (buyer) / $95.40 net (seller).
+- **All 5 critical PDFs generated & inspected**: Buyer Universal Receipt (EN + FR bilingual), Marketplace Seller Statement, Marketplace Seller Receipt, Marketplace Seller Commission Invoice. Every document displays BidVex letterhead, buyer + seller identity blocks, itemized breakdown (Hammer / BP / GST / QST / Stripe fee where applicable), legal footer with BidVex GST/QST numbers.
+- **Actual Stripe fee reconciliation** wired to `payment_intent.succeeded` webhook via `services/stripe_reconciliation_service.py`. Persists `estimated_cents`, `recovery_cents`, `actual_cents`, `variance_cents`, `card_country`, `resolved_jurisdiction` separately (never overwrites). Idempotent — 2 seed runs produce 2 rows, not 4.
+- **Admin ledger APIs** working: `/api/admin/stripe-reconciliation` (list) · `/api/admin/stripe-reconciliation/summary` (aggregate) · `/api/admin/stripe-reconciliation/{payment_intent_id}` (single row).
+- **Offline methods (Cash / E-Transfer / Cheque)** always $0 Stripe fee with reason `offline_method`; frontend sidebar shows 0,00 $ (hors ligne) on switch.
+- **Canadian card**: 2.9% + $0.30 gross-up = 344c on $104.54 base. **International card**: 3.9% + $0.30 = 438c. Both persisted with authoritative card country from Stripe payment_method_details.
+- **Individual/Business seller = 4% commission** · **Partner = 3%** (rate matrix in `routes/seller_commission_invoice.py`).
+- **BidVex never silently absorbs** Stripe rail cost. Anti-regression test `test_anti_regression_stripe_never_silent_zero` blocks future L-1 flips.
+
+### Bug fixed during audit — 🔴 LAUNCH-BLOCKER
+- **CheckoutPage.js sidebar "Frais + Taxes" row** was summing invalid keys (`fees_tax_total` / `hammer_tax_total`) that don't exist on the backend response. Under-counted by the tax portion (showed $3.50 instead of $4.54 for the $100 scenario). Fix: sum canonical `total_tax` field. New testid `checkout-summary-fees-taxes`. Verified end-to-end: Stripe path 100+4,54+3,44=107,98 · Cash path 100+4,54+0,00=104,54.
+
+### Test results
+- iter482 regression suite: **250/250 GREEN** across P0/P2/P3/P3.1/P4A/P4/P5/P5.1/golden matrix
+- `test_iter482_p4_end_to_end.py` in isolation: 14/14
+- Focused PDF verification script: `backend/tests/iter482_finalization_pdf_verify.py` — 5 PDFs generated, all analyzed and confirmed correct via `analyze_file_tool`
+- Frontend E2E smoke: Stripe ↔ Cash switching sidebar cent-perfect
+
+### Files changed (iter482 finalization)
+- Frontend: `pages/CheckoutPage.js` (sidebar canonical field fix + new testid)
+- New: `backend/tests/iter482_finalization_pdf_verify.py` (seed + PDF generator harness)
+- New: `memory/iter482_finalization_launch_report.md` (full launch-readiness report)
+
+### Guardrails honoured
+✅ Stripe TEST mode only · ✅ No production data · ✅ No historical mutations · ✅ No refunds · ✅ Reused canonical engine · ✅ No new calculators · ✅ No redesign
+
+### Remaining (post-launch — cosmetic only)
+- FR receipt labels "TPS sur prime" / "TVQ sur prime" are slightly imprecise (real taxable base = BP + processing recovery). Values correct; label wording future work.
+- International-card variance email automation (P5.1 deferred).
+- Auth `/api/auth/register` 1-req/min rate-limit flakes full backend test suite; add session-scoped fixture.
+
+---
+
 ## iter482 — Phase P5.1 Stripe Actual-Fee Reconciliation + Card Country + Partner Invoice (Feb 12, 2026) ✅ COMPLETE — PREVIEW ONLY · DO NOT DEPLOY
 
 ### Scope delivered end-to-end
