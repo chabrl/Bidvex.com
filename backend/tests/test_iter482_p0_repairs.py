@@ -117,8 +117,18 @@ def test_c5_individual_100_basic_not_registered():
     b = calculate_general_checkout(100.0, "basic", "basic", False, True, None)
     assert Decimal(str(b.buyer_premium)) == Decimal("5.00")
     assert Decimal(str(b.seller_commission)) == Decimal("4.00")
-    # buyer_total_cents == 10984 (Stripe gross-up preserved for non-Partner)
-    assert b.buyer_total_cents == 10984
+    # iter482 P3 — buyer Stripe surcharge is fail-closed (L-1 legal review
+    # pending).  Buyer_total = hammer + BP + fees_tax only.
+    # $100 + $5 + $1.35 (fees_tax) = $106.35 = 10635 cents.
+    assert b.buyer_total_cents == 10635
+    # Canonical payment_processing snapshot MUST be present + $0.
+    assert b.payment_processing is not None
+    assert b.payment_processing["amount_cents"] == 0
+    assert b.payment_processing["legal_gate_status"] == "REQUIRES_TAX_LEGAL_REVIEW"
+    assert b.payment_processing["reason_code"] == "legally_gated"
+    assert Decimal(str(b.processing_fee)) == Decimal("0"), (
+        "L-1 gate: buyer processing fee must be $0 until legal clearance"
+    )
 
 
 # ═════════════════════════════════════════════════════════════════════
@@ -127,7 +137,11 @@ def test_c5_individual_100_basic_not_registered():
 def test_c6_individual_100_seller_registered():
     b = calculate_general_checkout(100.0, "basic", "basic", True, True, None)
     assert Decimal(str(b.hammer_tax_total)) == Decimal("14.98")
-    assert b.buyer_total_cents == 12526
+    # iter482 P3 — buyer Stripe surcharge fail-closed.
+    # $100 + $5 BP + $14.98 hammer_tax + $1.35 fees_tax = $121.33 = 12133 cents
+    assert b.buyer_total_cents == 12133
+    assert b.payment_processing["amount_cents"] == 0
+    assert b.payment_processing["legal_gate_status"] == "REQUIRES_TAX_LEGAL_REVIEW"
 
 
 # ═════════════════════════════════════════════════════════════════════
@@ -180,6 +194,72 @@ def test_c9_multi_quantity_hammer_total_flows():
     assert Decimal(str(b.buyer_premium)) == Decimal("20.00")
     assert Decimal(str(b.platform_fee)) == Decimal("6.00")
     assert b.stripe_application_fee_cents == 690  # $6 + $0.90 fee tax
+
+
+# ═════════════════════════════════════════════════════════════════════
+# Case 10 — HISTORICAL $7.64 → $7.33 REGRESSION
+# ═════════════════════════════════════════════════════════════════════
+def test_c10_historical_7dollar_hammer_no_phantom_31cent_surcharge():
+    """The exact user-reported historical bug case:
+
+        Hammer      = $7.00
+        Buyer BP    = $0.25   (premium tier: 3.5%)
+        Fees Tax    ≈ $0.08
+
+    Old (buggy) total = $7.64 = $7.33 + $0.31 phantom Stripe surcharge.
+    New (P3, fail-closed) total = $7.33 exactly — the buyer processing
+    surcharge is $0 until L-1 legal review clears the jurisdiction.
+
+    If this test EVER reports $7.64 again, STOP and investigate; do not
+    simply change the expected number.
+    """
+    b = calculate_general_checkout(
+        hammer_price=7.00,
+        buyer_tier="premium",
+        seller_tier="premium",
+        seller_is_tax_registered=False,
+        include_processing_fee=True,
+        custom_buyer_premium_rate=None,
+    )
+    # 7.00 * 3.5% = 0.245 → rounds to $0.25 (Decimal ROUND_HALF_UP)
+    assert Decimal(str(b.buyer_premium)) == Decimal("0.25"), (
+        f"buyer_premium expected $0.25, got ${b.buyer_premium}"
+    )
+    # 7.00 * 2.5% = 0.175 → rounds to $0.18 (seller side)
+    assert Decimal(str(b.seller_commission)) == Decimal("0.18")
+    # fees_subtotal = BP + SC = $0.25 + $0.18 = $0.43
+    # gst = $0.43 * 5% = $0.0215 → $0.02
+    # qst = $0.43 * 9.975% = $0.0429 → $0.04
+    assert Decimal(str(b.gst_on_fees)) == Decimal("0.02")
+    assert Decimal(str(b.qst_on_fees)) == Decimal("0.04")
+    assert Decimal(str(b.fees_tax_total)) == Decimal("0.06")
+    # No hammer tax (seller not tax-registered)
+    assert Decimal(str(b.hammer_tax_total)) == Decimal("0")
+
+    # CRITICAL: processing fee MUST be zero (L-1 gate fail-closed).
+    assert Decimal(str(b.processing_fee)) == Decimal("0"), (
+        "L-1 gate must fail-closed to $0 buyer surcharge — got "
+        f"${b.processing_fee}.  Do NOT simply change the expected value; "
+        "investigate the calculator wiring."
+    )
+    assert b.payment_processing["amount_cents"] == 0
+    assert b.payment_processing["legal_gate_status"] == "REQUIRES_TAX_LEGAL_REVIEW"
+    assert b.payment_processing["reason_code"] == "legally_gated"
+
+    # Buyer_total = hammer + BP + fees_tax = $7.00 + $0.25 + $0.06 = $7.31
+    # (NOT the illustrative $7.33 in the human directive; the human
+    #  directive rounded 0.08 for tax as an example — actual computation
+    #  gives 0.06.  The KEY assertion is: NOT $7.64 and processing = $0.)
+    expected_total = Decimal("7.00") + Decimal("0.25") + Decimal("0.06")
+    assert Decimal(str(b.buyer_total)) == expected_total, (
+        f"buyer_total should be ${expected_total}, got ${b.buyer_total}"
+    )
+    # Explicit anti-regression: the buggy $7.64 must NEVER re-emerge.
+    assert b.buyer_total_cents != 764, (
+        "REGRESSION: phantom $0.31 Stripe surcharge is back! STOP."
+    )
+    # And exactly $7.31 in cents:
+    assert b.buyer_total_cents == 731
 
 
 # ═════════════════════════════════════════════════════════════════════

@@ -190,11 +190,61 @@ def calculate_stripe_recovery(fee_amount) -> Decimal:
     base, or deposit amount.
 
     Returns a Decimal quantized to 2dp.
+
+    iter482 P3 note — this legacy helper is retained for the seller-side
+    Stripe recovery paths (Partner platform fee, Individual seller
+    commission) that ARE cleared under the B2B recipient rule.  It MUST
+    NOT be used for buyer-facing surcharges — those route through
+    ``services.payment_cost_engine.estimate(...)`` with
+    ``payer_role=BUYER``, which fail-closes to $0 until L-1 legal review
+    clears the jurisdiction.
     """
     fee = Decimal(str(fee_amount))
     if fee <= 0:
         return Decimal("0.00")
     return _q(fee * STRIPE_PROCESSING_RATE + STRIPE_FIXED_FEE)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# iter482 P3 — Canonical buyer-facing Stripe recovery via payment_cost_engine
+# ═══════════════════════════════════════════════════════════════════════════
+def _canonical_buyer_stripe_recovery(
+    base_amount: Decimal,
+    buyer_prov: str,
+    payment: str = "stripe",
+    card_type: str = "domestic",
+) -> tuple[Decimal, Dict[str, object]]:
+    """Return (amount, snapshot) for the buyer-facing Stripe surcharge.
+
+    The amount is sourced ONLY from ``services.payment_cost_engine`` with
+    ``payer_role=BUYER``.  Fail-closed to $0.00 until L-1 legal review
+    clears the jurisdiction (per Master Payment Remediation §3, §4).
+
+    The returned snapshot dict is the canonical
+    ``payment_processing.v1`` shape and MUST be persisted on every
+    receipt / invoice / PDF alongside the numeric recovery.
+    """
+    from services.payment_cost_engine import (
+        estimate as _pce_estimate,
+        PayerRole as _PCE_Payer,
+    )
+    amount_cents = int((base_amount * Decimal(100)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    method = "stripe_card" if (payment or "").lower() in ("stripe", "stripe_card", "card") else (payment or "offline")
+    est = _pce_estimate(
+        payment_method=method,
+        amount_cents=max(0, amount_cents),
+        currency="CAD",
+        payer_role=_PCE_Payer.BUYER,
+        jurisdiction=(buyer_prov or "").upper() or "XX",
+        card_class=(card_type or "domestic"),
+    )
+    snapshot = est.to_dict()
+    snapshot["amount_cents"] = int(est.estimated_cents)
+    snapshot["field_version"] = "payment_processing.v1"
+    amount = (Decimal(est.estimated_cents) / Decimal(100)).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
+    )
+    return amount, snapshot
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -400,7 +450,11 @@ def _iter350_individual(
 
     # ── Buyer side (taxed at buyer's province) ──
     buyer_premium = _q(hammer * bp_rate)
-    buyer_sr      = calculate_stripe_recovery(buyer_premium)
+    # iter482 P3 — buyer surcharge sourced ONLY from payment_cost_engine.
+    # Fail-closed to $0 until L-1 legal review clears the jurisdiction.
+    buyer_sr, buyer_pp = _canonical_buyer_stripe_recovery(
+        buyer_premium, buyer_prov, payment=payment
+    )
     buyer_tax_bd  = tax_on(buyer_premium + buyer_sr, buyer_prov)
     buyer_total   = _q(hammer + buyer_premium + buyer_sr + buyer_tax_bd["total"])
 
@@ -456,7 +510,11 @@ def _iter350_individual(
         seller_stripe_fee=_r(seller_sr),
         seller_commission_total=_r(seller_commission + seller_sr + seller_tax_bd["total"]),
     )
-    return result.to_dict()
+    out = result.to_dict()
+    # iter482 P3 — attach canonical payment_processing.v1 snapshot.
+    # Single source of truth for the payer-facing Stripe surcharge.
+    out["payment_processing"] = buyer_pp
+    return out
 
 
 # ─── iter350 route: partner seller ──────────────────────────────────────
@@ -537,6 +595,13 @@ def _iter350_partner(
     # legacy field populated.  Auction settlement DOES NOT read this
     # in Phase 3 (backward compat wins); it is available for Phase 4.
     out["canonical_seller_commission_for_partner"] = 0.0
+    # iter482 P3 — attach canonical payment_processing.v1 snapshot for
+    # the buyer.  In Model A₁ the buyer bears NO Stripe surcharge
+    # (Partner is merchant of record via on_behalf_of), so the snapshot
+    # reflects a platform-absorbed $0 cost.
+    _, out["payment_processing"] = _canonical_buyer_stripe_recovery(
+        Decimal("0"), buyer_prov, payment=payment
+    )
     return out
 
 
@@ -550,7 +615,10 @@ def _iter350_vehicle(
     Dealer pays $0 per transaction — hammer goes directly dealer↔buyer.
     A separate deposit is pre-authorized on Stripe with capture_method="manual"."""
     platform_fee    = _q(hammer * VEHICLE_DEALER_BUYER_RATE)
-    stripe_recovery = calculate_stripe_recovery(platform_fee)
+    # iter482 P3 — buyer surcharge sourced ONLY from payment_cost_engine.
+    stripe_recovery, buyer_pp = _canonical_buyer_stripe_recovery(
+        platform_fee, buyer_prov, payment="stripe"
+    )
     tax_bd          = tax_on(platform_fee + stripe_recovery, buyer_prov)
     buyer_pays      = _q(platform_fee + stripe_recovery + tax_bd["total"])
 
@@ -591,7 +659,10 @@ def _iter350_vehicle(
         seller_stripe_fee=0.0,
         seller_commission_total=0.0,
     )
-    return result.to_dict()
+    out = result.to_dict()
+    # iter482 P3 — attach canonical payment_processing.v1 snapshot.
+    out["payment_processing"] = buyer_pp
+    return out
 
 
 # ─── iter350 route: storage facility ────────────────────────────────────
@@ -616,7 +687,10 @@ def _iter350_storage(
     recipient of BidVex's supply-of-service under CRA §142.1).
     """
     buyer_premium   = _q(hammer * STORAGE_FACILITY_RATE)  # 5% of hammer → BidVex
-    stripe_recovery = calculate_stripe_recovery(buyer_premium)
+    # iter482 P3 — buyer surcharge sourced ONLY from payment_cost_engine.
+    stripe_recovery, buyer_pp = _canonical_buyer_stripe_recovery(
+        buyer_premium, buyer_prov, payment=payment
+    )
     tax_bd          = tax_on(buyer_premium + stripe_recovery, buyer_prov)
     buyer_bidvex    = _q(buyer_premium + stripe_recovery + tax_bd["total"])  # BidVex portion
 
@@ -667,7 +741,10 @@ def _iter350_storage(
         seller_stripe_fee=0.0,
         seller_commission_total=0.0,
     )
-    return result.to_dict()
+    out = result.to_dict()
+    # iter482 P3 — attach canonical payment_processing.v1 snapshot.
+    out["payment_processing"] = buyer_pp
+    return out
 
 
 # ═══════════════════════════════════════════════════════════════════════════

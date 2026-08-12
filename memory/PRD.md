@@ -1,6 +1,86 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter482 — Phase P3 Checkout Wiring & $0.31 Frontend Fix (Feb 12, 2026) ✅ COMPLETE — PREVIEW ONLY · DO NOT DEPLOY
+
+**Scope**: P3 wires the canonical `services/payment_cost_engine.py` (P2) into every buyer-facing calculator, eliminating the phantom $0.31 Stripe surcharge. Buyer-side Stripe recovery is now fail-closed to $0 across all seller types until L-1 legal review clears the jurisdiction. ONE authoritative field — `payment_processing.amount_cents` — is the sole payer-facing processing amount.
+
+### Files modified (backend)
+- `backend/services/fee_calculator.py` — Added `_canonical_buyer_stripe_recovery(base_amount, buyer_prov, payment)` helper (line ~200). Rewired `_iter350_individual`, `_iter350_vehicle`, `_iter350_storage`, `_iter350_partner` to source `buyer_stripe_recovery` from the canonical engine. Every route now attaches a `payment_processing` snapshot to the return dict. Legacy `calculate_stripe_recovery()` retained ONLY for seller-side recovery (Partner platform fee, Individual seller commission — B2B cleared).
+- `backend/services/stripe_connect_service.py` — Already wired in a prior step: `_build_payment_processing_snapshot()` helper + canonical `payment_processing` field on every `CheckoutBreakdown`. Buyer-facing `processing_fee` in `calculate_general_checkout` now resolves via `payment_cost_engine.estimate(payer_role=BUYER)`. Model A₁ (`on_behalf_of` + `transfer_data.destination` + `application_fee_amount`) preserved for Partner destination charges.
+
+### Files modified (frontend)
+- `frontend/src/pages/CheckoutPage.js` — Processing fee card and Summary "Processing" row now read `breakdown.payment_processing.amount_cents` as the source of truth. Row is hidden when $0 (L-1 gated). Added `data-testid`: `processing-fee-section`, `processing-fee-label`, `processing-fee-amount`, `checkout-summary-processing`, `checkout-summary-processing-amount`.
+- `frontend/src/components/PriceBreakdown.js` — Payment Processing row reads `payment_processing.amount_cents`. Row hidden at $0. Added `data-testid`: `stripe-processing-fee-row`, `stripe-processing-fee-amount`.
+
+### Files created (tests)
+- `backend/tests/test_iter482_p3_fee_calculator_canonical.py` — 16 cent-exact P3 assertions covering: Individual QC (basic/premium/vip_elite), Partner E-10 neutrality, Storage 100% payout, Vehicle Dealer buyer path, Cash/E-Transfer/Cheque offline methods, quantity variations ($7×1/2/10), historical $7.64 anti-regression.
+- `backend/tests/test_iter482_p3_api_curl.py` (added by testing agent) — 15 live API tests against `/api/fees/v2/preview`.
+- Updated `backend/tests/test_iter482_p0_repairs.py`: Case 5 expected `10984 → 10635`, Case 6 `12526 → 12133`, NEW Case 10 (`test_c10_historical_7dollar_hammer_no_phantom_31cent_surcharge`) proves `buyer_total_cents=731`, NEVER `764`.
+
+### Historical $7.64 → $7.33/$7.29 anti-regression (mandatory)
+| Field | Old (buggy) | New (P3) |
+|---|---|---|
+| hammer_price | $7.00 | $7.00 |
+| buyer_premium (premium 3.5%) | $0.25 | $0.25 |
+| buyer_taxes | $0.08 | $0.04 (via `_iter350_individual` — tax on BP only) |
+| buyer_stripe_recovery | $0.31 (phantom) | **$0.00** (fail-closed L-1) |
+| **buyer_total_charged** | **$7.64** | **$7.29** (via `calculate_fee`) / **$7.31** (via `calculate_general_checkout`) |
+| payment_processing.legal_gate_status | — | `REQUIRES_TAX_LEGAL_REVIEW` |
+| payment_processing.reason_code | — | `legally_gated` |
+
+### Test results — **158/158 PASS**
+| Suite | Result |
+|---|---|
+| iter482 P0 golden repairs | 34/34 |
+| iter482 golden matrix (expanded cent-exact) | 40/40 |
+| iter482 P2 payment cost engine | 46/46 |
+| **iter482 P3 fee_calculator canonical** (new) | **16/16** |
+| iter482 P3 API curl (new) | 15/15 |
+| iter482 refund engine | 7/7 |
+| **Total iter482 P3 baseline** | **158/158** |
+
+### Cent-exact reconciliation (canonical scenarios)
+| Scenario | Old buyer_total | New buyer_total | Δ | processing_fee |
+|---|---|---|---|---|
+| Individual QC $100 basic/basic | $109.84 | **$105.75** | −$4.09 | $0 (was $3.49 phantom) |
+| Individual QC $100 basic/basic (seller registered) | $125.26 | **$121.33** | −$3.93 | $0 |
+| Individual QC $7 premium/premium | $7.64 | **$7.29** | −$0.35 | $0 (was $0.31 phantom) |
+| Partner QC $100 10% BP not-registered | $110.00 | **$110.00** | 0 | $0 (Model A₁ — Partner absorbs) |
+| Partner QC $100 10% BP registered | $126.48 | **$126.48** | 0 | $0 |
+| Storage QC $100 (5% BP) | $105.75 | **$105.75** | 0 | $0 (was already fail-closed) |
+
+### Legal/Tax gate (unchanged)
+- L-1 through L-9: `REQUIRES_TAX_LEGAL_REVIEW`. Buyer Stripe surcharges remain $0 pending explicit legal clearance.
+- Partner B2B (Partner→BidVex 3% fee): `CLEARED` (application_fee path retains BidVex tax on platform fee).
+- Platform-absorbed rows: `CLEARED` with `reason_code=platform_absorbed`.
+
+### Guardrails honoured
+- **DO NOT DEPLOY** — preview only.
+- Historical data unchanged (0 mutations to `db.receipts` / `db.transactions` / `db.seller_payouts`).
+- Stripe `livemode=false` throughout testing.
+- No refunds executed.
+- Partner Model A₁ topology preserved: `on_behalf_of` + `transfer_data.destination` + `application_fee_amount` unchanged.
+- E-10 buyer-tier neutrality on Partner: verified — Standard/Premium/VIP Elite all produce identical $110 on a $100 hammer at 10% BP.
+- Payment methods audited: `stripe_card` / `cash` / `cheque` / `e_transfer` / `offline` all return `buyer_stripe_recovery=0.0`.
+
+### Remaining duplicate calculators/fields (documented for P5+ cleanup)
+- `fee_calculator.calculate_stripe_recovery()` — retained ONLY for seller-side B2B recovery (partner platform fee, individual SC). Never invoked for buyer paths after P3.
+- `tax_engine.stripe_processing_fee` — seller-side field, still active for B2B path.
+- `vehicle_fee_service.stripe_processing_fee` — seller-side vehicle dealer B2B; buyer path already returns 0.
+- `broker_fee_engine._stripe_gross_up` — untouched (broker flow deferred to Phase 6).
+
+### Remaining legal/tax blockers
+- L-1..L-9 legal gate still closed. Any change requires explicit legal/tax sign-off.
+- Production historical exposure query still BLOCKED on prod DB access.
+
+### 🛑 HALTED at P3 boundary
+Phases P4 (Partner post-auction billing), P5 (refund consolidation + Gate 3 live Stripe TEST proof), P6 (tax engine consolidation), P7 (200-case matrix), P8 (peripheral flows), P9 (final audit + deploy gate) — **NOT executed**. Awaiting explicit approval.
+
+---
+
+
+
 ## iter480 — Fee Table Merge · Phase 3 (Feb 11, 2026) ✅ COMPLETE — CANONICAL PARTNER BUYER PREMIUM vs BIDVEX PLATFORM FEE SEPARATION
 
 **Scope**: Phase 3 canonical financial separation per master directive. Every existing settlement number preserved cent-exact. Partner sales now persist the BidVex Platform Fee under its correct economic name — no longer stuffed into `seller_commission`. Historical receipts render unchanged (backward compat).

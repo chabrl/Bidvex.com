@@ -107,10 +107,13 @@ def test_partner_qc_not_registered_no_hammer_or_bp_tax():
 # ═════════════════════════════════════════════════════════════════════
 
 @pytest.mark.parametrize("buyer_tier,seller_tier,seller_registered,expected_buyer_cents", [
-    ("basic", "basic", False, 10984),
-    ("basic", "basic", True, 12526),
-    ("premium", "premium", False, 10783),   # premium: 3.5% BP + 2.5% SC
-    ("vip_elite", "vip_elite", False, 10716),  # vip_elite: 3% BP + 2% SC
+    # iter482 P3 — buyer Stripe surcharge is fail-closed (L-1 legal review
+    # pending).  Buyer_total no longer includes a gross-up.  Values reflect:
+    #   $100 hammer + BP + fees_tax + (hammer_tax if seller registered)
+    ("basic", "basic", False, 10635),
+    ("basic", "basic", True, 12133),
+    ("premium", "premium", False, 10440),   # premium: 3.5% BP + 2.5% SC
+    ("vip_elite", "vip_elite", False, 10375),  # vip_elite: 3% BP + 2% SC
 ])
 def test_individual_various_tier_matrix(buyer_tier, seller_tier, seller_registered, expected_buyer_cents):
     b = calculate_general_checkout(
@@ -120,6 +123,13 @@ def test_individual_various_tier_matrix(buyer_tier, seller_tier, seller_register
         f"buyer_tier={buyer_tier} seller_tier={seller_tier} "
         f"reg={seller_registered} → got {b.buyer_total_cents}, expected {expected_buyer_cents}"
     )
+    # iter482 P3 — canonical payment_processing block MUST be present
+    # and MUST be fail-closed with no phantom surcharge.
+    pp = b.payment_processing
+    assert pp is not None
+    assert pp["amount_cents"] == 0
+    assert pp["legal_gate_status"] == "REQUIRES_TAX_LEGAL_REVIEW"
+    assert pp["reason_code"] == "legally_gated"
 
 
 def test_individual_buyer_tier_DOES_affect_total():

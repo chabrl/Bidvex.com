@@ -211,20 +211,33 @@ const PriceBreakdown = ({
             </span>
           </div>
 
-          {/* Payment Processing (Stripe fee passed to buyer — Bug 6) */}
-          {!isVehiclePayment && (breakdown.stripe_processing_fee || 0) > 0 && (
-            <div className="flex justify-between items-center" data-testid="stripe-processing-fee-row">
-              <span className="text-slate-600 dark:text-slate-400">
-                {i18n.language === 'fr' ? 'Frais de traitement (2,9 % + 0,30 $)' : 'Payment Processing (2.9% + $0.30)'}
-                <span className="ml-1" title={i18n.language === 'fr'
-                  ? 'Frais de traitement Stripe — répercutés sans majoration par BidVex.'
-                  : 'Stripe card processing fee — passed directly to you with no markup from BidVex.'}>ℹ️</span>
-              </span>
-              <span className="text-slate-700 dark:text-slate-300">
-                +{formatCurrency(breakdown.stripe_processing_fee)}
-              </span>
-            </div>
-          )}
+          {/* Payment Processing — iter482 P3 canonical mapping.
+              Reads from payment_processing.amount_cents (single source of
+              truth from canonical payment_cost_engine).  Legacy field
+              retained for older payloads.  Row hidden when $0 (L-1 gate). */}
+          {!isVehiclePayment && (() => {
+            const pp = breakdown.payment_processing;
+            const canonicalCents = pp?.amount_cents ?? null;
+            const shown = canonicalCents != null
+              ? (canonicalCents / 100)
+              : Number(breakdown.stripe_processing_fee || 0);
+            if (!(shown > 0)) return null;
+            return (
+              <div className="flex justify-between items-center" data-testid="stripe-processing-fee-row">
+                <span className="text-slate-600 dark:text-slate-400">
+                  {pp?.rate_label || (i18n.language === 'fr'
+                    ? 'Frais de traitement'
+                    : 'Payment Processing')}
+                  <span className="ml-1" title={i18n.language === 'fr'
+                    ? 'Frais de traitement Stripe — répercutés sans majoration par BidVex.'
+                    : 'Stripe card processing fee — passed directly to you with no markup from BidVex.'}>ℹ️</span>
+                </span>
+                <span className="text-slate-700 dark:text-slate-300" data-testid="stripe-processing-fee-amount">
+                  +{formatCurrency(shown)}
+                </span>
+              </div>
+            );
+          })()}
 
           {/* Tax breakdown tooltip for business sellers */}
           {!isVehiclePayment && breakdown.hammer_tax_applicable && (

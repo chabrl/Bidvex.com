@@ -23,8 +23,14 @@ import logging
 from typing import Dict, Any, Optional, Tuple
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime, timezone
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 import uuid
+from services.payment_cost_engine import (
+    estimate as _pce_estimate,
+    PaymentMethod as _PCE_Method,
+    PayerRole as _PCE_Payer,
+    LegalGate as _PCE_Gate,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +75,40 @@ def calculate_processing_fee(amount: Decimal) -> Decimal:
     return _round_currency(amount * STRIPE_PERCENTAGE_FEE + STRIPE_FIXED_FEE)
 
 
+# ── iter482 P3 — canonical payment_processing snapshot helper ────────
+def _build_payment_processing_snapshot(
+    *,
+    amount_cents: int,
+    currency: str,
+    payer_role: "_PCE_Payer",
+    jurisdiction: str,
+    payment_method: str = "stripe_card",
+    card_class: str = "domestic",
+    absorbed_by_platform: bool = False,
+) -> Dict[str, Any]:
+    """Return the canonical payment_processing dict, sourced solely
+    from `services.payment_cost_engine`.
+
+    This is the ONLY function in stripe_connect_service that computes
+    a payer-facing processing charge.  All other legacy paths that
+    computed processing_fee via gross-up must migrate to this in P3+.
+    """
+    est = _pce_estimate(
+        payment_method=payment_method,
+        amount_cents=int(amount_cents),
+        currency=currency,
+        payer_role=payer_role,
+        jurisdiction=jurisdiction,
+        card_class=card_class,
+        absorbed_by_platform=absorbed_by_platform,
+    )
+    d = est.to_dict()
+    # Expose a stable, canonical name for downstream consumers to read.
+    d["amount_cents"] = int(est.estimated_cents)
+    d["field_version"] = "payment_processing.v1"
+    return d
+
+
 @dataclass
 class CheckoutBreakdown:
     """Complete breakdown for checkout display and Stripe charge creation"""
@@ -104,7 +144,7 @@ class CheckoutBreakdown:
     # Processing fee (Stripe 2.9% + $0.30)
     processing_fee: Decimal
     processing_fee_display: Decimal  # Visible to buyer
-    
+
     # Totals
     subtotal_before_tax: Decimal
     buyer_total: Decimal           # Total buyer pays (hammer + premium + taxes + processing)
@@ -118,6 +158,14 @@ class CheckoutBreakdown:
     # Seller info
     seller_payout: Decimal        # Hammer - commission (+ hammer tax if collected)
     seller_receives_tax: Decimal  # Tax collected on seller's behalf (business only)
+
+    # ── iter482 P3 — Canonical payment_cost_engine snapshot ──
+    # This is the authoritative record of the payer-facing processing
+    # charge.  Read this instead of `processing_fee` for all
+    # buyer-facing UI, receipts, invoices, PDFs.  A `payment_processing`
+    # dict of `None` means the caller did not run the canonical engine
+    # (legacy path — remove such callers in P7).
+    payment_processing: Optional[Dict[str, Any]] = None
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary with serializable types"""
@@ -138,6 +186,9 @@ def calculate_general_checkout(
     include_processing_fee: bool = True,
     custom_buyer_premium_rate: Optional[float] = None,
     seller_commission_rate_override: Optional[float] = None,
+    *,
+    buyer_province: Optional[str] = None,
+    currency: str = "CAD",
 ) -> CheckoutBreakdown:
     """
     Calculate complete checkout breakdown for GENERAL items/lots
@@ -152,7 +203,12 @@ def calculate_general_checkout(
         buyer_tier: Buyer's subscription tier
         seller_tier: Seller's subscription tier
         seller_is_tax_registered: Whether seller has GST/QST registration
-        include_processing_fee: Whether to add processing fee to buyer total
+        include_processing_fee: LEGACY flag (retained for back-compat).
+            In iter482 P3 the payer-facing processing charge is sourced
+            solely from ``services.payment_cost_engine.estimate(...)``
+            with ``payer_role=BUYER``.  Buyer-facing surcharge is
+            fail-closed by default until L-1 legal review clears it, so
+            this returns processing_fee = 0 for buyer-facing flows.
         custom_buyer_premium_rate: iter441 — Optional listing-level override
             (e.g. 0.075 for 7.5%). Storage operators set this per listing.
             When None or 0, the standard tier-based rate applies.
@@ -161,6 +217,11 @@ def calculate_general_checkout(
             Storage Facility listings (iter443 canonical rule: facility
             keeps 100% hammer, no SC deducted).  When ``None`` (default),
             the standard tier-based rate applies.
+        buyer_province: iter482 P3 — Two-letter province code for the
+            buyer.  Used by ``payment_cost_engine`` to look up the
+            legal-gate status for buyer-facing Stripe surcharge.  Fails
+            closed (returns processing_fee=0) if not provided.
+        currency: iter482 P3 — ISO 4217 currency code.  Defaults to CAD.
     
     Returns:
         CheckoutBreakdown with all amounts calculated
@@ -212,14 +273,23 @@ def calculate_general_checkout(
     
     # Subtotal before processing fee
     subtotal_before_processing = hammer + buyer_premium + total_tax
-    
-    # Calculate processing fee using gross-up
-    if include_processing_fee:
-        gross_amount = _gross_up(subtotal_before_processing)
-        processing_fee = gross_amount - subtotal_before_processing
-    else:
-        processing_fee = Decimal("0")
-        gross_amount = subtotal_before_processing
+
+    # ── iter482 P3 — Canonical payment_cost_engine snapshot ──
+    # The buyer-facing processing charge is sourced ONLY from
+    # payment_cost_engine.  Buyer surcharge is fail-closed by default
+    # until L-1 legal review clears the jurisdiction.
+    _pp = _build_payment_processing_snapshot(
+        amount_cents=int((subtotal_before_processing * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP)),
+        currency=currency,
+        payer_role=_PCE_Payer.BUYER,
+        jurisdiction=(buyer_province or "").upper() or "XX",  # XX ⇒ fail-closed
+        payment_method="stripe_card",
+        card_class="domestic",
+    )
+    processing_fee = (Decimal(_pp["amount_cents"]) / Decimal(100)).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
+    )
+    gross_amount = subtotal_before_processing + processing_fee
     
     buyer_total = gross_amount
     
@@ -272,7 +342,8 @@ def calculate_general_checkout(
         stripe_transfer_amount_cents=_to_cents(transfer_amount),
         
         seller_payout=seller_payout,
-        seller_receives_tax=seller_receives_tax
+        seller_receives_tax=seller_receives_tax,
+        payment_processing=_pp,
     )
 
 
@@ -363,7 +434,22 @@ def calculate_vehicle_checkout(
         stripe_transfer_amount_cents=0,  # No transfer - hammer paid offline
         
         seller_payout=hammer,  # Seller receives full hammer via Bank Draft
-        seller_receives_tax=Decimal("0")  # Tax handled separately if business
+        seller_receives_tax=Decimal("0"),  # Tax handled separately if business
+        payment_processing={
+            "amount_cents": 0,
+            "estimated_cents": 0,
+            "is_estimate": True,
+            "payment_method": "stripe_card",
+            "payer_role": "buyer",
+            "currency": "CAD",
+            "jurisdiction": "N/A",
+            "amount_cents_input": _to_cents(buyer_total_stripe),
+            "legal_gate_status": "CLEARED",
+            "reason_code": "platform_absorbed",
+            "rate_label": "Vehicle BidVex-only Stripe charge — no payer surcharge",
+            "engine_version": "iter482-P2-v1",
+            "field_version": "payment_processing.v1",
+        },
     )
 
 
@@ -543,6 +629,19 @@ def calculate_partner_listing_checkout(
 
         seller_payout=transfer_to_partner,
         seller_receives_tax=hammer_tax_total + bp_tax_total,
+        # ── iter482 P3 — Canonical payment_processing snapshot ──
+        # Model A₁ buyer flow never surcharges the buyer for Stripe
+        # rail.  The rail cost is borne by the platform (Gate 2 result;
+        # will migrate to Partner via P4 Partner-invoice Stripe path).
+        payment_processing=_build_payment_processing_snapshot(
+            amount_cents=_to_cents(buyer_total),
+            currency="CAD",
+            payer_role=_PCE_Payer.BUYER,
+            jurisdiction=(partner_prov or "QC"),
+            payment_method="stripe_card",
+            card_class="domestic",
+            absorbed_by_platform=True,  # buyer never bears Model A₁ rail
+        ),
     )
 
 

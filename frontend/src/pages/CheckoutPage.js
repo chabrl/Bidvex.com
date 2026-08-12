@@ -493,21 +493,38 @@ const CheckoutPage = () => {
                   </div>
                 </div>
 
-                {/* Processing Fee Section (Standard flow only — Partners absorb this) */}
-                {paymentMethod === 'stripe' && breakdown?.flow_type !== 'PARTNER_FLOW' && (
-                <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-4">
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                      <CreditCard className="h-4 w-4 text-amber-600" />
-                      <span className="font-medium">
-                        {isFrench ? 'Frais de traitement sécurisé' : 'Secure Processing Fee'}
-                      </span>
-                      <span className="text-xs text-amber-600">(2.9% + $0.30)</span>
+                {/* Processing Fee Section — iter482 P3 canonical mapping.
+                    Sourced from breakdown.payment_processing.amount_cents (single
+                    source of truth from the canonical payment_cost_engine).
+                    Fail-closed: hidden when $0 (L-1 legal review pending). */}
+                {(() => {
+                  const pp = breakdown?.payment_processing;
+                  const canonicalCents = pp?.amount_cents ?? null;
+                  const legacyCents = breakdown?.stripe_processing_fee || breakdown?.processing_fee || 0;
+                  const shownCents = canonicalCents != null ? canonicalCents : Math.round(Number(legacyCents) * 100);
+                  const shown = (shownCents || 0) / 100;
+                  if (paymentMethod !== 'stripe') return null;
+                  if (breakdown?.flow_type === 'PARTNER_FLOW') return null;
+                  if (!(shown > 0)) return null;  // L-1 legally gated → $0, hide row
+                  return (
+                    <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-4" data-testid="processing-fee-section">
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                          <CreditCard className="h-4 w-4 text-amber-600" />
+                          <span className="font-medium">
+                            {isFrench ? 'Frais de traitement sécurisé' : 'Secure Processing Fee'}
+                          </span>
+                          <span className="text-xs text-amber-600" data-testid="processing-fee-label">
+                            {pp?.rate_label || (isFrench ? '(traitement)' : '(processing)')}
+                          </span>
+                        </div>
+                        <span className="font-medium" data-testid="processing-fee-amount">
+                          {formatCurrency(shown)}
+                        </span>
+                      </div>
                     </div>
-                    <span className="font-medium">{formatCurrency(breakdown?.stripe_processing_fee || breakdown?.processing_fee)}</span>
-                  </div>
-                </div>
-                )}
+                  );
+                })()}
 
                 {/* Late Penalty Section */}
                 {latePenalty > 0 && (
@@ -655,11 +672,17 @@ const CheckoutPage = () => {
                       )}
                     </span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between" data-testid="checkout-summary-processing">
                     <span className="text-slate-600 dark:text-slate-400">
                       {isFrench ? 'Traitement' : 'Processing'}
                     </span>
-                    <span>{formatCurrency(breakdown?.processing_fee)}</span>
+                    <span data-testid="checkout-summary-processing-amount">
+                      {formatCurrency(
+                        ((breakdown?.payment_processing?.amount_cents ?? null) != null)
+                          ? (breakdown.payment_processing.amount_cents / 100)
+                          : (breakdown?.processing_fee || 0)
+                      )}
+                    </span>
                   </div>
                   {latePenalty > 0 && (
                     <div className="flex justify-between text-red-600">

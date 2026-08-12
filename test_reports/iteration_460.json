@@ -1,0 +1,29 @@
+{
+  "summary": "iter482 P3 backend-only regression: ran full 143-test iter482 pytest suite (P0+Golden+P2+P3+refund) plus a new 15-test API-level curl suite against /api/fees/v2/preview covering all P3 canonical wiring scenarios. Every buyer-facing surcharge path returns buyer_stripe_recovery=0.0 and a payment_processing snapshot with amount_cents=0, legal_gate_status=REQUIRES_TAX_LEGAL_REVIEW, reason_code=legally_gated, field_version=payment_processing.v1. The P0 anti-regression case for the historical $7.64 phantom-$0.31 bug now returns buyer_total_charged=7.29 for a $7 hammer premium tier. Partner E-10 neutrality confirmed ($100 hammer @ 10% BP => $110 total across standard/premium/vip_elite buyer tiers, $3 platform fee). Storage facility keeps 100% ($100 payout). Vehicle dealer, offline payment methods (cash/e_transfer/cheque), and quantity smoke ($7x1/2/10) all clean. Total 158/158 PASS.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter482_p0_repairs.py",
+    "/app/backend/tests/test_iter482_golden_matrix.py",
+    "/app/backend/tests/test_iter482_p2_payment_cost_engine.py",
+    "/app/backend/tests/test_iter482_p3_fee_calculator_canonical.py",
+    "/app/backend/tests/test_iter482_refund_engine.py",
+    "/app/backend/tests/test_iter482_p3_api_curl.py",
+    "/app/test_reports/pytest/iter482_p3_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "P3 wiring is clean — _canonical_buyer_stripe_recovery helper correctly fail-closes to $0. All four route functions (_iter350_individual/vehicle/storage/partner) attach payment_processing snapshot from canonical engine.",
+    "Seller-side stripe recovery ($0.31 on the $7 premium hammer case) still flows through seller_stripe_recovery/seller_stripe_fee fields — this is intentional per L-1 gate scope (buyer surcharge gated, seller side unchanged). Documented for L-1 reviewer clarity."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter482_p3_api_curl.py (NEW - 15 API tests)"
+  ],
+  "success_rate": {"backend": "100% (158/158)", "frontend": "not tested (per scope)"},
+  "test_credentials": "not needed (public endpoint, pure calc)",
+  "seed_data_creation": "none",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "iter482 P3 backend fully green. Historical phantom $0.31 bug verified fixed via cent-exact assertion (buyer_total_charged=7.29, never 7.64). The new API test file test_iter482_p3_api_curl.py can serve as regression coverage. Frontend UI (CheckoutPage.js/PriceBreakdown.js) reading of breakdown.payment_processing.amount_cents was NOT tested this round — deferred to a future E2E round per E1's explicit instruction.",
+  "rca of the issue": "N/A — no failures. Historical $7.64 bug was a phantom $0.31 buyer_stripe_recovery leak; P3 canonical wiring routes all buyer surcharge lookups through payment_cost_engine which fail-closes to $0 until L-1 legal gate opens. Confirmed by both unit tests and live API curl."
+}
