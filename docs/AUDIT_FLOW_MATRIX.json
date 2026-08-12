@@ -1,0 +1,375 @@
+{
+  "meta": {
+    "iteration": "iter482+P1",
+    "phase": "P1 READ-ONLY MASTER AUDIT",
+    "date_utc": "2026-02-12",
+    "auditor": "E1 (main agent)",
+    "code_changes_this_phase": 0,
+    "production_writes_this_phase": 0,
+    "guardrails_honored": ["no_deploy", "no_prod_db", "no_refunds", "no_live_credentials", "no_history_mutation", "no_code_change"],
+    "artifacts": [
+      "/app/docs/PAYMENT_MASTER_AUDIT_FINAL_REPORT.md",
+      "/app/docs/AUDIT_FLOW_MATRIX.json",
+      "/app/docs/GATE2_STRIPE_A1_PROOF.md (Gate 2 from iter482)",
+      "/app/docs/GATE2_STRIPE_A1_PROOF.json (Gate 2 from iter482)"
+    ]
+  },
+  "payment_flow_matrix": [
+    {
+      "flow_id": "F1",
+      "flow": "Partner auction — buyer checkout",
+      "route": "POST /api/payments/checkout (routes/payments.py:63,841)",
+      "calculator": "services.stripe_connect_service.calculate_partner_listing_checkout",
+      "payer": "Buyer",
+      "recipient_of_hammer": "Partner (via destination charge)",
+      "bidvex_fee_source": "3% × hammer (PARTNER_PLATFORM_FEE_RATE) — collected as Stripe application_fee",
+      "bp_source": "listing.custom_buyer_premium_rate or user.custom_premium_rate (Partner-owned, 100% Partner)",
+      "tax_engine": "services.stripe_connect_service (inline QC-only, silently guesses non-QC as QC)",
+      "stripe_topology": "destination_charge with on_behalf_of=partner_acct",
+      "stripe_cost_payer_empirical": "PLATFORM (BidVex) — Gate 2 proven",
+      "stripe_cost_payer_claimed_in_code": "Partner (docstring — REFUTED by Gate 2)",
+      "refund_path": "services.refund_engine.refund_partner_charge (uses reverse_transfer + refund_application_fee)",
+      "immutability": "Receipt read-path calls calculate_fee() dynamically — VIOLATES immutability",
+      "severity_notes": "P0 rail incidence + P1 tax silent-guess"
+    },
+    {
+      "flow_id": "F2",
+      "flow": "Non-Partner auction winner checkout (individual/enterprise seller)",
+      "route": "POST /api/payments/auction-winner-checkout (routes/payments.py:1887)",
+      "calculator": "services.stripe_connect_service.calculate_general_checkout (via calc)",
+      "payer": "Buyer",
+      "recipient_of_hammer": "Individual/enterprise seller (via destination charge OR platform payout)",
+      "bidvex_fee_source": "buyer_premium 5%/3.5%/3% by tier + seller_commission 4%/2.5%/2% by seller tier",
+      "tax_engine": "services.tax_engine.calculate_qc_taxes (QC-canonicalized)",
+      "stripe_topology": "destination_charge (no on_behalf_of)",
+      "stripe_cost_payer_empirical": "Platform (destination charges never shift rail per Stripe API)",
+      "refund_path": "shared refund_engine flow (partner=False)",
+      "severity_notes": "Same rail issue; tax engine QC-centric"
+    },
+    {
+      "flow_id": "F3",
+      "flow": "Buy It Now (marketplace)",
+      "route": "POST /api/payments/buy-now (routes/payments.py:1577)",
+      "calculator": "same as F2",
+      "notes": "Uses same calculators; carries same silent-QC risks"
+    },
+    {
+      "flow_id": "F4",
+      "flow": "Vehicle checkout",
+      "route": "POST /api/payments/vehicle-buy-now-checkout (routes/payments.py:2280); services.vehicle_payment",
+      "calculator": "services.vehicle_pricing.calculate_vehicle_pricing; services.vehicle_fee_service.calculate_vehicle_fee",
+      "bidvex_fee_source": "VEHICLE_PLATFORM_FEE_RATE=0.025 (2.5%)",
+      "stripe_topology": "destination_charge → platform (application_fee_cents == whole amount, all to BidVex per lines 360–362)",
+      "refund_path": "vehicle-specific flow — NOT in refund_engine",
+      "severity_notes": "P2 — separate calculator; refund path not consolidated"
+    },
+    {
+      "flow_id": "F5",
+      "flow": "Storage facility auction — buyer",
+      "route": "POST /api/payments/... via services.storage_pricing.calculate_storage_pricing + routes/storage_auctions.py",
+      "calculator": "services.storage_pricing.calculate_storage_pricing (own STRIPE_PERCENT hardcoded 2.9%)",
+      "bidvex_fee_source": "5% buyer premium (STORAGE_FACILITY_RATE / BUYER_PREMIUM_RATE)",
+      "stripe_topology": "own path; storage_deposit_service for deposits, seller pays 0% commission",
+      "severity_notes": "Hardcoded stripe recovery 2.9% + 0.30; own tax table"
+    },
+    {
+      "flow_id": "F6",
+      "flow": "Broker (multi-lot) transaction",
+      "route": "services.broker_fee_engine.calculate_broker_transaction",
+      "calculator": "own — broker_fee_engine",
+      "bidvex_fee_source": "2.5% platform fee (BIDVEX_PLATFORM_FEE_RATE)",
+      "stripe_topology": "own gross-up (STRIPE_PCT=0.029 hardcoded)",
+      "severity_notes": "Yet another duplicate Stripe calculator"
+    },
+    {
+      "flow_id": "F7",
+      "flow": "Partner post-auction BidVex-fee invoice (Sections 2/8/9)",
+      "route": "NOT IMPLEMENTED",
+      "calculator": "N/A",
+      "trigger": "auction close for Partner listings",
+      "expected_behavior": "auto-generate immutable invoice = 3% × hammer + QC B2B tax on fee; email Partner with cash/cheque/e-transfer/Stripe options; Stripe option adds processing recovery",
+      "actual_behavior": "No dedicated Partner post-auction invoice/email flow exists. Only per-lot buyer receipts are emitted. Partner subsequently owes BidVex but there is no automated billing artifact",
+      "severity": "P0 — missing feature per Section 8"
+    },
+    {
+      "flow_id": "F8",
+      "flow": "Subscriptions (Standard / Premium / VIP Elite)",
+      "route": "POST /api/subscriptions/create-checkout (routes/subscriptions.py:840)",
+      "stripe_topology": "Stripe Checkout Session subscription mode; Stripe.Subscription.retrieve/modify/cancel",
+      "tax_engine": "delegated to Stripe Tax (routes/subscriptions.py:44 also adds a hardcoded 2.9%+0.30 gross-up in _stripe_gross)",
+      "severity_notes": "P2 — subscription flow reuses global Stripe constants"
+    },
+    {
+      "flow_id": "F9",
+      "flow": "Partner annual access fee ($100)",
+      "route": "routes/subscriptions.py + PARTNER_ANNUAL_ACCESS_FEE=100.00 (shared.py)",
+      "stripe_topology": "Stripe Checkout Session (one-time)",
+      "severity_notes": "P2 — constant in shared.py, not in a schedule; hardcoded amount"
+    },
+    {
+      "flow_id": "F10",
+      "flow": "Dealer subscription",
+      "route": "routes/dealer_subscription_routes.py; services.dealer_subscription_service",
+      "stripe_topology": "Stripe.Subscription with test coupon LAUNCH50 idempotency",
+      "severity_notes": "P2 — separate service, retest coverage"
+    },
+    {
+      "flow_id": "F11",
+      "flow": "Broker subscription",
+      "route": "routes/broker_subscription_routes.py",
+      "severity_notes": "P2"
+    },
+    {
+      "flow_id": "F12",
+      "flow": "Marketing (ad campaigns, email marketing, promoted listings)",
+      "route": "routes/marketing.py, routes/ad_campaigns.py, routes/payments_promotions.py (create-checkout Session)",
+      "stripe_topology": "Stripe.Checkout.Session (single one-time charges); routes/payments_promotions.py:233",
+      "tax_engine": "delegated to Stripe Tax or line item tax_behavior; ambiguous",
+      "severity_notes": "P2 — no dedicated tax/audit coverage"
+    },
+    {
+      "flow_id": "F13",
+      "flow": "Bidder deposits (bid hold)",
+      "route": "routes/bidder_deposits.py:243 stripe.PaymentIntent.create; services.bid_authorization_service.create_bid_hold",
+      "stripe_topology": "PaymentIntent authorization (not capture)",
+      "refund_path": "PaymentIntent.cancel or services.deposit_refund_queue",
+      "severity_notes": "P2 — parallel refund path (services.deposit_refund_queue.stripe.Refund.create) — NOT in refund_engine"
+    },
+    {
+      "flow_id": "F14",
+      "flow": "Broker deposits",
+      "route": "services.broker_deposit_service (create/refund/cancel)",
+      "severity_notes": "P2 — non-idempotent Stripe.Refund.create in cancel_broker_deposit"
+    },
+    {
+      "flow_id": "F15",
+      "flow": "Storage deposits",
+      "route": "services.storage_deposit_service",
+      "severity_notes": "P2 — separate refund path"
+    },
+    {
+      "flow_id": "F16",
+      "flow": "Escrow (create → release → refund → dispute)",
+      "route": "services.escrow_service (stripe.Transfer.create at release; own idempotency_key)",
+      "severity_notes": "P1 — escrow uses stripe.Transfer.create; refund path via pickup_confirmation.stripe.Refund.create (NOT in refund_engine)"
+    },
+    {
+      "flow_id": "F17",
+      "flow": "Disputes / cancellation refunds",
+      "route": "routes/disputes.py:327 stripe.Refund.create",
+      "severity_notes": "P1 — direct Stripe.Refund.create outside refund_engine — no idempotency guarantee"
+    },
+    {
+      "flow_id": "F18",
+      "flow": "Cancellation / no-show / failed pickup penalties",
+      "route": "routes/deposits.py; services.overdue_autocapture",
+      "calculator": "hardcoded platform_fee = hammer × 0.025 (overdue_autocapture:48)",
+      "severity_notes": "P1 — duplicate 2.5% fee formula"
+    },
+    {
+      "flow_id": "F19",
+      "flow": "Seller payouts (manual)",
+      "route": "services.seller_payouts.py stripe.Transfer.create; services.manual_settlement_service",
+      "severity_notes": "P2"
+    },
+    {
+      "flow_id": "F20",
+      "flow": "Contractor commission payouts",
+      "route": "services.contractor_commission stripe.Transfer.create (idempotency_key ok)",
+      "severity_notes": "P2"
+    },
+    {
+      "flow_id": "F21",
+      "flow": "Vehicle dealer extras (paid features)",
+      "route": "routes/vehicle_dealer_extras.py:327 PaymentIntent.create",
+      "calculator": "hardcoded STRIPE_FIXED_FEE=0.30, PLATFORM_FEE_PERCENT=2.5",
+      "severity_notes": "P1 — duplicate hardcoded Stripe fee formula and platform fee"
+    },
+    {
+      "flow_id": "F22",
+      "flow": "Down-payment (vehicle)",
+      "route": "services.down_payment_service stripe.checkout.Session.create",
+      "severity_notes": "P2"
+    },
+    {
+      "flow_id": "F23",
+      "flow": "Public payments (guest checkout)",
+      "route": "routes/public_payments.py:111 stripe.checkout.Session.create",
+      "severity_notes": "P2 — audit for auth boundary + tax accuracy"
+    },
+    {
+      "flow_id": "F24",
+      "flow": "Admin oversight one-off transfers",
+      "route": "routes/admin_oversight.py:836, 1009 stripe.Transfer.create",
+      "severity_notes": "P1 — admin-triggered transfers; verify audit trail + idempotency"
+    },
+    {
+      "flow_id": "F25",
+      "flow": "Webhooks (all Stripe events)",
+      "route": "POST /api/webhooks/stripe (routes/webhooks.py:89)",
+      "idempotency": "stripe_events.id unique index (routes/webhooks.py:113-138) — CORRECT",
+      "severity_notes": "OK — idempotency handled at the outer boundary"
+    }
+  ],
+  "duplicate_calculators": [
+    {"symbol": "BUYER_PREMIUM_RATES", "definitions_found": [
+      "services/pricing_config.py:20",
+      "services/tax_engine.py:65",
+      "services/fee_calculation_engine.py:45",
+      "services/fee_calculator.py:1123",
+      "services/subscription_service.py:64",
+      "services/vehicle_pricing.py:57"
+    ], "severity": "P1"},
+    {"symbol": "PLATFORM_FEE_* / PARTNER_PLATFORM_FEE_RATE", "definitions_found": [
+      "services/tax_engine.py:81,82",
+      "services/pricing_config.py:11,12",
+      "services/fee_calculation_engine.py:63",
+      "services/fee_calculator.py:1119",
+      "services/vehicle_fee_service.py:18 (float 0.025)",
+      "services/vehicle_pricing.py:63",
+      "services/broker_fee_engine.py:36 (float 0.025)",
+      "routes/settlement.py:29 (float 0.025)",
+      "routes/vehicle_dealer_extras.py:256 (float 2.5)",
+      "routes/auctions_bids.py:1791 (adhoc round(subtotal*rate,2))",
+      "routes/payments_fees.py:158 (dict {free:0.04, premium:0.025, vip:0.02})",
+      "services/overdue_autocapture.py:48 (hardcoded 0.025)"
+    ], "severity": "P1"},
+    {"symbol": "STRIPE_PERCENTAGE_FEE / STRIPE_PCT / STRIPE_PERCENT / STRIPE_PROCESSING_RATE / STRIPE_DOMESTIC_PCT", "definitions_found": [
+      "services/stripe_connect_service.py:32 (Decimal 0.029)",
+      "services/pricing_config.py:15 (Decimal 0.029)",
+      "services/storage_pricing.py:36 (Decimal 0.029)",
+      "services/vehicle_fee_service.py:19 (float 0.029)",
+      "services/broker_fee_engine.py:39 (float 0.029)",
+      "services/fee_calculator.py:83 (Decimal 0.029)",
+      "services/fee_calculator.py:151 (dict domestic:0.029)",
+      "services/fee_calculator.py:1117,1136 (Decimal 0.029 twice)",
+      "routes/vehicle_dealer_extras.py:262 (0.029)",
+      "routes/auctions_bids.py:1796 (round(platform_fee * 0.029 + 0.30, 2))",
+      "routes/payments_fees.py:158-207",
+      "routes/subscriptions.py:44 _stripe_gross (round(amount * STRIPE_PERCENTAGE_FEE + 0.30))",
+      "frontend/src/pages/HowBrokersWorkPage.jsx:42-43 (JS 0.029, 0.30)"
+    ], "severity": "P0 — this is exactly the risk in Section 3: hardcoded 2.9%+0.30 assumed universal",
+    "notes": "The user's own Section 3 rule says: 'Do NOT blindly hard-code amount × 0.029 + 0.30 as universal.' At least 13 places do exactly that."},
+    {"symbol": "GST_RATE / QST_RATE", "definitions_found": [
+      "services/pricing_config.py:111,112",
+      "services/tax_engine.py:37,38",
+      "services/fee_calculator.py:99,100",
+      "services/broker_fee_engine.py:37,38 (floats)",
+      "routes/tax_dashboard.py:27,28",
+      "services/connect_payment_engine.py:105 (inline Decimal 0.09975)",
+      "services/invoice_service.py:62 (inline Decimal 0.09975)"
+    ], "severity": "P1"},
+    {"symbol": "SELLER_COMMISSION_RATES (4% legacy)", "definitions_found": [
+      "services/pricing_config.py:32-36 (0.04 for free/basic/standard/partner)",
+      "services/subscription_service.py:73,74 (0.04 free/basic)",
+      "services/tax_engine.py:74,75 (0.04 BASIC/STANDARD)",
+      "services/fee_calculation_engine.py:55,56 (0.04 BASIC/STANDARD)",
+      "services/fee_calculator.py:62,791,800,804,1130",
+      "services/vehicle_pricing.py:52",
+      "services/category_rules.py:40",
+      "routes/payments_fees.py:158,175",
+      "routes/fees.py:268 ('4%'),280,296",
+      "routes/misc.py:610 ('4%')",
+      "routes/subscriptions.py:1076 ('4%')",
+      "services/prerender_service.py:220,230 (SEO copy — 4% commission)"
+    ], "severity": "P1 — user requires ALL storage seller commission = 0%; some Partner/Individual seller rates are legitimately 4% but the value is duplicated in 10+ places"},
+    {"symbol": "Partner Model A₁ tax on non-QC Partners", "location": "services/stripe_connect_service.py:471-484", "severity": "P1", "notes": "Non-QC Partners silently use QC combined rate (5%+9.975%). Same code path applies QST to Ontario/BC/AB partners. Per user Section 5, this is a silent tax invention and should FAIL CLOSED."}
+  ],
+  "seller_type_fallbacks": [
+    {"location": "services/auction_settlement.py:284,646", "context": "buyer_account_type='individual' hardcoded fallback in fee calc call", "severity": "P1"},
+    {"location": "services/smoke_test_runner.py:100", "context": "test — acceptable", "severity": "info"},
+    {"location": "routes/fees.py:25,69,97,357,368", "context": "route Query default 'individual'; two internal 'individual' fallbacks", "severity": "P1"},
+    {"location": "routes/invoices.py:215,308,399", "context": "seller_account_type='individual' + buyer_account_type='individual' fallbacks in invoice reconstruction (called at read time — dynamic recalc)", "severity": "P0"},
+    {"location": "routes/auctions_bids.py:1756", "context": "resolve_seller_account_type(...) or 'individual' fallback", "severity": "P1"},
+    {"location": "routes/marketplace.py:586,602", "context": "filter — acceptable", "severity": "info"},
+    {"location": "routes/vehicle_buyer_verification.py:218", "context": "bv.setdefault('type', 'individual') + setdefault('verified', True) — QC individuals auto-verified", "severity": "P2 (verification)"}
+  ],
+  "storage_04_hits": [
+    {"location": "services/storage_pricing.py — seller commission = 0 (0%) per iter482 fix; buyer premium = 5%", "status": "FIXED in iter482"},
+    {"location": "services/pricing_config.py:32-36 SELLER_COMMISSION_RATES uses 0.04 for free/basic/standard/partner", "severity": "P1 — Storage should be 0%, currently pricing_config's 'storage_facility' key must be checked"},
+    {"location": "routes/storage_auctions.py:946 seller_tier='storage_facility' — always 5% commission comment (mislabeled)", "severity": "P2 — verify meaning"}
+  ],
+  "quantity_propagation_status": {
+    "resolved_via_resolve_hammer_total": [
+      "services/payment_collection.py:384",
+      "services/auction_settlement.py:852",
+      "services/overdue_autocapture.py:47,324",
+      "routes/invoices.py:193,262",
+      "routes/payments.py:120,894"
+    ],
+    "known_bypass_or_direct_current_price": [
+      "routes/settlement.py:72 float(doc.get('final_price') or doc.get('current_price'))",
+      "routes/vehicles.py:2198 current_price=bid_data.amount (create bid — expected)",
+      "many display-only usages in ai_assistant, chat, marketing, feeds (not payment critical)"
+    ],
+    "severity": "Payment-critical paths appear covered post-iter482. Cross-check settlement.py:72 whether that's a settlement math path or display."
+  },
+  "buyer_facing_fee_explanations": [
+    {"location": "frontend/src/pages/HowBrokersWorkPage.jsx:40-43", "issue": "Hardcoded STRIPE_PCT=0.029, STRIPE_FIXED=0.30 in JS — independent from backend", "severity": "P1"},
+    {"location": "frontend/src/pages/admin/PricingManager.js:226,237,247", "issue": "Displayed '2.9% + $0.30' hardcoded (admin-facing)", "severity": "P2 (admin-only)"},
+    {"location": "frontend/src/pages/admin/FinanceDashboard.js:191", "issue": "'2.9% + $0.30 passed to buyer' label", "severity": "P2"},
+    {"location": "frontend/src/pages/storage/StoragePolicies.js:64,120,164", "issue": "Copy states buyer premium 5% + Stripe processing + GST/QST", "severity": "P3 (policy copy — verify accuracy after tax engine unified)"},
+    {"location": "frontend/src/pages/CheckoutPage.js:507", "issue": "Displays breakdown.stripe_processing_fee or breakdown.processing_fee — consumes backend value (OK)", "severity": "info"}
+  ],
+  "partner_post_auction_billing_status": {
+    "auto_invoice_generation": "NOT PRESENT",
+    "auto_email": "NOT PRESENT — the only Partner emails found are outreach / trial-reminder / approved-rejected (services/partner_outreach.py, services/partner_pro_emails.py, services/verification_service.py)",
+    "pay_now_endpoint": "NOT PRESENT — there is a checkout flow for buyer-side auction only; no dedicated Partner-owed-BidVex payment collection endpoint",
+    "immutable_invoice_record": "NOT PRESENT for the Partner-owed-BidVex leg (buyer invoices exist)",
+    "payment_options_cash_cheque_etransfer": "NOT PRESENT for Partner-owed leg — only some offline flags in routes/admin_offline_transactions.py",
+    "severity": "P0 — full feature missing per Section 8"
+  },
+  "immutability_violations": [
+    {"location": "routes/invoices.py:302-341 (fee = calculate_fee(...))", "issue": "Invoice read path DYNAMICALLY recomputes fees from the current fee_calculator. If rates change, historical invoices change.", "severity": "P0 — violates Section 19"},
+    {"location": "services/receipts.py + services/pdf_generators/common.py", "issue": "Read persisted receipt/transaction (OK) but PDF generator can format from live listing data if fields missing", "severity": "P1 — need to confirm all PDF generators are strictly consuming persisted fields"}
+  ],
+  "refund_paths_multiplicity": [
+    {"location": "services/refund_engine.py:refund_partner_charge", "canonical": true, "notes": "New iter482 canonical engine with Model A₁ semantics + duplicate_blocked idempotency"},
+    {"location": "routes/disputes.py:327 stripe.Refund.create", "canonical": false, "severity": "P1"},
+    {"location": "services/broker_deposit_service.py:116 stripe.Refund.create", "canonical": false, "severity": "P1"},
+    {"location": "services/deposit_refund_queue.py:154 stripe.Refund.create", "canonical": false, "severity": "P1"},
+    {"location": "services/pickup_confirmation.py:174 stripe.Refund.create", "canonical": false, "severity": "P1"},
+    {"location": "services/payment_idempotency.py:282,284 stripe.Refund.create(reason='duplicate')", "canonical": false, "severity": "P1 — an idempotency helper that creates auto-refunds"}
+  ],
+  "tax_engine_findings": {
+    "canonical_engine": "services/tax_engine.py (services.tax_rate_config.py PROVINCIAL_TAX_RATES for the multi-province matrix)",
+    "duplicate_tax_formulas": [
+      "services/stripe_connect_service.py:449-484 (own QC-only + silent QC-for-non-QC guess)",
+      "services/connect_payment_engine.py:105 inline QST",
+      "services/invoice_service.py:53-62 (has HST + own PST/QST)",
+      "services/fee_calculator.py:99-100, 754-837 (own province table)",
+      "services/broker_fee_engine.py:37-38 (float-based)",
+      "services/storage_pricing.py:46-59 (own PROV_TAX table)",
+      "routes/tax_dashboard.py:27-29 (own copy of rates + HST_RATES dict)",
+      "services/vehicle_pricing.py:80 (own inline)"
+    ],
+    "silent_defaults": [
+      "services/stripe_connect_service.py:471 partner_prov = (partner_province or 'QC').strip().upper()",
+      "routes/payments.py:912, 1053 default partner_province to 'QC'",
+      "routes/payments.py:1541, 1638, 2243, 2314 default buyer_province to 'QC'",
+      "services/stripe_connect_service.py:475-484 non-QC branch STILL applies QST (silent tax invention — CRITICAL)"
+    ],
+    "severity": "P0 — silent QC fallback in payment calculators is a tax risk in a jurisdiction-agnostic financial code path"
+  },
+  "stripe_cost_allocation_current_reality": {
+    "buyer_paying_stripe_topology": {
+      "partner_auction": "destination_charge + on_behalf_of=partner; buyer pays hammer+BP; BidVex application_fee=345; Stripe rail 437 debited from BIDVEX PLATFORM balance (Gate 2 proved). BidVex nets −$0.92 on canonical $100 scenario.",
+      "non_partner_auction": "destination_charge (no on_behalf_of); Stripe rail is on platform balance same as above — but BidVex fee is 4%+5% so it profits at typical hammer sizes",
+      "vehicle": "destination_charge with full application_fee = buyer_total (no partner destination) — Stripe rail is on BidVex platform balance (no shift); vehicle 2.5% platform fee",
+      "storage": "buyer pays hammer + 5% BP + explicit stripe_recovery ADDED to buyer subtotal (calculated at 2.9%+0.30 hardcoded), tax applied on (BP + stripe_recovery)",
+      "subscriptions": "Stripe Checkout Session subscription mode; some code adds hardcoded gross-up",
+      "bidder_deposits": "PaymentIntent auth — Stripe rail on platform if captured",
+      "marketing / promoted listings": "Stripe Checkout Session — rail on platform"
+    },
+    "partner_paying_stripe_topology_for_bidvex_platform_fee": "NOT IMPLEMENTED — there is no Partner-invoice Stripe payment endpoint at all",
+    "conclusion": "The system currently ABSORBS Stripe rail on Partner auction (loss on small tickets), EXPLICITLY PASSES a hardcoded 2.9%+0.30 recovery on storage buyer path, and inconsistently gross-ups elsewhere. No single canonical engine."
+  },
+  "webhook_idempotency": {
+    "outer_guard": "OK — routes/webhooks.py:113-138 uses stripe_events unique index (correct pattern)",
+    "handler_side_idempotency": [
+      "auction payment succeeded: handler upserts by pi.id (mostly OK)",
+      "refund events (charge.refunded, refund.*): handler at routes/webhooks.py:515+ — verify it does not double-decrement seller settlements. NEEDS TARGETED CHECK IN P5.",
+      "transfer.created / transfer.paid / transfer.failed / transfer.reversed: OK path"
+    ]
+  }
+}
