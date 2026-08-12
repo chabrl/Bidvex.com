@@ -25,6 +25,12 @@ CANADIAN_PROVINCES = ["AB", "BC", "MB", "NB", "NL", "NS", "ON", "PE", "QC", "SK"
 UNIT_SIZES = ["5x5", "5x10", "10x10", "10x15", "10x20", "10x30+"]
 UNIT_TYPES = ["indoor", "outdoor", "climate_controlled", "drive_up"]
 PAYMENT_METHODS = ["stripe", "cash", "etransfer"]
+# iter482 P4A — Seller-Controlled Payment Methods.  Extended set (adds
+# 'cheque') and enables multi-select via ``accepted_payment_methods``.
+# The legacy singleton ``payment_method`` below is retained for
+# backward compatibility with pre-P4A rows and treated as a
+# single-element accepted list at read time.
+ACCEPTED_PAYMENT_METHODS_ALLOWED = ["stripe", "etransfer", "cash", "cheque"]
 AUCTION_STATUSES = ["upcoming", "active", "ended", "sold", "cancelled"]
 
 # iter212 — Allowed registration types per Canadian jurisdiction.
@@ -83,7 +89,10 @@ class StorageAuctionCreate(BaseModel):
     cleanup_deadline_hours: int = Field(default=72, ge=24, le=168)
 
     # ── PAYMENT METHOD (single) ──
-    payment_method: str = Field(default="stripe")  # stripe | cash | etransfer
+    payment_method: str = Field(default="stripe")  # LEGACY singleton — see accepted_payment_methods below
+    # iter482 P4A — Seller-Controlled Payment Methods multi-select.
+    # Allowed values in ACCEPTED_PAYMENT_METHODS_ALLOWED; at least 1 required.
+    accepted_payment_methods: Optional[List[str]] = None
 
     # ── PARTICIPATION DEPOSIT (optional) ──
     deposit_required: bool = False
@@ -122,6 +131,16 @@ class StorageAuctionCreate(BaseModel):
         if v not in PAYMENT_METHODS:
             raise ValueError(f"payment_method must be one of {PAYMENT_METHODS}")
         return v
+
+    @field_validator("accepted_payment_methods")
+    @classmethod
+    def _vapm(cls, v):
+        # iter482 P4A — canonicalise + validate on write.  ``None`` is
+        # permitted (falls back to legacy ``payment_method`` singleton).
+        if v is None:
+            return None
+        from services.payment_methods_registry import normalise_list
+        return normalise_list(v)
 
     @model_validator(mode="after")
     def _vd(self):

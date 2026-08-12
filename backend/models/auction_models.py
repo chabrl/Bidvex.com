@@ -3,7 +3,7 @@ BidVex Shared Pydantic Models
 All domain models used across multiple route files live here.
 """
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
 import uuid
@@ -50,6 +50,13 @@ class ListingCreate(BaseModel):
     buyers_premium_rate: Optional[float] = None
     # Seller payment method preference: "stripe", "cash", "e-transfer"
     payment_method: Optional[str] = None
+    # iter482 P4A — Seller-Controlled Payment Methods
+    # Multi-select of methods the seller will accept.  At least one of:
+    #   {"stripe", "etransfer", "cash", "cheque"}.
+    # Snapshotted at first bid; further edits require an explicit
+    # controlled workflow (P4B+).  If omitted, the legacy ``payment_method``
+    # singleton is used as a single-element fallback for backward compat.
+    accepted_payment_methods: Optional[List[str]] = None
     currency: Optional[str] = None  # CAD or USD; auto-detected from location if omitted
     # ── Deposit (a.k.a. "Down Payment") — single field, single flow per spec ──
     requires_deposit: bool = False
@@ -62,6 +69,15 @@ class ListingCreate(BaseModel):
     description_fr: Optional[str] = None
     content_language: Optional[str] = "en"  # source language of title/description
     cfia_soil_declaration: Optional[bool] = None  # CFIA biosecurity: seller confirms equipment is soil-free
+
+    @field_validator("accepted_payment_methods")
+    @classmethod
+    def _vapm(cls, v):
+        # iter482 P4A — canonicalise + validate on write.
+        if v is None:
+            return None
+        from services.payment_methods_registry import normalise_list
+        return normalise_list(v)
 
 
 class Listing(BaseModel):
@@ -104,7 +120,11 @@ class Listing(BaseModel):
     is_opc_certified: bool = False
     is_dealer_certified: bool = False  # iter201 — replaces is_opc_certified going forward
     buyers_premium_percent: Optional[float] = None
-    payment_method: Optional[str] = None  # "stripe", "cash", "e-transfer"
+    payment_method: Optional[str] = None  # LEGACY singleton, kept for backward compat.
+    # iter482 P4A — Seller-Controlled Payment Methods snapshot on Listing docs.
+    accepted_payment_methods: Optional[List[str]] = None
+    accepted_payment_methods_snapshot: Optional[List[str]] = None
+    accepted_payment_methods_locked_at: Optional[datetime] = None
     currency: str = "CAD"
     # ── Deposit (Spec Feature 1) ──
     requires_deposit: bool = False
@@ -276,7 +296,11 @@ class MultiItemListingCreate(BaseModel):
     auction_start_date: Optional[datetime] = None
     lots: List[Lot]
     currency: Optional[str] = None
-    payment_method: Optional[str] = None  # "stripe" | "cash" | "e-transfer"
+    payment_method: Optional[str] = None  # LEGACY singleton — see accepted_payment_methods below
+    # iter482 P4A — Seller-Controlled Payment Methods multi-select
+    # for multi-item / partner auctions.  Allowed slugs:
+    # {"stripe", "etransfer", "cash", "cheque"}.
+    accepted_payment_methods: Optional[List[str]] = None
     requires_deposit: bool = False
     deposit_amount: Optional[float] = None
     deposit_type: Optional[str] = None  # "fixed" | "percentage"
@@ -300,6 +324,15 @@ class MultiItemListingCreate(BaseModel):
     description_en: Optional[str] = None
     description_fr: Optional[str] = None
     content_language: Optional[str] = "en"  # source language of title/description
+
+    @field_validator("accepted_payment_methods")
+    @classmethod
+    def _vapm(cls, v):
+        # iter482 P4A — canonicalise + validate on write.
+        if v is None:
+            return None
+        from services.payment_methods_registry import normalise_list
+        return normalise_list(v)
 
 
 class MultiItemListing(BaseModel):

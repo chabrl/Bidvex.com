@@ -1,6 +1,49 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter482 — Phase P4A Foundation: Seller-Controlled Payment Methods (Feb 12, 2026) ✅ COMPLETE — PREVIEW ONLY · DO NOT DEPLOY
+
+**Scope**: Foundation layer only — canonical registry, immutable snapshot service, model field addition, idempotent backfill script, 51 unit tests. No checkout, no Stripe wiring, no frontend.
+
+### Files created
+- `backend/services/payment_methods_registry.py` — canonical `{stripe, etransfer, cash, cheque}` + aliases + offline/rail helpers
+- `backend/services/seller_payment_methods_service.py` — `effective_methods()`, `guard_edit()`, `snapshot_at_first_bid()`, `assert_selection_allowed()`
+- `backend/scripts/iter482_p4a_backfill_accepted_payment_methods.py` — idempotent, 36 preview rows backfilled
+- `backend/tests/test_iter482_p4a_foundation.py` — 51 tests
+
+### Files modified (schema-only, additive)
+- `models/auction_models.py` — `ListingCreate`, `Listing`, `MultiItemListingCreate` gain `accepted_payment_methods`; `Listing` gains `accepted_payment_methods_snapshot` + `accepted_payment_methods_locked_at`
+- `models/storage_auction.py` — `StorageAuctionCreate` gains field + validator
+- `models/vehicle_models.py` — `VehicleListingCreate` gains field + validator
+
+### Business rules enforced
+- ≥ 1 method required; canonical slugs only; aliases normalised on write
+- Immutable snapshot at first bid; post-bid edits blocked (`PaymentMethodsLockedError`)
+- Buyer selection gated by SNAPSHOT (never live list) if locked
+- No silent defaults for new listings; `PaymentMethodsMissingError` on orphan rows
+- Legacy singleton `payment_method` retained for backward compatibility
+
+### Test results — **287/287 PASS**
+- iter482 P3 baseline: 158/158 · P3.1: 78/78 · **P4A new: 51/51** · zero regressions
+
+### Preview DB backfill — 36 rows updated
+- `listings=1`, `multi_item_listings=3`, `vehicle_listings=1`, `storage_auctions=31`, `partner_listings=0`
+- Snapshot-locked only where `bid_count > 0`
+- Second dry-run reports 0 (idempotent)
+
+### Deferred to next phases
+- P4B: Route enforcement + buyer selection endpoint + terms-ack persistence + offline path + first-bid snapshot call
+- P4C: Stripe manual-capture wiring + state machine + BalanceTransaction reconciliation + feature flag
+- P4D: Frontend (seller multi-select, buyer selector, PaymentStatusCard)
+- P4E: ≥ 500-case test matrix + 4 required final docs
+
+### 🛑 HALTED at P4A boundary
+Full P4A phase report: `/app/docs/P4A_FOUNDATION_REPORT.md`
+
+---
+
+
+
 ## iter482 — Phase P3.1 Cross-Calculator Reconciliation (Feb 12, 2026) ✅ COMPLETE — PREVIEW ONLY · DO NOT DEPLOY
 
 **Scope**: Root-cause and eliminate the $0.02 divergence between `calculate_fee()` (Path A, CRA/iter350) and `calculate_general_checkout()` (Path B, Stripe session builder) for the same $7.00/premium/premium/QC/QC scenario.

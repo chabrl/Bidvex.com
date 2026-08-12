@@ -413,6 +413,11 @@ class VehicleListingCreate(BaseModel):
     #                  immediately. Default — preserves existing behaviour.
     submission_intent: Optional[str] = "live"
 
+    # iter482 P4A — Seller-Controlled Payment Methods multi-select.
+    # Vehicle-dealer auctions can also accept multiple methods.
+    # Allowed slugs: {"stripe", "etransfer", "cash", "cheque"}.
+    accepted_payment_methods: Optional[List[str]] = None
+
     @field_validator('vin')
     @classmethod
     def validate_vin_format(cls, v):
@@ -434,6 +439,15 @@ class VehicleListingCreate(BaseModel):
         if v < 0:
             raise ValueError('Mileage cannot be negative')
         return v
+
+    @field_validator('accepted_payment_methods')
+    @classmethod
+    def _vapm(cls, v):
+        # iter482 P4A — canonicalise + validate list of methods.
+        if v is None:
+            return None
+        from services.payment_methods_registry import normalise_list
+        return normalise_list(v)
     
     @field_validator('starting_price', 'reserve_price', 'buy_now_price', 'deposit_amount')
     @classmethod

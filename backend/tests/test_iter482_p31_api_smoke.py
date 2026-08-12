@@ -3,7 +3,25 @@ import os
 import requests
 import pytest
 
-BASE = os.environ.get("REACT_APP_BACKEND_URL").rstrip("/")
+
+def _resolve_base() -> str:
+    val = os.environ.get("REACT_APP_BACKEND_URL")
+    if not val:
+        # Fall back to reading frontend/.env for pytest-only invocation
+        try:
+            with open("/app/frontend/.env") as f:
+                for line in f:
+                    if line.startswith("REACT_APP_BACKEND_URL="):
+                        val = line.split("=", 1)[1].strip()
+                        break
+        except OSError:
+            pass
+    if not val:
+        pytest.skip("REACT_APP_BACKEND_URL not set — skipping live API smoke")
+    return val.rstrip("/")
+
+
+BASE = _resolve_base()
 
 # (hammer_price_dollars, buyer_tier, seller_tier)
 SCENARIOS = [
