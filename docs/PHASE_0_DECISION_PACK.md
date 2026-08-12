@@ -291,6 +291,187 @@ Three Partner Stripe endpoints exist. **All three are wired to the frontend toda
 
 ---
 
+### E-10 — Partner + BidVex Buyer Premium Stacking (NEW, added Feb 12 2026)
+
+**Exact question**:
+Does BidVex's own buyer-tier-based Buyer Premium (Standard 5%, Premium 3.5%, VIP Elite 3%) apply to Partner listings *in addition to* the Partner's custom Buyer Premium? Choose:
+- **Model 1** — Partner premium only: `Buyer = Hammer + Partner BP + buyer taxes`
+- **Model 2** — BidVex premium only: `Buyer = Hammer + BidVex BP + buyer taxes`
+- **Model 3** — Both stacked: `Buyer = Hammer + Partner BP + BidVex BP + buyer taxes`
+
+**Answer: MODEL 1 — Partner premium only. No stacking on Partner listings.**
+
+This is **not an open business question**. It is unambiguously and consistently established by every authoritative code path, the canonical fee schedule (iter478), and the frontend disclosure copy. The evidence chain is airtight:
+
+#### Evidence 1 — `services/fee_calculator.py::_iter350_partner` (lines 463-540)
+
+Line 486, 492-494:
+```python
+partner_bp_revenue = _q(hammer * partner_bp_rate)  # → to partner
+...
+buyer_premium=_r(partner_bp_revenue),  # what buyer pays partner (100% → partner)
+buyer_subtotal=_r(hammer + partner_bp_revenue),
+buyer_total_charged=_r(hammer + partner_bp_revenue),
+```
+
+Buyer total = **hammer + Partner BP only**. No BidVex BP. No buyer_tier lookup.
+
+Line 507-511 (docstring):
+> "Partner Stripe: buyer pays partner directly (hammer + partner BP). BidVex charges partner 3% + Stripe recovery + tax @ partner province."
+
+#### Evidence 2 — `services/fee_calculator.py::PricingManager.partner_auction` (lines 1481-1539)
+
+Line 1491-1506 constructs the buyer's invoice with THREE line items:
+```python
+buyer = SideInvoice(
+    lines=[
+        InvoiceLine("Hammer Price", _pm_f(hp), "hammer"),
+        InvoiceLine(f"Buyer's Premium ({partner_bp_pct:.1f}% — set by auctioneer)", ...),
+        InvoiceLine("BidVex Platform Fee", 0.0, "fee", 0.0),   # ← explicitly $0
+    ],
+    ...
+    total=_pm_f(_pm_round(hp + partner_bp)),
+)
+```
+
+The **BidVex Platform Fee is explicitly set to $0.00 on the buyer's invoice** for Partner sales. The buyer's `total` is exactly `hammer + partner_bp`. No BidVex BP tier lookup.
+
+Line 1538: `bidvex_revenue=_pm_f(sc)` where `sc = hammer × 3%` — BidVex's revenue on a Partner sale is the 3% platform fee only, NOT a tier-based BP.
+
+#### Evidence 3 — `services/stripe_connect_service.py::calculate_partner_listing_checkout` (lines 356-467)
+
+Line 379-386:
+```python
+bp_rate = Decimal(str(custom_buyer_premium_rate))  # ← ONLY the Partner's custom BP rate
+buyer_premium = _round_currency(hammer * bp_rate)   # ← ONLY Partner BP
+platform_fee = _round_currency(hammer * PARTNER_PLATFORM_FEE_RATE)  # ← 3%
+bidvex_fees_subtotal = platform_fee  # ← ONLY the 3% platform fee; no BidVex BP
+```
+
+The `buyer_tier` parameter is not even accepted by `calculate_partner_listing_checkout`. There is no signature path for a tier-based BidVex BP to be applied to a Partner listing.
+
+#### Evidence 4 — `services/fee_schedule.py` (iter478 canonical schedule)
+
+Line 316-327:
+```python
+if seller_account_type == "partner":
+    ...
+    default = schedule.buyer_premium.get("partner", {}).get("default")
+    ...
+    return _validate_rate(default, field_name="schedule.buyer_premium.partner.default")
+```
+
+Partner listings resolve their buyer premium from `schedule.buyer_premium.partner.default` (currently 5% per iter478 bootstrap), **overridable per-listing via `partner_bp_rate` / `custom_buyer_premium_rate`**. **The buyer's subscription tier is never consulted for a Partner listing.** The canonical fee schedule has explicit `buyer_premium.partner.default`, `buyer_premium.partner_pro.default`, and `buyer_premium.individual.tiers` as three separate namespaces — not stacked.
+
+Bootstrap comment (line 128-131):
+> "Partners can set a lot-specific buyer premium. Precedence: `listing.partner_bp_rate → users.custom_premium_rate → default`."
+
+`users.custom_premium_rate` here refers to a per-Partner-account custom rate, not to buyer's subscription tier.
+
+#### Evidence 5 — `services/connect_payment_engine.py` module docstring (lines 5-9)
+
+> "PARTNER FLOW (is_partner=True, $100/yr Annual Fee):
+>   - BidVex keeps ONLY Seller Commission (2.5% vehicle / 3.0% general)
+>   - **100% of Buyer Premium goes to Partner's Connect account**
+>   - Stripe fees deducted from Partner's final payout (NOT passed to buyer)
+>   - Taxes on (Hammer + Premium)"
+
+BidVex's compensation on a Partner sale is unambiguously the platform fee ("seller commission" in this legacy nomenclature). The Buyer Premium is entirely the Partner's.
+
+Line 166:
+```python
+"buyer_premium_rate": 0.0 if (is_vehicle or seller_is_partner) else (bi.fees_subtotal / hammer_price if hammer_price else 0),
+```
+
+BidVex's metadata explicitly reports **`buyer_premium_rate=0.0`** for Partner sales — the "BidVex BP" reported in transaction records for a Partner sale is $0. The tier-based BP schedule (5%/3.5%/3%) is short-circuited for Partner listings at every layer.
+
+#### Evidence 6 — Frontend disclosure (`CheckoutPage.js:404`)
+
+```javascript
+{isFrench ? '100% transféré au vendeur partenaire' : '100% transferred to Partner seller'}
+```
+
+The frontend explicitly tells the buyer that 100% of the Buyer Premium goes to the Partner seller. If BidVex secretly stacked a second BP on top, this disclosure would be materially misleading — a consumer-protection violation under Loi Protection du Consommateur du Québec (art. 219, 224, 227).
+
+#### Evidence 7 — Business Model Rationale
+
+BidVex's Partner economic model (per PRD `is_partner=True, $100/yr Annual Fee`):
+- Partner pays BidVex a fixed **annual $100 fee** for platform access
+- Partner pays BidVex a **3% platform fee per hammer sold** (the "Seller Commission" for Partners)
+- Partner sets their own Buyer Premium (default 5%, custom per listing), keeps 100%
+- Buyer sees a single, transparent Buyer Premium line item — the Partner's rate
+- BidVex does NOT double-charge the buyer with a second BidVex BP
+
+This is the **auctioneer-partnership model** common to industry (e.g., LiveAuctioneers, Invaluable, Proxibid). The Partner is the merchant-of-record for the buyer transaction. BidVex is the platform facilitator, compensated by the Partner (not by the buyer).
+
+Model 3 (stacking both premiums) would:
+- Contradict every line of code in every canonical Partner path
+- Contradict `fee_schedule.py`'s bootstrap definition
+- Contradict the frontend disclosure ("100% transferred to Partner seller")
+- Contradict the industry-standard auctioneer-partnership economic model
+- Effectively double-charge the buyer for the same service concept
+- Violate the user's earlier stated rule: *"Partner BP belongs 100% to Partner. BidVex's 3% Platform fee is owed by the Partner to BidVex."*
+
+Model 2 (BidVex BP only, no Partner BP) would remove the Partner's revenue stream entirely and is not implemented anywhere.
+
+#### Answer to each sub-question:
+
+| Sub-question | Answer | Evidence |
+|---|---|---|
+| Does BidVex Buyer Premium apply to Partner listings? | **NO** | All 3 Partner code paths use only `partner_bp_rate`; buyer_tier is never consulted |
+| Does it apply on top of the Partner's custom Buyer Premium? | **NO** | `connect_payment_engine.py:166` reports `buyer_premium_rate=0.0` for Partner sales |
+| Who owns the BidVex Buyer Premium? | **N/A — there is no BidVex BP on Partner sales** | fee_schedule.py has no `partner` × `buyer_tier` cross-product |
+| Is the BidVex Buyer Premium calculated from hammer only? | N/A for Partner sales | See above |
+| Is the Partner Buyer Premium calculated from hammer only? | **YES** | `_iter350_partner:476`: `partner_bp_revenue = _q(hammer * partner_bp_rate)` |
+| Are taxes applied separately to each fee? | **YES**, per line-item on BidVex-owned fees | See existing tax logic (E-2, E-3) |
+| Does buyer subscription tier affect Partner Buyer Premium? | **NO** — Partner BP is 100% controlled by Partner (default 5%, override via listing) | fee_schedule.py:316-327 |
+| Does buyer subscription tier affect anything on a Partner listing? | **NO** — tier-based BP applies only to Individual/Enterprise/Vehicle/Storage seller types | Grep for `buyer_tier` in Partner branches returns 0 hits |
+| Does `PricingManager.partner_auction` correctly represent this model? | **YES** | Line 1498 explicitly sets BidVex Platform Fee on buyer invoice to $0.00 |
+| Does `fee_schedule.py` define this relationship? | **YES** | Line 316-327 with docstring in bootstrap line 128-131 |
+| Do the frontend checkout displays match the intended combined structure? | **YES** (Partner branch renders only Partner BP; CheckoutPage.js:404 explicitly discloses "100% transferred to Partner seller") | CheckoutPage.js |
+
+#### For your canonical test case ($100 hammer / 10% Partner BP / QC / Partner NOT registered):
+
+Under the confirmed **Model 1** rule:
+
+| Buyer tier | Buyer subtotal (pre-tax) |
+|---|---|
+| Standard | **$110.00** (hammer $100 + Partner BP $10; **no BidVex BP**) |
+| Premium | **$110.00** (unchanged; buyer tier has no effect) |
+| VIP Elite | **$110.00** (unchanged; buyer tier has no effect) |
+
+The buyer's subscription tier does not change the buyer's total on a Partner listing. This is intentional — the Partner sets the BP, the Partner is the merchant, and the buyer sees one Partner-set premium.
+
+#### Interaction with E-1 recommended architecture (Option A₁)
+
+Under Model 1 + E-1 Option A₁ (`on_behalf_of=partner`, `application_fee_amount=$3`):
+- **Buyer pays**: $110.00 (hammer + Partner BP) + applicable buyer-side taxes
+- **Partner nets**: $110.00 − $3.00 (BidVex platform fee via application_fee) − $3.49 (Stripe rail via on_behalf_of) = **$103.51**
+- **BidVex nets**: **$3.00** (the 3% platform fee)
+- **Stripe keeps**: $3.49 (rail cost, borne by Partner as merchant-of-record)
+
+**Numbers are identical to the E-1 Section 2 model.** Confirming E-10 does NOT change any E-1 math — the previously modeled money flow was already implicitly assuming Model 1.
+
+#### Financial consequence
+
+**None**. The current live code already implements Model 1 correctly. There is no P0/P1 defect for E-10 to fix. The intended rule is honored across all layers.
+
+#### Recommended decision
+
+**Model 1 — Partner premium only. Buyer's subscription tier is IGNORED for Partner listings.**
+
+If, however, you wish to *change* the business model to Model 3 (stack both premiums), that would be a substantive re-scoping requiring:
+- Update `_iter350_partner`, `PricingManager.partner_auction`, `calculate_partner_listing_checkout` to add tier-based BidVex BP on top
+- Update `fee_schedule.py` schema to include a `buyer_premium.partner.also_add_tier_default` boolean
+- Update frontend disclosure to show a two-line BP breakdown ("Partner Buyer Premium 10%" + "BidVex Service Fee 5%")
+- Update PDF generators to render both BPs
+- Update the receipt schema to persist both amounts distinctly
+- Reissue any historical Partner receipts (there are 0 in preview DB, but production may differ)
+
+**This would be a business-model change, not a bug fix.** I recommend you retain Model 1.
+
+---
+
 ### DECISION TABLE — E-1 through E-9
 
 | Decision | Exact Question | Options | Recommended | Financial Consequence |
@@ -304,6 +485,7 @@ Three Partner Stripe endpoints exist. **All three are wired to the frontend toda
 | **E-7** | Partner Pro live? | Yes / No / Defer | **Defer to later phase** (not P0) | No immediate financial impact. |
 | **E-8** | Broker Stripe live? | Yes / No / Defer | **Confirm business need; likely defer** | No immediate financial impact. |
 | **E-9** | Refund allocation | Full/partial policy | **Defer to Phase 4 with recommended defaults above** | No immediate action needed. |
+| **E-10** | Partner + BidVex Buyer Premium stacking | Model 1 (Partner only) / Model 2 (BidVex only) / Model 3 (both stacked) | **Model 1 — Partner BP only. Buyer's tier is IGNORED for Partner listings.** Not an open decision — every canonical code path, fee_schedule.py, and frontend disclosure already enforces Model 1 unambiguously. | No financial change. Model 1 is already live. |
 
 ---
 
