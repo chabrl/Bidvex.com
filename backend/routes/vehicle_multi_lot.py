@@ -246,6 +246,14 @@ async def create_multi_lot_auction(
     except Exception:  # noqa: BLE001
         pass
 
+    # iter482 P4B — Seller-Controlled Accepted Payment Methods (required, canonical)
+    from services.seller_payment_methods_service import http_require_methods
+    canon_methods_vml = http_require_methods(
+        getattr(payload, "accepted_payment_methods", None)
+    )
+    event_doc["accepted_payment_methods"] = canon_methods_vml
+    event_doc["accepted_payment_methods_source"] = "seller_declared_iter482_p4b"
+
     await _db.vehicle_multi_lot_auctions.insert_one(event_doc)
     return _serialise(event_doc)
 

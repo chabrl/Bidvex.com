@@ -23,6 +23,7 @@ import Papa from 'papaparse';
 import { useDropzone } from 'react-dropzone';
 import RichTextEditor from '../components/RichTextEditor';
 import LocationSelector from '../components/LocationSelector';
+import AcceptedPaymentMethodsSelector from '../components/AcceptedPaymentMethodsSelector';
 import ListingBlockDialog from '../components/ListingBlockDialog';
 import CategorySelector from '../components/CategorySelector';
 import InfoTip from '../components/InfoTip';
@@ -126,6 +127,8 @@ const CreateMultiItemListing = () => {
   const [promotionTier, setPromotionTier] = useState('standard'); // 'standard', 'premium', 'elite'
   const [promotionPaymentComplete, setPromotionPaymentComplete] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('stripe');
+  // iter482 P4B — Seller-Controlled Accepted Payment Methods (multi-select)
+  const [acceptedPaymentMethods, setAcceptedPaymentMethods] = useState(['stripe']);
   // Deposit (Spec Feature 1) — Lots/Multi-Item parity with Marketplace + Vehicle + Storage
   const [requiresDeposit, setRequiresDeposit] = useState(false);
   const [depositType, setDepositType] = useState('fixed');  // "fixed" | "percentage"
@@ -641,6 +644,16 @@ const CreateMultiItemListing = () => {
       return;
     }
 
+    // iter482 P4B — block publish if seller didn't choose ≥ 1 accepted method
+    if (!acceptedPaymentMethods || acceptedPaymentMethods.length === 0) {
+      toast.error(
+        i18n.language === 'fr'
+          ? "Veuillez sélectionner au moins un mode de paiement."
+          : "Please select at least one payment method."
+      );
+      return;
+    }
+
     setLoading(true);
 
     // iter310 — Bill 96 zero-friction translation: when the QC listing
@@ -726,8 +739,9 @@ const CreateMultiItemListing = () => {
         // Promotion tier
         promotion_tier: promotionTier !== 'standard' ? promotionTier : null,
         is_promoted: promotionTier !== 'standard',
-        // Payment method & Buyer's Premium
-        payment_method: paymentMethod,
+        // Payment methods (iter482 P4 canonical seller-controlled selection)
+        payment_method: (acceptedPaymentMethods && acceptedPaymentMethods[0]) || paymentMethod,
+        accepted_payment_methods: acceptedPaymentMethods,
         buyers_premium_rate: isPartner && buyersPremiumPercent !== '' ? parseFloat(buyersPremiumPercent) / 100 : null,
         // Deposit (Spec Feature 1)
         requires_deposit: requiresDeposit,
@@ -995,30 +1009,15 @@ const CreateMultiItemListing = () => {
         )}
       </div>
 
-      {/* Payment Method Selection */}
+      {/* iter482 P4 — Canonical Seller-Controlled Accepted Payment Methods (multi-select).
+          Replaces the legacy single-choice radio group. */}
       <div className="space-y-3" data-testid="multi-payment-method-section">
-        <Label>{t('createListing.paymentMethodLabel')}
-          <InfoTip en={t('createListing.paymentMethodInfo', { lng: 'en' })} fr={t('createListing.paymentMethodInfo', { lng: 'fr' })} />
-        </Label>
-        <div className="grid grid-cols-1 gap-2">
-          <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${paymentMethod === 'stripe' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300'}`}>
-            <input type="radio" name="multi_payment_method" value="stripe" checked={paymentMethod === 'stripe'} onChange={(e) => setPaymentMethod(e.target.value)} className="text-blue-600" data-testid="multi-payment-stripe" />
-            <div>
-              <span className="font-medium text-sm">{t('createListing.paymentMethodStripe')}</span>
-              <span className="ml-2 text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">{t('createListing.paymentMethodStripeBadge')}</span>
-              <p className="text-xs text-muted-foreground mt-0.5">{t('createListing.paymentMethodStripeHelp')}</p>
-            </div>
-          </label>
-          <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${paymentMethod === 'cash' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300'}`}>
-            <input type="radio" name="multi_payment_method" value="cash" checked={paymentMethod === 'cash'} onChange={(e) => setPaymentMethod(e.target.value)} data-testid="multi-payment-cash" />
-            <span className="font-medium text-sm">{t('createListing.paymentMethodCash')}</span>
-          </label>
-          <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${paymentMethod === 'e-transfer' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300'}`}>
-            <input type="radio" name="multi_payment_method" value="e-transfer" checked={paymentMethod === 'e-transfer'} onChange={(e) => setPaymentMethod(e.target.value)} data-testid="multi-payment-etransfer" />
-            <span className="font-medium text-sm">{t('createListing.paymentMethodETransfer')}</span>
-          </label>
-        </div>
-        {(paymentMethod === 'cash' || paymentMethod === 'e-transfer') && (
+        <AcceptedPaymentMethodsSelector
+          value={acceptedPaymentMethods}
+          onChange={setAcceptedPaymentMethods}
+          isFrench={i18n.language === 'fr'}
+        />
+        {(acceptedPaymentMethods || []).some((m) => ['cash', 'etransfer', 'cheque'].includes(m)) && (
           <div className="p-3 bg-amber-50 border border-amber-200 rounded-md" data-testid="multi-payment-legal-notice">
             <p className="text-sm text-amber-800 font-medium">{t('createListing.legalDisclosureTitle')}</p>
             <p className="text-xs text-amber-700 mt-1">

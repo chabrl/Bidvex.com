@@ -206,4 +206,32 @@ __all__ = [
     "guard_edit",
     "snapshot_at_first_bid",
     "assert_selection_allowed",
+    "http_require_methods",
 ]
+
+
+# ────────────────────────────────────────────────────────────────────
+# HTTP helper — for use in FastAPI route handlers
+# ────────────────────────────────────────────────────────────────────
+def http_require_methods(methods_in):
+    """Validate + canonicalise a payload from a POST/PATCH listing route.
+
+    Empty / missing / invalid → HTTP 400 with bilingual message.
+    Returns the canonical list on success.
+    """
+    from fastapi import HTTPException
+    if methods_in is None or (isinstance(methods_in, list) and not methods_in):
+        raise HTTPException(status_code=400, detail={
+            "error": "accepted_payment_methods_required",
+            "message_en": "Please select at least one payment method.",
+            "message_fr": "Veuillez sélectionner au moins un mode de paiement.",
+        })
+    try:
+        return validate_new_declaration(list(methods_in))
+    except (InvalidPaymentMethodError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail={
+            "error": "invalid_payment_methods",
+            "reason": str(exc),
+            "message_en": "One of the payment methods you selected is not allowed. Choose from: card, e-transfer, cash, cheque.",
+            "message_fr": "L'un des modes de paiement sélectionnés n'est pas autorisé. Choisissez parmi : carte, virement, espèces, chèque.",
+        }) from exc

@@ -151,6 +151,32 @@ def calculate_connect_checkout(
     else:
         application_fee = Decimal(str(buyer_premium + seller_commission + total_tax))
 
+    # ── iter482 P3/P4 canonical L-1 fail-closed gate ──
+    # While L-1 legal review is CLOSED, the BUYER-facing Stripe processing
+    # recovery MUST be exactly $0.  If ``include_stripe_fee=False`` was
+    # requested (offline paths) OR the L-1 gate is closed, we strip any
+    # residual bi.stripe_recovery from the buyer path.  Seller-side B2B
+    # recovery is untouched.
+    from services.payment_cost_engine import estimate as _pp_estimate, PayerRole as _PP_ROLE
+    _pp_est = _pp_estimate(
+        payment_method="stripe_card" if include_stripe_fee else "offline",
+        amount_cents=_to_cents(Decimal(str(buyer_total_full))),
+        currency=cur,
+        payer_role=_PP_ROLE.BUYER,
+        jurisdiction=province,
+    )
+    _pp_snapshot = _pp_est.to_dict()
+    _pp_snapshot["amount_cents"] = int(_pp_est.estimated_cents)
+    _pp_snapshot["field_version"] = "payment_processing.v1"
+    _canonical_pp_cents = int(_pp_est.estimated_cents)
+    _leaked_pp_cents = _to_cents(Decimal(str(bi.stripe_recovery or 0)))
+    if _canonical_pp_cents == 0 and _leaked_pp_cents > 0:
+        # Deduct the leaked recovery from every buyer-facing total so
+        # the invariant "displayed_total == charge_amount" holds.
+        delta = Decimal(str(bi.stripe_recovery))
+        buyer_total_full = buyer_total_full - delta
+        stripe_charge = stripe_charge - delta
+
     return {
         "hammer_price": float(hp),
         "currency": cur,
@@ -178,8 +204,10 @@ def calculate_connect_checkout(
         "qst": qst,
         "hst": hst,
         "total_tax": total_tax,
-        # Stripe
-        "stripe_processing_fee": bi.stripe_recovery,
+        # Stripe — canonical: 0 while L-1 closed.
+        "stripe_processing_fee": (_canonical_pp_cents / 100.0),
+        # iter482 canonical payment_processing snapshot for buyer-facing UI.
+        "payment_processing": _pp_snapshot,
         # Totals
         "buyer_total": float(buyer_total_full),
         "stripe_charge": float(stripe_charge),

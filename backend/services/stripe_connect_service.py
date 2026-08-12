@@ -706,6 +706,7 @@ async def create_destination_charge(
     return_url: str,
     seller_connect_account_id: str,
     is_partner_listing: bool = False,
+    selected_payment_method: str = "stripe",
 ) -> Dict[str, Any]:
     """
     Create Stripe Checkout Session with destination charge
@@ -777,7 +778,9 @@ async def create_destination_charge(
             "listing_id": listing_id,
             "buyer_id": buyer_id,
             "invoice_id": invoice_id,
-            "type": "auction_purchase"
+            "type": "auction_purchase",
+            # iter482 P4 — record the buyer's chosen payment method.
+            "selected_payment_method": selected_payment_method or "stripe",
         }
     }
     # iter482 — Model A₁: Partner is merchant of record; Stripe rail
@@ -822,6 +825,8 @@ async def create_destination_charge(
         "listing_id": listing_id,
         "buyer_id": buyer_id,
         "breakdown": breakdown.to_dict(),
+        # iter482 P4 — canonical selected payment method for reconciliation.
+        "selected_payment_method": selected_payment_method or "stripe",
         "status": "pending",
         "created_at": datetime.now(timezone.utc).isoformat()
     })

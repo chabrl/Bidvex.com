@@ -1108,8 +1108,7 @@ async def create_storage_auction(
         # Single facility-chosen payment method (legacy multi-select kept for compat readers)
         "payment_method": payload.payment_method,
         "payment_methods_accepted": [payload.payment_method],
-        "payment_status": "pending",
-        # Optional participation deposit
+        "payment_status": "pending",        # Optional participation deposit
         "deposit_required": bool(payload.deposit_required),
         "deposit_amount": float(payload.deposit_amount) if payload.deposit_amount else 0.0,
         "deposit_type": (payload.deposit_type or "fixed") if payload.deposit_required else None,
@@ -1144,6 +1143,21 @@ async def create_storage_auction(
 
     await db.storage_auctions.insert_one(doc.copy())
     doc.pop("_id", None)
+
+    # ── iter482 P4B — Seller-Controlled Payment Methods (required, canonical) ──
+    # Storage facilities may accept multiple methods; if none provided,
+    # fall back to the legacy singleton (backward compat).
+    from services.seller_payment_methods_service import http_require_methods
+    methods_in_storage = payload.accepted_payment_methods or [payload.payment_method]
+    canon_methods_s = http_require_methods(methods_in_storage)
+    await db.storage_auctions.update_one(
+        {"id": auction_id},
+        {"$set": {
+            "accepted_payment_methods": canon_methods_s,
+            "accepted_payment_methods_source": "seller_declared_iter482_p4b",
+        }},
+    )
+    doc["accepted_payment_methods"] = canon_methods_s
 
     # iter342 — prohibited-items scan on the storage path (parity with
     # marketplace + lots). Best-effort, fail-open.

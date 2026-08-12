@@ -41,6 +41,7 @@ import {
 
 } from 'lucide-react';
 import LocationSelector from '../../components/LocationSelector';
+import AcceptedPaymentMethodsSelector from '../../components/AcceptedPaymentMethodsSelector';
 import useGeoLocation from '../../hooks/useGeoLocation';
 
 const API = API_BASE;
@@ -112,6 +113,8 @@ const CreateVehicleListingPage = () => {
   const { token, user } = useAuth();
   const geo = useGeoLocation();
   const [currentStep, setCurrentStep] = useState(0);
+  // iter482 P4B — Seller-Controlled Accepted Payment Methods (multi-select)
+  const [acceptedPaymentMethods, setAcceptedPaymentMethods] = useState(['stripe']);
 
   const STEPS = [
     { id: 'vin', title: t('vehicleListing.steps.vin', 'VIN & Basic Info'), icon: Car },
@@ -356,6 +359,15 @@ const CreateVehicleListingPage = () => {
       toast.error('Please upload at least 10 photos');
       return;
     }
+    // iter482 P4B — block publish if seller didn't choose ≥ 1 accepted method
+    if (!acceptedPaymentMethods || acceptedPaymentMethods.length === 0) {
+      toast.error(
+        i18n.language === 'fr'
+          ? "Veuillez sélectionner au moins un mode de paiement."
+          : "Please select at least one payment method."
+      );
+      return;
+    }
     // Guard: Schedule intent must have a future start_time.
     if (intent === 'schedule') {
       const startMs = new Date(formData.start_time).getTime();
@@ -424,6 +436,8 @@ const CreateVehicleListingPage = () => {
         deposit_type: formData.requires_deposit ? formData.deposit_type : null,
         currency: formData.currency,
         // payment_method removed (iter194)
+        // iter482 P4B — Seller-Controlled Accepted Payment Methods multi-select.
+        accepted_payment_methods: acceptedPaymentMethods,
         auction_access: formData.auction_access,
         run_status: formData.run_status,
         title: formData.title,
@@ -1439,6 +1453,15 @@ const CreateVehicleListingPage = () => {
                   </p>
                 </div>
               </div>
+            </div>
+
+            {/* iter482 P4B — Seller-Controlled Accepted Payment Methods multi-select */}
+            <div className="space-y-3 p-4 bg-slate-50 rounded-lg">
+              <AcceptedPaymentMethodsSelector
+                value={acceptedPaymentMethods}
+                onChange={setAcceptedPaymentMethods}
+                isFrench={i18n.language === 'fr'}
+              />
             </div>
 
             {/* Deposit (Spec Feature 1) */}

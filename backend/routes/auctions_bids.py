@@ -304,6 +304,22 @@ async def place_bid(request: Request, bid_data: BidCreate, current_user: User = 
         "highest_bidder_id": current_user.id
     }
 
+    # iter482 P4B — Lock the accepted_payment_methods snapshot on the
+    # FIRST bid.  Idempotent: subsequent bids find an existing snapshot
+    # and no-op.  Failure to snapshot is not a blocker — worst case the
+    # next bid attempts it — so we log + continue.
+    if new_bid_count == 1:
+        try:
+            from services.seller_payment_methods_service import snapshot_at_first_bid
+            _snap = snapshot_at_first_bid(listing)
+            if _snap:
+                update_fields.update(_snap)
+        except Exception as _snap_exc:  # noqa: BLE001
+            logger.warning(
+                f"[iter482.p4b] snapshot_at_first_bid skipped for listing="
+                f"{bid_data.listing_id}: {_snap_exc}"
+            )
+
     if extension_applied and new_auction_end:
         update_fields["auction_end_date"] = new_auction_end.isoformat()
         update_fields["extension_count"] = listing.get("extension_count", 0) + 1
@@ -1186,6 +1202,23 @@ async def bid_on_lot(request: Request, listing_id: str, lot_number: int, data: D
         {"id": listing_id},
         {"$set": {"lots": lots}}
     )
+
+    # iter482 P4B — snapshot accepted_payment_methods on FIRST bid of the
+    # whole multi-item listing (regardless of which lot).  Idempotent.
+    try:
+        total_bids = sum(int(l.get("bid_count") or 0) for l in lots)
+        if total_bids == 1:
+            from services.seller_payment_methods_service import snapshot_at_first_bid
+            _snap = snapshot_at_first_bid(listing)
+            if _snap:
+                await db.multi_item_listings.update_one(
+                    {"id": listing_id},
+                    {"$set": _snap},
+                )
+    except Exception as _snap_exc:  # noqa: BLE001
+        logger.warning(
+            f"[iter482.p4b] multi-item snapshot skipped listing={listing_id}: {_snap_exc}"
+        )
 
     if extension_applied and new_end_time and _ws_manager:
         await _ws_manager.broadcast(listing_id, {

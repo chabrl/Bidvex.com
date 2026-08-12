@@ -1,117 +1,118 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://bidvex.com/</loc>
+    <loc>https://www.bidvex.com/</loc>
     <changefreq>weekly</changefreq>
     <priority>1.00</priority>
   </url>
   <url>
-    <loc>https://bidvex.com/marketplace</loc>
+    <loc>https://www.bidvex.com/marketplace</loc>
     <changefreq>hourly</changefreq>
     <priority>0.95</priority>
   </url>
   <url>
-    <loc>https://bidvex.com/items</loc>
+    <loc>https://www.bidvex.com/items</loc>
     <changefreq>hourly</changefreq>
     <priority>0.95</priority>
   </url>
   <url>
-    <loc>https://bidvex.com/lots</loc>
+    <loc>https://www.bidvex.com/lots</loc>
     <changefreq>hourly</changefreq>
     <priority>0.90</priority>
   </url>
   <url>
-    <loc>https://bidvex.com/lots-auction</loc>
+    <loc>https://www.bidvex.com/lots-auction</loc>
     <changefreq>hourly</changefreq>
     <priority>0.90</priority>
   </url>
   <url>
-    <loc>https://bidvex.com/vehicle-auctions</loc>
+    <loc>https://www.bidvex.com/vehicle-auctions</loc>
     <changefreq>weekly</changefreq>
     <priority>0.70</priority>
   </url>
   <url>
-    <loc>https://bidvex.com/storage-auctions</loc>
+    <loc>https://www.bidvex.com/storage-auctions</loc>
     <changefreq>hourly</changefreq>
     <priority>0.90</priority>
   </url>
   <url>
-    <loc>https://bidvex.com/storage-auctions/how-it-works</loc>
+    <loc>https://www.bidvex.com/storage-auctions/how-it-works</loc>
     <changefreq>monthly</changefreq>
     <priority>0.50</priority>
   </url>
   <url>
-    <loc>https://bidvex.com/storage-auctions/terms</loc>
+    <loc>https://www.bidvex.com/storage-auctions/terms</loc>
     <changefreq>monthly</changefreq>
     <priority>0.40</priority>
   </url>
   <url>
-    <loc>https://bidvex.com/storage-auctions/for-facilities</loc>
+    <loc>https://www.bidvex.com/storage-auctions/for-facilities</loc>
     <changefreq>monthly</changefreq>
     <priority>0.50</priority>
   </url>
   <url>
-    <loc>https://bidvex.com/become-a-broker</loc>
+    <loc>https://www.bidvex.com/become-a-broker</loc>
     <changefreq>weekly</changefreq>
     <priority>0.70</priority>
   </url>
   <url>
-    <loc>https://bidvex.com/broker-directory</loc>
+    <loc>https://www.bidvex.com/broker-directory</loc>
     <changefreq>weekly</changefreq>
     <priority>0.70</priority>
   </url>
   <url>
-    <loc>https://bidvex.com/contact</loc>
+    <loc>https://www.bidvex.com/contact</loc>
     <changefreq>monthly</changefreq>
     <priority>0.50</priority>
   </url>
   <url>
-    <loc>https://bidvex.com/about</loc>
+    <loc>https://www.bidvex.com/about</loc>
     <changefreq>monthly</changefreq>
     <priority>0.50</priority>
   </url>
   <url>
-    <loc>https://bidvex.com/about-us</loc>
+    <loc>https://www.bidvex.com/about-us</loc>
     <changefreq>monthly</changefreq>
     <priority>0.50</priority>
   </url>
   <url>
-    <loc>https://bidvex.com/how-it-works</loc>
+    <loc>https://www.bidvex.com/how-it-works</loc>
     <changefreq>monthly</changefreq>
     <priority>0.50</priority>
   </url>
   <url>
-    <loc>https://bidvex.com/privacy-policy</loc>
+    <loc>https://www.bidvex.com/privacy-policy</loc>
     <changefreq>yearly</changefreq>
     <priority>0.30</priority>
   </url>
   <url>
-    <loc>https://bidvex.com/terms-of-service</loc>
+    <loc>https://www.bidvex.com/terms-of-service</loc>
     <changefreq>yearly</changefreq>
     <priority>0.30</priority>
   </url>
   <url>
-    <loc>https://bidvex.com/legal/terms</loc>
+    <loc>https://www.bidvex.com/legal/terms</loc>
     <changefreq>yearly</changefreq>
     <priority>0.30</priority>
   </url>
   <url>
-    <loc>https://bidvex.com/legal/privacy</loc>
+    <loc>https://www.bidvex.com/legal/privacy</loc>
     <changefreq>yearly</changefreq>
     <priority>0.30</priority>
   </url>
   <url>
-    <loc>https://bidvex.com/legal/refunds</loc>
+    <loc>https://www.bidvex.com/legal/refunds</loc>
     <changefreq>yearly</changefreq>
     <priority>0.30</priority>
   </url>
   <url>
-    <loc>https://bidvex.com/legal/prohibited</loc>
+    <loc>https://www.bidvex.com/legal/prohibited</loc>
     <changefreq>yearly</changefreq>
     <priority>0.30</priority>
   </url>
   <url>
-    <loc>https://bidvex.com/vehicle-auctions/demo-87abd9da081e59cd4044ff9b</loc>
+    <loc>https://www.bidvex.com/lots/9afdf102-d5da-4b6b-865f-5d3cacb8b6c7</loc>
+    <lastmod>2026-08-08</lastmod>
     <changefreq>hourly</changefreq>
     <priority>0.85</priority>
   </url>

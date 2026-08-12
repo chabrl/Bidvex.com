@@ -1,0 +1,32 @@
+{
+  "summary": "iter482 P4 (Seller-Controlled Payment Methods) — end-to-end verification of backend enforcement + frontend rendering. Backend: 65/65 P4 unit tests pass (test_iter482_p4_end_to_end.py 14/14 + test_iter482_p4a_foundation.py 51/51). Added new test_iter482_p4_preview_e2e.py (7 tests) driving REAL preview URL against seeded listings — all 7 pass. Full iter482 regression suite: 310/310 pass (296 iter482 baseline + 14 new P4 e2e; verified after rate-limit cool-down). Frontend live checks on https://prod-verify-2.preview.emergentagent.com confirm dynamic method rendering per seller list, L-1 $0 processing, Buyer Premium attribution, and legacy radios fully removed from all three Create pages.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter482_p4_end_to_end.py",
+    "/app/backend/tests/test_iter482_p4a_foundation.py",
+    "/app/backend/tests/test_iter482_p4_preview_e2e.py",
+    "/app/test_reports/pytest/iter482_p4_full.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "GET /api/listings/{id}/accepted-payment-methods response shape confirmed on preview: {listing_id, collection, accepted_payment_methods[], locked, locked_at, allowed_universe[]}. Handles all four collections (listings, multi_item_listings, vehicle_listings, storage_auctions) — verified via seeded ids.",
+    "Server-side enforcement (assert_selection_allowed) confirmed on POST /api/payments/offline-checkout/{id}: sending cash to a stripe-only listing returns 400 PAYMENT_METHOD_NOT_ACCEPTED; sending etransfer to cheque-only listing returns 400. Selection reason bundled in detail payload.",
+    "L-1 legal gate CLOSED verified end-to-end: CheckoutPage 'Traitement' row = 0,00 $ across MULTI/CHEQUE-only/STRIPE-only listings; Total Due (104,54 $) = Hammer(100) + BP(3.50) + GST(0.35) + QST(0.69). No processing surcharge.",
+    "PriceBreakdown / CheckoutPage buyer-premium row includes attribution + percentage: 'Prime acheteur (fixée par le vendeur, 3.5%)' — matches spec ('by seller' variant, percentage rendered).",
+    "CheckoutPage payment-method-selector renders ONLY seller-accepted methods with canonical testids payment-method-stripe|etransfer|cash|cheque. Verified: MULTI → [stripe,etransfer,cash]; CHEQUE-only → [cheque]; STRIPE-only → [stripe]. Default selection = first accepted method (visual radio pre-selected).",
+    "All 3 Create pages (Individual /create-listing, Multi-Item /create-multi-item-listing, Storage /storage-auctions/create) expose exactly one data-testid='accepted-payment-methods-selector' AND zero legacy 'payment-stripe'/'payment-cash'/'payment-etransfer' testids in DOM. Legacy single-choice radios successfully removed.",
+    "Full-suite pytest hit /api/auth/register rate limit (429) when tests_iter482_p4_end_to_end ran alongside other files; a 60-sec cool-down cleared it and all 14 passed. Recommend using a shared preview-user fixture (or bypassing register entirely) to avoid flakiness in CI. Not a production bug.",
+    "Storage Create page URL is /storage-auctions/create (NOT /storage/create-auction as noted in review request); confirmed via App.js route table. Selector present."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter482_p4_preview_e2e.py (new — 7 live-preview e2e assertions)"
+  ],
+  "success_rate": {"backend": "100% (310/310 iter482 tests + 7/7 new preview e2e)", "frontend": "100% (all P4 UI acceptance criteria verified live)"},
+  "test_credentials": "buyer testbuyer@bidvex.com / TestBuyer2026!  seller testseller@bidvex.com / TestSeller2026! — both OK on preview",
+  "seed_data_creation": "None — reused main-agent-seeded listings iter482p4-e2e-multi-1d5c7d, iter482p4-e2e-cheque-only-a09e60, iter482p4-e2e-stripe-only-456890.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "iter482 P4 is fully green. Live preview verified. Only nit: /api/auth/register is rate-limited to ~1 register/min per IP, which can cause the 14-test HTTP portion of test_iter482_p4_end_to_end.py to fail mid-suite when running the whole iter482 pytest tree — a 60s pause + retry is a reliable fix. Consider a fixtures-based shared preview user to eliminate this brittleness. Preview API base = https://prod-verify-2.preview.emergentagent.com. GET accepted-payment-methods returns key 'allowed_universe' (not 'universe').",
+  "rca of the issue": "No product issue found. Only observation: pytest full-run flake caused by /api/auth/register per-IP rate limit (60s window). Mitigated by cool-down / can be permanently removed by extracting a session-scoped preview-user fixture."
+}

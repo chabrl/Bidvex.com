@@ -26,6 +26,7 @@ import { Loader2, Upload, AlertTriangle, ShieldAlert, ExternalLink, Search } fro
 import LocationSelector from '../components/LocationSelector';
 import CategorySelector from '../components/CategorySelector';
 import InfoTip from '../components/InfoTip';
+import AcceptedPaymentMethodsSelector from '../components/AcceptedPaymentMethodsSelector';
 import { CFIASoilBanner, CFIASoilCheckbox } from '../components/legal/LegalComplianceSections';
 import useGeoLocation from '../hooks/useGeoLocation';
 // iter299 P0 — Bill 96 French-title helpers + shared input field
@@ -172,8 +173,11 @@ const CreateListingPage = () => {
     )
   );
 
-  // Seller Payment Method
+  // Seller Payment Method (legacy singleton, retained for backward compat)
   const [paymentMethod, setPaymentMethod] = useState('stripe');
+
+  // iter482 P4B — Seller-Controlled Accepted Payment Methods (multi-select)
+  const [acceptedPaymentMethods, setAcceptedPaymentMethods] = useState(['stripe']);
 
   // Deposit (Spec Feature 1) — single field, single flow
   const [requiresDeposit, setRequiresDeposit] = useState(false);
@@ -423,6 +427,16 @@ const CreateListingPage = () => {
       return;
     }
 
+    // iter482 P4B — block publish if seller didn't choose ≥ 1 accepted method
+    if (!acceptedPaymentMethods || acceptedPaymentMethods.length === 0) {
+      toast.error(
+        i18n.language === 'fr'
+          ? "Veuillez sélectionner au moins un mode de paiement."
+          : "Please select at least one payment method."
+      );
+      return;
+    }
+
     // iter310 — Bill 96 compliance is now zero-friction: when the listing
     // is in Quebec and the French copy is missing, the backend auto-
     // translates it via Gemini 2.5 Flash before persisting. The UI shows a
@@ -477,20 +491,13 @@ const CreateListingPage = () => {
         buyers_premium_rate: isStorageLocker
           ? null
           : (buyersPremiumPercent !== '' ? parseFloat(buyersPremiumPercent) / 100 : null),
-        payment_method: paymentMethod,
+        payment_method: (acceptedPaymentMethods && acceptedPaymentMethods[0]) || paymentMethod,
+        // iter482 P4 — Seller-Controlled Accepted Payment Methods (canonical).
+        accepted_payment_methods: acceptedPaymentMethods,
         // Deposit (spec Feature 1) — disabled for storage_locker (native pre-auth holds replace this)
         requires_deposit: !isStorageLocker && requiresDeposit,
         deposit_amount: !isStorageLocker && requiresDeposit && depositAmount ? parseFloat(depositAmount) : null,
         deposit_type: !isStorageLocker && requiresDeposit ? depositType : null,
-        // FEATURE PATCH v9 / Feature 4 — Quantity (forced to 1 for storage_locker)
-        quantity: isStorageLocker ? 1 : Math.max(1, parseInt(quantity) || 1),
-        multiply_hammer_by_quantity: !isStorageLocker
-          && (Math.max(1, parseInt(quantity) || 1) > 1)
-          && !!multiplyHammerByQuantity,
-        // iter233 — Display-only "Lot price × Quantity" toggle.
-        price_multiplied_by_quantity: !isStorageLocker
-          && (Math.max(1, parseInt(quantity) || 1) > 1)
-          && !!priceMultipliedByQuantity,
         // Phase 6.0 / Task 4 — Storage Locker
         listing_type: isStorageLocker ? 'storage_locker' : null,
         storage_metadata: isStorageLocker ? {
@@ -1168,30 +1175,20 @@ const CreateListingPage = () => {
                 )}
               </div>
 
-              {/* Payment Method Selection */}
+              {/* Payment Method Selection (LEGACY singleton — retained for
+                  the fee-preview label). iter482 P4B adds a mandatory
+                  multi-select accepted-methods block BELOW that becomes
+                  the seller's actual acceptance policy. */}
+              {/* iter482 P4 — Canonical Seller-Controlled Accepted Payment Methods
+                  (multi-select). Replaces the legacy single-choice radio group.
+                  Buyer will only see methods selected here. */}
               <div className="space-y-3" data-testid="payment-method-section">
-                <Label>{t('createListing.paymentMethodLabel')}
-                  <InfoTip en={t('createListing.paymentMethodInfo', { lng: 'en' })} fr={t('createListing.paymentMethodInfo', { lng: 'fr' })} />
-                </Label>
-                <div className="grid grid-cols-1 gap-2">
-                  <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${paymentMethod === 'stripe' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300'}`}>
-                    <input type="radio" name="payment_method" value="stripe" checked={paymentMethod === 'stripe'} onChange={(e) => setPaymentMethod(e.target.value)} className="text-blue-600" data-testid="payment-stripe" />
-                    <div>
-                      <span className="font-medium text-sm">{t('createListing.paymentMethodStripe')}</span>
-                      <span className="ml-2 text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">{t('createListing.paymentMethodStripeBadge')}</span>
-                      <p className="text-xs text-muted-foreground mt-0.5">{t('createListing.paymentMethodStripeHelp')}</p>
-                    </div>
-                  </label>
-                  <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${paymentMethod === 'cash' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300'}`}>
-                    <input type="radio" name="payment_method" value="cash" checked={paymentMethod === 'cash'} onChange={(e) => setPaymentMethod(e.target.value)} data-testid="payment-cash" />
-                    <span className="font-medium text-sm">{t('createListing.paymentMethodCash')}</span>
-                  </label>
-                  <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${paymentMethod === 'e-transfer' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300'}`}>
-                    <input type="radio" name="payment_method" value="e-transfer" checked={paymentMethod === 'e-transfer'} onChange={(e) => setPaymentMethod(e.target.value)} data-testid="payment-etransfer" />
-                    <span className="font-medium text-sm">{t('createListing.paymentMethodETransfer')}</span>
-                  </label>
-                </div>
-                {(paymentMethod === 'cash' || paymentMethod === 'e-transfer') && (
+                <AcceptedPaymentMethodsSelector
+                  value={acceptedPaymentMethods}
+                  onChange={setAcceptedPaymentMethods}
+                  isFrench={i18n.language === 'fr'}
+                />
+                {(acceptedPaymentMethods || []).some((m) => ['cash', 'etransfer', 'cheque'].includes(m)) && (
                   <div className="p-3 bg-amber-50 border border-amber-200 rounded-md" data-testid="payment-legal-notice">
                     <p className="text-sm text-amber-800 font-medium">{t('createListing.legalDisclosureTitle')}</p>
                     <p className="text-xs text-amber-700 mt-1">
@@ -1199,7 +1196,7 @@ const CreateListingPage = () => {
                     </p>
                   </div>
                 )}
-                {paymentMethod === 'stripe' && (
+                {(acceptedPaymentMethods || []).includes('stripe') && (
                   <div className="p-3 bg-blue-50 border border-blue-200 rounded-md" data-testid="payment-stripe-notice">
                     <p className="text-sm text-blue-800 font-medium">{t('createListing.stripeDisclosureTitle')}</p>
                     <p className="text-xs text-blue-700 mt-1">

@@ -525,9 +525,22 @@ async def create_listing(
         else:
             listing_dict["buyers_premium_percent"] = 0
     
-    # Seller payment method preference
+    # Seller payment method preference (LEGACY singleton — kept for backward compat)
     if listing_data.payment_method:
         listing_dict["payment_method"] = listing_data.payment_method
+
+    # ── iter482 P4B — Seller-Controlled Payment Methods (required, canonical) ──
+    from services.seller_payment_methods_service import http_require_methods
+    canon_methods = http_require_methods(listing_data.accepted_payment_methods)
+    listing_dict["accepted_payment_methods"] = canon_methods
+    listing_dict["accepted_payment_methods_source"] = "seller_declared_iter482_p4b"
+    # Snapshot is NOT taken here; it's locked at first bid via
+    # `services.seller_payment_methods_service.snapshot_at_first_bid`.
+    # For backward compat, if the seller did not send a legacy singleton
+    # but declared a canonical list, populate the singleton with the
+    # first method so any legacy consumer still sees a value.
+    if not listing_dict.get("payment_method"):
+        listing_dict["payment_method"] = canon_methods[0]
 
     # ── Deposit (Spec Feature 1) — single field, ONE flow ──
     if listing_data.requires_deposit:
@@ -1544,6 +1557,14 @@ async def create_multi_item_listing(
 
     listing_dict["agreement_metadata"] = agreement_metadata
     serialise_datetimes(listing_dict)
+
+    # ── iter482 P4B — Seller-Controlled Payment Methods (required, canonical) ──
+    from services.seller_payment_methods_service import http_require_methods
+    canon_methods_mi = http_require_methods(listing_data.accepted_payment_methods)
+    listing_dict["accepted_payment_methods"] = canon_methods_mi
+    listing_dict["accepted_payment_methods_source"] = "seller_declared_iter482_p4b"
+    # Keep legacy singleton in sync (first method) for backward compat.
+    listing_dict["payment_method"] = canon_methods_mi[0]
 
     # iter211 P4 — tag demo accounts' multi-item listings
     from services.demo_filter import tag_listing_if_demo

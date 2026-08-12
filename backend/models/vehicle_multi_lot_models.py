@@ -151,6 +151,16 @@ class MultiLotAuctionCreate(BaseModel):
     # below in the model_validator.
     lots: List[MultiLotItemCreate] = Field(default_factory=list, max_length=200)
     submission_intent: Optional[str] = "live"   # draft / schedule / live
+    # iter482 P4B — Seller-Controlled Accepted Payment Methods (multi-select).
+    accepted_payment_methods: Optional[List[str]] = None
+
+    @field_validator("accepted_payment_methods")
+    @classmethod
+    def _vapm(cls, v):
+        if v is None:
+            return None
+        from services.payment_methods_registry import normalise_list
+        return normalise_list(v)
 
     @field_validator("submission_intent")
     @classmethod

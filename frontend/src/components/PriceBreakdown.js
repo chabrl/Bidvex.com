@@ -168,15 +168,21 @@ const PriceBreakdown = ({
             <span className="font-medium">{formatCurrency(bidAmount)}</span>
           </div>
 
-          {/* Buyer's Premium */}
-          <div className="flex justify-between items-center">
+          {/* Buyer's Premium (iter482 P4 — clear attribution to seller/partner) */}
+          <div className="flex justify-between items-center" data-testid="buyer-premium-row">
             <span className="text-slate-600 dark:text-slate-400">
               {i18n.language === 'fr' ? 'Prime acheteur' : "Buyer's Premium"}
-              <span className="text-xs text-slate-400 ml-1">
-                ({(breakdown.buyer_premium_rate * 100).toFixed(1)}%)
+              <span className="text-xs text-slate-500 ml-1">
+                {(() => {
+                  const source = breakdown.flow_type === 'PARTNER_FLOW'
+                    ? (i18n.language === 'fr' ? '(par le partenaire' : '(by Partner')
+                    : (i18n.language === 'fr' ? '(par le vendeur' : '(by seller');
+                  const pct = (breakdown.buyer_premium_rate * 100).toFixed(1);
+                  return `${source}, ${pct}%)`;
+                })()}
               </span>
             </span>
-            <span className="text-slate-700 dark:text-slate-300">
+            <span className="text-slate-700 dark:text-slate-300" data-testid="buyer-premium-amount">
               +{formatCurrency(breakdown.buyer_premium)}
             </span>
           </div>

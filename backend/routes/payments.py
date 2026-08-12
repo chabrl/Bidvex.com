@@ -835,6 +835,7 @@ class AuctionCheckoutRequest(BaseModel):
     """Request model for auction checkout"""
     listing_id: str = Field(..., description="Listing/auction ID")
     return_url: str = Field(..., description="URL to redirect after checkout")
+    payment_method: str = Field(default="stripe", description="Buyer-selected payment method")
 
 
 @payments_router.post("/checkout/auction")
@@ -869,7 +870,30 @@ async def create_auction_checkout(
     # Check if already paid
     if listing.get("payment_status") == "paid":
         raise HTTPException(status_code=400, detail="This auction has already been paid")
-    
+
+    # iter482 P4 — Enforce seller-controlled accepted payment methods.
+    # The buyer must have selected a method that the seller accepts.
+    # Stripe checkout requires the seller to accept 'stripe'.
+    from services.seller_payment_methods_service import (
+        assert_selection_allowed,
+        PaymentMethodNotAcceptedError,
+        PaymentMethodsMissingError,
+    )
+    try:
+        assert_selection_allowed(listing, request.payment_method or "stripe")
+    except PaymentMethodNotAcceptedError as exc:
+        raise HTTPException(status_code=400, detail={
+            "error": "PAYMENT_METHOD_NOT_ACCEPTED",
+            "reason": str(exc),
+            "message_en": "This seller does not accept the selected payment method.",
+            "message_fr": "Ce vendeur n'accepte pas le mode de paiement sélectionné.",
+        }) from exc
+    except PaymentMethodsMissingError as exc:
+        raise HTTPException(status_code=422, detail={
+            "error": "accepted_payment_methods_missing",
+            "reason": str(exc),
+        }) from exc
+
     # Get seller info
     seller = await db.users.find_one({"id": listing["seller_id"]})
     if not seller:
@@ -927,6 +951,7 @@ async def create_auction_checkout(
             return_url=request.return_url,
             seller_connect_account_id=seller_connect_id,
             is_partner_listing=True,
+            selected_payment_method=request.payment_method or "stripe",
         )
         
         return {
@@ -994,6 +1019,7 @@ async def create_auction_checkout(
             return_url=request.return_url,
             seller_connect_account_id=seller_connect_id,
             is_partner_listing=False,
+            selected_payment_method=request.payment_method or "stripe",
         )
         
         return {
@@ -1916,6 +1942,28 @@ async def auction_winner_checkout(
     if listing.get("payment_status") == "paid":
         raise HTTPException(status_code=400, detail="Already paid")
 
+    # iter482 P4 — Enforce seller's accepted payment methods (Stripe path)
+    from services.seller_payment_methods_service import (
+        assert_selection_allowed,
+        PaymentMethodNotAcceptedError,
+        PaymentMethodsMissingError,
+    )
+    _selected_method = (data or {}).get("payment_method", "stripe") or "stripe"
+    try:
+        assert_selection_allowed(listing, _selected_method)
+    except PaymentMethodNotAcceptedError as exc:
+        raise HTTPException(status_code=400, detail={
+            "error": "PAYMENT_METHOD_NOT_ACCEPTED",
+            "reason": str(exc),
+            "message_en": "This seller does not accept the selected payment method.",
+            "message_fr": "Ce vendeur n'accepte pas le mode de paiement sélectionné.",
+        }) from exc
+    except PaymentMethodsMissingError as exc:
+        raise HTTPException(status_code=422, detail={
+            "error": "accepted_payment_methods_missing",
+            "reason": str(exc),
+        }) from exc
+
     # Server-side price calculation via Connect engine
     from services.connect_payment_engine import calculate_connect_checkout, create_connect_checkout_session
 
@@ -2030,12 +2078,34 @@ async def offline_checkout(
     current_user = await _auth(credentials)
     db = get_db()
 
-    if data.payment_method not in ("cash", "etransfer"):
-        raise HTTPException(status_code=400, detail="Invalid payment method. Must be 'cash' or 'etransfer'.")
+    # iter482 P4 — accept cash/etransfer/cheque as canonical offline methods.
+    if data.payment_method not in ("cash", "etransfer", "cheque"):
+        raise HTTPException(status_code=400, detail="Invalid payment method. Must be 'cash', 'etransfer' or 'cheque'.")
 
     listing = await db.listings.find_one({"id": listing_id}, {"_id": 0})
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
+
+    # iter482 P4 — Enforce seller's accepted payment methods
+    from services.seller_payment_methods_service import (
+        assert_selection_allowed,
+        PaymentMethodNotAcceptedError,
+        PaymentMethodsMissingError,
+    )
+    try:
+        assert_selection_allowed(listing, data.payment_method)
+    except PaymentMethodNotAcceptedError as exc:
+        raise HTTPException(status_code=400, detail={
+            "error": "PAYMENT_METHOD_NOT_ACCEPTED",
+            "reason": str(exc),
+            "message_en": "This seller does not accept the selected payment method.",
+            "message_fr": "Ce vendeur n'accepte pas le mode de paiement sélectionné.",
+        }) from exc
+    except PaymentMethodsMissingError as exc:
+        raise HTTPException(status_code=422, detail={
+            "error": "accepted_payment_methods_missing",
+            "reason": str(exc),
+        }) from exc
 
     if listing.get("winner_id") != current_user.id and getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Only the auction winner can checkout")
@@ -2087,6 +2157,7 @@ async def offline_checkout(
         "seller_id": listing.get("seller_id", ""),
         "type": "auction_winner",
         "payment_method": data.payment_method,
+        "selected_payment_method": data.payment_method,  # iter482 P4 canonical
         "order_status": "pending_payment",
         "payment_status": "waiting_for_offline_confirmation",
         "hammer_price": hammer_price,
@@ -2101,9 +2172,8 @@ async def offline_checkout(
         "updated_at": now_iso,
     }
 
-    await db.offline_orders.insert_one({**order_record, "_id": None})
-    # Remove the _id that MongoDB adds
-    await db.offline_orders.update_one({"id": order_id}, {"$unset": {"_id": ""}})
+    # Insert without an explicit _id; Motor will generate one automatically.
+    await db.offline_orders.insert_one(order_record)
 
     # Mark listing as reserved to prevent double-selling
     await db.listings.update_one(
@@ -2112,6 +2182,7 @@ async def offline_checkout(
             "status": "reserved",
             "payment_status": "waiting_for_offline_confirmation",
             "payment_method": data.payment_method,
+            "selected_payment_method": data.payment_method,  # iter482 P4 canonical
             "offline_order_id": order_id,
             "reserved_at": now_iso,
             "updated_at": now_iso,
@@ -2151,6 +2222,29 @@ async def offline_checkout(
                     <p style="color:#94a3b8;font-size:12px;text-align:center">BidVex Inc. — {'Toutes taxes incluses' if is_fr else 'All taxes included'}</p>
                 </div></body></html>
                 """
+            elif data.payment_method == "cheque":
+                subject = f"Instructions de paiement - Chèque #{order_id[:8]}" if is_fr else f"Payment Instructions - Cheque #{order_id[:8]}"
+                html = f"""
+                <html><body style="font-family:Arial,sans-serif;padding:20px;max-width:600px;margin:auto">
+                <div style="background:#1e40af;padding:20px;border-radius:12px 12px 0 0;text-align:center">
+                    <h1 style="color:white;margin:0;font-size:22px">{'Confirmation de commande' if is_fr else 'Order Confirmation'}</h1>
+                </div>
+                <div style="border:1px solid #e2e8f0;border-top:none;padding:24px;border-radius:0 0 12px 12px">
+                    <p>{'Bonjour' if is_fr else 'Hello'} {user_doc.get('name','').split()[0]},</p>
+                    <p>{'Votre commande a été confirmée avec paiement par chèque.' if is_fr else 'Your order has been confirmed with cheque payment.'}</p>
+                    <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:16px;margin:16px 0">
+                        <h3 style="margin:0 0 8px 0;color:#92400e">{'Instructions de paiement par chèque' if is_fr else 'Cheque Payment Instructions'}</h3>
+                        <table style="width:100%;border-collapse:collapse">
+                            <tr><td style="padding:6px 0;color:#64748b">{'Montant dû' if is_fr else 'Amount Due'}:</td><td style="padding:6px 0;font-weight:bold">${breakdown.get('buyer_total', hammer_price):,.2f} CAD</td></tr>
+                            <tr><td style="padding:6px 0;color:#64748b">{'Référence' if is_fr else 'Reference'}:</td><td style="padding:6px 0;font-weight:bold">{order_id[:8].upper()}</td></tr>
+                            <tr><td style="padding:6px 0;color:#64748b">{'Article' if is_fr else 'Item'}:</td><td style="padding:6px 0">{item_title}</td></tr>
+                        </table>
+                        <p style="margin:12px 0 0 0;color:#92400e;font-weight:500">{'Veuillez contacter le vendeur pour organiser la remise du chèque et la cueillette.' if is_fr else 'Please contact the seller to arrange cheque delivery and pickup.'}</p>
+                    </div>
+                    <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0">
+                    <p style="color:#94a3b8;font-size:12px;text-align:center">BidVex Inc. — {'Toutes taxes incluses' if is_fr else 'All taxes included'}</p>
+                </div></body></html>
+                """
             else:
                 subject = f"Instructions de paiement - Comptant #{order_id[:8]}" if is_fr else f"Payment Instructions - Cash #{order_id[:8]}"
                 html = f"""
@@ -2178,16 +2272,21 @@ async def offline_checkout(
     except Exception as e:
         logger.error(f"Failed to send offline checkout email: {e}")
 
+    _msg_by_method = {
+        "etransfer": "Order confirmed. Follow payment instructions sent to your email.",
+        "cheque": "Order confirmed. Please arrange cheque delivery and pickup with the seller.",
+        "cash": "Order confirmed. Please arrange pickup and cash payment with the seller.",
+    }
     return {
         "success": True,
         "order_id": order_id,
         "payment_method": data.payment_method,
+        "selected_payment_method": data.payment_method,
         "order_status": "pending_payment",
         "payment_status": "waiting_for_offline_confirmation",
         "interac_email": interac_email if data.payment_method == "etransfer" else None,
         "breakdown": breakdown,
-        "message": "Order confirmed. Follow payment instructions sent to your email." if data.payment_method == "etransfer"
-                   else "Order confirmed. Please arrange pickup and cash payment with the seller.",
+        "message": _msg_by_method.get(data.payment_method, "Order confirmed."),
     }
 
 

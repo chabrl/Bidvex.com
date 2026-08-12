@@ -14,6 +14,7 @@ import { Checkbox } from '../../components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { toast } from 'sonner';
 import { Loader2, Upload, ImagePlus, FileSpreadsheet } from 'lucide-react';
+import AcceptedPaymentMethodsSelector from '../../components/AcceptedPaymentMethodsSelector';
 
 const API = API_BASE;
 const SIZES = ['5x5', '5x10', '10x10', '10x15', '10x20', '10x30+'];
@@ -42,8 +43,10 @@ const StorageAuctionCreate = () => {
     starting_price: 1, reserve_price: '', bid_increment: 10,
     start_time: '', end_time: '',
     cleanup_deadline_hours: 72,
-    // ── Payment method (single) ──
+    // ── Payment method (single) — LEGACY ──
     payment_method: 'stripe',
+    // iter482 P4B — Seller-Controlled Accepted Payment Methods (multi-select)
+    accepted_payment_methods: ['stripe'],
     // ── iter445 — Storage buyer's premium is FIXED at 5 % (platform policy).
     // The field is no longer configurable by facilities; server ignores
     // any client-sent value.
@@ -121,6 +124,13 @@ const StorageAuctionCreate = () => {
       toast.error(isFr
         ? 'Veuillez téléverser au moins 1 photo de l\'unité.'
         : 'Please upload at least 1 photo of the unit.');
+      return;
+    }
+    // iter482 P4B — block publish if seller didn't choose ≥ 1 accepted method
+    if (!form.accepted_payment_methods || form.accepted_payment_methods.length === 0) {
+      toast.error(isFr
+        ? 'Veuillez sélectionner au moins un mode de paiement.'
+        : 'Please select at least one payment method.');
       return;
     }
     // iter299 P0 — Bill 96: QC facilities must provide a French description.
@@ -342,47 +352,24 @@ const StorageAuctionCreate = () => {
                 </p>
               </div>
 
-              <Label className="text-sm">{t('storage.create.paymentMethod')}</Label>
-              <div className="grid grid-cols-1 gap-2" data-testid="payment-method-selector">                {[
-                  { v: 'stripe', emoji: '💳',
-                    label_en: 'Online Payment (Stripe)',
-                    label_fr: 'Paiement en ligne (Stripe)',
-                    sub_en: 'Buyer pays the hammer price via Stripe. BidVex deducts a 5% commission + GST/QST from your payout. No buyer fee.',
-                    sub_fr: 'L\'acheteur paie le prix marteau via Stripe. BidVex déduit une commission de 5 % + TPS/TVQ de votre versement. Aucun frais acheteur.' },
-                  { v: 'cash', emoji: '💵',
-                    label_en: 'Cash',
-                    label_fr: 'Comptant',
-                    sub_en: 'Buyer pays you directly in cash. BidVex auto-charges 5% + GST/QST + Stripe gross-up to your facility card on file.',
-                    sub_fr: 'L\'acheteur vous paie directement en comptant. BidVex prélève automatiquement 5 % + TPS/TVQ + frais Stripe sur la carte enregistrée de votre établissement.' },
-                  { v: 'etransfer', emoji: '📧',
-                    label_en: 'E-Transfer',
-                    label_fr: 'Virement Interac',
-                    sub_en: 'Buyer sends you an Interac e-Transfer. BidVex auto-charges 5% + GST/QST + Stripe gross-up to your facility card on file.',
-                    sub_fr: 'L\'acheteur vous envoie un virement Interac. BidVex prélève automatiquement 5 % + TPS/TVQ + frais Stripe sur la carte enregistrée de votre établissement.' },
-                ].map(opt => (
-                  <button
-                    type="button"
-                    key={opt.v}
-                    onClick={() => set('payment_method', opt.v)}
-                    data-testid={`payment-method-${opt.v}`}
-                    className={`text-left p-3 rounded-lg border-2 transition-all ${form.payment_method === opt.v
-                      ? 'border-blue-600 bg-blue-100/60 dark:bg-blue-900/30'
-                      : 'border-slate-200 dark:border-slate-700 hover:border-blue-400'}`}
-                  >
-                    <div className="flex items-center gap-2 font-semibold text-sm">
-                      <span>{opt.emoji}</span>
-                      <span>{isFr ? opt.label_fr : opt.label_en}</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1 ml-6">
-                      {isFr ? opt.sub_fr : opt.sub_en}
-                    </p>
-                  </button>
-                ))}
+              {/* iter482 P4 — Canonical Seller-Controlled Accepted Payment Methods (multi-select).
+                  Replaces the legacy single-choice buttons. */}
+              <div data-testid="payment-method-selector">
+                <AcceptedPaymentMethodsSelector
+                  value={form.accepted_payment_methods}
+                  onChange={(list) => {
+                    set('accepted_payment_methods', list);
+                    // Keep the legacy single-choice field in sync with the first
+                    // selected method so downstream fee-preview logic still works.
+                    if (list && list.length > 0) set('payment_method', list[0]);
+                  }}
+                  isFrench={isFr}
+                />
               </div>
 
               {/* Fee preview */}
               <div className="rounded-lg bg-white dark:bg-slate-900 p-3 text-xs border">
-                {form.payment_method === 'stripe' ? (
+                {(form.accepted_payment_methods || []).includes('stripe') ? (
                   <p>
                     👤 <strong>
                       {t('storage.create.buyerPays')}

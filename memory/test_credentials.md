@@ -223,3 +223,17 @@ Two additional accounts prove cross-user ownership rejection:
 - Cross seller: `iter474_seller_b@test.com` / `IterTestPwd!123`
 Both are role=user. Used only for T3/T6 authorization tests — they own
 no seeded purchases or sales.
+
+
+## 🆕 iter482 P4 — Seller-Controlled Payment Methods (Feb 12, 2026)
+Buyer/Seller/Admin above (`testbuyer@bidvex.com`, `testseller@bidvex.com`, `charbel911@gmail.com`) all verified working on this preview DB.
+
+Seeded test listings for P4 buyer-checkout E2E (winner_id = testbuyer@bidvex.com):
+- `iter482p4-e2e-multi-1d5c7d` — accepts [stripe, etransfer, cash]
+- `iter482p4-e2e-cheque-only-a09e60` — accepts [cheque]
+- `iter482p4-e2e-stripe-only-456890` — accepts [stripe]
+
+Reproduce via:
+```python
+# See /app/backend/tests/test_iter482_p4_end_to_end.py::_seed_listing
+```

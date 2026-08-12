@@ -296,6 +296,25 @@ async def place_bid(db, auction_id: str, bidder_id: str, max_bid: float) -> Dict
         },
     )
 
+    # iter482 P4B — Snapshot accepted_payment_methods on the very first
+    # bid of a storage auction.  Idempotent.
+    if original_bid_count == 0:
+        try:
+            from services.seller_payment_methods_service import snapshot_at_first_bid
+            fresh = await db.storage_auctions.find_one(
+                {"id": auction_id},
+                {"_id": 0, "accepted_payment_methods": 1,
+                 "accepted_payment_methods_snapshot": 1, "payment_method": 1},
+            ) or {}
+            _snap = snapshot_at_first_bid(fresh)
+            if _snap:
+                await db.storage_auctions.update_one(
+                    {"id": auction_id},
+                    {"$set": _snap},
+                )
+        except Exception:  # pragma: no cover
+            pass
+
     return {
         "current_bid": new_current,
         "bid_count": original_bid_count + 1,

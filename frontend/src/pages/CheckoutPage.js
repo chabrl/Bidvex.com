@@ -26,7 +26,6 @@ import {
   Banknote,
   Send,
 } from 'lucide-react';
-
 import InfoTip from '../components/InfoTip';
 
 const API = API_BASE;
@@ -46,7 +45,10 @@ const CheckoutPage = () => {
   const [sellerIsTaxRegistered, setSellerIsTaxRegistered] = useState(false);
   const [isPartnerListing, setIsPartnerListing] = useState(false);
   const [partnerCompany, setPartnerCompany] = useState(null);
-  const [paymentMethod, setPaymentMethod] = useState('stripe');
+  const [paymentMethod, setPaymentMethod] = useState(null);
+  // iter482 P4 — seller's accepted methods snapshot for this auction.
+  const [acceptedPaymentMethods, setAcceptedPaymentMethods] = useState(null);
+  const [paymentMethodsLocked, setPaymentMethodsLocked] = useState(false);
 
   // Auction winner flow state
   const [isWinnerFlow, setIsWinnerFlow] = useState(false);
@@ -133,17 +135,108 @@ const CheckoutPage = () => {
       setLoading(false);
     }
   };
+
+  // iter482 P4 — fetch seller's accepted payment methods snapshot
+  useEffect(() => {
+    if (!listingId) return;
+    (async () => {
+      try {
+        const res = await axios.get(
+          `${API}/listings/${listingId}/accepted-payment-methods`
+        );
+        const methods = Array.isArray(res.data?.accepted_payment_methods)
+          ? res.data.accepted_payment_methods
+          : [];
+        setAcceptedPaymentMethods(methods);
+        setPaymentMethodsLocked(!!res.data?.locked);
+        // Auto-default to the FIRST accepted method (never hardcoded 'stripe').
+        if (methods.length > 0) {
+          setPaymentMethod((prev) => (prev && methods.includes(prev) ? prev : methods[0]));
+        }
+      } catch (err) {
+        console.error('Failed to load accepted payment methods:', err);
+        // Non-blocking. Buyer will still see the checkout, but no method
+        // will be selectable — the button will be disabled and show a
+        // clear message.
+        setAcceptedPaymentMethods([]);
+      }
+    })();
+  }, [listingId]);
   
   const handleProceedToPayment = async () => {
     try {
       setProcessing(true);
       setError(null);
-      
+
       const token = localStorage.getItem('token');
       const returnUrl = `${window.location.origin}/checkout/${listingId}`;
 
-      // Offline payment (Cash or E-Transfer)
-      if (paymentMethod === 'cash' || paymentMethod === 'etransfer') {
+      // iter482 P4 — Guard: buyer must have a valid method that the seller accepts.
+      if (!paymentMethod) {
+        setError(isFrench ? 'Veuillez sélectionner un mode de paiement.' : 'Please select a payment method.');
+        setProcessing(false);
+        return;
+      }
+      if (Array.isArray(acceptedPaymentMethods) && !acceptedPaymentMethods.includes(paymentMethod)) {
+        setError(isFrench
+          ? "Ce mode de paiement n'est pas accepté pour cette enchère."
+          : 'This payment method is not accepted for this auction.');
+        setProcessing(false);
+        return;
+      }
+
+      // iter482 P4 — Acknowledge exact-cent totals & selected method
+      // BEFORE creating any Stripe session or offline order.  The
+      // server persists this into ``db.buyer_payment_selections`` and
+      // will use it as the authoritative selection.
+      try {
+        const hammerCents = Math.round(Number(breakdown?.hammer_price || 0) * 100);
+        const bpCents = Math.round(Number(breakdown?.buyer_premium || 0) * 100);
+        const buyerTaxCents = Math.round(
+          Number(breakdown?.bp_tax_total ?? breakdown?.fees_tax_total ?? 0) * 100
+          + Number(breakdown?.hammer_tax_total || 0) * 100
+        );
+        const ppCents = Number(breakdown?.payment_processing?.amount_cents ?? 0);
+        const totalCents = Math.round(Number(buyerTotal || 0) * 100);
+        // The parts must sum to total_cents server-side (anti-tamper).
+        // If rounding mismatch occurs, absorb the rounding delta into
+        // the processing cents (which is $0 while L-1 gate closed).
+        const partsSum = hammerCents + bpCents + buyerTaxCents + ppCents;
+        const rounded = totalCents - (partsSum - ppCents);
+        const finalPp = rounded >= 0 ? rounded : ppCents;
+
+        await axios.post(
+          `${API}/checkout/select-payment-method`,
+          {
+            listing_id: listingId,
+            selected_payment_method: paymentMethod,
+            ack_totals: {
+              hammer_cents: hammerCents,
+              buyer_premium_cents: bpCents,
+              buyer_tax_cents: buyerTaxCents,
+              payment_processing_cents: finalPp,
+              total_cents: totalCents,
+            },
+            terms_version: 'iter482.p4.v1',
+          },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      } catch (ackErr) {
+        // Distinguish 400 PAYMENT_METHOD_NOT_ACCEPTED from other errors.
+        const code = ackErr?.response?.data?.detail?.error;
+        if (code === 'PAYMENT_METHOD_NOT_ACCEPTED') {
+          setError(isFrench
+            ? "Ce mode de paiement n'est pas accepté pour cette enchère."
+            : 'This payment method is not accepted for this auction.');
+          setProcessing(false);
+          return;
+        }
+        // Log but don't block — the primary endpoints re-enforce.
+        console.error('select-payment-method ack failed:', ackErr);
+      }
+
+      // Offline payment (Cash, E-Transfer, Cheque)
+      if (paymentMethod === 'cash' || paymentMethod === 'etransfer' || paymentMethod === 'cheque') {
         const response = await axios.post(
           `${API}/payments/offline-checkout/${listingId}`,
           { payment_method: paymentMethod, return_url: returnUrl },
@@ -160,17 +253,17 @@ const CheckoutPage = () => {
       if (isWinnerFlow) {
         response = await axios.post(
           `${API}/payments/auction-winner-checkout/${listingId}`,
-          { return_url: returnUrl },
+          { return_url: returnUrl, payment_method: 'stripe' },
           { headers: { Authorization: `Bearer ${token}` } }
         );
       } else {
         response = await axios.post(
           `${API}/payments/checkout/auction`,
-          { listing_id: listingId, return_url: returnUrl },
+          { listing_id: listingId, return_url: returnUrl, payment_method: 'stripe' },
           { headers: { Authorization: `Bearer ${token}` } }
         );
       }
-      
+
       window.location.href = response.data.checkout_url;
     } catch (err) {
       console.error('Failed to create checkout session:', err);
@@ -391,12 +484,18 @@ const CheckoutPage = () => {
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span>
-                        {isFrench ? 'Prime acheteur' : "Buyer's Premium"} 
-                        <span className="text-slate-400 ml-1">
-                          ({(breakdown?.buyer_premium_rate * 100)?.toFixed(1)}%)
+                        {isFrench ? 'Prime acheteur' : "Buyer's Premium"}
+                        <span className="text-slate-500 ml-1">
+                          {(() => {
+                            const source = breakdown?.flow_type === 'PARTNER_FLOW'
+                              ? (isFrench ? '(fixée par le partenaire' : '(set by Partner')
+                              : (isFrench ? '(fixée par le vendeur' : '(set by seller');
+                            const pct = (breakdown?.buyer_premium_rate * 100)?.toFixed(1);
+                            return pct ? `${source}, ${pct}%)` : `${source})`;
+                          })()}
                         </span>
                       </span>
-                      <span>{formatCurrency(breakdown?.buyer_premium)}</span>
+                      <span data-testid="buyer-premium-amount">{formatCurrency(breakdown?.buyer_premium)}</span>
                     </div>
                     
                     {breakdown?.flow_type === 'PARTNER_FLOW' && (
@@ -435,16 +534,40 @@ const CheckoutPage = () => {
                   </div>
                 </div>
                 
-                {/* ── Payment Method Selector ── */}
+                {/* ── Payment Method Selector — iter482 P4 ──
+                    Dynamically renders ONLY the methods the seller has
+                    accepted for this auction (snapshot-locked at first
+                    bid).  If none configured, show an error state. */}
                 <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden" data-testid="payment-method-selector">
                   <div className="bg-slate-100 dark:bg-slate-800 px-4 py-2.5">
                     <h3 className="font-semibold text-sm flex items-center gap-2">
                       <CreditCard className="h-4 w-4" />
                       {isFrench ? 'Méthode de paiement' : 'Payment Method'}
+                      {paymentMethodsLocked && (
+                        <Badge variant="outline" className="ml-2 text-[10px] bg-slate-50 border-slate-300" data-testid="payment-methods-locked-badge">
+                          {isFrench ? 'Verrouillé' : 'Locked'}
+                        </Badge>
+                      )}
                     </h3>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {isFrench
+                        ? 'Le vendeur détermine les modes de paiement acceptés.'
+                        : 'The seller determines which payment methods are accepted.'}
+                    </p>
                   </div>
                   <div className="p-3 space-y-2">
+                    {Array.isArray(acceptedPaymentMethods) && acceptedPaymentMethods.length === 0 && (
+                      <Alert variant="destructive" data-testid="no-payment-methods-alert">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertDescription>
+                          {isFrench
+                            ? "Le vendeur n'a configuré aucun mode de paiement. Contactez le support."
+                            : 'The seller has not configured any payment methods. Contact support.'}
+                        </AlertDescription>
+                      </Alert>
+                    )}
                     {/* Stripe */}
+                    {(acceptedPaymentMethods || []).includes('stripe') && (
                     <label data-testid="payment-method-stripe"
                       className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
                         paymentMethod === 'stripe' ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-950/20' : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
@@ -454,28 +577,15 @@ const CheckoutPage = () => {
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <CreditCard className="h-4 w-4 text-blue-600" />
-                          <span className="font-medium">{isFrench ? 'Carte de crédit' : 'Credit Card'}</span>
+                          <span className="font-medium">{isFrench ? 'Carte de crédit / débit' : 'Credit / Debit Card'}</span>
                           <span className="text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded-full font-medium">{isFrench ? 'Recommandé' : 'Recommended'}</span>
                         </div>
                         <p className="text-xs text-slate-500 mt-0.5">{isFrench ? 'Paiement sécurisé par Stripe. Visa, Mastercard, Amex.' : 'Secure payment via Stripe. Visa, Mastercard, Amex.'}</p>
                       </div>
                     </label>
-                    {/* Cash */}
-                    <label data-testid="payment-method-cash"
-                      className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                        paymentMethod === 'cash' ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20' : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
-                      }`}>
-                      <input type="radio" name="paymentMethod" value="cash" checked={paymentMethod === 'cash'}
-                        onChange={() => setPaymentMethod('cash')} className="mt-1 accent-emerald-600" />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <Banknote className="h-4 w-4 text-emerald-600" />
-                          <span className="font-medium">{isFrench ? 'Comptant' : 'Cash'}</span>
-                        </div>
-                        <p className="text-xs text-slate-500 mt-0.5">{isFrench ? 'Paiement en personne lors de la cueillette.' : 'Pay in person at local pickup.'}</p>
-                      </div>
-                    </label>
+                    )}
                     {/* E-Transfer */}
+                    {(acceptedPaymentMethods || []).includes('etransfer') && (
                     <label data-testid="payment-method-etransfer"
                       className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
                         paymentMethod === 'etransfer' ? 'border-purple-500 bg-purple-50/50 dark:bg-purple-950/20' : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
@@ -490,6 +600,41 @@ const CheckoutPage = () => {
                         <p className="text-xs text-slate-500 mt-0.5">{isFrench ? 'Les instructions seront envoyées par courriel.' : 'Instructions will be sent via email.'}</p>
                       </div>
                     </label>
+                    )}
+                    {/* Cash */}
+                    {(acceptedPaymentMethods || []).includes('cash') && (
+                    <label data-testid="payment-method-cash"
+                      className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                        paymentMethod === 'cash' ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20' : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                      }`}>
+                      <input type="radio" name="paymentMethod" value="cash" checked={paymentMethod === 'cash'}
+                        onChange={() => setPaymentMethod('cash')} className="mt-1 accent-emerald-600" />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <Banknote className="h-4 w-4 text-emerald-600" />
+                          <span className="font-medium">{isFrench ? 'Comptant' : 'Cash'}</span>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5">{isFrench ? 'Paiement en personne lors de la cueillette.' : 'Pay in person at local pickup.'}</p>
+                      </div>
+                    </label>
+                    )}
+                    {/* Cheque */}
+                    {(acceptedPaymentMethods || []).includes('cheque') && (
+                    <label data-testid="payment-method-cheque"
+                      className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                        paymentMethod === 'cheque' ? 'border-amber-500 bg-amber-50/50 dark:bg-amber-950/20' : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                      }`}>
+                      <input type="radio" name="paymentMethod" value="cheque" checked={paymentMethod === 'cheque'}
+                        onChange={() => setPaymentMethod('cheque')} className="mt-1 accent-amber-600" />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-amber-600" />
+                          <span className="font-medium">{isFrench ? 'Chèque' : 'Cheque'}</span>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5">{isFrench ? 'Envoi ou remise d\'un chèque bancaire.' : 'Mail or deliver a bank cheque.'}</p>
+                      </div>
+                    </label>
+                    )}
                   </div>
                 </div>
 
@@ -585,7 +730,11 @@ const CheckoutPage = () => {
                 <Button 
                   className="w-full h-12 text-lg"
                   onClick={handleProceedToPayment}
-                  disabled={processing}
+                  disabled={
+                    processing
+                    || !paymentMethod
+                    || (Array.isArray(acceptedPaymentMethods) && acceptedPaymentMethods.length === 0)
+                  }
                   data-testid="proceed-to-payment-btn"
                 >
                   {processing ? (
@@ -604,6 +753,11 @@ const CheckoutPage = () => {
                     <>
                       <Banknote className="mr-2 h-5 w-5" />
                       {isFrench ? 'Confirmer la commande' : 'Confirm Order'} — {formatCurrency(buyerTotal)}
+                    </>
+                  ) : paymentMethod === 'cheque' ? (
+                    <>
+                      <FileText className="mr-2 h-5 w-5" />
+                      {isFrench ? 'Confirmer par chèque' : 'Confirm by Cheque'} — {formatCurrency(buyerTotal)}
                     </>
                   ) : (
                     <>

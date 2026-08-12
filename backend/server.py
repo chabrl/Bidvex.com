@@ -1755,9 +1755,17 @@ try:
     from routes.email_to_friend import router as email_to_friend_router
     api_router.include_router(email_to_friend_router)
 
-    # iter306 — CSV bulk import of lots into a multi-lot vehicle auction event
+    # iter304 — CSV bulk import of lots into a multi-lot vehicle auction event
     from routes.multi_lot_bulk_import import router as multi_lot_bulk_import_router
     api_router.include_router(multi_lot_bulk_import_router)
+
+    # iter482 P4B — Seller-Controlled Payment Methods (public GET + buyer selection + admin edit)
+    from routes.seller_payment_methods import (
+        seller_payment_methods_router,
+        set_seller_payment_methods_db,
+    )
+    set_seller_payment_methods_db(db)
+    app.include_router(seller_payment_methods_router)
 
     # iter306 — Error logging (frontend + backend) and admin Error Logs tab
     from routes.error_logs import router as error_logs_router

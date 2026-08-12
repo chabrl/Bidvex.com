@@ -1005,6 +1005,18 @@ async def create_vehicle_listing(
     except Exception:  # noqa: BLE001 — never block create on enrichment failure
         pass
 
+    # ── iter482 P4B — Seller-Controlled Payment Methods (required, canonical) ──
+    from services.seller_payment_methods_service import http_require_methods
+    canon_methods_v = http_require_methods(
+        getattr(listing_data, "accepted_payment_methods", None)
+    )
+    listing["accepted_payment_methods"] = canon_methods_v
+    listing["accepted_payment_methods_source"] = "seller_declared_iter482_p4b"
+    # Vehicle listings don't have a legacy `payment_method` singleton on
+    # the top-level document (per model), so we only stamp the canonical
+    # list here.  Consumers should read via
+    # ``seller_payment_methods_service.effective_methods()``.
+
     await db.vehicle_listings.insert_one(listing)
     
     # Update seller monthly count

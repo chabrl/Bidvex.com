@@ -64,6 +64,7 @@ import {
 } from 'lucide-react';
 import { TIMING_MODES, getTimingModeLabel, getTimingModeDescription } from '../../lib/vehicleMultiLotTimingModes';
 import BulkImportLotsCSV from '../../components/vehicles/BulkImportLotsCSV';
+import AcceptedPaymentMethodsSelector from '../../components/AcceptedPaymentMethodsSelector';
 import DealerVerificationGate from '../../components/vehicles/DealerVerificationGate';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -355,6 +356,8 @@ const CreateVehicleMultiLotPage = () => {
 
   // Saved lots (committed via Review & Submit)
   const [lots, setLots] = useState([]);
+  // iter482 P4B — Seller-Controlled Accepted Payment Methods (multi-select)
+  const [acceptedPaymentMethods, setAcceptedPaymentMethods] = useState(['stripe']);
 
   // Wizard state — when non-null, the per-lot wizard renders instead of the lot list.
   // shape: { lotIndex: number | 'new', currentStep: 0..5, draft: lot }
@@ -545,6 +548,10 @@ const CreateVehicleMultiLotPage = () => {
   const handleSubmit = async (intent) => {
     if (!event.title.trim()) { toast.error(L('Event title is required', "Titre de l'événement requis")); return; }
     if (lots.length === 0) { toast.error(L('Add at least one lot', 'Ajoutez au moins un lot')); return; }
+    if (!acceptedPaymentMethods || acceptedPaymentMethods.length === 0) {
+      toast.error(L('Please select at least one payment method.', 'Veuillez sélectionner au moins un mode de paiement.'));
+      return;
+    }
     if (Number(event.lot_duration_seconds) < MIN_LOT_DURATION_SECONDS) {
       toast.error(L(`Per-lot duration must be ≥ ${MIN_LOT_DURATION_SECONDS}s`, `Durée par lot ≥ ${MIN_LOT_DURATION_SECONDS}s`));
       return;
@@ -572,6 +579,8 @@ const CreateVehicleMultiLotPage = () => {
         lot_duration_seconds: Math.max(MIN_LOT_DURATION_SECONDS, Number(event.lot_duration_seconds) || 120),
         stagger_offset_seconds: Number(event.stagger_offset_seconds) || 60,
         submission_intent: createIntent,
+        // iter482 P4B — Seller-Controlled Accepted Payment Methods
+        accepted_payment_methods: acceptedPaymentMethods,
         lots: lots.map((l) => ({
           vin: l.vin,
           year: Number(l.year),
@@ -835,6 +844,15 @@ const CreateVehicleMultiLotPage = () => {
               type="datetime-local"
               value={event.start_time}
               onChange={(e) => setEvent({ ...event, start_time: e.target.value })}
+            />
+          </div>
+
+          {/* iter482 P4B — Seller-Controlled Accepted Payment Methods */}
+          <div className="md:col-span-2">
+            <AcceptedPaymentMethodsSelector
+              value={acceptedPaymentMethods}
+              onChange={setAcceptedPaymentMethods}
+              isFrench={(i18n?.language || 'en').startsWith('fr')}
             />
           </div>
           <div className="md:col-span-2">
