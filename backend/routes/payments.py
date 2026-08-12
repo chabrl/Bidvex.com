@@ -1043,14 +1043,23 @@ async def preview_checkout_breakdown(
     
     if is_partner:
         # Partner listing — custom buyer premium, 3% platform fee
-        custom_bp_rate = listing.get("custom_buyer_premium_rate", 0.0) or 0.0
+        # iter482 — use the authoritative Partner BP resolver and pass
+        # the Partner's actual province to match /checkout/auction.
+        from services.seller_type_resolver import resolve_partner_bp_rate
+        custom_bp_rate = resolve_partner_bp_rate(listing=listing, user=seller)
         partner_is_tax_registered = seller.get("is_tax_registered", False) if seller else False
+        partner_province = (
+            (seller or {}).get("province")
+            or (seller or {}).get("business_province")
+            or "QC"
+        )
         
         breakdown = calculate_partner_listing_checkout(
             hammer_price=hammer_price,
             custom_buyer_premium_rate=custom_bp_rate,
             partner_is_tax_registered=partner_is_tax_registered,
-            include_processing_fee=True
+            include_processing_fee=True,
+            partner_province=partner_province,
         )
         
         return {
@@ -1081,12 +1090,14 @@ async def preview_checkout_breakdown(
         # present (>0) it overrides the tier-based default in the
         # preview breakdown too.
         listing_bp_override = listing.get("custom_buyer_premium_rate")
-        # iter445 — Storage BP is FIXED at 5 % platform policy.
+        # iter445/iter482 — Storage BP forced 5%; SC forced 0% (iter443).
+        seller_sc_override = None
         if (
             listing.get("category") == "storage_locker"
             or listing.get("listing_type") == "storage_locker"
         ):
             listing_bp_override = 0.05
+            seller_sc_override = 0.0
 
         breakdown = calculate_general_checkout(
             hammer_price=hammer_price,
@@ -1095,10 +1106,11 @@ async def preview_checkout_breakdown(
             seller_is_tax_registered=seller_is_tax_registered,
             include_processing_fee=True,
             custom_buyer_premium_rate=listing_bp_override,
+            seller_commission_rate_override=seller_sc_override,
         )
         
         return {
-            "checkout_type": "general",
+            "checkout_type": "storage" if seller_sc_override == 0.0 else "general",
             "breakdown": breakdown.to_dict(),
             "stripe_charge_description": "Full Payment via Stripe",
             "seller_is_tax_registered": seller_is_tax_registered,
