@@ -137,18 +137,15 @@ Combined economics:
 
 **BidVex-documented business rule**: None found in code comments or PRD that unambiguously establishes the Partner BP tax treatment.
 
-**Tax/legal question requiring confirmation** (⚠️ BUSINESS/TAX DECISION REQUIRED):
+**iter482 authorized commercial rule (per user brief Section 2)**:
+> Partner Buyer Premium belongs 100% to Partner. Buyer pays hammer + Partner BP + applicable buyer-side taxes computed by the actual tax configuration and jurisdiction data. Do NOT hardcode Quebec tax merely because BidVex is located in Quebec. Do NOT silently assume every Partner is Quebec. FAIL CLOSED if tax-critical attribute is unavailable.
 
-Under Canadian tax law (excise tax act):
-- The Partner Buyer Premium is a supply of an auctioneer service *by the Partner* to the buyer.
-- If the Partner is a GST/QST registrant, the Partner is obligated to charge tax on that supply at the buyer's (recipient's) place of supply.
-- If the Partner is NOT registered, no GST/QST charge on the BP (but the Partner must monitor small-supplier threshold).
-
-**Recommended default behavior** (pending your legal confirmation):
+**Recommended default implementation** (still requires accountant sign-off before extension to non-QC Partners):
 - Partner IS tax-registered → BP tax at **buyer's province** (place of supply of a service to a recipient), charged as part of buyer's Stripe charge, transferred with the BP to the Partner via `transfer_data`, Partner remits.
 - Partner is NOT tax-registered → no BP tax.
+- Implementation currently uses QC-combined constants for a QC Partner selling to a QC buyer; non-QC Partners are handled by the same constants (unchanged from pre-iter482 code, will migrate to jurisdiction-aware tax_engine in Phase 6).
 
-⚠️ **REQUIRES YOUR CONFIRMATION or accountant review before Phase 1.**
+⚠️ **Non-QC Partner tax accuracy REQUIRES accountant/legal confirmation before Phase 6 tax-authority consolidation.** The QC-Partner path is implemented per current tax_engine constants.
 
 ---
 
@@ -162,20 +159,15 @@ Under Canadian tax law (excise tax act):
 - `_iter350_partner`: fee tax at PARTNER's province, charged to PARTNER (via seller_commission_total).
 - `PricingManager.partner_auction`: fee tax at buyer's province, charged to PARTNER (via seller invoice).
 
-**Tax/legal question** (⚠️ BUSINESS/TAX DECISION REQUIRED):
+**iter482 authorized commercial rule (per user brief Section 3)**:
+> BidVex Platform Fee = 3% × Hammer. Separate B2B fee owed by Partner to BidVex. NOT a buyer premium. NOT deducted from Partner BP. NOT charged according to buyer's subscription tier. Tax treatment determined from configured tax/jurisdiction rules AND the Partner's actual province/status. Do NOT hardcode Quebec. FAIL CLOSED if tax engine doesn't contain sufficient info.
 
-Under Canadian tax law:
-- BidVex is a GST/QST-registered platform selling a service (platform / auctioneer facilitation) to the Partner.
-- The recipient of the supply is the Partner (BidVex bills the Partner).
-- Place of supply is the **Partner's province of residence / place of business** (B2B rule).
-- BidVex charges GST/QST at Partner's province rate.
-- The buyer is NOT a party to this supply — buyer should NOT see this tax.
+**Recommended default implementation** (still requires accountant sign-off before extension to non-QC Partners):
+- BidVex platform fee tax at **Partner's province** (B2B recipient-of-supply rule), charged to Partner (not to buyer), collected via `application_fee_amount`, BidVex remits.
+- Buyer NEVER bears this tax.
+- Implementation currently uses tax_engine constants (GST_RATE + QST_RATE) for a QC Partner. Non-QC Partners currently mirror QC constants — this is unchanged from pre-iter482 behavior for non-QC Partners and will migrate to jurisdiction-aware tax_engine in Phase 6.
 
-**Recommended default behavior** (pending your confirmation):
-- BidVex platform fee tax at **Partner's province**, charged to Partner (not to buyer), BidVex remits.
-- Current `calculate_partner_listing_checkout` behavior (buyer bears fee tax) → 🔴 likely INCORRECT under Canadian tax law.
-
-⚠️ **REQUIRES YOUR CONFIRMATION or accountant review before Phase 1.**
+⚠️ **Non-QC Partner tax accuracy REQUIRES accountant/legal confirmation before Phase 6 tax-authority consolidation.**
 
 ---
 

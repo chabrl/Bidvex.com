@@ -3,7 +3,7 @@ Fee calculation routes - buyer cost, seller net, subscription benefits
 """
 
 from fastapi import APIRouter, HTTPException, Depends, Query, Request
-from typing import Optional
+from typing import Optional, Any, Dict
 from decimal import Decimal
 from deps import get_current_user, get_db, User
 from rate_limit import limiter as _limiter
@@ -318,11 +318,17 @@ async def estimate_full_transaction(
     """Estimate complete transaction costs for both buyer and seller (iter350 CRA-compliant)."""
     try:
         from services.fee_calculator import calculate_fee
+        from services.seller_type_resolver import (
+            resolve_seller_account_type,
+            resolve_partner_bp_rate,
+            SellerTypeUnresolved,
+        )
         db = get_db()
         buyer_tier = "free"
         seller_tier = "free"
         buyer_province = region
         seller_province = region
+        seller_doc: Dict[str, Any] = {}
 
         if buyer_id:
             buyer = await db.users.find_one({"id": buyer_id})
@@ -332,14 +338,32 @@ async def estimate_full_transaction(
         if seller_id:
             seller = await db.users.find_one({"id": seller_id})
             if seller:
+                seller_doc = seller
                 seller_tier = seller.get("subscription_tier", "free")
                 seller_province = seller.get("business_province") or seller.get("province") or region
+
+        # iter482 — Resolve seller type through the authoritative resolver
+        # so admin fee preview matches settlement.  When ``seller_id`` is
+        # not provided (anonymous preview), fall back to individual —
+        # this is a NO-SETTLEMENT path and admin explicitly chose to
+        # preview without a seller context.
+        try:
+            seller_account_type = resolve_seller_account_type(
+                user=seller_doc if seller_doc else None,
+                listing=None,
+                seller_id_for_error=seller_id,
+            )
+        except SellerTypeUnresolved:
+            seller_account_type = "individual"
+        partner_bp_rate = 0.0
+        if seller_account_type in ("partner", "partner_pro") and seller_doc:
+            partner_bp_rate = resolve_partner_bp_rate(user=seller_doc)
 
         # iter350 — Route through `calculate_fee()` single source of truth with CRA Place-of-Supply.
         fee = calculate_fee(
             hammer_price=float(hammer_price),
             auction_type="lots",
-            seller_account_type="individual",
+            seller_account_type=seller_account_type,
             seller_tier=seller_tier,
             buyer_account_type="individual",
             buyer_tier=buyer_tier,
@@ -347,6 +371,7 @@ async def estimate_full_transaction(
             card_type="domestic",
             buyer_province=buyer_province,
             seller_province=seller_province,
+            partner_bp_rate=partner_bp_rate,
         )
         return {"success": True, **fee}
     except Exception as e:

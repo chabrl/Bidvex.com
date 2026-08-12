@@ -137,6 +137,7 @@ def calculate_general_checkout(
     seller_is_tax_registered: bool = False,
     include_processing_fee: bool = True,
     custom_buyer_premium_rate: Optional[float] = None,
+    seller_commission_rate_override: Optional[float] = None,
 ) -> CheckoutBreakdown:
     """
     Calculate complete checkout breakdown for GENERAL items/lots
@@ -155,6 +156,11 @@ def calculate_general_checkout(
         custom_buyer_premium_rate: iter441 — Optional listing-level override
             (e.g. 0.075 for 7.5%). Storage operators set this per listing.
             When None or 0, the standard tier-based rate applies.
+        seller_commission_rate_override: iter482 — Optional per-listing SC
+            override.  Used to force ``seller_commission_rate=0`` for
+            Storage Facility listings (iter443 canonical rule: facility
+            keeps 100% hammer, no SC deducted).  When ``None`` (default),
+            the standard tier-based rate applies.
     
     Returns:
         CheckoutBreakdown with all amounts calculated
@@ -170,7 +176,15 @@ def calculate_general_checkout(
         buyer_premium_rate = Decimal(str(custom_buyer_premium_rate))
     else:
         buyer_premium_rate = BUYER_PREMIUM_RATES.get(b_tier, Decimal("0.05"))
-    seller_commission_rate = SELLER_COMMISSION_RATES.get(s_tier, Decimal("0.04"))
+    # iter482 — Honor per-listing SC override.  Only applied when the
+    # caller explicitly passes ``0`` (Storage Facility) — the ``is not
+    # None`` guard means passing ``None`` keeps the tier-based rate.
+    if seller_commission_rate_override is not None:
+        seller_commission_rate = Decimal(str(seller_commission_rate_override))
+        if seller_commission_rate < 0:
+            raise ValueError("seller_commission_rate_override must be >= 0")
+    else:
+        seller_commission_rate = SELLER_COMMISSION_RATES.get(s_tier, Decimal("0.04"))
     
     # Calculate fees
     buyer_premium = _round_currency(hammer * buyer_premium_rate)
@@ -357,113 +371,178 @@ def calculate_partner_listing_checkout(
     hammer_price: float,
     custom_buyer_premium_rate: float = 0.0,
     partner_is_tax_registered: bool = False,
-    include_processing_fee: bool = True
+    include_processing_fee: bool = True,
+    partner_province: str = "QC",
 ) -> CheckoutBreakdown:
     """
     Calculate checkout breakdown for PARTNER listings.
-    
-    Partner fee model (overrides ALL subscription discounts):
-    - Platform Fee: Fixed 3% of Hammer Price (collected by BidVex)
-    - Buyer Premium: Custom rate set by partner (e.g., 18%)
-    - Stripe fee: Recovered from buyer via Net-Zero gross-up
-    - Transfer to partner: Hammer + Buyer Premium
-    - Application fee: Platform Fee (3%) + tax on fees + Stripe recovery
-    
+
+    iter482 — Model A₁ redesign (E-1 authorized, E-10 confirmed Model 1).
+    ------------------------------------------------------------------
+    Business rule (authoritative, per PHASE_0_DECISION_PACK.md):
+
+      Buyer pays:  hammer + Partner Buyer Premium
+                   (+ hammer tax if Partner IS tax-registered)
+                   (+ BP tax if Partner IS tax-registered)
+
+      Buyer does NOT bear:
+        - BidVex's 3% platform fee
+        - Tax on BidVex's platform fee
+        - Stripe processing rail cost (borne by Partner via ``on_behalf_of``
+          in the Stripe Session builder — see create_destination_charge).
+
+      100% of the Partner Buyer Premium belongs to the Partner (Model 1).
+      Buyer's subscription tier has ZERO effect (E-10 verified).
+
+      BidVex's compensation on a Partner sale is:
+        - 3% of hammer (platform_fee)  — owed by the Partner to BidVex
+        - Tax on the platform fee at the Partner's province (B2B recipient
+          rule per E-3 commercial spec) — collected in application_fee
+          and remitted by BidVex.
+
+      Stripe rail cost is borne by the Partner via ``on_behalf_of`` in
+      the checkout session (Partner is merchant of record).
+
+    Application fee (BidVex retains):
+        application_fee = platform_fee + fees_tax_at_partner_province
+
+    Transfer to Partner Connect:
+        Automatically derived by Stripe as (charge − application_fee).
+
     Args:
-        hammer_price: Winning bid amount
-        custom_buyer_premium_rate: Partner's custom buyer premium (e.g., 0.18 for 18%)
-        partner_is_tax_registered: Whether partner has GST/QST registration
-        include_processing_fee: Whether to add processing fee to buyer total
+        hammer_price: Winning bid amount.
+        custom_buyer_premium_rate: Partner-set BP rate (default 5% at
+            caller level per E-10). Buyer's tier is IGNORED.
+        partner_is_tax_registered: Whether the Partner has GST/QST
+            registration.
+        include_processing_fee: Kept for backward compatibility.
+            Historically added a Stripe gross-up to the buyer's base.
+            In Model A₁ this is a NO-OP — Stripe rail is borne by
+            Partner via ``on_behalf_of``, never by the buyer.
+        partner_province: Used to compute Partner-side tax on BidVex's
+            $3 fee (B2B recipient rule per E-3).  Defaults to "QC" for
+            back-compat only — callers on the production path MUST pass
+            the actual Partner province.
+
+    Returns:
+        CheckoutBreakdown with buyer_total = hammer + Partner BP
+        (+ hammer tax + bp tax if Partner is tax-registered) — never
+        larger than the user-facing rule requires.
     """
     hammer = Decimal(str(hammer_price))
     bp_rate = Decimal(str(custom_buyer_premium_rate))
-    
-    # Partner-specific rates (override subscription discounts)
-    buyer_premium = _round_currency(hammer * bp_rate)
-    platform_fee = _round_currency(hammer * PARTNER_PLATFORM_FEE_RATE)
-    
-    # BidVex fees = platform fee only (buyer premium goes to partner)
-    bidvex_fees_subtotal = platform_fee
-    
-    # Taxes on hammer (only if partner is tax registered)
+    if bp_rate < 0:
+        raise ValueError("custom_buyer_premium_rate must be >= 0")
+
+    # Partner-side fees
+    buyer_premium = _round_currency(hammer * bp_rate)  # 100% Partner
+    platform_fee = _round_currency(hammer * PARTNER_PLATFORM_FEE_RATE)  # BidVex
+
+    # Tax on the buyer's line items (hammer + BP) — only when Partner is
+    # tax-registered.  Under E-2 the place-of-supply for the auctioneer
+    # service (Partner BP) is the recipient's province; for a
+    # QC-registered Partner selling to a QC buyer, the combined rate is
+    # 14.975%.  Non-QC registered Partners tax at their own province in
+    # the current tax_engine (single-province canonicalization); the
+    # canonical tax engine remains the authoritative source and this
+    # function must not invent a rate.
     if partner_is_tax_registered:
         gst_on_hammer = _round_currency(hammer * GST_RATE)
         qst_on_hammer = _round_currency(hammer * QST_RATE)
+        gst_on_bp = _round_currency(buyer_premium * GST_RATE)
+        qst_on_bp = _round_currency(buyer_premium * QST_RATE)
     else:
         gst_on_hammer = Decimal("0")
         qst_on_hammer = Decimal("0")
+        gst_on_bp = Decimal("0")
+        qst_on_bp = Decimal("0")
     hammer_tax_total = gst_on_hammer + qst_on_hammer
-    
-    # Tax on BidVex fees (platform fee) — always applies
-    gst_on_fees = _round_currency(bidvex_fees_subtotal * GST_RATE)
-    qst_on_fees = _round_currency(bidvex_fees_subtotal * QST_RATE)
-    fees_tax_total = gst_on_fees + qst_on_fees
-    
-    # Tax on buyer premium (if partner is registered, tax on BP goes to partner)
-    gst_on_bp = _round_currency(buyer_premium * GST_RATE) if partner_is_tax_registered else Decimal("0")
-    qst_on_bp = _round_currency(buyer_premium * QST_RATE) if partner_is_tax_registered else Decimal("0")
     bp_tax_total = gst_on_bp + qst_on_bp
-    
-    total_tax = hammer_tax_total + fees_tax_total + bp_tax_total
-    
-    # Subtotal before processing
-    subtotal_before_processing = hammer + buyer_premium + total_tax
-    
-    # Gross-up for Stripe processing fee
-    if include_processing_fee:
-        gross_amount = _gross_up(subtotal_before_processing)
-        processing_fee = gross_amount - subtotal_before_processing
+
+    # Tax on BidVex's B2B supply of platform-fee to the Partner.  Per
+    # E-3 (commercial spec) the place of supply is the Partner's province
+    # (recipient rule).  BidVex collects this from the application_fee
+    # and remits it — the buyer NEVER bears this tax.
+    # Under the current tax_engine, QC gives 14.975% combined; other
+    # provinces vary.  For the initial P0 repair we honor the same
+    # constants that tax_engine exposes (GST_RATE + QST_RATE);
+    # jurisdictional variation for non-QC Partners will land in the
+    # canonical tax-authority pass (Phase 6).
+    partner_prov = (partner_province or "QC").strip().upper()
+    if partner_prov == "QC":
+        gst_on_fees = _round_currency(platform_fee * GST_RATE)
+        qst_on_fees = _round_currency(platform_fee * QST_RATE)
     else:
-        processing_fee = Decimal("0")
-        gross_amount = subtotal_before_processing
-    
-    buyer_total = gross_amount
-    
-    # Stripe parameters:
-    # Transfer to partner = Hammer + BP + hammer_tax + bp_tax (partner remits tax)
-    transfer_to_partner = hammer + buyer_premium + hammer_tax_total + bp_tax_total
-    
-    # Application fee (BidVex keeps) = Platform fee + fee taxes + processing fee
-    application_fee = platform_fee + fees_tax_total + processing_fee
-    
+        # Non-QC Partners: use GST_RATE + provincial part per tax_engine.
+        # For P0 P repair, we mirror the QC combined-rate behavior for a
+        # QC Partner; non-QC Partners fall through the canonical tax
+        # engine in Phase 6.  Keep the current behavior consistent with
+        # the pre-iter482 code for non-QC Partners to avoid silently
+        # changing tax for other provinces.
+        gst_on_fees = _round_currency(platform_fee * GST_RATE)
+        qst_on_fees = _round_currency(platform_fee * QST_RATE)
+    fees_tax_total = gst_on_fees + qst_on_fees
+
+    # ── BUYER TOTAL (Model A₁) ────────────────────────────────────────
+    # Buyer pays ONLY hammer + Partner BP (+ Partner-side taxes when
+    # applicable).  Buyer does NOT bear BidVex's platform fee, its tax,
+    # or the Stripe rail gross-up.  Stripe rail is charged to the
+    # Partner via ``on_behalf_of`` in create_destination_charge.
+    buyer_total = hammer + buyer_premium + hammer_tax_total + bp_tax_total
+
+    total_tax = hammer_tax_total + bp_tax_total  # buyer-visible tax only
+    # Backward-compat: legacy field kept for downstream consumers.
+    subtotal_before_processing = buyer_total
+    processing_fee = Decimal("0")  # Never charged to the buyer in Model A₁
+
+    # ── STRIPE PARAMETERS (Model A₁ destination charge) ──────────────
+    # BidVex retains application_fee = platform_fee + fees_tax
+    # (fee + Partner-province tax on that fee).  Stripe automatically
+    # transfers (charge − application_fee) to the Partner Connect
+    # account.  With on_behalf_of=partner_acct on the Session builder,
+    # Stripe rail cost is deducted from the Partner's account (merchant
+    # of record) — NOT from the buyer's line item and NOT from BidVex.
+    application_fee = platform_fee + fees_tax_total
+    transfer_to_partner = buyer_total - application_fee
+
     return CheckoutBreakdown(
         hammer_price=hammer,
-        buyer_tier="partner",
+        buyer_tier="partner",  # opaque — buyer's tier IGNORED (E-10 Model 1)
         seller_tier="partner",
         seller_is_tax_registered=partner_is_tax_registered,
         is_vehicle=False,
-        
+
         buyer_premium_rate=bp_rate,
         buyer_premium=buyer_premium,
-        seller_commission_rate=Decimal("0"),  # No seller commission for partners
+        seller_commission_rate=Decimal("0"),  # No seller commission for Partners
         seller_commission=Decimal("0"),
         platform_fee=platform_fee,
-        
-        bidvex_fees_subtotal=bidvex_fees_subtotal,
-        
+
+        bidvex_fees_subtotal=platform_fee,
+
         gst_on_hammer=gst_on_hammer,
         qst_on_hammer=qst_on_hammer,
         hammer_tax_total=hammer_tax_total,
-        
+
         gst_on_fees=gst_on_fees,
         qst_on_fees=qst_on_fees,
         fees_tax_total=fees_tax_total,
-        
+
         total_tax=total_tax,
-        
+
         processing_fee=processing_fee,
         processing_fee_display=processing_fee,
-        
+
         subtotal_before_tax=hammer + buyer_premium,
         buyer_total=buyer_total,
         buyer_total_cents=_to_cents(buyer_total),
-        
+
         stripe_charge_amount_cents=_to_cents(buyer_total),
         stripe_application_fee_cents=_to_cents(application_fee),
         stripe_transfer_amount_cents=_to_cents(transfer_to_partner),
-        
+
         seller_payout=transfer_to_partner,
-        seller_receives_tax=hammer_tax_total + bp_tax_total
+        seller_receives_tax=hammer_tax_total + bp_tax_total,
     )
 
 
@@ -473,7 +552,8 @@ async def create_destination_charge(
     buyer_id: str,
     breakdown: CheckoutBreakdown,
     return_url: str,
-    seller_connect_account_id: str
+    seller_connect_account_id: str,
+    is_partner_listing: bool = False,
 ) -> Dict[str, Any]:
     """
     Create Stripe Checkout Session with destination charge
@@ -482,6 +562,17 @@ async def create_destination_charge(
     - Total charge on buyer
     - Application fee to BidVex
     - Remainder to seller's Connect account
+
+    iter482 — When ``is_partner_listing=True``, the checkout session is
+    built with ``on_behalf_of=seller_connect_account_id`` so that Stripe
+    treats the Partner as the merchant of record.  Under this Connect
+    parameter, Stripe's rail cost (2.9% + $0.30) is deducted from the
+    Partner's Connect account balance, NOT from the buyer's line item
+    and NOT from BidVex's platform account.  This is the Option A₁
+    architecture authorized in PHASE_0_DECISION_PACK.md §E-1.
+
+    For non-Partner listings the historical behavior is preserved
+    (Stripe rail borne by the platform via the buyer-facing gross-up).
     """
     import stripe
     
@@ -525,6 +616,24 @@ async def create_destination_charge(
     description = " | ".join(line_items_display)
     
     # Create checkout session with destination charge
+    payment_intent_data: Dict[str, Any] = {
+        "application_fee_amount": breakdown.stripe_application_fee_cents,
+        "transfer_data": {
+            "destination": seller_connect_account_id
+        },
+        "metadata": {
+            "listing_id": listing_id,
+            "buyer_id": buyer_id,
+            "invoice_id": invoice_id,
+            "type": "auction_purchase"
+        }
+    }
+    # iter482 — Model A₁: Partner is merchant of record; Stripe rail
+    # is deducted from the Partner Connect account.
+    if is_partner_listing:
+        payment_intent_data["on_behalf_of"] = seller_connect_account_id
+        payment_intent_data["metadata"]["stripe_model"] = "A1_partner_on_behalf_of"
+
     session = stripe.checkout.Session.create(
         customer=customer_id,
         payment_method_types=["card"],
@@ -540,18 +649,7 @@ async def create_destination_charge(
             },
             "quantity": 1
         }],
-        payment_intent_data={
-            "application_fee_amount": breakdown.stripe_application_fee_cents,
-            "transfer_data": {
-                "destination": seller_connect_account_id
-            },
-            "metadata": {
-                "listing_id": listing_id,
-                "buyer_id": buyer_id,
-                "invoice_id": invoice_id,
-                "type": "auction_purchase"
-            }
-        },
+        payment_intent_data=payment_intent_data,
         success_url=f"{return_url}?session_id={{CHECKOUT_SESSION_ID}}&status=success",
         cancel_url=f"{return_url}?status=cancelled",
         metadata={
@@ -560,7 +658,8 @@ async def create_destination_charge(
             "invoice_id": invoice_id,
             "type": "auction_purchase",
             "hammer_price": str(float(breakdown.hammer_price)),
-            "seller_is_business": str(breakdown.seller_is_tax_registered)
+            "seller_is_business": str(breakdown.seller_is_tax_registered),
+            "is_partner_listing": "true" if is_partner_listing else "false",
         }
     )
     

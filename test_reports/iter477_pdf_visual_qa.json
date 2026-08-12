@@ -274,7 +274,7 @@
       "pdf": "03_universal_receipt_mkt_with_logo",
       "check": "valid_pdf_magic",
       "ok": true,
-      "bytes": 2522211,
+      "bytes": 2522200,
       "pages": 2
     },
     {
@@ -389,7 +389,7 @@
       "pdf": "04_universal_receipt_mkt_no_logo",
       "check": "valid_pdf_magic",
       "ok": true,
-      "bytes": 2520166,
+      "bytes": 2520171,
       "pages": 1
     },
     {
@@ -474,7 +474,7 @@
       "pdf": "05_universal_receipt_multi_lot_3",
       "check": "valid_pdf_magic",
       "ok": true,
-      "bytes": 2522433,
+      "bytes": 2522434,
       "pages": 2
     },
     {
@@ -577,7 +577,7 @@
       "pdf": "06_universal_receipt_12_lot_multipage",
       "check": "valid_pdf_magic",
       "ok": true,
-      "bytes": 2523351,
+      "bytes": 2523355,
       "pages": 2
     },
     {
@@ -668,7 +668,7 @@
       "pdf": "07_seller_statement_mkt_en",
       "check": "valid_pdf_magic",
       "ok": true,
-      "bytes": 2520102,
+      "bytes": 2520097,
       "pages": 1
     },
     {
@@ -801,7 +801,7 @@
       "pdf": "08_commission_invoice_mkt_en",
       "check": "valid_pdf_magic",
       "ok": true,
-      "bytes": 2519951,
+      "bytes": 2519948,
       "pages": 1
     },
     {
@@ -904,7 +904,7 @@
       "pdf": "09_seller_statement_vehicle_en",
       "check": "valid_pdf_magic",
       "ok": true,
-      "bytes": 2520092,
+      "bytes": 2520091,
       "pages": 1
     },
     {
@@ -1068,7 +1068,7 @@
       "pdf": "11_universal_receipt_historical",
       "check": "valid_pdf_magic",
       "ok": true,
-      "bytes": 2520132,
+      "bytes": 2520134,
       "pages": 1
     },
     {

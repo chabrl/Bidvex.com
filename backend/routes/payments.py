@@ -879,8 +879,20 @@ async def create_auction_checkout(
     category = listing.get("category", "").lower()
     is_vehicle = any(keyword in category for keyword in ["vehicle", "car", "auto", "truck", "motorcycle"])
     is_partner = listing.get("is_partner_listing", False)
-    
-    hammer_price = listing.get("current_price", listing.get("starting_price", 0))
+    is_storage = (
+        listing.get("category") == "storage_locker"
+        or listing.get("listing_type") == "storage_locker"
+    )
+
+    # iter482 — Never use ``listing.current_price`` directly as the final
+    # hammer amount.  For multi-unit lots with
+    # ``multiply_hammer_by_quantity=True`` (unit=$7, quantity=2), the
+    # authoritative hammer total is unit × quantity = $14.  Prior code
+    # leaked $7 through the Stripe checkout on this route (P1 defect
+    # documented in PAYMENT_AUDIT_REPORT §A-5).
+    from services.hammer_total import resolve_hammer_total
+    _hammer_info = resolve_hammer_total(listing)
+    hammer_price = float(_hammer_info["hammer_total"])
     
     if is_partner:
         # Partner listing — 3% platform fee, custom buyer premium, destination charge
@@ -891,23 +903,30 @@ async def create_auction_checkout(
                 detail="Partner has not completed Stripe Connect onboarding."
             )
         
-        custom_bp_rate = listing.get("custom_buyer_premium_rate", 0.0) or 0.0
+        # iter482 — Resolve the Partner BP rate through the authoritative
+        # resolver (listing.partner_bp_rate → listing.custom_bp → user
+        # default → 5% Partner default).  Never zero-default silently.
+        from services.seller_type_resolver import resolve_partner_bp_rate
+        custom_bp_rate = resolve_partner_bp_rate(listing=listing, user=seller)
         partner_is_tax_registered = seller.get("is_tax_registered", False)
-        
+        partner_province = seller.get("province") or seller.get("business_province") or "QC"
+
         breakdown = calculate_partner_listing_checkout(
             hammer_price=hammer_price,
             custom_buyer_premium_rate=custom_bp_rate,
             partner_is_tax_registered=partner_is_tax_registered,
-            include_processing_fee=True
+            include_processing_fee=True,
+            partner_province=partner_province,
         )
-        
+
         result = await create_destination_charge(
             db=db,
             listing_id=request.listing_id,
             buyer_id=current_user.id,
             breakdown=breakdown,
             return_url=request.return_url,
-            seller_connect_account_id=seller_connect_id
+            seller_connect_account_id=seller_connect_id,
+            is_partner_listing=True,
         )
         
         return {
@@ -948,11 +967,14 @@ async def create_auction_checkout(
         listing_bp_override = listing.get("custom_buyer_premium_rate")
         # iter445 — Storage BP is FIXED at 5 % platform policy. Pass 0.05
         # explicitly so any buyer-tier discount is bypassed.
-        if (
-            listing.get("category") == "storage_locker"
-            or listing.get("listing_type") == "storage_locker"
-        ):
+        # iter482 — Storage listings ALSO get seller_commission=0
+        # explicitly (iter443 canonical rule: facility keeps 100% hammer).
+        # The 4% SC leakage documented in PAYMENT_AUDIT_REPORT §A-4 is
+        # closed by this override.
+        seller_sc_override = None
+        if is_storage:
             listing_bp_override = 0.05
+            seller_sc_override = 0.0
 
         breakdown = calculate_general_checkout(
             hammer_price=hammer_price,
@@ -961,6 +983,7 @@ async def create_auction_checkout(
             seller_is_tax_registered=seller.get("is_tax_registered", False),
             include_processing_fee=True,
             custom_buyer_premium_rate=listing_bp_override,
+            seller_commission_rate_override=seller_sc_override,
         )
         
         result = await create_destination_charge(
@@ -969,11 +992,12 @@ async def create_auction_checkout(
             buyer_id=current_user.id,
             breakdown=breakdown,
             return_url=request.return_url,
-            seller_connect_account_id=seller_connect_id
+            seller_connect_account_id=seller_connect_id,
+            is_partner_listing=False,
         )
         
         return {
-            "checkout_type": "general",
+            "checkout_type": "storage" if is_storage else "general",
             **result
         }
 
@@ -1006,7 +1030,12 @@ async def preview_checkout_breakdown(
     is_vehicle = any(keyword in category for keyword in ["vehicle", "car", "auto", "truck", "motorcycle"])
     is_partner = listing.get("is_partner_listing", False)
     
-    hammer_price = listing.get("current_price", listing.get("starting_price", 0))
+    # iter482 — Never use ``listing.current_price`` as the final hammer.
+    # Multi-unit lots (unit=$7 × qty=2, multiply_hammer_by_quantity=True)
+    # must resolve to $14 across ALL money-facing paths (checkout, preview,
+    # settlement, receipt, invoice, PDF, escrow, payout).
+    from services.hammer_total import resolve_hammer_total
+    hammer_price = float(resolve_hammer_total(listing)["hammer_total"])
     
     buyer_tier = "basic"
     if hasattr(current_user, 'subscription_tier'):
@@ -1768,7 +1797,9 @@ async def auction_winner_preview(
 
     from services.connect_payment_engine import calculate_connect_checkout
 
-    hammer_price = listing.get("final_price", listing.get("current_price", 0))
+    # iter482 — quantity-aware hammer total
+    from services.hammer_total import resolve_hammer_total
+    hammer_price = float(resolve_hammer_total(listing)["hammer_total"])
 
     user_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0})
     buyer_tier = user_doc.get("subscription_tier", "free") if user_doc else "free"
@@ -1876,7 +1907,9 @@ async def auction_winner_checkout(
     # Server-side price calculation via Connect engine
     from services.connect_payment_engine import calculate_connect_checkout, create_connect_checkout_session
 
-    hammer_price = listing.get("final_price", listing.get("current_price", 0))
+    # iter482 — quantity-aware hammer total
+    from services.hammer_total import resolve_hammer_total
+    hammer_price = float(resolve_hammer_total(listing)["hammer_total"])
 
     user_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0})
     buyer_tier = user_doc.get("subscription_tier", "free") if user_doc else "free"
@@ -2004,7 +2037,9 @@ async def offline_checkout(
     # Calculate breakdown (same engine, no Stripe fee)
     from services.connect_payment_engine import calculate_connect_checkout
 
-    hammer_price = listing.get("final_price", listing.get("current_price", 0))
+    # iter482 — quantity-aware hammer total
+    from services.hammer_total import resolve_hammer_total
+    hammer_price = float(resolve_hammer_total(listing)["hammer_total"])
     user_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0})
     buyer_tier = user_doc.get("subscription_tier", "free") if user_doc else "free"
 

@@ -76,7 +76,7 @@
     {
       "test": "T_PDF_1.buyer_receipt_shows_buyer_premium",
       "ok": true,
-      "snippet": "BidVex Inc. | 103-761 Chalifoux Street, Sherbrooke, QC, J1G 0A8 | 1-800-BIDVEX \u00b7 billing@bidvex.com | www.bidvex.com | GST 706766367RT0001 \u00b7 QST 1233530880TQ0001 | RECEIPT | No. BV-RCPT-59435DC7 | Issued: Aug 11, 2"
+      "snippet": "BidVex Inc. | 103-761 Chalifoux Street, Sherbrooke, QC, J1G 0A8 | 1-800-BIDVEX \u00b7 billing@bidvex.com | www.bidvex.com | GST 706766367RT0001 \u00b7 QST 1233530880TQ0001 | RECEIPT | No. BV-RCPT-79B3C004 | Issued: Aug 12, 2"
     },
     {
       "test": "T_PDF_2.buyer_receipt_does_NOT_show_bidvex_platform_fee_as_buyer_charge",

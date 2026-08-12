@@ -37,6 +37,11 @@ from services.payment_idempotency import (
     rollback_stripe_charge,
 )
 from services.fee_calculator import calculate_fee, promo_first_listing_waiver_applies
+from services.seller_type_resolver import (
+    resolve_seller_account_type,
+    resolve_partner_bp_rate,
+    SellerTypeUnresolved,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -252,18 +257,37 @@ async def settle_cash_or_etransfer(
     buyer_prov = (buyer or {}).get("province") or (buyer or {}).get("business_province") or "QC"
     seller_prov = (seller or {}).get("province") or (seller or {}).get("business_province") or "QC"
 
+    # iter482 — Resolve the authoritative seller account type. FAIL-CLOSED
+    # if the seller's record is missing or ambiguous. Never silently
+    # default to "individual" (see PAYMENT_PHASE_1_GATE_REPORT §Gate 2).
+    seller_account_type = resolve_seller_account_type(
+        user=seller, listing=listing, seller_id_for_error=seller_id,
+    )
+    partner_bp_rate = 0.0
+    if seller_account_type in ("partner", "partner_pro"):
+        partner_bp_rate = resolve_partner_bp_rate(listing=listing, user=seller)
+
+    # Payment method — cash flow must NOT run the Stripe recovery formula
+    # on the buyer's hammer (it's paid offline). Buyer commission is still
+    # charged via Stripe, so the recovery on that commission-only charge
+    # remains "stripe" for that sub-charge — but the fee_calculator's
+    # top-level `payment_method` should reflect the ACTUAL rail so
+    # jurisdictional/tax logic downstream can be correct.
+    payment_method_for_fee = "stripe"  # buyer commission is via Stripe
+
     # iter350 — Single source of truth: calculate_fee() with per-user Place-of-Supply
     fee = calculate_fee(
         hammer_price=float(hammer_price),
         auction_type="lots",
-        seller_account_type="individual",
+        seller_account_type=seller_account_type,
         seller_tier=seller_tier,
         buyer_account_type="individual",
         buyer_tier=buyer_tier,
-        payment_method="stripe",
+        payment_method=payment_method_for_fee,
         card_type="domestic",
         buyer_province=buyer_prov,
         seller_province=seller_prov,
+        partner_bp_rate=partner_bp_rate,
     )
     buyer_commission = float(fee["buyer_premium"]) + float(fee["buyer_taxes"]) + float(fee["buyer_stripe_recovery"])
     seller_commission = float(fee["seller_commission_total"])
@@ -603,11 +627,21 @@ async def settle_stripe_full(
     buyer_prov = (buyer or {}).get("province") or (buyer or {}).get("business_province") or "QC"
     seller_prov = (seller or {}).get("province") or (seller or {}).get("business_province") or "QC"
 
+    # iter482 — Resolve the authoritative seller account type. FAIL-CLOSED
+    # if the seller's record is missing or ambiguous. Never silently
+    # default to "individual".
+    seller_account_type = resolve_seller_account_type(
+        user=seller, listing=listing, seller_id_for_error=seller_id,
+    )
+    partner_bp_rate = 0.0
+    if seller_account_type in ("partner", "partner_pro"):
+        partner_bp_rate = resolve_partner_bp_rate(listing=listing, user=seller)
+
     # iter350 — Single source of truth: calculate_fee() with per-user Place-of-Supply
     fee = calculate_fee(
         hammer_price=float(hammer_price),
         auction_type="lots",
-        seller_account_type="individual",
+        seller_account_type=seller_account_type,
         seller_tier=seller_tier,
         buyer_account_type="individual",
         buyer_tier=buyer_tier,
@@ -615,6 +649,7 @@ async def settle_stripe_full(
         card_type="domestic",
         buyer_province=buyer_prov,
         seller_province=seller_prov,
+        partner_bp_rate=partner_bp_rate,
     )
     buyer_total = float(fee["buyer_total_charged"])
     seller_payout = float(fee["seller_payout"])
@@ -836,28 +871,48 @@ async def settle_auction(
         return {"settled": False, "reason": "invalid_hammer_price"}
 
     if payment_method in ("cash", "etransfer", "etransfere"):
-        out = await settle_cash_or_etransfer(
-            db,
-            auction_id=auction_id,
-            listing=listing,
-            winner_user_id=winner_user_id,
-            seller_id=seller_id,
-            hammer_price=hammer_price,
-            currency=currency,
-            auction_end_ts=auction_end_ts,
-        )
+        try:
+            out = await settle_cash_or_etransfer(
+                db,
+                auction_id=auction_id,
+                listing=listing,
+                winner_user_id=winner_user_id,
+                seller_id=seller_id,
+                hammer_price=hammer_price,
+                currency=currency,
+                auction_end_ts=auction_end_ts,
+            )
+        except SellerTypeUnresolved as exc:
+            logger.error(f"[settle_auction] fail-closed seller_type: {exc}")
+            return {
+                "settled": False,
+                "reason": "seller_type_unresolved",
+                "error": str(exc),
+                "seller_id": seller_id,
+                "auction_id": auction_id,
+            }
         out["scenario"] = "cash_or_etransfer"
     else:
-        out = await settle_stripe_full(
-            db,
-            auction_id=auction_id,
-            listing=listing,
-            winner_user_id=winner_user_id,
-            seller_id=seller_id,
-            hammer_price=hammer_price,
-            currency=currency,
-            auction_end_ts=auction_end_ts,
-        )
+        try:
+            out = await settle_stripe_full(
+                db,
+                auction_id=auction_id,
+                listing=listing,
+                winner_user_id=winner_user_id,
+                seller_id=seller_id,
+                hammer_price=hammer_price,
+                currency=currency,
+                auction_end_ts=auction_end_ts,
+            )
+        except SellerTypeUnresolved as exc:
+            logger.error(f"[settle_auction] fail-closed seller_type: {exc}")
+            return {
+                "settled": False,
+                "reason": "seller_type_unresolved",
+                "error": str(exc),
+                "seller_id": seller_id,
+                "auction_id": auction_id,
+            }
         out["scenario"] = "stripe_full"
 
     out["settled"] = True
