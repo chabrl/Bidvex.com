@@ -1,5 +1,73 @@
 # BidVex — Auction Marketplace PRD
 
+## iter482 — Phase P5.1 Stripe Actual-Fee Reconciliation + Card Country + Partner Invoice (Feb 12, 2026) ✅ COMPLETE — PREVIEW ONLY · DO NOT DEPLOY
+
+### Scope delivered end-to-end
+- **Actual Stripe BalanceTransaction persistence** — new `services/stripe_reconciliation_service.py` retrieves the authoritative `BalanceTransaction.fee`/`fee_details`, plus `payment_method_details.card.country`, and persists a canonical row in `db.payment_processing_reconciliation` keyed by `payment_intent_id`.  Idempotent via `$setOnInsert` — webhook replay updates the same row without duplicating.
+- **Canonical reconciliation record**:
+  - `estimated_cents` — additive Stripe estimate (base × rate + fixed)
+  - `recovery_cents`  — gross-up amount charged to the payer
+  - `actual_cents`    — BalanceTransaction.fee
+  - `variance_cents`  — `recovery - actual`
+  - `reconciliation_status` ∈ `COVERED` (`≥ actual`) / `SHORTFALL` (`< actual`) / `UNKNOWN` (no BT) / `ERROR` (Stripe API failed)
+  - `card_country` + `resolved_jurisdiction` (`domestic`/`international`)
+- **`payment_intent.succeeded` webhook** now invokes `reconcile_payment_intent` before the existing card-country delta logging (preserves the legacy shortfall log for non-CA cards).
+- **PaymentIntent metadata expanded** with the seven canonical fields (`payment_processing_estimated_cents`, `payment_processing_recovery_cents`, `payment_processing_rate`, `payment_processing_jurisdiction`, `payment_processing_payer_role`, `buyer_total_cents`, `seller_commission_cents`) so the reconciler can compute variance without a second DB round-trip.
+- **Admin ledger API** — new `routes/admin_stripe_reconciliation.py`:
+  - `GET /api/admin/stripe-reconciliation` (filter by status, since, limit)
+  - `GET /api/admin/stripe-reconciliation/{payment_intent_id}` (single row)
+  - `GET /api/admin/stripe-reconciliation/summary` (aggregate covered/shortfall/unknown counts + variance totals)
+  - Role gated to `admin` / `super_admin`
+- **Partner multi-lot PAY NOW invoice** — extended `GET /api/seller/commission-invoice/{id}` so `multi_item_listings` rows return `sold_lots[]` + summed `hammer_cents`.  Frontend `SellerCommissionInvoicePage.js` renders the sold-lots table above the commission detail card.  Screenshot `/tmp/iter482_p51_partner_invoice.png` confirms: **3 sold lots totalling $870 → 4% commission $34.80 + taxes $5.21 + Stripe recovery $1.51 = $41.52 (via Stripe) / $40.01 (offline)**.
+
+### Test results — 276/276 GREEN across P0/P2/P3/P3.1/P4/P4A/P5/P5.1
+| Suite | Result |
+|---|---|
+| iter482 P0 golden repairs | 10/10 |
+| iter482 golden matrix | 40/40 |
+| iter482 P2 canonical engine | 40/40 |
+| iter482 P3 fee_calculator | 16/16 |
+| iter482 P3.1 reconciliation | 38/38 |
+| iter482 P4A foundation | 51/51 |
+| iter482 P4 end-to-end | 14/14 |
+| iter482 P5 payer-bears-fee | 31/31 |
+| **iter482 P5.1 reconciliation (new)** | **10/10** |
+| **Anti-regression: no silent $0 for Stripe** | proven |
+
+### Files changed (P5.1)
+- Backend: `services/stripe_reconciliation_service.py` (new), `routes/admin_stripe_reconciliation.py` (new), `routes/webhooks.py` (wire reconciler in `payment_intent.succeeded`), `services/stripe_connect_service.py` (metadata expansion), `routes/seller_commission_invoice.py` (sold_lots + hammer-sum for multi-item), `server.py`
+- Frontend: `pages/SellerCommissionInvoicePage.js` (sold lots table)
+- Tests: `backend/tests/test_iter482_p51_reconciliation.py` (10 new tests including anti-regression + Stripe stub monkeypatch)
+
+### Anti-regression guards added
+- Test `test_anti_regression_stripe_never_silent_zero` asserts every Stripe/card payment either has `recovery_cents > 0` OR a documented `reason_code` (`offline_method`, `legally_gated`, `prohibited`, `platform_absorbed`, `unknown_rate_matrix`).  Prevents a future L-1 flip from silently zeroing the fee.
+- Test `test_reconcile_payment_intent_persists_and_is_idempotent` proves webhook replay never duplicates a reconciliation row.
+- Test `test_reconcile_payment_intent_error_when_stripe_fails` proves an `ERROR` row is still written on Stripe API failure so admins see the missing reconciliation.
+
+### Rate examples — cent-exact via canonical engine
+| Base | Card | Additive | Gross-up recovery |
+|---|---|---|---|
+| $100 | CA domestic | $3.20 | **$3.30** |
+| $100 | international | $4.20 | **$4.38** |
+| $7 | CA domestic | $0.50 | **$0.52** |
+| $1,000 | CA domestic | $29.30 | **$30.18** |
+
+### Guardrails honoured
+✅ Preview only — **DO NOT DEPLOY** · ✅ Stripe **TEST** mode only · ✅ No production data mutated · ✅ No historical records modified · ✅ No real refunds · ✅ BidVex never silently absorbs Stripe cost (invariant proven) · ✅ Offline methods always $0 with `reason_code=offline_method` · ✅ Idempotent webhook reconciliation
+
+### Known limitation (documented, NOT silently ignored)
+- **Card country pre-confirmation**: Stripe Checkout Session amounts are locked at session creation, so we cannot know the card's country *before* the payer confirms.  The engine defaults to `domestic` for the initial estimate; on webhook receive we resolve the true country from `payment_method_details.card.country` and record any variance in the reconciliation ledger.  If the user's business policy requires re-issuing a variance invoice for international-card shortfalls, that is a straightforward follow-up: iterate rows with `resolved_jurisdiction="international"` AND `reconciliation_status="SHORTFALL"` and email the delta.
+
+### Deferred (post-P5.1, awaiting next directive)
+- 🟠 **International-card variance invoice** — email seller/buyer the delta captured in `stripe_fee_adjustments` + `payment_processing_reconciliation.SHORTFALL` rows
+- 🟠 **P6** — Tax engine consolidation across jurisdictions
+- 🟠 **P7** — ≥ 200-case exact-cent regression matrix
+- 🟢 **P8** — Peripheral flows
+- 🟠 **P9** — Static audit + deployment gate
+
+---
+
+
 ## iter482 — Phase P5 Payer-Bears-Stripe-Processing-Cost (Feb 12, 2026) ✅ COMPLETE — PREVIEW ONLY · DO NOT DEPLOY
 
 ### Scope delivered end-to-end (Backend + Frontend + Tests)

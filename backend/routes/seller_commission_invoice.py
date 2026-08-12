@@ -149,7 +149,18 @@ def _build_invoice_body(
     seller_province: str,
 ) -> Dict[str, Any]:
     """Build the canonical invoice payload (no persistence)."""
+    # iter482 P5.1 — for multi_item_listings the hammer_price is the
+    # SUM of sold sub-lot hammers.  Fall back to the top-level
+    # hammer/current if no lots present.
     hammer = Decimal(str(listing.get("hammer_price") or listing.get("current_price") or 0))
+    if listing.get("_collection") == "multi_item_listings":
+        lots = listing.get("lots") or listing.get("items") or []
+        sold_sum = Decimal(0)
+        for lot in lots:
+            if lot.get("winner_id") or lot.get("winning_bidder_id"):
+                sold_sum += Decimal(str(lot.get("hammer_price") or lot.get("winning_bid") or 0))
+        if sold_sum > 0:
+            hammer = sold_sum
     if hammer <= 0:
         raise HTTPException(status_code=422, detail={
             "error": "invalid_hammer_price",
@@ -245,6 +256,26 @@ async def get_commission_invoice(
     invoice["payment_status"] = "paid" if paid else "unpaid"
     invoice["paid_at"] = (paid or {}).get("paid_at")
     invoice["accepted_offline_methods"] = ["cash", "etransfer", "cheque", "stripe"]
+
+    # iter482 P5.1 — Attach sold-lots table when this is a multi-item
+    # listing (Partner or Individual multi-lot batch).  Enables the
+    # Partner PAY NOW page to show the full breakdown of sold items.
+    if listing.get("_collection") == "multi_item_listings":
+        lots = listing.get("lots") or listing.get("items") or []
+        sold_lots = [
+            {
+                "lot_number": lot.get("lot_number") or lot.get("index"),
+                "title": lot.get("title") or lot.get("name") or "",
+                "hammer_cents": int(round(float(lot.get("hammer_price") or lot.get("winning_bid") or 0) * 100)),
+                "winner_id": lot.get("winner_id") or lot.get("winning_bidder_id"),
+                "status": lot.get("status") or ("sold" if (lot.get("winner_id") or lot.get("winning_bidder_id")) else "unsold"),
+            }
+            for lot in lots
+            if lot.get("status") in (None, "sold", "won", "closed", "ended")
+            and (lot.get("winner_id") or lot.get("winning_bidder_id") or lot.get("hammer_price"))
+        ]
+        invoice["sold_lots"] = sold_lots
+        invoice["sold_lots_count"] = len(sold_lots)
     return invoice
 
 
@@ -333,6 +364,7 @@ async def pay_commission_invoice(
                 }],
                 metadata={
                     "type": "seller_commission_invoice",
+                    "transaction_type": "seller_commission_invoice",
                     "invoice_id": inv_id,
                     "listing_id": listing_id,
                     "seller_id": str(listing.get("seller_id")),
@@ -340,6 +372,12 @@ async def pay_commission_invoice(
                     "tax_total_cents": str(invoice["tax_total_cents"]),
                     "stripe_recovery_cents": str(method_row["stripe_recovery_cents"]),
                     "total_cents": str(method_row["total_cents"]),
+                    # iter482 P5.1 canonical reconciliation metadata
+                    "payment_processing_estimated_cents": str(int(method_row.get("estimated_stripe_fee_cents", 0))),
+                    "payment_processing_recovery_cents": str(int(method_row["stripe_recovery_cents"])),
+                    "payment_processing_payer_role": "seller",
+                    "payment_processing_jurisdiction": seller_province or "QC",
+                    "payment_method": "stripe",
                 },
                 success_url=success_url,
                 cancel_url=cancel_url,

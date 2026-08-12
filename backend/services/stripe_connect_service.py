@@ -778,6 +778,7 @@ async def create_destination_charge(
     description = " | ".join(line_items_display)
     
     # Create checkout session with destination charge
+    _pp = breakdown.payment_processing or {}
     payment_intent_data: Dict[str, Any] = {
         "application_fee_amount": breakdown.stripe_application_fee_cents,
         "transfer_data": {
@@ -788,8 +789,21 @@ async def create_destination_charge(
             "buyer_id": buyer_id,
             "invoice_id": invoice_id,
             "type": "auction_purchase",
+            "transaction_type": "auction_purchase",
             # iter482 P4 — record the buyer's chosen payment method.
             "selected_payment_method": selected_payment_method or "stripe",
+            "payment_method": selected_payment_method or "stripe",
+            # iter482 P5.1 canonical reconciliation fields.  Every one
+            # of these must be present so ``reconcile_payment_intent``
+            # can compare estimated vs recovery vs actual after the
+            # BalanceTransaction is retrieved on the webhook.
+            "payment_processing_estimated_cents": str(int(_pp.get("estimated_cents", 0) or 0)),
+            "payment_processing_recovery_cents": str(int(_pp.get("recovery_cents", _pp.get("amount_cents", 0)) or 0)),
+            "payment_processing_rate": str(_pp.get("rate_pct") or ""),
+            "payment_processing_jurisdiction": str(_pp.get("jurisdiction") or ""),
+            "payment_processing_payer_role": "buyer",
+            "buyer_total_cents": str(int(breakdown.buyer_total_cents or 0)),
+            "seller_commission_cents": str(int((Decimal(str(breakdown.seller_commission)) * 100).to_integral_value())),
         }
     }
     # iter482 — Model A₁: Partner is merchant of record; Stripe rail

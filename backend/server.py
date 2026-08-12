@@ -1775,6 +1775,14 @@ try:
     set_seller_commission_invoice_db(db)
     app.include_router(seller_commission_invoice_router)
 
+    # iter482 P5.1 — Admin Stripe reconciliation ledger
+    from routes.admin_stripe_reconciliation import (
+        router as admin_stripe_recon_router,
+        set_db as set_admin_stripe_recon_db,
+    )
+    set_admin_stripe_recon_db(db)
+    app.include_router(admin_stripe_recon_router)
+
     # iter306 — Error logging (frontend + backend) and admin Error Logs tab
     from routes.error_logs import router as error_logs_router
     api_router.include_router(error_logs_router)

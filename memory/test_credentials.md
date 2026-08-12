@@ -243,3 +243,15 @@ Reproduce via:
 Seeded seller-commission-invoice listing (owner = testseller@bidvex.com):
 - `iter482p5-si-b69cad15` — $100 hammer, accepts all 4 methods, individual seller
 Reproduce commission calc via `GET /api/seller/commission-invoice/iter482p5-si-b69cad15`.
+
+## 🆕 iter482 P5.1 — Actual Stripe Reconciliation + Partner Multi-Lot Invoice (Feb 12, 2026)
+Seeded multi-item Partner-style invoice (owner = testseller@bidvex.com):
+- `iter482p51-partner-1e3b1f59` — 3 sold sub-lots ($250 + $120 + $500 = $870 hammer), accepts all 4 methods
+Reproduce Partner-style invoice via `GET /api/seller/commission-invoice/iter482p51-partner-1e3b1f59`.
+
+Admin reconciliation ledger:
+- `GET /api/admin/stripe-reconciliation` (list, filterable by status)
+- `GET /api/admin/stripe-reconciliation/summary` (aggregate)
+- `GET /api/admin/stripe-reconciliation/{payment_intent_id}` (single row)
+Admin credential: `charbel911@gmail.com / Anderosli123!@#`
+

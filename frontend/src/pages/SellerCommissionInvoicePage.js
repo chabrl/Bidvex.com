@@ -109,6 +109,41 @@ export default function SellerCommissionInvoicePage() {
         </Alert>
       )}
 
+      {/* Sold lots table — Partner / multi-lot invoices */}
+      {Array.isArray(invoice.sold_lots) && invoice.sold_lots.length > 0 && (
+        <Card data-testid="sold-lots-card">
+          <CardHeader>
+            <CardTitle className="text-base">
+              {isFr ? 'Lots vendus' : 'Sold Lots'} · {invoice.sold_lots.length}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <table className="w-full text-sm" data-testid="sold-lots-table">
+              <thead>
+                <tr className="border-b text-slate-500">
+                  <th className="text-left py-2">{isFr ? 'Lot' : 'Lot'}</th>
+                  <th className="text-left py-2">{isFr ? 'Article' : 'Item'}</th>
+                  <th className="text-right py-2">{isFr ? 'Prix marteau' : 'Hammer'}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {invoice.sold_lots.map((lot, idx) => (
+                  <tr key={idx} className="border-b last:border-0" data-testid={`sold-lot-row-${idx}`}>
+                    <td className="py-2">{lot.lot_number ?? idx + 1}</td>
+                    <td className="py-2">{lot.title}</td>
+                    <td className="py-2 text-right">{fmt(lot.hammer_cents)}</td>
+                  </tr>
+                ))}
+                <tr className="border-t font-semibold">
+                  <td colSpan="2" className="py-2">{isFr ? 'Total marteau' : 'Total Hammer'}</td>
+                  <td className="py-2 text-right" data-testid="sold-lots-total">{fmt(invoice.hammer_cents)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Invoice lines */}
       <Card>
         <CardHeader>

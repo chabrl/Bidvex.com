@@ -426,6 +426,16 @@ async def handle_stripe_webhook(request: Request):
             pi_meta = data.get("metadata", {})
             tx_type = pi_meta.get("transaction_type", "")
 
+            # ── iter482 P5.1 canonical reconciliation ─────────────────
+            # Retrieve the authoritative BalanceTransaction fee and
+            # persist estimated / recovery / actual / variance +
+            # resolved card jurisdiction.  Idempotent via upsert.
+            try:
+                from services.stripe_reconciliation_service import reconcile_payment_intent
+                await reconcile_payment_intent(db, pi_id)
+            except Exception as _rec_err:
+                logger.warning(f"[stripe-webhook] canonical reconciliation failed: {_rec_err}")
+
             # ─── Card-country detection (Missing 2) ───
             # Read payment_method.card.country from the PaymentIntent payload.
             # If the card was international, recalculate the actual Stripe fee
