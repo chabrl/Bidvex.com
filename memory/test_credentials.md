@@ -237,3 +237,9 @@ Reproduce via:
 ```python
 # See /app/backend/tests/test_iter482_p4_end_to_end.py::_seed_listing
 ```
+
+
+## 🆕 iter482 P5 — Payer-Bears-Stripe-Fee (Feb 12, 2026)
+Seeded seller-commission-invoice listing (owner = testseller@bidvex.com):
+- `iter482p5-si-b69cad15` — $100 hammer, accepts all 4 methods, individual seller
+Reproduce commission calc via `GET /api/seller/commission-invoice/iter482p5-si-b69cad15`.

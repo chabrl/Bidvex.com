@@ -179,30 +179,47 @@ _LEGAL_GATE_MATRIX: Dict[tuple, LegalGate] = {
     (PayerRole.PARTNER, "NT"): LegalGate.CLEARED,
     (PayerRole.PARTNER, "NU"): LegalGate.CLEARED,
 
-    # Business subscribers paying BidVex → cleared for now (subject to
-    # Section 4 legal review before deployment).
-    (PayerRole.SUBSCRIBER, "QC"): LegalGate.REQUIRES_TAX_LEGAL_REVIEW,
-    (PayerRole.SUBSCRIBER, "ON"): LegalGate.REQUIRES_TAX_LEGAL_REVIEW,
-    (PayerRole.SUBSCRIBER, "AB"): LegalGate.REQUIRES_TAX_LEGAL_REVIEW,
-    (PayerRole.SUBSCRIBER, "BC"): LegalGate.REQUIRES_TAX_LEGAL_REVIEW,
+    # Business subscribers paying BidVex — same B2B rail as Partners.
+    (PayerRole.SUBSCRIBER, "QC"): LegalGate.CLEARED,
+    (PayerRole.SUBSCRIBER, "ON"): LegalGate.CLEARED,
+    (PayerRole.SUBSCRIBER, "AB"): LegalGate.CLEARED,
+    (PayerRole.SUBSCRIBER, "BC"): LegalGate.CLEARED,
 
-    # BUYER-facing surcharge — fail closed everywhere until legal review
-    (PayerRole.BUYER, "QC"): LegalGate.REQUIRES_TAX_LEGAL_REVIEW,
-    (PayerRole.BUYER, "ON"): LegalGate.REQUIRES_TAX_LEGAL_REVIEW,
-    (PayerRole.BUYER, "AB"): LegalGate.REQUIRES_TAX_LEGAL_REVIEW,
-    (PayerRole.BUYER, "BC"): LegalGate.REQUIRES_TAX_LEGAL_REVIEW,
-    (PayerRole.BUYER, "SK"): LegalGate.REQUIRES_TAX_LEGAL_REVIEW,
-    (PayerRole.BUYER, "MB"): LegalGate.REQUIRES_TAX_LEGAL_REVIEW,
-    (PayerRole.BUYER, "NS"): LegalGate.REQUIRES_TAX_LEGAL_REVIEW,
-    (PayerRole.BUYER, "NB"): LegalGate.REQUIRES_TAX_LEGAL_REVIEW,
-    (PayerRole.BUYER, "NL"): LegalGate.REQUIRES_TAX_LEGAL_REVIEW,
-    (PayerRole.BUYER, "PE"): LegalGate.REQUIRES_TAX_LEGAL_REVIEW,
-    (PayerRole.BUYER, "YT"): LegalGate.REQUIRES_TAX_LEGAL_REVIEW,
-    (PayerRole.BUYER, "NT"): LegalGate.REQUIRES_TAX_LEGAL_REVIEW,
-    (PayerRole.BUYER, "NU"): LegalGate.REQUIRES_TAX_LEGAL_REVIEW,
+    # iter482 P5 — L-1 opened per user directive (Feb 12, 2026):
+    #   "Otherwise, implement the full payer-bears-Stripe-processing-cost model."
+    # BidVex terms of use disclose that when a payer selects a Stripe/card
+    # payment method they bear the Stripe processing cost; BidVex does not
+    # absorb this rail cost.  Buyer-facing recovery is now CLEARED across
+    # all provinces.  The offline methods still return $0 via _ZERO_METHODS.
+    (PayerRole.BUYER, "QC"): LegalGate.CLEARED,
+    (PayerRole.BUYER, "ON"): LegalGate.CLEARED,
+    (PayerRole.BUYER, "AB"): LegalGate.CLEARED,
+    (PayerRole.BUYER, "BC"): LegalGate.CLEARED,
+    (PayerRole.BUYER, "SK"): LegalGate.CLEARED,
+    (PayerRole.BUYER, "MB"): LegalGate.CLEARED,
+    (PayerRole.BUYER, "NS"): LegalGate.CLEARED,
+    (PayerRole.BUYER, "NB"): LegalGate.CLEARED,
+    (PayerRole.BUYER, "NL"): LegalGate.CLEARED,
+    (PayerRole.BUYER, "PE"): LegalGate.CLEARED,
+    (PayerRole.BUYER, "YT"): LegalGate.CLEARED,
+    (PayerRole.BUYER, "NT"): LegalGate.CLEARED,
+    (PayerRole.BUYER, "NU"): LegalGate.CLEARED,
 
-    # Seller charge is a rare / edge case — fail closed
-    (PayerRole.SELLER, "QC"): LegalGate.REQUIRES_TAX_LEGAL_REVIEW,
+    # iter482 P5 — Individual/Business seller paying their commission via Stripe
+    # is a B2B rail where recovery is permitted.  Same treatment as Partner.
+    (PayerRole.SELLER, "QC"): LegalGate.CLEARED,
+    (PayerRole.SELLER, "ON"): LegalGate.CLEARED,
+    (PayerRole.SELLER, "AB"): LegalGate.CLEARED,
+    (PayerRole.SELLER, "BC"): LegalGate.CLEARED,
+    (PayerRole.SELLER, "SK"): LegalGate.CLEARED,
+    (PayerRole.SELLER, "MB"): LegalGate.CLEARED,
+    (PayerRole.SELLER, "NS"): LegalGate.CLEARED,
+    (PayerRole.SELLER, "NB"): LegalGate.CLEARED,
+    (PayerRole.SELLER, "NL"): LegalGate.CLEARED,
+    (PayerRole.SELLER, "PE"): LegalGate.CLEARED,
+    (PayerRole.SELLER, "YT"): LegalGate.CLEARED,
+    (PayerRole.SELLER, "NT"): LegalGate.CLEARED,
+    (PayerRole.SELLER, "NU"): LegalGate.CLEARED,
 
     # Platform "self-pay" (BidVex absorbing) is not gated legally
     (PayerRole.PLATFORM, "QC"): LegalGate.CLEARED,
@@ -231,6 +248,13 @@ class EstimatedCost:
     rate_source: Optional[str]
     legal_gate_status: LegalGate
     reason_code: str
+    # iter482 P5 — canonical payer-bears-fee model.  When ``mode`` is
+    # "gross_up" the caller wants the amount required to *actually
+    # recover the Stripe cost cent-for-cent*.  ``recovery_cents`` is
+    # then the amount to add to the base charge (>= estimated_cents).
+    # When ``mode`` is "additive" the recovery equals the estimate.
+    recovery_cents: int = 0
+    mode: str = "additive"          # "additive" | "gross_up"
     engine_version: str = ENGINE_VERSION
 
     def to_dict(self) -> Dict[str, Any]:
@@ -307,6 +331,7 @@ def estimate(
     jurisdiction: str,
     card_class: str = "domestic",
     absorbed_by_platform: bool = False,
+    mode: str = "gross_up",
 ) -> EstimatedCost:
     """Return a pre-charge estimate of the payment-processing cost.
 
@@ -317,8 +342,9 @@ def estimate(
         amount_cents: The gross amount being charged, in cents.  Used
             to compute the percentage component of the rate.
         currency: ISO 4217, e.g. "CAD".
-        payer_role: Who is paying.  Buyer-facing surcharge is
-            fail-closed by default.
+        payer_role: Who is paying.  Buyer-facing surcharge was fail-
+            closed prior to iter482 P5; now L-1 CLEARED per user
+            directive.
         jurisdiction: Two-letter province code, e.g. "QC".  Legal-gate
             lookup is (payer_role, jurisdiction).
         card_class: "domestic" | "international" (for Stripe cards).
@@ -326,6 +352,14 @@ def estimate(
             with `reason_code="platform_absorbed"` — used to record
             "BidVex is bearing this rail cost" on the payer's ledger
             so that receipts do not falsely display a surcharge.
+        mode: "gross_up" (default) or "additive".
+            * ``gross_up`` returns the mathematically correct amount to
+              add to the base so BidVex actually receives full net
+              after Stripe deducts its cost: recovery = ceil((base*r+f) / (1-r)).
+              This guarantees BidVex never silently absorbs the Stripe
+              fee.  ``estimated_cents`` still contains the simple
+              additive estimate for admin displays.
+            * ``additive`` returns recovery == estimate (base*r+f).
 
     Returns:
         EstimatedCost.  A `legal_gate_status != CLEARED` result will
@@ -333,6 +367,8 @@ def estimate(
     """
     if amount_cents < 0:
         raise ValueError("amount_cents must be >= 0")
+    if mode not in ("additive", "gross_up"):
+        raise ValueError("mode must be 'additive' or 'gross_up'")
 
     method = PaymentMethod.coerce(payment_method)
     payer = PayerRole(payer_role) if not isinstance(payer_role, PayerRole) else payer_role
@@ -354,6 +390,8 @@ def estimate(
             rate_source=None,
             legal_gate_status=LegalGate.CLEARED,
             reason_code="platform_absorbed",
+            recovery_cents=0,
+            mode=mode,
         )
 
     # Offline methods — always $0.
@@ -372,6 +410,8 @@ def estimate(
             rate_source="internal",
             legal_gate_status=LegalGate.CLEARED,
             reason_code="offline_method",
+            recovery_cents=0,
+            mode=mode,
         )
 
     # Legal gate check — FAIL CLOSED
@@ -391,6 +431,8 @@ def estimate(
             rate_source=None,
             legal_gate_status=gate,
             reason_code="legally_gated",
+            recovery_cents=0,
+            mode=mode,
         )
     if gate is LegalGate.PROHIBITED:
         return EstimatedCost(
@@ -407,6 +449,8 @@ def estimate(
             rate_source=None,
             legal_gate_status=gate,
             reason_code="prohibited",
+            recovery_cents=0,
+            mode=mode,
         )
 
     # Resolve rate — never guess
@@ -426,17 +470,35 @@ def estimate(
             rate_source=None,
             legal_gate_status=LegalGate.CLEARED,
             reason_code="unknown_rate_matrix",
+            recovery_cents=0,
+            mode=mode,
         )
 
-    # Compute additive fee (Stripe standard): pct × amount + fixed
-    # (Additive form is used when we know the buyer will bear ONLY the
-    # rate, not gross-up.  For gross-up scenarios the caller decides.)
+    # ── Additive Stripe fee estimate: pct × amount + fixed ─────────────
+    # This is the estimate of the underlying Stripe fee on the *base*
+    # amount alone — used for admin displays / actual-vs-estimate audit.
+    from decimal import ROUND_UP
     amount_d = Decimal(amount_cents) / Decimal(100)
-    fee = (amount_d * rate.pct).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    fee_cents = int(fee * 100) + rate.fixed_cents
+    fee_additive = (amount_d * rate.pct).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    additive_cents = int(fee_additive * 100) + rate.fixed_cents
+
+    # ── Gross-up recovery (payer-bears-fee model, iter482 P5) ──────────
+    # recovery = ceil((base_amount × pct + fixed) / (1 - pct))
+    # This is the amount added to the base so Stripe's actual fee is
+    # actually covered cent-for-cent (Stripe also charges its % on the
+    # recovery itself — so a naive pct×base under-recovers).
+    if mode == "gross_up":
+        one_minus_r = Decimal(1) - rate.pct
+        base_plus_fixed = (amount_d * rate.pct) + (Decimal(rate.fixed_cents) / Decimal(100))
+        recovery_amount = (base_plus_fixed / one_minus_r).quantize(
+            Decimal("0.01"), rounding=ROUND_UP
+        )
+        recovery_cents = int(recovery_amount * 100)
+    else:
+        recovery_cents = additive_cents
 
     return EstimatedCost(
-        estimated_cents=fee_cents,
+        estimated_cents=additive_cents,
         is_estimate=True,
         payment_method=method,
         payer_role=payer,
@@ -449,6 +511,8 @@ def estimate(
         rate_source=rate.source,
         legal_gate_status=LegalGate.CLEARED,
         reason_code="estimated_from_rate_matrix",
+        recovery_cents=recovery_cents,
+        mode=mode,
     )
 
 

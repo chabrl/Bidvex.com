@@ -275,9 +275,21 @@ const CheckoutPage = () => {
   const isVehicle = checkoutType === 'vehicle';
 
   // Derive buyer total (accounts for late penalty in winner flow)
-  const buyerTotal = isWinnerFlow
-    ? (winnerPreview?.buyer_total || 0)
-    : breakdown?.buyer_total;
+  // iter482 P5 — derive the visible processing amount + adjusted total
+  // for the CURRENTLY selected payment method.  Backend always returns
+  // the Stripe-recovery amount in ``breakdown.payment_processing`` but
+  // when the buyer picks an offline method (cash/etransfer/cheque)
+  // that amount MUST be zeroed out from the buyer-facing display AND
+  // the buyer_total.  This keeps the main-card, the sidebar and the
+  // Total row all consistent cent-for-cent.
+  const processingCentsRaw = Number(breakdown?.payment_processing?.amount_cents ?? 0);
+  const visibleProcessingCents = paymentMethod === 'stripe' ? processingCentsRaw : 0;
+  const rawBuyerTotal = isWinnerFlow
+    ? Number(winnerPreview?.buyer_total || 0)
+    : Number(breakdown?.buyer_total || 0);
+  const buyerTotal = paymentMethod === 'stripe'
+    ? rawBuyerTotal
+    : Number((rawBuyerTotal - processingCentsRaw / 100).toFixed(2));
   
   // Success state
   if (status === 'success') {
@@ -638,35 +650,38 @@ const CheckoutPage = () => {
                   </div>
                 </div>
 
-                {/* Processing Fee Section — iter482 P3 canonical mapping.
-                    Sourced from breakdown.payment_processing.amount_cents (single
-                    source of truth from the canonical payment_cost_engine).
-                    Fail-closed: hidden when $0 (L-1 legal review pending). */}
+                {/* Processing Fee Section — iter482 P5 canonical.
+                    Uses the derived ``visibleProcessingCents`` so main
+                    card, sidebar, and Total all stay in sync when the
+                    buyer switches payment methods. */}
                 {(() => {
                   const pp = breakdown?.payment_processing;
-                  const canonicalCents = pp?.amount_cents ?? null;
-                  const legacyCents = breakdown?.stripe_processing_fee || breakdown?.processing_fee || 0;
-                  const shownCents = canonicalCents != null ? canonicalCents : Math.round(Number(legacyCents) * 100);
-                  const shown = (shownCents || 0) / 100;
                   if (paymentMethod !== 'stripe') return null;
                   if (breakdown?.flow_type === 'PARTNER_FLOW') return null;
-                  if (!(shown > 0)) return null;  // L-1 legally gated → $0, hide row
+                  const shown = visibleProcessingCents / 100;
                   return (
                     <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-4" data-testid="processing-fee-section">
                       <div className="flex justify-between items-center">
                         <div className="flex items-center gap-2">
                           <CreditCard className="h-4 w-4 text-amber-600" />
                           <span className="font-medium">
-                            {isFrench ? 'Frais de traitement sécurisé' : 'Secure Processing Fee'}
+                            {isFrench ? 'Frais de traitement du paiement' : 'Payment Processing Fee'}
                           </span>
                           <span className="text-xs text-amber-600" data-testid="processing-fee-label">
-                            {pp?.rate_label || (isFrench ? '(traitement)' : '(processing)')}
+                            {pp?.rate_label || (isFrench
+                              ? '(2,9 % + 0,30 $ – gross-up)'
+                              : '(2.9% + $0.30 — gross-up)')}
                           </span>
                         </div>
                         <span className="font-medium" data-testid="processing-fee-amount">
                           {formatCurrency(shown)}
                         </span>
                       </div>
+                      {(pp?.reason_code && pp.reason_code !== 'estimated_from_rate_matrix') && (
+                        <p className="text-xs text-amber-700 mt-1" data-testid="processing-fee-reason">
+                          {isFrench ? 'Motif' : 'Reason'}: {pp.reason_code}
+                        </p>
+                      )}
                     </div>
                   );
                 })()}
@@ -828,14 +843,15 @@ const CheckoutPage = () => {
                   </div>
                   <div className="flex justify-between" data-testid="checkout-summary-processing">
                     <span className="text-slate-600 dark:text-slate-400">
-                      {isFrench ? 'Traitement' : 'Processing'}
+                      {isFrench ? 'Frais de traitement du paiement' : 'Payment Processing Fee'}
+                      {paymentMethod !== 'stripe' && (
+                        <span className="text-xs text-slate-500 ml-1" data-testid="checkout-summary-processing-reason">
+                          ({isFrench ? 'hors ligne' : 'offline'})
+                        </span>
+                      )}
                     </span>
                     <span data-testid="checkout-summary-processing-amount">
-                      {formatCurrency(
-                        ((breakdown?.payment_processing?.amount_cents ?? null) != null)
-                          ? (breakdown.payment_processing.amount_cents / 100)
-                          : (breakdown?.processing_fee || 0)
-                      )}
+                      {formatCurrency(visibleProcessingCents / 100)}
                     </span>
                   </div>
                   {latePenalty > 0 && (

@@ -52,20 +52,35 @@ def test_offline_methods_zero_cost(method):
     assert r.is_estimate is True
 
 
-# ─── Buyer-facing Stripe surcharge — FAIL CLOSED (Section 4) ──────────
+# ─── Buyer-facing Stripe recovery — L-1 CLEARED per iter482 P5 (Feb 2026) ──────
+# The gate was OPENED per explicit user directive to implement the full
+# payer-bears-Stripe-processing-cost model.  Buyer Stripe recovery is now
+# computed cent-exact using the gross-up formula so BidVex does NOT
+# silently absorb the Stripe processing cost.
 
 @pytest.mark.parametrize("prov", ["QC", "ON", "AB", "BC", "SK", "MB", "NS", "NB", "NL", "PE", "YT", "NT", "NU"])
-def test_buyer_stripe_surcharge_fails_closed(prov):
+def test_buyer_stripe_recovery_l1_cleared(prov):
     r = estimate(
         payment_method="stripe_card",
         amount_cents=11000,
         currency="CAD",
         payer_role=PayerRole.BUYER,
         jurisdiction=prov,
+        mode="gross_up",
     )
-    assert r.estimated_cents == 0
-    assert r.legal_gate_status is LegalGate.REQUIRES_TAX_LEGAL_REVIEW
-    assert r.reason_code == "legally_gated"
+    # L-1 CLEARED (iter482 P5) → non-zero recovery
+    assert r.legal_gate_status is LegalGate.CLEARED, (
+        f"prov={prov} expected CLEARED, got {r.legal_gate_status.value}"
+    )
+    assert r.reason_code == "estimated_from_rate_matrix"
+    # additive estimate: 110.00 × 0.029 = $3.19 → 319 cents + 30 = 349 cents
+    assert r.estimated_cents == 349, (
+        f"prov={prov} additive expected 349 got {r.estimated_cents}"
+    )
+    # gross-up recovery must be strictly greater than additive
+    assert r.recovery_cents > r.estimated_cents, (
+        f"prov={prov} recovery ({r.recovery_cents}) must exceed estimate ({r.estimated_cents})"
+    )
 
 
 # ─── B2B Partner-invoice Stripe recovery — CLEARED (Q1=B) ─────────────
@@ -311,16 +326,13 @@ def test_rate_source_included_for_traceability():
     assert r.rate_source == "stripe_docs_2026_02"
 
 
-# ─── Canonical $0.31 receipt scenario — after legal gate flips ────────
-# Documented so P3+ tests can reference it once the buyer-flow gate is
-# CLEARED.  Right now the engine correctly refuses (legally_gated).
-def test_canonical_31_cent_scenario_currently_gated_for_buyer():
+# ─── Canonical $0.31 buyer scenario — L-1 CLEARED (iter482 P5) ────────
+def test_canonical_31_cent_scenario_buyer_l1_cleared():
     """The $0.31 finding: BP = $0.25 × 2.9% + $0.30 = $0.31.
 
-    Under P2's fail-closed rule, a buyer-facing surcharge is REFUSED
-    (legally_gated), so the engine returns 0 — proving buyer will
-    never be silently charged $0.31 until Section 4 legal review
-    explicitly clears the jurisdiction.
+    Under iter482 P5 L-1 CLEARED, the buyer-facing Stripe recovery is
+    computed via the canonical gross-up formula so BidVex does NOT
+    silently absorb the Stripe processing cost.
     """
     r = estimate(
         payment_method="stripe_card",
@@ -328,9 +340,16 @@ def test_canonical_31_cent_scenario_currently_gated_for_buyer():
         currency="CAD",
         payer_role=PayerRole.BUYER,
         jurisdiction="QC",
+        mode="gross_up",
     )
-    assert r.estimated_cents == 0
-    assert r.reason_code == "legally_gated"
+    # additive: 0.25 × 0.029 = $0.00725 → rounds to $0.01 → 1 + 30 = 31 cents
+    assert r.estimated_cents == 31, (
+        f"additive expected 31 got {r.estimated_cents}"
+    )
+    # gross-up must be greater than or equal to additive
+    assert r.recovery_cents >= r.estimated_cents
+    assert r.legal_gate_status is LegalGate.CLEARED
+    assert r.reason_code == "estimated_from_rate_matrix"
 
 
 def test_canonical_31_cent_scenario_for_partner_is_computed():

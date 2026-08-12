@@ -1,0 +1,42 @@
+{
+  "summary": "iter482 P5 (Payer-Bears-Stripe-Processing-Cost) end-to-end verification. Backend: 270/270 tests PASS (31/31 new P5 tests + 14/14 P4 e2e + 225/225 iter482 regression covering P0/P2/P3/P3.1/P4A/matrix). Gross-up math, L-1 open gate, offline-zero reason codes, Path A/Path B reconciliation, application_fee-includes-recovery invariant, and all three seller_commission_invoice HTTP endpoints (GET breakdown / POST pay-now stripe / POST pay-now offline / POST pay-now non-owner 403) all green. Frontend: Seller Commission Invoice page (/seller/commission-invoice/iter482p5-si-b69cad15) renders correctly — hammer $100 / commission $4.00 (4.0%) / taxes $0.60 / processing $0.45 (Stripe) or $0.00 (offline) / TOTAL $5.05 or $4.60; PAY NOW button updates label dynamically per method; offline click returns cash-payment instructions text. Checkout page (buyer): Stripe path renders 'Frais de traitement du paiement 3,44 $' and Total 107,98 $ correctly. HOWEVER a HIGH-priority frontend bug was found: when the buyer switches to an offline method (cash / etransfer / cheque) the sidebar 'Résumé' STILL shows the Stripe recovery (3,44 $) and Total 107,98 $ instead of 0 $ / 104,54 $. The main-card processing-fee-section IS hidden correctly (line 652 gates on paymentMethod==='stripe'), but the sidebar block at CheckoutPage.js lines 836-847 is NOT gated and buyerTotal is not recomputed on method change — this violates the acceptance criterion 'switching between Stripe and offline hides/shows the processing row correctly. Offline methods always $0.'",
+  "backend_issues": {"critical": [], "minor": [
+    {"endpoint": "/api/auth/register", "issue": "Per-IP rate limit ~1 req/min still causes test_iter482_p4_end_to_end HTTP tests to 429 on cold-run. 60s cool-down clears it. Same non-blocking flake as iteration_462."}
+  ]},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "CheckoutPage (buyer) — summary sidebar", "issue": "When paymentMethod switches from stripe to cash/etransfer/cheque, the sidebar processing-fee row STILL shows Stripe recovery (3,44 $) and Total STILL shows 107,98 $ instead of 0 $ / 104,54 $. Only the main-card processing-fee-section is correctly hidden (line 652). Sidebar block (lines 836-847, testid=checkout-summary-processing) is unconditionally rendered from breakdown.payment_processing.amount_cents which was fetched under Stripe assumptions, and buyerTotal is not recomputed on method change.", "selector": "[data-testid=\"checkout-summary-processing\"], [data-testid=\"checkout-summary-processing-amount\"]", "priority": "HIGH"}
+    ],
+    "integration_issues": [
+      {"flow": "Buyer checkout — payment method switch", "issue": "Client does not refetch or client-adjust the breakdown when paymentMethod changes; sidebar therefore diverges from the (correctly hidden) main card. Fix: gate sidebar processing row on paymentMethod==='stripe' AND subtract processing from buyerTotal when offline (or refetch breakdown with ?method=cash).", "affected_selectors": ["[data-testid=\"checkout-summary-processing\"]", "[data-testid=\"checkout-summary-processing-amount\"]"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter482_p5_payer_bears_fee.py",
+    "/app/backend/tests/test_iter482_p4_end_to_end.py",
+    "/app/test_reports/pytest/iter482_p5.xml",
+    "/app/test_reports/pytest/iter482_p4_e2e.xml",
+    "/app/test_reports/pytest/iter482_regression.xml"
+  ],
+  "action_items": [
+    "Fix CheckoutPage.js sidebar (lines 836-847): gate the checkout-summary-processing row on paymentMethod==='stripe' (mirroring line 652), OR display 0 $ with reason_code=offline_method when non-stripe.",
+    "Recompute buyerTotal (or the sidebar Total line at ~858-861) when paymentMethod changes so Total drops from 107,98 $ to 104,54 $ for cash/etransfer/cheque. Simplest: subtract breakdown.payment_processing.amount_cents/100 from the displayed total when paymentMethod !== 'stripe', or refetch breakdown with the selected method as a query param.",
+    "OPTIONAL DX: replace /api/auth/register calls inside test_iter482_p4_end_to_end with a session-scoped fixture that reuses testbuyer/testseller to eliminate the 429 flake on full-suite runs."
+  ],
+  "critical_code_review_comments": [
+    "Divergence between CheckoutPage main-card (correctly gated) and sidebar (ungated) is a maintainability smell — both should share a single derived value like `visibleProcessingCents = paymentMethod==='stripe' ? breakdown.payment_processing.amount_cents : 0` computed once at component level.",
+    "Seller Commission Invoice page uses testids `pay-method-{stripe|etransfer|cash|cheque}` while Checkout uses `payment-method-{...}`. Consider unifying the naming for testability. Also `line-stripe-recovery` remains rendered with $0.00 for offline methods (with reason 'Hors ligne — 0 $') which is correct per spec — good.",
+    "Seller invoice PAY NOW offline flow returns human-readable instructions inline (Contact BidVex support to arrange in-person cash payment) — good UX. However there is no visible success toast / confirmation banner or link to the persisted invoice record; consider surfacing the invoice_id for user reference.",
+    "Backend gross-up formula recovery = ceil((base × r + f) / (1 − r)) verified cent-exact across CA/international × $7/$100/$1000; application_fee=BP+SC+fees_tax+recovery invariant asserted by test_application_fee_includes_recovery — Path A ↔ Path B reconcile cent-exact for all 6 param sets.",
+    "Rate-limit on /api/auth/register (60s window) continues to be the only friction in full-suite backend runs — same observation as iteration_462."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (270/270: 31 P5 + 14 P4 e2e + 225 regression)", "frontend": "83% (Seller Invoice 100% + Checkout sidebar bug on method switch)"},
+  "test_credentials": "buyer testbuyer@bidvex.com / TestBuyer2026!  seller testseller@bidvex.com / TestSeller2026! — both OK on preview",
+  "seed_data_creation": "None — reused main-agent-seeded listings iter482p4-e2e-multi-1d5c7d (buyer checkout) and iter482p5-si-b69cad15 (seller invoice).",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "P5 backend is 100% green (270/270). Only remaining issue is a FRONTEND-ONLY bug on /checkout/{id} sidebar: when buyer switches from stripe to cash/etransfer/cheque the sidebar processing row (data-testid=checkout-summary-processing) and Total do not update — they keep showing Stripe values. Main-card section (data-testid=processing-fee-section, line 652) IS correctly hidden. Fix should be scoped to CheckoutPage.js lines 836-861. After the fix, retest: (1) load /checkout/iter482p4-e2e-multi-1d5c7d as testbuyer, (2) confirm Stripe shows 3,44 $ + Total 107,98 $, (3) click payment-method-cash and confirm sidebar Frais row hides (or shows 0 $) AND Total drops to 104,54 $. Auth rate-limit 60s cool-down still needed between full pytest passes.",
+  "rca of the issue": "Buyer CheckoutPage.js: the price breakdown is loaded ONCE from the backend at mount and stored in `breakdown` state. `breakdown.payment_processing.amount_cents` is populated by the server based on default (stripe) assumption. On method change, `setPaymentMethod(...)` is called but no refetch happens and no client-side derivation is applied to zero-out processing for offline. The main-card processing section was updated for P5 (line 652 gates on stripe) but the parallel sidebar block at lines 836-847 was not — an incomplete refactor. Total (`buyerTotal`) is derived from the original breakdown so it also does not update. Reproduce: login testbuyer → /checkout/iter482p4-e2e-multi-1d5c7d → click Comptant → observe sidebar still shows Frais de traitement du paiement 3,44 $ and Total 107,98 $. Mitigation: gate lines 836-847 on paymentMethod==='stripe' and adjust displayed Total accordingly (or refetch breakdown with selected method)."
+}

@@ -237,11 +237,16 @@ def _canonical_buyer_stripe_recovery(
         payer_role=_PCE_Payer.BUYER,
         jurisdiction=(buyer_prov or "").upper() or "XX",
         card_class=(card_type or "domestic"),
+        mode="gross_up",
     )
     snapshot = est.to_dict()
-    snapshot["amount_cents"] = int(est.estimated_cents)
-    snapshot["field_version"] = "payment_processing.v1"
-    amount = (Decimal(est.estimated_cents) / Decimal(100)).quantize(
+    # iter482 P5 — buyer-facing amount is the gross-up recovery, not
+    # the additive estimate.  Both are persisted for reconciliation.
+    snapshot["amount_cents"] = int(est.recovery_cents)
+    snapshot["recovery_cents"] = int(est.recovery_cents)
+    snapshot["estimated_cents"] = int(est.estimated_cents)
+    snapshot["field_version"] = "payment_processing.v2"
+    amount = (Decimal(est.recovery_cents) / Decimal(100)).quantize(
         Decimal("0.01"), rounding=ROUND_HALF_UP
     )
     return amount, snapshot
@@ -450,16 +455,19 @@ def _iter350_individual(
 
     # ── Buyer side (taxed at buyer's province) ──
     buyer_premium = _q(hammer * bp_rate)
-    # iter482 P3 — buyer surcharge sourced ONLY from payment_cost_engine.
-    # Fail-closed to $0 until L-1 legal review clears the jurisdiction.
+    # iter482 P5 — L-1 CLEARED: buyer bears the Stripe processing cost
+    # via gross-up recovery on the FULL amount they are charged
+    # (hammer + BP + buyer tax).  Both Path A and Path B must gross
+    # up on the same base to reconcile cent-exact.
+    buyer_tax_bd  = tax_on(buyer_premium, buyer_prov)
+    buyer_tax_total = _q(buyer_tax_bd["gst"] + buyer_tax_bd["qst"] + buyer_tax_bd["hst"])
+    _base_for_recovery = _q(hammer + buyer_premium + buyer_tax_total)
     buyer_sr, buyer_pp = _canonical_buyer_stripe_recovery(
-        buyer_premium, buyer_prov, payment=payment
+        _base_for_recovery, buyer_prov, payment=payment
     )
-    buyer_tax_bd  = tax_on(buyer_premium + buyer_sr, buyer_prov)
     # iter482 P3.1 — Use per-line GST+QST+HST sum for buyer_taxes so
     # gst + qst + hst == taxes exactly.  Matches CRA/RQ remittance
     # practice and reconciles cent-exact with `calculate_general_checkout`.
-    buyer_tax_total = _q(buyer_tax_bd["gst"] + buyer_tax_bd["qst"] + buyer_tax_bd["hst"])
     buyer_total   = _q(hammer + buyer_premium + buyer_sr + buyer_tax_total)
 
     # ── Seller side (taxed at seller's province) ──

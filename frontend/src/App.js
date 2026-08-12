@@ -134,6 +134,7 @@ const EmailMarketingPricing = lazy(() => import('./pages/EmailMarketingPricing')
 const SubscriptionPricingPage = lazy(() => import('./pages/SubscriptionPricingPage'));
 const MaintenancePage = lazy(() => import('./pages/MaintenancePage'));
 const CheckoutPage = lazy(() => import('./pages/CheckoutPage'));
+const SellerCommissionInvoicePage = lazy(() => import('./pages/SellerCommissionInvoicePage'));
 const BecomePartnerPage = lazy(() => import('./pages/BecomePartnerPage'));
 const PartnerDashboard = lazy(() => import('./pages/PartnerDashboard'));
 const PaymentPage = lazy(() => import('./pages/PaymentPage'));
@@ -929,6 +930,10 @@ const App = () => {
           <Route path="/subscription/success" element={<PaymentSuccessPage />} />
           <Route path="/checkout/:listingId" element={
             <ProtectedRoute><CheckoutPage /></ProtectedRoute>
+          } />
+          {/* iter482 P5 — Seller Commission Invoice (PAY NOW) */}
+          <Route path="/seller/commission-invoice/:listingId" element={
+            <ProtectedRoute><SellerCommissionInvoicePage /></ProtectedRoute>
           } />
           <Route path="/review/submit" element={
             <ProtectedRoute><ReviewSubmitPage /></ProtectedRoute>

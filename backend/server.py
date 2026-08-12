@@ -1767,6 +1767,14 @@ try:
     set_seller_payment_methods_db(db)
     app.include_router(seller_payment_methods_router)
 
+    # iter482 P5 — Seller Commission Invoice (4% Individual/Business, 3% Partner)
+    from routes.seller_commission_invoice import (
+        router as seller_commission_invoice_router,
+        set_db as set_seller_commission_invoice_db,
+    )
+    set_seller_commission_invoice_db(db)
+    app.include_router(seller_commission_invoice_router)
+
     # iter306 — Error logging (frontend + backend) and admin Error Logs tab
     from routes.error_logs import router as error_logs_router
     api_router.include_router(error_logs_router)

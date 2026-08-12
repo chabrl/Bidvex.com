@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="4" skipped="0" tests="14" time="3.474" timestamp="2026-08-12T13:08:20.570424+00:00" hostname="agent-env-c75ae3b4-0836-48ac-857c-c6a46c32e016"><testcase classname="backend.tests.test_iter482_p4_end_to_end" name="test_registry_canonical_slugs" time="0.001" /><testcase classname="backend.tests.test_iter482_p4_end_to_end" name="test_effective_methods_snapshot_wins" time="0.000" /><testcase classname="backend.tests.test_iter482_p4_end_to_end" name="test_effective_methods_live_when_no_snapshot" time="0.000" /><testcase classname="backend.tests.test_iter482_p4_end_to_end" name="test_effective_methods_legacy_fallback" time="0.000" /><testcase classname="backend.tests.test_iter482_p4_end_to_end" name="test_assert_selection_rejects_unaccepted" time="0.000" /><testcase classname="backend.tests.test_iter482_p4_end_to_end" name="test_assert_selection_normalises_aliases" time="0.000" /><testcase classname="backend.tests.test_iter482_p4_end_to_end" name="test_snapshot_idempotent_when_locked" time="0.000" /><testcase classname="backend.tests.test_iter482_p4_end_to_end" name="test_snapshot_locks_live_list" time="0.000" /><testcase classname="backend.tests.test_iter482_p4_end_to_end" name="test_http_get_accepted_payment_methods_returns_universe" time="0.706" /><testcase classname="backend.tests.test_iter482_p4_end_to_end" name="test_http_offline_checkout_allows_cash_and_persists_selection" time="2.375" /><testcase classname="backend.tests.test_iter482_p4_end_to_end" name="test_http_offline_checkout_rejects_disallowed_method" time="0.029"><failure message="AssertionError: {&quot;error&quot;:&quot;rate_limit_exceeded&quot;,&quot;message_en&quot;:&quot;Too many requests. Please wait before trying again.&quot;,&quot;message_fr&quot;:&quot;Trop de requêtes. Veuillez patienter avant de réessayer.&quot;,&quot;retry_after_seconds&quot;:60}&#10;assert 429 in (200, 201)&#10; +  where 429 = &lt;Response [429 Too Many Requests]&gt;.status_code">backend/tests/test_iter482_p4_end_to_end.py:238: in test_http_offline_checkout_rejects_disallowed_method
+    asyncio.run(_t())
+/usr/local/lib/python3.11/asyncio/runners.py:190: in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/asyncio/runners.py:118: in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/asyncio/base_events.py:654: in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+backend/tests/test_iter482_p4_end_to_end.py:222: in _t
+    buyer = await _register_buyer(c)
+            ^^^^^^^^^^^^^^^^^^^^^^^^
+backend/tests/test_iter482_p4_end_to_end.py:79: in _register_buyer
+    assert r.status_code in (200, 201), r.text
+E   AssertionError: {"error":"rate_limit_exceeded","message_en":"Too many requests. Please wait before trying again.","message_fr":"Trop de requêtes. Veuillez patienter avant de réessayer.","retry_after_seconds":60}
+E   assert 429 in (200, 201)
+E    +  where 429 = &lt;Response [429 Too Many Requests]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_iter482_p4_end_to_end" name="test_http_offline_checkout_supports_cheque" time="0.029"><failure message="AssertionError: {&quot;error&quot;:&quot;rate_limit_exceeded&quot;,&quot;message_en&quot;:&quot;Too many requests. Please wait before trying again.&quot;,&quot;message_fr&quot;:&quot;Trop de requêtes. Veuillez patienter avant de réessayer.&quot;,&quot;retry_after_seconds&quot;:60}&#10;assert 429 in (200, 201)&#10; +  where 429 = &lt;Response [429 Too Many Requests]&gt;.status_code">backend/tests/test_iter482_p4_end_to_end.py:259: in test_http_offline_checkout_supports_cheque
+    asyncio.run(_t())
+/usr/local/lib/python3.11/asyncio/runners.py:190: in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/asyncio/runners.py:118: in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/asyncio/base_events.py:654: in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+backend/tests/test_iter482_p4_end_to_end.py:245: in _t
+    buyer = await _register_buyer(c)
+            ^^^^^^^^^^^^^^^^^^^^^^^^
+backend/tests/test_iter482_p4_end_to_end.py:79: in _register_buyer
+    assert r.status_code in (200, 201), r.text
+E   AssertionError: {"error":"rate_limit_exceeded","message_en":"Too many requests. Please wait before trying again.","message_fr":"Trop de requêtes. Veuillez patienter avant de réessayer.","retry_after_seconds":60}
+E   assert 429 in (200, 201)
+E    +  where 429 = &lt;Response [429 Too Many Requests]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_iter482_p4_end_to_end" name="test_http_select_payment_method_persists_ack" time="0.031"><failure message="AssertionError: {&quot;error&quot;:&quot;rate_limit_exceeded&quot;,&quot;message_en&quot;:&quot;Too many requests. Please wait before trying again.&quot;,&quot;message_fr&quot;:&quot;Trop de requêtes. Veuillez patienter avant de réessayer.&quot;,&quot;retry_after_seconds&quot;:60}&#10;assert 429 in (200, 201)&#10; +  where 429 = &lt;Response [429 Too Many Requests]&gt;.status_code">backend/tests/test_iter482_p4_end_to_end.py:302: in test_http_select_payment_method_persists_ack
+    asyncio.run(_t())
+/usr/local/lib/python3.11/asyncio/runners.py:190: in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/asyncio/runners.py:118: in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/asyncio/base_events.py:654: in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+backend/tests/test_iter482_p4_end_to_end.py:266: in _t
+    buyer = await _register_buyer(c)
+            ^^^^^^^^^^^^^^^^^^^^^^^^
+backend/tests/test_iter482_p4_end_to_end.py:79: in _register_buyer
+    assert r.status_code in (200, 201), r.text
+E   AssertionError: {"error":"rate_limit_exceeded","message_en":"Too many requests. Please wait before trying again.","message_fr":"Trop de requêtes. Veuillez patienter avant de réessayer.","retry_after_seconds":60}
+E   assert 429 in (200, 201)
+E    +  where 429 = &lt;Response [429 Too Many Requests]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_iter482_p4_end_to_end" name="test_http_ack_totals_must_sum" time="0.029"><failure message="AssertionError: {&quot;error&quot;:&quot;rate_limit_exceeded&quot;,&quot;message_en&quot;:&quot;Too many requests. Please wait before trying again.&quot;,&quot;message_fr&quot;:&quot;Trop de requêtes. Veuillez patienter avant de réessayer.&quot;,&quot;retry_after_seconds&quot;:60}&#10;assert 429 in (200, 201)&#10; +  where 429 = &lt;Response [429 Too Many Requests]&gt;.status_code">backend/tests/test_iter482_p4_end_to_end.py:331: in test_http_ack_totals_must_sum
+    asyncio.run(_t())
+/usr/local/lib/python3.11/asyncio/runners.py:190: in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/asyncio/runners.py:118: in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/asyncio/base_events.py:654: in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+backend/tests/test_iter482_p4_end_to_end.py:309: in _t
+    buyer = await _register_buyer(c)
+            ^^^^^^^^^^^^^^^^^^^^^^^^
+backend/tests/test_iter482_p4_end_to_end.py:79: in _register_buyer
+    assert r.status_code in (200, 201), r.text
+E   AssertionError: {"error":"rate_limit_exceeded","message_en":"Too many requests. Please wait before trying again.","message_fr":"Trop de requêtes. Veuillez patienter avant de réessayer.","retry_after_seconds":60}
+E   assert 429 in (200, 201)
+E    +  where 429 = &lt;Response [429 Too Many Requests]&gt;.status_code</failure></testcase></testsuite></testsuites>

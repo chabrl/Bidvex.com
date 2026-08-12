@@ -217,26 +217,27 @@ const PriceBreakdown = ({
             </span>
           </div>
 
-          {/* Payment Processing — iter482 P3 canonical mapping.
+          {/* Payment Processing — iter482 P5 canonical.
               Reads from payment_processing.amount_cents (single source of
-              truth from canonical payment_cost_engine).  Legacy field
-              retained for older payloads.  Row hidden when $0 (L-1 gate). */}
+              truth from canonical payment_cost_engine).  Never silently
+              displays $0 for Stripe payments — shows a reason code
+              alongside if amount is 0. */}
           {!isVehiclePayment && (() => {
             const pp = breakdown.payment_processing;
             const canonicalCents = pp?.amount_cents ?? null;
             const shown = canonicalCents != null
               ? (canonicalCents / 100)
               : Number(breakdown.stripe_processing_fee || 0);
-            if (!(shown > 0)) return null;
+            // Hide the row entirely only for offline reason codes.
+            if (shown === 0 && pp?.reason_code === 'offline_method') return null;
+            if (shown === 0 && !pp?.reason_code) return null;
             return (
               <div className="flex justify-between items-center" data-testid="stripe-processing-fee-row">
                 <span className="text-slate-600 dark:text-slate-400">
-                  {pp?.rate_label || (i18n.language === 'fr'
-                    ? 'Frais de traitement'
-                    : 'Payment Processing')}
-                  <span className="ml-1" title={i18n.language === 'fr'
-                    ? 'Frais de traitement Stripe — répercutés sans majoration par BidVex.'
-                    : 'Stripe card processing fee — passed directly to you with no markup from BidVex.'}>ℹ️</span>
+                  {i18n.language === 'fr' ? 'Frais de traitement du paiement' : 'Payment Processing Fee'}
+                  <span className="text-xs text-slate-500 ml-1">
+                    {pp?.rate_label || (i18n.language === 'fr' ? '(Stripe)' : '(Stripe)')}
+                  </span>
                 </span>
                 <span className="text-slate-700 dark:text-slate-300" data-testid="stripe-processing-fee-amount">
                   +{formatCurrency(shown)}

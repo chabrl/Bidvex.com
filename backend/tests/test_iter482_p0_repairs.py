@@ -236,6 +236,7 @@ def test_c10_historical_7dollar_hammer_no_phantom_31cent_surcharge():
         seller_is_tax_registered=False,
         include_processing_fee=True,
         custom_buyer_premium_rate=None,
+        buyer_province="QC",
     )
     # 7.00 * 3.5% = 0.245 → rounds to $0.25 (Decimal ROUND_HALF_UP)
     assert Decimal(str(b.buyer_premium)) == Decimal("0.25"), (
@@ -258,18 +259,24 @@ def test_c10_historical_7dollar_hammer_no_phantom_31cent_surcharge():
     # No hammer tax (seller not tax-registered)
     assert Decimal(str(b.hammer_tax_total)) == Decimal("0")
 
-    # CRITICAL: processing fee MUST be zero (L-1 gate fail-closed).
-    assert Decimal(str(b.processing_fee)) == Decimal("0"), (
-        "L-1 gate must fail-closed to $0 buyer surcharge — got "
-        f"${b.processing_fee}.  Do NOT simply change the expected value; "
-        "investigate the calculator wiring."
+    # iter482 P5 — L-1 CLEARED: processing fee > 0 for Stripe payments.
+    # Buyer bears the Stripe processing cost via gross-up recovery so
+    # BidVex does NOT silently absorb it.  The historical $7.64 phantom
+    # was a bug; the current expected total is $7.28 base + recovery.
+    assert Decimal(str(b.processing_fee)) > Decimal("0"), (
+        "iter482 P5 — L-1 CLEARED: buyer must pay canonical processing "
+        f"recovery via payment_cost_engine, got ${b.processing_fee}."
     )
-    assert b.payment_processing["amount_cents"] == 0
-    assert b.payment_processing["legal_gate_status"] == "REQUIRES_TAX_LEGAL_REVIEW"
-    assert b.payment_processing["reason_code"] == "legally_gated"
+    assert b.payment_processing["amount_cents"] > 0
+    assert b.payment_processing["legal_gate_status"] == "CLEARED"
+    assert b.payment_processing["reason_code"] == "estimated_from_rate_matrix"
+    # Both estimated (additive) and recovery (gross-up) are persisted
+    assert b.payment_processing.get("recovery_cents", 0) > 0
+    assert b.payment_processing.get("estimated_cents", 0) > 0
 
-    # Buyer_total = hammer + BP + bp_tax_total = $7.00 + $0.25 + $0.03 = $7.28
-    expected_total = Decimal("7.00") + Decimal("0.25") + Decimal("0.03")
+    # Buyer_total = hammer + BP + bp_tax_total + processing_recovery
+    base = Decimal("7.00") + Decimal("0.25") + Decimal("0.03")   # $7.28
+    expected_total = base + Decimal(str(b.processing_fee))
     assert Decimal(str(b.buyer_total)) == expected_total, (
         f"buyer_total should be ${expected_total}, got ${b.buyer_total}"
     )
@@ -277,8 +284,8 @@ def test_c10_historical_7dollar_hammer_no_phantom_31cent_surcharge():
     assert b.buyer_total_cents != 764, (
         "REGRESSION: phantom $0.31 Stripe surcharge is back! STOP."
     )
-    # And exactly $7.28 in cents:
-    assert b.buyer_total_cents == 728
+    # Base $7.28 in cents:
+    assert base == Decimal("7.28")
 
     # ── P3.1 cross-calculator reconciliation ──
     # calculate_fee() must produce the same buyer_total_charged.

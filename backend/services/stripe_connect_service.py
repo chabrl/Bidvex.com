@@ -101,11 +101,17 @@ def _build_payment_processing_snapshot(
         jurisdiction=jurisdiction,
         card_class=card_class,
         absorbed_by_platform=absorbed_by_platform,
+        mode="gross_up",
     )
     d = est.to_dict()
-    # Expose a stable, canonical name for downstream consumers to read.
-    d["amount_cents"] = int(est.estimated_cents)
-    d["field_version"] = "payment_processing.v1"
+    # Expose stable canonical names for downstream consumers.
+    # iter482 P5 — buyer-facing amount comes from the gross-up
+    # ``recovery_cents``, not the additive estimate.  Additive
+    # ``estimated_cents`` remains for audit / reconciliation.
+    d["amount_cents"] = int(est.recovery_cents)
+    d["recovery_cents"] = int(est.recovery_cents)
+    d["estimated_cents"] = int(est.estimated_cents)
+    d["field_version"] = "payment_processing.v2"
     return d
 
 
@@ -337,9 +343,12 @@ def calculate_general_checkout(
     buyer_total = gross_amount
     
     # Stripe parameters
-    # Application fee = BidVex fees (premium + commission) + full fees tax
-    # BidVex retains all its fees and remits the tax on BOTH.
-    application_fee = buyer_premium + seller_commission + fees_tax_total
+    # iter482 P5 — Application fee = BidVex fees + buyer-borne Stripe recovery.
+    # The buyer pays the processing_fee gross-up recovery on top of the
+    # hammer/BP/tax total.  BidVex retains that recovery inside the
+    # application_fee, from which Stripe then deducts its actual fee.
+    # This ensures BidVex does NOT silently absorb the Stripe cost.
+    application_fee = buyer_premium + seller_commission + fees_tax_total + processing_fee
 
     # ── iter482 P3.1 — Seller payout now deducts tax on SC (CRA-canonical) ──
     # Seller loses SC AND its GST/QST (business input tax on BidVex's

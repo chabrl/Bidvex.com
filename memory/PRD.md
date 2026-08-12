@@ -1,6 +1,114 @@
 # BidVex — Auction Marketplace PRD
 
-## iter482 — Phase P4 Seller-Controlled Payment Methods (Feb 12, 2026) ✅ COMPLETE — PREVIEW ONLY · DO NOT DEPLOY
+## iter482 — Phase P5 Payer-Bears-Stripe-Processing-Cost (Feb 12, 2026) ✅ COMPLETE — PREVIEW ONLY · DO NOT DEPLOY
+
+### Scope delivered end-to-end (Backend + Frontend + Tests)
+- **L-1 legal gate OPENED** per explicit user directive: buyer + seller Stripe recovery is CLEARED across all 13 provinces/territories.  Terms of Use disclose that when a payer selects a Stripe/card payment method they bear the Stripe processing cost — BidVex never silently absorbs it.
+- **Canonical gross-up recovery** added to `services/payment_cost_engine.py`.  `estimate(mode="gross_up")` returns both:
+  - `estimated_cents` — additive underlying Stripe fee (`base × rate + fixed`)
+  - `recovery_cents` — mathematically correct amount to add so BidVex actually recovers the Stripe cost cent-for-cent: `ceil((base × rate + fixed) / (1 − rate))`
+- **CA vs INT rate matrix** honoured: `2.9% + $0.30` domestic / `3.9% + $0.30` international.
+- **`stripe_connect_service.calculate_general_checkout` + `connect_payment_engine.calculate_connect_checkout` + `fee_calculator.calculate_fee`** ALL sourced from the canonical engine.  Path A ↔ Path B reconcile cent-exact.  BidVex's `application_fee` now includes the buyer-borne recovery so Stripe's actual fee is covered by the payer, not by BidVex.
+- **CheckoutPage.js**:
+  - Sidebar row: **"Payment Processing Fee"** (never hidden when Stripe selected)
+  - Card row: bilingual **"Frais de traitement du paiement / Payment Processing Fee"** with the rate label `(2.9% + $0.30 — gross-up)` and a Reason line if the engine returns 0 with a documented reason
+  - Total Due includes the recovery cent-exact
+- **New Seller Commission Invoice**:
+  - Backend: `routes/seller_commission_invoice.py` — `GET /api/seller/commission-invoice/{listing_id}` + `POST /api/seller/commission-invoice/{listing_id}/pay-now`
+  - Rate resolver: 4% Individual/Business · 3% Partner · Vehicle/Storage flagged `REQUIRES_BUSINESS_REVIEW`
+  - Renders the 4 payment-method breakdown (Stripe/E-Transfer/Cash/Cheque) with per-method total and reason codes
+  - Persistence: `db.seller_commission_invoices` with pending/paid states + Stripe Checkout Session id
+  - Frontend: `/seller/commission-invoice/:listingId` — bilingual page with itemized total and **PAY NOW** button that redirects to Stripe Checkout or records offline instructions
+- **PriceBreakdown.js**: updated to show reason code when processing is 0 for a Stripe path (never silent $0).
+- **BidVex retention math**: `application_fee = BP + SC + fees_tax + processing_recovery`; the destination-charge invariant `charge = app_fee + transfer` still holds cent-exact.
+- **Regression tests updated** to reflect the new L-1 CLEARED behaviour + new invariants.
+
+### Rate examples (cent-exact via canonical engine)
+| Base | Card | Additive estimate | Gross-up recovery |
+|---|---|---|---|
+| $100 | CA domestic | $3.20 | **$3.30** |
+| $100 | international | $4.20 | **$4.38** |
+| $7 | CA domestic | $0.50 | **$0.52** |
+| $1,000 | CA domestic | $29.30 | **$30.18** |
+
+### Test results — 270/270 across P5 + regression
+| Suite | Result |
+|---|---|
+| iter482 P0 golden repairs | 10/10 |
+| iter482 golden matrix | 40/40 |
+| iter482 P2 payment cost engine | 40/40 |
+| iter482 P3 fee_calculator canonical | 16/16 |
+| iter482 P3.1 reconciliation | 38/38 |
+| iter482 P4A foundation | 51/51 |
+| iter482 P4 end-to-end | 14/14 |
+| **iter482 P5 payer-bears-fee (new)** | **31/31** |
+
+### Frontend E2E proofs (visual)
+- `/tmp/iter482_p5_checkout.png` — Total $107.98 = hammer $100 + BP $3.50 + GST $0.35 + QST $0.69 + Processing $3.44 (bilingual label, no silent $0)
+- `/tmp/iter482_p5_checkout_switch_fixed.png` — Reactive switching: Stripe $107.98 / $3.44, Cash $104.54 / $0.00, E-Transfer $104.54 / $0.00, Stripe $107.98 / $3.44 (verified via automated E2E)
+- `/tmp/iter482_p5_seller_invoice.png` — Seller commission invoice $5.05 = commission $4.00 + tax $0.60 + Stripe recovery $0.45 (4 payment methods, PAY NOW active)
+
+### Files changed
+- Backend: `services/payment_cost_engine.py`, `services/stripe_connect_service.py`, `services/connect_payment_engine.py`, `services/fee_calculator.py`, `routes/seller_commission_invoice.py` (new), `server.py`
+- Frontend: `pages/CheckoutPage.js`, `pages/SellerCommissionInvoicePage.js` (new), `components/PriceBreakdown.js`, `App.js`
+- Tests: `tests/test_iter482_p5_payer_bears_fee.py` (new · 31 tests), regression tests updated in `test_iter482_p31_reconciliation.py`, `test_iter482_p0_repairs.py`, `test_iter482_p2_payment_cost_engine.py`, `test_iter482_p3_fee_calculator_canonical.py`
+
+### Guardrails honoured
+✅ Preview only — **DO NOT DEPLOY** · ✅ Stripe TEST mode · ✅ No production data mutated · ✅ No historical financial records changed · ✅ Terms-of-use payer-bears-fee disclosure captured · ✅ BidVex retains recovery via application_fee (Stripe's actual fee comes out of that recovery, NOT BidVex margin)
+
+### Deferred (awaiting Stripe test-mode real-charge test)
+- 🟠 **Actual Stripe BalanceTransaction reconciliation via webhook** (`services/payment_cost_engine.lock_actual` is already the API — needs the `payment_intent.succeeded` webhook wiring to persist actual fee alongside estimate/recovery)
+- 🟠 **Card country detection at payment confirmation** — currently defaults to `domestic` for the initial estimate; on webhook receive-side we can read `payment_method.card.country` and post-charge reconcile (delta absorbed by BidVex or invoiced separately per business policy)
+- 🟠 **Partner post-auction "PAY NOW" 3% invoice page** — backend covers computation via `routes/partner_platform_fee.py` (existing); UI is next
+- 🟠 **P6** — Tax engine consolidation
+- 🟠 **P7** — ≥ 200-case regression matrix
+- 🟢 **P8** — Peripheral flows
+- 🟠 **P9** — Static audit + deployment gate
+
+
+---
+
+
+## iter482 — Phase P4 Seller-Controlled Payment Methods (Feb 12, 2026) ✅ COMPLETE — PREVIEW ONLY
+
+Canonical `AcceptedPaymentMethodsSelector` (stripe/etransfer/cash/cheque) wired across all Create flows.  Immutable snapshot at first bid.  Buyer restriction on CheckoutPage.js with server-side enforcement (`400 PAYMENT_METHOD_NOT_ACCEPTED`).  Selected method propagated to receipts + Stripe metadata.  Legacy duplicate radios REMOVED.
+
+## iter482 — Phase P4A Foundation (Feb 12, 2026) ✅
+Canonical registry, snapshot service, model field addition, backfill script, 51 unit tests.
+
+## iter482 — Phase P3.1 Cross-Calculator Reconciliation (Feb 12, 2026) ✅
+Root-caused and fixed the $0.02 tax divergence.  196/196 tests passed pre-P5.
+
+## iter482 — Phase P3 Checkout Wiring & $0.31 Fix (Feb 12, 2026) ✅
+Wired canonical `payment_cost_engine` into every buyer-facing calculator.
+
+## Original problem statement + core requirements
+
+1. Exact-cent reconciliation across all financial paths.
+2. Seller-controlled payment methods (stripe/etransfer/cash/cheque). ✅ P4
+3. Buyer restricted to seller's accepted methods. ✅ P4
+4. BidVex NEVER silently absorbs Stripe processing costs. Payer-bears-fee model implemented. ✅ P5
+5. First-bid immutable snapshot on payment methods. ✅ P4A
+6. Selected payment method propagates to transactions, receipts, and seller dashboards. ✅ P4
+
+## Personas
+- Individual buyer, Individual/Business seller (4% commission), Partner (3% platform fee), Vehicle Dealer, Storage Facility, Admin (`charbel911@gmail.com`).
+
+## Architecture
+- Frontend: React SPA + Tailwind + shadcn/ui
+- Backend: FastAPI + Motor (async Mongo)
+- Integrations: Stripe (TEST mode), SendGrid, Twilio, Cloudflare R2, Emergent LLM key
+
+## Prioritized backlog
+- 🟠 P5.1 Actual Stripe fee reconciliation via webhook + card_country detection
+- 🟠 Partner post-auction "PAY NOW" invoice UI (backend done)
+- 🟠 P6 Tax engine consolidation
+- 🟠 P7 ≥ 200-case regression matrix
+- 🟢 P8 Peripheral flows (escrow, deposits, penalties, marketing)
+- 🟠 P9 Static audit + deployment gate
+- 🟢 Admin Fee Schedule UI
+- 🟢 Claude AI models integration
+- 🟢 Lot buyer chip + photo auto-matcher
 
 ### Scope delivered end-to-end (Backend + Frontend + Tests)
 - **Canonical seller multi-select** (`stripe`, `etransfer`, `cash`, `cheque`) via `AcceptedPaymentMethodsSelector.jsx` wired into ALL Create-Listing flows (Individual, Multi-Item, Vehicle, Vehicle Multi-Lot, Storage). **Legacy duplicate radio buttons REMOVED** in `CreateListingPage.js`, `CreateMultiItemListing.js`, `storage/StorageAuctionCreate.js`.
@@ -69,28 +177,6 @@
 
 ---
 
-
-## iter482 — Phase P4A Foundation: Seller-Controlled Payment Methods (Feb 12, 2026) ✅ COMPLETE — PREVIEW ONLY · DO NOT DEPLOY
-
-**Scope**: Foundation layer — canonical registry, immutable snapshot service, model field addition, idempotent backfill script, 51 unit tests. No checkout, no Stripe wiring, no frontend.
-
-### Files created
-- `backend/services/payment_methods_registry.py` — canonical `{stripe, etransfer, cash, cheque}` + aliases + offline/rail helpers
-- `backend/services/seller_payment_methods_service.py` — `effective_methods()`, `guard_edit()`, `snapshot_at_first_bid()`, `assert_selection_allowed()`
-- `backend/scripts/iter482_p4a_backfill_accepted_payment_methods.py` — idempotent, 36 preview rows backfilled
-- `backend/tests/test_iter482_p4a_foundation.py` — 51 tests
-
-### Files modified (schema-only, additive)
-- `models/auction_models.py` — `ListingCreate`, `Listing`, `MultiItemListingCreate` gain `accepted_payment_methods`; `Listing` gains `accepted_payment_methods_snapshot` + `accepted_payment_methods_locked_at`
-- `models/storage_auction.py` — `StorageAuctionCreate` gains field + validator
-- `models/vehicle_models.py` — `VehicleListingCreate` gains field + validator
-
-### Business rules enforced
-- ≥ 1 method required; canonical slugs only; aliases normalised on write
-- Immutable snapshot at first bid; post-bid edits blocked (`PaymentMethodsLockedError`)
-- Buyer selection gated by SNAPSHOT (never live list) if locked
-- No silent defaults for new listings; `PaymentMethodsMissingError` on orphan rows
-- Legacy singleton `payment_method` retained for backward compatibility
 
 ## iter482 — Phase P3.1 Cross-Calculator Reconciliation (Feb 12, 2026) ✅ COMPLETE
 Root-caused and eliminated the $0.02 divergence between `calculate_fee()` (Path A, CRA/iter350) and `calculate_general_checkout()` (Path B, Stripe session builder) for the $7.00/premium/premium/QC/QC scenario. 196/196 tests pass. Details preserved in git history and iter482 P3 architectural docs.
