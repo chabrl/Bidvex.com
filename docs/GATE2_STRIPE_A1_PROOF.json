@@ -1,0 +1,256 @@
+{
+  "gate": "Gate 2 \u2014 Model A\u2081 Stripe Sandbox Proof",
+  "timestamp": "2026-08-12T02:30:46.384761+00:00",
+  "livemode": false,
+  "guardrails": {
+    "no_refunds": true,
+    "no_production_writes": true,
+    "no_secrets_exposed": true,
+    "livemode_false_confirmed": true
+  },
+  "platform_account": {
+    "id": "acct_1SXA7iBd6Wtvh7hs",
+    "country": "CA",
+    "default_currency": "cad",
+    "type": "standard"
+  },
+  "partner_test_connect_account": {
+    "id": "acct_1U3RqWBgXhyoZCGg",
+    "country": "CA",
+    "type": "custom",
+    "charges_enabled": true,
+    "card_payments_capability": "active",
+    "transfers_capability": "active",
+    "livemode": null
+  },
+  "expected": {
+    "hammer_cents": 10000,
+    "partner_bp_cents": 1000,
+    "buyer_subtotal_cents": 11000,
+    "platform_fee_cents": 300,
+    "gst_on_fee_cents": 15,
+    "qst_on_fee_cents": 30,
+    "fees_tax_total_cents": 45,
+    "application_fee_cents": 345,
+    "buyer_total_cents": 11000,
+    "partner_gross_transfer_cents": 11000,
+    "partner_net_before_stripe_rail_cents": 10655,
+    "bidvex_net_cents": 345,
+    "bidvex_buyer_premium_cents": 0,
+    "currency": "cad"
+  },
+  "actual_stripe": {
+    "payment_intent_id": "pi_3U3RwJBd6Wtvh7hs1tMUB9xU",
+    "payment_intent_status": "succeeded",
+    "payment_intent_amount": 11000,
+    "payment_intent_currency": "cad",
+    "payment_intent_livemode": false,
+    "payment_intent_on_behalf_of": "acct_1U3RqWBgXhyoZCGg",
+    "payment_intent_transfer_destination": "acct_1U3RqWBgXhyoZCGg",
+    "payment_intent_application_fee_amount": 345,
+    "charge_id": "ch_3U3RwJBd6Wtvh7hs1ozKjYnC",
+    "charge_amount": 11000,
+    "charge_currency": "cad",
+    "charge_captured": true,
+    "charge_livemode": false,
+    "charge_paid": true,
+    "charge_on_behalf_of": "acct_1U3RqWBgXhyoZCGg",
+    "charge_transfer_id": "tr_3U3RwJBd6Wtvh7hs1BWAPGDJ",
+    "charge_application_fee_id": "fee_1U3RwMBgXhyoZCGguIQpbpNa",
+    "platform_balance_transaction_id": "txn_3U3RwJBd6Wtvh7hs1khs9NC8",
+    "platform_balance_transaction_amount": 11000,
+    "platform_balance_transaction_fee": 437,
+    "platform_balance_transaction_net": 10563,
+    "application_fee_amount_cents": 345,
+    "application_fee_currency": "cad",
+    "application_fee_livemode": false,
+    "application_fee_account": "acct_1U3RqWBgXhyoZCGg",
+    "transfer_id": "tr_3U3RwJBd6Wtvh7hs1BWAPGDJ",
+    "transfer_amount_cents": 11000,
+    "transfer_currency": "cad",
+    "transfer_destination": "acct_1U3RqWBgXhyoZCGg",
+    "transfer_livemode": false,
+    "transfer_source_transaction": "ch_3U3RwJBd6Wtvh7hs1ozKjYnC",
+    "partner_side_balance_transaction_id": "txn_1U3RwNBgXhyoZCGgpS28lTiW",
+    "partner_side_balance_transaction_amount": 11000,
+    "partner_side_balance_transaction_fee": 345,
+    "partner_side_balance_transaction_net": 10655,
+    "platform_stripe_fee_cents": 437,
+    "partner_stripe_fee_cents": null,
+    "true_bidvex_net_cents": -92,
+    "true_partner_net_cents": 10655
+  },
+  "reconciliation": [
+    {
+      "item": "Buyer charge \u2014 PaymentIntent.amount",
+      "expected_cents": 11000,
+      "actual_cents": 11000,
+      "delta_cents": 0,
+      "match": true,
+      "notes": ""
+    },
+    {
+      "item": "Buyer charge \u2014 Charge.amount",
+      "expected_cents": 11000,
+      "actual_cents": 11000,
+      "delta_cents": 0,
+      "match": true,
+      "notes": ""
+    },
+    {
+      "item": "Application fee (BidVex net revenue)",
+      "expected_cents": 345,
+      "actual_cents": 345,
+      "delta_cents": 0,
+      "match": true,
+      "notes": ""
+    },
+    {
+      "item": "Destination transfer (mirror of charge in destination-charge model)",
+      "expected_cents": 11000,
+      "actual_cents": 11000,
+      "delta_cents": 0,
+      "match": true,
+      "notes": "Stripe destination charges send FULL charge amount to Partner; application fee is separately deducted from Partner balance."
+    },
+    {
+      "item": "Partner net BEFORE Stripe rail (transfer \u2212 app_fee)",
+      "expected_cents": 10655,
+      "actual_cents": 10655,
+      "delta_cents": 0,
+      "match": true,
+      "notes": "Should equal charge \u2212 application_fee = 10655."
+    },
+    {
+      "item": "Currency == CAD",
+      "expected_cents": "cad",
+      "actual_cents": "cad",
+      "delta_cents": "N/A",
+      "match": true,
+      "notes": ""
+    },
+    {
+      "item": "livemode == false (PaymentIntent)",
+      "expected_cents": false,
+      "actual_cents": false,
+      "delta_cents": 0,
+      "match": true,
+      "notes": ""
+    },
+    {
+      "item": "livemode == false (Charge)",
+      "expected_cents": false,
+      "actual_cents": false,
+      "delta_cents": 0,
+      "match": true,
+      "notes": ""
+    },
+    {
+      "item": "livemode == false (Transfer)",
+      "expected_cents": false,
+      "actual_cents": false,
+      "delta_cents": 0,
+      "match": true,
+      "notes": ""
+    },
+    {
+      "item": "livemode == false (ApplicationFee)",
+      "expected_cents": false,
+      "actual_cents": false,
+      "delta_cents": 0,
+      "match": true,
+      "notes": ""
+    },
+    {
+      "item": "PaymentIntent.on_behalf_of == Partner Connect acct",
+      "expected_cents": "acct_1U3RqWBgXhyoZCGg",
+      "actual_cents": "acct_1U3RqWBgXhyoZCGg",
+      "delta_cents": "N/A",
+      "match": true,
+      "notes": ""
+    },
+    {
+      "item": "PaymentIntent.transfer_data.destination == Partner Connect acct",
+      "expected_cents": "acct_1U3RqWBgXhyoZCGg",
+      "actual_cents": "acct_1U3RqWBgXhyoZCGg",
+      "delta_cents": "N/A",
+      "match": true,
+      "notes": ""
+    },
+    {
+      "item": "Transfer.destination == Partner Connect acct",
+      "expected_cents": "acct_1U3RqWBgXhyoZCGg",
+      "actual_cents": "acct_1U3RqWBgXhyoZCGg",
+      "delta_cents": "N/A",
+      "match": true,
+      "notes": ""
+    },
+    {
+      "item": "ApplicationFee.account == Partner Connect acct",
+      "expected_cents": "acct_1U3RqWBgXhyoZCGg",
+      "actual_cents": "acct_1U3RqWBgXhyoZCGg",
+      "delta_cents": "N/A",
+      "match": true,
+      "notes": ""
+    },
+    {
+      "item": "Charge.on_behalf_of == Partner Connect acct (Model A\u2081)",
+      "expected_cents": "acct_1U3RqWBgXhyoZCGg",
+      "actual_cents": "acct_1U3RqWBgXhyoZCGg",
+      "delta_cents": "N/A",
+      "match": true,
+      "notes": ""
+    },
+    {
+      "item": "No BidVex buyer premium (buyer_total == 11000 exactly)",
+      "expected_cents": 11000,
+      "actual_cents": 11000,
+      "delta_cents": 0,
+      "match": true,
+      "notes": ""
+    },
+    {
+      "item": "Stripe processing fee (from PLATFORM-side BalanceTransaction, type=stripe_fee)",
+      "expected_cents": "\u22650 (variable rail cost)",
+      "actual_cents": 437,
+      "delta_cents": "N/A (variable rail cost)",
+      "match": true,
+      "notes": "IMPORTANT: On destination charges, on_behalf_of does NOT shift processing-fee incidence to the Partner. The platform (BidVex) balance is debited for this fee. See CRITICAL FINDING."
+    }
+  ],
+  "topology_notes": [
+    "Model A\u2081 verified: on_behalf_of forces Partner as merchant-of-record.",
+    "Destination-charge accounting: transfer amount == charge amount; app fee is separately deducted from Partner balance.",
+    "Buyer paid exactly $110.00 = hammer $100 + Partner BP $10; no BidVex fees on buyer.",
+    "BidVex retains $3.45 (application_fee) = $3.00 platform fee + $0.45 QC B2B fee tax.",
+    "Stripe rail fee incidence: PLATFORM bore 437 cents (Model A\u2081 code claim of 'Partner bears rail' is REFUTED by Stripe TEST-mode ledger)."
+  ],
+  "verdict": "PASS WITH CRITICAL FINDING",
+  "critical_findings": [
+    {
+      "severity": "P0 \u2014 CRITICAL",
+      "title": "Stripe processing fee is NOT borne by the Partner",
+      "description": "The Stripe processing rail fee of 437 cents ($4.37) was debited from the PLATFORM (BidVex) balance, NOT from the Partner Connect account. This contradicts the assumption stated in stripe_connect_service.calculate_partner_listing_checkout docstring: \"Stripe rail cost is borne by the Partner via on_behalf_of\". In reality, `on_behalf_of` on a destination charge shifts only tax-reporting / merchant-of-record status; processing-fee incidence remains on the platform for destination charges (Stripe API behavior).",
+      "evidence": {
+        "platform_balance_transaction_id": "txn_3U3RwJBd6Wtvh7hs1khs9NC8",
+        "platform_fee_amount_cents": 437,
+        "platform_fee_type": "stripe_fee",
+        "partner_balance_transaction_id": "txn_1U3RwNBgXhyoZCGgpS28lTiW",
+        "partner_fee_amount_cents": 345,
+        "partner_fee_type_from_details": [
+          "application_fee"
+        ],
+        "note": "Partner-side 'fee' is `application_fee` (the app fee reversal), NOT `stripe_fee`."
+      },
+      "financial_impact_on_canonical_scenario": {
+        "buyer_pays_cents": 11000,
+        "bidvex_application_fee_income_cents": 345,
+        "stripe_rail_fee_debited_from_bidvex_cents": 437,
+        "true_bidvex_net_cents": -92,
+        "true_bidvex_net_dollars": "$-0.92",
+        "on_100_hammer_bidvex_loses": "$0.92"
+      },
+      "recommendation": "Report this finding to the user before any further gates. Do NOT auto-remediate. Possible fixes (require user + accountant approval): (a) Increase BidVex platform fee to cover expected Stripe rail cost and update the price display; (b) Switch Partner charges to Stripe Direct Charges on the connected account (major architectural change); (c) Add a Stripe-rail line item to the application_fee (requires computing an expected rail cost, which is variable and imprecise); (d) Accept BidVex bears the rail cost on Partner sales and adjust the business model / financial forecasts accordingly."
+    }
+  ]
+}
