@@ -35,16 +35,24 @@ Admin surface additionally exposes ONLY: `winner_user_id`, `hammer_price`, `sold
 ### Performance
 - Verified with 10,000-lot synthetic auction — CSV under 20 MB, headers streamed within 1 second.
 
-### Frontend integration
-- `SellerDashboard.js` — added an "Export CSV" button on every listing row (data-testid `export-csv-btn-{listingId}`). Uses `fetch` + Blob download, respects backend `Content-Disposition` filename, shows toast on success/failure. Available for both single-listing and multi-item listings.
+### Frontend integration (3 surfaces)
+- **Seller surface**: `SellerDashboard.js` — "Export CSV" button per listing row (`export-csv-btn-{listingId}`).
+- **Public surface**: `MultiItemListingDetailPage.js` — "Download Lot List (CSV)" / "Télécharger la liste des lots (CSV)" button next to the sort/view controls (`public-export-csv-btn`).  **Guest users see NO button**; authenticated buyers get access.
+- **Admin surface**: `admin/ManageAllAuctions.js` — "Export CSV (Admin)" button in the per-row action bar (`admin-export-csv-btn-{listingId}`).  Emits the 4 admin extras (`winner_user_id`, `hammer_price`, `sold_at`, `seller_id`).
+- **Shared helper**: `utils/lotCsvExport.js` — single `downloadLotCsv(...)` primitive used by all three surfaces.  Fetch → Blob → download with Content-Disposition filename, bilingual toast feedback.
+- Bilingual (EN/FR) labels + toasts everywhere.
 
 ### Files changed
-- New: `backend/services/lot_csv_export_service.py` — canonical service (~370 LOC)
+- New: `backend/services/lot_csv_export_service.py` — canonical service (~380 LOC, includes `role in ('admin','super_admin')` deps.User compatibility)
 - New: `backend/routes/lot_exports.py` — thin route wrapper (~140 LOC)
-- New: `backend/tests/test_iter482_lot_csv_export.py` — 28 tests (unit + HTTP)
-- Modified: `backend/server.py` — router registration (auth-shared with payments)
-- Modified: `frontend/src/pages/SellerDashboard.js` — Export CSV button + handler
-- Modified: `memory/test_credentials.md` — testseller/buyer re-seed note
+- New: `backend/tests/test_iter482_lot_csv_export.py` — 32 tests (unit + HTTP, incl. admin-role variants)
+- New: `backend/tests/test_iter482_lot_csv_export_e2e_frontend.py` — Playwright E2E for public + admin buttons (skips gracefully if Playwright not installed)
+- New: `frontend/src/utils/lotCsvExport.js` — shared browser helper (~90 LOC)
+- Modified: `backend/server.py` — router registration only
+- Modified: `frontend/src/pages/SellerDashboard.js` — Export CSV button + handler (now uses shared helper)
+- Modified: `frontend/src/pages/MultiItemListingDetailPage.js` — public Download Lot List (CSV) button
+- Modified: `frontend/src/pages/admin/ManageAllAuctions.js` — admin Export CSV (Admin) button
+- Modified: `memory/test_credentials.md`, `memory/PRD.md` (docs)
 
 ### Endpoints added
 - `GET /api/exports/lots/{auction_id}` (returns `text/csv; charset=utf-8`)

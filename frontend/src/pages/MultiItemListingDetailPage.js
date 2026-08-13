@@ -19,7 +19,7 @@ import {
   Grid as GridIcon, List as ListIcon, Menu, X, Flame, Heart, Info,
   Zap, ShoppingCart, Loader2, Truck, Building2, Shield, DollarSign,
   Scale, Wrench, HardHat, CheckCircle, XCircle, FileText,
-  CreditCard, Banknote, Send
+  CreditCard, Banknote, Send, FileDown
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
@@ -76,6 +76,8 @@ const MultiItemListingDetailPage = () => {
   const [listing, setListing] = useState(null);
   const [loading, setLoading] = useState(true);
   const [bidAmounts, setBidAmounts] = useState({});
+  // iter482+ — Public Lot CSV Export state
+  const [csvDownloading, setCsvDownloading] = useState(false);
   const [viewMode, setViewMode] = useState(() => localStorage.getItem('lotViewMode') || 'grid');
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxImages, setLightboxImages] = useState([]);
@@ -1373,6 +1375,48 @@ const MultiItemListingDetailPage = () => {
                   <ListIcon className="h-4 w-4 mr-2" />
                   List
                 </Button>
+                {/* iter482+ — Public Lot CSV Export.  Authenticated
+                    users only (guests see no button).  Uses the
+                    canonical /api/exports/lots endpoint with
+                    surface=public. */}
+                {user && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={csvDownloading}
+                    onClick={async () => {
+                      const fr = (i18n.language || 'en').startsWith('fr');
+                      const { downloadLotCsv, csvLocale } =
+                        await import('../utils/lotCsvExport');
+                      const L = csvLocale(i18n.language);
+                      setCsvDownloading(true);
+                      try {
+                        await downloadLotCsv({
+                          auctionId: id,
+                          surface: 'public',
+                          token: localStorage.getItem('token'),
+                          apiBase: API,
+                          lang: i18n.language,
+                          onSuccess: () => toast.success(L.success),
+                          onError: (err) => toast.error(err.message || L.failed),
+                        });
+                      } catch (_) {
+                        /* toast already shown */
+                      } finally {
+                        setCsvDownloading(false);
+                      }
+                    }}
+                    data-testid="public-export-csv-btn"
+                    className="border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                  >
+                    {csvDownloading
+                      ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      : <FileDown className="h-4 w-4 mr-2" />}
+                    {(i18n.language || 'en').startsWith('fr')
+                      ? 'Télécharger la liste des lots (CSV)'
+                      : 'Download Lot List (CSV)'}
+                  </Button>
+                )}
               </div>
             </div>
 

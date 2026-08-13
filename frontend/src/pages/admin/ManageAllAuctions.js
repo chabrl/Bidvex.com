@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogD
 import { ConfirmDialog } from '../../components/ui/confirm-dialog';
 import { AsyncButton } from '../../components/ui/async-button';
 import { toast } from 'sonner';
-import { Package, Search, Edit2, Trash2, Pause, Archive, XCircle, Eye, AlertTriangle, Download, Star, Play, Clock } from 'lucide-react';
+import { Package, Search, Edit2, Trash2, Pause, Archive, XCircle, Eye, AlertTriangle, Download, Star, Play, Clock, FileDown, Loader2 } from 'lucide-react';
 import { formatCurrency } from '../../utils/currencyFormatter';
 import AdminLotEditorModal from './AdminLotEditorModal';
 import { extractErrorMessage } from '../../utils/errorHandler';
@@ -38,6 +38,30 @@ const ManageAllAuctions = () => {
   const [lotEditor, setLotEditor] = useState({ open: false, listing: null });
   // iter311 — performance + capacity telemetry from the unified endpoint
   const [perfMeta, setPerfMeta] = useState({ total: 0, server_ms: 0, by_section: {} });
+  // iter482+ — Admin CSV Export state (per-row)
+  const [csvExportingId, setCsvExportingId] = useState(null);
+
+  const handleAdminCsvExport = async (listing) => {
+    setCsvExportingId(listing.id);
+    try {
+      const { downloadLotCsv, csvLocale } = await import('../../utils/lotCsvExport');
+      const lang = (typeof window !== 'undefined' && window.localStorage.getItem('i18nextLng')) || 'en';
+      const L = csvLocale(lang);
+      await downloadLotCsv({
+        auctionId: listing.id,
+        surface: 'admin',
+        token,
+        apiBase: API,
+        lang,
+        onSuccess: () => toast.success(L.success),
+        onError: (err) => toast.error(err.message || L.failed),
+      });
+    } catch (_) {
+      /* toast shown */
+    } finally {
+      setCsvExportingId(null);
+    }
+  };
 
   useEffect(() => {
     fetchAllListings();
@@ -676,6 +700,24 @@ const ManageAllAuctions = () => {
                     >
                       <Eye className="h-4 w-4 mr-1" />
                       View
+                    </Button>
+                    {/* iter482+ — Admin Lot CSV Export.  Uses the
+                        canonical /api/exports/lots endpoint with
+                        surface=admin so it also emits winner_user_id,
+                        hammer_price, sold_at, seller_id. */}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleAdminCsvExport(listing)}
+                      disabled={csvExportingId === listing.id}
+                      data-testid={`admin-export-csv-btn-${listing.id}`}
+                      title="Download admin CSV export (includes hammer_price, winner, sold_at, seller_id)"
+                      className="border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                    >
+                      {csvExportingId === listing.id
+                        ? <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                        : <FileDown className="h-4 w-4 mr-1" />}
+                      Export CSV (Admin)
                     </Button>
                     <Button
                       size="sm"

@@ -178,31 +178,19 @@ const SellerDashboard = () => {
   const handleExportCsv = async (listing) => {
     setCsvExportingId(listing.id);
     try {
-      const url = `${API}/exports/lots/${listing.id}?surface=seller`;
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
+      const { downloadLotCsv, csvLocale } = await import('../utils/lotCsvExport');
+      const L = csvLocale(i18n.language);
+      await downloadLotCsv({
+        auctionId: listing.id,
+        surface: 'seller',
+        token,
+        apiBase: API,
+        lang: i18n.language,
+        onSuccess: () => toast.success(L.success),
+        onError: (err) => toast.error(err.message || L.failed),
       });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({ detail: 'Export failed' }));
-        throw new Error(body.detail || `HTTP ${res.status}`);
-      }
-      // Extract filename from Content-Disposition
-      const cd = res.headers.get('content-disposition') || '';
-      const m = /filename="?([^";]+)"?/i.exec(cd);
-      const filename = (m && m[1]) || `bidvex_lots_${listing.id}_seller.csv`;
-      const blob = await res.blob();
-      const dl = document.createElement('a');
-      dl.href = URL.createObjectURL(blob);
-      dl.download = filename;
-      document.body.appendChild(dl);
-      dl.click();
-      dl.remove();
-      URL.revokeObjectURL(dl.href);
-      const fr = (i18n.language || 'en').startsWith('fr');
-      toast.success(fr ? 'Exportation CSV téléchargée' : 'CSV export downloaded');
-    } catch (error) {
-      const fr = (i18n.language || 'en').startsWith('fr');
-      toast.error(error.message || (fr ? 'Échec de l\u2019exportation' : 'Export failed'));
+    } catch (_) {
+      /* toast already shown */
     } finally {
       setCsvExportingId(null);
     }

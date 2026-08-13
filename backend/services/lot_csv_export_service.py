@@ -290,8 +290,19 @@ async def resolve_auction(db, auction_id: str) -> Optional[ExportResolution]:
 def _is_admin(user: Any) -> bool:
     if user is None:
         return False
+    # Canonical role check — matches deps.require_admin() in the rest
+    # of the codebase.  Also honours the legacy ``is_admin`` boolean
+    # and any ``roles`` list, so unit tests using plain dicts still pass.
     if isinstance(user, dict):
-        return bool(user.get("is_admin") or "admin" in (user.get("roles") or []))
+        role = (user.get("role") or "").lower()
+        if role in ("admin", "super_admin"):
+            return True
+        if user.get("is_admin"):
+            return True
+        return "admin" in (user.get("roles") or [])
+    role = getattr(user, "role", None)
+    if role and str(role).lower() in ("admin", "super_admin"):
+        return True
     return bool(getattr(user, "is_admin", False))
 
 
