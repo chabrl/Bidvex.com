@@ -1,5 +1,81 @@
 # BidVex — Auction Marketplace PRD
 
+## iter482+ — Canonical Lot CSV Export (Feb 13, 2026) ✅ SHIPPED · READ-ONLY
+
+**Scope:** Single canonical CSV export system for lot catalog data across every BidVex auction type. Read-only. Zero touch to payment / tax / fee / settlement / Stripe / auction endpoints.
+
+### Architecture
+- **Single source of truth**: `services/lot_csv_export_service.py` — every export flows through `generate_csv(db, auction_id, surface, current_user)`. No duplicate calculators or per-page generators.
+- **Thin route wrapper**: `routes/lot_exports.py` — two endpoints:
+  - `GET /api/exports/lots/{auction_id}?surface={seller|public|admin}&include_drafts={bool}` — streams CSV (UTF-8 with BOM for Excel compatibility)
+  - `GET /api/exports/lots/{auction_id}/preview?surface=...` — JSON preview (columns, row count, first 5 rows)
+- **Auction-type coverage**: 6 collections registered — `listings` (general), `multi_item_listings`, `vehicle_listings`, `vehicle_multi_lot_listings`, `storage_auctions`, `partner_auctions`. Each has a schema normaliser.
+
+### Canonical column order (product-owner approved)
+```
+auction_id, auction_name, lot_number, title, description,
+quantity, starting_bid, category, condition, current_bid,
+status, listing_url, image_urls
+```
+Admin surface additionally exposes ONLY: `winner_user_id`, `hammer_price`, `sold_at`, `seller_id`.
+
+### Redaction rules
+- **public**: 13 canonical columns; NEVER exposes `seller_id`, `seller_email`, `seller_phone`, `winner_user_id`, `hammer_price`, `reserve_price`, `internal_notes`, `moderation_status`, `payment_information`, `invoices`, `commission_data`.
+- **seller**: 13 canonical columns; enforced ownership at service layer (admin can bypass).
+- **admin**: 13 canonical + 4 admin-only columns; admin-only access.
+
+### Draft / status filter
+- Default: hidden statuses `draft`, `pending_review`, `deleted` are excluded.
+- Seller/admin can pass `?include_drafts=true` to include them.
+- Public surface ALWAYS hides drafts regardless of the flag.
+
+### Multi-image handling
+- Single `image_urls` column with pipe-separated URLs. Excel-friendly. Keeps 1 row per lot.
+
+### Performance
+- Verified with 10,000-lot synthetic auction — CSV under 20 MB, headers streamed within 1 second.
+
+### Frontend integration
+- `SellerDashboard.js` — added an "Export CSV" button on every listing row (data-testid `export-csv-btn-{listingId}`). Uses `fetch` + Blob download, respects backend `Content-Disposition` filename, shows toast on success/failure. Available for both single-listing and multi-item listings.
+
+### Files changed
+- New: `backend/services/lot_csv_export_service.py` — canonical service (~370 LOC)
+- New: `backend/routes/lot_exports.py` — thin route wrapper (~140 LOC)
+- New: `backend/tests/test_iter482_lot_csv_export.py` — 28 tests (unit + HTTP)
+- Modified: `backend/server.py` — router registration (auth-shared with payments)
+- Modified: `frontend/src/pages/SellerDashboard.js` — Export CSV button + handler
+- Modified: `memory/test_credentials.md` — testseller/buyer re-seed note
+
+### Endpoints added
+- `GET /api/exports/lots/{auction_id}` (returns `text/csv; charset=utf-8`)
+- `GET /api/exports/lots/{auction_id}/preview` (returns JSON)
+
+### Tests added
+- **28 tests total** (in `test_iter482_lot_csv_export.py`)
+- Unit (in-process): resolution across 6 collections, access control (seller/public/admin), 13-column ordering, admin extras, redaction, embedded lot normalisation, draft filtering (with/without flag), vehicle & storage schema mapping, 10,000-lot performance, UTF-8 BOM Excel compatibility
+- HTTP end-to-end (against preview URL): unauthenticated → 401, non-owner → 403, owner → 200 + valid CSV + BOM, admin-only → 403 for non-admin, public → 200 no auth + forbidden fields absent, preview endpoint JSON, missing auction → 404, `include_drafts=true` behaviour
+- **Result: 28/28 PASS**
+
+### Sample CSV output
+```
+auction_id,auction_name,lot_number,title,description,quantity,starting_bid,category,condition,current_bid,status,listing_url,image_urls
+iter482csv-seller-owned-test,iter482 CSV Export Test Auction,1,Vintage Bicycle,Restored 1970s Peugeot,1,50.00,sports,good,75.00,active,https://bidvex.ca/auction/iter482csv-seller-owned-test,https://cdn.example/bike.jpg
+iter482csv-seller-owned-test,iter482 CSV Export Test Auction,2,Antique Chair Set,Set of 4 oak chairs,4,20.00,furniture,fair,20.00,active,https://bidvex.ca/auction/iter482csv-seller-owned-test,https://cdn.example/chair1.jpg|https://cdn.example/chair2.jpg
+```
+
+### Confirmations
+- ✅ All 6 auction types supported (general / multi_item / vehicle / vehicle_multi_lot / storage / partner)
+- ✅ No duplicate calculators, no per-page generators
+- ✅ Payment / tax / fee / Stripe / settlement code UNTOUCHED
+- ✅ Frontend E2E download verified via Playwright (`iter482_csv_downloaded_bidvex_lots_iter482csv-seller-owned-test_seller.csv` — matches spec)
+- ✅ UTF-8 BOM present for Excel compatibility (verified via `od -c`)
+- ✅ Draft filtering works; `include_drafts=true` flag honoured on seller/admin only
+- ✅ Existing iter482 regression suite unaffected (250/250 excluding known rate-limit flake)
+
+**🚫 DO NOT DEPLOY — feature is READY, not deployed.**
+
+---
+
 ## iter482 — Finalization Pass (Feb 12, 2026) ✅ LAUNCH-READY (TEST MODE) · DO NOT DEPLOY
 
 **Focused audit** of Stripe processing correctness, actual fee reconciliation, billing documents (buyer receipt / seller statement / seller receipt / commission invoice / partner multi-lot invoice), PDF generation, and end-to-end payment consistency. Reused all existing P4/P5/P5.1 architecture — no new calculators, no redesign.

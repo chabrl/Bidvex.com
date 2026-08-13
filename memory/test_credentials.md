@@ -1,5 +1,9 @@
 # BidVex Test Credentials
 
+## 🆕 iter482 CSV Export (Feb 13, 2026) — Test seed
+- testseller@bidvex.com and testbuyer@bidvex.com were RE-SEEDED (they were missing on preview) via `python /app/backend/scripts/iter308_reseed_test_fixtures.py`. Both are now phone-verified (`phone_verified=True`) so the seller dashboard is accessible without the phone-verification wall.
+- Seeded owned-listing for iter482+ CSV Export tests (idempotent): `iter482csv-seller-owned-test` (`multi_item_listings`, owned by `testseller@bidvex.com`, 3 lots: 2 active + 1 draft). Recreated by the test suite as a fixture if deleted.
+
 ## 🔒 PERMANENT — Sole Admin (DO NOT CHANGE)
 **The admin email is `charbel911@gmail.com` — forever.** This is the only and permanent admin account for BidVex. Any new admin-related feature (compliance digests, alerts, escalations, system notifications, audit emails) must route here unless the user explicitly says otherwise.
 

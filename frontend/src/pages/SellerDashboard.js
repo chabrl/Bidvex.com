@@ -32,7 +32,7 @@ import PendingPaymentsCard from '../components/PendingPaymentsCard';
 import StripeConnectBanner from '../components/StripeConnectBanner';
 // iter239 Mission 5 — Seller "Promote" modal.
 import PromoteListingModal from '../components/PromoteListingModal';
-import { Sparkles, RefreshCw, Pencil, Receipt } from 'lucide-react';
+import { Sparkles, RefreshCw, Pencil, Receipt, FileDown } from 'lucide-react';
 // iter474 — Per-row Documents access (statement / receipt / commission invoice)
 import { DocumentsPopover } from '../components/DocumentsPopover';
 // iter476 — Shared Business Settings / Billing Profile (logo + tax IDs)
@@ -168,6 +168,43 @@ const SellerDashboard = () => {
       toast.error(msg);
     } finally {
       setRelistingId(null);
+    }
+  };
+
+  // iter482+ — Canonical Lot CSV Export.  Streams from the canonical
+  // service `/api/exports/lots/{auction_id}?surface=seller`.  The
+  // filename is set by the backend via Content-Disposition.
+  const [csvExportingId, setCsvExportingId] = useState(null);
+  const handleExportCsv = async (listing) => {
+    setCsvExportingId(listing.id);
+    try {
+      const url = `${API}/exports/lots/${listing.id}?surface=seller`;
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ detail: 'Export failed' }));
+        throw new Error(body.detail || `HTTP ${res.status}`);
+      }
+      // Extract filename from Content-Disposition
+      const cd = res.headers.get('content-disposition') || '';
+      const m = /filename="?([^";]+)"?/i.exec(cd);
+      const filename = (m && m[1]) || `bidvex_lots_${listing.id}_seller.csv`;
+      const blob = await res.blob();
+      const dl = document.createElement('a');
+      dl.href = URL.createObjectURL(blob);
+      dl.download = filename;
+      document.body.appendChild(dl);
+      dl.click();
+      dl.remove();
+      URL.revokeObjectURL(dl.href);
+      const fr = (i18n.language || 'en').startsWith('fr');
+      toast.success(fr ? 'Exportation CSV téléchargée' : 'CSV export downloaded');
+    } catch (error) {
+      const fr = (i18n.language || 'en').startsWith('fr');
+      toast.error(error.message || (fr ? 'Échec de l\u2019exportation' : 'Export failed'));
+    } finally {
+      setCsvExportingId(null);
     }
   };
 
@@ -1161,6 +1198,21 @@ const SellerDashboard = () => {
                               className="w-full lg:w-auto"
                             >
                               {t('dashboard.seller.view')}
+                            </Button>
+                            {/* iter482+ — Canonical Lot CSV Export button */}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleExportCsv(listing)}
+                              disabled={csvExportingId === listing.id}
+                              data-testid={`export-csv-btn-${listing.id}`}
+                              className="w-full lg:w-auto border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                              title={(i18n.language || 'en').startsWith('fr') ? 'Exporter les lots en CSV' : 'Export lots to CSV'}
+                            >
+                              {csvExportingId === listing.id
+                                ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                                : <FileDown className="h-3.5 w-3.5 mr-1.5" />}
+                              {(i18n.language || 'en').startsWith('fr') ? 'Exporter CSV' : 'Export CSV'}
                             </Button>
                             {/* iter239 Mission 5 — Seller "Promote" affordance for active listings. */}
                             {listing.status === 'active' && (

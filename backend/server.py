@@ -1783,6 +1783,17 @@ try:
     set_admin_stripe_recon_db(db)
     app.include_router(admin_stripe_recon_router)
 
+    # iter482+ — Canonical Lot CSV Export (read-only, all auction types)
+    from routes.lot_exports import (
+        router as lot_exports_router,
+        set_db as set_lot_exports_db,
+        set_auth as set_lot_exports_auth,
+    )
+    set_lot_exports_db(db)
+    from routes.payments import _auth as _payments_auth
+    set_lot_exports_auth(_payments_auth)
+    app.include_router(lot_exports_router)
+
     # iter306 — Error logging (frontend + backend) and admin Error Logs tab
     from routes.error_logs import router as error_logs_router
     api_router.include_router(error_logs_router)
