@@ -22,6 +22,8 @@ import ConversionFunnelDashboard from './admin/ConversionFunnelDashboard';
 import DisputedSettlements from './admin/DisputedSettlements';
 import ManageAllAuctions from './admin/ManageAllAuctions';
 import DeletionRequestsManager from './admin/DeletionRequestsManager';
+// iter483 — End-Time Change Requests admin queue
+import AdminEndTimeRequests from './admin/AdminEndTimeRequests';
 // iter288 — Listing change-request inbox (admin moderation triage).
 import ListingRequestsManager from './admin/ListingRequestsManager';
 import TaxVerificationQueue from './admin/TaxVerificationQueue';
@@ -171,6 +173,7 @@ const SECONDARY_TABS = {
     { id: 'flagged-listings',    label: 'Flagged Listings (AI Review)', icon: '🤖', lucideIcon: ShieldAlert },
     { id: 'disputed-settlements', label: 'Disputed Settlements', icon: '⚠️', lucideIcon: Shield },
     { id: 'all-auctions', label: 'Manage All Auctions', icon: '🏛️', lucideIcon: Package },
+    { id: 'end-time-requests', label: 'End-Time Change Requests', icon: '⏰', lucideIcon: Package },
     { id: 'deletion-requests', label: 'Deletion Requests', icon: '🗑️', lucideIcon: AlertTriangle },
     // iter288 — Per-listing change-request inbox (edit / delete triage)
     { id: 'listing-requests', label: 'Listing Change Requests', icon: '📝', lucideIcon: Inbox },
@@ -600,6 +603,7 @@ const AdminDashboard = () => {
           // route both URLs to the unified UI.
           case 'lots': return <ListingsModeration />;
           case 'all-auctions': return <ManageAllAuctions />;
+          case 'end-time-requests': return <AdminEndTimeRequests />;
           case 'deletion-requests': return <DeletionRequestsManager />;
           // iter288 — New listing-change request triage queue
           case 'listing-requests': return <ListingRequestsManager />;

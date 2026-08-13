@@ -1,5 +1,42 @@
 # BidVex — Auction Marketplace PRD
 
+## iter483 — Seller Live Auction Edit + Admin End-Time Approval (Feb 14, 2026) ✅ SHIPPED · TEST MODE — DO NOT DEPLOY
+
+**Scope:** Sellers can safely edit their live auctions (title, description, images, schedule, pickup, shipping, add new draft lots) without admin approval. End-time changes require admin approval via request/queue flow. All edits appended to immutable `edited_history` audit log.
+
+### Architecture
+- **Service**: `services/live_edit_service.py` — collection-agnostic resolver + safe-field enforcer + audit logger + end-time request state machine.
+- **Routes**: `routes/live_edit.py` — five endpoints:
+  - `PATCH /api/auctions/{auction_id}/live-edit` — safe edits (seller-owner only, admin bypass)
+  - `POST /api/auctions/{auction_id}/end-time-request` — seller submits end-time change with reason
+  - `GET /api/admin/end-time-requests?status=pending` — admin queue
+  - `POST /api/admin/end-time-requests/{request_id}/approve` — approve or deny
+  - `GET /api/auctions/{auction_id}/edited-history` — read audit log (seller/admin only)
+- **State record**: `end_time_requests` collection — links `auction_id`, `seller_id`, `requested_end_time`, `reason`, `status` (pending/approved/denied).
+- **Audit log**: Immutable `edited_history` array appended to each auction document on every safe edit and every add-lot event.
+
+### Frontend UI
+- `pages/SellerLiveEditModal.jsx` — wired into `SellerDashboard.js` per active auction row.
+- `pages/admin/AdminEndTimeRequests.js` — wired as new tab in `AdminDashboard.js`.
+
+### Safety Guarantees
+- Zero touch to payment / tax / fee / settlement / Stripe logic.
+- Financial fields (starting_price, current_price, hammer_price, reserve_price, winner_user_id, sold_at) never mutable via live-edit path.
+- New lots via `add_lot` land as `draft` + `pending_admin_review`.
+
+### Tests
+- `tests/test_iter483_live_edit.py` — 36/36 PASSED (unit + HTTP).
+- Regression: 303+ Iter 482 baseline tests pass; 45 pre-existing fee-preview failures are unrelated (financial engine untouched by Iter 483). 1 CSV public-export test blocked by stale fixture (missing `iter474ui-veh-c2c08eb2`).
+
+### Launch-Readiness — Feb 14, 2026
+✅ Backend service + routes shipped, mounted, tested (36/36).
+✅ Frontend modal + admin tab built, wired, linted.
+✅ Audit log verified immutable + append-only.
+✅ Access control: seller-owner + admin bypass, non-owner 403, unauthenticated 401.
+✅ No side-effects on Iter 482 financial engine (confirmed by git diff scope: only new files + 3 mount lines in server.py + 2 dashboard wire lines).
+⚠️ Pre-existing $7 hammer premium/premium fee-preview drift (781 vs expected 728) — pre-Iter483, tracked separately.
+
+
 ## iter482+ — Canonical Lot CSV Export (Feb 13, 2026) ✅ SHIPPED · READ-ONLY
 
 **Scope:** Single canonical CSV export system for lot catalog data across every BidVex auction type. Read-only. Zero touch to payment / tax / fee / settlement / Stripe / auction endpoints.

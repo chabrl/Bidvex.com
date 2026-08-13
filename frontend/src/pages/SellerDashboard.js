@@ -33,6 +33,7 @@ import StripeConnectBanner from '../components/StripeConnectBanner';
 // iter239 Mission 5 — Seller "Promote" modal.
 import PromoteListingModal from '../components/PromoteListingModal';
 import { Sparkles, RefreshCw, Pencil, Receipt, FileDown } from 'lucide-react';
+import SellerLiveEditModal from './SellerLiveEditModal';
 // iter474 — Per-row Documents access (statement / receipt / commission invoice)
 import { DocumentsPopover } from '../components/DocumentsPopover';
 // iter476 — Shared Business Settings / Billing Profile (logo + tax IDs)
@@ -175,6 +176,8 @@ const SellerDashboard = () => {
   // service `/api/exports/lots/{auction_id}?surface=seller`.  The
   // filename is set by the backend via Content-Disposition.
   const [csvExportingId, setCsvExportingId] = useState(null);
+  // iter483 — Seller Live Edit Modal state
+  const [liveEditModal, setLiveEditModal] = useState({ open: false, listing: null });
   const handleExportCsv = async (listing) => {
     setCsvExportingId(listing.id);
     try {
@@ -1202,6 +1205,20 @@ const SellerDashboard = () => {
                                 : <FileDown className="h-3.5 w-3.5 mr-1.5" />}
                               {(i18n.language || 'en').startsWith('fr') ? 'Exporter CSV' : 'Export CSV'}
                             </Button>
+                            {/* iter483 — Seller Live Auction Edit (active only) */}
+                            {listing.status === 'active' && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setLiveEditModal({ open: true, listing })}
+                                data-testid={`live-edit-btn-${listing.id}`}
+                                className="w-full lg:w-auto border-blue-300 text-blue-700 hover:bg-blue-50"
+                                title={(i18n.language || 'en').startsWith('fr') ? 'Modifier l\u2019enchère en direct' : 'Edit active auction'}
+                              >
+                                <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                                {(i18n.language || 'en').startsWith('fr') ? 'Modifier' : 'Edit Auction'}
+                              </Button>
+                            )}
                             {/* iter239 Mission 5 — Seller "Promote" affordance for active listings. */}
                             {listing.status === 'active' && (
                               <Button
@@ -1820,6 +1837,17 @@ const RegionalTrendsPanel = ({ token }) => {
           </CardContent>
         </Card>
       </div>
+
+      {/* iter483 — Seller Live Auction Edit Modal */}
+      {liveEditModal.open && liveEditModal.listing && (
+        <SellerLiveEditModal
+          open={liveEditModal.open}
+          onClose={() => setLiveEditModal({ open: false, listing: null })}
+          listing={liveEditModal.listing}
+          token={token}
+          onSaved={() => fetchDashboard()}
+        />
+      )}
     </div>
   );
 };

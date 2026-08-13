@@ -1794,6 +1794,18 @@ try:
     set_lot_exports_auth(_payments_auth)
     app.include_router(lot_exports_router)
 
+    # iter483 — Seller Live Auction Edit + End-Time Request workflow
+    from routes.live_edit import (
+        seller_router as live_edit_seller_router,
+        admin_router  as live_edit_admin_router,
+        set_db   as set_live_edit_db,
+        set_auth as set_live_edit_auth,
+    )
+    set_live_edit_db(db)
+    set_live_edit_auth(_payments_auth)
+    app.include_router(live_edit_seller_router)
+    app.include_router(live_edit_admin_router)
+
     # iter306 — Error logging (frontend + backend) and admin Error Logs tab
     from routes.error_logs import router as error_logs_router
     api_router.include_router(error_logs_router)
