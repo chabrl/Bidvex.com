@@ -11,7 +11,7 @@ import inspect
 import pytest
 
 from routes.admin_ops import admin_get_pending_listings, admin_compliance_alerts
-from routes.admin_user_actions import (
+from routes.admin_user_management import (
     admin_send_notification,
     admin_request_documents,
     SendNotificationPayload,

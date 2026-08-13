@@ -47,7 +47,7 @@ export default function AdminEndTimeRequests() {
     } finally {
       setLoading(false);
     }
-  }, [status, token]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [status, token]);
 
   useEffect(() => { load(); }, [load]);
 

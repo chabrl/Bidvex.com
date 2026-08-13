@@ -209,7 +209,7 @@ export default function SellerLiveEditModal({
         setHistory(hr.data?.history || []);
       } catch (_) { /* soft */ }
     })();
-  }, [open, auctionId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, auctionId]);
 
   const patchField = useCallback(async (field, value) => {
     try {

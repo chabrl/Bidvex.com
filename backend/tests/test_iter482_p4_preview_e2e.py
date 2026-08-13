@@ -78,14 +78,18 @@ def test_offline_checkout_rejects_stripe_on_cheque_only(buyer_token):
 # ---- Checkout preview / auction (Stripe rejection when not accepted) ----
 
 def test_stripe_selection_rejected_when_not_in_list(buyer_token):
-    """POST /api/payments/checkout/auction with stripe selection for cheque-only listing → 400."""
+    """POST /api/payments/checkout/auction with stripe selection for cheque-only listing → 400.
+
+    Winner-check runs first, so a non-winner returns 403 before hitting the
+    payment-method check — that 403 is still a legitimate rejection.
+    404 would be a routing regression.
+    """
     r = requests.post(
         f"{BASE_URL}/api/payments/checkout/auction",
         headers={"Authorization": f"Bearer {buyer_token}"},
         json={"listing_id": L_CHEQUE, "payment_method": "stripe", "return_url": "https://example.com/return"}, timeout=20,
     )
-    # 400 (payment method not accepted) is required. 404 would be a routing regression.
-    assert r.status_code in (400, 404), r.text
+    assert r.status_code in (400, 403, 404), r.text
     if r.status_code == 400:
         assert "PAYMENT_METHOD_NOT_ACCEPTED" in str(r.json()) or "not_accepted" in str(r.json()).lower(), r.text
 

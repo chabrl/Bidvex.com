@@ -1,5 +1,31 @@
 # BidVex — Auction Marketplace PRD
 
+## iter483.1 — Seller Live Edit Modal HOTFIX (Feb 14, 2026) ✅ FIXED · TEST MODE
+
+**User-reported bug:** Edit button on the seller dashboard did not open the modal.
+
+**Root cause:** The `<SellerLiveEditModal />` JSX block was structurally appended to the WRONG component. `SellerDashboard`'s return closes at line 1462 (`};`). The modal JSX was placed near line 1852, which is INSIDE the `RegionalTrendsPanel` sub-component's return block (starts line 1717, ends line 1853). `RegionalTrendsPanel` has no `liveEditModal` state nor `SellerLiveEditModal` import in scope, so React silently rendered nothing when the seller clicked Edit. No console error surfaced because the `RegionalTrendsPanel` initially returns a loading spinner and the buggy JSX only executed after `/api/insights/regional-trends` resolved — by which point the reference error was swallowed by React's async render path.
+
+**Fix:** Moved the modal JSX from inside `RegionalTrendsPanel` (removed lines ~1852-1861) into `SellerDashboard`'s return block, right before its closing `</div>` at line 1460. Now `liveEditModal.open` state is resolved from the correct scope.
+
+**Files changed:**
+- `/app/frontend/src/pages/SellerDashboard.js` — Modal JSX moved from `RegionalTrendsPanel` (bottom of file) to `SellerDashboard` return block (line ~1461).
+
+**Live verification (Playwright end-to-end against preview URL):**
+- ✅ Edit button opens modal (`data-testid="seller-live-edit-modal"` visible)
+- ✅ Title saves + reflects on dashboard immediately (DB: `title="iter483 QA — title saved e2e"`)
+- ✅ Description saves (DB: `description="iter483 QA — description saved e2e"`)
+- ✅ Image URL add pipeline works (DB: `images=[seed, new-url]`)
+- ✅ Schedule/pickup save (DB: `pickup={location, instructions}`)
+- ✅ Shipping saves (DB: `shipping={available:True, notes, estimated_cost:"42.50"}`)
+- ✅ Add-lot button opens flow; single-item `listings` returns "Add-lot is not supported" (intentional); `multi_item_listings` succeeds with "New lot added — pending admin review"
+- ✅ End-time change request submits and shows "Request pending" badge
+- ✅ Admin panel `/admin` → End-Time Change Requests tab lists pending rows (2 shown)
+- ✅ Admin approve fires "Request approved" toast + request moves from Pending → Approved tab
+- ✅ Seller re-opens modal → End Time tab shows green "Request approved" badge + admin note visible + `current_end_time` updated to new value
+- ✅ History tab shows 9 immutable audit entries (title, description, images, schedule, pickup, shipping, end_time, ...)
+
+
 ## iter483 — Seller Live Auction Edit + Admin End-Time Approval (Feb 14, 2026) ✅ SHIPPED · TEST MODE — DO NOT DEPLOY
 
 **Scope:** Sellers can safely edit their live auctions (title, description, images, schedule, pickup, shipping, add new draft lots) without admin approval. End-time changes require admin approval via request/queue flow. All edits appended to immutable `edited_history` audit log.

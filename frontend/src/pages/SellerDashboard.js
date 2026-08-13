@@ -1457,6 +1457,17 @@ const SellerDashboard = () => {
           onCancel={() => setShowTaxModal(false)}
         />
       )}
+
+      {/* iter483 — Seller Live Auction Edit Modal */}
+      {liveEditModal.open && liveEditModal.listing && (
+        <SellerLiveEditModal
+          open={liveEditModal.open}
+          onClose={() => setLiveEditModal({ open: false, listing: null })}
+          listing={liveEditModal.listing}
+          token={token}
+          onSaved={() => fetchDashboard()}
+        />
+      )}
     </div>
   );
 };
@@ -1838,16 +1849,6 @@ const RegionalTrendsPanel = ({ token }) => {
         </Card>
       </div>
 
-      {/* iter483 — Seller Live Auction Edit Modal */}
-      {liveEditModal.open && liveEditModal.listing && (
-        <SellerLiveEditModal
-          open={liveEditModal.open}
-          onClose={() => setLiveEditModal({ open: false, listing: null })}
-          listing={liveEditModal.listing}
-          token={token}
-          onSaved={() => fetchDashboard()}
-        />
-      )}
     </div>
   );
 };
