@@ -227,12 +227,32 @@ back to a hardcoded value instead of erroring.
 | `services/tax_engine.py::calculate_general_payment:466–469` | Missing `seller_is_business` → no hammer tax | Under-collection if seller IS business but flag missing. |
 | `services/broker_fee_engine.py:151` | `QST × amount if QC else 0` — no HST branch | Under-collection on ON/NS/NB/NL/PE. |
 | `routes/broker_compliance.py:146` | Same as broker_fee_engine — QST-or-zero | Under-collection on HST provinces. |
-| `services/invoice_service.py:160` | `9.975% if QC else 0%` — no HST branch | Non-QC invoices show 0 tax even if HST applies. |
+| `services/invoice_service.py:160` | Legacy invoice tax calculation only emits PST/QST when `province == "QC"` and does NOT emit HST for HST jurisdictions (ON/NB/NS/NL/PE). Not a blanket "non-QC = 0 tax" claim — this is a specific **HST-emission omission / non-QC calculation gap** in this code path only. See §5-A for the separate `routes/invoices.py` missing-province fallback defect. | HST provinces: under-collection on the legacy invoice path. Provinces with only GST (AB/BC/MB/SK/YT/NT/NU) fall through without a PST/QST row (behaviour matches DB-canonical rate = GST-only). |
 | `services/connect_payment_engine.py:104-105` | Tax computed at 5% + 9.975% ignoring province | Over-collection on non-QC. |
 
 ---
 
 ## 5. Legal Review Collection (see `LEGAL_TAX_REVIEW_REQUIRED.md`)
+
+### 5-A — Clarified invoice defects (two separate issues; must not be conflated)
+
+The invoice generation path has **two distinct defects**. They are separate code paths, separate risks, and must be tracked separately in any P6 remediation:
+
+**A. Missing-province fallback → QC 14.975% (over-collection risk)**
+- Location: `routes/invoices.py` line 203 and line 608 (`... or "QC"`).
+- Behaviour: when the province field is missing/empty/None on the calling payload, the expression silently defaults to `"QC"` and can apply the QC combined rate (14.975%).
+- Risk: **over-collection** on any buyer/seller whose province was not populated on the invoice payload. This affects unknown/missing province — it does NOT apply to invoices whose province was correctly populated.
+- Explicit clarification: this must NOT be characterized as "all non-QC invoices receive 0 tax." The defect is a silent QC-14.975% fallback when the province is missing, not a zero-tax defect.
+
+**B. HST not emitted by the legacy invoice calculation (under-collection on HST provinces)**
+- Location: `services/invoice_service.py` line 160.
+- Behaviour: the legacy calculation only emits a PST/QST row when `province == "QC"` and does not emit an HST row for HST jurisdictions (ON, NB, NS, NL, PE).
+- Risk: **under-collection** on the legacy invoice path for HST provinces (HST-emission omission). GST-only provinces (AB, BC, MB, SK, YT, NT, NU) are consistent with DB-canonical rates on this path.
+- Explicit clarification: this is a specific HST-emission gap in one legacy calculator. It is NOT a blanket statement that every non-QC invoice receives zero tax; the hot auction settlement path is unaffected and uses the DB-canonical `services/fee_calculator.py::tax_on`.
+
+Issues A and B are independent and require independent legal review and independent P6 remediation.
+
+### 5-B — Other legal-review items
 
 Findings collected in the separate legal review file. Summary:
 - Interprovincial supply — CRA §142.1 Place-of-Supply — currently applied
