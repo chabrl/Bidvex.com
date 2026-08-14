@@ -48,6 +48,12 @@ STATUS_ALIASES: Dict[str, str] = {
     "SHORTFALL": "SHORTFALL",
     "UNKNOWN":   "PENDING",
     "ERROR":     "ERROR",
+    # iter482 P6.2 — non-reconcilable PaymentIntents (subscriptions,
+    # deposits, promotions, etc.) never generate a variance email and
+    # are hidden from the default admin dashboard list. Kept in the DB
+    # so admins have a forensic audit trail of every PI seen by the
+    # webhook.
+    "SKIPPED":   "SKIPPED",
 }
 
 
@@ -60,8 +66,33 @@ def public_status(internal_status: Optional[str]) -> str:
       • SHORTFALL → SHORTFALL  (BidVex is out of pocket)
       • UNKNOWN   → PENDING    (no BalanceTransaction yet)
       • ERROR     → ERROR      (Stripe retrieve failed)
+      • SKIPPED   → SKIPPED    (transaction_type not payer-bears-fee)
     """
     return STATUS_ALIASES.get((internal_status or "").upper(), "PENDING")
+
+
+# ─────────────────────────────────────────────────────────────────────
+# iter482 P6.2 — Payer-bears-fee whitelist
+# ─────────────────────────────────────────────────────────────────────
+# ONLY these PaymentIntent transaction_types carry the canonical P5.1
+# reconciliation metadata (`payment_processing_estimated_cents` +
+# `payment_processing_recovery_cents`).  Any other type (subscriptions,
+# bidder/broker/storage/vehicle deposits, promotions, dealer cards,
+# etc.) has no BidVex recovery attached — reconciling them against a
+# 0-cent recovery would falsely mark every one as SHORTFALL and fire
+# an admin variance email.  We record a SKIPPED row so the forensic
+# audit trail is preserved.
+#
+# To add a new payer-bears-fee flow later:
+#   1. Set `transaction_type` in the PI metadata to a canonical string.
+#   2. Also set `payment_processing_estimated_cents` +
+#      `payment_processing_recovery_cents` on the PI.
+#   3. Add the transaction_type to this whitelist.
+# ─────────────────────────────────────────────────────────────────────
+RECONCILABLE_TRANSACTION_TYPES: frozenset = frozenset({
+    "auction_purchase",
+    "seller_commission_invoice",
+})
 
 
 def _get_stripe():
@@ -118,6 +149,37 @@ async def reconcile_payment_intent(db, payment_intent_id: str) -> Optional[Dict[
     payer_role = meta.get("payment_processing_payer_role") or "buyer"
     rate = meta.get("payment_processing_rate")
     prior_jurisdiction = meta.get("payment_processing_jurisdiction")
+    transaction_type = (meta.get("transaction_type") or "").strip().lower()
+
+    # ── iter482 P6.2 — Gate non-payer-bears-fee PaymentIntents ───────
+    # Subscriptions, deposits, promotions, etc. do NOT carry the
+    # canonical P5.1 recovery metadata.  Reconciling them at 0/0
+    # would falsely mark them as SHORTFALL and dispatch a variance
+    # email.  We still persist a SKIPPED forensic row so admins can
+    # audit which PIs the webhook saw — but no dashboard pollution,
+    # no false alerts, no variance email dispatch.
+    if transaction_type not in RECONCILABLE_TRANSACTION_TYPES:
+        skip_doc = {
+            "payment_intent_id": payment_intent_id,
+            "reconciliation_status": "SKIPPED",
+            "skip_reason": (
+                f"transaction_type='{transaction_type or 'unset'}' "
+                f"not in RECONCILABLE_TRANSACTION_TYPES"
+            ),
+            "transaction_type": transaction_type or None,
+            "engine_version": "iter482-P6.2-v1",
+            "updated_at": _iso_now(),
+        }
+        await db.payment_processing_reconciliation.update_one(
+            {"payment_intent_id": payment_intent_id},
+            {"$set": skip_doc, "$setOnInsert": {"created_at": _iso_now()}},
+            upsert=True,
+        )
+        logger.info(
+            f"[reconcile] PI={payment_intent_id} SKIPPED — "
+            f"transaction_type={transaction_type or '<unset>'}"
+        )
+        return skip_doc
 
     # ── Read actual fee from BalanceTransaction ──────────────────────
     # iter482 P6.1 — Stripe's deep-nested `expand=['latest_charge.balance_transaction']`

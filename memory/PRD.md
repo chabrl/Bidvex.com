@@ -1,6 +1,66 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter482 P6.2 — Reconciliation Gate + Production-Safe Variance Routing (Feb 14, 2026) ✅ SHIPPED · PREVIEW ONLY
+
+### Delivered
+**Fixes S-1 and S-2 from ITER482_FINAL_AUDIT_MATRIX.md.**
+
+**S-1 fix — reconciliation gate (`services/stripe_reconciliation_service.py`):**
+- New whitelist `RECONCILABLE_TRANSACTION_TYPES = frozenset({"auction_purchase", "seller_commission_invoice"})` — the only payer-bears-fee flows that carry the canonical P5.1 metadata (`payment_processing_estimated_cents` + `payment_processing_recovery_cents`).
+- `reconcile_payment_intent()` now checks `metadata.transaction_type` immediately after resolving the PI and returns a `SKIPPED` forensic row when the type isn't whitelisted. **No** SHORTFALL is generated. **No** variance email is dispatched. **No** dashboard pollution.
+- Idempotent — 4× webhook replay produces exactly 1 SKIPPED row and 0 emails, proven end-to-end.
+- Empty/unset `transaction_type` also lands in SKIPPED (default-safe).
+
+**S-2 fix — production-safe variance recipient routing (`services/variance_notification_service.py`):**
+- When `BILLING_ALERT_EMAIL` is set → **only** that address is used (+ `ADMIN_EMAIL` if distinct). Users table is bypassed entirely. This is the recommended production configuration.
+- When `BILLING_ALERT_EMAIL` is unset → admin/super_admin fallback with a `_is_test_email(email)` filter that strips synthetic seeds (`@example.com`, `sub-test-*`, `iter373_lp_*`, `v6-*`, `p61-admin*`, `*@test.com`, `bidvex-p6test`, etc.).
+- `ADMIN_EMAIL` last-resort remains trusted (operator-set).
+
+**Dashboard update (`routes/admin_stripe_reconciliation.py`):**
+- `/summary` excludes SKIPPED from `total_rows` + all cent totals; exposes `skipped` as its own bucket.
+- Default `/list` endpoint hides SKIPPED (auto-adds `reconciliation_status != SKIPPED`); explicit `?status=SKIPPED` grants forensic access.
+- `engine_version` bumped to `iter482-P6.2-v1`.
+
+**Regression tests — 18 new (all green), 8 pre-existing migrated to declare `transaction_type`:**
+- `tests/iter482/test_p62_gating_and_recipients.py` — 18 tests covering:
+  - 11 parametrised non-payer-bears-fee types → all SKIPPED, no emails
+  - Webhook replay idempotency on SKIPPED
+  - `auction_purchase` still reconciles → SHORTFALL + email
+  - `seller_commission_invoice` still reconciles → COVERED
+  - `BILLING_ALERT_EMAIL` bypasses users table
+  - Users-table fallback filters synthetic seeds
+  - Summary endpoint excludes SKIPPED from cent totals
+  - Whitelist frozen — prevents accidental additions
+- Migrations: `_pi_payload` helpers in `test_p6_end_to_end_scenarios.py` + `test_p61_real_stripe_reconciliation.py` + `test_iter482_p51_reconciliation.py` now default `transaction_type=auction_purchase`.
+- `TestRecipientResolution` in `test_p6_variance_notification.py` rewritten to reflect the new production-safe contract (3 focused tests replacing 1 obsolete assertion).
+
+**Live proof on preview:**
+- Injected a fake subscription PI with real 129¢ Stripe fee, replayed 4×: `SKIPPED`, 0 emails, 1 DB row.
+- `/api/admin/stripe-reconciliation/summary` on preview: `total_rows=17`, `skipped=1`, `engine_version=iter482-P6.2-v1`.
+- `/admin/reconciliation` dashboard renders 17 rows (SKIPPED excluded), FR canonical wording preserved.
+
+**Total tests:** 1,533 passing (was 1,523 baseline; net +10 after adding P6.2 suite and consolidating obsolete assertions). Zero financial regressions. Zero tax changes. Zero calculator changes.
+
+**Guardrails held:**
+- ✅ Zero touch to any tax / fee / commission / Stripe / escrow / payout calculators.
+- ✅ Zero payment amount changes.
+- ✅ Zero historical record mutation.
+- ✅ Preview only. No deploy.
+
+**Files changed:**
+- `services/stripe_reconciliation_service.py` (+52 lines — whitelist + gate + SKIPPED alias)
+- `services/variance_notification_service.py` (+58 −20 lines — test-email filter + billing-alert-first routing)
+- `routes/admin_stripe_reconciliation.py` (+21 −5 lines — summary + list SKIPPED exclusion)
+- `tests/iter482/test_p62_gating_and_recipients.py` (NEW, 18 tests)
+- `tests/iter482/test_p6_end_to_end_scenarios.py` (`_pi_payload` inject default `transaction_type`)
+- `tests/iter482/test_p6_variance_notification.py` (`TestRecipientResolution` rewrite)
+- `tests/iter482/test_p61_real_stripe_reconciliation.py` (payload adds `transaction_type=auction_purchase`)
+- `tests/test_iter482_p51_reconciliation.py` (`_fake_pi` default `transaction_type=auction_purchase`)
+- `docs/ITER482_FINAL_AUDIT_MATRIX.md` (already delivered — audit + P8/P9 read-only report)
+
+---
+
 ## iter484.3 P7.5 — Meta + Google Commerce Conversion Tracking (Feb 14, 2026) ✅ SHIPPED · PREVIEW ONLY
 
 ### Delivered

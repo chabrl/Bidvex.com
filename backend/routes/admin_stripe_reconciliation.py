@@ -111,7 +111,13 @@ async def summary(credentials: HTTPAuthorizationCredentials = Depends(security))
     await _require_admin(credentials)
     db = _db()
 
-    total = await db.payment_processing_reconciliation.count_documents({})
+    # iter482 P6.2 — exclude SKIPPED rows from all summary counts.
+    # SKIPPED rows are subscription / deposit / promotion PaymentIntents
+    # that were correctly identified as non-payer-bears-fee and stored
+    # for forensic audit only. They must never affect dashboard stats.
+    _RECON_ONLY = {"reconciliation_status": {"$ne": "SKIPPED"}}
+
+    total = await db.payment_processing_reconciliation.count_documents(_RECON_ONLY)
     covered = await db.payment_processing_reconciliation.count_documents(
         {"reconciliation_status": "COVERED"}
     )
@@ -123,6 +129,9 @@ async def summary(credentials: HTTPAuthorizationCredentials = Depends(security))
     )
     error = await db.payment_processing_reconciliation.count_documents(
         {"reconciliation_status": "ERROR"}
+    )
+    skipped = await db.payment_processing_reconciliation.count_documents(
+        {"reconciliation_status": "SKIPPED"}
     )
     variance = await db.payment_processing_reconciliation.count_documents(
         {"reconciliation_status": "COVERED", "variance_cents": {"$ne": 0}}
@@ -143,12 +152,15 @@ async def summary(credentials: HTTPAuthorizationCredentials = Depends(security))
         {"$group": {"_id": None, "sum": {"$sum": "$variance_cents"}}},
     ])
     total_actual = await _sum([
+        {"$match": _RECON_ONLY},
         {"$group": {"_id": None, "sum": {"$sum": "$actual_cents"}}},
     ])
     total_estimated = await _sum([
+        {"$match": _RECON_ONLY},
         {"$group": {"_id": None, "sum": {"$sum": "$estimated_cents"}}},
     ])
     total_recovery = await _sum([
+        {"$match": _RECON_ONLY},
         {"$group": {"_id": None, "sum": {"$sum": "$recovery_cents"}}},
     ])
 
@@ -160,6 +172,10 @@ async def summary(credentials: HTTPAuthorizationCredentials = Depends(security))
         "shortfall":  shortfall,
         "pending":    unknown,
         "error":      error,
+        # iter482 P6.2 — forensic-only bucket for non-reconcilable PIs
+        # (subscriptions, deposits, promotions). Excluded from
+        # total_rows + cent totals so dashboard stats stay clean.
+        "skipped":    skipped,
         # Cent totals — never round on the frontend, backend is
         # authoritative.
         "estimated_cents_total":  total_estimated,
@@ -170,7 +186,7 @@ async def summary(credentials: HTTPAuthorizationCredentials = Depends(security))
         # Legacy fields — retained so existing callers keep working.
         "covered": covered,
         "unknown": unknown,
-        "engine_version": "iter482-P6-v1",
+        "engine_version": "iter482-P6.2-v1",
     }
 
 
@@ -192,6 +208,12 @@ async def list_reconciliations(
     db = _db()
     q: Dict[str, Any] = {}
 
+    # iter482 P6.2 — Exclude SKIPPED rows by default so the list is
+    # not polluted with subscription / deposit / promotion PIs.
+    # Admins can still opt in via `?status=SKIPPED` for forensic
+    # audit access to the skipped rows.
+    exclude_skipped = True
+
     # Status filter — accepts both P6-canonical + legacy vocabulary.
     if status:
         s = status.upper()
@@ -205,6 +227,9 @@ async def list_reconciliations(
                 # RECONCILED = COVERED with zero variance for the strict UI view.
                 # Loose interpretation (all covered) is available under status=COVERED.
                 q["variance_cents"] = 0
+            elif s == "SKIPPED":
+                q["reconciliation_status"] = "SKIPPED"
+                exclude_skipped = False  # explicit opt-in
             else:
                 internal = _STATUS_PUBLIC_TO_INTERNAL.get(s, s)
                 q["reconciliation_status"] = internal
@@ -212,6 +237,9 @@ async def list_reconciliations(
             # Silently ignore unknown status — the frontend uses a fixed
             # menu, so this only happens on hand-crafted requests.
             pass
+
+    if exclude_skipped and "reconciliation_status" not in q:
+        q["reconciliation_status"] = {"$ne": "SKIPPED"}
 
     if jurisdiction:
         q["resolved_jurisdiction"] = jurisdiction.lower()

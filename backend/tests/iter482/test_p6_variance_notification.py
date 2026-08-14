@@ -312,26 +312,67 @@ class TestReconciliationStatusVocabulary:
 
 
 class TestRecipientResolution:
-    """Recipients MUST combine admin users + BILLING_ALERT_EMAIL env
-    override + ADMIN_EMAIL fallback, deduped, ordered."""
+    """Recipients MUST use production-safe routing (iter482 P6.2):
 
-    def test_deduped_and_ordered(self, monkeypatch):
+    * When ``BILLING_ALERT_EMAIL`` is set → ONLY that address is used
+      (plus ``ADMIN_EMAIL`` if different).  DB users table is bypassed.
+    * When ``BILLING_ALERT_EMAIL`` is unset → fall back to admin/
+      super_admin users, filtering synthetic seed emails.
+    * Deduped, order-preserving in both modes.
+    """
+
+    def test_billing_alert_email_bypasses_users_table(self, monkeypatch):
         from services.variance_notification_service import _resolve_recipients
         db = _FakeDB()
+        # These admins MUST NOT be consulted when BILLING_ALERT_EMAIL is set.
         db.users.docs.extend([
-            {"role": "admin",       "email": "a@bidvex.test"},
-            {"role": "super_admin", "email": "b@bidvex.test"},
-            {"role": "admin",       "email": "a@bidvex.test"},  # duplicate
+            {"role": "admin",       "email": "should-not-be-notified@bidvex.test"},
+            {"role": "super_admin", "email": "also-should-not-be-notified@bidvex.test"},
         ])
         monkeypatch.setenv("BILLING_ALERT_EMAIL", "billing@bidvex.test")
-        monkeypatch.setenv("ADMIN_EMAIL",         "a@bidvex.test")  # dupe of above
+        monkeypatch.setenv("ADMIN_EMAIL",         "billing@bidvex.test")  # same → dedupe
 
         result = asyncio.get_event_loop().run_until_complete(
             _resolve_recipients(db)
         )
-        # Deduped: admins first, then unique env override; ADMIN_EMAIL
-        # already present, so not appended twice.
-        assert result[0] == "a@bidvex.test"
+        assert result == ["billing@bidvex.test"], (
+            f"BILLING_ALERT_EMAIL must be the ONLY recipient when set "
+            f"(with ADMIN_EMAIL dedupe): got {result}"
+        )
+
+    def test_billing_alert_plus_distinct_admin_email(self, monkeypatch):
+        from services.variance_notification_service import _resolve_recipients
+        db = _FakeDB()
+        monkeypatch.setenv("BILLING_ALERT_EMAIL", "billing@bidvex.test")
+        monkeypatch.setenv("ADMIN_EMAIL",         "cto@bidvex.test")
+
+        result = asyncio.get_event_loop().run_until_complete(
+            _resolve_recipients(db)
+        )
+        assert result == ["billing@bidvex.test", "cto@bidvex.test"]
+
+    def test_admin_fallback_filters_test_seeds_and_dedupes(self, monkeypatch):
+        from services.variance_notification_service import _resolve_recipients
+        db = _FakeDB()
+        db.users.docs.extend([
+            {"role": "admin",       "email": "real-admin@bidvex.test"},
+            {"role": "super_admin", "email": "b@bidvex.test"},
+            {"role": "admin",       "email": "real-admin@bidvex.test"},  # dupe
+            {"role": "admin",       "email": "sub-test-abc@example.com"}, # seed - filtered
+            {"role": "admin",       "email": "v6-6ae132@example.com"},    # seed - filtered
+            {"role": "admin",       "email": "iter373_lp_x@bidvex.com"},  # seed - filtered
+        ])
+        monkeypatch.delenv("BILLING_ALERT_EMAIL", raising=False)
+        monkeypatch.setenv("ADMIN_EMAIL", "real-admin@bidvex.test")  # dedupe
+
+        result = asyncio.get_event_loop().run_until_complete(
+            _resolve_recipients(db)
+        )
+        assert result[0] == "real-admin@bidvex.test"
         assert "b@bidvex.test" in result
-        assert "billing@bidvex.test" in result
         assert len(result) == len(set(result))
+        # Synthetic seeds MUST be filtered.
+        for seed in ("sub-test-abc@example.com",
+                     "v6-6ae132@example.com",
+                     "iter373_lp_x@bidvex.com"):
+            assert seed not in result, f"seed {seed!r} leaked through"

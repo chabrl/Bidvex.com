@@ -97,11 +97,18 @@ def test_build_reconciliation_unknown_when_no_actual():
 # ═══════════════════════════════════════════════════════════════════
 # Integration: reconcile_payment_intent persists + is idempotent
 # ═══════════════════════════════════════════════════════════════════
-def _fake_pi(pi_id, *, recovery=330, actual=321, country="CA"):
-    """Build a fake Stripe PaymentIntent object for patch()."""
+def _fake_pi(pi_id, *, recovery=330, actual=321, country="CA",
+             transaction_type="auction_purchase"):
+    """Build a fake Stripe PaymentIntent object for patch().
+
+    iter482 P6.2 — `transaction_type` defaults to `auction_purchase`
+    so these pre-existing reconciliation tests continue to exercise
+    the reconciliation code path (rather than the new SKIPPED gate).
+    """
     return {
         "id": pi_id,
         "metadata": {
+            "transaction_type": transaction_type,
             "payment_processing_estimated_cents": "320",
             "payment_processing_recovery_cents": str(recovery),
             "payment_processing_payer_role": "buyer",

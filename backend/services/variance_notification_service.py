@@ -191,25 +191,88 @@ def _render_html(doc: Dict[str, Any], lang: str) -> str:
     )
 
 
+# iter482 P6.2 — Test/seed email filter
+# =======================================================================
+# When BILLING_ALERT_EMAIL is unset we fall back to admin/super_admin
+# users from the DB.  Preview / staging DBs often carry synthetic seed
+# admin accounts left over from earlier iterations (e.g.
+# `sub-test-*@example.com`, `iter373_lp_admin@bidvex.com`, `v6-*@example.com`).
+# Delivering financial variance alerts to these addresses is both
+# operationally noisy and — if the mailbox is unmonitored — a security
+# risk (sensitive PI IDs in the email body).  This regex removes any
+# obvious test/seed email so only real admin operators receive them.
+_TEST_EMAIL_PATTERNS = (
+    "@example.com",   # RFC 2606 test TLD
+    "@test.com",      # common test domain
+    "sub-test-",      # iter subscription test seeds
+    "iter373_lp_",    # landing-page builder seeds
+    "iter444_",
+    "iter355_",
+    "iter369_",
+    "iter209-",
+    "v6-",            # v6 test batch
+    "v9test_",        # v9 test batch
+    "p61-admin",      # P6.1 test admin
+    "test_",
+    "bidvex-p6test",  # P6 test subdomain
+)
+
+
+def _is_test_email(email: Optional[str]) -> bool:
+    """Return True if the address looks like a test/seed account."""
+    if not email:
+        return True
+    e = email.strip().lower()
+    return any(p in e for p in _TEST_EMAIL_PATTERNS)
+
+
 async def _resolve_recipients(db) -> List[str]:
-    """Recipient resolution mirrors ``compliance_notifier._admin_recipients``.
-    Rules:
-      1. All ``role in {admin, super_admin}`` users (up to 20).
-      2. Plus ``BILLING_ALERT_EMAIL`` env override if set.
-      3. Plus the existing ``ADMIN_EMAIL`` env fallback (last-resort).
-    Deduped, empty-safe, order-preserving.
+    """Resolve variance-notification recipients.
+
+    iter482 P6.2 — Production-safe routing:
+
+      1. If ``BILLING_ALERT_EMAIL`` env is set, USE ONLY THAT (plus
+         ``ADMIN_EMAIL`` as a distinct fallback if different) —
+         bypassing the users table entirely.  This is the recommended
+         production configuration: a dedicated finance mailbox that
+         does not depend on the users collection.
+
+      2. Otherwise, fall back to ``role in {admin, super_admin}`` users
+         (up to 20), but FILTER OUT any address matching a synthetic
+         seed pattern via ``_is_test_email`` — preview / staging DBs
+         carry test admin rows that must never receive financial
+         alerts.
+
+      3. Empty-safe, deduped, order-preserving.
     """
     recipients: List[str] = []
     seen: set = set()
 
-    def _add(email: Optional[str]) -> None:
+    def _add(email: Optional[str], *, allow_test: bool = False) -> None:
         if not email:
             return
         e = email.strip().lower()
+        if not allow_test and _is_test_email(e):
+            logger.info(f"[variance-notify] filtered test/seed email: {email}")
+            return
         if e and e not in seen:
             seen.add(e)
             recipients.append(email)
 
+    billing_alert = os.environ.get("BILLING_ALERT_EMAIL")
+    admin_email = os.environ.get("ADMIN_EMAIL")
+
+    if billing_alert:
+        # Production-safe mode — dedicated finance mailbox is
+        # authoritative. The env-configured value is trusted (operator-
+        # set) so we allow test-looking values through in case the
+        # operator deliberately routes to a testing address on staging.
+        _add(billing_alert, allow_test=True)
+        if admin_email and admin_email.strip().lower() != billing_alert.strip().lower():
+            _add(admin_email, allow_test=True)
+        return recipients
+
+    # Fallback: admin/super_admin users from the DB, filtered.
     try:
         cur = db.users.find(
             {"role": {"$in": ["admin", "super_admin"]}, "email": {"$ne": None}},
@@ -220,8 +283,7 @@ async def _resolve_recipients(db) -> List[str]:
     except Exception as e:  # pragma: no cover — DB failure
         logger.warning(f"[variance-notify] admin recipient lookup failed: {e}")
 
-    _add(os.environ.get("BILLING_ALERT_EMAIL"))
-    _add(os.environ.get("ADMIN_EMAIL"))
+    _add(admin_email, allow_test=True)  # last-resort — trust env value
     return recipients
 
 

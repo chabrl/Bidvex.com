@@ -96,6 +96,7 @@ class TestRealStripeReconciliation:
             confirm=True,
             automatic_payment_methods={"enabled": True, "allow_redirects": "never"},
             metadata={
+                "transaction_type":                    "auction_purchase",
                 "payment_processing_estimated_cents": str(estimated_cents),
                 "payment_processing_recovery_cents":  str(recovery_cents),
                 "payment_processing_payer_role":      "buyer",

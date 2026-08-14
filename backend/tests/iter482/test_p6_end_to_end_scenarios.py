@@ -84,7 +84,16 @@ def _stub_email_dispatch(monkeypatch):
 
 def _pi_payload(*, meta, actual_cents: int, card_country: str) -> Dict[str, Any]:
     """Build a minimal PaymentIntent shape that ``reconcile_payment_intent``
-    reads (metadata + latest_charge + payment_method_details)."""
+    reads (metadata + latest_charge + payment_method_details).
+
+    iter482 P6.2 — Auto-injects `transaction_type=auction_purchase` on
+    every payload that doesn't already declare one so these pre-P6.2
+    scenarios continue to exercise the reconciliation code path
+    instead of the SKIPPED gate.  Explicit transaction_types in caller
+    metadata (e.g. `seller_commission_invoice`) are preserved.
+    """
+    meta = dict(meta)
+    meta.setdefault("transaction_type", "auction_purchase")
     return {
         "metadata": meta,
         "latest_charge": {
