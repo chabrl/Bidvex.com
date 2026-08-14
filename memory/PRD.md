@@ -1004,12 +1004,20 @@ Wired canonical `services/payment_cost_engine.py` into every buyer-facing calcul
 - Backend: FastAPI + Motor (async Mongo)
 - Integrations: Stripe (TEST mode), SendGrid, Twilio, Cloudflare R2, Emergent LLM key
 
+## 2026-02-15 — iter482 Billing Document Visual QA delivery
+- Delivered 47 realistic TEST copies of every billing-related document to `charbel911@gmail.com` (single-recipient safety wrapper, `[TEST/PREVIEW]` on every subject, banner injected in every body).
+- 33 unique documents catalogued (see `/app/docs/ITER482_BILLING_DOCUMENT_INVENTORY.md`).
+- 11 PDFs generated from the actual production PDF renderers (`services/invoice_service.py`, `services/invoice_generator.py`, `invoice_templates.py`).
+- 0 hard-fails, 0 financial discrepancies, 7 P2 presentation defects flagged (EN-only bodies on 6 helpers + FR currency format on bilingual PDF) — see `/app/docs/ITER482_BILLING_VISUAL_QA_REPORT.md`.
+- All 47 iter482 tests still pass.  Zero production-code modifications — additive only.
+
 ## Prioritized backlog (P0 top-down)
 - P0 P5 — Refund engine consolidation + live Stripe TEST proof
 - P0 P6 — Tax engine consolidation across jurisdictions
 - P0 P7 — ≥200-case exact-cent regression matrix
 - P1 P8 — Peripheral flows (escrow, deposits, penalties, marketing)
 - P0 P9 — Static financial audit + final deployment gate
+- P1 iter482 P2 presentation fixes (7 items — EN-only billing helpers + FR PDF currency format)
 - P1 Admin Fee Schedule UI
 - P1 Claude AI models integration
 - P1 Explicit seller-side commission invoice widget on seller dashboard

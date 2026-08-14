@@ -92,6 +92,16 @@ def public_status(internal_status: Optional[str]) -> str:
 RECONCILABLE_TRANSACTION_TYPES: frozenset = frozenset({
     "auction_purchase",
     "seller_commission_invoice",
+    # iter482 P6.4 — payer-bears-fee flows that now carry the canonical
+    # P5.1 metadata on their PaymentIntents.  Adding a value here
+    # REQUIRES the corresponding PI creation site (see
+    # `services/vehicle_fee_service.py::create_vehicle_platform_fee_pi`
+    # and `routes/payments.py::buy_now_checkout` +
+    # `routes/payments.py::vehicle_buy_now`) to also set
+    # `payment_processing_estimated_cents` +
+    # `payment_processing_recovery_cents` + payer_role + jurisdiction.
+    "buy_it_now",
+    "vehicle_platform_fee",
 })
 
 

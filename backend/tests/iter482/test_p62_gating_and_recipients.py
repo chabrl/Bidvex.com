@@ -182,8 +182,6 @@ NON_RECONCILABLE_TYPES = [
     "",              # explicit empty
     "unknown_type",  # future safety
 ]
-
-
 @pytest.mark.parametrize("tx_type", NON_RECONCILABLE_TYPES)
 async def test_reconcile_skips_non_payer_bears_fee_types(
     tx_type, db, stub_stripe, capture_emails
@@ -496,6 +494,8 @@ def test_reconcilable_whitelist_is_frozen():
     assert RECONCILABLE_TRANSACTION_TYPES == frozenset({
         "auction_purchase",
         "seller_commission_invoice",
+        "buy_it_now",
+        "vehicle_platform_fee",
     }), (
         "Adding a new payer-bears-fee transaction_type requires a "
         "matching update to this test AND documentation of the new "

@@ -71,6 +71,37 @@ async def create_vehicle_fee_charge(
 
     amount_cents = int(round(fees["total_charge"] * 100))
 
+    # iter482 P6.4 — Canonical P5.1 reconciliation metadata.  BidVex is
+    # the payer-bears-fee recipient (buyer pays platform fee + stripe
+    # recovery).  Compute via the canonical engine so the additive
+    # estimate + gross-up recovery are consistent with every other
+    # payer-bears-fee flow.
+    from services.payment_cost_engine import (
+        estimate as _pce_estimate,
+        build_pi_metadata as _pce_metadata,
+        PaymentMethod as _PCE_PM,
+        PayerRole as _PCE_Payer,
+    )
+    _recovery_cents_vf = int(round(float(fees["stripe_processing_fee"] or 0) * 100))
+    _base_pre_stripe_cents_vf = max(amount_cents - _recovery_cents_vf, 0)
+    _pce_snapshot_vf = _pce_estimate(
+        payment_method=_PCE_PM.STRIPE_CARD,
+        amount_cents=_base_pre_stripe_cents_vf,
+        currency="CAD",
+        payer_role=_PCE_Payer.BUYER,
+        # jurisdiction is domestic-assumed at PI creation time; the
+        # webhook resolves the true value from card.country and
+        # persists it on the reconciliation row.
+        jurisdiction="QC",
+        card_class="domestic",
+        mode="gross_up",
+    )
+    _pi_reconc_metadata_vf = _pce_metadata(
+        transaction_type="vehicle_platform_fee",
+        est=_pce_snapshot_vf,
+        payer_role="buyer",
+    )
+
     try:
         pi_params = {
             "amount": amount_cents,
@@ -78,9 +109,9 @@ async def create_vehicle_fee_charge(
             "customer": buyer_stripe_customer_id,
             "description": f"BidVex Platform Fee — Auction #{auction_id[:8]}",
             "metadata": {
+                **_pi_reconc_metadata_vf,
                 "bidvex_role": "platform_intermediary",
                 "vehicle_title_holder": "seller",
-                "transaction_type": "vehicle_platform_fee",
                 "auction_id": auction_id,
                 "buyer_id": buyer_id,
                 "hammer_price": str(hammer_price),

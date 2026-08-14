@@ -581,6 +581,49 @@ def describe_rates() -> Dict[str, Any]:
     }
 
 
+# ─────────────────────────────────────────────────────────────────────
+# iter482 P6.4 — Canonical PI-metadata helper
+# ─────────────────────────────────────────────────────────────────────
+# Any payer-bears-fee Stripe PI (buyer auction purchase, seller
+# commission invoice, buy_it_now, vehicle_platform_fee, ...) MUST carry
+# the same set of five keys in its ``metadata`` so
+# ``stripe_reconciliation_service.reconcile_payment_intent`` can
+# compare estimated ↔ recovery ↔ actual on webhook receipt.
+#
+# This helper serializes an ``EstimatedCost`` (or the raw amounts) into
+# that dict.  It does NOT compute any new fee — it only formats what
+# the canonical engine already returned.
+def build_pi_metadata(
+    *,
+    transaction_type: str,
+    est: "EstimatedCost",
+    payer_role: str = "buyer",
+) -> Dict[str, str]:
+    """Return the canonical PaymentIntent metadata block.
+
+    All values are stringified because Stripe requires all metadata
+    values to be strings (max 500 chars each, 50 keys per resource).
+
+    Args:
+        transaction_type: One of the whitelisted values in
+            ``services.stripe_reconciliation_service.RECONCILABLE_TRANSACTION_TYPES``.
+        est: The ``EstimatedCost`` returned by ``estimate(mode="gross_up")``.
+        payer_role: "buyer" | "seller" | "partner" | "platform".
+
+    Returns:
+        Dict[str, str] — merge into your ``PaymentIntent.create(metadata=...)``
+        or ``payment_intent_data.metadata`` on a Checkout Session.
+    """
+    return {
+        "transaction_type": transaction_type,
+        "payment_processing_estimated_cents": str(int(est.estimated_cents or 0)),
+        "payment_processing_recovery_cents":  str(int(est.recovery_cents or 0)),
+        "payment_processing_payer_role":      payer_role,
+        "payment_processing_jurisdiction":    (est.jurisdiction or "").lower() or "domestic",
+        "payment_processing_rate":            (est.rate_label or ""),
+    }
+
+
 __all__ = [
     "ENGINE_VERSION",
     "PaymentMethod",
@@ -593,4 +636,5 @@ __all__ = [
     "estimate",
     "lock_actual",
     "describe_rates",
+    "build_pi_metadata",
 ]

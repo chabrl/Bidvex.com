@@ -1774,6 +1774,35 @@ async def buy_now_checkout(
 
     auction_currency = auction.get("currency", "CAD").lower()
 
+    # iter482 P6.4 — Canonical PI reconciliation metadata.  Compute the
+    # payer-bears-fee estimate + gross-up recovery via the canonical
+    # engine, then attach BOTH to Session.metadata (for admin/legacy
+    # readers) AND to payment_intent_data.metadata (so it propagates
+    # to the PaymentIntent and the P6.2 reconciliation gate accepts
+    # this as a reconcilable flow).
+    from services.payment_cost_engine import (
+        estimate as _pce_estimate,
+        build_pi_metadata as _pce_metadata,
+        PaymentMethod as _PCE_PM,
+        PayerRole as _PCE_Payer,
+    )
+    _recovery_cents = int(round(float(bi.stripe_recovery or 0) * 100))
+    _base_pre_stripe_cents = max(buyer_total_cents - _recovery_cents, 0)
+    _pce_snapshot = _pce_estimate(
+        payment_method=_PCE_PM.STRIPE_CARD,
+        amount_cents=_base_pre_stripe_cents,
+        currency=auction_currency.upper(),
+        payer_role=_PCE_Payer.BUYER,
+        jurisdiction=(buyer_province or "QC"),
+        card_class="domestic",
+        mode="gross_up",
+    )
+    _pi_reconc_metadata = _pce_metadata(
+        transaction_type="buy_it_now",
+        est=_pce_snapshot,
+        payer_role="buyer",
+    )
+
     session_params = {
         "customer": customer_id,
         "payment_method_types": ["card"],
@@ -1812,6 +1841,16 @@ async def buy_now_checkout(
         session_params["payment_intent_data"] = {
             "application_fee_amount": stripe_application_fee_cents,
             "transfer_data": {"destination": seller_connect_id},
+            # iter482 P6.4 — canonical reconciliation metadata on the
+            # PaymentIntent so the P6.2 gate accepts this flow.
+            "metadata": {**_pi_reconc_metadata, "listing_id": data.auction_id},
+        }
+    else:
+        # No Connect destination charge — attach reconciliation
+        # metadata directly via payment_intent_data.metadata anyway so
+        # the PI carries the canonical fields.
+        session_params["payment_intent_data"] = {
+            "metadata": {**_pi_reconc_metadata, "listing_id": data.auction_id},
         }
 
     session = stripe_mod.checkout.Session.create(**session_params)
@@ -2469,6 +2508,36 @@ async def vehicle_buy_now_checkout(
     card_charged_amount = 0.0
     stripe_actions = []
 
+    # iter482 P6.4 — Canonical reconciliation metadata for the P6.2
+    # gate.  We compute ONCE up front and reuse across all three
+    # PaymentIntent creation branches (Session fallback, remainder
+    # PI, and full-charge PI).  This ensures every vehicle_buy_now
+    # Stripe object carries payment_processing_estimated_cents +
+    # payment_processing_recovery_cents so the webhook reconciler
+    # accepts it.
+    from services.payment_cost_engine import (
+        estimate as _pce_estimate,
+        build_pi_metadata as _pce_metadata,
+        PaymentMethod as _PCE_PM,
+        PayerRole as _PCE_Payer,
+    )
+    _recovery_cents_v = int(round(float(bi.stripe_recovery or 0) * 100))
+    _base_pre_stripe_cents_v = max(platform_fee_cents - _recovery_cents_v, 0)
+    _pce_snapshot_v = _pce_estimate(
+        payment_method=_PCE_PM.STRIPE_CARD,
+        amount_cents=_base_pre_stripe_cents_v,
+        currency="CAD",
+        payer_role=_PCE_Payer.BUYER,
+        jurisdiction=(buyer_province or "QC"),
+        card_class="domestic",
+        mode="gross_up",
+    )
+    _pi_reconc_metadata_v = _pce_metadata(
+        transaction_type="buy_it_now",
+        est=_pce_snapshot_v,
+        payer_role="buyer",
+    )
+
     try:
         if deposit:
             deposit_amount = float(deposit.get("amount", 500.0))
@@ -2500,6 +2569,31 @@ async def vehicle_buy_now_checkout(
 
                 remainder_cents = platform_fee_cents - deposit_cents
                 remainder_amount = round(remainder_cents / 100.0, 2)
+                # iter482 P6.4 — the remainder PI carries a pro-rata
+                # slice of the same buy_it_now flow.  Attach canonical
+                # reconciliation metadata scaled to the remainder
+                # amount so the P6.2 gate accepts this Stripe object
+                # too.  We do NOT double-count: the "estimated" and
+                # "recovery" fields describe THIS PI only.
+                _remainder_recovery_cents = max(
+                    int(round(_recovery_cents_v * remainder_cents / max(platform_fee_cents, 1))),
+                    0,
+                )
+                _remainder_base_cents = max(remainder_cents - _remainder_recovery_cents, 0)
+                _pce_snapshot_rem = _pce_estimate(
+                    payment_method=_PCE_PM.STRIPE_CARD,
+                    amount_cents=_remainder_base_cents,
+                    currency="CAD",
+                    payer_role=_PCE_Payer.BUYER,
+                    jurisdiction=(buyer_province or "QC"),
+                    card_class="domestic",
+                    mode="gross_up",
+                )
+                _pi_reconc_metadata_rem = _pce_metadata(
+                    transaction_type="buy_it_now",
+                    est=_pce_snapshot_rem,
+                    payer_role="buyer",
+                )
                 from services.stripe_circuit_breaker import safe_stripe_call_blocking
                 pi = await safe_stripe_call_blocking(
                     lambda: stripe.PaymentIntent.create(
@@ -2511,6 +2605,7 @@ async def vehicle_buy_now_checkout(
                         confirm=True if user_doc.get("stripe_default_payment_method") else False,
                         description=f"BidVex Vehicle Platform Fee Remainder — Listing {data.listing_id}",
                         metadata={
+                            **_pi_reconc_metadata_rem,
                             "type": "vehicle_buy_now_remainder",
                             "listing_id": data.listing_id,
                             "buyer_id": current_user.id,
@@ -2556,8 +2651,8 @@ async def vehicle_buy_now_checkout(
                     success_url=f"{os.environ.get('FRONTEND_URL', 'https://bidvex.com')}/vehicle-auctions/{data.listing_id}?buy_now=success&txn={transaction_id}",
                     cancel_url=f"{os.environ.get('FRONTEND_URL', 'https://bidvex.com')}/vehicle-auctions/{data.listing_id}?buy_now=cancelled",
                     metadata={
+                        **_pi_reconc_metadata_v,
                         "type": "vehicle_buy_now",
-                        "transaction_type": "buy_it_now",
                         "buy_now": "true",
                         "listing_id": data.listing_id,
                         "item_id": data.listing_id,
@@ -2608,8 +2703,8 @@ async def vehicle_buy_now_checkout(
                 confirm=True,
                 description=f"BidVex Vehicle Platform Fee — Listing {data.listing_id}",
                 metadata={
+                    **_pi_reconc_metadata_v,
                     "type": "vehicle_buy_now",
-                    "transaction_type": "buy_it_now",
                     "buy_now": "true",
                     "listing_id": data.listing_id,
                     "item_id": data.listing_id,
