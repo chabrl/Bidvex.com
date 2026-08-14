@@ -61,6 +61,15 @@ PERMITTED_FIELDS: set[str] = {
     "title", "description",
     "images",
     "schedule", "pickup", "shipping",
+    # iter483.3 — Per-lot image add/remove (multi-lot auctions only)
+    "lot_image_add", "lot_image_remove",
+}
+
+# iter483.3 — Fields that become locked at the auction level once
+# ANY bid has been placed on ANY lot of the auction. Sellers must
+# route requests through the Request Center for these instead.
+AUCTION_BID_LOCKED_FIELDS: set[str] = {
+    "title", "description", "schedule", "pickup", "shipping",
 }
 
 MIN_REASON_LENGTH = 20
@@ -172,8 +181,9 @@ def _make_history_entry(
     old_value: Any,
     new_value: Any,
     edited_by: str,
+    extra: Optional[dict] = None,
 ) -> dict:
-    return {
+    entry = {
         "id":         str(uuid.uuid4()),
         "field":      field,
         "old_value":  old_value,
@@ -181,6 +191,9 @@ def _make_history_entry(
         "edited_by":  edited_by,
         "edited_at":  _now_iso(),
     }
+    if extra:
+        entry.update(extra)
+    return entry
 
 
 async def _append_history(
@@ -190,6 +203,61 @@ async def _append_history(
         {"id": auction_id},
         {"$push": {"edited_history": entry}},
     )
+
+
+# ═════════════════════════════════════════════════════════════════════
+# iter483.3 — Bid-count helpers (lot-level + auction-level lock)
+# ═════════════════════════════════════════════════════════════════════
+
+async def _auction_bid_count(db, collection: str, doc: dict) -> int:
+    """Return total bids across all lots (or the auction itself).
+
+    Reads from three sources — first non-zero wins:
+      1) top-level ``bid_count`` field (fastest path if kept in sync)
+      2) sum of ``lots[].bid_count``
+      3) live count from ``db.bids`` collection (listing_id match)
+    """
+    top = doc.get("bid_count")
+    if isinstance(top, (int, float)) and top > 0:
+        return int(top)
+    lots = doc.get("lots") or []
+    if lots:
+        total = sum(int(l.get("bid_count") or 0) for l in lots if isinstance(l, dict))
+        if total > 0:
+            return total
+    try:
+        return await db.bids.count_documents({"listing_id": doc.get("id")})
+    except Exception:
+        return 0
+
+
+async def _lot_bid_count(db, doc: dict, lot: dict) -> int:
+    """Bids received by a single lot within a multi-lot auction."""
+    v = lot.get("bid_count")
+    if isinstance(v, (int, float)) and v > 0:
+        return int(v)
+    try:
+        return await db.bids.count_documents({
+            "listing_id": doc.get("id"),
+            "lot_number": lot.get("lot_number"),
+        })
+    except Exception:
+        return 0
+
+
+def _find_lot(doc: dict, lot_ref: Any) -> Optional[dict]:
+    """Resolve a lot by id OR lot_number within an auction doc."""
+    for lot in doc.get("lots") or []:
+        if not isinstance(lot, dict):
+            continue
+        if lot.get("id") == lot_ref:
+            return lot
+        try:
+            if int(lot.get("lot_number")) == int(lot_ref):
+                return lot
+        except (TypeError, ValueError):
+            continue
+    return None
 
 
 # ═════════════════════════════════════════════════════════════════════
@@ -232,6 +300,25 @@ async def live_edit(
     _require_seller_of_active(doc, current_user)
 
     editor = _user_id(current_user) or "unknown"
+
+    # ── iter483.3 · Auction-level bid lock ─────────────────────────
+    # Once ANY bid has been placed on the auction (single-lot or any
+    # lot of a multi-lot), the seller can NO LONGER directly edit the
+    # locked fields — they must submit an edit request via the Request
+    # Center.  Admins bypass this rule.  Auction-level images remain
+    # editable so sellers can still swap the hero photo etc.  Per-lot
+    # edits (lot_image_add / lot_image_remove) are gated separately
+    # in their handlers below.
+    if (
+        field in AUCTION_BID_LOCKED_FIELDS
+        and not _is_admin(current_user)
+    ):
+        bid_count = await _auction_bid_count(db, collection, doc)
+        if bid_count > 0:
+            raise AccessDenied(
+                "auction_has_bids — use request flow "
+                f"(field={field!r}, bids={bid_count})"
+            )
 
     # ── title / description ─────────────────────────────────────────
     if field == "title":
@@ -362,6 +449,73 @@ async def live_edit(
             _make_history_entry("shipping", old, v, editor))
         return {"success": True, "auction_id": auction_id,
                 "field": "shipping", "new_value": v}
+
+    # ── iter483.3 · Per-lot images (multi-lot auctions only) ───────
+    if field in {"lot_image_add", "lot_image_remove"}:
+        if not isinstance(value, dict):
+            raise InvalidField(
+                f"{field} payload must be a dict with lot_id + image_url")
+        lot_ref = value.get("lot_id") or value.get("lot_number")
+        image_url = value.get("image_url") or value.get("url")
+        if not lot_ref:
+            raise InvalidField("lot_id (or lot_number) is required")
+        if not image_url or not isinstance(image_url, str):
+            raise InvalidField("image_url must be a non-empty string")
+
+        lots = list(doc.get("lots") or [])
+        if not lots:
+            raise InvalidField(
+                "Per-lot images are only supported on multi-lot auctions")
+
+        target = _find_lot(doc, lot_ref)
+        if target is None:
+            raise NotFoundError(f"Lot {lot_ref!r} not found in auction")
+
+        # Bid-lock: a lot that has received bids is fully locked for
+        # seller editing (admins bypass).
+        if not _is_admin(current_user):
+            lot_bids = await _lot_bid_count(db, doc, target)
+            if lot_bids > 0:
+                raise AccessDenied(
+                    f"lot_has_bids — lot={target.get('lot_number')} "
+                    f"bids={lot_bids}")
+
+        lot_imgs = list(target.get("images") or [])
+        old_imgs = list(lot_imgs)
+
+        if field == "lot_image_add":
+            if image_url not in lot_imgs:
+                lot_imgs.append(image_url)
+        else:  # lot_image_remove
+            lot_imgs = [u for u in lot_imgs if u != image_url]
+
+        # Positional update on the matched lot.
+        # We match by lot_number (stable) OR by embedded id.
+        lot_number = target.get("lot_number")
+        lot_id = target.get("id")
+        filter_q: dict = {"id": auction_id}
+        arr_filter: dict
+        if lot_id is not None:
+            filter_q["lots.id"] = lot_id
+            arr_filter = {"lots.$.images": lot_imgs}
+        else:
+            filter_q["lots.lot_number"] = lot_number
+            arr_filter = {"lots.$.images": lot_imgs}
+
+        await db[collection].update_one(
+            filter_q,
+            {"$set": {**arr_filter, "updated_at": _now_iso()}},
+        )
+        await _append_history(
+            db, collection, auction_id,
+            _make_history_entry(field, old_imgs, lot_imgs, editor,
+                                extra={"lot_number": lot_number,
+                                       "lot_id": lot_id,
+                                       "image_url": image_url}),
+        )
+        return {"success": True, "auction_id": auction_id, "field": field,
+                "lot_number": lot_number, "lot_id": lot_id,
+                "new_value": lot_imgs}
 
     raise InvalidField(f"Unhandled field {field!r}")
 
@@ -717,11 +871,39 @@ async def get_edit_state(
     db, auction_id: str, current_user: Any,
 ) -> dict:
     """Return the current DB values of every editable field so the modal
-    can render the true saved state on re-open (no stale placeholders)."""
+    can render the true saved state on re-open (no stale placeholders).
+
+    iter483.3 additions: `bid_count` (auction-level lock signal), plus
+    per-lot `bid_count` inside each lot summary so the UI can render
+    lock badges + disable inputs on locked lots.
+    """
     coll, doc = await resolve_auction(db, auction_id)
     if not _is_admin(current_user):
         if doc.get("seller_id") != _user_id(current_user):
             raise AccessDenied("You are not the owner of this auction")
+
+    # Roll up bid counts
+    auction_bids = await _auction_bid_count(db, coll, doc)
+    lots_summary = []
+    for lot in (doc.get("lots") or []):
+        if not isinstance(lot, dict):
+            continue
+        bc = await _lot_bid_count(db, doc, lot)
+        lots_summary.append({
+            "id":              lot.get("id"),
+            "lot_number":      lot.get("lot_number"),
+            "title":           lot.get("title") or "",
+            "description":     lot.get("description") or "",
+            "quantity":        lot.get("quantity"),
+            "starting_price":  lot.get("starting_price"),
+            "reserve_price":   lot.get("reserve_price"),   # may be None
+            "current_price":   lot.get("current_price"),
+            "status":          lot.get("status"),
+            "images":          list(lot.get("images") or []),
+            "bid_count":       bc,
+            "locked":          bc > 0,
+        })
+
     return {
         "auction_id":  auction_id,
         "collection":  coll,
@@ -733,6 +915,13 @@ async def get_edit_state(
         "shipping":    dict(doc.get("shipping") or {}),
         "status":      doc.get("status"),
         "end_time":    doc.get("end_time") or doc.get("auction_end_date"),
+        # iter483.3 lock signals
+        "bid_count":            auction_bids,
+        "auction_locked":       auction_bids > 0,
+        "locked_fields":        (
+            sorted(AUCTION_BID_LOCKED_FIELDS) if auction_bids > 0 else []
+        ),
+        "lots":                 lots_summary,
     }
 
 

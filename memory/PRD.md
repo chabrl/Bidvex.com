@@ -1,5 +1,100 @@
 # BidVex — Auction Marketplace PRD
 
+## iter483.3 — Lot-Level Controls + Auction Requests Center + Responsive UX (Feb 14, 2026) ✅ SHIPPED · PREVIEW ONLY
+
+### Scope
+1. Lot-level image upload (drag & drop) per lot in the seller edit modal.
+2. Full responsive UX (mobile / tablet / desktop) with sticky mobile Save and unsaved-changes confirm dialog.
+3. Bid-locked lot protection — server + UI.
+4. Auction-level bid lock — server + UI (edit via request only).
+5. Unified Auction Request Center (end_time · reserve_price · edit).
+6. Admin-only Reserve Price setter (per lot or auction).
+7. Admin unified Auction Requests queue with filters.
+8. Admin Lot Editor fully responsive with per-lot S3 uploader + Reserve Price field.
+
+### Backend
+**New files**
+- `services/auction_requests_service.py` — unified request lifecycle + reserve-price setter.
+- `routes/auction_requests.py` — seller + admin endpoints.
+
+**Modified**
+- `services/live_edit_service.py`:
+  - Added `AUCTION_BID_LOCKED_FIELDS` (title, description, schedule, pickup, shipping).
+  - Added `_auction_bid_count`, `_lot_bid_count`, `_find_lot` helpers.
+  - Enforced auction-level bid lock inside `live_edit()` (403 `auction_has_bids` for non-admin).
+  - Added `lot_image_add` / `lot_image_remove` field handlers with per-lot bid lock (403 `lot_has_bids`).
+  - Extended `_make_history_entry` to accept `extra` payload (lot_number, request_id).
+  - Extended `get_edit_state` to return `bid_count`, `auction_locked`, `locked_fields`, and per-lot `bid_count` + `locked` flags.
+- `server.py` — mounted `auction_requests` routers.
+
+**New endpoints**
+- `POST   /api/auctions/{id}/requests` — submit any request type
+- `GET    /api/auctions/{id}/requests` — seller view of own requests
+- `GET    /api/admin/auction-requests` — unified admin queue (filters: status, request_type, auction_id, seller_id)
+- `POST   /api/admin/auction-requests/{req}/approve|deny`
+- `PATCH  /api/admin/lots/reserve-price` — admin-only reserve setter (per lot or auction; `null` cents clears)
+- Legacy `auction_end_time_requests` collection is bridged into the unified queue so pre-iter483.3 rows still appear.
+
+### Frontend
+- `pages/SellerLiveEditModal.jsx` — full responsive rewrite:
+  - Mobile (<640px) full-screen sheet · Tablet 720px · Desktop 860px.
+  - Horizontal scroll-pill tab row across all breakpoints.
+  - Sticky mobile Save button.
+  - Bid-lock badge in header; `LockNotice` in each locked section with "Submit Edit Request" CTA that pre-fills the Request Center.
+  - New Lots tab with per-lot cards, each with own S3 dropzone + per-lot bid-lock badge + "Reserve price" request button.
+  - New Requests tab (unified Auction Request Center): end_time / reserve_price / edit picker; own-requests list with status badges.
+  - Unsaved-changes AlertDialog on tab switch.
+- `pages/admin/AdminAuctionRequests.jsx` — new unified admin queue (replaces `AdminEndTimeRequests`).
+  - Filters: status × request_type × search by auction_id/seller_id.
+  - Per-row payload summary + reason + admin_note + Approve/Deny (mobile-full buttons).
+- `pages/admin/AdminLotEditorModal.js` — full responsive rewrite:
+  - Full-screen sheet on mobile · 3xl on tablet · 5xl on desktop.
+  - Grid layout (1 col mobile / 2 col md+); no horizontal scroll.
+  - Per-lot admin-only S3 dropzone with progress bar.
+  - Dedicated Reserve Price section flagged "Admin Only — hidden from public".
+- `pages/AdminDashboard.js` — replaced sidebar item "End-Time Change Requests" (⏰) with "Auction Requests" (📬).
+
+### Tests
+- `tests/test_iter483_3_lot_and_requests.py` — 29 new tests:
+  - lot_image_add/remove (5)
+  - bid-locked lot protection (2)
+  - auction-level bid lock enforcement (5 parametrized fields + 2 admin bypass + images-still-allowed)
+  - `get_edit_state` bid-count + locks summary
+  - unified Auction Request create / duplicate 409 / reason min-length / all 3 types
+  - admin approve applies edit / deny leaves untouched
+  - admin unified list requires admin
+  - seller sees own requests
+  - reserve price admin-only setter (5 scenarios: lot / auction / clear / non-admin / negative)
+- Extended fake DB positional-op support in the shared test harness (backwards-compatible).
+
+### Live E2E verification (Playwright · preview URL)
+Desktop (1920×900):
+- ☑ 8 tabs render in seller modal
+- ☑ Lots tab shows 3 lot cards with per-lot dropzone + "Reserve price" button
+- ☑ Lot #1 shows `Reserve: $500` badge (from admin-set reserve)
+- ☑ Request Center renders 3 type buttons; approved/pending requests listed
+- ☑ Admin unified queue shows 3 pending rows across types (3 filters × 4 types × search)
+- ☑ Filter=edit narrows to 1 row
+- ☑ Admin approve fires "Request approved" toast and row moves out of Pending
+- ☑ Admin lot editor shows 24 lots in 2-column grid (no horizontal scroll)
+- ☑ Reserve Price field visible with admin-only warning
+
+Tablet (900×900):
+- ☑ Seller modal renders at 720px width with pill tabs
+
+Mobile (390×844):
+- ☑ Seller modal is full-screen with sticky Save button
+- ☑ Admin queue filters wrap; Approve/Deny become full-width
+- ☑ Admin lot editor stacks single-column; all controls tappable
+
+### Backend test summary
+- **36 iter483** live-edit tests: PASS
+- **29 iter483.3** new tests: PASS
+- **Total 65/65 green**
+
+**Guardrails held:** zero payment/tax/fee/Stripe files touched (`git status` verified); no deploy; no pre-existing test failures fixed.
+
+
 ## iter483.2 — Description Refresh + Direct S3 Uploader (Feb 14, 2026) ✅ SHIPPED
 
 ### Fix 1 — Description field refreshes from DB on modal open

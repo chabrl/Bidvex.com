@@ -1806,6 +1806,20 @@ try:
     app.include_router(live_edit_seller_router)
     app.include_router(live_edit_admin_router)
 
+    # iter483.3 — Unified Auction Requests (end_time + reserve_price + edit)
+    from routes.auction_requests import (
+        seller_router        as ar_seller_router,
+        admin_router         as ar_admin_router,
+        admin_reserve_router as ar_admin_reserve_router,
+        set_db   as set_ar_db,
+        set_auth as set_ar_auth,
+    )
+    set_ar_db(db)
+    set_ar_auth(_payments_auth)
+    app.include_router(ar_seller_router)
+    app.include_router(ar_admin_router)
+    app.include_router(ar_admin_reserve_router)
+
     # iter306 — Error logging (frontend + backend) and admin Error Logs tab
     from routes.error_logs import router as error_logs_router
     api_router.include_router(error_logs_router)
