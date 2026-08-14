@@ -120,6 +120,17 @@ async def reconcile_payment_intent(db, payment_intent_id: str) -> Optional[Dict[
     prior_jurisdiction = meta.get("payment_processing_jurisdiction")
 
     # ── Read actual fee from BalanceTransaction ──────────────────────
+    # iter482 P6.1 — Stripe's deep-nested `expand=['latest_charge.balance_transaction']`
+    # can return `balance_transaction=None` in the current API version
+    # (the nested expansion is not populated immediately after confirm —
+    # Stripe's ledger writes the BalanceTransaction asynchronously,
+    # typically within a few seconds). Fall back to retrieving the
+    # charge directly with a single-level expand, and if the BT is
+    # still absent, poll up to 3× at 1s intervals. In production the
+    # `payment_intent.succeeded` webhook usually arrives after the BT
+    # is posted, but this retry hardens the direct-call path used by
+    # tests and admin re-reconciliation.
+    import time as _time
     actual_cents = 0
     stripe_currency = "cad"
     charge_id = None
@@ -128,12 +139,26 @@ async def reconcile_payment_intent(db, payment_intent_id: str) -> Optional[Dict[
     latest_charge = pi.get("latest_charge") or {}
     if isinstance(latest_charge, dict):
         charge_id = latest_charge.get("id")
-        bt = latest_charge.get("balance_transaction") or {}
+        bt = latest_charge.get("balance_transaction")
+        if not isinstance(bt, dict) and charge_id:
+            for _attempt in range(3):
+                try:
+                    fresh = stripe.Charge.retrieve(charge_id, expand=["balance_transaction"])
+                    bt = fresh.get("balance_transaction")
+                    if isinstance(bt, dict):
+                        break
+                except Exception as _bt_exc:
+                    logger.warning(f"[reconcile] charge refetch for BT failed: {_bt_exc}")
+                    bt = None
+                _time.sleep(1)
         if isinstance(bt, dict):
             balance_txn_id = bt.get("id")
             actual_cents = int(bt.get("fee") or 0)
             stripe_currency = (bt.get("currency") or "cad").lower()
-            fee_details = bt.get("fee_details") or []
+            # Convert Stripe FeeDetail objects to plain dicts so Motor
+            # can persist them cleanly.
+            raw_details = bt.get("fee_details") or []
+            fee_details = [dict(x) if isinstance(x, dict) else x for x in raw_details]
 
     # ── Resolve authoritative card country ───────────────────────────
     card_country = None
