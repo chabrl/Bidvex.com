@@ -564,6 +564,25 @@ async def place_lot_bid(
         },
     )
 
+    # iter484.2 — Snapshot accepted_payment_methods on FIRST bid of the
+    # whole vehicle multi-lot event (regardless of which lot).  Idempotent.
+    # Vehicle bidding is currently gated system-wide but wiring this
+    # protects future activation.
+    try:
+        total_bids = sum(int(lt.get("bid_count") or 0) for lt in event.get("lots") or [])
+        if total_bids == 0:  # this bid is the very first — pre-increment view
+            from services.seller_payment_methods_service import snapshot_at_first_bid
+            _snap = snapshot_at_first_bid(event)
+            if _snap:
+                await _db.vehicle_multi_lot_auctions.update_one(
+                    {"id": event_id},
+                    {"$set": _snap},
+                )
+    except Exception as _snap_exc:  # noqa: BLE001
+        logger.warning(
+            f"[iter484.2] vehicle multi-lot snapshot skipped event={event_id}: {_snap_exc}"
+        )
+
     # iter294 P1 — Outbid notification (multi-lot). Fire-and-forget so
     # the bid response stays snappy. Reuses the existing
     # send_outbid_email template — passes the event title + lot

@@ -27,6 +27,7 @@ import Countdown from 'react-countdown';
 // iter369 — GlobalImageViewer replaces the legacy react-image-lightbox.
 import GlobalImageViewer from '../components/GlobalImageViewer';
 import AutoBidModal from '../components/AutoBidModal';
+import AcceptedPaymentMethodsCard, { resolveAcceptedMethods } from '../components/AcceptedPaymentMethodsCard';
 import SubscriptionBadge from '../components/SubscriptionBadge';
 import SellerTierBadge from '../components/SellerTierBadge';
 import WishlistHeartButton from '../components/WishlistHeartButton';
@@ -420,7 +421,11 @@ const MultiItemListingDetailPage = () => {
     }
 
     setPaymentModalLot(lot);
-    setSelectedPaymentMethod('stripe');
+    // iter484.2 — Default to the FIRST method the seller actually accepts,
+    // not a hardcoded 'stripe'. Falls back to 'stripe' only if the listing
+    // is missing config (defensive).
+    const accepted = resolveAcceptedMethods(listing);
+    setSelectedPaymentMethod(accepted[0] || 'stripe');
     setPaymentModalOpen(true);
 
     // iter370 FIX 4 — fetch the canonical fee breakdown for this Buy Now.
@@ -1744,52 +1749,93 @@ const MultiItemListingDetailPage = () => {
           )}
 
           <div className="space-y-2" data-testid="payment-method-options">
-            {/* Stripe */}
-            <label data-testid="lot-payment-method-stripe"
-              className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                selectedPaymentMethod === 'stripe' ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-950/20' : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
-              }`}>
-              <input type="radio" name="lotPaymentMethod" value="stripe" checked={selectedPaymentMethod === 'stripe'}
-                onChange={() => setSelectedPaymentMethod('stripe')} className="mt-1 accent-blue-600" />
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <CreditCard className="h-4 w-4 text-blue-600" />
-                  <span className="font-medium">{t('checkout.creditCard', 'Credit Card')}</span>
-                  <span className="text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded-full font-medium">{t('checkout.recommended', 'Recommended')}</span>
-                </div>
-                <p className="text-xs text-slate-500 mt-0.5">{t('checkout.stripeDesc', 'Secure payment via Stripe. Visa, Mastercard, Amex.')}</p>
-              </div>
-            </label>
-            {/* Cash */}
-            <label data-testid="lot-payment-method-cash"
-              className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                selectedPaymentMethod === 'cash' ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20' : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
-              }`}>
-              <input type="radio" name="lotPaymentMethod" value="cash" checked={selectedPaymentMethod === 'cash'}
-                onChange={() => setSelectedPaymentMethod('cash')} className="mt-1 accent-emerald-600" />
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <Banknote className="h-4 w-4 text-emerald-600" />
-                  <span className="font-medium">{t('checkout.cash', 'Cash')}</span>
-                </div>
-                <p className="text-xs text-slate-500 mt-0.5">{t('checkout.cashDesc', 'Pay in person at local pickup.')}</p>
-              </div>
-            </label>
-            {/* E-Transfer */}
-            <label data-testid="lot-payment-method-etransfer"
-              className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                selectedPaymentMethod === 'etransfer' ? 'border-purple-500 bg-purple-50/50 dark:bg-purple-950/20' : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
-              }`}>
-              <input type="radio" name="lotPaymentMethod" value="etransfer" checked={selectedPaymentMethod === 'etransfer'}
-                onChange={() => setSelectedPaymentMethod('etransfer')} className="mt-1 accent-purple-600" />
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <Send className="h-4 w-4 text-purple-600" />
-                  <span className="font-medium">{t('checkout.etransfer', 'Interac E-Transfer')}</span>
-                </div>
-                <p className="text-xs text-slate-500 mt-0.5">{t('checkout.etransferDesc', 'Instructions will be sent via email.')}</p>
-              </div>
-            </label>
+            {(() => {
+              // iter484.2 — Filter Buy Now payment methods by what the
+              // seller actually accepts.  Never show a method the seller
+              // hasn't enabled.
+              const accepted = resolveAcceptedMethods(listing);
+              if (accepted.length === 0) {
+                return (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800" data-testid="lot-buy-now-no-methods">
+                    {t('checkout.noMethodsConfigured', 'This seller has not configured any payment methods. Contact the seller.')}
+                  </div>
+                );
+              }
+              const rows = [];
+              if (accepted.includes('stripe')) {
+                rows.push(
+                  <label key="stripe" data-testid="lot-payment-method-stripe"
+                    className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                      selectedPaymentMethod === 'stripe' ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-950/20' : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                    }`}>
+                    <input type="radio" name="lotPaymentMethod" value="stripe" checked={selectedPaymentMethod === 'stripe'}
+                      onChange={() => setSelectedPaymentMethod('stripe')} className="mt-1 accent-blue-600" />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <CreditCard className="h-4 w-4 text-blue-600" />
+                        <span className="font-medium">{t('checkout.creditCard', 'Credit Card')}</span>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-0.5">{t('checkout.stripeDesc', 'Secure payment via Stripe. Visa, Mastercard, Amex.')}</p>
+                    </div>
+                  </label>
+                );
+              }
+              if (accepted.includes('cash')) {
+                rows.push(
+                  <label key="cash" data-testid="lot-payment-method-cash"
+                    className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                      selectedPaymentMethod === 'cash' ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20' : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                    }`}>
+                    <input type="radio" name="lotPaymentMethod" value="cash" checked={selectedPaymentMethod === 'cash'}
+                      onChange={() => setSelectedPaymentMethod('cash')} className="mt-1 accent-emerald-600" />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <Banknote className="h-4 w-4 text-emerald-600" />
+                        <span className="font-medium">{t('checkout.cash', 'Cash')}</span>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-0.5">{t('checkout.cashDesc', 'Pay in person at local pickup.')}</p>
+                    </div>
+                  </label>
+                );
+              }
+              if (accepted.includes('etransfer')) {
+                rows.push(
+                  <label key="etransfer" data-testid="lot-payment-method-etransfer"
+                    className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                      selectedPaymentMethod === 'etransfer' ? 'border-purple-500 bg-purple-50/50 dark:bg-purple-950/20' : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                    }`}>
+                    <input type="radio" name="lotPaymentMethod" value="etransfer" checked={selectedPaymentMethod === 'etransfer'}
+                      onChange={() => setSelectedPaymentMethod('etransfer')} className="mt-1 accent-purple-600" />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <Send className="h-4 w-4 text-purple-600" />
+                        <span className="font-medium">{t('checkout.etransfer', 'Interac E-Transfer')}</span>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-0.5">{t('checkout.etransferDesc', 'Instructions will be sent via email.')}</p>
+                    </div>
+                  </label>
+                );
+              }
+              if (accepted.includes('cheque')) {
+                rows.push(
+                  <label key="cheque" data-testid="lot-payment-method-cheque"
+                    className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                      selectedPaymentMethod === 'cheque' ? 'border-amber-500 bg-amber-50/50 dark:bg-amber-950/20' : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                    }`}>
+                    <input type="radio" name="lotPaymentMethod" value="cheque" checked={selectedPaymentMethod === 'cheque'}
+                      onChange={() => setSelectedPaymentMethod('cheque')} className="mt-1 accent-amber-600" />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-amber-600" />
+                        <span className="font-medium">{t('checkout.cheque', 'Certified Cheque')}</span>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-0.5">{t('checkout.chequeDesc', 'Bring a certified cheque payable to the seller at pickup.')}</p>
+                    </div>
+                  </label>
+                );
+              }
+              return rows;
+            })()}
           </div>
 
           <DialogFooter className="mt-2">
@@ -1802,6 +1848,7 @@ const MultiItemListingDetailPage = () => {
               className={
                 selectedPaymentMethod === 'stripe' ? 'bg-blue-600 hover:bg-blue-700' :
                 selectedPaymentMethod === 'cash' ? 'bg-emerald-600 hover:bg-emerald-700' :
+                selectedPaymentMethod === 'cheque' ? 'bg-amber-600 hover:bg-amber-700' :
                 'bg-purple-600 hover:bg-purple-700'
               }
             >
@@ -1809,6 +1856,8 @@ const MultiItemListingDetailPage = () => {
                 <><CreditCard className="h-4 w-4 mr-1.5" />{t('checkout.payNow', 'Pay Now')}</>
               ) : selectedPaymentMethod === 'cash' ? (
                 <><Banknote className="h-4 w-4 mr-1.5" />{t('checkout.confirmOrder', 'Confirm Order')}</>
+              ) : selectedPaymentMethod === 'cheque' ? (
+                <><FileText className="h-4 w-4 mr-1.5" />{t('checkout.confirmCheque', 'Confirm Cheque')}</>
               ) : (
                 <><Send className="h-4 w-4 mr-1.5" />{t('checkout.confirmEtransfer', 'Confirm E-Transfer')}</>
               )}

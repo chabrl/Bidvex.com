@@ -30,6 +30,7 @@ import RateSellerModal from '../components/RateSellerModal';
 import AuctioneerInfo from '../components/AuctioneerInfo';
 import BidConfirmationDialog from '../components/BidConfirmationDialog';
 import PriceBreakdown from '../components/PriceBreakdown';
+import AcceptedPaymentMethodsCard, { resolveAcceptedMethods } from '../components/AcceptedPaymentMethodsCard';
 import PrivateSaleBadge, { BusinessSellerBadge, SellerAccountBadge } from '../components/PrivateSaleBadge';
 // iter300 — Top Seller merit badge + dispute filing
 import { TopSellerBadge } from '../components/TopSellerBadge';
@@ -84,6 +85,8 @@ const ListingDetailPage = () => {
   const [showVerificationPrompt, setShowVerificationPrompt] = useState(false);
   const [depositAuthorized, setDepositAuthorized] = useState(false);
   const [showPromoModal, setShowPromoModal] = useState(false);
+  // iter484.2 — Buyer must acknowledge accepted payment methods before bidding
+  const [paymentAck, setPaymentAck] = useState(false);
   
   // Cross-border & settlement state
   const [crossBorderModalOpen, setCrossBorderModalOpen] = useState(false);
@@ -251,6 +254,17 @@ const ListingDetailPage = () => {
     const amount = parseFloat(bidAmount);
     if (isNaN(amount) || amount <= 0) {
       toast.error('Please enter a valid bid amount');
+      return;
+    }
+
+    // iter484.2 — Buyer must acknowledge accepted payment methods
+    // BEFORE the confirmation dialog opens.
+    if (!paymentAck) {
+      toast.error(
+        i18n.language === 'fr'
+          ? 'Veuillez confirmer que vous comprenez les modes de paiement acceptés avant d\u2019enchérir.'
+          : 'Please acknowledge the accepted payment methods before placing a bid.'
+      );
       return;
     }
 
@@ -891,36 +905,11 @@ const ListingDetailPage = () => {
                       </div>
                     )}
 
-                    {/* iter217 — Payment-method specific buyer notice (i18n-conditional) */}
-                    {(listing.payment_method === 'cash' || listing.payment_method === 'e-transfer') ? (
-                      <div className="p-3 bg-purple-50 border border-purple-200 rounded-md text-xs leading-relaxed" data-testid="bid-cash-payment-notice">
-                        <p className="font-semibold text-purple-900 mb-1">
-                          {t('listingDetail.paymentMethodCashLabel', {
-                            method: listing.payment_method === 'cash' ? t('listingDetail.paymentMethodCash', 'Cash') : t('listingDetail.paymentMethodETransfer', 'E-Transfer'),
-                            defaultValue: 'Payment method: {{method}}',
-                          })}
-                        </p>
-                        <p className="text-purple-800">
-                          {t('listingDetail.paymentMethodCashCopy', {
-                            method: listing.payment_method === 'cash' ? t('listingDetail.paymentMethodCash', 'Cash') : t('listingDetail.paymentMethodETransfer', 'E-Transfer'),
-                            currency: listing.currency || 'CAD',
-                            defaultValue: 'This seller collects payment via {{method}} directly. BidVex will only charge your saved card our buyer commission fee in {{currency}}.',
-                          })}
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="p-3 bg-blue-50 border border-blue-200 rounded-md text-xs leading-relaxed" data-testid="bid-stripe-payment-notice">
-                        <p className="font-semibold text-blue-900 mb-1">
-                          {t('listingDetail.paymentMethodStripeLabel', 'Payment method: Stripe (BidVex)')}
-                        </p>
-                        <p className="text-blue-800">
-                          {t('listingDetail.paymentMethodStripeCopy', {
-                            currency: listing.currency || 'CAD',
-                            defaultValue: 'This seller uses BidVex Stripe checkout. Any deposit you already paid will be deducted from your winning total in {{currency}}.',
-                          })}
-                        </p>
-                      </div>
-                    )}
+                    {/* iter484.2 — Data-driven Accepted Payment Methods card
+                        (bilingual). Replaces the legacy singleton branch that
+                        only showed Stripe OR Cash OR E-Transfer — ignoring
+                        `listing.accepted_payment_methods` entirely. */}
+                    <AcceptedPaymentMethodsCard listing={listing} variant="inline" />
 
                     {/* Real-time Price Breakdown */}
                     <PriceBreakdown
@@ -946,11 +935,30 @@ const ListingDetailPage = () => {
                         Cross-border listing / Annonce transfrontalière
                       </div>
                     )}
-                    
+
+                    {/* iter484.2 — Pre-bid Acknowledgement of accepted payment methods */}
+                    <label
+                      className="flex items-start gap-2 text-[11px] leading-snug text-slate-600 dark:text-slate-300 cursor-pointer select-none px-1"
+                      data-testid="listing-payment-ack-label"
+                    >
+                      <input
+                        type="checkbox"
+                        className="mt-0.5 h-3.5 w-3.5 accent-emerald-600 flex-shrink-0"
+                        checked={paymentAck}
+                        onChange={(e) => setPaymentAck(e.target.checked)}
+                        data-testid="bid-payment-ack-checkbox"
+                      />
+                      <span>
+                        {i18n.language?.startsWith('fr')
+                          ? 'Je comprends les modes de paiement acceptés pour cette enchère et j\u2019accepte de compléter le paiement en utilisant l\u2019un des modes approuvés par le vendeur si je gagne.'
+                          : 'I understand the accepted payment methods for this auction and agree to complete payment using one of the seller\u2019s approved methods if I win.'}
+                      </span>
+                    </label>
+
                     <Button 
                       type="submit" 
                       className="w-full gradient-button text-white border-0" 
-                      disabled={!canBid || ((listing.starting_price || 0) >= 10000 && !depositAuthorized)}
+                      disabled={!canBid || !paymentAck || ((listing.starting_price || 0) >= 10000 && !depositAuthorized)}
                       style={i18n.language === 'fr' ? { letterSpacing: '-0.02em', fontSize: '0.875rem' } : {}}
                       data-testid="place-bid-btn"
                     >

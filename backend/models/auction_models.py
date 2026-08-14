@@ -306,6 +306,8 @@ class MultiItemListingCreate(BaseModel):
     # for multi-item / partner auctions.  Allowed slugs:
     # {"stripe", "etransfer", "cash", "cheque"}.
     accepted_payment_methods: Optional[List[str]] = None
+    accepted_payment_methods_snapshot: Optional[List[str]] = None
+    accepted_payment_methods_locked_at: Optional[datetime] = None
     requires_deposit: bool = False
     deposit_amount: Optional[float] = None
     deposit_type: Optional[str] = None  # "fixed" | "percentage"
@@ -391,6 +393,14 @@ class MultiItemListing(BaseModel):
     # iter233 — Display-only "Lot price × Quantity" toggle.
     price_multiplied_by_quantity: bool = False
     payment_method: Optional[str] = None
+    # iter482 P4A + iter484.2 — Seller-Controlled Payment Methods
+    # multi-select for multi-item / partner auctions.  Allowed slugs:
+    # {"stripe", "etransfer", "cash", "cheque"}.  These fields MUST be
+    # declared on the read model or Pydantic's ``extra="ignore"`` will
+    # silently strip them from the buyer-facing response.
+    accepted_payment_methods: Optional[List[str]] = None
+    accepted_payment_methods_snapshot: Optional[List[str]] = None
+    accepted_payment_methods_locked_at: Optional[datetime] = None
     requires_deposit: bool = False
     deposit_amount: Optional[float] = None
     deposit_type: Optional[str] = None  # "fixed" | "percentage"

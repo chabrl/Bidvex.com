@@ -291,18 +291,10 @@ export default function CompactLotCard({
           <div className="flex items-baseline gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
             <span className="font-mono font-semibold">#{lot.lot_number}</span>
             {location && (<><span>·</span><MapPin className="h-3 w-3 inline flex-shrink-0" /><span className="truncate">{location}</span></>)}
-            {/* iter484 — Subtle reserve badge (amount hidden). Backed
-                by boolean `has_reserve`; the amount never crosses the
-                network to the buyer surface. */}
-            {(lot.has_reserve || Number(lot.reserve_price) > 0) && (
-              <span
-                className="ml-auto inline-flex items-center rounded-full border border-slate-300 dark:border-slate-600 px-1.5 py-[1px] text-[9px] font-medium uppercase tracking-wide text-slate-600 dark:text-slate-300 whitespace-nowrap"
-                title={isFR ? 'Prix de réserve défini' : 'Reserve price set'}
-                data-testid={`lot-card-${lot.lot_number}-reserve-badge`}
-              >
-                {isFR ? 'Prix de réserve' : 'Reserve'}
-              </span>
-            )}
+            {/* iter484.2 — Reserve badge removed from multi-item lot cards.
+                Per platform owner directive, reserve-price UI is confined
+                to vehicle auctions only.  The backend `has_reserve` flag
+                is retained (harmless) but no longer surfaced here. */}
           </div>
 
           <h3 className="text-sm font-semibold text-slate-900 dark:text-white line-clamp-2 leading-snug" data-testid={`lot-card-${lot.lot_number}-title`}>

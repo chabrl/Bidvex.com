@@ -1,6 +1,90 @@
 # BidVex — Auction Marketplace PRD
 
-## iter484.1 — Buyer Reserve Badge + Admin Reserve-Not-Met Filter (Feb 14, 2026) ✅ SHIPPED · PREVIEW ONLY
+## iter484.2 — Payment Methods Buyer-UI Defect Fix + iter484.1 Reserve Badge Revert (Feb 14, 2026) ✅ SHIPPED · PREVIEW ONLY
+
+### User-reported bug (root cause)
+Seller `alexboul1993@gmail.com` selected multiple accepted payment
+methods (`stripe + etransfer + cheque + cash`) during auction creation
+on the multi-item auction `58758582-f53a-46d8-bc0b-87cf9de60523`.
+Buyer detail page still showed only "This seller uses BidVex Stripe
+checkout".
+
+### Root cause — TWO independent defects
+- **Defect A (backend):** `MultiItemListing` Pydantic model in
+  `models/auction_models.py` did NOT declare
+  `accepted_payment_methods` / `_snapshot` / `_locked_at`. With
+  `ConfigDict(extra="ignore")` the fields were silently DROPPED from
+  every `GET /api/multi-item-listings/{id}` buyer response. Sibling
+  `Listing` (single-item) had them declared and was unaffected.
+- **Defect B (frontend):** `LotDetailPage.jsx`, `ListingDetailPage.js`,
+  and `MultiItemListingDetailPage.js` hardcoded "BidVex Stripe
+  checkout" copy + a 3-way Buy Now selector (stripe/cash/etransfer),
+  ignoring `listing.accepted_payment_methods`.
+
+### Fix delivered
+**Backend:**
+- Added `accepted_payment_methods` + `_snapshot` + `_locked_at` to
+  `MultiItemListing` (read model) and `VehicleListing`.
+- Wired `snapshot_at_first_bid()` into `POST /api/vehicle-bids`
+  (`routes/vehicles.py`) and vehicle multi-lot bid endpoint
+  (`routes/vehicle_multi_lot.py`). Dormant today (vehicle bidding
+  disabled) but future-safe.
+
+**Frontend:**
+- NEW canonical bilingual component
+  `/app/frontend/src/components/AcceptedPaymentMethodsCard.jsx` with
+  4 canonical slugs (stripe / etransfer / cash / cheque) — no `wire`
+  per user directive. Uses backend precedence: snapshot → live →
+  legacy singleton.
+- Wired into `LotDetailPage.jsx` (multi-item), `ListingDetailPage.js`
+  (single-item), and `MultiItemListingDetailPage.js` (Buy Now modal
+  now filters methods dynamically + supports Cheque).
+- Removed hardcoded Stripe copy at LotDetailPage.jsx lines 427 + 475.
+- Removed legacy singleton branch at ListingDetailPage.js lines 894-921.
+- Pre-bid acknowledgement checkbox `data-testid="bid-payment-ack-checkbox"`
+  blocks Place Bid / quick-bid pills until checked.
+
+**iter484.1 revert (per user directive #1):**
+- Reserve-price UI removed from `CompactLotCard.jsx` — reserve UI
+  now confined to vehicle auctions only. Backend `has_reserve`
+  boolean retained (harmless).
+
+### Test results — 165/165 green
+| Suite | Result |
+|---|---|
+| iter484.2 payment_methods_visibility (NEW) | 15/15 |
+| iter484 reserve settlement | 23/23 |
+| iter483 live_edit | 36/36 |
+| iter483.3 lot_and_requests | 29/29 |
+| iter482 P4 end_to_end | 14/14 (+3 skipped) |
+| iter482 P4A foundation | 48/48 |
+
+**Testing agent verdict:** 100% pass. Zero regressions. Zero action
+items. Frontend E2E confirmed all 4 methods render, hardcoded copy
+gone, ack checkbox works, reserve badges gone from multi-item grid.
+
+### Audit + risk deliverables
+- `/app/docs/PAYMENT_METHODS_RCA_REPORT.md`
+- `/app/docs/POST_BID_LOCK_AUDIT.md`
+- `/app/docs/PAYMENT_METHODS_REGRESSION_MATRIX.md`
+- `/app/docs/P6_RISK_MATRIX.md` (pre-req for future P6 tax work)
+
+### Guardrails held
+- ✅ Zero touch to Stripe charge / payout code.
+- ✅ Zero touch to tax / fee / commission calculators.
+- ✅ 88 baseline tests preserved (now 165).
+- ✅ Preview only. No deploy.
+
+### Follow-up backlog (documented, NOT shipped)
+- Wire `AcceptedPaymentMethodsCard` into Storage detail page.
+- Wire `AcceptedPaymentMethodsCard` into Vehicle + Vehicle Multi-Lot
+  detail pages + pre-bid ack.
+- Vehicle-specific reserve UI (new task).
+- P6 Tax Engine Consolidation (blocked on legal review — see risk matrix).
+
+---
+
+## iter484.1 — Buyer Reserve Badge + Admin Reserve-Not-Met Filter (Feb 14, 2026) ⚠️ REVERTED in iter484.2 (multi-item badge only)
 
 ### Scope
 UI polish on top of iter484:

@@ -548,6 +548,13 @@ class VehicleListing(BaseModel):
     final_price: Optional[float] = None
     sold_at: Optional[datetime] = None
 
+    # iter482 P4A + iter484.2 — Seller-Controlled Payment Methods (read-side).
+    # Declaring on the read model so Pydantic does not silently drop the
+    # snapshot / live list from the buyer-facing response.
+    accepted_payment_methods: Optional[List[str]] = None
+    accepted_payment_methods_snapshot: Optional[List[str]] = None
+    accepted_payment_methods_locked_at: Optional[datetime] = None
+
     # iter194 — Buyer Unlock Flow (dealer contact gating)
     unlock_required: bool = True
     unlock_paid_at: Optional[datetime] = None

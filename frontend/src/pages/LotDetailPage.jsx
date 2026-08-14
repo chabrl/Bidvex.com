@@ -48,6 +48,7 @@ import { CompareCheckbox } from '../components/CompareBar';
 import MaskedBidHistory from '../components/MaskedBidHistory';
 import AutoBidModal from '../components/AutoBidModal';
 import SanitizedHtml from '../components/SanitizedHtml';
+import AcceptedPaymentMethodsCard, { resolveAcceptedMethods } from '../components/AcceptedPaymentMethodsCard';
 import { computeDisplayPrice } from '../utils/priceUtils';
 import { LangLink } from '../components/LangLink';
 
@@ -72,6 +73,9 @@ export default function LotDetailPage() {
   const [feesPreview, setFeesPreview] = useState(null);
   const [feesOpen, setFeesOpen] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  // iter484.2 — Buyer must acknowledge accepted payment methods
+  // BEFORE placing a bid. Reset when the lot changes.
+  const [paymentAck, setPaymentAck] = useState(false);
 
   const lotNumber = Number(lotNumberParam);
   const lot = useMemo(() => (listing?.lots || []).find((l) => l.lot_number === lotNumber) || null, [listing, lotNumber]);
@@ -133,7 +137,7 @@ export default function LotDetailPage() {
     return () => { cancelled = true; };
   }, [auctionId, lot?.lot_number, user?.subscription_tier, token, lot]);
 
-  useEffect(() => { setImgIdx(0); }, [lotNumber]);
+  useEffect(() => { setImgIdx(0); setPaymentAck(false); }, [lotNumber]);
 
   // iter368 — Compute minimum increment via the server-derived schedule.
   // Single source of truth: same ladder used by the backend enforcement.
@@ -202,6 +206,15 @@ export default function LotDetailPage() {
     if (!user) { navigate('/auth'); return; }
     if (!amount || amount < nextValidBid) {
       toast.error(t('bid.mustBeAtLeast', { defaultValue: 'Bid must be at least {{amount}}', amount: formatCurrency(nextValidBid) }));
+      return;
+    }
+    // iter484.2 — Buyer must acknowledge the seller's accepted payment
+    // methods before the bid is submitted. Server-side enforcement of
+    // the actual method allowlist still runs at checkout time.
+    if (!paymentAck) {
+      toast.error(isFR
+        ? 'Veuillez confirmer que vous comprenez les modes de paiement acceptés avant d\u2019enchérir.'
+        : 'Please acknowledge the accepted payment methods before placing a bid.');
       return;
     }
     try {
@@ -424,7 +437,17 @@ export default function LotDetailPage() {
                         ? formatCurrency(feesPreview.deposit_required)
                         : (isFR ? 'Aucun dépôt requis' : 'No deposit required')],
                     [isFR ? 'Paiement' : 'Payment',
-                      <span key="pay" className="text-xs">{isFR ? 'Ce vendeur utilise le paiement Stripe BidVex' : 'This seller uses BidVex Stripe checkout'}</span>],
+                      (() => {
+                        const acc = resolveAcceptedMethods(listing);
+                        if (acc.length === 0) {
+                          return <span key="pay" className="text-xs text-amber-600">{isFR ? 'Aucun mode configuré' : 'None configured'}</span>;
+                        }
+                        return (
+                          <span key="pay" className="text-xs" data-testid="lot-detail-fee-payment-methods-summary">
+                            {acc.length} {isFR ? (acc.length > 1 ? 'modes acceptés' : 'mode accepté') : (acc.length > 1 ? 'methods accepted' : 'method accepted')}
+                          </span>
+                        );
+                      })()],
                     [<strong key="est">{isFR ? 'Total estimé' : 'Estimated Total'}</strong>,
                       <strong key="est-v" className="text-emerald-700 dark:text-emerald-400 font-mono" data-testid="lot-detail-fee-estimated-total">
                         {formatCurrency(feesPreview.estimated_total)} {feesPreview.currency}
@@ -472,11 +495,17 @@ export default function LotDetailPage() {
                   : <>A deposit of <strong>{formatCurrency(feesPreview.deposit_required)}</strong> is required to bid on this lot. It will be applied to your winning total, otherwise released automatically.</>
               ) : (
                 isFR
-                  ? <>Aucun dépôt requis pour enchérir sur cette enchère. Ce vendeur utilise le paiement Stripe BidVex. Tout dépôt déjà payé sera déduit de votre total gagnant en CAD.</>
-                  : <>No deposit is required to bid on this auction. This seller uses BidVex Stripe checkout. Any deposit you already paid will be deducted from your winning total in CAD.</>
+                  ? <>Aucun dépôt requis pour enchérir sur cette enchère. Consultez la carte « Modes de paiement acceptés » pour les modes offerts par le vendeur. Tout dépôt déjà payé sera déduit de votre total gagnant en CAD.</>
+                  : <>No deposit is required to bid on this auction. See the &ldquo;Accepted Payment Methods&rdquo; card below for the options offered by this seller. Any deposit you already paid will be deducted from your winning total in CAD.</>
               )}
             </span>
           </div>
+
+          {/* iter484.2 — Buyer-facing Accepted Payment Methods card.
+              Dynamic (data-driven from listing.accepted_payment_methods),
+              bilingual, replaces the hardcoded "BidVex Stripe checkout"
+              copy that previously misled buyers on multi-method auctions. */}
+          <AcceptedPaymentMethodsCard listing={listing} />
 
           {/* Description */}
           <Card>
@@ -580,8 +609,9 @@ export default function LotDetailPage() {
                       key={i}
                       size="sm"
                       variant="outline"
-                      className="text-xs font-mono h-8"
+                      className="text-xs font-mono h-8 disabled:opacity-50 disabled:cursor-not-allowed"
                       onClick={() => handlePlaceBid(amt)}
+                      disabled={!paymentAck}
                       data-testid={`lot-detail-quick-bid-${i}`}
                     >
                       {formatCurrency(amt)}
@@ -602,7 +632,32 @@ export default function LotDetailPage() {
                     onChange={(e) => setBidAmount(e.target.value)}
                     data-testid="lot-detail-bid-input"
                   />
-                  <Button className="w-full h-9 bg-emerald-600 hover:bg-emerald-700 text-white font-bold" onClick={() => handlePlaceBid(Number(bidAmount))} data-testid="lot-detail-place-bid">
+                  {/* iter484.2 — Pre-bid acknowledgement of accepted
+                      payment methods. Must be checked before the buyer
+                      can submit a bid. */}
+                  <label
+                    className="flex items-start gap-2 text-[11px] leading-snug text-slate-600 dark:text-slate-300 cursor-pointer select-none px-1 py-1"
+                    data-testid="lot-detail-payment-ack-label"
+                  >
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 h-3.5 w-3.5 accent-emerald-600 flex-shrink-0"
+                      checked={paymentAck}
+                      onChange={(e) => setPaymentAck(e.target.checked)}
+                      data-testid="bid-payment-ack-checkbox"
+                    />
+                    <span>
+                      {isFR
+                        ? 'Je comprends les modes de paiement acceptés pour cette enchère et j\u2019accepte de compléter le paiement en utilisant l\u2019un des modes approuvés par le vendeur si je gagne.'
+                        : 'I understand the accepted payment methods for this auction and agree to complete payment using one of the seller\u2019s approved methods if I win.'}
+                    </span>
+                  </label>
+                  <Button
+                    className="w-full h-9 bg-emerald-600 hover:bg-emerald-700 text-white font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                    onClick={() => handlePlaceBid(Number(bidAmount))}
+                    disabled={!paymentAck || !bidAmount || Number(bidAmount) < nextValidBid}
+                    data-testid="lot-detail-place-bid"
+                  >
                     <Gavel className="h-4 w-4 mr-1.5" />
                     {isFR ? 'Placer une enchère' : 'Place Bid'}
                   </Button>

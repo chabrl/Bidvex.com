@@ -1,0 +1,35 @@
+{
+  "summary": "iter484.2 Payment Methods Buyer-UI defect fix verified end-to-end. Backend Defect A (MultiItemListing Pydantic model dropping accepted_payment_methods) is FIXED — GET /api/multi-item-listings/58758582-... now returns ['stripe','etransfer','cheque','cash']. Frontend LotDetailPage renders the AcceptedPaymentMethodsCard with all 4 methods, no 'BidVex Stripe checkout' hardcoded text anywhere, ack checkbox blocks Place Bid until checked, and reserve badges are fully removed from multi-item grid (iter484.1 revert confirmed). 15/15 iter484.2 unit tests pass + 5/6 new live-API tests pass (1 skipped — no single-item listing on preview DB).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter484_2_payment_methods_visibility.py",
+    "/app/backend/tests/test_iter484_2_live_api.py",
+    "/app/test_reports/pytest/iter484_2_live.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "No issues found in this iteration's scope. Pydantic model additions are minimal and targeted. AcceptedPaymentMethodsCard component follows existing i18n patterns.",
+    "Minor observation (not blocker): The MultiItemListingDetailPage 'Buy Now' modal filtering could not be exercised on the seed auction 58758582-... because that auction lists lots by BID only (no lot-card Buy Now testids present on grid). Recommend adding a seed lot with buy_now_price set + accepted_payment_methods spanning all 4 to make this regression testable end-to-end. Code path was reviewed and uses resolveAcceptedMethods correctly."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter484_2_live_api.py (new — 6 live API regression tests)"
+  ],
+  "success_rate": {
+    "backend": "100% (20/21 executed; 1 skipped: no single-item listing seed on preview)",
+    "frontend": "100% (all data-testids verified on LotDetailPage + grid)"
+  },
+  "test_credentials": "testbuyer@bidvex.com / TestBuyer2026! used for live-API buyer selection tests (200 OK on cheque, 400 PAYMENT_METHOD_NOT_ACCEPTED on paypal).",
+  "seed_data_creation": "None. Reused existing seed auction 58758582-f53a-46d8-bc0b-87cf9de60523.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend Defect A verified via curl AND live pytest: GET /api/multi-item-listings/58758582-f53a-46d8-bc0b-87cf9de60523 returns accepted_payment_methods=['stripe','etransfer','cheque','cash']. Buyer selection gate: POST /api/checkout/select-payment-method returns 400 PAYMENT_METHOD_NOT_ACCEPTED for methods NOT in accepted list, 200 ok with canonicalised method for accepted. Post-bid lock (409 PAYMENT_METHODS_LOCKED) covered by unit test_guard_edit_raises_when_locked — no bids exist on preview seed so a live 409 could not be produced; unauth POST returns 401 as expected. Frontend: on /lots/58758582-.../lot/1 the AcceptedPaymentMethodsCard shows apm-method-{stripe,etransfer,cash,cheque}, no 'BidVex Stripe checkout' text, bid-payment-ack-checkbox controls disabled state of lot-detail-place-bid (verified: disabled when unchecked+amount=500, enabled when checked). /lots/58758582-... grid has 0 reserve badges (revert of iter484.1 confirmed). MultiItemListingDetailPage Buy Now modal not exercised — that seed auction only exposes lot-card-N-bid actions, no buy-now testids on cards; code review of resolveAcceptedMethods filter logic looks correct.",
+  "rca of the issue": "Original bug: MultiItemListing Pydantic model (backend/models/auction_models.py) did not declare accepted_payment_methods, so FastAPI response serialization with extra='ignore' silently stripped the field from the API response even though the DB document had it. Frontend detail pages then had no data to render and were hardcoded to Stripe. Fix: (1) add accepted_payment_methods + snapshot_at_first_bid + locked_at fields to MultiItemListing read model; (2) new AcceptedPaymentMethodsCard.jsx wired into LotDetailPage/ListingDetailPage; (3) pre-bid ack checkbox gating Place Bid button; (4) revert iter484.1 reserve badge on multi-item cards. All items verified."
+}

@@ -2194,7 +2194,29 @@ async def place_vehicle_bid(
             "$inc": {"bid_count": 1}
         }
     )
-    
+
+    # iter484.2 — Snapshot accepted_payment_methods on FIRST vehicle bid.
+    # Idempotent: subsequent bids find an existing snapshot and no-op.
+    # This mirrors the auctions_bids.py and storage_auction_service.py
+    # patterns.  Failure to snapshot is non-fatal — worst case the next
+    # bid retries.  Vehicle bidding is currently gated system-wide by
+    # `vehicle_bidding_enabled` but wiring this now protects future
+    # activation.
+    if listing.get("bid_count", 0) == 0:
+        try:
+            from services.seller_payment_methods_service import snapshot_at_first_bid
+            _snap = snapshot_at_first_bid(listing)
+            if _snap:
+                await db.vehicle_listings.update_one(
+                    {"id": bid_data.vehicle_id},
+                    {"$set": _snap},
+                )
+        except Exception as _snap_exc:  # noqa: BLE001
+            logger.warning(
+                f"[iter484.2] vehicle snapshot_at_first_bid skipped for "
+                f"vehicle_id={bid_data.vehicle_id}: {_snap_exc}"
+            )
+
     bid.pop("_id", None)
 
     # iter287 — Vehicle Auto-Bid (Proxy Bidding) Engine.
