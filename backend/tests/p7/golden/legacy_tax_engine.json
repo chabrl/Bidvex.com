@@ -1,0 +1,584 @@
+{
+  "legacy_calculate_tax|0.01": {
+    "gst_cents": 0,
+    "qst_cents": 0,
+    "total_tax_cents": 0,
+    "total_with_tax_cents": 1
+  },
+  "legacy_calculate_tax|0.99": {
+    "gst_cents": 5,
+    "qst_cents": 10,
+    "total_tax_cents": 15,
+    "total_with_tax_cents": 114
+  },
+  "legacy_calculate_tax|1.00": {
+    "gst_cents": 5,
+    "qst_cents": 10,
+    "total_tax_cents": 15,
+    "total_with_tax_cents": 115
+  },
+  "legacy_calculate_tax|10.00": {
+    "gst_cents": 50,
+    "qst_cents": 100,
+    "total_tax_cents": 150,
+    "total_with_tax_cents": 1150
+  },
+  "legacy_calculate_tax|100.00": {
+    "gst_cents": 500,
+    "qst_cents": 998,
+    "total_tax_cents": 1498,
+    "total_with_tax_cents": 11498
+  },
+  "legacy_calculate_tax|1000.00": {
+    "gst_cents": 5000,
+    "qst_cents": 9975,
+    "total_tax_cents": 14975,
+    "total_with_tax_cents": 114975
+  },
+  "legacy_calculate_tax|125000.00": {
+    "gst_cents": 625000,
+    "qst_cents": 1246875,
+    "total_tax_cents": 1871875,
+    "total_with_tax_cents": 14371875
+  },
+  "legacy_calculate_tax|25000.00": {
+    "gst_cents": 125000,
+    "qst_cents": 249375,
+    "total_tax_cents": 374375,
+    "total_with_tax_cents": 2874375
+  },
+  "legacy_calculate_tax|500000.00": {
+    "gst_cents": 2500000,
+    "qst_cents": 4987500,
+    "total_tax_cents": 7487500,
+    "total_with_tax_cents": 57487500
+  },
+  "legacy_calculate_tax|9.99": {
+    "gst_cents": 50,
+    "qst_cents": 100,
+    "total_tax_cents": 150,
+    "total_with_tax_cents": 1149
+  },
+  "legacy_calculate_tax|99.99": {
+    "gst_cents": 500,
+    "qst_cents": 997,
+    "total_tax_cents": 1497,
+    "total_with_tax_cents": 11496
+  },
+  "legacy_calculate_tax|999.99": {
+    "gst_cents": 5000,
+    "qst_cents": 9975,
+    "total_tax_cents": 14975,
+    "total_with_tax_cents": 114974
+  },
+  "legacy_general|0.01": {
+    "buyer_premium": 0,
+    "commission_amount": null,
+    "fees_tax_gst": null,
+    "fees_tax_qst": null,
+    "fees_tax_total": null,
+    "hammer_price": 1,
+    "platform_fee": null,
+    "seller_receives_hammer": 1,
+    "total_stripe_charge": null
+  },
+  "legacy_general|0.99": {
+    "buyer_premium": 5,
+    "commission_amount": null,
+    "fees_tax_gst": null,
+    "fees_tax_qst": null,
+    "fees_tax_total": null,
+    "hammer_price": 99,
+    "platform_fee": null,
+    "seller_receives_hammer": 99,
+    "total_stripe_charge": null
+  },
+  "legacy_general|1.00": {
+    "buyer_premium": 5,
+    "commission_amount": null,
+    "fees_tax_gst": null,
+    "fees_tax_qst": null,
+    "fees_tax_total": null,
+    "hammer_price": 100,
+    "platform_fee": null,
+    "seller_receives_hammer": 100,
+    "total_stripe_charge": null
+  },
+  "legacy_general|10.00": {
+    "buyer_premium": 50,
+    "commission_amount": null,
+    "fees_tax_gst": null,
+    "fees_tax_qst": null,
+    "fees_tax_total": null,
+    "hammer_price": 1000,
+    "platform_fee": null,
+    "seller_receives_hammer": 1000,
+    "total_stripe_charge": null
+  },
+  "legacy_general|100.00": {
+    "buyer_premium": 500,
+    "commission_amount": null,
+    "fees_tax_gst": null,
+    "fees_tax_qst": null,
+    "fees_tax_total": null,
+    "hammer_price": 10000,
+    "platform_fee": null,
+    "seller_receives_hammer": 10000,
+    "total_stripe_charge": null
+  },
+  "legacy_general|1000.00": {
+    "buyer_premium": 5000,
+    "commission_amount": null,
+    "fees_tax_gst": null,
+    "fees_tax_qst": null,
+    "fees_tax_total": null,
+    "hammer_price": 100000,
+    "platform_fee": null,
+    "seller_receives_hammer": 100000,
+    "total_stripe_charge": null
+  },
+  "legacy_general|125000.00": {
+    "buyer_premium": 625000,
+    "commission_amount": null,
+    "fees_tax_gst": null,
+    "fees_tax_qst": null,
+    "fees_tax_total": null,
+    "hammer_price": 12500000,
+    "platform_fee": null,
+    "seller_receives_hammer": 12500000,
+    "total_stripe_charge": null
+  },
+  "legacy_general|25000.00": {
+    "buyer_premium": 125000,
+    "commission_amount": null,
+    "fees_tax_gst": null,
+    "fees_tax_qst": null,
+    "fees_tax_total": null,
+    "hammer_price": 2500000,
+    "platform_fee": null,
+    "seller_receives_hammer": 2500000,
+    "total_stripe_charge": null
+  },
+  "legacy_general|500000.00": {
+    "buyer_premium": 2500000,
+    "commission_amount": null,
+    "fees_tax_gst": null,
+    "fees_tax_qst": null,
+    "fees_tax_total": null,
+    "hammer_price": 50000000,
+    "platform_fee": null,
+    "seller_receives_hammer": 50000000,
+    "total_stripe_charge": null
+  },
+  "legacy_general|9.99": {
+    "buyer_premium": 50,
+    "commission_amount": null,
+    "fees_tax_gst": null,
+    "fees_tax_qst": null,
+    "fees_tax_total": null,
+    "hammer_price": 999,
+    "platform_fee": null,
+    "seller_receives_hammer": 999,
+    "total_stripe_charge": null
+  },
+  "legacy_general|99.99": {
+    "buyer_premium": 500,
+    "commission_amount": null,
+    "fees_tax_gst": null,
+    "fees_tax_qst": null,
+    "fees_tax_total": null,
+    "hammer_price": 9999,
+    "platform_fee": null,
+    "seller_receives_hammer": 9999,
+    "total_stripe_charge": null
+  },
+  "legacy_general|999.99": {
+    "buyer_premium": 5000,
+    "commission_amount": null,
+    "fees_tax_gst": null,
+    "fees_tax_qst": null,
+    "fees_tax_total": null,
+    "hammer_price": 99999,
+    "platform_fee": null,
+    "seller_receives_hammer": 99999,
+    "total_stripe_charge": null
+  },
+  "legacy_gst_qst_cad|0.01": {
+    "gst_amount": 0,
+    "qst_amount": 0,
+    "total_tax": 0,
+    "total_with_tax": 1
+  },
+  "legacy_gst_qst_cad|0.99": {
+    "gst_amount": 5,
+    "qst_amount": 10,
+    "total_tax": 15,
+    "total_with_tax": 114
+  },
+  "legacy_gst_qst_cad|1.00": {
+    "gst_amount": 5,
+    "qst_amount": 10,
+    "total_tax": 15,
+    "total_with_tax": 115
+  },
+  "legacy_gst_qst_cad|10.00": {
+    "gst_amount": 50,
+    "qst_amount": 100,
+    "total_tax": 150,
+    "total_with_tax": 1150
+  },
+  "legacy_gst_qst_cad|100.00": {
+    "gst_amount": 500,
+    "qst_amount": 998,
+    "total_tax": 1498,
+    "total_with_tax": 11498
+  },
+  "legacy_gst_qst_cad|1000.00": {
+    "gst_amount": 5000,
+    "qst_amount": 9975,
+    "total_tax": 14975,
+    "total_with_tax": 114975
+  },
+  "legacy_gst_qst_cad|125000.00": {
+    "gst_amount": 625000,
+    "qst_amount": 1246875,
+    "total_tax": 1871875,
+    "total_with_tax": 14371875
+  },
+  "legacy_gst_qst_cad|25000.00": {
+    "gst_amount": 125000,
+    "qst_amount": 249375,
+    "total_tax": 374375,
+    "total_with_tax": 2874375
+  },
+  "legacy_gst_qst_cad|500000.00": {
+    "gst_amount": 2500000,
+    "qst_amount": 4987500,
+    "total_tax": 7487500,
+    "total_with_tax": 57487500
+  },
+  "legacy_gst_qst_cad|9.99": {
+    "gst_amount": 50,
+    "qst_amount": 100,
+    "total_tax": 150,
+    "total_with_tax": 1149
+  },
+  "legacy_gst_qst_cad|99.99": {
+    "gst_amount": 500,
+    "qst_amount": 997,
+    "total_tax": 1497,
+    "total_with_tax": 11496
+  },
+  "legacy_gst_qst_cad|999.99": {
+    "gst_amount": 5000,
+    "qst_amount": 9975,
+    "total_tax": 14975,
+    "total_with_tax": 114974
+  },
+  "legacy_gst_qst_usd|0.01": {
+    "gst_amount": 0,
+    "qst_amount": 0,
+    "total_tax": 0,
+    "total_with_tax": 1
+  },
+  "legacy_gst_qst_usd|0.99": {
+    "gst_amount": 0,
+    "qst_amount": 0,
+    "total_tax": 0,
+    "total_with_tax": 99
+  },
+  "legacy_gst_qst_usd|1.00": {
+    "gst_amount": 0,
+    "qst_amount": 0,
+    "total_tax": 0,
+    "total_with_tax": 100
+  },
+  "legacy_gst_qst_usd|10.00": {
+    "gst_amount": 0,
+    "qst_amount": 0,
+    "total_tax": 0,
+    "total_with_tax": 1000
+  },
+  "legacy_gst_qst_usd|100.00": {
+    "gst_amount": 0,
+    "qst_amount": 0,
+    "total_tax": 0,
+    "total_with_tax": 10000
+  },
+  "legacy_gst_qst_usd|1000.00": {
+    "gst_amount": 0,
+    "qst_amount": 0,
+    "total_tax": 0,
+    "total_with_tax": 100000
+  },
+  "legacy_gst_qst_usd|125000.00": {
+    "gst_amount": 0,
+    "qst_amount": 0,
+    "total_tax": 0,
+    "total_with_tax": 12500000
+  },
+  "legacy_gst_qst_usd|25000.00": {
+    "gst_amount": 0,
+    "qst_amount": 0,
+    "total_tax": 0,
+    "total_with_tax": 2500000
+  },
+  "legacy_gst_qst_usd|500000.00": {
+    "gst_amount": 0,
+    "qst_amount": 0,
+    "total_tax": 0,
+    "total_with_tax": 50000000
+  },
+  "legacy_gst_qst_usd|9.99": {
+    "gst_amount": 0,
+    "qst_amount": 0,
+    "total_tax": 0,
+    "total_with_tax": 999
+  },
+  "legacy_gst_qst_usd|99.99": {
+    "gst_amount": 0,
+    "qst_amount": 0,
+    "total_tax": 0,
+    "total_with_tax": 9999
+  },
+  "legacy_gst_qst_usd|999.99": {
+    "gst_amount": 0,
+    "qst_amount": 0,
+    "total_tax": 0,
+    "total_with_tax": 99999
+  },
+  "legacy_recipient|100.00|AB": {
+    "gst": 500,
+    "hst": 0,
+    "province": "AB",
+    "qst": 0,
+    "total_tax": 500
+  },
+  "legacy_recipient|100.00|BC": {
+    "gst": 500,
+    "hst": 0,
+    "province": "BC",
+    "qst": 0,
+    "total_tax": 500
+  },
+  "legacy_recipient|100.00|MISSING": {
+    "gst": 0,
+    "hst": 0,
+    "province": "INTL",
+    "qst": 0,
+    "total_tax": 0
+  },
+  "legacy_recipient|100.00|ON": {
+    "gst": 0,
+    "hst": 1300,
+    "province": "ON",
+    "qst": 0,
+    "total_tax": 1300
+  },
+  "legacy_recipient|100.00|QC": {
+    "gst": 500,
+    "hst": 0,
+    "province": "QC",
+    "qst": 998,
+    "total_tax": 1498
+  },
+  "legacy_recipient|100.00|ZZ": {
+    "gst": 0,
+    "hst": 0,
+    "province": "INTL",
+    "qst": 0,
+    "total_tax": 0
+  },
+  "legacy_recipient|1000.00|AB": {
+    "gst": 5000,
+    "hst": 0,
+    "province": "AB",
+    "qst": 0,
+    "total_tax": 5000
+  },
+  "legacy_recipient|1000.00|BC": {
+    "gst": 5000,
+    "hst": 0,
+    "province": "BC",
+    "qst": 0,
+    "total_tax": 5000
+  },
+  "legacy_recipient|1000.00|MISSING": {
+    "gst": 0,
+    "hst": 0,
+    "province": "INTL",
+    "qst": 0,
+    "total_tax": 0
+  },
+  "legacy_recipient|1000.00|ON": {
+    "gst": 0,
+    "hst": 13000,
+    "province": "ON",
+    "qst": 0,
+    "total_tax": 13000
+  },
+  "legacy_recipient|1000.00|QC": {
+    "gst": 5000,
+    "hst": 0,
+    "province": "QC",
+    "qst": 9975,
+    "total_tax": 14975
+  },
+  "legacy_recipient|1000.00|ZZ": {
+    "gst": 0,
+    "hst": 0,
+    "province": "INTL",
+    "qst": 0,
+    "total_tax": 0
+  },
+  "legacy_recipient|25000.00|AB": {
+    "gst": 125000,
+    "hst": 0,
+    "province": "AB",
+    "qst": 0,
+    "total_tax": 125000
+  },
+  "legacy_recipient|25000.00|BC": {
+    "gst": 125000,
+    "hst": 0,
+    "province": "BC",
+    "qst": 0,
+    "total_tax": 125000
+  },
+  "legacy_recipient|25000.00|MISSING": {
+    "gst": 0,
+    "hst": 0,
+    "province": "INTL",
+    "qst": 0,
+    "total_tax": 0
+  },
+  "legacy_recipient|25000.00|ON": {
+    "gst": 0,
+    "hst": 325000,
+    "province": "ON",
+    "qst": 0,
+    "total_tax": 325000
+  },
+  "legacy_recipient|25000.00|QC": {
+    "gst": 125000,
+    "hst": 0,
+    "province": "QC",
+    "qst": 249375,
+    "total_tax": 374375
+  },
+  "legacy_recipient|25000.00|ZZ": {
+    "gst": 0,
+    "hst": 0,
+    "province": "INTL",
+    "qst": 0,
+    "total_tax": 0
+  },
+  "legacy_vehicle|0.01": {
+    "buyer_premium": 0,
+    "fees_tax_gst": null,
+    "fees_tax_qst": null,
+    "fees_tax_total": null,
+    "platform_fee": 0,
+    "seller_receives": null,
+    "total_stripe_charge": null
+  },
+  "legacy_vehicle|0.99": {
+    "buyer_premium": 5,
+    "fees_tax_gst": null,
+    "fees_tax_qst": null,
+    "fees_tax_total": null,
+    "platform_fee": 2,
+    "seller_receives": null,
+    "total_stripe_charge": null
+  },
+  "legacy_vehicle|1.00": {
+    "buyer_premium": 5,
+    "fees_tax_gst": null,
+    "fees_tax_qst": null,
+    "fees_tax_total": null,
+    "platform_fee": 3,
+    "seller_receives": null,
+    "total_stripe_charge": null
+  },
+  "legacy_vehicle|10.00": {
+    "buyer_premium": 50,
+    "fees_tax_gst": null,
+    "fees_tax_qst": null,
+    "fees_tax_total": null,
+    "platform_fee": 25,
+    "seller_receives": null,
+    "total_stripe_charge": null
+  },
+  "legacy_vehicle|100.00": {
+    "buyer_premium": 500,
+    "fees_tax_gst": null,
+    "fees_tax_qst": null,
+    "fees_tax_total": null,
+    "platform_fee": 250,
+    "seller_receives": null,
+    "total_stripe_charge": null
+  },
+  "legacy_vehicle|1000.00": {
+    "buyer_premium": 5000,
+    "fees_tax_gst": null,
+    "fees_tax_qst": null,
+    "fees_tax_total": null,
+    "platform_fee": 2500,
+    "seller_receives": null,
+    "total_stripe_charge": null
+  },
+  "legacy_vehicle|125000.00": {
+    "buyer_premium": 625000,
+    "fees_tax_gst": null,
+    "fees_tax_qst": null,
+    "fees_tax_total": null,
+    "platform_fee": 312500,
+    "seller_receives": null,
+    "total_stripe_charge": null
+  },
+  "legacy_vehicle|25000.00": {
+    "buyer_premium": 125000,
+    "fees_tax_gst": null,
+    "fees_tax_qst": null,
+    "fees_tax_total": null,
+    "platform_fee": 62500,
+    "seller_receives": null,
+    "total_stripe_charge": null
+  },
+  "legacy_vehicle|500000.00": {
+    "buyer_premium": 2500000,
+    "fees_tax_gst": null,
+    "fees_tax_qst": null,
+    "fees_tax_total": null,
+    "platform_fee": 1250000,
+    "seller_receives": null,
+    "total_stripe_charge": null
+  },
+  "legacy_vehicle|9.99": {
+    "buyer_premium": 50,
+    "fees_tax_gst": null,
+    "fees_tax_qst": null,
+    "fees_tax_total": null,
+    "platform_fee": 25,
+    "seller_receives": null,
+    "total_stripe_charge": null
+  },
+  "legacy_vehicle|99.99": {
+    "buyer_premium": 500,
+    "fees_tax_gst": null,
+    "fees_tax_qst": null,
+    "fees_tax_total": null,
+    "platform_fee": 250,
+    "seller_receives": null,
+    "total_stripe_charge": null
+  },
+  "legacy_vehicle|999.99": {
+    "buyer_premium": 5000,
+    "fees_tax_gst": null,
+    "fees_tax_qst": null,
+    "fees_tax_total": null,
+    "platform_fee": 2500,
+    "seller_receives": null,
+    "total_stripe_charge": null
+  }
+}

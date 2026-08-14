@@ -1,5 +1,36 @@
 # BidVex — Auction Marketplace PRD
 
+## iter484.2 Gate 3 — P7 Cent-Perfect Financial Regression Matrix (Feb 14, 2026) ✅ SHIPPED · PREVIEW ONLY
+
+### Delivered
+**1 049 exact-cent P7 tests** (target ≥ 200 → 5× exceeded) locking the
+current behaviour of every tax / fee calculator across QC · ON · AB · BC
+× registered / unregistered × 8 transaction types × 12 amount tiers
+including $0.01, $9.99, $100, $999.99, $25 000, $125 000, $500 000.
+
+Golden snapshot files: `/app/backend/tests/p7/golden/{canonical_fee_calculator,legacy_tax_engine,broker_fee_engine,invoice_service}.json`
+(675 rows total).
+
+**Named P6 risks all fingerprinted (Class C / D):**
+- Broker QST-or-zero HST under-collection (~$4.68 per $100 fees on ON) — LOCKED
+- Legacy `tax_engine` QC-hardcoded (14.975 % regardless of caller prov) — LOCKED
+- `invoice_service` MISSING-province → QC over-collection (+$14.98 on $100) — LOCKED + corrected P6 audit finding #5
+- `stripe_connect_service.py` + `auction_settlement.py` silent QC defaults (6 sites) — LOCKED via static grep monitor
+- 8-way divergent tax rate tables — LOCKED via allowlist high-water mark
+- 4 pairs of duplicate calculators — both sides snapshotted so P6 refactor cannot silently move a penny
+
+**Guardrails held:**
+- ✅ Zero touch to any tax / fee / commission / Stripe / escrow / payout code.
+- ✅ `git diff --stat` on `/app/backend/services/` = only `reserve_price_gate.py` (Gate 2 delta).
+- ✅ 181 baseline pytest still green.
+- ✅ Preview only.  No deploy.
+
+**Report:** `/app/docs/P7_CENT_PERFECT_REGRESSION_REPORT.md` (11 sections including matrix coverage, discrepancy cent tables, legal-review items L1–L10, correction to P6 audit, and hand-off gate).
+
+**Total tests:** 181 baseline + 1 049 P7 = **1 230 passing, 3 skipped, 0 failed**.
+
+---
+
 ## iter484.2 Gate 2 — Vehicle Reserve UI + Security Masking (Feb 14, 2026) ✅ SHIPPED · PREVIEW ONLY
 
 ### Delivered
