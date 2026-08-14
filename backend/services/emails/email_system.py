@@ -408,58 +408,85 @@ async def send_payment_confirmation_email(invoice: Dict[str, Any]) -> Dict[str, 
 
 
 async def send_invoice_overdue_email(invoice: Dict[str, Any], days_overdue: int) -> Dict[str, Any]:
-    """Send reminder for overdue invoice"""
+    """Send reminder for overdue invoice. iter482 P2 fix — language-aware EN/FR."""
+    lang = _detect_language(invoice)
+    is_fr = lang == "fr"
+    fmt_money = _format_currency_fr if is_fr else _format_currency
+
+    title = "⚠️ Paiement en retard" if is_fr else "⚠️ Payment Overdue"
+    intro = (
+        f"Le paiement de votre facture est maintenant <strong>en retard de {days_overdue} jour(s)</strong>. "
+        "Veuillez effectuer le règlement immédiatement pour éviter des pénalités supplémentaires."
+        if is_fr else
+        f"Your invoice payment is now <strong>{days_overdue} days overdue</strong>. "
+        "Please make payment immediately to avoid additional penalties."
+    )
+    lbl_inv = "Facture nº :" if is_fr else "Invoice #:"
+    lbl_original = "Montant initial :" if is_fr else "Original Amount:"
+    lbl_penalty = "Pénalité de retard :" if is_fr else "Late Penalty:"
+    lbl_total = "Total à payer maintenant :" if is_fr else "Total Due Now:"
+    warn = (
+        "<strong>Avertissement :</strong> Le non-paiement continu peut entraîner la suspension "
+        "du compte et des actions de recouvrement supplémentaires."
+        if is_fr else
+        "<strong>Warning:</strong> Continued non-payment may result in account suspension and "
+        "additional collection actions."
+    )
+    cta = "Payer maintenant" if is_fr else "Pay Now"
+
     content = f"""
-    <h2 style="margin: 0 0 20px 0; color: #dc2626;">⚠️ Payment Overdue</h2>
+    <h2 style="margin: 0 0 20px 0; color: #dc2626;">{title}</h2>
     
     <p style="color: #475569; line-height: 1.6;">
-        Your invoice payment is now <strong>{days_overdue} days overdue</strong>. 
-        Please make payment immediately to avoid additional penalties.
+        {intro}
     </p>
     
     <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 20px 0;"><tr><td style="background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 20px;">
         <table width="100%" style="font-size: 14px; color: #1e293b;">
             <tr>
-                <td style="padding: 8px 0;"><strong>Invoice #:</strong></td>
+                <td style="padding: 8px 0;"><strong>{lbl_inv}</strong></td>
                 <td style="padding: 8px 0; text-align: right;">{invoice.get('invoice_number', 'N/A')}</td>
             </tr>
             <tr>
-                <td style="padding: 8px 0;"><strong>Original Amount:</strong></td>
-                <td style="padding: 8px 0; text-align: right;">{_format_currency(invoice.get('total_amount', 0))}</td>
+                <td style="padding: 8px 0;"><strong>{lbl_original}</strong></td>
+                <td style="padding: 8px 0; text-align: right;">{fmt_money(invoice.get('total_amount', 0))}</td>
             </tr>
             <tr>
-                <td style="padding: 8px 0;"><strong>Late Penalty:</strong></td>
+                <td style="padding: 8px 0;"><strong>{lbl_penalty}</strong></td>
                 <td style="padding: 8px 0; text-align: right; color: #dc2626;">
-                    +{_format_currency(invoice.get('penalty_amount', 0))}
+                    +{fmt_money(invoice.get('penalty_amount', 0))}
                 </td>
             </tr>
             <tr>
-                <td style="padding: 8px 0;"><strong>Total Due Now:</strong></td>
+                <td style="padding: 8px 0;"><strong>{lbl_total}</strong></td>
                 <td style="padding: 8px 0; text-align: right; font-size: 18px; color: #dc2626; font-weight: bold;">
-                    {_format_currency(invoice.get('total_amount', 0) + invoice.get('penalty_amount', 0))}
+                    {fmt_money(invoice.get('total_amount', 0) + invoice.get('penalty_amount', 0))}
                 </td>
             </tr>
         </table>
     </td></tr></table>
     
     <p style="color: #991b1b; font-size: 13px; line-height: 1.6; background-color: #fef2f2; padding: 15px; border-radius: 8px;">
-        <strong>Warning:</strong> Continued non-payment may result in account suspension and 
-        additional collection actions.
+        {warn}
     </p>
     
     <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 30px auto;">
         <tr>
             <td align="center" style="background-color: #dc2626; padding: 14px 30px; border-radius: 8px;">
-                <a href="{FRONTEND_URL}/vehicle-auctions/invoices/{invoice.get('id')}" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">Pay Now</a>
+                <a href="{FRONTEND_URL}/vehicle-auctions/invoices/{invoice.get('id')}" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">{cta}</a>
             </td>
         </tr>
     </table>
     """
-    
+    subject = (
+        f"⚠️ EN RETARD : Facture nº{invoice.get('invoice_number')} — action requise"
+        if is_fr else
+        f"⚠️ OVERDUE: Invoice #{invoice.get('invoice_number')} - Action Required"
+    )
     return await _send_via_unified(
         to_email=invoice.get('buyer_email'),
-        subject=f"⚠️ OVERDUE: Invoice #{invoice.get('invoice_number')} - Action Required",
-        html_content=_base_template(content, "Payment Overdue")
+        subject=subject,
+        html_content=_base_template(content, "Paiement en retard" if is_fr else "Payment Overdue")
     )
 
 
@@ -613,114 +640,187 @@ async def send_subscription_reminder_email(
     user_name: str,
     plan: str,
     days_remaining: int,
-    end_date: str
+    end_date: str,
+    lang: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Send reminder email 3 days before subscription expires"""
+    """Send reminder email 3 days before subscription expires. iter482 P2 fix — language-aware EN/FR."""
+    if lang is None:
+        lang = "en"
+    is_fr = str(lang).lower().startswith("fr")
     plan_name = plan.title()
-    
+
+    title = "⏰ Abonnement bientôt expiré" if is_fr else "⏰ Subscription Expiring Soon"
+    greet = f"Bonjour {user_name}," if is_fr else f"Hi {user_name},"
+    intro = (
+        f"Votre abonnement <strong>{plan_name}</strong> expirera dans <strong>{days_remaining} jour(s)</strong>."
+        if is_fr else
+        f"Your <strong>{plan_name}</strong> subscription will expire in <strong>{days_remaining} days</strong>."
+    )
+    lbl_current = "Forfait actuel :" if is_fr else "Current Plan:"
+    lbl_exp = "Expire le :" if is_fr else "Expires On:"
+    lbl_days = "Jours restants :" if is_fr else "Days Remaining:"
+    benefits_note = (
+        f"Pour continuer à profiter des avantages {plan_name} (frais réduits, soutien prioritaire, etc.), "
+        "veuillez contacter le service à la clientèle pour renouveler votre abonnement."
+        if is_fr else
+        f"To continue enjoying {plan_name} benefits (reduced fees, priority support, and more), "
+        "please contact support to renew your subscription."
+    )
+    downgrade_note = (
+        "Si votre abonnement expire, votre compte sera automatiquement rétrogradé au forfait Gratuit."
+        if is_fr else
+        "If your subscription expires, your account will be downgraded to the Free plan automatically."
+    )
+    cta = "Voir mon abonnement" if is_fr else "View Subscription"
+
     content = f"""
-    <h2 style="margin: 0 0 20px 0; color: #f59e0b;">⏰ Subscription Expiring Soon</h2>
-    
+    <h2 style="margin: 0 0 20px 0; color: #f59e0b;">{title}</h2>
+
     <p style="color: #475569; line-height: 1.6;">
-        Hi {user_name},
+        {greet}
     </p>
-    
+
     <p style="color: #475569; line-height: 1.6;">
-        Your <strong>{plan_name}</strong> subscription will expire in <strong>{days_remaining} days</strong>.
+        {intro}
     </p>
-    
+
     <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 20px 0;"><tr><td style="background-color: #fef3c7; border: 1px solid #fcd34d; border-radius: 8px; padding: 20px;">
         <table width="100%" style="font-size: 14px; color: #1e293b;">
             <tr>
-                <td style="padding: 8px 0;"><strong>Current Plan:</strong></td>
+                <td style="padding: 8px 0;"><strong>{lbl_current}</strong></td>
                 <td style="padding: 8px 0; text-align: right;">{plan_name}</td>
             </tr>
             <tr>
-                <td style="padding: 8px 0;"><strong>Expires On:</strong></td>
+                <td style="padding: 8px 0;"><strong>{lbl_exp}</strong></td>
                 <td style="padding: 8px 0; text-align: right;">{end_date}</td>
             </tr>
             <tr>
-                <td style="padding: 8px 0;"><strong>Days Remaining:</strong></td>
+                <td style="padding: 8px 0;"><strong>{lbl_days}</strong></td>
                 <td style="padding: 8px 0; text-align: right; color: #d97706; font-weight: bold;">{days_remaining}</td>
             </tr>
         </table>
     </td></tr></table>
-    
+
     <p style="color: #475569; line-height: 1.6;">
-        To continue enjoying {plan_name} benefits (reduced fees, priority support, and more), 
-        please contact support to renew your subscription.
+        {benefits_note}
     </p>
-    
+
     <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 30px auto;">
         <tr>
             <td align="center" style="background-color: #f59e0b; padding: 14px 30px; border-radius: 8px;">
-                <a href="{FRONTEND_URL}/settings/subscription" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">View Subscription</a>
+                <a href="{FRONTEND_URL}/settings/subscription" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">{cta}</a>
             </td>
         </tr>
     </table>
-    
+
     <p style="color: #64748b; font-size: 13px; line-height: 1.6;">
-        If your subscription expires, your account will be downgraded to the Free plan automatically.
+        {downgrade_note}
     </p>
     """
-    
+    subject = (
+        f"⏰ Votre abonnement {plan_name} expire dans {days_remaining} jour(s)"
+        if is_fr else
+        f"⏰ Your {plan_name} Subscription Expires in {days_remaining} Days"
+    )
     return await _send_via_unified(
         to_email=user_email,
-        subject=f"⏰ Your {plan_name} Subscription Expires in {days_remaining} Days",
-        html_content=_base_template(content, "Subscription Reminder")
+        subject=subject,
+        html_content=_base_template(content, "Rappel d'abonnement" if is_fr else "Subscription Reminder")
     )
 
 
 async def send_subscription_expired_email(
     user_email: str,
     user_name: str,
-    previous_plan: str
+    previous_plan: str,
+    lang: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Send confirmation email when subscription expires"""
+    """Send confirmation email when subscription expires. iter482 P2 fix — language-aware EN/FR."""
+    if lang is None:
+        lang = "en"
+    is_fr = str(lang).lower().startswith("fr")
     plan_name = previous_plan.title()
-    
+
+    title = "Abonnement expiré" if is_fr else "Subscription Expired"
+    greet = f"Bonjour {user_name}," if is_fr else f"Hi {user_name},"
+    intro = (
+        f"Votre abonnement <strong>{plan_name}</strong> est expiré. "
+        f"Votre compte a été rétrogradé au forfait <strong>Gratuit</strong>."
+        if is_fr else
+        f"Your <strong>{plan_name}</strong> subscription has expired. Your account has been "
+        f"downgraded to the <strong>Free</strong> plan."
+    )
+    changes_title = "Ce qui a changé :" if is_fr else "What's Changed:"
+    changes = (
+        [
+            "Limite mensuelle d'annonces réduite",
+            "Remises sur la prime acheteur retirées",
+            "Remises sur la commission vendeur retirées",
+            "Soutien prioritaire non disponible",
+        ] if is_fr else [
+            "Monthly listing limit reduced",
+            "Buyer premium discounts removed",
+            "Seller commission discounts removed",
+            "Priority support no longer available",
+        ]
+    )
+    outro = (
+        f"Pas d'inquiétude ! Vos annonces existantes restent actives. "
+        f"Pour retrouver vos avantages {plan_name}, veuillez contacter le service à la clientèle "
+        f"pour renouveler votre abonnement."
+        if is_fr else
+        f"Don't worry! Your existing listings will remain active. To regain your {plan_name} benefits, "
+        f"please contact support to renew your subscription."
+    )
+    thanks = (
+        f"Merci d'avoir été membre {plan_name}. Au plaisir de vous revoir bientôt !"
+        if is_fr else
+        f"Thank you for being a {plan_name} member. We hope to see you back soon!"
+    )
+    cta = "Renouveler mon abonnement" if is_fr else "Renew Subscription"
+    changes_html = "".join(f"<li>{c}</li>" for c in changes)
+
     content = f"""
-    <h2 style="margin: 0 0 20px 0; color: #64748b;">Subscription Expired</h2>
-    
+    <h2 style="margin: 0 0 20px 0; color: #64748b;">{title}</h2>
+
     <p style="color: #475569; line-height: 1.6;">
-        Hi {user_name},
+        {greet}
     </p>
-    
+
     <p style="color: #475569; line-height: 1.6;">
-        Your <strong>{plan_name}</strong> subscription has expired. Your account has been 
-        downgraded to the <strong>Free</strong> plan.
+        {intro}
     </p>
-    
-    <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="background-color: #f1f5f9; border-radius: 8px; padding: 20px; margin: 20px 0;">        <h4 style="margin: 0 0 15px 0; color: #334155;">What's Changed:</h4>
+
+    <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="background-color: #f1f5f9; border-radius: 8px; padding: 20px; margin: 20px 0;">        <h4 style="margin: 0 0 15px 0; color: #334155;">{changes_title}</h4>
         <ul style="margin: 0; padding: 0 0 0 20px; color: #475569; line-height: 1.8;">
-            <li>Monthly listing limit reduced</li>
-            <li>Buyer premium discounts removed</li>
-            <li>Seller commission discounts removed</li>
-            <li>Priority support no longer available</li>
+            {changes_html}
         </ul></td></tr></table>
-    
+
     <p style="color: #475569; line-height: 1.6;">
-        Don't worry! Your existing listings will remain active. To regain your {plan_name} benefits, 
-        please contact support to renew your subscription.
+        {outro}
     </p>
-    
+
     <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 30px auto;">
         <tr>
             <td align="center" style="background-color: #1e3a5f; padding: 14px 30px; border-radius: 8px;">
-                <a href="{FRONTEND_URL}/settings/subscription" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">Renew Subscription</a>
+                <a href="{FRONTEND_URL}/settings/subscription" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">{cta}</a>
             </td>
         </tr>
     </table>
-    
+
     <p style="color: #64748b; font-size: 13px; line-height: 1.6;">
-        Thank you for being a {plan_name} member. We hope to see you back soon!
+        {thanks}
     </p>
     """
-    
+    subject = (
+        f"Votre abonnement {plan_name} est expiré"
+        if is_fr else
+        f"Your {plan_name} Subscription Has Expired"
+    )
     return await _send_via_unified(
         to_email=user_email,
-        subject=f"Your {plan_name} Subscription Has Expired",
-        html_content=_base_template(content, "Subscription Expired")
+        subject=subject,
+        html_content=_base_template(content, title)
     )
 
 
@@ -728,51 +828,94 @@ async def send_subscription_upgraded_email(
     user_email: str,
     user_name: str,
     new_plan: str,
-    end_date: str
+    end_date: str,
+    lang: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Send confirmation when subscription is upgraded/changed by admin"""
+    """Send confirmation when subscription is upgraded/changed by admin. iter482 P2 fix — language-aware EN/FR."""
+    if lang is None:
+        lang = "en"
+    is_fr = str(lang).lower().startswith("fr")
     plan_name = new_plan.title()
-    
+
+    title = "🎉 Abonnement mis à jour" if is_fr else "🎉 Subscription Updated"
+    greet = f"Bonjour {user_name}," if is_fr else f"Hi {user_name},"
+    intro = (
+        f"Bonne nouvelle ! Votre abonnement a été mis à jour à <strong>{plan_name}</strong>."
+        if is_fr else
+        f"Great news! Your subscription has been updated to <strong>{plan_name}</strong>."
+    )
+    active_lbl = f"Actif jusqu'au {end_date}" if is_fr else f"Active until {end_date}"
+    benefits_title = f"Vos avantages {plan_name} :" if is_fr else f"Your {plan_name} Benefits:"
+
+    if is_fr:
+        benefits = []
+        if new_plan in ("premium", "vip"):
+            benefits += [
+                "Frais de prime acheteur réduits",
+                "Taux de commission vendeur réduits",
+                "Soutien à la clientèle prioritaire",
+            ]
+        if new_plan == "vip":
+            benefits += [
+                "Tableau de bord analytique avancé",
+                "Gestionnaire de compte dédié",
+            ]
+    else:
+        benefits = []
+        if new_plan in ("premium", "vip"):
+            benefits += [
+                "Reduced buyer premium fees",
+                "Lower seller commission rates",
+                "Priority customer support",
+            ]
+        if new_plan == "vip":
+            benefits += [
+                "Advanced analytics dashboard",
+                "Dedicated account manager",
+            ]
+    benefits_html = "".join(f"<li>{b}</li>" for b in benefits)
+    cta = "Commencer à explorer" if is_fr else "Start Exploring"
+
     content = f"""
-    <h2 style="margin: 0 0 20px 0; color: #10b981;">🎉 Subscription Updated</h2>
-    
+    <h2 style="margin: 0 0 20px 0; color: #10b981;">{title}</h2>
+
     <p style="color: #475569; line-height: 1.6;">
-        Hi {user_name},
+        {greet}
     </p>
-    
+
     <p style="color: #475569; line-height: 1.6;">
-        Great news! Your subscription has been updated to <strong>{plan_name}</strong>.
+        {intro}
     </p>
-    
+
     <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="background-color: #d1fae5; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center;">        <p style="margin: 0; color: #065f46; font-size: 24px; font-weight: bold;">
             {plan_name}
         </p>
         <p style="margin: 10px 0 0 0; color: #10b981; font-size: 14px;">
-            Active until {end_date}
+            {active_lbl}
         </p></td></tr></table>
-    
-    <h4 style="margin: 25px 0 15px 0; color: #334155;">Your {plan_name} Benefits:</h4>
+
+    <h4 style="margin: 25px 0 15px 0; color: #334155;">{benefits_title}</h4>
     <ul style="margin: 0; padding: 0 0 0 20px; color: #475569; line-height: 1.8;">
-        {"<li>Reduced buyer premium fees</li>" if new_plan in ['premium', 'vip'] else ""}
-        {"<li>Lower seller commission rates</li>" if new_plan in ['premium', 'vip'] else ""}
-        {"<li>Priority customer support</li>" if new_plan in ['premium', 'vip'] else ""}
-        {"<li>Advanced analytics dashboard</li>" if new_plan == 'vip' else ""}
-        {"<li>Dedicated account manager</li>" if new_plan == 'vip' else ""}
+        {benefits_html}
     </ul>
-    
+
     <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 30px auto;">
         <tr>
             <td align="center" style="background-color: #10b981; padding: 14px 30px; border-radius: 8px;">
-                <a href="{FRONTEND_URL}/marketplace" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">Start Exploring</a>
+                <a href="{FRONTEND_URL}/marketplace" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">{cta}</a>
             </td>
         </tr>
     </table>
     """
-    
+    subject = (
+        f"🎉 Bienvenue chez {plan_name} !"
+        if is_fr else
+        f"🎉 Welcome to {plan_name}!"
+    )
     return await _send_via_unified(
         to_email=user_email,
-        subject=f"🎉 Welcome to {plan_name}!",
-        html_content=_base_template(content, "Subscription Updated")
+        subject=subject,
+        html_content=_base_template(content, "Abonnement mis à jour" if is_fr else "Subscription Updated")
     )
 
 
@@ -784,50 +927,82 @@ async def send_payment_reminder_email(
     listing_id: str,
     days_remaining: int,
     payment_deadline: str,
+    lang: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Send payment reminder email (day 10)"""
+    """Send payment reminder email (day 10). iter482 P2 fix — language-aware EN/FR."""
+    if lang is None:
+        lang = "en"
+    is_fr = str(lang).lower().startswith("fr")
+    fmt_money = _format_currency_fr if is_fr else _format_currency
     checkout_url = f"{FRONTEND_URL}/checkout/{listing_id}"
-    price_display = _format_currency(final_price)
-    deadline_display = _format_date(payment_deadline) if payment_deadline else "soon"
+    price_display = fmt_money(final_price)
+    deadline_display = _format_date(payment_deadline) if payment_deadline else ("bientôt" if is_fr else "soon")
+
+    title = "Rappel de paiement" if is_fr else "Payment Reminder"
+    greet = f"Bonjour {winner_name}," if is_fr else f"Hi {winner_name},"
+    intro = (
+        f"Nous vous rappelons que le paiement pour <strong>{item_title}</strong> "
+        f"est exigible dans <strong>{days_remaining} jour(s)</strong>."
+        if is_fr else
+        f"This is a reminder that your payment for <strong>{item_title}</strong> "
+        f"is due in <strong>{days_remaining} days</strong>."
+    )
+    box_title = "Détails du paiement" if is_fr else "Payment Details"
+    amount_lbl = "Montant" if is_fr else "Amount"
+    fees_note = (
+        "(+ frais et taxes applicables)" if is_fr else "(+ applicable fees &amp; taxes)"
+    )
+    deadline_lbl = "Échéance" if is_fr else "Deadline"
+    penalty_note = (
+        "Passé ce délai, une <strong>pénalité mensuelle de 2 %</strong> sera appliquée à votre solde."
+        if is_fr else
+        "After the deadline, a <strong>2% monthly late penalty</strong> will be applied to your balance."
+    )
+    cta = "Payer maintenant" if is_fr else "Pay Now"
 
     content = f"""
-    <h2 style="margin: 0 0 20px 0; color: #f59e0b;">Payment Reminder</h2>
+    <h2 style="margin: 0 0 20px 0; color: #f59e0b;">{title}</h2>
 
     <p style="color: #475569; line-height: 1.6;">
-        Hi {winner_name},
+        {greet}
     </p>
 
     <p style="color: #475569; line-height: 1.6;">
-        This is a reminder that your payment for <strong>{item_title}</strong> is due in <strong>{days_remaining} days</strong>.
+        {intro}
     </p>
 
     <table width="100%" cellpadding="0" cellspacing="0" border="0">
         <tr>
             <td style="background-color: #fffbeb; border: 1px solid #fbbf24; border-radius: 8px; padding: 20px;">
-                <p style="margin: 0 0 8px 0; color: #92400e; font-weight: bold;">Payment Details</p>
-                <p style="margin: 0; color: #92400e;">Amount: <strong>{price_display}</strong> (+ applicable fees &amp; taxes)</p>
-                <p style="margin: 8px 0 0 0; color: #dc2626; font-weight: bold;">Deadline: {deadline_display}</p>
+                <p style="margin: 0 0 8px 0; color: #92400e; font-weight: bold;">{box_title}</p>
+                <p style="margin: 0; color: #92400e;">{amount_lbl}: <strong>{price_display}</strong> {fees_note}</p>
+                <p style="margin: 8px 0 0 0; color: #dc2626; font-weight: bold;">{deadline_lbl}: {deadline_display}</p>
             </td>
         </tr>
     </table>
 
     <p style="color: #475569; line-height: 1.6; margin-top: 20px;">
-        After the deadline, a <strong>2% monthly late penalty</strong> will be applied to your balance.
+        {penalty_note}
     </p>
 
     <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 30px auto;">
         <tr>
             <td align="center" style="background-color: #f59e0b; padding: 14px 30px; border-radius: 8px;">
-                <a href="{checkout_url}" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">Pay Now</a>
+                <a href="{checkout_url}" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">{cta}</a>
             </td>
         </tr>
     </table>
     """
 
+    subject = (
+        f"Rappel de paiement : {item_title} — {days_remaining} jour(s) restant(s)"
+        if is_fr else
+        f"Payment Reminder: {item_title} - {days_remaining} Days Left"
+    )
     return await _send_via_unified(
         to_email=winner_email,
-        subject=f"Payment Reminder: {item_title} - {days_remaining} Days Left",
-        html_content=_base_template(content, "Payment Reminder")
+        subject=subject,
+        html_content=_base_template(content, title)
     )
 
 
@@ -839,22 +1014,48 @@ async def send_payment_overdue_email(
     listing_id: str,
     penalty_amount: float,
     total_with_penalty: float,
+    lang: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Send payment overdue notice with penalty (day 14+)"""
+    """Send payment overdue notice with penalty (day 14+). iter482 P2 fix — language-aware EN/FR."""
+    if lang is None:
+        lang = "en"
+    is_fr = str(lang).lower().startswith("fr")
+    fmt_money = _format_currency_fr if is_fr else _format_currency
     checkout_url = f"{FRONTEND_URL}/checkout/{listing_id}"
-    price_display = _format_currency(final_price)
-    penalty_display = _format_currency(penalty_amount)
-    total_display = _format_currency(total_with_penalty)
+    price_display = fmt_money(final_price)
+    penalty_display = fmt_money(penalty_amount)
+    total_display = fmt_money(total_with_penalty)
+
+    title = "Paiement en retard" if is_fr else "Payment Overdue"
+    greet = f"Bonjour {winner_name}," if is_fr else f"Hi {winner_name},"
+    intro = (
+        f"Le paiement pour <strong>{item_title}</strong> est maintenant <strong>en retard</strong>. "
+        "Une pénalité de retard a été appliquée."
+        if is_fr else
+        f"Your payment for <strong>{item_title}</strong> is now <strong>overdue</strong>. "
+        "A late penalty has been applied."
+    )
+    lbl_original = "Montant initial :" if is_fr else "Original Amount:"
+    lbl_penalty = "Pénalité de retard (2 %/mois) :" if is_fr else "Late Penalty (2%/month):"
+    lbl_new_total = "Nouveau total à payer :" if is_fr else "New Total Due:"
+    escalation = (
+        "Veuillez régler immédiatement pour éviter d'autres pénalités. "
+        "La pénalité augmente de 2 % pour chaque mois de retard supplémentaire."
+        if is_fr else
+        "Please complete your payment immediately to avoid further penalties. "
+        "The late penalty increases by 2% for each additional month."
+    )
+    cta = "Payer maintenant" if is_fr else "Pay Now"
 
     content = f"""
-    <h2 style="margin: 0 0 20px 0; color: #dc2626;">Payment Overdue</h2>
+    <h2 style="margin: 0 0 20px 0; color: #dc2626;">{title}</h2>
 
     <p style="color: #475569; line-height: 1.6;">
-        Hi {winner_name},
+        {greet}
     </p>
 
     <p style="color: #475569; line-height: 1.6;">
-        Your payment for <strong>{item_title}</strong> is now <strong>overdue</strong>. A late penalty has been applied.
+        {intro}
     </p>
 
     <table width="100%" cellpadding="0" cellspacing="0" border="0">
@@ -862,18 +1063,18 @@ async def send_payment_overdue_email(
             <td style="background-color: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px; padding: 20px;">
                 <table width="100%" cellpadding="0" cellspacing="0" border="0">
                     <tr>
-                        <td style="color: #991b1b; font-size: 14px; padding: 4px 0;">Original Amount:</td>
+                        <td style="color: #991b1b; font-size: 14px; padding: 4px 0;">{lbl_original}</td>
                         <td style="color: #991b1b; font-size: 14px; text-align: right;">{price_display}</td>
                     </tr>
                     <tr>
-                        <td style="color: #dc2626; font-size: 14px; padding: 4px 0;">Late Penalty (2%/month):</td>
+                        <td style="color: #dc2626; font-size: 14px; padding: 4px 0;">{lbl_penalty}</td>
                         <td style="color: #dc2626; font-size: 14px; font-weight: bold; text-align: right;">+{penalty_display}</td>
                     </tr>
                     <tr>
                         <td colspan="2" style="border-top: 1px solid #fca5a5; padding-top: 8px; margin-top: 8px;"></td>
                     </tr>
                     <tr>
-                        <td style="color: #991b1b; font-size: 16px; font-weight: bold; padding: 4px 0;">New Total Due:</td>
+                        <td style="color: #991b1b; font-size: 16px; font-weight: bold; padding: 4px 0;">{lbl_new_total}</td>
                         <td style="color: #dc2626; font-size: 20px; font-weight: bold; text-align: right;">{total_display}</td>
                     </tr>
                 </table>
@@ -882,22 +1083,26 @@ async def send_payment_overdue_email(
     </table>
 
     <p style="color: #475569; line-height: 1.6; margin-top: 20px;">
-        Please complete your payment immediately to avoid further penalties. The late penalty increases by 2% for each additional month.
+        {escalation}
     </p>
 
     <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 30px auto;">
         <tr>
             <td align="center" style="background-color: #dc2626; padding: 14px 30px; border-radius: 8px;">
-                <a href="{checkout_url}" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">Pay Now</a>
+                <a href="{checkout_url}" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">{cta}</a>
             </td>
         </tr>
     </table>
     """
-
+    subject = (
+        f"EN RETARD : paiement requis pour {item_title}"
+        if is_fr else
+        f"OVERDUE: Payment Required for {item_title}"
+    )
     return await _send_via_unified(
         to_email=winner_email,
-        subject=f"OVERDUE: Payment Required for {item_title}",
-        html_content=_base_template(content, "Payment Overdue")
+        subject=subject,
+        html_content=_base_template(content, title)
     )
 
 

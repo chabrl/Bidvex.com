@@ -266,8 +266,22 @@ LABELS = {
 }
 
 
-def _fmt_currency(amount: float, currency: str = "CAD") -> str:
-    symbol = "$" if currency in ("CAD", "USD") else currency
+def _fmt_currency(amount: float, currency: str = "CAD", lang: str = "en") -> str:
+    """iter482 P2 — Currency formatter with Canadian French locale support.
+    EN (and any non-fr locale): ``$32,500.00`` — symbol prefix, comma
+    thousands separator, dot decimal.
+    FR (Canadian French): ``32 500,00 $`` — non-breaking-space thousands
+    separator, comma decimal, symbol suffix (per BNQ 9921-500).
+    """
+    if currency in ("CAD", "USD"):
+        symbol = "$"
+    else:
+        symbol = currency
+    if lang == "fr":
+        s = f"{amount:,.2f}"
+        # comma → non-breaking space (thousands), dot → comma (decimal)
+        s = s.replace(",", "\u00a0").replace(".", ",")
+        return f"{s}\u00a0{symbol}"
     return f"{symbol}{amount:,.2f}"
 
 
@@ -440,16 +454,16 @@ def generate_invoice_pdf(
             Paragraph(str(item.get("title", item.get("name", "Auction Item"))), styles["Normal"]),
             Paragraph(str(item.get("description", ""))[:80], styles["InvSmall"]),
             str(item.get("quantity", 1)),
-            _fmt_currency(item.get("unit_price", item.get("hammer_price", 0)), currency),
-            _fmt_currency(item.get("amount", item.get("hammer_price", 0)), currency),
+            _fmt_currency(item.get("unit_price", item.get("hammer_price", 0)), currency, lang),
+            _fmt_currency(item.get("amount", item.get("hammer_price", 0)), currency, lang),
         ])
 
     if not items:
         table_data.append([
             Paragraph(invoice_data.get("item_title", "Auction Item"), styles["Normal"]),
             "", "1",
-            _fmt_currency(invoice_data.get("subtotal", 0), currency),
-            _fmt_currency(invoice_data.get("subtotal", 0), currency),
+            _fmt_currency(invoice_data.get("subtotal", 0), currency, lang),
+            _fmt_currency(invoice_data.get("subtotal", 0), currency, lang),
         ])
 
     items_table = Table(table_data, colWidths=[1.8 * inch, 2.2 * inch, 0.5 * inch, 1.2 * inch, 1.3 * inch])
@@ -475,16 +489,16 @@ def generate_invoice_pdf(
     tax_result = calculate_province_tax(taxable_amount, buyer_province, lang)
 
     totals_data = [
-        ["", L["subtotal"], _fmt_currency(subtotal, currency)],
+        ["", L["subtotal"], _fmt_currency(subtotal, currency, lang)],
     ]
     if buyer_premium > 0:
-        totals_data.append(["", L["buyer_premium"], _fmt_currency(buyer_premium, currency)])
+        totals_data.append(["", L["buyer_premium"], _fmt_currency(buyer_premium, currency, lang)])
 
     for tax_line in tax_result.line_items:
-        totals_data.append(["", tax_line["label"], _fmt_currency(tax_line["amount"], currency)])
+        totals_data.append(["", tax_line["label"], _fmt_currency(tax_line["amount"], currency, lang)])
 
     total = taxable_amount + tax_result.total_tax
-    totals_data.append(["", L["total"], _fmt_currency(total, currency)])
+    totals_data.append(["", L["total"], _fmt_currency(total, currency, lang)])
 
     totals_table = Table(totals_data, colWidths=[3.8 * inch, 1.7 * inch, 1.5 * inch])
     totals_table.setStyle(TableStyle([

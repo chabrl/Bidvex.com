@@ -514,21 +514,44 @@ async def send_all():
     )
 
     # ==================================================================
-    # 7) Invoice overdue / payment reminder / payment overdue
+    # 7) Invoice overdue / payment reminder / payment overdue  [iter482 P2-FIX]
     # ==================================================================
-    ov = _invoice_common_en(); ov["penalty_amount"] = 100.00; ov["payment_status"] = "overdue"
-    await send_invoice_overdue_email(ov, days_overdue=5)
+    # EN version
+    ov_en = _invoice_common_en(); ov_en["penalty_amount"] = 100.00; ov_en["payment_status"] = "overdue"
+    await send_invoice_overdue_email(ov_en, days_overdue=5)
+    # FR version (invoice carries preferred_language="fr" + buyer_province="QC")
+    ov_fr = _invoice_common_fr(); ov_fr["penalty_amount"] = 100.00; ov_fr["payment_status"] = "overdue"
+    ov_fr["preferred_language"] = "fr"; ov_fr["buyer_province"] = "QC"
+    await send_invoice_overdue_email(ov_fr, days_overdue=5)
+
+    # Payment reminder — EN + FR
     await send_payment_reminder_email(
         winner_email=RECIPIENT, winner_name="Alexandra Riley",
         item_title="2019 Ford F-150 Lariat 4x4",
         final_price=32500.00, listing_id="lst_test_reminder",
-        days_remaining=4, payment_deadline=ov["due_at"],
+        days_remaining=4, payment_deadline=ov_en["due_at"],
     )
+    await send_payment_reminder_email(
+        winner_email=RECIPIENT, winner_name="Sophie Tremblay",
+        item_title="Camion Ford F-150 Lariat 4x4 2019",
+        final_price=32500.00, listing_id="lst_test_reminder_fr",
+        days_remaining=4, payment_deadline=ov_fr["due_at"],
+        lang="fr",
+    )
+
+    # Payment overdue — EN + FR
     await send_payment_overdue_email(
         winner_email=RECIPIENT, winner_name="Alexandra Riley",
         item_title="2019 Ford F-150 Lariat 4x4",
         final_price=32500.00, listing_id="lst_test_overdue",
         penalty_amount=650.00, total_with_penalty=33150.00,
+    )
+    await send_payment_overdue_email(
+        winner_email=RECIPIENT, winner_name="Sophie Tremblay",
+        item_title="Camion Ford F-150 Lariat 4x4 2019",
+        final_price=32500.00, listing_id="lst_test_overdue_fr",
+        penalty_amount=650.00, total_with_penalty=33150.00,
+        lang="fr",
     )
 
     # ==================================================================
@@ -669,8 +692,9 @@ async def send_all():
                                          amount=1828.13, currency="CAD")
 
     # ==================================================================
-    # 13) Subscription documents
+    # 13) Subscription documents  [iter482 P2-FIX — now EN + FR]
     # ==================================================================
+    # EN — regular subscription active + reminder + expired + upgraded
     await send_manual_subscription_active_email(
         user={"email": RECIPIENT, "name": "Prairie Auto Group Ltd."},
         account_kind="vehicle_dealer",
@@ -678,19 +702,41 @@ async def send_all():
         renewal_until=(datetime.now(timezone.utc) + timedelta(days=365)).isoformat(),
         reference="ETR-2026-042",
     )
+    # Reminder — EN
     await send_subscription_reminder_email(
         user_email=RECIPIENT, user_name="Prairie Auto Group Ltd.",
         plan="premium", days_remaining=3,
         end_date=(datetime.now(timezone.utc) + timedelta(days=3)).strftime("%B %d, %Y"),
     )
+    # Reminder — FR
+    await send_subscription_reminder_email(
+        user_email=RECIPIENT, user_name="Encans Charbonneau Inc.",
+        plan="premium", days_remaining=3,
+        end_date="18 février 2026",
+        lang="fr",
+    )
+    # Expired — EN
     await send_subscription_expired_email(
         user_email=RECIPIENT, user_name="Prairie Auto Group Ltd.",
         previous_plan="vip",
     )
+    # Expired — FR
+    await send_subscription_expired_email(
+        user_email=RECIPIENT, user_name="Encans Charbonneau Inc.",
+        previous_plan="vip", lang="fr",
+    )
+    # Upgraded — EN
     await send_subscription_upgraded_email(
         user_email=RECIPIENT, user_name="Prairie Auto Group Ltd.",
         new_plan="vip",
         end_date=(datetime.now(timezone.utc) + timedelta(days=365)).strftime("%B %d, %Y"),
+    )
+    # Upgraded — FR
+    await send_subscription_upgraded_email(
+        user_email=RECIPIENT, user_name="Encans Charbonneau Inc.",
+        new_plan="vip",
+        end_date="15 février 2027",
+        lang="fr",
     )
 
     # ==================================================================

@@ -360,10 +360,12 @@ async def check_subscription_expirations_job():
                 # Send expiration email
                 try:
                     from services.emails.email_system import send_subscription_expired_email
+                    from services.emails._email_core import _detect_language as _dl
                     await send_subscription_expired_email(
                         user_email=user.get("email"),
                         user_name=user.get("name", user.get("email")),
-                        previous_plan=previous_plan
+                        previous_plan=previous_plan,
+                        lang=_dl(user),
                     )
                 except Exception as email_error:
                     logger.error(f"Failed to send expiration email to {user.get('email')}: {email_error}")
@@ -428,12 +430,14 @@ async def send_subscription_reminders_job():
                 # Send reminder email
                 try:
                     from services.emails.email_system import send_subscription_reminder_email
+                    from services.emails._email_core import _detect_language as _dl
                     await send_subscription_reminder_email(
                         user_email=user.get("email"),
                         user_name=user.get("name", user.get("email")),
                         plan=user.get("subscription_tier"),
                         days_remaining=days_left,
-                        end_date=end_date.strftime("%B %d, %Y")
+                        end_date=end_date.strftime("%B %d, %Y"),
+                        lang=_dl(user),
                     )
                     
                     # Mark reminder as sent

@@ -1004,6 +1004,14 @@ Wired canonical `services/payment_cost_engine.py` into every buyer-facing calcul
 - Backend: FastAPI + Motor (async Mongo)
 - Integrations: Stripe (TEST mode), SendGrid, Twilio, Cloudflare R2, Emergent LLM key
 
+## 2026-02-15 — iter482 P2 Presentation Fix Pass
+- Fixed 7 P2 presentation defects reported in the Visual QA Report:
+  - Made 6 EN-only helpers bilingual EN/FR (`send_invoice_overdue_email`, `send_payment_reminder_email`, `send_payment_overdue_email`, `send_subscription_reminder_email`, `send_subscription_expired_email`, `send_subscription_upgraded_email`).
+  - Fixed Canadian French currency formatting on the bilingual auction PDF (`services/invoice_service.py::_fmt_currency` now emits `32 500,00 $` when `lang="fr"`, EN unchanged).
+- Zero production-financial-code changes.  No tax, Stripe, reconciliation, or settlement logic altered.
+- 15 new regression tests (`tests/iter482/test_p2_billing_presentation_fixes.py`).  iter482 suite: **62 passing** (up from 47).  Billing critical (p7 + p7_5 + iter482 + golden_matrix): **1,195 passing** (up from ~1,180).
+- Re-delivered **49 corrected TEST/PREVIEW emails** to `charbel911@gmail.com` (up from 43 — 6 new FR variants of the fixed helpers).  See `/app/docs/ITER482_BILLING_P2_FIX_REPORT.md`.
+
 ## 2026-02-15 — iter482 Billing Document Visual QA delivery
 - Delivered 47 realistic TEST copies of every billing-related document to `charbel911@gmail.com` (single-recipient safety wrapper, `[TEST/PREVIEW]` on every subject, banner injected in every body).
 - 33 unique documents catalogued (see `/app/docs/ITER482_BILLING_DOCUMENT_INVENTORY.md`).
@@ -1017,7 +1025,6 @@ Wired canonical `services/payment_cost_engine.py` into every buyer-facing calcul
 - P0 P7 — ≥200-case exact-cent regression matrix
 - P1 P8 — Peripheral flows (escrow, deposits, penalties, marketing)
 - P0 P9 — Static financial audit + final deployment gate
-- P1 iter482 P2 presentation fixes (7 items — EN-only billing helpers + FR PDF currency format)
 - P1 Admin Fee Schedule UI
 - P1 Claude AI models integration
 - P1 Explicit seller-side commission invoice widget on seller dashboard

@@ -222,7 +222,7 @@ async def send_manual_payment_reminder(listing_id: str, current_user: User = Dep
             "message_fr": f"Rappel déjà envoyé il y a {hours_ago:.0f} heures. Vous pourrez en envoyer un autre dans {24 - hours_ago:.0f} h.",
         })
 
-    winner = await db.users.find_one({"id": winner_id}, {"_id": 0, "email": 1, "name": 1, "preferred_language": 1})
+    winner = await db.users.find_one({"id": winner_id}, {"_id": 0, "email": 1, "name": 1, "preferred_language": 1, "province": 1})
     if not winner or not winner.get("email"):
         raise HTTPException(status_code=400, detail="Winner has no email on file")
 
@@ -230,6 +230,7 @@ async def send_manual_payment_reminder(listing_id: str, current_user: User = Dep
     deadline = doc.get("payment_deadline") or ""
     try:
         from services.emails.email_system import send_payment_reminder_email
+        from services.emails._email_core import _detect_language as _dl
         await send_payment_reminder_email(
             winner_email=winner["email"],
             winner_name=winner.get("name", "Winner"),
@@ -238,6 +239,7 @@ async def send_manual_payment_reminder(listing_id: str, current_user: User = Dep
             listing_id=listing_id,
             days_remaining=0,
             payment_deadline=deadline,
+            lang=_dl(winner, doc),
         )
     except Exception as e:  # noqa: BLE001
         logger.error(f"[settlement] manual reminder email failed for {listing_id}: {e}")

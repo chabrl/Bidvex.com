@@ -193,12 +193,13 @@ async def send_auction_payment_reminders(db):
                         continue
 
                     winner = await db.users.find_one(
-                        {"id": winner_id}, {"_id": 0, "email": 1, "name": 1})
+                        {"id": winner_id}, {"_id": 0, "email": 1, "name": 1, "preferred_language": 1, "province": 1})
                     hammer = float(listing.get("final_price") or listing.get("current_price")
                                    or listing.get("current_bid") or 0)
                     hours_remaining = max(0, (deadline_dt - now).total_seconds() / 3600)
 
                     if winner and winner.get("email"):
+                        from services.emails._email_core import _detect_language as _dl
                         await send_payment_reminder_email(
                             winner_email=winner["email"],
                             winner_name=winner.get("name", "Winner"),
@@ -207,6 +208,7 @@ async def send_auction_payment_reminders(db):
                             listing_id=listing["id"],
                             days_remaining=int(hours_remaining // 24),
                             payment_deadline=str(listing["payment_deadline"]),
+                            lang=_dl(winner, listing),
                         )
                         # Escalation warning on the 48h reminder
                         if stage == "48":
@@ -318,9 +320,10 @@ async def process_overdue_auction_payments(db):
                 except Exception:
                     pass
 
-                winner = await db.users.find_one({"id": winner_id}, {"_id": 0, "email": 1, "name": 1})
+                winner = await db.users.find_one({"id": winner_id}, {"_id": 0, "email": 1, "name": 1, "preferred_language": 1, "province": 1})
                 if winner and winner.get("email"):
                     from services.emails.email_system import send_payment_overdue_email
+                    from services.emails._email_core import _detect_language as _dl
                     await send_payment_overdue_email(
                         winner_email=winner["email"],
                         winner_name=winner.get("name", "Winner"),
@@ -329,6 +332,7 @@ async def process_overdue_auction_payments(db):
                         listing_id=listing_id,
                         penalty_amount=penalty_amount,
                         total_with_penalty=hammer_price + penalty_amount,
+                        lang=_dl(winner, listing),
                     )
 
                 logger.info(f"Overdue processed for listing {listing_id}: penalty=${penalty_amount:.2f}")
