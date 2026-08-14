@@ -273,6 +273,11 @@ class Lot(BaseModel):
     title_fr: Optional[str] = None
     description_en: Optional[str] = None
     description_fr: Optional[str] = None
+    # iter484 — Buyer-facing reserve indicator. The Lot model NEVER
+    # exposes the actual reserve_price to the buyer surface; we only
+    # signal whether one is set. Admin/seller surfaces read the amount
+    # from the raw DB doc via the edit-state / admin endpoints.
+    has_reserve: bool = False
     # ── Seller-type pricing/badge/geo-sort fields (copied at creation) ──
     seller_type: str = "individual"
     partner_bp_rate: Optional[float] = None

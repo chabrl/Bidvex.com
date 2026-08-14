@@ -20,19 +20,20 @@ import { Input } from '../../components/ui/input';
 import { Textarea } from '../../components/ui/textarea';
 import {
   Loader2, Check, X, Clock, RefreshCw, DollarSign,
-  FileText, MessageSquare,
+  FileText, MessageSquare, AlertTriangle,
 } from 'lucide-react';
 import API_BASE from '../../config';
 
 const API = API_BASE;
 
 const STATUSES = ['pending', 'approved', 'denied'];
-const TYPES = ['all', 'end_time', 'reserve_price', 'edit'];
+const TYPES = ['all', 'end_time', 'reserve_price', 'edit', 'reserve_not_met'];
 
 const typeIcon = (t) => {
   if (t === 'end_time') return Clock;
   if (t === 'reserve_price') return DollarSign;
   if (t === 'edit') return FileText;
+  if (t === 'reserve_not_met') return AlertTriangle;
   return MessageSquare;
 };
 
@@ -152,7 +153,7 @@ export default function AdminAuctionRequests() {
                       onClick={() => setType(t)}
                       data-testid={`request-type-filter-${t}`}
                       className={type === t ? 'bg-purple-600 text-white' : ''}>
-                {t === 'all' ? 'All types' : t}
+                {t === 'all' ? 'All types' : t === 'reserve_not_met' ? 'Reserve not met' : t}
               </Button>
             ))}
           </div>
@@ -208,6 +209,26 @@ export default function AdminAuctionRequests() {
                     <>
                       <div><span className="text-slate-500">Field:</span> {r.payload?.field_name || '—'}</div>
                       <div><span className="text-slate-500">New value:</span> {typeof r.payload?.requested_new_value === 'object' ? JSON.stringify(r.payload?.requested_new_value) : r.payload?.requested_new_value}</div>
+                    </>
+                  )}
+                  {r.request_type === 'reserve_not_met' && (
+                    <>
+                      <div>
+                        <span className="text-slate-500">Hammer:</span>{' '}
+                        <span className="font-semibold text-rose-600">${Number(r.payload?.hammer_price ?? 0).toFixed(2)}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Reserve:</span>{' '}
+                        <span className="font-semibold text-emerald-700">${Number(r.payload?.reserve_price ?? 0).toFixed(2)}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Shortfall:</span>{' '}
+                        ${(Number(r.payload?.reserve_price ?? 0) - Number(r.payload?.hammer_price ?? 0)).toFixed(2)}
+                      </div>
+                      <div><span className="text-slate-500">Winner:</span> <span className="font-mono">{r.payload?.winner_user_id || '—'}</span></div>
+                      {r.payload?.lot_number != null && (
+                        <div><span className="text-slate-500">Lot #</span> {r.payload.lot_number}</div>
+                      )}
                     </>
                   )}
                 </div>

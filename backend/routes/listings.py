@@ -1819,6 +1819,21 @@ async def get_multi_item_listing(listing_id: str, background_tasks: BackgroundTa
     from services.listing_seller_enrichment import enrich_listing_async
     listing = await enrich_listing_async(db, listing)
 
+    # iter484 — Reserve price is admin-set and MUST NOT leak to the buyer
+    # response. Emit a boolean `has_reserve` per lot so the UI can render
+    # the subtle "Reserve" badge without exposing the amount. Strip the
+    # raw `reserve_price` from both the auction-level and lot-level
+    # payloads on this route.
+    listing.pop("reserve_price", None)
+    for _lot in listing.get("lots") or []:
+        if isinstance(_lot, dict):
+            _rp = _lot.get("reserve_price")
+            try:
+                _lot["has_reserve"] = bool(_rp is not None and float(_rp) > 0)
+            except (TypeError, ValueError):
+                _lot["has_reserve"] = False
+            _lot.pop("reserve_price", None)
+
     # iter405 — Fire-and-forget view increment (parity with the single-item
     # GET endpoint above); never blocks the response.
     background_tasks.add_task(_increment_multi_item_listing_views, listing_id)

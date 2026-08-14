@@ -1,5 +1,52 @@
 # BidVex — Auction Marketplace PRD
 
+## iter484.1 — Buyer Reserve Badge + Admin Reserve-Not-Met Filter (Feb 14, 2026) ✅ SHIPPED · PREVIEW ONLY
+
+### Scope
+UI polish on top of iter484:
+1. **Buyer-facing Reserve badge** — subtle outline chip on lot cards
+   (`Reserve` EN / `Prix de réserve` FR) rendered only when
+   `lot.has_reserve === true`.  Amount is NEVER sent to the buyer.
+2. **Admin queue filter** — new one-tap `Reserve not met` filter in the
+   Auction Requests admin queue alongside existing type filters.
+
+### Backend
+- `models/auction_models.py::Lot` — added `has_reserve: bool = False`
+  (buyer-safe boolean).
+- `routes/listings.py::get_multi_item_listing` — computes
+  `has_reserve = bool(reserve_price and reserve_price > 0)` per lot and
+  STRIPS `reserve_price` from both the auction root and every lot
+  before serializing.  Admin/seller surfaces still read the amount
+  from their own edit-state endpoints.
+
+### Frontend
+- `components/CompactLotCard.jsx` — subtle outline chip:
+  `border-slate-300`, `text-slate-600`, `uppercase text-[9px]`, pill.
+  Placed on the same row as `#{lot_number}` (`ml-auto`) so it never
+  reserves empty space on lots without a reserve.  Testid
+  `lot-card-{n}-reserve-badge`.
+- `pages/admin/AdminAuctionRequests.jsx`:
+  - Added `reserve_not_met` to `TYPES` (label: "Reserve not met").
+  - New AlertTriangle icon in `typeIcon()` for reserve_not_met rows.
+  - Payload summary block for reserve_not_met rows shows
+    hammer / reserve / shortfall / winner / lot_number, with hammer in
+    rose-600 and reserve in emerald-700 for at-a-glance triage.
+
+### Live E2E verification (Playwright · preview URL)
+- ☑ 2 reserve badges render on auction
+  `58758582-f53a-46d8-bc0b-87cf9de60523` (lots #1 + #23 have reserves).
+- ☑ EN label: `RESERVE` · FR label: `PRIX DE RÉSERVE`.
+- ☑ 22 lots without a reserve show no badge and no empty space.
+- ☑ Buyer API response contains `has_reserve: true` for lots #1 + #23,
+  no `reserve_price` key anywhere.
+- ☑ Admin filter row shows `All types · end_time · reserve_price · edit · Reserve not met`.
+- ☑ 88/88 backend tests still green.
+
+**Guardrails held:** zero touch to payment / tax / fee / Stripe code.
+No deploy.
+
+---
+
 ## iter484 — Reserve Price at Auction Close (Feb 14, 2026) ✅ SHIPPED · PREVIEW ONLY
 
 ### Scope
