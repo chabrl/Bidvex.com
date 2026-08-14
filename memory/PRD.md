@@ -1,5 +1,36 @@
 # BidVex — Auction Marketplace PRD
 
+## iter483.2 — Description Refresh + Direct S3 Uploader (Feb 14, 2026) ✅ SHIPPED
+
+### Fix 1 — Description field refreshes from DB on modal open
+**Change:** Added a new backend endpoint `GET /api/auctions/{id}/edit-state` that returns the current DB values of every editable field (title, description, images, schedule, pickup, shipping, status, end_time). The modal's on-open `useEffect` now fetches this snapshot in parallel with the end-time-request + edited-history calls and hydrates every local `useState` with the fresh DB value. Textarea/inputs always render the true saved state — never a stale prop-cached placeholder.
+
+**Backend files:**
+- `/app/backend/services/live_edit_service.py` — added `get_edit_state(db, auction_id, current_user)` (role-gated: owner-only or admin).
+- `/app/backend/routes/live_edit.py` — mounted `@seller_router.get("/{auction_id}/edit-state")`.
+
+### Fix 2 — Direct S3 image uploader replaces URL paste-box
+**Change:** Media tab now shows a drag-and-drop dropzone (also click-to-pick). Files are validated client-side (MIME must be `image/jpeg|jpg|png|webp`, size ≤ 10 MB) and uploaded sequentially to the pre-existing `POST /api/uploads/listing-image` endpoint (which returns `{url}` after S3 write). The returned URL is then appended via the same `PATCH /api/auctions/{id}/live-edit {field:"images", value:{add:[url]}}` call, so the audit log (`edited_history`) captures the mutation identically. Per-file progress bar; success shows a green ✓; validation/upload errors surface as non-blocking sonner toasts with `filename — reason`.
+
+**Frontend file:**
+- `/app/frontend/src/pages/SellerLiveEditModal.jsx`
+  - Removed `newImageUrl` state + `addImage` handler + `<Input> / <Button>` URL row + unused `Image` import.
+  - Added `uploads` state (per-file tracker), `fileInputRef`, `dragActive`; new handlers `uploadFiles`, `onDrop`, `onDragOver`, `onDragLeave`, `onPickFile`.
+  - New dropzone JSX with `data-testid="image-uploader-dropzone"`, hidden `<input data-testid="image-uploader-input">`, per-row progress list `data-testid="image-upload-progress"` / `image-upload-row-{status}`.
+  - Bilingual EN/FR strings for `uploadHint`, `uploadAccepted`, `uploadRejectedType`, `uploadRejectedSize`, `uploadFailed`.
+
+### Live E2E verification (Playwright, testseller@bidvex.com)
+- ☑ Description on re-open: `iter483 QA — description saved e2e` (fresh DB value, not stale)
+- ☑ Title on re-open: `iter483 QA — title saved e2e`
+- ☑ Dropzone rendered · file input hidden · URL input removed (`new-image-url-input` count = 0)
+- ☑ 1×1 PNG uploaded → progress row appeared → status "done" ✓ → grid re-rendered from 2 → 3 images
+- ☑ DB confirms 3rd image URL = `https://bidvex-marketplace-images.s3.us-east-2.amazonaws.com/listings/staged-<user>/...`
+- ☑ `edited_history` captured the S3-URL add as a normal images-add event
+- ☑ 36/36 iter483 backend tests still pass (no regression)
+
+**Guardrails held:** no payment/tax/fee/Stripe code touched; no pre-existing tests fixed; no deploy.
+
+
 ## iter483.1 — Seller Live Edit Modal HOTFIX (Feb 14, 2026) ✅ FIXED · TEST MODE
 
 **User-reported bug:** Edit button on the seller dashboard did not open the modal.

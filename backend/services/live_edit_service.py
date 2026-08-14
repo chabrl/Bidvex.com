@@ -710,6 +710,33 @@ async def get_edited_history(
 
 
 # ═════════════════════════════════════════════════════════════════════
+#  Editable field snapshot — iter483.2 (Description Refresh)
+# ═════════════════════════════════════════════════════════════════════
+
+async def get_edit_state(
+    db, auction_id: str, current_user: Any,
+) -> dict:
+    """Return the current DB values of every editable field so the modal
+    can render the true saved state on re-open (no stale placeholders)."""
+    coll, doc = await resolve_auction(db, auction_id)
+    if not _is_admin(current_user):
+        if doc.get("seller_id") != _user_id(current_user):
+            raise AccessDenied("You are not the owner of this auction")
+    return {
+        "auction_id":  auction_id,
+        "collection":  coll,
+        "title":       doc.get("title") or "",
+        "description": doc.get("description") or "",
+        "images":      list(doc.get("images") or doc.get("photos") or []),
+        "schedule":    dict(doc.get("schedule") or {}),
+        "pickup":      dict(doc.get("pickup") or {}),
+        "shipping":    dict(doc.get("shipping") or {}),
+        "status":      doc.get("status"),
+        "end_time":    doc.get("end_time") or doc.get("auction_end_date"),
+    }
+
+
+# ═════════════════════════════════════════════════════════════════════
 #  Email queue helper — idempotent via dedupe_key.
 # ═════════════════════════════════════════════════════════════════════
 
@@ -750,4 +777,5 @@ __all__ = [
     "approve_end_time_request", "deny_end_time_request",
     "list_end_time_requests",
     "get_edited_history",
+    "get_edit_state",
 ]

@@ -148,6 +148,23 @@ async def get_edited_history(
         raise _handle_err(e)
 
 
+# iter483.2 — Description-refresh companion: return the current DB
+# values of every editable field so the seller modal can populate
+# state on re-open without relying on the parent dashboard cache.
+@seller_router.get("/{auction_id}/edit-state")
+async def get_edit_state(
+    auction_id: str,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    user = await _current_user(credentials)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    try:
+        return await les.get_edit_state(_db(), auction_id, user)
+    except LiveEditError as e:
+        raise _handle_err(e)
+
+
 # ═════════════════════════════════════════════════════════════════════
 #  Admin endpoints
 # ═════════════════════════════════════════════════════════════════════

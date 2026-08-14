@@ -31,8 +31,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs'
 import { Badge } from '../components/ui/badge';
 import { Label } from '../components/ui/label';
 import {
-  Loader2, Save, Image as ImageIcon, Calendar, Truck,
-  Plus, Clock, History, Check, X,
+  Loader2, Save, Calendar, Truck,
+  Plus, Clock, History, Check, X, Upload,
 } from 'lucide-react';
 import API_BASE from '../config';
 
@@ -76,7 +76,12 @@ function useBilingual() {
           shippingEstimateHelp:'Ceci est une estimation. Aucun paiement Stripe n\u2019est prélevé.',
           carrier:             'Transporteur',
           addImage:            'Ajouter des images',
-          uploadHint:          'Colle une URL d\u2019image et appuie sur Ajouter',
+          uploadHint:          'Glissez-déposez ou cliquez pour téléverser vos images',
+          uploadingCount:      'Téléversement en cours',
+          uploadAccepted:      'JPG · PNG · WEBP · 10 Mo max par fichier',
+          uploadRejectedType:  'Format non supporté',
+          uploadRejectedSize:  'Fichier trop volumineux (max 10 Mo)',
+          uploadFailed:        'Échec du téléversement',
           currentImages:       'Images actuelles',
           removeOwnOnly:       'Vous ne pouvez retirer que les images que vous avez ajoutées.',
           reorder:             'Réordonner',
@@ -128,7 +133,12 @@ function useBilingual() {
           shippingEstimateHelp:'This is an estimate. No Stripe payment is charged.',
           carrier:             'Carrier',
           addImage:            'Add image',
-          uploadHint:          'Paste an image URL and press Add',
+          uploadHint:          'Drag & drop or click to upload your images',
+          uploadingCount:      'Uploading',
+          uploadAccepted:      'JPG · PNG · WEBP · 10 MB max per file',
+          uploadRejectedType:  'Unsupported file type',
+          uploadRejectedSize:  'File too large (max 10 MB)',
+          uploadFailed:        'Upload failed',
           currentImages:       'Current images',
           removeOwnOnly:       'You can only remove images you added.',
           reorder:             'Reorder',
@@ -174,7 +184,10 @@ export default function SellerLiveEditModal({
   const [savingInfo, setSavingInfo] = useState(false);
 
   const [images, setImages] = useState(listing?.images || listing?.photos || []);
-  const [newImageUrl, setNewImageUrl] = useState('');
+  // iter483.2 — S3 uploader per-file progress: { name, pct, status }
+  const [uploads, setUploads] = useState([]);
+  const fileInputRef = React.useRef(null);
+  const [dragActive, setDragActive] = useState(false);
 
   const [schedule, setSchedule] = useState(listing?.schedule || {});
   const [pickup, setPickup] = useState(listing?.pickup || {});
@@ -196,17 +209,27 @@ export default function SellerLiveEditModal({
 
   const [history, setHistory] = useState([]);
 
-  // ── Load current end-time request + history on open ────────────
+  // ── Load current end-time request + history + fresh edit-state on open ────
   useEffect(() => {
     if (!open || !auctionId) return;
     (async () => {
       try {
-        const [er, hr] = await Promise.all([
+        const [er, hr, sr] = await Promise.all([
           axios.get(`${API}/auctions/${auctionId}/end-time-request`, { headers }),
           axios.get(`${API}/auctions/${auctionId}/edited-history`, { headers }),
+          axios.get(`${API}/auctions/${auctionId}/edit-state`,     { headers }),
         ]);
         setEndTimeReq(er.data || null);
         setHistory(hr.data?.history || []);
+        // iter483.2 — hydrate local state from the fresh DB snapshot so the
+        // textarea always shows the saved value (never the stale placeholder).
+        const s = sr.data || {};
+        setTitle(s.title || '');
+        setDescription(s.description || '');
+        setImages(Array.isArray(s.images) ? s.images : []);
+        setSchedule(s.schedule || {});
+        setPickup(s.pickup || {});
+        setShipping(s.shipping || {});
       } catch (_) { /* soft */ }
     })();
   }, [open, auctionId]);
@@ -237,20 +260,94 @@ export default function SellerLiveEditModal({
     }
   };
 
-  const addImage = async () => {
-    if (!newImageUrl.trim()) return;
-    try {
-      const r = await patchField('images', { add: [newImageUrl.trim()] });
-      setImages(r.new_value);
-      setNewImageUrl('');
-    } catch (_) { /* toast already shown by patchField */ }
-  };
   const removeImage = async (url) => {
     try {
       const r = await patchField('images', { remove: [url] });
       setImages(r.new_value);
     } catch (_) { /* toast already shown */ }
   };
+
+  // iter483.2 — S3 direct upload pipeline (uses existing
+  // POST /api/uploads/listing-image endpoint).  Accepts JPG/PNG/WEBP,
+  // max 10 MB per file, non-blocking per-file error toasts.
+  const ACCEPTED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+  const MAX_BYTES = 10 * 1024 * 1024;
+
+  const uploadFiles = async (fileList) => {
+    const files = Array.from(fileList || []);
+    if (files.length === 0) return;
+
+    // First pass — validate + create tracker rows synchronously so the
+    // UI reflects the queue immediately.
+    const trackers = files.map((f) => {
+      let rejection = null;
+      if (!ACCEPTED_TYPES.includes(f.type)) rejection = L.uploadRejectedType;
+      else if (f.size > MAX_BYTES)          rejection = L.uploadRejectedSize;
+      return {
+        id: `${f.name}-${f.size}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        name: f.name,
+        pct: 0,
+        status: rejection ? 'error' : 'uploading',
+        error: rejection,
+        file: rejection ? null : f,
+      };
+    });
+    setUploads((prev) => [...prev, ...trackers]);
+
+    // Emit non-blocking toasts for validation failures.
+    trackers.filter((t) => t.status === 'error').forEach((t) => {
+      toast.error(`${t.name} — ${t.error}`);
+    });
+
+    // Upload each valid file sequentially so we don't blow through
+    // browser socket limits or S3 rate ceilings.
+    for (const t of trackers) {
+      if (t.status !== 'uploading') continue;
+      const form = new FormData();
+      form.append('file', t.file);
+      try {
+        const res = await axios.post(`${API}/uploads/listing-image`, form, {
+          headers: { ...headers, 'Content-Type': 'multipart/form-data' },
+          onUploadProgress: (evt) => {
+            if (evt.total) {
+              const pct = Math.round((evt.loaded * 100) / evt.total);
+              setUploads((prev) => prev.map((row) =>
+                row.id === t.id ? { ...row, pct } : row));
+            }
+          },
+        });
+        const url = res?.data?.url;
+        if (!url) throw new Error('missing_url_in_response');
+        // Append via the same PATCH we already use for URL adds so the
+        // audit-log (edited_history) captures the mutation identically.
+        const patched = await patchField('images', { add: [url] });
+        setImages(patched.new_value);
+        setUploads((prev) => prev.map((row) =>
+          row.id === t.id ? { ...row, pct: 100, status: 'done' } : row));
+      } catch (err) {
+        const reason = err?.response?.data?.detail?.message_en
+                    || err?.response?.data?.detail?.detail
+                    || err?.response?.data?.detail
+                    || err?.message
+                    || L.uploadFailed;
+        toast.error(`${t.name} — ${typeof reason === 'string' ? reason : L.uploadFailed}`);
+        setUploads((prev) => prev.map((row) =>
+          row.id === t.id
+            ? { ...row, status: 'error', error: typeof reason === 'string' ? reason : L.uploadFailed }
+            : row));
+      }
+    }
+  };
+
+  const onDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer?.files?.length) uploadFiles(e.dataTransfer.files);
+  };
+  const onDragOver = (e) => { e.preventDefault(); e.stopPropagation(); setDragActive(true); };
+  const onDragLeave = (e) => { e.preventDefault(); e.stopPropagation(); setDragActive(false); };
+  const onPickFile = (e) => { if (e.target.files?.length) uploadFiles(e.target.files); e.target.value = ''; };
 
   const saveSchedule = async () => {
     setSavingSchedule(true);
@@ -351,16 +448,68 @@ export default function SellerLiveEditModal({
             </Button>
           </TabsContent>
 
-          {/* Section B — Media */}
+          {/* Section B — Media (iter483.2 — direct S3 uploader) */}
           <TabsContent value="media" className="space-y-4 pt-4">
             <p className="text-xs text-slate-500">{L.removeOwnOnly}</p>
-            <div className="flex gap-2">
-              <Input value={newImageUrl} onChange={(e) => setNewImageUrl(e.target.value)}
-                placeholder={L.uploadHint} data-testid="new-image-url-input" />
-              <Button onClick={addImage} data-testid="add-image-btn">
-                <ImageIcon className="h-4 w-4 mr-2" /> {L.addImage}
-              </Button>
+
+            {/* Drag & drop uploader */}
+            <div
+              role="button"
+              tabIndex={0}
+              data-testid="image-uploader-dropzone"
+              onClick={() => fileInputRef.current?.click()}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') fileInputRef.current?.click(); }}
+              onDrop={onDrop}
+              onDragOver={onDragOver}
+              onDragLeave={onDragLeave}
+              className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition ${
+                dragActive
+                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30'
+                  : 'border-slate-300 hover:border-blue-400 bg-slate-50 dark:bg-slate-800'
+              }`}
+            >
+              <Upload className="h-8 w-8 mx-auto text-slate-500 mb-2" />
+              <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{L.uploadHint}</p>
+              <p className="text-xs text-slate-500 mt-1">{L.uploadAccepted}</p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/jpg,image/png,image/webp"
+                multiple
+                onChange={onPickFile}
+                className="hidden"
+                data-testid="image-uploader-input"
+              />
             </div>
+
+            {/* Per-file progress list */}
+            {uploads.length > 0 && (
+              <div className="space-y-2" data-testid="image-upload-progress">
+                {uploads.map((u) => (
+                  <div key={u.id} className="border rounded p-2 text-sm bg-white dark:bg-slate-900"
+                       data-testid={`image-upload-row-${u.status}`}>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="truncate max-w-xs">{u.name}</span>
+                      <span className={
+                        u.status === 'error' ? 'text-rose-600 text-xs'
+                        : u.status === 'done' ? 'text-emerald-600 text-xs'
+                        : 'text-slate-500 text-xs'
+                      }>
+                        {u.status === 'error' ? u.error
+                          : u.status === 'done' ? '✓'
+                          : `${u.pct}%`}
+                      </span>
+                    </div>
+                    {u.status === 'uploading' && (
+                      <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                        <div className="bg-blue-600 h-1.5 transition-all" style={{ width: `${u.pct}%` }} />
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div>
               <Label>{L.currentImages} ({images.length})</Label>
               <div className="grid grid-cols-3 gap-3 mt-2">
