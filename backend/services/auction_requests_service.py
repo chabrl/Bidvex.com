@@ -44,10 +44,14 @@ from services.live_edit_service import (
 COLLECTION = "auction_requests"
 LEGACY_END_TIME_COLLECTION = "auction_end_time_requests"
 
-REQUEST_TYPES = {"end_time", "reserve_price", "edit"}
+REQUEST_TYPES = {"end_time", "reserve_price", "edit", "reserve_not_met"}
 STATUSES = {"pending", "approved", "denied"}
 
 MIN_REASON_LENGTH = 20
+
+# iter484 — System-generated request types skip seller-facing checks
+# (ownership, reason min-length, active-status).
+SYSTEM_GENERATED_TYPES = {"reserve_not_met"}
 
 
 # ═════════════════════════════════════════════════════════════════════
@@ -105,10 +109,46 @@ def _validate_edit_payload(payload: dict) -> dict:
     return {"field_name": field_name, "requested_new_value": new_value}
 
 
+def _validate_reserve_not_met_payload(payload: dict) -> dict:
+    """iter484 — System-generated payload written when settlement halts.
+
+    Required keys:
+        hammer_price   : float / int  (dollars)
+        reserve_price  : float / int  (dollars)
+        winner_user_id : str
+    """
+    if not isinstance(payload, dict):
+        raise InvalidField("payload must be a dict")
+    hp = payload.get("hammer_price")
+    rp = payload.get("reserve_price")
+    wu = payload.get("winner_user_id")
+    if hp is None or rp is None:
+        raise InvalidField("hammer_price and reserve_price are required")
+    try:
+        hp_f = float(hp)
+        rp_f = float(rp)
+    except (TypeError, ValueError):
+        raise InvalidField("hammer_price and reserve_price must be numeric")
+    if hp_f < 0 or rp_f < 0:
+        raise InvalidField("prices must be >= 0")
+    if not wu:
+        raise InvalidField("winner_user_id is required")
+    return {
+        "hammer_price":   round(hp_f, 2),
+        "reserve_price":  round(rp_f, 2),
+        "winner_user_id": str(wu),
+        # Optional passthrough fields.
+        "lot_number":     payload.get("lot_number"),
+        "collection":     payload.get("collection"),
+        "currency":       payload.get("currency") or "CAD",
+    }
+
+
 PAYLOAD_VALIDATORS = {
-    "end_time":      _validate_end_time_payload,
-    "reserve_price": _validate_reserve_payload,
-    "edit":          _validate_edit_payload,
+    "end_time":         _validate_end_time_payload,
+    "reserve_price":    _validate_reserve_payload,
+    "edit":             _validate_edit_payload,
+    "reserve_not_met":  _validate_reserve_not_met_payload,
 }
 
 
@@ -210,8 +250,133 @@ async def create_request(
 
 
 # ═════════════════════════════════════════════════════════════════════
-# List
+# iter484 — System-generated request (reserve_not_met)
 # ═════════════════════════════════════════════════════════════════════
+
+async def create_system_reserve_not_met_request(
+    db,
+    auction_id: str,
+    target: str,
+    hammer_price: float,
+    reserve_price: float,
+    winner_user_id: str,
+    seller_id: Optional[str] = None,
+    lot_number: Any = None,
+    collection: Optional[str] = None,
+    currency: str = "CAD",
+) -> dict:
+    """Insert a ``reserve_not_met`` row into the unified auction_requests
+    queue.  Idempotent — a pending row for the same (auction_id, target)
+    returns the existing row instead of duplicating.
+
+    Notes
+    -----
+    * Bypasses ownership checks (created by the settlement pipeline).
+    * ``target`` is ``"auction"`` for single-listing flows or
+      ``str(lot_number)`` for multi-lot flows.
+    * The row is created without touching the caller's transaction —
+      any DB error is swallowed so a bookkeeping failure never blocks
+      the auction-close pipeline.
+    """
+    normalised_target = (target or "auction").strip() or "auction"
+    payload = {
+        "hammer_price":   round(float(hammer_price), 2),
+        "reserve_price":  round(float(reserve_price), 2),
+        "winner_user_id": winner_user_id,
+        "lot_number":     lot_number,
+        "collection":     collection,
+        "currency":       currency,
+    }
+    validated = _validate_reserve_not_met_payload(payload)
+
+    # Idempotency — pending row wins.
+    existing = await db[COLLECTION].find_one(
+        {
+            "auction_id":   auction_id,
+            "request_type": "reserve_not_met",
+            "target":       normalised_target,
+            "status":       "pending",
+        },
+        {"_id": 0},
+    )
+    if existing:
+        return existing
+
+    # Resolve auction_title + seller (best-effort).
+    auction_title = ""
+    _seller_id = seller_id
+    try:
+        _, doc = await resolve_auction(db, auction_id)
+        auction_title = (doc.get("title") or "").strip()
+        if not _seller_id:
+            _seller_id = doc.get("seller_id")
+    except Exception:
+        pass
+
+    row = {
+        "id":            str(uuid.uuid4()),
+        "auction_id":    auction_id,
+        "auction_title": auction_title,
+        "seller_id":     _seller_id,
+        "request_type":  "reserve_not_met",
+        "target":        normalised_target,
+        "payload":       validated,
+        "reason":        (
+            f"System — reserve not met: hammer "
+            f"${validated['hammer_price']:.2f} < reserve "
+            f"${validated['reserve_price']:.2f}"
+        ),
+        "status":        "pending",
+        "submitted_at":  _now_iso(),
+        "submitted_by":  "system",
+        "reviewed_at":   None,
+        "reviewed_by":   None,
+        "admin_note":    None,
+    }
+    try:
+        await db[COLLECTION].insert_one(row)
+    except Exception:
+        return existing or row
+
+    # Best-effort admin email — routed through the shared outbox so
+    # dedupe keys prevent duplicate sends on scheduler retries.
+    await _queue_email(
+        db,
+        kind="auction_request_submitted:reserve_not_met",
+        dedupe_key=f"reserve_not_met_admin:{auction_id}:{normalised_target}",
+        context={
+            "request_id":    row["id"],
+            "auction_id":    auction_id,
+            "auction_title": auction_title,
+            "target":        normalised_target,
+            "payload":       validated,
+            "reason":        row["reason"],
+        },
+    )
+
+    # Neutral bilingual buyer email — "your bid is under review".
+    if winner_user_id:
+        await _queue_email(
+            db,
+            kind="reserve_not_met_buyer_under_review",
+            dedupe_key=(
+                f"reserve_not_met_buyer:{auction_id}:{normalised_target}:{winner_user_id}"
+            ),
+            context={
+                "request_id":    row["id"],
+                "auction_id":    auction_id,
+                "auction_title": auction_title,
+                "target":        normalised_target,
+                # Deliberately DO NOT include reserve amount in the
+                # buyer-facing context.
+                "hammer_price":  validated["hammer_price"],
+                "currency":      validated["currency"],
+            },
+            to_user_id=winner_user_id,
+        )
+
+    row.pop("_id", None)
+    return row
 
 async def _hydrate_row(db, row: dict) -> dict:
     """Attach seller_email + auction_title if missing (best-effort)."""
@@ -438,6 +603,217 @@ async def _apply_approval_side_effects(db, req: dict, current_user: Any) -> None
         except Exception:
             pass
 
+    elif request_type == "reserve_not_met":
+        # iter484 — Admin ACCEPTED the sale below reserve.  Re-run the
+        # settlement pipeline with ``bypass_reserve=True`` so the buyer
+        # is charged and the payout is queued exactly as if the reserve
+        # had been met.  All bookkeeping / notifications / receipts
+        # cascade from the standard settlement path.
+        await _apply_reserve_not_met_approval(db, req, current_user)
+
+
+async def _apply_reserve_not_met_approval(db, req: dict, current_user: Any) -> None:
+    """iter484 — On admin approval of a ``reserve_not_met`` row, re-run
+    the auction settlement with the reserve gate bypassed. Best-effort;
+    any failure is logged and swallowed so the request row still
+    resolves to ``approved`` in the queue."""
+    import logging
+    logger = logging.getLogger(__name__)
+
+    auction_id = req.get("auction_id")
+    payload = req.get("payload") or {}
+    target = req.get("target") or "auction"
+    hammer = payload.get("hammer_price")
+    reserve = payload.get("reserve_price")
+    winner_user_id = payload.get("winner_user_id")
+    lot_number = payload.get("lot_number")
+    if not auction_id or hammer is None or not winner_user_id:
+        return
+
+    try:
+        collection, doc = await resolve_auction(db, auction_id)
+    except Exception:
+        return
+
+    seller_id = doc.get("seller_id")
+    if not seller_id:
+        return
+
+    # Flip status back to something the settlement code accepts.
+    if target == "auction":
+        await db[collection].update_one(
+            {"id": auction_id},
+            {"$set": {"status": "ended", "updated_at": _now_iso()}},
+        )
+    else:
+        # Lot-level — flip that lot's status to "sold" so the settlement
+        # path can pick it up.  Uses the same positional-op trick used
+        # elsewhere in this service.
+        try:
+            _lot_num_int = int(lot_number)
+        except (TypeError, ValueError):
+            _lot_num_int = lot_number
+        await db[collection].update_one(
+            {"id": auction_id, "lots.lot_number": _lot_num_int},
+            {"$set": {
+                "lots.$.status": "sold",
+                "lots.$.sold_at": _now_iso(),
+                "lots.$.winner_user_id": winner_user_id,
+                "lots.$.final_price": float(hammer),
+            }},
+        )
+
+    # Audit log entry.
+    try:
+        from services.live_edit_service import _append_history, _make_history_entry
+        await _append_history(
+            db, collection, auction_id,
+            _make_history_entry(
+                "reserve_not_met_approved_by_admin",
+                {"reserve_price": reserve},
+                {"hammer_price": float(hammer),
+                 "target": target,
+                 "winner_user_id": winner_user_id},
+                _user_id(current_user) or "admin",
+                extra={
+                    "request_id": req.get("id"),
+                    "lot_number": lot_number,
+                },
+            ),
+        )
+    except Exception:
+        pass
+
+    # Re-run settlement with the reserve bypass.
+    try:
+        from services.auction_settlement import settle_auction
+        from services.payment_collection import finalize_auction_payment
+
+        # Reload the (possibly updated) auction/lot document.
+        _, doc2 = await resolve_auction(db, auction_id)
+        if target == "auction":
+            settle_listing = {
+                **doc2,
+                "winner_id": winner_user_id,
+                "seller_id": seller_id,
+                "current_price": float(hammer),
+                "final_price":   float(hammer),
+                "payment_method": doc2.get("payment_method", "stripe"),
+                "currency":       doc2.get("currency", payload.get("currency") or "CAD"),
+            }
+            settlement = await settle_auction(
+                db,
+                auction_id=auction_id,
+                listing=settle_listing,
+                bypass_reserve=True,
+            )
+            await finalize_auction_payment(
+                db,
+                listing={**settle_listing, "id": auction_id,
+                         "winner_user_id": winner_user_id},
+                collection=collection,
+                settlement=settlement,
+                section="marketplace",
+            )
+        else:
+            from services.live_edit_service import _find_lot
+            lot = _find_lot(doc2, target) or {}
+            lot_title = f"{doc2.get('title', 'Auction')} — Lot #{lot.get('lot_number', target)}"
+            _lot_synthetic = {
+                "id":              f"{auction_id}:lot{lot.get('lot_number', target)}",
+                "title":           lot_title,
+                "winner_id":       winner_user_id,
+                "seller_id":       seller_id,
+                "final_price":     float(hammer),
+                "current_price":   float(hammer),
+                "payment_method":  doc2.get("payment_method", "stripe"),
+                "currency":        doc2.get("currency", payload.get("currency") or "CAD"),
+                "auction_end_date": doc2.get("auction_end_date"),
+                "listing_type":    "lots",
+            }
+            settlement = await settle_auction(
+                db,
+                auction_id=_lot_synthetic["id"],
+                listing=_lot_synthetic,
+                bypass_reserve=True,
+            )
+            await finalize_auction_payment(
+                db,
+                listing={**_lot_synthetic, "id": auction_id,
+                         "winner_user_id": winner_user_id},
+                collection=collection,
+                settlement=settlement,
+                section="lots",
+                lot_number=lot.get("lot_number"),
+                listing_title=lot_title,
+                hammer_override=float(hammer),
+                winner_override=winner_user_id,
+            )
+    except Exception as e:  # noqa: BLE001
+        logger.exception(
+            f"[reserve_not_met_approve] settlement re-run failed for {auction_id}/{target}: {e}"
+        )
+
+
+async def _apply_denial_side_effects(db, req: dict, current_user: Any) -> None:
+    """iter484 — On admin denial of a ``reserve_not_met`` row, mark the
+    listing/lot as ``ended_reserve_not_met`` and record the audit trail.
+    No financial actions.  Non-``reserve_not_met`` denials fall through
+    with no side effects (their default lifecycle is enough)."""
+    if req.get("request_type") != "reserve_not_met":
+        return
+
+    auction_id = req.get("auction_id")
+    target = req.get("target") or "auction"
+    payload = req.get("payload") or {}
+    if not auction_id:
+        return
+
+    try:
+        collection, doc = await resolve_auction(db, auction_id)
+    except Exception:
+        return
+
+    if target == "auction":
+        await db[collection].update_one(
+            {"id": auction_id},
+            {"$set": {
+                "status": "ended_reserve_not_met",
+                "end_reason": "reserve_not_met",
+                "updated_at": _now_iso(),
+            }},
+        )
+    else:
+        try:
+            _lot_num_int = int(payload.get("lot_number") or target)
+        except (TypeError, ValueError):
+            _lot_num_int = payload.get("lot_number") or target
+        await db[collection].update_one(
+            {"id": auction_id, "lots.lot_number": _lot_num_int},
+            {"$set": {
+                "lots.$.status": "ended_reserve_not_met",
+                "lots.$.end_reason": "reserve_not_met",
+            }},
+        )
+
+    try:
+        from services.live_edit_service import _append_history, _make_history_entry
+        await _append_history(
+            db, collection, auction_id,
+            _make_history_entry(
+                "reserve_not_met_denied_by_admin",
+                {"reserve_price": payload.get("reserve_price")},
+                {"hammer_price": payload.get("hammer_price"),
+                 "target": target,
+                 "winner_user_id": payload.get("winner_user_id")},
+                _user_id(current_user) or "admin",
+                extra={"request_id": req.get("id"),
+                       "lot_number": payload.get("lot_number")},
+            ),
+        )
+    except Exception:
+        pass
+
 
 async def _decide(
     db, request_id: str, current_user: Any,
@@ -495,6 +871,8 @@ async def _decide(
 
     if new_status == "approved":
         await _apply_approval_side_effects(db, resolved, current_user)
+    elif new_status == "denied":
+        await _apply_denial_side_effects(db, resolved, current_user)
 
     await _queue_email(
         db,
@@ -608,8 +986,9 @@ async def admin_set_reserve_price(
 
 
 __all__ = [
-    "COLLECTION", "REQUEST_TYPES", "STATUSES",
+    "COLLECTION", "REQUEST_TYPES", "STATUSES", "SYSTEM_GENERATED_TYPES",
     "create_request",
+    "create_system_reserve_not_met_request",
     "list_requests_for_seller", "list_requests_admin",
     "approve_request", "deny_request",
     "admin_set_reserve_price",

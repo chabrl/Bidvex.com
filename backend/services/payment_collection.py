@@ -388,6 +388,17 @@ async def finalize_auction_payment(
         if not winner_id or hammer <= 0:
             return out
 
+        # iter484 — Reserve gate short-circuit. When ``settle_auction``
+        # returned ``reason="reserve_not_met"`` we MUST NOT touch the
+        # buyer / seller / receipts / payouts pipeline. The caller
+        # (routes/auctions) is responsible for flipping the listing/lot
+        # status to ``reserve_not_met`` and enqueuing the admin-review
+        # request row.
+        if (settlement.get("reason") == "reserve_not_met"
+                or settlement.get("settled") is False):
+            out["payment_status"] = settlement.get("reason") or "not_settled"
+            return out
+
         warnings = settlement.get("warnings") or []
         fee = settlement.get("fee_breakdown") or {}
         buyer_charge = settlement.get("buyer_charge")

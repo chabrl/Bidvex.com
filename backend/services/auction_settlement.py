@@ -831,10 +831,22 @@ async def settle_auction(
     *,
     auction_id: str,
     listing: Dict[str, Any],
+    bypass_reserve: bool = False,
+    reserve_price_override: Optional[float] = None,
+    lot: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Single entry point — choose flow based on listing.payment_method.
     Spec: payment_method ∈ {"stripe", "cash", "etransfer", "e-transfer"}
+
+    iter484 — Reserve Price Gate. When a reserve is set and
+    ``hammer_price < reserve_price``, settlement is HALTED before any
+    Stripe/DB writes and returns
+    ``{"settled": False, "reason": "reserve_not_met", ...}``.  The
+    ``bypass_reserve=True`` flag is used by the admin approval flow to
+    accept the sale at the offered hammer.  ``reserve_price_override``
+    lets callers pass the effective reserve without duplicating the
+    resolver.  ``lot`` gives the lot-level context for multi-lot flows.
     """
     payment_method = (listing.get("payment_method") or "stripe").lower().replace("-", "")
     winner_user_id = (
@@ -869,6 +881,36 @@ async def settle_auction(
         return {"settled": False, "reason": "no_seller"}
     if hammer_price <= 0:
         return {"settled": False, "reason": "invalid_hammer_price"}
+
+    # ── iter484 — Reserve Price Gate ──────────────────────────────────
+    # If the reserve is set and the winning hammer is below it, halt
+    # BEFORE any Stripe / DB writes.  Callers own the follow-up
+    # (status flip + admin-review row).  Admin-triggered re-runs can
+    # opt in with ``bypass_reserve=True``.
+    if not bypass_reserve:
+        if reserve_price_override is not None:
+            from services.reserve_price_gate import is_reserve_met
+            _reserve = reserve_price_override
+        else:
+            from services.reserve_price_gate import (
+                is_reserve_met, resolve_reserve_price,
+            )
+            _reserve = resolve_reserve_price(listing, lot=lot)
+        if not is_reserve_met(hammer_price, _reserve):
+            logger.info(
+                f"[settle_auction] {auction_id}: reserve_not_met "
+                f"(hammer={hammer_price} reserve={_reserve})"
+            )
+            return {
+                "settled": False,
+                "reason": "reserve_not_met",
+                "reserve_price": float(_reserve) if _reserve is not None else None,
+                "hammer_price": float(hammer_price),
+                "winner_user_id": winner_user_id,
+                "seller_id": seller_id,
+                "auction_id": auction_id,
+                "currency": currency,
+            }
 
     if payment_method in ("cash", "etransfer", "etransfere"):
         try:

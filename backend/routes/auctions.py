@@ -120,20 +120,82 @@ async def process_ended_auctions():
             # iter298 BUG 2 — zero-bid auctions get the dedicated
             # `ended_no_sale` status so the relist flow can target them.
             winner_id = listing.get("highest_bidder_id")
+
+            # ── iter484 — Reserve Price Gate (single-listing flow) ────
+            # Evaluate the reserve BEFORE marking the auction as `ended`
+            # so we can flip to `reserve_not_met` instead and skip the
+            # entire settle → finalize → notifications → emails cascade.
+            _reserve_hold = False
+            _reserve_price_hold = None
+            if winner_id:
+                try:
+                    from services.reserve_price_gate import (
+                        is_reserve_met, resolve_reserve_price,
+                    )
+                    _reserve_price_hold = resolve_reserve_price(listing)
+                    _hammer_hold = float(listing.get("current_price") or 0)
+                    if not is_reserve_met(_hammer_hold, _reserve_price_hold):
+                        _reserve_hold = True
+                except Exception as rg_err:
+                    logger.warning(
+                        f"[reserve-gate] check failed for {listing_id}: {rg_err}"
+                    )
+
             _update_set = {
-                "status": "ended" if winner_id else "ended_no_sale",
+                "status": (
+                    "reserve_not_met" if _reserve_hold
+                    else ("ended" if winner_id else "ended_no_sale")
+                ),
                 "ended_at": now_str,
             }
             if winner_id:
                 _update_set["winner_user_id"] = winner_id
-                _update_set["sold_at"] = now_str
-                _update_set["final_price"] = float(listing.get("current_price") or 0)
+                if _reserve_hold:
+                    _update_set["end_reason"] = "reserve_not_met"
+                else:
+                    _update_set["sold_at"] = now_str
+                    _update_set["final_price"] = float(listing.get("current_price") or 0)
             await db.listings.update_one(
                 {"id": listing_id, "status": "active"},
                 {"$set": _update_set}
             )
 
             seller_id = listing.get("seller_id")
+
+            # iter484 — When the reserve is not met, insert the system
+            # auction-request row (unified admin queue) + neutral bilingual
+            # buyer email (via email_outbox).  Skip every downstream
+            # side-effect: pickup-code, settle_auction, finalize_auction_payment,
+            # notifications, winner/seller emails.
+            if _reserve_hold and winner_id and seller_id:
+                try:
+                    from services.auction_requests_service import (
+                        create_system_reserve_not_met_request,
+                    )
+                    await create_system_reserve_not_met_request(
+                        db,
+                        auction_id=listing_id,
+                        target="auction",
+                        hammer_price=float(listing.get("current_price") or 0),
+                        reserve_price=float(_reserve_price_hold or 0),
+                        winner_user_id=winner_id,
+                        seller_id=seller_id,
+                        collection="listings",
+                        currency=(listing.get("currency") or "CAD").upper(),
+                    )
+                    logger.info(
+                        f"[reserve-gate] {listing_id}: reserve_not_met "
+                        f"(hammer={listing.get('current_price')} "
+                        f"reserve={_reserve_price_hold}) — halted"
+                    )
+                except Exception as rg_err:
+                    logger.warning(
+                        f"[reserve-gate] request creation failed for {listing_id}: {rg_err}"
+                    )
+                # Non-winner deposit refunds still run below so bidders
+                # get their held funds released.  Everything else is
+                # skipped via the `_reserve_hold` guard.
+                pass
 
             # ─── STRICT PAYMENT SYSTEM (Spec Features 1-3) ───
             # 1) Enqueue non-winner deposit refunds (60s SLA)
@@ -156,7 +218,7 @@ async def process_ended_auctions():
                 logger.warning(f"[auction-end] enqueue non-winner refunds failed: {ref_err}")
 
             # 2) Settle winner via cash-or-stripe fork
-            if winner_id and seller_id:
+            if winner_id and seller_id and not _reserve_hold:
                 try:
                     from services.auction_settlement import settle_auction
                     settle_listing = {**listing, "winner_id": winner_id, "seller_id": seller_id}
@@ -185,80 +247,82 @@ async def process_ended_auctions():
             # iter214 P1 — Generate pickup code for cash / e-transfer
             # transactions from INDIVIDUAL sellers (not partners / dealers /
             # storage facilities, which manage payments themselves).
-            try:
-                seller_doc = await db.users.find_one(
-                    {"id": seller_id},
-                    {"_id": 0, "account_type": 1, "is_licensed_partner": 1, "is_vehicle_dealer": 1, "is_storage_facility": 1},
-                ) or {}
-                is_individual_seller = not (
-                    seller_doc.get("is_licensed_partner")
-                    or seller_doc.get("is_vehicle_dealer")
-                    or seller_doc.get("is_storage_facility")
-                    or (seller_doc.get("account_type") in {"partner", "vehicle_dealer", "storage_facility"})
-                )
-                pay_method = (listing.get("payment_method") or "").lower()
-                if is_individual_seller and pay_method in {"cash", "etransfer", "interac_e_transfer", "interac"}:
-                    pm = "cash" if pay_method == "cash" else "etransfer"
-                    from routes.transaction_pickup_code import ensure_pickup_code_on_transaction
-                    # Find or create the matching transaction record
-                    txn = await db.transactions.find_one(
-                        {"$or": [{"listing_id": listing_id}, {"auction_id": listing_id}]},
-                        {"_id": 0},
+            # iter484 — Suppress when the reserve was not met.
+            if not _reserve_hold:
+                try:
+                    seller_doc = await db.users.find_one(
+                        {"id": seller_id},
+                        {"_id": 0, "account_type": 1, "is_licensed_partner": 1, "is_vehicle_dealer": 1, "is_storage_facility": 1},
+                    ) or {}
+                    is_individual_seller = not (
+                        seller_doc.get("is_licensed_partner")
+                        or seller_doc.get("is_vehicle_dealer")
+                        or seller_doc.get("is_storage_facility")
+                        or (seller_doc.get("account_type") in {"partner", "vehicle_dealer", "storage_facility"})
                     )
-                    if not txn:
-                        import uuid as _u
-                        txn_id = str(_u.uuid4())
-                        await db.transactions.insert_one({
-                            "id": txn_id,
-                            "auction_id": listing_id,
-                            "listing_id": listing_id,
-                            "listing_title": listing.get("title", "Item"),
-                            "buyer_id": winner_id,
-                            "seller_id": seller_id,
-                            "hammer_price": float(listing.get("current_price") or 0),
-                            "payment_method": pm,
-                            "payment_confirmed": False,
-                            "created_at": datetime.now(timezone.utc).isoformat(),
-                        })
-                        txn_for_code = {"id": txn_id}
-                    else:
-                        txn_for_code = txn
-                    code = await ensure_pickup_code_on_transaction(
-                        db, txn_for_code["id"],
-                        payment_method=pm, seller_id=seller_id, listing_id=listing_id,
-                    )
-                    if code:
-                        logger.info(f"[pickup-code] generated {code} for txn {txn_for_code['id']}")
-                        # iter214 P1 — Dispatch dedicated bilingual pickup-code emails
-                        try:
-                            buyer_doc = await db.users.find_one({"id": winner_id}, {"_id": 0}) or {}
-                            seller_full = await db.users.find_one({"id": seller_id}, {"_id": 0}) or {}
-                            from services.emails.email_marketplace import (
-                                send_buyer_pickup_code_email,
-                                send_seller_pickup_instructions_email,
-                            )
-                            await send_buyer_pickup_code_email(
-                                buyer=buyer_doc,
-                                seller=seller_full,
-                                listing_title=listing.get("title", "Item"),
-                                hammer_price=float(listing.get("current_price") or 0),
-                                pickup_code=code,
-                                payment_method=pm,
-                                transaction_id=txn_for_code["id"],
-                            )
-                            await send_seller_pickup_instructions_email(
-                                seller=seller_full,
-                                listing_title=listing.get("title", "Item"),
-                                hammer_price=float(listing.get("current_price") or 0),
-                                payment_method=pm,
-                                transaction_id=txn_for_code["id"],
-                            )
-                        except Exception as email_err:
-                            logger.warning(f"[pickup-code] email send failed: {email_err}")
-            except Exception as pkup_err:
-                logger.warning(f"[pickup-code] generation failed for listing {listing_id}: {pkup_err}")
+                    pay_method = (listing.get("payment_method") or "").lower()
+                    if is_individual_seller and pay_method in {"cash", "etransfer", "interac_e_transfer", "interac"}:
+                        pm = "cash" if pay_method == "cash" else "etransfer"
+                        from routes.transaction_pickup_code import ensure_pickup_code_on_transaction
+                        # Find or create the matching transaction record
+                        txn = await db.transactions.find_one(
+                            {"$or": [{"listing_id": listing_id}, {"auction_id": listing_id}]},
+                            {"_id": 0},
+                        )
+                        if not txn:
+                            import uuid as _u
+                            txn_id = str(_u.uuid4())
+                            await db.transactions.insert_one({
+                                "id": txn_id,
+                                "auction_id": listing_id,
+                                "listing_id": listing_id,
+                                "listing_title": listing.get("title", "Item"),
+                                "buyer_id": winner_id,
+                                "seller_id": seller_id,
+                                "hammer_price": float(listing.get("current_price") or 0),
+                                "payment_method": pm,
+                                "payment_confirmed": False,
+                                "created_at": datetime.now(timezone.utc).isoformat(),
+                            })
+                            txn_for_code = {"id": txn_id}
+                        else:
+                            txn_for_code = txn
+                        code = await ensure_pickup_code_on_transaction(
+                            db, txn_for_code["id"],
+                            payment_method=pm, seller_id=seller_id, listing_id=listing_id,
+                        )
+                        if code:
+                            logger.info(f"[pickup-code] generated {code} for txn {txn_for_code['id']}")
+                            # iter214 P1 — Dispatch dedicated bilingual pickup-code emails
+                            try:
+                                buyer_doc = await db.users.find_one({"id": winner_id}, {"_id": 0}) or {}
+                                seller_full = await db.users.find_one({"id": seller_id}, {"_id": 0}) or {}
+                                from services.emails.email_marketplace import (
+                                    send_buyer_pickup_code_email,
+                                    send_seller_pickup_instructions_email,
+                                )
+                                await send_buyer_pickup_code_email(
+                                    buyer=buyer_doc,
+                                    seller=seller_full,
+                                    listing_title=listing.get("title", "Item"),
+                                    hammer_price=float(listing.get("current_price") or 0),
+                                    pickup_code=code,
+                                    payment_method=pm,
+                                    transaction_id=txn_for_code["id"],
+                                )
+                                await send_seller_pickup_instructions_email(
+                                    seller=seller_full,
+                                    listing_title=listing.get("title", "Item"),
+                                    hammer_price=float(listing.get("current_price") or 0),
+                                    payment_method=pm,
+                                    transaction_id=txn_for_code["id"],
+                                )
+                            except Exception as email_err:
+                                logger.warning(f"[pickup-code] email send failed: {email_err}")
+                except Exception as pkup_err:
+                    logger.warning(f"[pickup-code] generation failed for listing {listing_id}: {pkup_err}")
 
-            if winner_id and seller_id:
+            if winner_id and seller_id and not _reserve_hold:
                 try:
                     winner = await db.users.find_one({"id": winner_id}, {"_id": 0, "name": 1, "email": 1, "phone": 1})
                     seller = await db.users.find_one({"id": seller_id}, {"_id": 0, "name": 1, "email": 1, "phone": 1})
@@ -644,24 +708,81 @@ async def process_ended_auctions():
                 lot_unit_price = float(_lot_totals["unit_price"])
                 lot_quantity = int(_lot_totals["quantity"])
                 lot_title = f"{auction.get('title', 'Auction')} — Lot #{lot.get('lot_number','?')}"
+
+                # ── iter484 — Per-lot Reserve Price Gate ─────────────
+                # Lot-level reserve wins; auction-level is the fallback.
+                _lot_reserve_hold = False
+                _lot_reserve_price = None
+                if winner_id:
+                    try:
+                        from services.reserve_price_gate import (
+                            is_reserve_met, resolve_reserve_price,
+                        )
+                        _lot_reserve_price = resolve_reserve_price(auction, lot=lot)
+                        if not is_reserve_met(lot_final, _lot_reserve_price):
+                            _lot_reserve_hold = True
+                    except Exception as rg_err:
+                        logger.warning(
+                            f"[reserve-gate] lot check failed for "
+                            f"{auction_id}/lot{lot.get('lot_number')}: {rg_err}"
+                        )
+
                 # Persist lot winner on the document for dashboard counters
                 try:
+                    _lot_status_set = {
+                        "lots.$.winner_user_id": winner_id,
+                        "lots.$.final_price": lot_final,
+                        # iter451 — Stamp per-unit + qty so invoices
+                        # can render `unit × qty = line_total` from
+                        # the actual winning lot data.
+                        "lots.$.winning_unit_price": lot_unit_price,
+                        "lots.$.winning_quantity": lot_quantity,
+                    }
+                    if _lot_reserve_hold and winner_id:
+                        _lot_status_set["lots.$.status"] = "reserve_not_met"
+                        _lot_status_set["lots.$.end_reason"] = "reserve_not_met"
+                    else:
+                        _lot_status_set["lots.$.sold_at"] = now_str if winner_id else None
+                        _lot_status_set["lots.$.status"] = "sold" if winner_id else "ended"
                     await db.multi_item_listings.update_one(
                         {"id": auction_id, "lots.lot_number": lot.get("lot_number")},
-                        {"$set": {
-                            "lots.$.winner_user_id": winner_id,
-                            "lots.$.final_price": lot_final,
-                            # iter451 — Stamp per-unit + qty so invoices
-                            # can render `unit × qty = line_total` from
-                            # the actual winning lot data.
-                            "lots.$.winning_unit_price": lot_unit_price,
-                            "lots.$.winning_quantity": lot_quantity,
-                            "lots.$.sold_at": now_str if winner_id else None,
-                            "lots.$.status": "sold" if winner_id else "ended",
-                        }},
+                        {"$set": _lot_status_set},
                     )
                 except Exception as we:
                     logger.warning(f"[lots-end] could not stamp lot winner: {we}")
+
+                # iter484 — When reserve not met, create the system
+                # auction-request row and skip ALL downstream side-effects
+                # for THIS lot (notifications, aggregate email accumulator,
+                # settlement, finalize). Other lots continue normally.
+                if _lot_reserve_hold and winner_id and seller_id:
+                    try:
+                        from services.auction_requests_service import (
+                            create_system_reserve_not_met_request,
+                        )
+                        await create_system_reserve_not_met_request(
+                            db,
+                            auction_id=auction_id,
+                            target=str(lot.get("lot_number") or "auction"),
+                            hammer_price=lot_final,
+                            reserve_price=float(_lot_reserve_price or 0),
+                            winner_user_id=winner_id,
+                            seller_id=seller_id,
+                            lot_number=lot.get("lot_number"),
+                            collection="multi_item_listings",
+                            currency=(auction.get("currency") or "CAD").upper(),
+                        )
+                        logger.info(
+                            f"[reserve-gate] {auction_id}/lot{lot.get('lot_number')}: "
+                            f"reserve_not_met (hammer={lot_final} reserve={_lot_reserve_price}) — halted"
+                        )
+                    except Exception as rg_err:
+                        logger.warning(
+                            f"[reserve-gate] request creation failed for "
+                            f"{auction_id}/lot{lot.get('lot_number')}: {rg_err}"
+                        )
+                    # Do not enter the winner side-effects branch below.
+                    continue
 
                 if winner_id and seller_id:
                     try:

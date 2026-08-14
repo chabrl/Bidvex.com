@@ -1,5 +1,87 @@
 # BidVex — Auction Marketplace PRD
 
+## iter484 — Reserve Price at Auction Close (Feb 14, 2026) ✅ SHIPPED · PREVIEW ONLY
+
+### Scope
+Wire admin-set `reserve_price` into the auction-close settlement path.
+When `hammer < reserve`, halt auto-payment, flag the listing/lot as
+`reserve_not_met`, insert a system-generated row into the unified
+Auction Requests queue, and notify buyer + admin with idempotent
+outbox rows.  Admin can APPROVE (accept the sale at the offered
+hammer → runs settlement with `bypass_reserve=True`) or DENY
+(mark as `ended_reserve_not_met`, no charges).
+
+### Backend
+**New**
+- `services/reserve_price_gate.py` — pure `resolve_reserve_price()`
+  (lot > auction fallback) + `is_reserve_met()`.
+
+**Modified**
+- `services/auction_settlement.py::settle_auction` — new kwargs
+  `bypass_reserve` / `reserve_price_override` / `lot`.  Halts BEFORE
+  any Stripe call when reserve isn't met, returning
+  `{settled:False, reason:"reserve_not_met", reserve_price, hammer_price, ...}`.
+- `services/auction_requests_service.py`:
+  - Added `"reserve_not_met"` to `REQUEST_TYPES` (system-generated).
+  - New `create_system_reserve_not_met_request()` — idempotent, queues
+    admin + neutral bilingual buyer emails via `email_outbox`.
+    Buyer context deliberately omits the reserve amount.
+  - `_apply_approval_side_effects` handles `reserve_not_met` →
+    re-runs settlement + finalize with `bypass_reserve=True`.
+  - New `_apply_denial_side_effects` → flips listing/lot to
+    `ended_reserve_not_met` with `end_reason=reserve_not_met`.
+- `services/payment_collection.py::finalize_auction_payment` —
+  short-circuits when settlement carries `reason=reserve_not_met`
+  (no receipts / payouts / pickup codes).
+- `routes/auctions.py`:
+  - Single-listing flow: reserve check BEFORE marking status.  When
+    unmet: status → `reserve_not_met`, system-request created, all
+    downstream side-effects (pickup, notifications, winner/seller
+    emails, offline invoices, settle+finalize) are gated off.
+  - Multi-lot flow: per-lot reserve check.  Unmet lots set
+    `lots.$.status="reserve_not_met"`, request created, `continue`
+    skips the winner side-effects for THAT lot.  Other lots continue
+    normally.
+
+### Guardrails held
+- ✅ Zero touch to Stripe charge / payout / refund code.
+- ✅ Reserve gate lives in ONE place (`reserve_price_gate.py`);
+  settlement + routes both delegate.
+- ✅ Idempotent: repeat scheduler ticks never duplicate the request row
+  or the buyer email (unified `dedupe_key` on outbox).
+- ✅ Lot-level reserve OVERRIDES auction-level reserve.
+- ✅ 65/65 iter483 tests continue to pass.
+- ✅ `bypass_reserve` only reachable through admin approve — sellers
+  cannot self-override.
+
+### Tests — 23 new (all green)
+`tests/test_iter484_reserve_settlement.py`:
+1. `resolve_reserve_price` — None / lot-wins / fallback / rejects
+   negatives, strings, 0.
+2. `is_reserve_met` — no-reserve / equal / above / below.
+3. `settle_auction` halts + no Stripe helper called when reserve unmet.
+4. `settle_auction` proceeds when hammer ≥ reserve.
+5. `settle_auction` proceeds when reserve is 0 / missing.
+6. `bypass_reserve=True` skips the gate.
+7. `lot.reserve_price` overrides `listing.reserve_price`.
+8. `reserve_price_override` kwarg wins over listing value.
+9. `create_system_reserve_not_met_request` — shape / idempotency /
+   per-lot scoping / queues both emails.
+10. Buyer email context does NOT include reserve amount.
+11. Admin approve → `settle_stripe_full` called + `finalize` called,
+    listing → `ended`, lot → `sold`.
+12. Admin deny → no Stripe / finalize, listing/lot → `ended_reserve_not_met`.
+13. `finalize_auction_payment` short-circuits when settlement carries
+    `reason=reserve_not_met`.
+
+**Total 88/88 iter483 + iter484 tests green.**
+
+### Halted at end of Priority 1
+Per user directive: STOP AND REPORT.  Priority 2 (buyer-facing
+reserve badge) and Priority 3 (P6 tax engine) not started.
+
+---
+
 ## iter483.3 — Lot-Level Controls + Auction Requests Center + Responsive UX (Feb 14, 2026) ✅ SHIPPED · PREVIEW ONLY
 
 ### Scope
