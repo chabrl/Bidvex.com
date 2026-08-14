@@ -67,6 +67,15 @@ const PaymentSuccessPage = () => {
           //
           // P7.5 — Also emits GA4 `purchase` + optional Google Ads Purchase
           // conversion + Enhanced Conversions user_data (hashed email/phone).
+          //
+          // P7.5 POST-VERIFICATION FIX — The backend `analytics_tracker.py`
+          // computes the CAPI `event_id` as
+          // `bidvex_purchase_<CID>_session_<session_id>`. The frontend used
+          // to rebuild the id locally with the raw session_id (missing the
+          // `session_` prefix), which BROKE Meta browser↔CAPI dedup. We now
+          // pass the backend-computed `meta_purchase_event_id` directly to
+          // the tracking hook so the browser Pixel and CAPI share the exact
+          // same event_id (byte-identical).
           try {
             const meta = data.metadata || {};
             const listingId =
@@ -79,15 +88,18 @@ const PaymentSuccessPage = () => {
               meta.listing_type ||
               (meta.multi_item_listing_id ? 'multi_lot' : 'marketplace');
             const finalWinningPrice = (data.amount_total || 0) / 100;
-            // Stripe Checkout session id (cs_...) is folded into the event_id
-            // so the backend CAPI fires the same id and Meta dedupes the pair.
-            const stripeSessionId = data.session_id || sessionId || data.meta_purchase_event_id;
+            // The Stripe Checkout session id (cs_...) is still needed by
+            // GA4 `transaction_id` (Google's own dedupe key). Meta's dedup
+            // key is the authoritative backend `meta_purchase_event_id`.
+            const stripeSessionId = sessionId;
+            const serverEventId = data.meta_purchase_event_id;
             if (listingId) {
               trackPurchase({
                 listingId,
                 listingType,
                 finalWinningPrice,
                 stripeSessionId,
+                serverEventId,
                 title:    data.listing_title    || meta.listing_title,
                 category: data.listing_category || meta.listing_category,
                 identity: user

@@ -133,10 +133,16 @@ export function useMetaPixelTracking({ routeHint } = {}) {
 
     /**
      * Purchase + purchase — fires once per (listing, session) on payment
-     * confirmation. The `stripeSessionId` is folded into the event_id so
-     * the backend Conversions API can fire the same event_id and Meta
-     * will deduplicate. GA4 `purchase` uses the Stripe session as
-     * `transaction_id` so GA4 dedupes replays.
+     * confirmation. The `stripeSessionId` is used as GA4's
+     * `transaction_id` (Google dedupe key).
+     *
+     * For Meta browser↔CAPI dedup we PREFER the backend-computed
+     * `serverEventId` (from `/payments/status.meta_purchase_event_id`)
+     * because the backend uses `discriminator=session_<id>` while the
+     * frontend used to use the raw `<id>` — Meta would not dedupe.
+     * When `serverEventId` is omitted we fall back to the legacy local
+     * derivation (kept for backwards compat with any caller not yet
+     * threading the backend value).
      *
      * Enhanced Conversions user_data (SHA-256 email/phone) is emitted
      * BEFORE the purchase event when `identity` is supplied.
@@ -146,19 +152,22 @@ export function useMetaPixelTracking({ routeHint } = {}) {
       listingType,
       finalWinningPrice,
       stripeSessionId,
+      serverEventId,
       title,
       category,
       identity,
       lotContentId,
     } = {}) => {
       if (!listingId) return;
-      const eventId = stripeSessionId
-        ? buildEventId({
-            eventName: 'Purchase',
-            contentId: lotContentId || listingId,
-            discriminator: stripeSessionId,
-          })
-        : null;
+      const eventId =
+        serverEventId
+        || (stripeSessionId
+            ? buildEventId({
+                eventName: 'Purchase',
+                contentId: lotContentId || listingId,
+                discriminator: `session_${stripeSessionId}`,
+              })
+            : null);
       _purchase({
         listingId: lotContentId || listingId,
         listingType: listingType || routeHint,
