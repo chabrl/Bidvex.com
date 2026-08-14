@@ -141,6 +141,16 @@ const ListingDetailPage = () => {
       }).catch((pixelErr) => {
         console.debug('[ListingDetailPage] ViewContent pixel emit failed:', pixelErr);
       });
+      // P7.5 — GA4 `view_item` (canonical content_id = raw listing.id).
+      import('../utils/analytics_events').then(({ trackGA4ViewItem }) => {
+        trackGA4ViewItem({
+          contentId: String(data.id || ''),
+          value: Number(data.current_bid ?? data.current_price ?? data.starting_bid ?? data.starting_price ?? 0),
+          itemName: data.title || '',
+          itemCategory: data.category || '',
+          currency: data.currency || 'CAD',
+        });
+      }).catch(() => { /* silent */ });
 
       const sellerResponse = await axios.get(`${API}/users/${data.seller_id}`);
       setSeller(sellerResponse.data);
@@ -287,6 +297,17 @@ const ListingDetailPage = () => {
     } catch (pixelErr) {
       console.debug('[ListingDetailPage] AddToCart pixel emit failed:', pixelErr);
     }
+    // P7.5 — GA4 `add_to_cart` alongside Meta AddToCart. Same canonical ID.
+    try {
+      const { trackGA4AddToCart } = await import('../utils/analytics_events');
+      trackGA4AddToCart({
+        contentId: String(listing?.id || ''),
+        value: Number(amount),
+        itemName: listing?.title || '',
+        itemCategory: listing?.category || '',
+        currency: listing?.currency || 'CAD',
+      });
+    } catch (_) { /* silent — GA4 must not block bidding */ }
 
     // Show bid confirmation dialog with cost breakdown
     setPendingBidAmount(amount);

@@ -25,6 +25,7 @@ import {
   getCanonicalContentId,
   getCanonicalContentType,
   getCanonicalListingType,
+  getLotContentId,
   buildEventId,
 } from './metaContentId';
 
@@ -314,11 +315,15 @@ const _extractPrice = (listing) => {
  * ViewContent — fires on detail-page mount. Dedupe-safe per (listing, session).
  *
  * @param {object} listing — listing payload from API
- * @param {object} [opts]  — { routeHint }
+ * @param {object} [opts]  — { routeHint, lot } — when `lot` supplied,
+ *                           content_ids resolve to the per-lot canonical
+ *                           ID (matches per-lot catalog decomposition).
  */
 export const trackViewContent = (listing, opts = {}) => {
   if (!listing || !listing.id) return;
-  const contentId = getCanonicalContentId(listing, opts);
+  const contentId = opts.lot
+    ? getLotContentId(listing, opts.lot, opts)
+    : getCanonicalContentId(listing, opts);
   if (!contentId) return;
   if (_wasFired('ViewContent', contentId)) {
     console.debug('[meta-pixel] ViewContent deduped:', contentId);
@@ -327,11 +332,13 @@ export const trackViewContent = (listing, opts = {}) => {
   _markFired('ViewContent', contentId);
 
   const contentType = getCanonicalContentType(listing, opts);
-  const value = _extractPrice(listing);
+  const value = opts.lot
+    ? Number(opts.lot.current_price ?? opts.lot.current_bid ?? opts.lot.starting_price ?? 0)
+    : _extractPrice(listing);
   const params = {
     content_ids: [contentId],
     content_type: contentType,
-    content_name: listing.title || '',
+    content_name: (opts.lot && (opts.lot.title || opts.lot.title_en)) || listing.title || '',
     content_category: listing.category || '',
     value: parseFloat(Number(value).toFixed(2)),
     currency: listing.currency || 'CAD',
@@ -367,12 +374,18 @@ export const trackAddToWishlist = (listing, price, opts = {}) => {
  *
  * @param {object} args
  * @param {object} args.listing      — listing payload
+ * @param {object} [args.lot]        — lot payload (multi-lot only). When
+ *                                     supplied, content_ids resolve to the
+ *                                     per-lot canonical ID so Meta can match
+ *                                     against the decomposed catalog rows.
  * @param {number} args.bidAmount    — intended bid amount (CAD)
  * @param {string} [args.routeHint]
  */
-export const trackAddToCart = ({ listing, bidAmount, routeHint } = {}) => {
+export const trackAddToCart = ({ listing, lot, bidAmount, routeHint } = {}) => {
   if (!listing || !listing.id) return;
-  const contentId = getCanonicalContentId(listing, { routeHint });
+  const contentId = lot
+    ? getLotContentId(listing, lot, { routeHint })
+    : getCanonicalContentId(listing, { routeHint });
   if (!contentId) return;
   if (_wasFired('AddToCart', contentId)) {
     console.debug('[meta-pixel] AddToCart deduped:', contentId);
@@ -383,7 +396,7 @@ export const trackAddToCart = ({ listing, bidAmount, routeHint } = {}) => {
   const params = {
     content_ids: [contentId],
     content_type: getCanonicalContentType(listing, { routeHint }),
-    content_name: listing.title || '',
+    content_name: (lot && (lot.title || lot.title_en)) || listing.title || '',
     content_category: listing.category || '',
     value: parseFloat(Number(bidAmount || _extractPrice(listing) || 0).toFixed(2)),
     currency: listing.currency || 'CAD',
@@ -404,25 +417,35 @@ export const trackAddToCart = ({ listing, bidAmount, routeHint } = {}) => {
  *
  * @param {object} args
  * @param {object} args.listing      — listing payload
+ * @param {object} [args.lot]        — lot payload (multi-lot only). When
+ *                                     supplied, content_ids resolve to the
+ *                                     per-lot canonical ID.
  * @param {number} args.bidAmount    — submitted bid amount (CAD)
  * @param {number} [args.lotNumber]  — sub-lot # for multi-item auctions
+ *                                     (kept for backwards-compat; if `lot`
+ *                                     is also passed, `lot.lot_number` wins).
  * @param {string} [args.routeHint]
  */
-export const trackInitiateCheckout = ({ listing, bidAmount, lotNumber, routeHint } = {}) => {
+export const trackInitiateCheckout = ({ listing, lot, bidAmount, lotNumber, routeHint } = {}) => {
   if (!listing || !listing.id) return;
-  const contentId = getCanonicalContentId(listing, { routeHint });
+  const contentId = lot
+    ? getLotContentId(listing, lot, { routeHint })
+    : getCanonicalContentId(listing, { routeHint });
   if (!contentId) return;
 
   const params = {
     content_ids: [contentId],
     content_type: getCanonicalContentType(listing, { routeHint }),
-    content_name: listing.title || '',
+    content_name: (lot && (lot.title || lot.title_en)) || listing.title || '',
     content_category: listing.category || '',
     value: parseFloat(Number(bidAmount || _extractPrice(listing) || 0).toFixed(2)),
     currency: listing.currency || 'CAD',
     num_items: 1,
   };
-  if (lotNumber != null) params.contents = [{ id: contentId, quantity: 1, item_price: params.value }];
+  const effectiveLotNumber = (lot && lot.lot_number != null) ? lot.lot_number : lotNumber;
+  if (effectiveLotNumber != null) {
+    params.contents = [{ id: contentId, quantity: 1, item_price: params.value }];
+  }
 
   // Each bid is a distinct InitiateCheckout — discriminator is bid amount +
   // millisecond timestamp to ensure uniqueness across rapid re-bids.
@@ -512,6 +535,7 @@ export {
   getCanonicalContentId,
   getCanonicalContentType,
   getCanonicalListingType,
+  getLotContentId,
   buildEventId,
 };
 

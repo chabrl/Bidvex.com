@@ -16,18 +16,19 @@
  */
 // Type → prefix. Mirror of meta_feed_mapper.py::TYPE_PREFIX.
 const TYPE_PREFIX = {
-  marketplace:    'MKT',
-  single:         'MKT',
-  product:        'MKT',
-  lots:           'LOT',
-  multi_lot:      'LOT',
-  multi_item:     'LOT',
-  vehicle:        'VEH',
-  vehicles:       'VEH',
-  vehicle_dealer: 'VEH',
-  storage:        'STO',
-  storage_locker: 'STO',
-  storage_unit:   'STO',
+  marketplace:      'MKT',
+  single:           'MKT',
+  product:          'MKT',
+  lots:             'LOT',
+  multi_lot:        'LOT',
+  multi_item:       'LOT',
+  vehicle:          'VEH',
+  vehicles:         'VEH',
+  vehicle_dealer:   'VEH',
+  vehicle_multi_lot:'VML',
+  storage:          'STO',
+  storage_locker:   'STO',
+  storage_unit:     'STO',
 };
 
 // Canonical (long-form) listing type used for content_type metadata.
@@ -35,6 +36,7 @@ const CANONICAL_TYPE = {
   MKT: 'marketplace',
   LOT: 'multi_lot',
   VEH: 'vehicle',
+  VML: 'vehicle_multi_lot',
   STO: 'storage',
 };
 
@@ -97,6 +99,39 @@ export const deriveListingType = ({ listing, routeHint } = {}) => {
 export const getCanonicalContentId = (listing) => {
   if (!listing || !listing.id) return null;
   return String(listing.id);
+};
+
+/**
+ * P7.5 — Returns the canonical PER-LOT content_id used by Meta + Google
+ * for multi-lot auctions. Must match the backend decomposition rule in
+ * `services/meta_feed_mapper.py::map_multi_lot_listing_to_meta_items`:
+ *
+ *   general multi-lot (ltype "lots"):
+ *     "LOT-{parent_id}-L{lot_number}"
+ *   vehicle multi-lot (ltype "vehicle_multi_lot"):
+ *     "VML-{parent_id}-{lot_id[:8]}"
+ *
+ * Returns `null` when the inputs are insufficient.
+ *
+ * @param {object} parentListing — parent auction payload (must have .id)
+ * @param {object} lot           — lot payload (must have .lot_number for LOT,
+ *                                 or .id for VML)
+ * @param {object} [opts]        — { routeHint }
+ * @returns {string|null}
+ */
+export const getLotContentId = (parentListing, lot, opts = {}) => {
+  if (!parentListing || !parentListing.id || !lot) return null;
+  const parentId = String(parentListing.id);
+  const type = deriveListingType({ listing: parentListing, routeHint: opts.routeHint });
+  if (type === 'vehicle_multi_lot') {
+    const lotId = lot.id != null ? String(lot.id) : null;
+    if (!lotId) return null;
+    return `VML-${parentId}-${lotId.slice(0, 8)}`;
+  }
+  // General multi-lot fallback (also covers 'lots', 'multi_lot', 'multi_item').
+  const lotNumber = lot.lot_number != null ? String(lot.lot_number) : null;
+  if (!lotNumber) return null;
+  return `LOT-${parentId}-L${lotNumber}`;
 };
 
 /**

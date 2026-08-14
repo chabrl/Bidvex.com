@@ -242,6 +242,7 @@ async def get_checkout_status(
                     {"session_id": session_id},
                     {"_id": 0, "listing_id": 1, "seller_id": 1, "user_id": 1,
                      "amount": 1, "currency": 1, "transaction_type": 1,
+                     "lot_number": 1, "lot_id": 1,
                      "meta_purchase_emitted": 1},
                 )
                 if txn and txn.get("seller_id"):
@@ -316,9 +317,26 @@ async def get_checkout_status(
                             from services.analytics_tracker import (
                                 track_listing_purchase,
                                 canonical_content_id,
+                                canonical_lot_content_id,
                                 deterministic_event_id,
                             )
-                            content_id = canonical_content_id(listing_type, listing_id)
+                            # P7.5 — Multi-lot purchases carry a distinct
+                            # per-lot content_id (LOT-<parent>-L<num> or
+                            # VML-<parent>-<lot_id[:8]>) matching the
+                            # decomposed catalog rows. Prefer the transaction
+                            # payload's stored lot_number / lot_id (recorded
+                            # at Buy Now / auction-won time) then fall back
+                            # to Stripe session metadata.
+                            lot_ref = (
+                                txn.get("lot_number")
+                                or txn.get("lot_id")
+                                or (session.metadata or {}).get("lot_number")
+                                or (session.metadata or {}).get("lot_id")
+                            )
+                            lot_content_id = canonical_lot_content_id(
+                                listing_type, listing_id, lot_ref,
+                            ) if lot_ref else None
+                            content_id = lot_content_id or canonical_content_id(listing_type, listing_id)
                             event_id = deterministic_event_id(
                                 event_name="Purchase",
                                 content_id=content_id or f"BIDVEX-MKT-{listing_id}",
@@ -328,6 +346,12 @@ async def get_checkout_status(
                             out["listing_type"] = listing_type
                             out["listing_title"] = (listing_doc or {}).get("title")
                             out["listing_category"] = (listing_doc or {}).get("category")
+                            # P7.5 — surface the resolved catalog content_id
+                            # (raw UUID for singles, LOT-/VML- for lots) so
+                            # the frontend fires Pixel + GA4 Purchase with
+                            # the exact catalog row identifier.
+                            if content_id:
+                                out["meta_content_id"] = content_id
 
                             if not txn.get("meta_purchase_emitted"):
                                 buyer_user = None
@@ -348,6 +372,7 @@ async def get_checkout_status(
                                         buyer_user=buyer_user,
                                         listing_title=(listing_doc or {}).get("title"),
                                         listing_category=(listing_doc or {}).get("category"),
+                                        lot_ref=lot_ref,
                                     )
                                 except Exception as capi_err:
                                     logger.warning(f"[meta_capi/listing] emit failed: {capi_err}")

@@ -20,6 +20,8 @@ import useVehicleCountdown from '../../hooks/useVehicleCountdown';
 import { extractErrorMessage } from '../../utils/errorHandler';
 import AcceptedPaymentMethodsCard from '../../components/AcceptedPaymentMethodsCard';
 import VehicleReserveBadge from '../../components/vehicles/VehicleReserveBadge';
+// P7.5 — Meta + GA4 commerce tracking (canonical per-lot content_id).
+import { useMetaPixelTracking } from '../../hooks/useMetaPixelTracking';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -299,6 +301,12 @@ const VehicleMultiLotDetailPage = () => {
   // iter418 — one shared per-second tick for all countdowns on the page
   const { format: formatCountdown } = useVehicleCountdown();
 
+  // P7.5 — Meta + GA4 commerce tracking hook. `routeHint` is critical so
+  // the canonical content_id resolves to the VML- prefix (per-lot catalog
+  // decomposition matches `services/meta_feed_mapper.py`).
+  const { trackViewContent, trackAddToCart, trackBidSubmitted } =
+    useMetaPixelTracking({ routeHint: 'vehicle_multi_lot' });
+
   const refresh = useCallback(async () => {
     try {
       const r = await axios.get(`${API}/vehicle-multi-lot-auctions/${eventId}`);
@@ -389,6 +397,17 @@ const VehicleMultiLotDetailPage = () => {
     setActiveImageIdx(0);
   }, [activeLotId]);
 
+  // P7.5 — Meta ViewContent + GA4 view_item for the currently-active lot.
+  // The per-lot canonical content_id (VML-<eventId>-<lot_id[:8]>) matches
+  // the Meta + Google Merchant catalog rows produced by
+  // `map_multi_lot_listing_to_meta_items`. Dedupe-safe per (event, lot,
+  // session) via the underlying pixel helper.
+  useEffect(() => {
+    if (event && activeLot) {
+      trackViewContent({ listing: event, lot: activeLot });
+    }
+  }, [event, activeLot, trackViewContent]);
+
   // iter418 — Ordered media URLs for the currently-visible active lot.
   const activeLotMedia = activeLot ? getSortedMediaUrls(activeLot) : [];
 
@@ -416,6 +435,10 @@ const VehicleMultiLotDetailPage = () => {
     if (!activeLot) return;
     const amt = Number(bidAmount);
     if (!amt || amt <= 0) { toast.error('Enter a bid amount'); return; }
+    // P7.5 — Meta AddToCart + GA4 add_to_cart on bid intent. Dedupe-safe
+    // per (event, lot, session). Fires BEFORE the network request so the
+    // signal is captured even if the bid POST fails.
+    trackAddToCart({ listing: event, lot: activeLot, bidAmount: amt });
     setPlacing(true);
     try {
       const token = localStorage.getItem('token');
@@ -425,6 +448,9 @@ const VehicleMultiLotDetailPage = () => {
         { headers: { Authorization: `Bearer ${token}` } },
       ));
       toast.success('Bid placed!');
+      // P7.5 — Meta InitiateCheckout on successful commit (not GA4 —
+      // GA4 reserves `purchase` for payment completion).
+      trackBidSubmitted({ listing: event, lot: activeLot, bidAmount: amt });
       setBidAmount('');
       refresh();
     } catch (e) {

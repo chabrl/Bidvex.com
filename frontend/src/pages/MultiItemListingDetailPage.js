@@ -280,8 +280,25 @@ const MultiItemListingDetailPage = () => {
         }
       }
 
-      // Meta Pixel ViewContent — dedupe-safe per (listing, session).
-      trackViewContent({ listing: response.data });
+      // P7.5 — Meta Pixel ViewContent + GA4 view_item.
+      //
+      // The Meta / Google catalog only exposes PER-LOT rows for multi-lot
+      // auctions (see `services/meta_feed_mapper.py::map_multi_lot_listing_to_meta_items`).
+      // Firing ViewContent with the parent UUID would resolve to no
+      // catalog row → 0 % match rate.
+      //
+      // Resolution: fire ViewContent for the initially-focused lot
+      // (either the ?lot=N deep-link target or the first lot in the
+      // sorted list). Dedupe-safe per (parent, lot, session).
+      const _lots = response.data.lots || [];
+      const _targetLot = (targetLotParam != null
+        && _lots.find(l => Number(l.lot_number) === Number(targetLotParam))
+      ) || _lots[0];
+      if (_targetLot) {
+        trackViewContent({ listing: response.data, lot: _targetLot });
+      } else {
+        trackViewContent({ listing: response.data });
+      }
 
       // Fetch seller info for tax status badge
       if (response.data.seller_id) {
@@ -382,8 +399,9 @@ const MultiItemListingDetailPage = () => {
       }
     }
 
-    // Meta Pixel AddToCart — bid intent (parent-scoped content_id matches catalog 1:1).
-    trackAddToCart({ listing, bidAmount });
+    // Meta Pixel AddToCart — bid intent scoped to the specific lot so
+    // Meta Commerce Manager matches the per-lot catalog decomposition.
+    trackAddToCart({ listing, lot, bidAmount });
 
     try {
       await runWithTermsGate(() => axios.post(
@@ -393,8 +411,8 @@ const MultiItemListingDetailPage = () => {
       ));
       toast.success('Bid placed successfully!');
       // Meta Pixel InitiateCheckout — fires on every successful bid commit.
-      // lotNumber is carried in `contents[]` while content_ids stay parent-scoped.
-      trackBidSubmitted({ listing, bidAmount, lotNumber });
+      // Per-lot content_id matches catalog 1:1 (LOT-<parent>-L<lot_number>).
+      trackBidSubmitted({ listing, lot, bidAmount, lotNumber });
       fetchListing();
       setBidAmounts({ ...bidAmounts, [lotNumber]: '' });
     } catch (error) {

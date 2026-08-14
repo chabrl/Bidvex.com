@@ -1,5 +1,47 @@
 # BidVex — Auction Marketplace PRD
 
+
+## iter484.3 P7.5 — Meta + Google Commerce Conversion Tracking (Feb 14, 2026) ✅ SHIPPED · PREVIEW ONLY
+
+### Delivered
+**Root cause fixed for 0 % product-view match rate on multi-lot pages.**
+Meta + Google catalog rows are decomposed per-lot (`LOT-<parent>-L<n>`
+and `VML-<parent>-<lot_id[:8]>`); the Pixel + GA4 + CAPI now emit those
+same per-lot IDs (previously emitted the parent UUID, which matched no
+catalog row).
+
+- Frontend: new `getLotContentId(parent, lot, {routeHint})` helper +
+  `useMetaPixelTracking` hook now fires Meta Pixel **AND** GA4
+  ecommerce events (`view_item` / `add_to_cart` / `purchase`) with the
+  same canonical content_id.
+- Missing tracking added to `VehicleMultiLotDetailPage.js` and
+  `CompactLotCard.jsx` (inline lot bidder) — both fired **nothing**
+  before this iter.
+- Google Enhanced Conversions for Web wired on Purchase (SHA-256
+  hashed email/phone via `window.crypto.subtle.digest`).
+- Google Ads purchase conversion supported behind
+  `REACT_APP_GOOGLE_ADS_PURCHASE_LABEL` env var (dormant until user
+  supplies the label; GA4 attribution still works via GA4↔Ads link).
+- Backend: new `canonical_lot_content_id` + `track_listing_purchase`
+  now accepts `lot_ref` → per-lot CAPI Purchase. `/payments/status`
+  returns `meta_content_id` (per-lot when applicable).
+- **23 new P7.5 regression tests** locking the canonical ID contract
+  across Meta / Google / GA4 / CAPI surfaces.
+
+**Total tests:** 1,049 P7 + 58 existing Meta pixel + 23 P7.5 = **1,130
+tracking + P7 tests passing** on top of the 181 baseline (1,230
+overall unchanged).
+
+**Guardrails held:**
+- ✅ Zero touch to any tax / fee / commission / Stripe / escrow / payout code.
+- ✅ P7 golden snapshots and P6 audit unchanged.
+- ✅ Preview only. No deploy.
+
+**Docs:** `/app/docs/P7_5_CONVERSION_TRACKING_REPORT.md`,
+`/app/docs/P7_5_CANONICAL_ID_MAP.md`.
+
+---
+
 ## iter484.2 Gate 3 — P7 Cent-Perfect Financial Regression Matrix (Feb 14, 2026) ✅ SHIPPED · PREVIEW ONLY
 
 ### Delivered

@@ -190,6 +190,44 @@ def canonical_content_id(listing_type: Optional[str], listing_id: Optional[str])
     return str(listing_id)
 
 
+def canonical_lot_content_id(
+    listing_type: Optional[str],
+    parent_id: Optional[str],
+    lot_ref: Optional[Any],
+) -> Optional[str]:
+    """P7.5 — Returns the canonical PER-LOT content_id used by Meta +
+    Google Merchant for multi-lot auctions.
+
+    MUST match the backend catalog decomposition rule in
+    `services/meta_feed_mapper.py::map_multi_lot_listing_to_meta_items`:
+
+      • general multi-lot (listing_type in {"lots","multi_lot","multi_item"}):
+          "LOT-{parent_id}-L{lot_number}"
+
+      • vehicle multi-lot (listing_type == "vehicle_multi_lot"):
+          "VML-{parent_id}-{lot_id[:8]}"
+
+    ``lot_ref`` is:
+      • ``lot_number`` (int/str) for general multi-lot
+      • ``lot_id`` (UUID string) for vehicle multi-lot
+
+    Returns None on missing/invalid inputs.
+    """
+    if not parent_id or lot_ref is None:
+        return None
+    t = (listing_type or "").lower()
+    if t == "vehicle_multi_lot":
+        lot_id_str = str(lot_ref)
+        if not lot_id_str:
+            return None
+        return f"VML-{parent_id}-{lot_id_str[:8]}"
+    # Default → general multi-lot ("LOT-<parent>-L<number>").
+    lot_num_str = str(lot_ref)
+    if not lot_num_str:
+        return None
+    return f"LOT-{parent_id}-L{lot_num_str}"
+
+
 def canonical_content_type(listing_type: Optional[str]) -> str:
     """Returns 'vehicle' for vehicle listings, 'product' for everything else.
 
@@ -395,10 +433,17 @@ async def track_listing_purchase(*,
                                   listing_title: Optional[str] = None,
                                   listing_category: Optional[str] = None,
                                   fbp:          Optional[str] = None,
-                                  fbc:          Optional[str] = None) -> Dict[str, Any]:
+                                  fbc:          Optional[str] = None,
+                                  lot_ref:      Optional[Any] = None) -> Dict[str, Any]:
     """Fires Meta CAPI Purchase for a non-broker checkout (marketplace,
     multi-lot, storage). `event_id` is deterministic based on the Stripe
     `session_id` so the browser-side pixel can be deduplicated.
+
+    P7.5 — When ``lot_ref`` is supplied (lot_number for general multi-lot
+    or lot_id for vehicle_multi_lot), the CAPI Purchase event carries the
+    per-lot canonical ID (``LOT-<parent>-L<num>`` or
+    ``VML-<parent>-<lot_id[:8]>``) so Meta attributes the conversion to
+    the decomposed catalog row rather than the parent event.
 
     For BidVex revenue accounting this passes the buyer's TOTAL charged
     amount (gross) as the Meta value — Meta's catalog attribution model
@@ -426,7 +471,13 @@ async def track_listing_purchase(*,
             fbc         = fbc,
         )
 
-    content_id = canonical_content_id(listing_type, listing_id)
+    # P7.5 — Prefer per-lot content_id when the caller identified a
+    # specific lot (multi-lot decomposition). Falls back to the raw
+    # listing_id for single-listing checkouts.
+    if lot_ref is not None:
+        content_id = canonical_lot_content_id(listing_type, listing_id, lot_ref)
+    else:
+        content_id = canonical_content_id(listing_type, listing_id)
     if not content_id:
         return {"ok": False, "reason": "missing_content_id"}
     content_ids = [content_id]

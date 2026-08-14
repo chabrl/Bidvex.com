@@ -38,6 +38,8 @@ import { formatCurrency } from '../utils/currencyFormatter';
 import API_BASE from '../config';
 import { useAuth } from '../contexts/AuthContext';
 import SafeImage from './SafeImage';
+// P7.5 — Meta + GA4 commerce tracking for inline lot bids (compact card).
+import { useMetaPixelTracking } from '../hooks/useMetaPixelTracking';
 
 const stateStyles = {
   default: 'border-slate-200 dark:border-slate-800 hover:border-cyan-400',
@@ -63,6 +65,11 @@ export default function CompactLotCard({
   const { token, user } = useAuth();
   const navigate = useNavigate();
   const isFR = i18n.language?.startsWith('fr');
+  // P7.5 — commerce tracking hook. `routeHint` matches the parent
+  // multi-lot page so the per-lot canonical content_id resolves to
+  // `LOT-<parent>-L<lot_number>` (mirrors backend catalog decomposition).
+  const { trackAddToCart, trackBidSubmitted } =
+    useMetaPixelTracking({ routeHint: 'multi_lot' });
   const [imgIdx, setImgIdx] = useState(0);
   const [autoBidOpen, setAutoBidOpen] = useState(false);
   const [feesPreview, setFeesPreview] = useState(null);
@@ -153,12 +160,23 @@ export default function CompactLotCard({
       return;
     }
     setPlacing(true);
+    // P7.5 — AddToCart on bid intent (once per lot, per session). Fires
+    // BEFORE the network request so the signal is captured even if the
+    // POST fails (matches parent-page behaviour).
+    try {
+      trackAddToCart({ listing, lot, bidAmount: amount });
+    } catch (_) { /* tracking must never block the bid path */ }
     try {
       await axios.post(
         `${API_BASE}/multi-item-listings/${auctionId}/lots/${lot.lot_number}/bid`,
         { amount, bid_type: 'normal' },
         { headers: { Authorization: `Bearer ${token}` } },
       );
+      // P7.5 — InitiateCheckout on successful bid commit (Meta only; no
+      // GA4 equivalent for per-bid signals).
+      try {
+        trackBidSubmitted({ listing, lot, bidAmount: amount });
+      } catch (_) { /* silent */ }
       setBidInput('');
       setBidError('');
       // Bubble a soft signal to the parent so it can refetch.

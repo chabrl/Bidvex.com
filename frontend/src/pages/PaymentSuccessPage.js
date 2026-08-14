@@ -9,6 +9,7 @@ import { CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { formatCurrency } from '../utils/currencyFormatter';
 import { useMetaPixelTracking } from '../hooks/useMetaPixelTracking';
+import { useAuth } from '../contexts/AuthContext';
 
 const API = API_BASE;
 
@@ -21,6 +22,9 @@ const PaymentSuccessPage = () => {
   const sessionId = searchParams.get('session_id');
   // iter230 — centralized Meta Pixel tracking hook
   const { trackPurchase } = useMetaPixelTracking();
+  // P7.5 — currently signed-in user, used for Google Enhanced Conversions
+  // (SHA-256-hashed email/phone shipped with the purchase event).
+  const { user } = useAuth();
 
   useEffect(() => {
     if (sessionId) {
@@ -60,6 +64,9 @@ const PaymentSuccessPage = () => {
           // server-side Purchase with the SAME event_id so Meta deduplicates
           // (max 1 attributed conversion per session). content_ids resolve
           // via the canonical helper so they match the catalog feed exactly.
+          //
+          // P7.5 — Also emits GA4 `purchase` + optional Google Ads Purchase
+          // conversion + Enhanced Conversions user_data (hashed email/phone).
           try {
             const meta = data.metadata || {};
             const listingId =
@@ -83,6 +90,14 @@ const PaymentSuccessPage = () => {
                 stripeSessionId,
                 title:    data.listing_title    || meta.listing_title,
                 category: data.listing_category || meta.listing_category,
+                identity: user
+                  ? { email: user.email, phone: user.phone }
+                  : undefined,
+                // Multi-lot / vehicle-multi-lot lots carry a distinct
+                // catalog id — when the backend supplies it via
+                // `data.meta_content_id`, use it verbatim so GA4 +
+                // Meta both attribute to the exact catalog row.
+                lotContentId: data.meta_content_id || meta.meta_content_id,
               });
             }
           } catch (e) { /* silent — pixel must never block the success flow */ }
