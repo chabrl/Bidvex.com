@@ -733,7 +733,7 @@
   },
   "subscription": {
     "subtotal": "Sous-total",
-    "processingFee": "Frais de traitement",
+    "processingFee": "Frais de traitement du paiement",
     "paymentSetupPending": "Configuration de paiement en attente",
     "cancelAnytime": "Annulez à tout moment",
     "instantAccess": "Accès instantané"
@@ -2657,7 +2657,7 @@
     "unlockSubtitle": "Payez les frais de plateforme BidVex pour révéler les coordonnées du concessionnaire et finaliser la transaction hors plateforme.",
     "winningBid": "Votre offre gagnante",
     "platformFeeLabel": "Frais de service plateforme (2,5 %)",
-    "stripeFeeLabel": "Frais de traitement Stripe",
+    "stripeFeeLabel": "Frais de traitement du paiement",
     "totalToPay": "Total à payer",
     "payAndUnlock": "Payer et débloquer",
     "processing": "Traitement…",
@@ -2824,5 +2824,101 @@
     "buyerReviews": "Avis des acheteurs",
     "previous": "Précédent",
     "next": "Suivant"
+  },
+  "adminReconciliation": {
+    "title": "Rapprochement des paiements",
+    "subtitle": "Auditer les frais de traitement Stripe, les récupérations et les écarts pour chaque paiement par carte.",
+    "cards": {
+      "totalPayments": "Total des paiements Stripe",
+      "reconciled": "Rapproché",
+      "variance": "Écart",
+      "shortfall": "Manque à récupérer",
+      "pending": "En attente",
+      "error": "Erreur",
+      "estimatedTotal": "Frais de traitement estimés",
+      "recoveryTotal": "Frais récupérés",
+      "actualTotal": "Frais Stripe réels",
+      "varianceTotal": "Écart total",
+      "shortfallTotal": "Manque à récupérer total"
+    },
+    "columns": {
+      "paymentIntent": "Intention de paiement",
+      "date": "Date",
+      "payerRole": "Rôle du payeur",
+      "cardJurisdiction": "Juridiction de la carte",
+      "estimated": "Estimé",
+      "recovery": "Récupération",
+      "actual": "Frais Stripe réels",
+      "variance": "Écart",
+      "status": "Statut",
+      "reference": "Référence"
+    },
+    "filters": {
+      "status": "Statut",
+      "jurisdiction": "Juridiction de la carte",
+      "payerRole": "Rôle du payeur",
+      "dateFrom": "Du",
+      "dateTo": "Au",
+      "search": "Recherche",
+      "searchPlaceholder": "Rechercher par intention de paiement, facture, annonce, vendeur, acheteur",
+      "clear": "Effacer les filtres"
+    },
+    "status": {
+      "all": "Tous",
+      "reconciled": "Rapproché",
+      "variance": "Écart",
+      "shortfall": "Manque à récupérer",
+      "pending": "En attente",
+      "error": "Erreur"
+    },
+    "jurisdiction": {
+      "all": "Toutes",
+      "domestic": "Canada",
+      "international": "International"
+    },
+    "payerRole": {
+      "all": "Tous",
+      "buyer": "Acheteur",
+      "seller": "Vendeur",
+      "partner": "Partenaire",
+      "platform": "Plateforme"
+    },
+    "detail": {
+      "title": "Détail du rapprochement",
+      "paymentIntent": "Intention de paiement",
+      "chargeId": "ID de la charge",
+      "balanceTxnId": "Transaction de solde",
+      "listing": "Annonce / Facture",
+      "cardCountry": "Pays de la carte",
+      "cardJurisdiction": "Juridiction de la carte",
+      "detectedAt": "Détecté le",
+      "estimatedFee": "Frais de traitement du paiement estimés",
+      "recoveryFee": "Récupération des frais de traitement du paiement",
+      "actualFee": "Frais de traitement Stripe réels",
+      "variance": "Écart des frais de traitement",
+      "shortfall": "Manque à récupérer sur les frais de traitement",
+      "notificationStatus": "Notification d'écart",
+      "notificationSentAt": "Notification envoyée le",
+      "close": "Fermer"
+    },
+    "empty": "Aucun enregistrement de rapprochement ne correspond aux filtres actuels.",
+    "loading": "Chargement du registre de rapprochement…",
+    "loadError": "Impossible de charger le registre de rapprochement.",
+    "loadErrorAuth": "Vous n'avez pas la permission de consulter ce tableau de bord.",
+    "labels": {
+      "paymentProcessingFee": "Frais de traitement du paiement",
+      "actualStripeFee": "Frais de traitement Stripe réels",
+      "estimatedFee": "Frais de traitement du paiement estimés",
+      "recovery": "Récupération des frais de traitement du paiement",
+      "processingVariance": "Écart des frais de traitement",
+      "processingShortfall": "Manque à récupérer sur les frais de traitement",
+      "paid": "Payé",
+      "pending": "En attente",
+      "reconciled": "Rapproché",
+      "variance": "Écart",
+      "cardJurisdiction": "Juridiction de la carte",
+      "canada": "Canada",
+      "international": "International"
+    }
   }
 }

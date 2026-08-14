@@ -80,6 +80,9 @@ const MultiItemListingDetailPage = lazy(() => import('./pages/MultiItemListingDe
 const ItemsMarketplacePage = lazy(() => import('./pages/ItemsMarketplacePage'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const AdminTaxDashboard = lazy(() => import('./pages/AdminTaxDashboard'));
+// iter482 P6 — Admin Payment Reconciliation dashboard (Stripe processing
+// fee estimated vs recovery vs actual + variance).
+const AdminPaymentReconciliation = lazy(() => import('./pages/admin/AdminPaymentReconciliation'));
 // iter217 Phase 5 Hotfix v5b — Broker Ecosystem
 const AdminBrokersPage = lazy(() => import('./pages/admin/AdminBrokersPage'));
 // iter374 — Admin Landing Page Builder
@@ -798,6 +801,11 @@ const App = () => {
           } />
           <Route path="/admin/tax-dashboard" element={
             <ProtectedRoute><AdminTaxDashboard /></ProtectedRoute>
+          } />
+          {/* iter482 P6 — Admin Payment Reconciliation dashboard. Read-only
+              audit of Stripe processing fees / recovery / variance. */}
+          <Route path="/admin/reconciliation" element={
+            <ProtectedRoute><ErrorBoundary scope="admin-reconciliation"><AdminPaymentReconciliation /></ErrorBoundary></ProtectedRoute>
           } />
           {/* iter316 Phase B — Browser-based Twilio dialer + AI insights */}
           <Route path="/admin/dialer" element={

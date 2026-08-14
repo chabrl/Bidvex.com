@@ -22,6 +22,11 @@ webhook replay, never duplicates).
 The service also resolves the authoritative card-country jurisdiction
 from ``payment_method_details.card.country`` and stores it so admins
 can audit CA-vs-INT charging accuracy.
+
+iter482 P6 completion — On a genuine SHORTFALL the service dispatches
+one idempotent variance email to the admin billing recipients (uses
+the canonical SendGrid dispatcher and ``variance_notification_status``
+flag on the reconciliation doc so webhook retries never re-send).
 """
 
 from __future__ import annotations
@@ -31,6 +36,32 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
+
+
+# Public API-visible status vocabulary (iter482 P6 completion). The
+# internal storage keeps the legacy values (COVERED / SHORTFALL /
+# UNKNOWN / ERROR) for backwards compatibility with existing rows and
+# the summary aggregation; this map is used when a caller (typically
+# the admin dashboard route) wants the P6-canonical vocabulary.
+STATUS_ALIASES: Dict[str, str] = {
+    "COVERED":   "RECONCILED",
+    "SHORTFALL": "SHORTFALL",
+    "UNKNOWN":   "PENDING",
+    "ERROR":     "ERROR",
+}
+
+
+def public_status(internal_status: Optional[str]) -> str:
+    """Translate an internal reconciliation_status to the
+    P6-canonical vocabulary that the admin dashboard consumes.
+
+    Rules:
+      • COVERED   → RECONCILED (recovery covered the actual fee)
+      • SHORTFALL → SHORTFALL  (BidVex is out of pocket)
+      • UNKNOWN   → PENDING    (no BalanceTransaction yet)
+      • ERROR     → ERROR      (Stripe retrieve failed)
+    """
+    return STATUS_ALIASES.get((internal_status or "").upper(), "PENDING")
 
 
 def _get_stripe():
@@ -148,6 +179,29 @@ async def reconcile_payment_intent(db, payment_intent_id: str) -> Optional[Dict[
         f"[reconcile] PI={payment_intent_id} status={status} recovery={recovery_cents}c "
         f"actual={actual_cents}c variance={variance_cents}c country={card_country}"
     )
+
+    # iter482 P6 — idempotent variance notification. Only fires when the
+    # reconciliation ends in SHORTFALL AND the notification has not
+    # already been dispatched for this PI. Webhook replays / repeat
+    # calls into this function are no-ops for the email once the flag
+    # is set.
+    try:
+        if status == "SHORTFALL":
+            row = await db.payment_processing_reconciliation.find_one(
+                {"payment_intent_id": payment_intent_id},
+                {"_id": 0, "variance_notification_status": 1},
+            )
+            if not row or row.get("variance_notification_status") != "SENT":
+                from services.variance_notification_service import (
+                    dispatch_variance_notification,
+                )
+                await dispatch_variance_notification(db, doc)
+    except Exception as _notif_err:  # pragma: no cover — best-effort
+        logger.warning(
+            f"[reconcile] variance notification dispatch failed for "
+            f"PI={payment_intent_id}: {_notif_err}"
+        )
+
     return doc
 
 

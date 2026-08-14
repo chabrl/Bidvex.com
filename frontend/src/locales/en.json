@@ -733,7 +733,7 @@
   },
   "subscription": {
     "subtotal": "Subtotal",
-    "processingFee": "Processing fee",
+    "processingFee": "Payment Processing Fee",
     "paymentSetupPending": "Payment setup pending",
     "cancelAnytime": "Cancel Anytime",
     "instantAccess": "Instant Access"
@@ -2637,7 +2637,7 @@
     "unlockSubtitle": "Pay the BidVex platform fee to reveal the dealer's contact information and proceed with the off-platform transaction.",
     "winningBid": "Your Winning Bid",
     "platformFeeLabel": "Platform Service Fee (2.5%)",
-    "stripeFeeLabel": "Stripe Processing Fee",
+    "stripeFeeLabel": "Payment Processing Fee",
     "totalToPay": "Total to Pay",
     "payAndUnlock": "Pay & Unlock Contact",
     "processing": "Processing…",
@@ -2804,5 +2804,101 @@
     "buyerReviews": "Buyer Reviews",
     "previous": "Previous",
     "next": "Next"
+  },
+  "adminReconciliation": {
+    "title": "Payment Reconciliation",
+    "subtitle": "Audit Stripe processing fees, recoveries, and variance across every card payment.",
+    "cards": {
+      "totalPayments": "Total Stripe Payments",
+      "reconciled": "Reconciled",
+      "variance": "Variance",
+      "shortfall": "Shortfall",
+      "pending": "Pending",
+      "error": "Error",
+      "estimatedTotal": "Estimated Processing Fees",
+      "recoveryTotal": "Processing Fees Recovered",
+      "actualTotal": "Actual Stripe Fees",
+      "varianceTotal": "Total Variance",
+      "shortfallTotal": "Total Shortfall"
+    },
+    "columns": {
+      "paymentIntent": "Payment Intent",
+      "date": "Date",
+      "payerRole": "Payer Role",
+      "cardJurisdiction": "Card Jurisdiction",
+      "estimated": "Estimated",
+      "recovery": "Recovery",
+      "actual": "Actual Stripe Fee",
+      "variance": "Variance",
+      "status": "Status",
+      "reference": "Reference"
+    },
+    "filters": {
+      "status": "Status",
+      "jurisdiction": "Card Jurisdiction",
+      "payerRole": "Payer Role",
+      "dateFrom": "From",
+      "dateTo": "To",
+      "search": "Search",
+      "searchPlaceholder": "Search by Payment Intent, invoice, listing, seller, buyer",
+      "clear": "Clear filters"
+    },
+    "status": {
+      "all": "All",
+      "reconciled": "Reconciled",
+      "variance": "Variance",
+      "shortfall": "Shortfall",
+      "pending": "Pending",
+      "error": "Error"
+    },
+    "jurisdiction": {
+      "all": "All",
+      "domestic": "Canada",
+      "international": "International"
+    },
+    "payerRole": {
+      "all": "All",
+      "buyer": "Buyer",
+      "seller": "Seller",
+      "partner": "Partner",
+      "platform": "Platform"
+    },
+    "detail": {
+      "title": "Reconciliation detail",
+      "paymentIntent": "Payment Intent",
+      "chargeId": "Charge ID",
+      "balanceTxnId": "Balance Transaction",
+      "listing": "Listing / Invoice",
+      "cardCountry": "Card Country",
+      "cardJurisdiction": "Card Jurisdiction",
+      "detectedAt": "Detected at",
+      "estimatedFee": "Estimated Payment Processing Fee",
+      "recoveryFee": "Payment Processing Fee Recovery",
+      "actualFee": "Actual Stripe Processing Fee",
+      "variance": "Processing Fee Variance",
+      "shortfall": "Processing Fee Shortfall",
+      "notificationStatus": "Variance Notification",
+      "notificationSentAt": "Notification Sent At",
+      "close": "Close"
+    },
+    "empty": "No reconciliation records match the current filters.",
+    "loading": "Loading reconciliation ledger…",
+    "loadError": "Unable to load reconciliation ledger.",
+    "loadErrorAuth": "You do not have permission to view this dashboard.",
+    "labels": {
+      "paymentProcessingFee": "Payment Processing Fee",
+      "actualStripeFee": "Actual Stripe Processing Fee",
+      "estimatedFee": "Estimated Payment Processing Fee",
+      "recovery": "Payment Processing Fee Recovery",
+      "processingVariance": "Processing Fee Variance",
+      "processingShortfall": "Processing Fee Shortfall",
+      "paid": "Paid",
+      "pending": "Pending",
+      "reconciled": "Reconciled",
+      "variance": "Variance",
+      "cardJurisdiction": "Card Jurisdiction",
+      "canada": "Canada",
+      "international": "International"
+    }
   }
 }
