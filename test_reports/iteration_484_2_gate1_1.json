@@ -1,0 +1,69 @@
+{
+  "summary": "iter484.2 Gate 1.1 frontend verification: Storage bid form now correctly requires the buyer to check the new `bid-payment-ack-checkbox` (unchecked by default) before Place Bid + quick-bid pills become interactive. The pre-existing Stripe deposit pre-auth notice remains intact and independent. The Accepted Payment Methods card renders the seller's actual accepted list (including `cheque` when configured). Multi-item lot regression passes (ack card + checkbox still visible). Vehicle detail regression verified statically only (no vehicle records exist in preview DB).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_matrix": {
+    "storage_detail_live": {
+      "auction_used": "TEST-iter484-2-gate11 (seeded temporary storage auction, accepted_payment_methods=['stripe','cheque'], deposit_required=false)",
+      "accepted-payment-methods-card-root_visible": true,
+      "apm_method_count": 2,
+      "apm_methods_rendered": ["apm-method-stripe (Stripe Checkout)", "apm-method-cheque (Certified Cheque)"],
+      "bid-payment-ack-checkbox_visible": true,
+      "bid-payment-ack-checkbox_default_unchecked": true,
+      "place-bid-btn_disabled_before_ack_with_valid_amount": true,
+      "quick_bid_pills_disabled_before_ack": {"1x": true, "5x": true, "10x": true},
+      "place-bid-btn_enabled_after_ack": true,
+      "quick_bid_pills_enabled_after_ack": {"1x": true, "5x": true, "10x": true},
+      "storage-bid-deposit-notice_visible": true,
+      "legacy_hardcoded_blurb_present": false
+    },
+    "multi_item_lot_regression": {
+      "url": "/lots/58758582-f53a-46d8-bc0b-87cf9de60523/lot/1",
+      "accepted-payment-methods-card-root_visible": true,
+      "apm_method_count": 4,
+      "bid-payment-ack-checkbox_visible": true,
+      "place_bid_disabled_when_unchecked_screenshot_verified": true,
+      "legacy_hardcoded_blurb_present": false
+    },
+    "vehicle_detail_regression": {
+      "status": "code-inspected only; no vehicles exist in preview DB (GET /api/vehicles total=0)",
+      "code_confirms_AcceptedPaymentMethodsCard_in_Rules_tab": "line 1755 of VehicleDetailPage.js renders <AcceptedPaymentMethodsCard listing={vehicle}/> immediately before <PaymentTermsDisplay/>",
+      "legacy_hardcoded_blurb_removed_from_PaymentTermsDisplay": "verified at /app/frontend/src/components/vehicles/LegalDisclaimers.js lines 158-161 (comment confirms deletion)"
+    },
+    "vehicle_multi_lot_regression": {
+      "status": "code-inspected only; no vehicle events exist in preview DB",
+      "code_confirms_AcceptedPaymentMethodsCard_above_Lot_Queue": "VehicleMultiLotDetailPage.js line 780 renders <AcceptedPaymentMethodsCard listing={event}/>"
+    }
+  },
+  "test_report_links": [
+    "/app/test_reports/iteration_484_2_gate1_1.json"
+  ],
+  "notes_on_review_request_selectors": [
+    "Review request expected `data-testid='storage-quick-bid-*'` — actual testid pattern is `storage-quick-bid-pill-{1x|5x|10x}` (QuickBidButtons component uses `${prefix}-pill-${m}x`). Pills verified with correct testids: disabled BEFORE ack, enabled AFTER ack.",
+    "Review request expected `data-testid='apm-method-prod-verify-2'` — actual pattern is `apm-method-{method_id}` (e.g. `apm-method-stripe`, `apm-method-cheque`). Two methods confirmed on the storage test auction."
+  ],
+  "action_items": [
+    "OPTIONAL: consider seeding a live storage auction and at least one vehicle listing in preview so future testing agents can run Gate 1.1 UI checks without needing a temporary DB insert. All seeded live storage auctions currently have ended (status='no_winner').",
+    "OPTIONAL: update the review-request selector documentation to reference `storage-quick-bid-pill-{Nx}` and `apm-method-{method_id}` so future agents don't chase phantom testids."
+  ],
+  "critical_code_review_comments": [
+    "StorageAuctionDetail.js correctly resets paymentAck on `id` change (line 96) preventing carry-over across auctions — good hygiene.",
+    "Place Bid button uses `disabled={submittingBid || !paymentAck}` (line 497) — correct guard combining submit state and ack.",
+    "handlePlaceBid also enforces ack server-side-of-UI at line 118 — defense-in-depth (toast + early return) beyond the button disable.",
+    "QuickBidButtons receives `disabled={!paymentAck}` (line 423) — pills cannot open the confirm banner while unchecked.",
+    "Legacy hardcoded `payment_methods_accepted` blurb correctly removed from `PaymentTermsDisplay` (LegalDisclaimers.js 158-161).",
+    "No changes touched Stripe/deposit/fee/commission code paths — guardrails respected."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (frontend-only)", "frontend": "100% for storage & multi-item lot; vehicle pages verified via code inspection only"},
+  "test_credentials": "testbuyer@bidvex.com / TestBuyer2026! (successful login)",
+  "seed_data_creation": "Temporarily inserted `TEST-iter484-2-gate11` into `storage_auctions` (status=active, deposit_required=false, accepted_payment_methods=['stripe','cheque'], end_time +1d). Cleaned up after tests (delete_count=1). Script saved at /tmp/seed_storage_test.py.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All Gate 1.1 acceptance criteria pass on Storage detail and the multi-item lot regression. To retest vehicles you must first seed a vehicle listing (none exist in preview DB). No live storage auctions exist either — seed via /tmp/seed_storage_test.py or create a fresh one via admin flow.",
+  "rca of the issue": "N/A — no bugs found."
+}

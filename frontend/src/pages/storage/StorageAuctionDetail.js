@@ -63,6 +63,11 @@ const StorageAuctionDetail = () => {
   const [lastExtendedAt, setLastExtendedAt] = useState(null);
   // iter369 — fullscreen image viewer state (Bug 9 wire-up).
   const [viewerOpen, setViewerOpen] = useState(false);
+  // iter484.2 Gate 1.1 — buyer MUST acknowledge the seller's accepted
+  // payment methods BEFORE submitting a storage bid.  Unchecked by
+  // default; reset on every auction/lot change.  Independent from the
+  // existing deposit acknowledgement (which remains intact).
+  const [paymentAck, setPaymentAck] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -86,6 +91,10 @@ const StorageAuctionDetail = () => {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  // iter484.2 Gate 1.1 — reset payment-method ack when the auction id
+  // changes so buyers can't carry a stale ack across auctions.
+  useEffect(() => { setPaymentAck(false); }, [id]);
+
   // Refresh every 15s for live bid updates
   useEffect(() => {
     const t = setInterval(fetchData, 15000);
@@ -100,6 +109,16 @@ const StorageAuctionDetail = () => {
     }
     if (!token) {
       toast.error(t('storage.detail.signInToPlaceABid'));
+      return;
+    }
+    // iter484.2 Gate 1.1 — Buyer MUST acknowledge accepted payment
+    // methods BEFORE the bid is submitted.  Server-side enforcement
+    // of the method allowlist still runs at checkout via
+    // `assert_selection_allowed`; this is a contractual/UX gate.
+    if (!paymentAck) {
+      toast.error(isFr
+        ? 'Veuillez confirmer que vous comprenez les modes de paiement acceptés avant d\u2019enchérir.'
+        : 'Please acknowledge the accepted payment methods before placing a bid.');
       return;
     }
     // Meta Pixel AddToCart — bid intent (dedupe-safe per session).
@@ -401,6 +420,7 @@ const StorageAuctionDetail = () => {
                       currentBid={auction.current_bid || 0}
                       bidIncrement={auction.bid_increment || 10}
                       loading={submittingBid}
+                      disabled={!paymentAck}
                       onConfirm={async (amount) => {
                         setMaxBid(String(amount));
                         await new Promise(r => setTimeout(r, 30));
@@ -409,6 +429,29 @@ const StorageAuctionDetail = () => {
                       testidPrefix="storage-quick-bid"
                     />
                   </div>
+
+                  {/* iter484.2 Gate 1.1 — Pre-bid Accepted Payment
+                      Methods acknowledgement.  Separate from the
+                      Storage deposit acknowledgement above (which
+                      covers the pre-auth hold).  Bid submit + quick-bid
+                      pills stay disabled until this is checked. */}
+                  <label
+                    className="flex items-start gap-2 text-[11px] leading-snug text-slate-600 dark:text-slate-300 cursor-pointer select-none px-1 py-1 mb-2"
+                    data-testid="storage-payment-ack-label"
+                  >
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 h-3.5 w-3.5 accent-emerald-600 flex-shrink-0"
+                      checked={paymentAck}
+                      onChange={(e) => setPaymentAck(e.target.checked)}
+                      data-testid="bid-payment-ack-checkbox"
+                    />
+                    <span>
+                      {isFr
+                        ? 'Je comprends les modes de paiement acceptés pour cette enchère et j\u2019accepte de compléter le paiement en utilisant l\u2019un des modes approuvés par le vendeur si je gagne.'
+                        : 'I understand the accepted payment methods for this auction and agree to complete payment using one of the seller\u2019s approved methods if I win.'}
+                    </span>
+                  </label>
 
                   <label className="text-xs font-medium mb-1 block">
                     {t('storage.detail.yourBidVotreOffre')} (≥ ${minNext.toFixed(2)})
@@ -451,8 +494,8 @@ const StorageAuctionDetail = () => {
                         }
                         await handlePlaceBid();
                       }}
-                      disabled={submittingBid}
-                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                      disabled={submittingBid || !paymentAck}
+                      className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                       data-testid="place-bid-btn"
                     >
                       {submittingBid ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Gavel className="h-4 w-4 mr-1" /> {t('storage.detail.bidEnchRir')}</>}
