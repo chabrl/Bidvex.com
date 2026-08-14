@@ -35,6 +35,7 @@ import WatchlistButton from '../../components/WatchlistButton';
 import { useMetaPixelTracking } from '../../hooks/useMetaPixelTracking';
 import { TrendingUp } from 'lucide-react';
 import { LangLink } from '../../components/LangLink';
+import AcceptedPaymentMethodsCard from '../../components/AcceptedPaymentMethodsCard';
 
 const API = API_BASE;
 
@@ -481,26 +482,19 @@ const StorageAuctionDetail = () => {
               </p>
             </Card>
 
-            {/* Payment methods */}
-            <Card className="p-4">
-              <p className="text-xs font-semibold mb-2 uppercase tracking-wider">{t('storage.detail.paymentMethodsAccepted')}</p>
-              <div className="flex flex-wrap gap-2 text-xs">
-                {(auction.payment_methods_accepted || []).includes('stripe') && (
-                  <Badge variant="outline"><CreditCard className="h-3 w-3 mr-1" />Stripe</Badge>
-                )}
-                {(auction.payment_methods_accepted || []).includes('cash') && (
-                  <Badge variant="outline"><Banknote className="h-3 w-3 mr-1" />{t('storage.detail.cash')}</Badge>
-                )}
-                {(auction.payment_methods_accepted || []).includes('etransfer') && (
-                  <Badge variant="outline"><Send className="h-3 w-3 mr-1" />E-Transfer</Badge>
-                )}
-              </div>
-              {pricing && (
-                <p className="text-[10px] text-muted-foreground mt-2">
-                  {t('storage.detail.ifStripe29030ProcessingFeeAddedOnTop')}
-                </p>
-              )}
-            </Card>
+            {/* iter484.2 Gate 1 — Accepted Payment Methods parity.
+                Previously rendered 3 hardcoded badges keyed off the
+                LEGACY `payment_methods_accepted` field (wrong name) and
+                missed `cheque` entirely.  Now driven by the canonical
+                `AcceptedPaymentMethodsCard` which honours the
+                snapshot → live → legacy precedence, mirroring the
+                multi-item and single-item detail pages. */}
+            <AcceptedPaymentMethodsCard listing={auction} />
+            {pricing && (
+              <p className="text-[10px] text-center text-muted-foreground -mt-2">
+                {t('storage.detail.ifStripe29030ProcessingFeeAddedOnTop')}
+              </p>
+            )}
 
             <div className="text-[10px] text-center text-muted-foreground">
               <LangLink to="/storage-auctions/terms" className="underline">{t('storage.detail.terms')}</LangLink>

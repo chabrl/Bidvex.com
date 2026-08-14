@@ -18,6 +18,7 @@ import { usePlatformTermsGate } from '../../contexts/PlatformTermsGateContext';
 import SafeImage from '../../components/SafeImage';
 import useVehicleCountdown from '../../hooks/useVehicleCountdown';
 import { extractErrorMessage } from '../../utils/errorHandler';
+import AcceptedPaymentMethodsCard from '../../components/AcceptedPaymentMethodsCard';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -771,6 +772,12 @@ const VehicleMultiLotDetailPage = () => {
           </div>
         </Card>
       )}
+
+      {/* iter484.2 Gate 1 — Vehicle Multi-Lot accepted payment methods.
+          Auction-level (applies to every lot in the event).  Shown
+          above the Lot Queue so buyers see the seller's approved
+          methods before choosing a lot to bid on. */}
+      <AcceptedPaymentMethodsCard listing={event} />
 
       {/* Lot queue — iter418 rebuilt as visual card grid */}
       <Card className="p-4 sm:p-6">

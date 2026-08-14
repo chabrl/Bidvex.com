@@ -155,12 +155,10 @@ export const PaymentTermsDisplay = ({ deadline, penaltyRate = 2 }) => (
         </div>
       </div>
       
-      <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3 text-sm">
-        <p className="text-slate-600 dark:text-slate-400">
-          <strong>Accepted Payment Methods:</strong> Bank transfer, certified cheque, 
-          credit card (subject to processing fee)
-        </p>
-      </div>
+      {/* iter484.2 Gate 1 — The hardcoded methods blurb below was
+          buyer-misleading (it named methods the seller may not accept).
+          Removed; the sibling `AcceptedPaymentMethodsCard` renders the
+          seller's actual accepted list. */}
     </CardContent>
   </Card>
 );

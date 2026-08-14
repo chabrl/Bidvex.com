@@ -53,6 +53,7 @@ import ListingLogisticsDetails from '../../components/ListingLogisticsDetails';
 import MessageSellerModal from '../../components/MessageSellerModal';
 import { MessageSquare, ShieldCheck, Mail, Share2 } from 'lucide-react';
 import VehicleLegalFooter from '../../components/vehicles/VehicleLegalFooter';
+import AcceptedPaymentMethodsCard from '../../components/AcceptedPaymentMethodsCard';
 import VerifiedAuctionFirmBadge from '../../components/VerifiedAuctionFirmBadge';
 import EmailToFriendModal from '../../components/EmailToFriendModal';
 import VehicleBuyerGateModal from '../../components/vehicles/VehicleBuyerGateModal';
@@ -1745,6 +1746,13 @@ const VehicleDetailPage = () => {
                 <AuctionRulesSummary vehicle={vehicle} />
                 <AsIsWhereIsDisclaimer vehicle={vehicle} prominent />
                 <InspectionReminder />
+                {/* iter484.2 Gate 1 — Vehicle Accepted Payment Methods.
+                    Driven by the seller's configured
+                    `vehicle.accepted_payment_methods` (with snapshot
+                    precedence).  Shown BEFORE the generic Payment
+                    Terms card so buyers see seller-approved methods
+                    first, then the payment deadline / penalty terms. */}
+                <AcceptedPaymentMethodsCard listing={vehicle} />
                 <PaymentTermsDisplay />
                 <BindingBidNotice />
                 <PlatformRoleDisclaimer />
