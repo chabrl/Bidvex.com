@@ -54,6 +54,7 @@ import MessageSellerModal from '../../components/MessageSellerModal';
 import { MessageSquare, ShieldCheck, Mail, Share2 } from 'lucide-react';
 import VehicleLegalFooter from '../../components/vehicles/VehicleLegalFooter';
 import AcceptedPaymentMethodsCard from '../../components/AcceptedPaymentMethodsCard';
+import VehicleReserveBadge from '../../components/vehicles/VehicleReserveBadge';
 import VerifiedAuctionFirmBadge from '../../components/VerifiedAuctionFirmBadge';
 import EmailToFriendModal from '../../components/EmailToFriendModal';
 import VehicleBuyerGateModal from '../../components/vehicles/VehicleBuyerGateModal';
@@ -493,20 +494,15 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
             </div>
           </div>
           
-          {/* Reserve Status */}
-          {vehicle?.reserve_price && (
-            <div className={`p-3 rounded-lg ${reserveMet || vehicle?.reserve_met ? 'bg-green-50 border border-green-200' : 'bg-yellow-50 border border-yellow-200'}`}>
-              {reserveMet || vehicle?.reserve_met ? (
-                <p className="text-green-700 font-medium flex items-center gap-2">
-                  <CheckCircle className="h-5 w-5" /> Reserve Met
-                </p>
-              ) : (
-                <p className="text-yellow-700 font-medium flex items-center gap-2">
-                  <AlertTriangle className="h-5 w-5" /> Reserve Not Met
-                </p>
-              )}
-            </div>
-          )}
+          {/* iter484.2 Gate 2 — Buyer-facing reserve status.
+              Renders "No Reserve" / "Reserve Met" / "Reserve Not Met"
+              ONLY.  The raw reserve amount is masked server-side and
+              is never available on the frontend. */}
+          <VehicleReserveBadge
+            doc={vehicle}
+            variant="card"
+            reserveMetRealtime={reserveMet}
+          />
           
           {/* iter285 — Bug 4 — Provincial registration eligibility for buyers.
               Renders below the bid panel so a buyer sees whether they can
@@ -1227,7 +1223,16 @@ const VehicleDetailPage = () => {
               <TitleStatusBadge status={vehicle.title_status} />
               <RunningStatusBadge isRunning={vehicle.condition_report?.is_running} />
               <VINVerifiedBadge vin={vehicle.vin} vinData={vehicle.vin_data} />
-              {!vehicle.reserve_price && <NoReserveBadge />}
+              {/* iter484.2 Gate 2 — Buyer-safe reserve chip.  Replaces
+                  the old `!vehicle.reserve_price && <NoReserveBadge/>`
+                  branch which relied on the leaked amount.  Uses the
+                  masked backend `reserve_met` boolean (no realtime hook
+                  needed at this scope; the sidebar Bid Panel already
+                  wires the WebSocket update via BiddingPanel). */}
+              <VehicleReserveBadge
+                doc={vehicle}
+                variant="chip"
+              />
               {/* iter304 — "Email to a Friend" share button */}
               <Button
                 size="sm"
@@ -1848,9 +1853,10 @@ const VehicleDetailPage = () => {
               </CardContent>
             </Card>
             
-            {/* Reserve Status */}
-            <ReserveStatusDisplay 
-              hasReserve={!!vehicle.reserve_price} 
+            {/* Reserve Status — iter484.2 Gate 2 uses masked
+                boolean `has_reserve` (raw amount no longer available). */}
+            <ReserveStatusDisplay
+              hasReserve={!!vehicle.has_reserve}
               reserveMet={vehicle.reserve_met}
               prominent
             />

@@ -68,6 +68,7 @@ from services.vehicle_auction_handler import (
     run_auction_scheduler
 )
 from services.vehicle_payment import get_payment_service
+from services.reserve_price_gate import mask_reserve_for_buyer
 from services.seller_documents import (
     create_seller_document,
     get_seller_documents,
@@ -1372,7 +1373,7 @@ async def list_vehicles(
         )
 
     return {
-        "vehicles": all_vehicles,
+        "vehicles": [mask_reserve_for_buyer(v) for v in all_vehicles],
         "total": _final,
         "page": page,
         "pages": (_final + limit - 1) // limit
@@ -1460,7 +1461,7 @@ async def get_vehicle_detail(vehicle_id: str, request: Request):
             listing["seller"] = seller
             # Increment view count in listings collection
             await db.listings.update_one({"id": vehicle_id}, {"$inc": {"views": 1}})
-            return listing
+            return mask_reserve_for_buyer(listing)
     
     if not listing:
         raise HTTPException(status_code=404, detail="Vehicle not found")
@@ -1499,8 +1500,12 @@ async def get_vehicle_detail(vehicle_id: str, request: Request):
         {"_id": 0, "id": 1, "bidder_name": 1, "amount": 1, "created_at": 1}
     ).sort("created_at", -1).limit(20).to_list(length=20)
     listing["recent_bids"] = bids
-    
-    return listing
+
+    # iter484.2 Gate 2 — Buyer-safe reserve masking.  Strips the raw
+    # reserve_price amount and emits `has_reserve` + `reserve_state`
+    # (none | met | not_met).  Admin surfaces read the raw amount via
+    # `/api/vehicle-admin/*` endpoints which are unaffected.
+    return mask_reserve_for_buyer(listing)
 
 
 # iter286 — Bug 5 — Broker-gated Carfax / inspection report endpoint.

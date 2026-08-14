@@ -26,6 +26,7 @@ from models.vehicle_multi_lot_models import (
     MultiLotAuctionCreate, MultiLotBidCreate,
     MultiLotEventStatus, MultiLotItemStatus, MultiLotTimingMode,
 )
+from services.reserve_price_gate import mask_reserve_for_buyer
 
 logger = logging.getLogger("vehicle_multi_lot")
 security = HTTPBearer(auto_error=False)
@@ -95,7 +96,13 @@ def _now() -> datetime:
 
 
 def _serialise(event: dict) -> dict:
-    """Strip Mongo `_id` + coerce datetimes for JSON serialisation."""
+    """Strip Mongo `_id` + coerce datetimes for JSON serialisation.
+
+    iter484.2 Gate 2 — Also masks the raw ``reserve_price`` amount on
+    every lot and emits ``has_reserve`` + ``reserve_state`` for buyer
+    consumption.  Admin surfaces read the raw amount via
+    ``/api/admin/*`` endpoints, which are unaffected.
+    """
     if not event:
         return event
     event.pop("_id", None)
@@ -103,12 +110,17 @@ def _serialise(event: dict) -> dict:
         v = event.get(key)
         if isinstance(v, datetime):
             event[key] = v.isoformat()
+    masked_lots = []
     for lot in event.get("lots", []) or []:
         for key in ("start_time", "end_time"):
             v = lot.get(key)
             if isinstance(v, datetime):
                 lot[key] = v.isoformat()
-    return event
+        masked_lots.append(mask_reserve_for_buyer(lot))
+    if "lots" in event:
+        event["lots"] = masked_lots
+    # Also mask any auction-level reserve (rare, but future-proof).
+    return mask_reserve_for_buyer(event)
 
 
 # ── CREATE ───────────────────────────────────────────────────────────

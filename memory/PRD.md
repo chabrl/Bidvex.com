@@ -1,5 +1,78 @@
 # BidVex — Auction Marketplace PRD
 
+## iter484.2 Gate 2 — Vehicle Reserve UI + Security Masking (Feb 14, 2026) ✅ SHIPPED · PREVIEW ONLY
+
+### Delivered
+**Backend security masking (raw amount never leaves the server):**
+- `services/reserve_price_gate.py`: added `mask_reserve_for_buyer()` and
+  `mask_reserve_for_buyer_with_lots()`. Strips `reserve_price` from
+  the doc; emits `has_reserve` (bool), `reserve_state` (one of
+  `none | met | not_met`), preserves `reserve_met`.
+- `routes/vehicles.py::list_vehicles` + `get_vehicle_detail` return
+  masked payloads.
+- `routes/vehicle_multi_lot.py::_serialise` masks every lot in the
+  event (and the top-level in case of future auction-level reserve).
+- Admin endpoints (`/api/vehicle-admin/*`, `/api/admin/*`) unaffected —
+  admin still sees the raw amount for edit workflows.
+
+**Frontend — `<VehicleReserveBadge>` (bilingual EN/FR, 3 states):**
+- New: `/app/frontend/src/components/vehicles/VehicleReserveBadge.jsx`
+  - Reads `doc.reserve_state` → falls back to `has_reserve + reserve_met`.
+  - Chip + card variants.
+  - Test IDs: `vehicle-reserve-badge`, `vehicle-reserve-badge-{none|met|not_met|set}`.
+- Wired on: vehicle detail (trust-badges row + bid-sidebar card),
+  vehicle multi-lot detail (active lot header + lot queue thumbnails),
+  vehicle listing card in browse (three-state chip).
+- Reserve UI scope: **vehicles only** — storage / liquidation / general /
+  non-vehicle multi-item unchanged.
+
+**Guardrails held:**
+- ✅ Zero changes to auction-close settlement / reserve calculation
+  (`is_reserve_met` bit-for-bit unchanged).
+- ✅ Zero changes to bid math / Stripe / fees / commissions / tax /
+  escrow / payout.
+- ✅ Buyer response now NEVER contains `reserve_price`.
+- ✅ 181 pytest passing (was 165) — 10 new gate2 unit tests + 6 API
+  masking tests added by the testing agent.
+
+**Testing evidence:**
+- Testing agent — first pass caught a `reserveMet` scoping bug on
+  VehicleDetailPage trust-badges row → fixed by removing the
+  out-of-scope `reserveMetRealtime` prop.
+- Testing agent retest — 100% pass. All 3 seed vehicles render the
+  correct chip/card state, no ErrorBoundary, no dollar amount in DOM.
+- Seed script: `/app/backend/scripts/seed_iter484_2_gate2_vehicles.py`
+  produces 3 vehicles + 1 VML event covering `none | not_met | met`.
+
+**Test reports:**
+- `/app/test_reports/iteration_484_2_gate2.json` (first pass, caught the bug)
+- `/app/test_reports/iteration_484_2_gate2_retest.json` (100% pass)
+
+**Follow-ups:**
+- Realtime `reserveMet` propagation for the trust-badges chip is NOT
+  wired — only the bid-sidebar card gets live updates via `BiddingPanel`
+  → `useVehicleBidding`. Acceptable because the chip has authoritative
+  data on GET; page refreshes when the reserve is crossed. If realtime
+  chip updates are wanted later, hoist the `useVehicleBidding` hook
+  to VehicleDetailPage scope.
+
+---
+
+## iter484.2 Gate 1.1 — Storage Bid Payment-Method Ack (Feb 14, 2026) ✅ SHIPPED
+
+- New `data-testid='bid-payment-ack-checkbox'` on Storage bid form
+  (unchecked by default; blocks bid submit until checked).
+- Bilingual copy identical to marketplace/multi-item.
+- Uses `resolveAcceptedMethods` (snapshot-first precedence). No hardcoded methods.
+- Existing Storage deposit pre-auth notice remains intact.
+- 103 core pytest green (zero backend touches).
+
+## iter484.2 Gate 1 — Payment-Method Parity (Storage + Vehicle + VML) (Feb 14, 2026) ✅ SHIPPED
+
+- Storage detail: replaced broken 3-badge card (legacy field name) with `AcceptedPaymentMethodsCard`.
+- Vehicle detail: wired `AcceptedPaymentMethodsCard` into Rules tab; removed hardcoded "Bank transfer, certified cheque, credit card" blurb.
+- Vehicle multi-lot detail: wired card above the Lot Queue.
+
 ## iter484.2 — Payment Methods Buyer-UI Defect Fix + iter484.1 Reserve Badge Revert (Feb 14, 2026) ✅ SHIPPED · PREVIEW ONLY
 
 ### User-reported bug (root cause)

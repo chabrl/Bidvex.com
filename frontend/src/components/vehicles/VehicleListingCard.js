@@ -81,8 +81,10 @@ const VehicleListingCard = ({ vehicle, countdown, onClick, onQuickView, compact 
   const isFeatured = !!vehicle.is_featured;
   const isEndingSoon = countdown?.critical && !countdown?.ended;
   const isLive = vehicle.auction_type === 'live' && !countdown?.ended;
-  const noReserve = !vehicle.reserve_price || vehicle.reserve_price === 0;
-  const reserveMet = vehicle.reserve_met === true;
+  // iter484.2 Gate 2 — Reserve reads use the masked buyer-safe
+  // fields (`has_reserve` + `reserve_state`), never the raw amount.
+  const noReserve = !vehicle.has_reserve;
+  const reserveMet = vehicle.reserve_state === 'met' || vehicle.reserve_met === true;
   const titleStatus = vehicle.title_status; // clean | salvage | rebuilt | etc.
   const dealerVerified = vehicle.seller?.verification_status === 'approved' ||
                          vehicle.seller?.dealer_license_verified === true;
@@ -262,15 +264,31 @@ const VehicleListingCard = ({ vehicle, countdown, onClick, onQuickView, compact 
             </span>
           )}
           {noReserve && (
-            <span className="inline-flex items-center gap-1 rounded-md bg-purple-600 text-white text-[10px] font-bold uppercase tracking-wider px-2 py-1 shadow">
+            <span
+              className="inline-flex items-center gap-1 rounded-md bg-purple-600 text-white text-[10px] font-bold uppercase tracking-wider px-2 py-1 shadow"
+              data-testid="vehicle-listing-card-no-reserve"
+            >
               <Award className="h-3 w-3" />
               {t('vehicleCard.noReserve', 'No reserve')}
             </span>
           )}
           {reserveMet && (
-            <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500 text-white text-[10px] font-bold uppercase tracking-wider px-2 py-1 shadow">
+            <span
+              className="inline-flex items-center gap-1 rounded-md bg-emerald-500 text-white text-[10px] font-bold uppercase tracking-wider px-2 py-1 shadow"
+              data-testid="vehicle-listing-card-reserve-met"
+            >
               <CheckCircle className="h-3 w-3" />
               {t('vehicleCard.reserveMet', 'Reserve met')}
+            </span>
+          )}
+          {/* iter484.2 Gate 2 — third state: Reserve set but not yet met */}
+          {!noReserve && !reserveMet && (
+            <span
+              className="inline-flex items-center gap-1 rounded-md bg-amber-500 text-white text-[10px] font-bold uppercase tracking-wider px-2 py-1 shadow"
+              data-testid="vehicle-listing-card-reserve-not-met"
+            >
+              <AlertTriangle className="h-3 w-3" />
+              {t('vehicleCard.reserveNotMet', 'Reserve not met')}
             </span>
           )}
         </div>

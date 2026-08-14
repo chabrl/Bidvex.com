@@ -19,6 +19,7 @@ import SafeImage from '../../components/SafeImage';
 import useVehicleCountdown from '../../hooks/useVehicleCountdown';
 import { extractErrorMessage } from '../../utils/errorHandler';
 import AcceptedPaymentMethodsCard from '../../components/AcceptedPaymentMethodsCard';
+import VehicleReserveBadge from '../../components/vehicles/VehicleReserveBadge';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -653,19 +654,10 @@ const VehicleMultiLotDetailPage = () => {
                 <Car className="h-5 w-5 text-blue-600" />
                 <h2 className="text-xl font-semibold">Lot #{activeLot.lot_number} — {activeLot.title}</h2>
                 <StatusBadge status={activeLot.status} />
-                {activeLot.reserve_price > 0 && (
-                  Number(activeLot.current_bid) >= Number(activeLot.reserve_price) ? (
-                    <Badge data-testid="reserve-met-badge"
-                      className="bg-green-100 text-green-800 border border-green-300">
-                      ✓ Reserve Met
-                    </Badge>
-                  ) : (
-                    <Badge data-testid="reserve-not-met-badge"
-                      className="bg-slate-100 text-slate-600 border border-slate-300">
-                      Reserve Not Met
-                    </Badge>
-                  )
-                )}
+                {/* iter484.2 Gate 2 — Reserve chip driven by masked
+                    `has_reserve` + `reserve_state` fields.  Never
+                    reveals the raw amount. */}
+                <VehicleReserveBadge doc={activeLot} variant="chip" />
                 {/* iter295 — deposit lock icon on active lot */}
                 {activeLot.status === 'live' && (
                   depositMap[activeLot.id]
@@ -795,8 +787,9 @@ const VehicleMultiLotDetailPage = () => {
             const c = lot.end_time ? formatCountdown(lot.end_time) : null;
             const isLive = lot.status === 'live';
             const isUpcoming = lot.status === 'upcoming';
-            const hasReserve = Number(lot.reserve_price) > 0;
-            const reserveMet = hasReserve && Number(lot.current_bid) >= Number(lot.reserve_price);
+            // iter484.2 Gate 2 — VehicleReserveBadge is the single
+            // source of truth for the buyer-visible reserve state.
+            // The raw amount is masked on the API.
             return (
               <div
                 key={lot.id}
@@ -885,23 +878,11 @@ const VehicleMultiLotDetailPage = () => {
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                    {hasReserve && (
-                      reserveMet ? (
-                        <Badge
-                          className="bg-green-100 text-green-800 border border-green-300 text-[10px]"
-                          data-testid={`lot-card-reserve-met-${lot.lot_number}`}
-                        >
-                          ✓ Reserve Met
-                        </Badge>
-                      ) : (
-                        <Badge
-                          className="bg-slate-100 text-slate-600 border border-slate-300 text-[10px]"
-                          data-testid={`lot-card-reserve-not-met-${lot.lot_number}`}
-                        >
-                          Reserve Not Met
-                        </Badge>
-                      )
-                    )}
+                    {/* iter484.2 Gate 2 — Reserve chip on lot queue
+                        thumbnail.  Data-driven by masked has_reserve /
+                        reserve_state.  Raw amount is not available on
+                        the client any more. */}
+                    <VehicleReserveBadge doc={lot} variant="chip" hideWhenNone />
                     {depositMap[lot.id] ? (
                       <span
                         className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-700"

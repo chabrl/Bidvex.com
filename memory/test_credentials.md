@@ -259,3 +259,25 @@ Admin reconciliation ledger:
 - `GET /api/admin/stripe-reconciliation/{payment_intent_id}` (single row)
 Admin credential: `charbel911@gmail.com / Anderosli123!@#`
 
+
+## 🆕 iter484.2 Gate 2 — Vehicle Reserve UI Seed (Feb 14, 2026)
+Seeded via `python -m scripts.seed_iter484_2_gate2_vehicles` from
+`/app/backend/` (idempotent — safe to re-run).
+
+Three vehicles covering every buyer-facing reserve state on the
+`vehicle_listings` collection.  Backend `mask_reserve_for_buyer()`
+strips the raw amount from every buyer response.
+
+- `iter484-2-gate2-no-reserve`      — no reserve   (reserve_state="none",    has_reserve=false, reserve_met=false)
+- `iter484-2-gate2-reserve-not-met` — reserve set  (reserve_state="not_met", has_reserve=true,  reserve_met=false, DB reserve=$25 000)
+- `iter484-2-gate2-reserve-met`     — reserve met  (reserve_state="met",     has_reserve=true,  reserve_met=true,  DB reserve=$20 000)
+
+Vehicle multi-lot event `iter484-2-gate2-vml-event` with 3 lots for
+the same states (Lot #1 none, Lot #2 not_met, Lot #3 met).
+
+Test dealer/seller: `iter484-2-gate2-seed-seller` (approved, dealer,
+QC, license number `TEST-GATE2`).
+
+The seed script also confirms the buyer response NEVER contains
+`reserve_price`.  Use with the seeded admin `charbel911@gmail.com` to
+verify the mask via `curl "$API/api/vehicles/{id}"`.
