@@ -1,6 +1,49 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter482 SEC-001 & SEC-002 — Security Hardening (Feb 15, 2026) ✅ SHIPPED · PREVIEW ONLY
+
+### Delivered — narrow security patch, no billing/tax/Stripe/escrow touch
+
+**SEC-001 · `POST /api/notifications/create` — DELETED**
+- Endpoint was unauthenticated + accepted client-chosen `user_id`, allowing arbitrary phishing notifications into any user's feed (confirmed by prior audit probe).
+- Root-cause investigation: **zero legitimate HTTP callers** in the backend. All 60+ internal notification-creation flows use `services.notifications_i18n.create_notification()` in-process. HTTP endpoint was orphaned attack surface.
+- **Fix action:** endpoint deleted entirely (not just auth-gated) — hardened-but-unused endpoints are attack surface waiting for the next auth regression. Admin-driven creation goes exclusively through the pre-existing `POST /api/notifications/admin/send` (authenticated + admin-gated).
+- Downstream cleanups: `notification_test.py` QA harness patched to use `/admin/send`; `test_iter217_phase2_admin_watchlist_badges.py` re-pointed at surviving handler.
+
+**SEC-002 · `POST /api/auth/admin-force-sync` — DELETED**
+- Endpoint reset any account's password when the caller supplied a header equal to `JWT_SECRET` (shared-secret bypass, plain `!=` compare, not real auth).
+- **Fix action:** endpoint deleted entirely. Proper admin-driven password reset already exists via `/api/admin/users/{user_id}/force-password-reset` behind real admin auth.
+- Codebase re-scanned for residual shared-secret comparisons: **none** — no `hmac.compare_digest` migration needed.
+- **`JWT_SECRET` rotation recommended** for LIVE launch — flagged, not executed (rotation is a LIVE-env action outside this patch).
+
+**SEC-001 XSS boundary (read-only investigation only, no fix):**
+- Grep'd all four notification-rendering surfaces (`NotificationCenter.js`, `NotificationDetailModal.jsx`, `NotificationsPage.jsx`, `admin/NotificationBell.jsx`) — **zero** uses of `dangerouslySetInnerHTML` / `innerHTML`. Title/message render as escaped React text.
+- **Verdict:** SEC-001 was a phishing/spoofing/DB-flood vector only, **not** a stored-XSS vector.
+
+### Regression coverage
+New file `backend/tests/iter482/test_security_hardening.py` — 9 tests, all passing:
+- Anonymous + admin-token POSTs to deleted `/notifications/create` → not 200 (404/405); DB not written.
+- Surviving `/notifications/admin/send` — anonymous rejected (401/403), non-admin rejected (403), admin succeeds (200, `sent_count=1`).
+- Anonymous + sync-key-carrying POSTs to deleted `/admin-force-sync` → not 200 (404/405).
+- Source-level guards preventing accidental reintroduction of either handler.
+- **Full iter482 suite:** 82 tests pass. One pre-existing failure (`test_p61_real_stripe_reconciliation` — invalid Stripe TEST key in `.env`) confirmed to have been failing **before** this patch.
+- **QA harness runtime proof:** live curl E2E against preview backend using real admin + seeded testbuyer — `admin/send` accepts patched payload, notification appears in buyer's feed with all required fields, cleaned up afterwards.
+
+### Files changed
+- `backend/routes/notifications.py` (−32 lines, delete `POST /notifications/create`)
+- `backend/routes/auth.py` (−45 lines, delete `POST /admin-force-sync`)
+- `backend/tests/test_iter217_phase2_admin_watchlist_badges.py` (re-point action_url schema test at surviving endpoint)
+- `notification_test.py` (3 call sites → `/admin/send`, credentials updated)
+- `backend/tests/iter482/test_security_hardening.py` (NEW, 9 tests)
+- `docs/ITER482_SECURITY_HARDENING_REPORT.md` (NEW, full before/after report)
+
+### Guardrails held
+- ✅ Zero touch to billing / tax / fee / commission / Stripe / escrow / invoice / receipt code.
+- ✅ Zero changes to any calculator; exact-cent test regime preserved.
+- ✅ Preview only. No deploy.
+
+
 ## iter482 P6.2 — Reconciliation Gate + Production-Safe Variance Routing (Feb 14, 2026) ✅ SHIPPED · PREVIEW ONLY
 
 ### Delivered

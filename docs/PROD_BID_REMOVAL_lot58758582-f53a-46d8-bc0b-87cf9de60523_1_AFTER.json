@@ -1,0 +1,22 @@
+{
+  "when": "2026-08-15T03:14:49.835136+00:00",
+  "listing_id": "58758582-f53a-46d8-bc0b-87cf9de60523",
+  "lot_number": 1,
+  "after": {
+    "lot_bid_row_present": false,
+    "auto_bid_row_present": false,
+    "lot_inline_fields": {
+      "lot_number": 1,
+      "starting_price": 2.0,
+      "current_price": 2.0,
+      "bid_count": 0,
+      "highest_bidder_id": null,
+      "has_reserve": null,
+      "reserve_price": 70.0,
+      "reserve_met": null,
+      "lot_status": "active",
+      "lot_end_time": "2026-08-21T20:01:00+00:00"
+    }
+  },
+  "verification_matches_clean_pattern": true
+}

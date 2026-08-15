@@ -221,38 +221,12 @@ async def delete_notification(notification_id: str, current_user: User = Depends
     return {"success": True}
 
 
-@notifications_router.post("/notifications/create")
-async def create_notification(
-    user_id: str,
-    notification_type: str,
-    title: str,
-    message: str,
-    data: Optional[dict] = None,
-    action_url: Optional[str] = None,
-    action_type: Optional[str] = None,
-):
-    """Create a notification (internal use / admin).
-
-    iter217 — `action_url` is the click-through destination (relative SPA
-    path like `/lots/<id>` or an absolute URL). `action_type` is a hint
-    (e.g. "navigate", "external", "modal") used by the NotificationCenter.
-    """
-    db = get_db()
-    notification = {
-        "id": str(uuid.uuid4()),
-        "user_id": user_id,
-        "type": notification_type,
-        "title": title,
-        "message": message,
-        "data": data or {},
-        "action_url": action_url,
-        "action_type": action_type or ("navigate" if action_url else None),
-        "read": False,
-        "created_at": datetime.now(timezone.utc).isoformat()
-    }
-    await db.notifications.insert_one(notification)
-    notification.pop("_id", None)
-    return notification
+# iter482 SEC-001 — The former unauthenticated `POST /api/notifications/create`
+# endpoint has been REMOVED. It had zero legitimate runtime callers (all internal
+# notification flows use `services.notifications_i18n.create_notification()` in
+# process). Admin-driven notification creation now goes exclusively through
+# `POST /api/notifications/admin/send` below, which requires an authenticated
+# admin session. Do NOT reintroduce a public creation endpoint.
 
 
 # ─── iter266 Mission 3 — Admin: send notification with optional attachment request ──

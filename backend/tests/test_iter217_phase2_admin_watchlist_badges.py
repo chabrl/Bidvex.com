@@ -129,13 +129,17 @@ class TestBulkEnrichment:
 # Bug 8 — Notifications: action_url / action_type plumbing
 # ────────────────────────────────────────────────────────────────────────
 class TestNotificationActionUrlSchema:
-    def test_notifications_create_accepts_action_url(self):
-        # Import lazily so we can introspect the function signature.
+    def test_notifications_admin_send_accepts_action_url(self):
+        # iter482 SEC-001 — the former unauthenticated `create_notification`
+        # HTTP endpoint was removed. Admin-driven creation now goes through
+        # `admin_send_notification`, which accepts `action_url` / `cta_url`
+        # via the payload dict. We inspect its source to confirm the schema
+        # guarantee is preserved on the surviving endpoint.
         import inspect
-        from routes.notifications import create_notification
-        sig = inspect.signature(create_notification)
-        assert "action_url" in sig.parameters
-        assert "action_type" in sig.parameters
+        from routes.notifications import admin_send_notification
+        src = inspect.getsource(admin_send_notification)
+        assert '"action_url"' in src, "admin_send_notification must persist action_url"
+        assert '"cta_url"' in src, "admin_send_notification must accept cta_url"
 
     def test_cleanup_endpoint_exists(self):
         import inspect

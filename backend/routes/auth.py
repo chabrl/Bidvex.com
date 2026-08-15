@@ -1248,52 +1248,16 @@ async def force_reset_password(request: Request):
 
 
 
-@auth_router.post("/admin-force-sync")
-async def admin_force_password_sync(request: Request):
-    """
-    One-time admin password sync endpoint.
-    Uses the EXACT same hash_password() as login verification.
-    Requires a secret header to prevent abuse.
-    """
-    body = await request.json()
-    email = body.get("email", "").strip().lower()
-    new_password = body.get("new_password", "")
-    sync_key = request.headers.get("X-Sync-Key", "")
-
-    # Require the JWT_SECRET as the sync key to prevent abuse
-    if sync_key != JWT_SECRET:
-        raise HTTPException(status_code=403, detail="Invalid sync key")
-
-    if not email or not new_password:
-        raise HTTPException(status_code=400, detail="Email and new_password required")
-
-    user_doc = await db.users.find_one({"email": email}, {"_id": 0})
-    if not user_doc:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    # Hash with the EXACT same function used in login verification
-    hashed = hash_password(new_password)
-
-    # Verify roundtrip immediately
-    if not verify_password(new_password, hashed):
-        raise HTTPException(status_code=500, detail="CRITICAL: Hash roundtrip failed")
-
-    await db.users.update_one(
-        {"email": email},
-        {"$set": {
-            "password": hashed,
-            "password_changed_at": datetime.now(timezone.utc).isoformat()
-        }}
-    )
-
-    # Clear any brute force blocks
-    from services.brute_force import reset_failures, unblock_ip
-    client_ip = get_client_ip(request)
-    await reset_failures(client_ip)
-
-    logger.info(f"[AUTH_DEBUG] Admin force-sync completed for '{email}' — hash starts with: {hashed[:10]}")
-    return {"success": True, "message": f"Password synced for {email}. Hash verified."}
-
+# iter482 SEC-002 — The former `POST /api/auth/admin-force-sync` endpoint has
+# been REMOVED. It reset any account's password when the caller supplied a
+# header equal to JWT_SECRET (a shared-secret bypass, not real auth). Proper
+# admin-driven password resets already exist via
+# `POST /api/admin/users/{user_id}/force-password-reset` which requires an
+# authenticated admin session. Do NOT reintroduce shared-secret backdoors.
+# NOTE: JWT_SECRET rotation is RECOMMENDED given this endpoint accepted it
+# as an out-of-band auth secret; rotation must be performed against the
+# LIVE environment (invalidates all sessions/tokens) and is outside the
+# scope of this patch.
 
 
 # ============= EMAIL CHANGE WITH VERIFICATION (Law 25 Compliance) =============

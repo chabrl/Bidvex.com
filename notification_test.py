@@ -12,8 +12,10 @@ from typing import Dict, Any, Optional
 
 # Configuration
 BASE_URL = "https://prod-verify-2.preview.emergentagent.com/api"
-ADMIN_EMAIL = "admin@bazario.com"
-ADMIN_PASSWORD = "Admin123!"
+# iter482 SEC-001 — updated stale credentials (were `admin@bazario.com` from
+# the pre-BidVex rebrand). Sourced from /app/memory/test_credentials.md.
+ADMIN_EMAIL = "charbel911@gmail.com"
+ADMIN_PASSWORD = "Anderosli123!@#"
 
 class BidVexNotificationTester:
     def __init__(self):
@@ -135,46 +137,69 @@ class BidVexNotificationTester:
             return False
             
     async def test_create_notification_manually(self) -> bool:
-        """Test creating a notification manually using internal endpoint"""
-        print("\n🧪 Testing manual notification creation...")
-        
+        """Test creating a notification manually via the admin-only endpoint.
+
+        iter482 SEC-001 — the former unauthenticated
+        `POST /api/notifications/create` was removed. Admin-driven
+        creation now goes exclusively through `/notifications/admin/send`,
+        which requires an authenticated admin session.
+        """
+        print("\n🧪 Testing manual notification creation (admin/send)...")
+
         try:
-            # Create a test notification using query parameters
-            params = {
+            # JSON body (not query params) — admin/send takes a payload dict.
+            payload = {
                 "user_id": self.test_user_id,
-                "notification_type": "test",
+                "type": "test",
                 "title": "Test Notification",
-                "message": "This is a test notification for the notification center"
+                "body": "This is a test notification for the notification center",
             }
-            
+
             async with self.session.post(
-                f"{BASE_URL}/notifications/create",
-                params=params,
+                f"{BASE_URL}/notifications/admin/send",
+                json=payload,
                 headers=self.get_admin_headers()
             ) as response:
                 if response.status == 200:
                     data = await response.json()
-                    
+
+                    # admin/send returns {success: True, sent_count: N}. Fetch the
+                    # just-inserted row from the recipient's feed to validate shape.
+                    assert data.get("success") is True, "success should be True"
+                    assert data.get("sent_count") == 1, "sent_count should be 1"
+
+                    async with self.session.get(
+                        f"{BASE_URL}/notifications?limit=5",
+                        headers=self.get_user_headers()
+                    ) as feed_response:
+                        feed = await feed_response.json()
+                        notifications = feed if isinstance(feed, list) else feed.get("notifications", [])
+                        created = next(
+                            (n for n in notifications
+                             if n.get("type") == "test" and n.get("title") == "Test Notification"),
+                            None,
+                        )
+                        assert created is not None, "Newly created notification not found in feed"
+
                     # Verify notification structure
-                    required_fields = ["id", "user_id", "type", "title", "message", "data", "read", "created_at"]
+                    required_fields = ["id", "user_id", "type", "title", "message", "read", "created_at"]
                     for field in required_fields:
-                        assert field in data, f"Missing required field: {field}"
-                    
+                        assert field in created, f"Missing required field: {field}"
+
                     # Verify field values
-                    assert data["user_id"] == self.test_user_id, "Incorrect user_id"
-                    assert data["type"] == "test", "Incorrect notification type"
-                    assert data["title"] == "Test Notification", "Incorrect title"
-                    assert data["read"] == False, "Notification should be unread initially"
-                    assert isinstance(data["data"], dict), "Data should be a dictionary"
-                    
-                    self.test_notification_id = data["id"]
-                    
-                    print(f"✅ Notification created successfully")
-                    print(f"   - ID: {data['id']}")
-                    print(f"   - Type: {data['type']}")
-                    print(f"   - Title: {data['title']}")
-                    print(f"   - Read: {data['read']}")
-                    
+                    assert created["user_id"] == self.test_user_id, "Incorrect user_id"
+                    assert created["type"] == "test", "Incorrect notification type"
+                    assert created["title"] == "Test Notification", "Incorrect title"
+                    assert created["read"] == False, "Notification should be unread initially"
+
+                    self.test_notification_id = created["id"]
+
+                    print(f"✅ Notification created successfully via admin/send")
+                    print(f"   - ID: {created['id']}")
+                    print(f"   - Type: {created['type']}")
+                    print(f"   - Title: {created['title']}")
+                    print(f"   - Read: {created['read']}")
+
                     return True
                 else:
                     print(f"❌ Failed to create notification: {response.status}")
@@ -297,17 +322,17 @@ class BidVexNotificationTester:
         print("\n🧪 Testing POST /api/notifications/mark-all-read...")
         
         try:
-            # First create another unread notification
-            params = {
+            # First create another unread notification via the admin/send endpoint.
+            payload = {
                 "user_id": self.test_user_id,
-                "notification_type": "test2",
+                "type": "test2",
                 "title": "Second Test Notification",
-                "message": "This is another test notification"
+                "body": "This is another test notification",
             }
-            
+
             async with self.session.post(
-                f"{BASE_URL}/notifications/create",
-                params=params,
+                f"{BASE_URL}/notifications/admin/send",
+                json=payload,
                 headers=self.get_admin_headers()
             ) as create_response:
                 if create_response.status != 200:
@@ -404,37 +429,51 @@ class BidVexNotificationTester:
             return False
             
     async def test_outbid_notification_creation(self) -> bool:
-        """Test outbid notification structure and creation (simplified)"""
+        """Test outbid notification structure and creation (simplified).
+
+        iter482 SEC-001 — uses the admin-only `/notifications/admin/send`.
+        """
         print("\n🧪 Testing outbid notification structure...")
-        
+
         try:
             # Create a mock outbid notification to test the structure
-            params = {
+            payload = {
                 "user_id": self.test_user_id,
-                "notification_type": "outbid",
+                "type": "outbid",
                 "title": "You've been outbid! 🔔",
-                "message": "Someone placed a higher bid of $25.00 on Lot #1 - Test Item. Tap to bid again."
+                "body": "Someone placed a higher bid of $25.00 on Lot #1 - Test Item. Tap to bid again.",
             }
-            
+
             async with self.session.post(
-                f"{BASE_URL}/notifications/create",
-                params=params,
+                f"{BASE_URL}/notifications/admin/send",
+                json=payload,
                 headers=self.get_admin_headers()
             ) as response:
                 if response.status == 200:
-                    data = await response.json()
-                    
+                    # Fetch just-inserted row from the recipient's feed.
+                    async with self.session.get(
+                        f"{BASE_URL}/notifications?limit=5",
+                        headers=self.get_user_headers()
+                    ) as feed_response:
+                        feed = await feed_response.json()
+                        notifications = feed if isinstance(feed, list) else feed.get("notifications", [])
+                        data = next(
+                            (n for n in notifications if n.get("type") == "outbid"),
+                            None,
+                        )
+                        assert data is not None, "Outbid notification not found in feed"
+
                     # Verify outbid notification structure
                     assert data["type"] == "outbid", "Should be outbid type"
                     assert "You've been outbid!" in data["title"], "Title should contain 'You've been outbid!'"
                     assert "Lot #" in data["message"], "Message should include lot number"
                     assert "$" in data["message"], "Message should include bid amount"
-                    
+
                     print(f"✅ Outbid notification structure verified")
                     print(f"   - Type: {data['type']}")
                     print(f"   - Title: {data['title']}")
                     print(f"   - Message: {data['message']}")
-                    
+
                     # Test that the notification appears in the user's list
                     async with self.session.get(
                         f"{BASE_URL}/notifications",

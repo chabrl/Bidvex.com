@@ -601,7 +601,13 @@ export default function LotDetailPage() {
                 <div className="text-lg font-bold text-slate-900 dark:text-white font-mono" data-testid="lot-detail-next-bid">{formatCurrency(nextValidBid)}</div>
               </div>
 
-              {/* Three Quick Bid pills — same increment ladder */}
+              {/* Three Quick Bid pills — amount pickers that populate the
+                  custom-bid input; the actual submission happens via the
+                  "Place Bid" button below. iter485 UX fix: previously these
+                  pills submitted the bid on click, which mismatched the
+                  "select amount → confirm ack → place bid" mental model
+                  and left users stuck when the payment-ack was checked
+                  AFTER a pill click. */}
               {!isEnded && (
                 <div className="grid grid-cols-3 gap-1.5" data-testid="lot-detail-quick-bid">
                   {bidSuggestions.map((amt, i) => (
@@ -609,9 +615,8 @@ export default function LotDetailPage() {
                       key={i}
                       size="sm"
                       variant="outline"
-                      className="text-xs font-mono h-8 disabled:opacity-50 disabled:cursor-not-allowed"
-                      onClick={() => handlePlaceBid(amt)}
-                      disabled={!paymentAck}
+                      className="text-xs font-mono h-8"
+                      onClick={() => setBidAmount(String(amt))}
                       data-testid={`lot-detail-quick-bid-${i}`}
                     >
                       {formatCurrency(amt)}

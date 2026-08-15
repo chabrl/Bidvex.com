@@ -1,0 +1,38 @@
+{
+  "when": "2026-08-15T03:14:49.599123+00:00",
+  "listing_id": "58758582-f53a-46d8-bc0b-87cf9de60523",
+  "lot_number": 1,
+  "before": {
+    "lot_bid_row": {
+      "id": "8a5ac7dd-2b3b-4569-b5a3-37010482a335",
+      "listing_id": "58758582-f53a-46d8-bc0b-87cf9de60523",
+      "lot_number": 1,
+      "bidder_id": "8940074d-da97-43ca-9a0b-c59d39411ed6",
+      "amount": 7,
+      "bid_type": "normal",
+      "created_at": "2026-08-15T02:54:43.611563+00:00"
+    },
+    "auto_bid_row": {
+      "id": "df58d92b-1ce6-4b92-9949-e14e50215a5d",
+      "user_id": "8940074d-da97-43ca-9a0b-c59d39411ed6",
+      "listing_id": "58758582-f53a-46d8-bc0b-87cf9de60523",
+      "max_bid": 7.04,
+      "is_active": false,
+      "created_at": "2026-08-15T02:50:57.443190+00:00",
+      "lot_number": 1,
+      "strategy": "min_to_lead"
+    },
+    "lot_inline_fields": {
+      "lot_number": 1,
+      "starting_price": 2.0,
+      "current_price": 7,
+      "bid_count": 1,
+      "highest_bidder_id": "8940074d-da97-43ca-9a0b-c59d39411ed6",
+      "has_reserve": null,
+      "reserve_price": 70.0,
+      "reserve_met": null,
+      "lot_status": "active",
+      "lot_end_time": "2026-08-21T20:01:00+00:00"
+    }
+  }
+}
