@@ -440,21 +440,39 @@ def generate_general_invoice_pdf(
     elements.append(Paragraph(f"<b>QST/TVQ #:</b> {BIDVEX_QST_NUMBER}", normal_style))
     elements.append(Spacer(1, 0.1*inch))
     
+    # iter482 P2-followup — Every visible line item is derived from the
+    # canonical `payment_result` fields so the sum of shown rows reconciles
+    # with `payment_result.buyer_total`.  Previously the seller-commission
+    # line was hidden yet its value was folded into the GST/QST base, which
+    # made the visible "GST on Buyer Premium" numbers un-verifiable.
+    _buyer_premium = float(payment_result.buyer_premium)
+    _seller_commission = float(payment_result.seller_commission)
+    _bidvex_fees_subtotal = float(payment_result.bidvex_fees_subtotal)  # BP + commission
+    _bidvex_fees_gst = float(payment_result.bidvex_fees_gst)            # 5% × subtotal
+    _bidvex_fees_qst = float(payment_result.bidvex_fees_qst)            # 9.975% × subtotal
+    _bidvex_fees_tax_total = float(payment_result.bidvex_fees_tax_total)
+    _bidvex_fees_grand_total = _bidvex_fees_subtotal + _bidvex_fees_tax_total
+
     fees_data = [
         [Paragraph(bi("Description", "Description"), normal_style),
          Paragraph(bi("Rate", "Taux"), normal_style),
          Paragraph(bi("Amount", "Montant"), normal_style)],
         [Paragraph(bi("Buyer Premium", "Prime de l'acheteur"), normal_style),
          f"{payment_result.buyer_premium_rate * 100:.1f}%",
-         format_currency(payment_result.buyer_premium)],
-        [Paragraph(bi("GST on Buyer Premium (TPS — 5%)", "TPS sur la prime de l'acheteur (5 %)"), normal_style),
-         '', format_currency(payment_result.bidvex_fees_gst)],
-        [Paragraph(bi("QST on Buyer Premium (TVQ — 9.975%)", "TVQ sur la prime de l'acheteur (9,975 %)"), normal_style),
-         '', format_currency(payment_result.bidvex_fees_qst)],
+         format_currency(_buyer_premium)],
+        [Paragraph(bi("Seller Commission", "Commission du vendeur"), normal_style),
+         f"{payment_result.seller_commission_rate * 100:.1f}%",
+         format_currency(_seller_commission)],
+        [Paragraph(bi("BidVex Fees Subtotal", "Sous-total des frais BidVex"), normal_style),
+         '', format_currency(_bidvex_fees_subtotal)],
+        [Paragraph(bi("GST on BidVex Fees (TPS — 5%)", "TPS sur les frais BidVex (5 %)"), normal_style),
+         '', format_currency(_bidvex_fees_gst)],
+        [Paragraph(bi("QST on BidVex Fees (TVQ — 9.975%)", "TVQ sur les frais BidVex (9,975 %)"), normal_style),
+         '', format_currency(_bidvex_fees_qst)],
         [Paragraph(bi("GST + QST (combined 14.975%)", "TPS + TVQ (combinées 14,975 %)"), normal_style),
-         '', format_currency(payment_result.bidvex_fees_gst + payment_result.bidvex_fees_qst)],
-        [Paragraph(bi("Platform Fees Subtotal", "Sous-total des frais de plateforme"), normal_style),
-         '', format_currency(payment_result.buyer_pays_fees + payment_result.buyer_pays_fees_tax)],
+         '', format_currency(_bidvex_fees_tax_total)],
+        [Paragraph(bi("Platform Fees Total (incl. taxes)", "Total des frais de plateforme (taxes incluses)"), normal_style),
+         '', format_currency(_bidvex_fees_grand_total)],
     ]
     
     fees_table = Table(fees_data, colWidths=[3.2*inch, 1.2*inch, 1.6*inch])

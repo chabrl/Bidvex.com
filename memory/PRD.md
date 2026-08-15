@@ -1004,6 +1004,16 @@ Wired canonical `services/payment_cost_engine.py` into every buyer-facing calcul
 - Backend: FastAPI + Motor (async Mongo)
 - Integrations: Stripe (TEST mode), SendGrid, Twilio, Cloudflare R2, Emergent LLM key
 
+## 2026-02-15 — iter482 P2-followup Calculation & Data-Integrity Fix Pass
+- Fixed 4 CRITICAL calculation / data-integrity defects independently identified in the visual QA batch:
+  - **Defect 1** — Commission Invoice hardcoded wrong business identity (`123 Auction Street / Montreal / 123456789RT0001`) → now sourced from `services.tax_engine.BIDVEX_ADDRESS / GST / QST / LEGAL_NAME` (canonical `103-761 Chalifoux Street / Sherbrooke, QC, J1G 0A8 / 706766367RT0001 / 1233530880TQ0001`).
+  - **Defect 2** — General Auction Invoice hid the Seller Commission row while folding it into the GST/QST base → template now emits BOTH BP + Commission lines + a BidVex Fees Subtotal + a Platform Fees Total row; every visible number reconciles with `payment_result.buyer_total`.
+  - **Defect 3** — Payment Letter passed through caller-supplied grand_total while Lots Won Summary computed internally → both now derive from shared `compute_buyer_totals(lots, premium, buyer_province, ...)` helper.  Ontario buyer → $0 QST on BOTH documents (grand total $3,589.90); QC buyer → GST+QST on both (grand total $3,930.94).
+  - **Defect 4** — Seller Statement omitted tax-on-commission deduction ($2,824.35 wrong); Receipt was correct ($2,802.09); Commission Invoice's `net_payout` trusted caller drift → all three now derive from shared `compute_seller_payout` helper.  Business-logic decision confirmed: BidVex is GST+QST registered, commission is a taxable service → **Net Payout = Hammer − Commission − GST − QST on Commission**.
+- Zero changes to tax_engine, fee_calculator, payment logic, Stripe logic, reconciliation, or auction settlement.
+- 12 new regression tests in `tests/iter482/test_p2_followup_billing_calc_integrity.py` locking in the exact corrected numbers.  Billing critical: **1,207 passing** (up from 1,195).
+- Re-delivered 49 corrected TEST/PREVIEW emails to `charbel911@gmail.com`.  See `/app/docs/ITER482_BILLING_CALC_INTEGRITY_FIX_REPORT.md`.
+
 ## 2026-02-15 — iter482 P2 Presentation Fix Pass
 - Fixed 7 P2 presentation defects reported in the Visual QA Report:
   - Made 6 EN-only helpers bilingual EN/FR (`send_invoice_overdue_email`, `send_payment_reminder_email`, `send_payment_overdue_email`, `send_subscription_reminder_email`, `send_subscription_expired_email`, `send_subscription_upgraded_email`).

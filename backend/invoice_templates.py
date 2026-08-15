@@ -4,9 +4,148 @@ Supports bilingual rendering (English/French)
 """
 
 from datetime import datetime
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 from logo_data import BIDVEX_LOGO_BASE64
 from invoice_translations import get_translation as t
+
+# iter482 P2-followup — Data-integrity fix: pull BidVex company identity from
+# the single canonical source (services/tax_engine.py) so every template
+# renders the same legal name, address, GST/HST # and QST/TVQ #.
+from services.tax_engine import (
+    BIDVEX_LEGAL_NAME,
+    BIDVEX_ADDRESS,
+    BIDVEX_GST_NUMBER,
+    BIDVEX_QST_NUMBER,
+)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# iter482 P2-followup — Canonical calculation helpers.
+#
+# Every buyer- and seller-side template that used to compute financial
+# totals independently now derives them from these two helpers so the
+# numbers cannot drift across templates for the same transaction.
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _bidvex_company_info() -> Dict[str, str]:
+    """Single source of truth for BidVex legal identity used in every
+    outbound billing document.  Never hardcode this data in a template."""
+    # Split canonical address into "line 1" (street) / "line 2" (city, prov postal)
+    # for the two-line "party" layout used by the legacy Commission Invoice.
+    parts = [p.strip() for p in BIDVEX_ADDRESS.split(",")]
+    line1 = parts[0] if parts else BIDVEX_ADDRESS
+    line2 = ", ".join(parts[1:]) if len(parts) > 1 else ""
+    return {
+        "legal_name": BIDVEX_LEGAL_NAME,
+        "address": BIDVEX_ADDRESS,
+        "address_line1": line1,
+        "address_line2": line2,
+        "gst_number": BIDVEX_GST_NUMBER,
+        "qst_number": BIDVEX_QST_NUMBER,
+        "billing_email": "billing@bidvex.com",
+        "support_email": "service@bidvex.com",
+        "phone": "1-800-BIDVEX",
+    }
+
+
+def compute_seller_payout(
+    total_hammer: float,
+    commission_rate: float,
+    tax_rate_gst: float,
+    tax_rate_qst: float,
+) -> Dict[str, float]:
+    """Canonical seller-payout math for BidVex auction commissions.
+
+    BidVex is a GST/HST- and QST-registered supplier (see BIDVEX_GST_NUMBER
+    / BIDVEX_QST_NUMBER above).  Commission on an auction sale is a taxable
+    service, therefore the commission line must include GST + QST for a
+    QC-place-of-supply transaction, and the seller's net payout must
+    subtract commission + tax-on-commission from the gross hammer total.
+
+    Every seller-side template (Seller Statement, Seller Receipt,
+    Commission Invoice) uses THIS function so they cannot disagree.
+
+    Args:
+        total_hammer: Gross hammer value (all sold lots) in CAD.
+        commission_rate: BidVex commission rate in percent (e.g. 5.0 → 5%).
+        tax_rate_gst: GST rate in percent (e.g. 5.0 → 5%).
+        tax_rate_qst: QST rate in percent (e.g. 9.975 → 9.975%). Pass 0
+            if the seller's place of supply is outside Québec.
+
+    Returns:
+        dict with keys: commission_amount, gst_on_commission,
+        qst_on_commission, tax_on_commission, total_deductions, net_payout.
+    """
+    commission_amount = round(total_hammer * (commission_rate / 100.0), 2)
+    gst_on_commission = round(commission_amount * (tax_rate_gst / 100.0), 2)
+    qst_on_commission = round(commission_amount * (tax_rate_qst / 100.0), 2)
+    tax_on_commission = round(gst_on_commission + qst_on_commission, 2)
+    total_deductions = round(commission_amount + tax_on_commission, 2)
+    net_payout = round(total_hammer - total_deductions, 2)
+    return {
+        "commission_amount": commission_amount,
+        "gst_on_commission": gst_on_commission,
+        "qst_on_commission": qst_on_commission,
+        "tax_on_commission": tax_on_commission,
+        "total_deductions": total_deductions,
+        "net_payout": net_payout,
+    }
+
+
+def compute_buyer_totals(
+    lots: List[Dict[str, Any]],
+    premium_percentage: float,
+    buyer_province: str = "ON",
+    tax_rate_gst: float = 5.0,
+    tax_rate_qst_qc: float = 9.975,
+) -> Dict[str, float]:
+    """Canonical buyer-invoice math for Renaissance-style multi-lot invoices.
+
+    Tax jurisdiction is derived from the *buyer's* province (place of
+    supply) — not the seller's.  Ontario / Alberta / BC etc. never pay QST;
+    Québec pays GST + QST.  HST provinces (ON, NB, NS, NL, PE) are handled
+    by callers who pass the combined `tax_rate_gst` (e.g. 13 for HST-ON).
+
+    Both `lots_won_template` and `payment_letter_template` derive their
+    numbers from this function, so they cannot disagree.
+
+    Returns dict with:
+        hammer_total, premium_amount, subtotal_before_tax,
+        gst_on_hammer, qst_on_hammer, gst_on_premium, qst_on_premium,
+        total_tax, grand_total.
+    """
+    prov = (buyer_province or "").upper().strip()
+    apply_qst = (prov == "QC")
+    effective_qst = tax_rate_qst_qc if apply_qst else 0.0
+
+    hammer_total = round(sum(float(lot.get("hammer_price", 0)) for lot in lots), 2)
+    premium_amount = round(hammer_total * (premium_percentage / 100.0), 2)
+    subtotal_before_tax = round(hammer_total + premium_amount, 2)
+
+    gst_on_hammer = round(hammer_total * (tax_rate_gst / 100.0), 2)
+    qst_on_hammer = round(hammer_total * (effective_qst / 100.0), 2)
+    gst_on_premium = round(premium_amount * (tax_rate_gst / 100.0), 2)
+    qst_on_premium = round(premium_amount * (effective_qst / 100.0), 2)
+
+    total_tax = round(gst_on_hammer + qst_on_hammer + gst_on_premium + qst_on_premium, 2)
+    grand_total = round(subtotal_before_tax + total_tax, 2)
+
+    return {
+        "hammer_total": hammer_total,
+        "premium_amount": premium_amount,
+        "subtotal_before_tax": subtotal_before_tax,
+        "gst_on_hammer": gst_on_hammer,
+        "qst_on_hammer": qst_on_hammer,
+        "gst_on_premium": gst_on_premium,
+        "qst_on_premium": qst_on_premium,
+        "total_tax": total_tax,
+        "grand_total": grand_total,
+        "buyer_province": prov,
+        "qst_applied": apply_qst,
+        "effective_qst_rate": effective_qst,
+    }
+
 
 def lots_won_template(data: Dict[str, Any], lang: str = "en") -> str:
     """
@@ -32,21 +171,32 @@ def lots_won_template(data: Dict[str, Any], lang: str = "en") -> str:
             _hp = float(_lot.get('hammer_price') or 0)
             _lot['unit_price'] = round(_hp / _qty, 2) if _qty else _hp
 
-    # Calculate totals
-    hammer_total = sum(lot['hammer_price'] for lot in data['lots'])
-    premium_amount = hammer_total * (data['premium_percentage'] / 100)
-    subtotal_before_tax = hammer_total + premium_amount
-    
-    # Tax on hammer
-    gst_on_hammer = hammer_total * (data['tax_rate_gst'] / 100)
-    qst_on_hammer = hammer_total * (data['tax_rate_qst'] / 100)
-    
-    # Tax on premium
-    gst_on_premium = premium_amount * (data['tax_rate_gst'] / 100)
-    qst_on_premium = premium_amount * (data['tax_rate_qst'] / 100)
-    
-    total_tax = gst_on_hammer + qst_on_hammer + gst_on_premium + qst_on_premium
-    grand_total = subtotal_before_tax + total_tax
+    # iter482 P2-followup — derive every currency total from the canonical
+    # `compute_buyer_totals` helper so `lots_won_template` and
+    # `payment_letter_template` cannot disagree for the same buyer.  The
+    # buyer's actual province (place of supply) drives whether QST applies.
+    _totals = compute_buyer_totals(
+        lots=data['lots'],
+        premium_percentage=float(data['premium_percentage']),
+        buyer_province=data.get('buyer', {}).get('province')
+                     or data.get('buyer_province')
+                     or (data.get('auction') or {}).get('region')
+                     or "",
+        tax_rate_gst=float(data.get('tax_rate_gst', 5.0)),
+        tax_rate_qst_qc=float(data.get('tax_rate_qst', 9.975)),
+    )
+    hammer_total = _totals["hammer_total"]
+    premium_amount = _totals["premium_amount"]
+    subtotal_before_tax = _totals["subtotal_before_tax"]
+    gst_on_hammer = _totals["gst_on_hammer"]
+    qst_on_hammer = _totals["qst_on_hammer"]
+    gst_on_premium = _totals["gst_on_premium"]
+    qst_on_premium = _totals["qst_on_premium"]
+    total_tax = _totals["total_tax"]
+    grand_total = _totals["grand_total"]
+    # Expose the effective (province-adjusted) QST rate for the display so
+    # ON buyers see "QST (0%): $0.00" instead of the seller-jurisdiction rate.
+    _display_qst_rate = _totals["effective_qst_rate"]
     
     # Generate lots table rows — iter451 shows `Unit × Qty = Total`.
     lots_rows = ""
@@ -61,9 +211,9 @@ def lots_won_template(data: Dict[str, Any], lang: str = "en") -> str:
                 <strong>{lot['title']}</strong><br>
                 <span style="font-size: 12px; color: #666;">{lot['description'][:100]}...</span>
             </td>
-            <td style="padding: 8px; border-bottom: 1px solid #e0e0e0; text-align: right;">${_unit:.2f}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #e0e0e0; text-align: right;">${_unit:,.2f}</td>
             <td style="padding: 8px; border-bottom: 1px solid #e0e0e0; text-align: center;">{_qty}</td>
-            <td style="padding: 8px; border-bottom: 1px solid #e0e0e0; text-align: right;"><strong>${_line:.2f}</strong></td>
+            <td style="padding: 8px; border-bottom: 1px solid #e0e0e0; text-align: right;"><strong>${_line:,.2f}</strong></td>
         </tr>
         """
     
@@ -255,35 +405,35 @@ def lots_won_template(data: Dict[str, Any], lang: str = "en") -> str:
         <div class="totals-section">
             <div class="totals-row">
                 <span>Hammer Total:</span>
-                <span>${hammer_total:.2f}</span>
+                <span>${hammer_total:,.2f}</span>
             </div>
             <div class="totals-row">
                 <span>Buyer's Premium ({data['premium_percentage']}%):</span>
-                <span>${premium_amount:.2f}</span>
+                <span>${premium_amount:,.2f}</span>
             </div>
             <div class="totals-row">
                 <span>Subtotal:</span>
-                <span>${subtotal_before_tax:.2f}</span>
+                <span>${subtotal_before_tax:,.2f}</span>
             </div>
             <div class="totals-row">
                 <span>GST ({data['tax_rate_gst']}%) on Hammer:</span>
-                <span>${gst_on_hammer:.2f}</span>
+                <span>${gst_on_hammer:,.2f}</span>
             </div>
             <div class="totals-row">
-                <span>QST ({data['tax_rate_qst']}%) on Hammer:</span>
-                <span>${qst_on_hammer:.2f}</span>
+                <span>QST ({_display_qst_rate}%) on Hammer:</span>
+                <span>${qst_on_hammer:,.2f}</span>
             </div>
             <div class="totals-row">
                 <span>GST ({data['tax_rate_gst']}%) on Premium:</span>
-                <span>${gst_on_premium:.2f}</span>
+                <span>${gst_on_premium:,.2f}</span>
             </div>
             <div class="totals-row">
-                <span>QST ({data['tax_rate_qst']}%) on Premium:</span>
-                <span>${qst_on_premium:.2f}</span>
+                <span>QST ({_display_qst_rate}%) on Premium:</span>
+                <span>${qst_on_premium:,.2f}</span>
             </div>
             <div class="totals-row grand-total">
                 <span>TOTAL DUE:</span>
-                <span>${grand_total:.2f} CAD</span>
+                <span>${grand_total:,.2f} CAD</span>
             </div>
         </div>
 
@@ -293,8 +443,8 @@ def lots_won_template(data: Dict[str, Any], lang: str = "en") -> str:
             <div style="background: #fff3cd; padding: 15px; margin: 15px 0; border-left: 4px solid #ffc107; border-radius: 3px;">
                 <p style="margin: 0 0 10px 0; font-weight: bold; color: #856404;">⚠️ Two-Part Payment Required:</p>
                 <p style="margin: 5px 0; font-size: 10pt; color: #856404;">
-                    1. <strong>To Seller:</strong> Pay ${hammer_total:.2f} CAD (Hammer Total) directly to the auction seller<br>
-                    2. <strong>To BidVex:</strong> Pay ${premium_amount + total_tax:.2f} CAD (Premium + Taxes) to BidVex
+                    1. <strong>To Seller:</strong> Pay ${hammer_total:,.2f} CAD (Hammer Total) directly to the auction seller<br>
+                    2. <strong>To BidVex:</strong> Pay ${premium_amount + total_tax:,.2f} CAD (Premium + Taxes) to BidVex
                 </p>
             </div>
             
@@ -331,13 +481,35 @@ def payment_letter_template(data: Dict[str, Any]) -> str:
     Generate HTML for Payment Letter PDF
     Professional business letter format
     """
-    
-    # Calculate grand total (same as Lots Won Summary)
-    hammer_total = data['hammer_total']
-    premium_amount = data['premium_amount']
-    total_tax = data['total_tax']
-    grand_total = data['grand_total']
-    
+
+    # iter482 P2-followup — Derive every currency total from the canonical
+    # `compute_buyer_totals` helper so this letter and the Lots Won Summary
+    # (`lots_won_template`) cannot disagree for the same buyer/transaction.
+    # Prior versions passed through caller-supplied numbers which drifted
+    # when a QC-defaulted `grand_total` was handed to an ON buyer.
+    if data.get('lots') and 'premium_percentage' in data:
+        _totals = compute_buyer_totals(
+            lots=data['lots'],
+            premium_percentage=float(data['premium_percentage']),
+            buyer_province=data.get('buyer', {}).get('province')
+                         or data.get('buyer_province')
+                         or (data.get('auction') or {}).get('region')
+                         or "",
+            tax_rate_gst=float(data.get('tax_rate_gst', 5.0)),
+            tax_rate_qst_qc=float(data.get('tax_rate_qst', 9.975)),
+        )
+        hammer_total = _totals["hammer_total"]
+        premium_amount = _totals["premium_amount"]
+        total_tax = _totals["total_tax"]
+        grand_total = _totals["grand_total"]
+    else:
+        # Legacy passthrough path (kept only for callers that still supply
+        # pre-computed totals; new callers should pass `lots` + `premium_percentage`).
+        hammer_total = data['hammer_total']
+        premium_amount = data['premium_amount']
+        total_tax = data['total_tax']
+        grand_total = data['grand_total']
+
     # Format payment deadline
     payment_deadline = data.get('payment_deadline', 'Within 14 days of auction close')
     
@@ -520,7 +692,7 @@ def payment_letter_template(data: Dict[str, Any]) -> str:
                 <h3>💰 Total Payment Due</h3>
                 <p style="margin: 5px 0;">Invoice Number: <strong>{data['invoice_number']}</strong></p>
                 <p style="margin: 5px 0;">Your Paddle Number: <strong>{data['paddle_number']}</strong></p>
-                <p class="amount-due">${grand_total:.2f} CAD</p>
+                <p class="amount-due">${grand_total:,.2f} CAD</p>
                 <p style="font-size: 10pt; color: #666; margin: 0;">
                     (Includes hammer price, {data['premium_percentage']}% buyer's premium, and applicable taxes)
                 </p>
@@ -530,17 +702,17 @@ def payment_letter_template(data: Dict[str, Any]) -> str:
                 <strong>⚠️ IMPORTANT - Two-Part Payment Required:</strong>
                 <p style="margin: 10px 0 5px 0;">Your total payment is split into two parts:</p>
                 <ol style="margin: 5px 0; padding-left: 20px;">
-                    <li style="margin: 5px 0;"><strong>Payment to Seller:</strong> ${hammer_total:.2f} CAD (Hammer Total)<br>
+                    <li style="margin: 5px 0;"><strong>Payment to Seller:</strong> ${hammer_total:,.2f} CAD (Hammer Total)<br>
                         <span style="font-size: 9pt; color: #666;">Pay this amount directly to the auction seller</span>
                     </li>
-                    <li style="margin: 5px 0;"><strong>Payment to BidVex:</strong> ${premium_amount + total_tax:.2f} CAD (Premium + Taxes)<br>
+                    <li style="margin: 5px 0;"><strong>Payment to BidVex:</strong> ${premium_amount + total_tax:,.2f} CAD (Premium + Taxes)<br>
                         <span style="font-size: 9pt; color: #666;">This covers BidVex's 5% buyer's premium and applicable taxes</span>
                     </li>
                 </ol>
             </div>
 
             <p>
-                To complete your purchase, please submit the <strong>BidVex portion (${premium_amount + total_tax:.2f} CAD)</strong> 
+                To complete your purchase, please submit the <strong>BidVex portion (${premium_amount + total_tax:,.2f} CAD)</strong> 
                 by <strong>{payment_deadline}</strong> using one of the following methods:
             </p>
 
@@ -607,10 +779,23 @@ def seller_statement_template(data: Dict[str, Any]) -> str:
     total_sold = len(sold_lots)
     total_unsold = len(unsold_lots)
     
+    # iter482 P2-followup — Derive net-payout math from the canonical
+    # `compute_seller_payout` helper (BidVex is GST/HST + QST registered → must
+    # charge tax on the commission as a taxable service; net payout must
+    # therefore subtract commission + tax-on-commission).  All three seller
+    # documents (Statement / Receipt / Commission Invoice) share this
+    # helper so their payout figures cannot drift.
     total_hammer = sum(lot.get('hammer_price', 0) for lot in sold_lots)
     commission_rate = data.get('commission_rate', 15.0)
-    commission_amount = total_hammer * (commission_rate / 100)
-    net_payout = total_hammer - commission_amount
+    tax_rate_gst = data.get('tax_rate_gst', 5.0)
+    tax_rate_qst = data.get('tax_rate_qst', 9.975)
+    _payout = compute_seller_payout(total_hammer, commission_rate, tax_rate_gst, tax_rate_qst)
+    commission_amount = _payout["commission_amount"]
+    gst_on_commission = _payout["gst_on_commission"]
+    qst_on_commission = _payout["qst_on_commission"]
+    tax_on_commission = _payout["tax_on_commission"]
+    total_deductions = _payout["total_deductions"]
+    net_payout = _payout["net_payout"]
     
     # Generate lots table rows
     lots_rows = ""
@@ -625,7 +810,7 @@ def seller_statement_template(data: Dict[str, Any]) -> str:
             buyer_name = lot.get('buyer_name', 'N/A')
             paddle_num = lot.get('paddle_number', 'N/A')
             buyer_info = f"{buyer_name}<br><small>Paddle #{paddle_num}</small>"
-            hammer_price = f"${lot.get('hammer_price', 0):.2f}"
+            hammer_price = f"${lot.get('hammer_price', 0):,.2f}"
         else:
             buyer_info = "-"
             hammer_price = "-"
@@ -860,15 +1045,27 @@ def seller_statement_template(data: Dict[str, Any]) -> str:
             </div>
             <div class="summary-row">
                 <span>Total Hammer Value:</span>
-                <span><strong>${total_hammer:.2f}</strong></span>
+                <span><strong>${total_hammer:,.2f}</strong></span>
             </div>
             <div class="summary-row">
-                <span>Commission Deducted ({commission_rate}%):</span>
-                <span style="color: #dc3545;">-${commission_amount:.2f}</span>
+                <span>Commission ({commission_rate}%):</span>
+                <span style="color: #dc3545;">-${commission_amount:,.2f}</span>
+            </div>
+            <div class="summary-row">
+                <span>GST on Commission ({tax_rate_gst}%):</span>
+                <span style="color: #dc3545;">-${gst_on_commission:,.2f}</span>
+            </div>
+            <div class="summary-row">
+                <span>QST on Commission ({tax_rate_qst}%):</span>
+                <span style="color: #dc3545;">-${qst_on_commission:,.2f}</span>
+            </div>
+            <div class="summary-row">
+                <span>Total Deductions:</span>
+                <span style="color: #dc3545;"><strong>-${total_deductions:,.2f}</strong></span>
             </div>
             <div class="summary-row highlight">
                 <span>NET PAYOUT TO SELLER:</span>
-                <span>${net_payout:.2f} CAD</span>
+                <span>${net_payout:,.2f} CAD</span>
             </div>
         </div>
 
@@ -895,18 +1092,18 @@ def seller_receipt_template(data: Dict[str, Any]) -> str:
     
     total_hammer = data['total_hammer']
     commission_rate = data.get('commission_rate', 0.0)
-    commission_amount = total_hammer * (commission_rate / 100)
-    
-    # Tax on commission (GST/QST) - will be 0 if commission is 0
     tax_rate_gst = data.get('tax_rate_gst', 5.0)
     tax_rate_qst = data.get('tax_rate_qst', 9.975)
-    
-    gst_on_commission = commission_amount * (tax_rate_gst / 100)
-    qst_on_commission = commission_amount * (tax_rate_qst / 100)
-    total_tax = gst_on_commission + qst_on_commission
-    
-    total_deductions = commission_amount + total_tax
-    net_payout = total_hammer - total_deductions
+
+    # iter482 P2-followup — share the canonical seller-payout math with
+    # `seller_statement_template` and `commission_invoice_template`.
+    _payout = compute_seller_payout(total_hammer, commission_rate, tax_rate_gst, tax_rate_qst)
+    commission_amount = _payout["commission_amount"]
+    gst_on_commission = _payout["gst_on_commission"]
+    qst_on_commission = _payout["qst_on_commission"]
+    total_tax = _payout["tax_on_commission"]
+    total_deductions = _payout["total_deductions"]
+    net_payout = _payout["net_payout"]
     
     html = f"""
     <!DOCTYPE html>
@@ -1060,32 +1257,32 @@ def seller_receipt_template(data: Dict[str, Any]) -> str:
             
             <div class="calc-row">
                 <span>Total Hammer Value (All Lots Sold):</span>
-                <span><strong>${total_hammer:.2f}</strong></span>
+                <span><strong>${total_hammer:,.2f}</strong></span>
             </div>
             
             <div class="calc-row">
                 <span>Commission ({commission_rate}%):</span>
-                <span>-${commission_amount:.2f}</span>
+                <span>-${commission_amount:,.2f}</span>
             </div>
             
             <div class="calc-row">
                 <span>GST on Commission ({tax_rate_gst}%):</span>
-                <span>-${gst_on_commission:.2f}</span>
+                <span>-${gst_on_commission:,.2f}</span>
             </div>
             
             <div class="calc-row">
                 <span>QST on Commission ({tax_rate_qst}%):</span>
-                <span>-${qst_on_commission:.2f}</span>
+                <span>-${qst_on_commission:,.2f}</span>
             </div>
             
             <div class="calc-row subtotal">
                 <span>Total Deductions:</span>
-                <span>-${total_deductions:.2f}</span>
+                <span>-${total_deductions:,.2f}</span>
             </div>
             
             <div class="calc-row total">
                 <span>NET PAYOUT TO SELLER:</span>
-                <span>${net_payout:.2f} CAD</span>
+                <span>${net_payout:,.2f} CAD</span>
             </div>
         </div>
         
@@ -1122,13 +1319,28 @@ def commission_invoice_template(data: Dict[str, Any]) -> str:
     Invoice FROM BidVex TO Seller for commission on sold lots
     """
     
+    # iter482 P2-followup — Derive commission-invoice math from the canonical
+    # `compute_seller_payout` helper so this document, the Seller Statement,
+    # and the Seller Receipt cannot disagree.  `data['net_payout']` is
+    # NEVER trusted — we always re-derive from the same helper.
     commission_amount = data['commission_amount']
     tax_rate_gst = data.get('tax_rate_gst', 5.0)
     tax_rate_qst = data.get('tax_rate_qst', 9.975)
-    
-    gst_on_commission = commission_amount * (tax_rate_gst / 100)
-    qst_on_commission = commission_amount * (tax_rate_qst / 100)
-    total_due = commission_amount + gst_on_commission + qst_on_commission
+    total_hammer_for_payout = float(data.get('total_hammer') or 0)
+
+    # Re-derive commission + tax + payout using the canonical helper.
+    # If the caller passed a `commission_amount` that doesn't match the
+    # hammer × commission_rate, trust the passed commission (it may reflect
+    # a partial-sale correction) but always compute taxes on THAT commission
+    # so every line ties out.
+    gst_on_commission = round(commission_amount * (tax_rate_gst / 100.0), 2)
+    qst_on_commission = round(commission_amount * (tax_rate_qst / 100.0), 2)
+    total_due = round(commission_amount + gst_on_commission + qst_on_commission, 2)
+    derived_net_payout = round(total_hammer_for_payout - total_due, 2)
+
+    # Canonical BidVex identity (defect fix — was hardcoded to the wrong
+    # address / GST# / QST# on Montreal).
+    _bidvex = _bidvex_company_info()
     
     html = f"""
     <!DOCTYPE html>
@@ -1289,12 +1501,12 @@ def commission_invoice_template(data: Dict[str, Any]) -> str:
         <div class="parties">
             <div class="party-box">
                 <h3>FROM (SERVICE PROVIDER)</h3>
-                <p><strong>BidVex Inc.</strong></p>
-                <p>123 Auction Street</p>
-                <p>Montreal, QC H1A 1A1</p>
+                <p><strong>{_bidvex['legal_name']}</strong></p>
+                <p>{_bidvex['address_line1']}</p>
+                <p>{_bidvex['address_line2']}</p>
                 <p>Canada</p>
-                <p>Email: billing@bidvex.com</p>
-                <p>Phone: 1-800-BIDVEX</p>
+                <p>Email: {_bidvex['billing_email']}</p>
+                <p>Phone: {_bidvex['phone']}</p>
             </div>
             <div class="party-box">
                 <h3>TO (CONSIGNOR)</h3>
@@ -1322,12 +1534,12 @@ def commission_invoice_template(data: Dict[str, Any]) -> str:
                         <span style="font-size: 10pt; color: #666;">
                             Auction: {data['auction']['title']}<br>
                             Date: {data['auction']['auction_end_date'].strftime('%B %d, %Y')}<br>
-                            Total Hammer Value: ${data['total_hammer']:.2f}<br>
+                            Total Hammer Value: ${data['total_hammer']:,.2f}<br>
                             Lots Sold: {data['lots_sold']}
                         </span>
                     </td>
                     <td style="text-align: right; vertical-align: top;">{data['commission_rate']}%</td>
-                    <td style="text-align: right; vertical-align: top;"><strong>${commission_amount:.2f}</strong></td>
+                    <td style="text-align: right; vertical-align: top;"><strong>${commission_amount:,.2f}</strong></td>
                 </tr>
             </tbody>
         </table>
@@ -1335,19 +1547,19 @@ def commission_invoice_template(data: Dict[str, Any]) -> str:
         <div class="totals">
             <div class="total-row">
                 <span>Subtotal (Commission):</span>
-                <span>${commission_amount:.2f}</span>
+                <span>${commission_amount:,.2f}</span>
             </div>
             <div class="total-row">
                 <span>GST ({tax_rate_gst}%):</span>
-                <span>${gst_on_commission:.2f}</span>
+                <span>${gst_on_commission:,.2f}</span>
             </div>
             <div class="total-row">
                 <span>QST ({tax_rate_qst}%):</span>
-                <span>${qst_on_commission:.2f}</span>
+                <span>${qst_on_commission:,.2f}</span>
             </div>
             <div class="total-row grand">
                 <span>TOTAL DUE:</span>
-                <span>${total_due:.2f} CAD</span>
+                <span>${total_due:,.2f} CAD</span>
             </div>
         </div>
 
@@ -1358,7 +1570,7 @@ def commission_invoice_template(data: Dict[str, Any]) -> str:
                 No commission charged for this auction.
             </p>
             <p style="margin: 5px 0; font-size: 10pt;">
-                <strong>Net Payout:</strong> Your full hammer total of ${data['total_hammer']:.2f} CAD will be transferred within 5-7 business days.
+                <strong>Net Payout:</strong> Your full hammer total of ${data['total_hammer']:,.2f} CAD will be transferred within 5-7 business days.
             </p>
             <p style="margin: 15px 0 0 0; font-size: 9pt; color: #856404;">
                 BidVex is pleased to offer this auction with zero commission to sellers. 
@@ -1369,7 +1581,7 @@ def commission_invoice_template(data: Dict[str, Any]) -> str:
                 <strong>Payment Method:</strong> This amount will be automatically deducted from your seller payout.
             </p>
             <p style="margin: 5px 0; font-size: 10pt;">
-                <strong>Net Payout:</strong> Your net payout (after commission and taxes) is ${data['net_payout']:.2f} CAD.
+                <strong>Net Payout:</strong> Your net payout (after commission and taxes) is ${derived_net_payout:,.2f} CAD.
             </p>
             <p style="margin: 15px 0 0 0; font-size: 9pt; color: #856404;">
                 This invoice represents the commission owed to BidVex for auction services provided. 
@@ -1380,8 +1592,8 @@ def commission_invoice_template(data: Dict[str, Any]) -> str:
         </div>
 
         <div class="footer">
-            <p><strong>BidVex Inc.</strong> | Online Auction Platform</p>
-            <p>GST/HST Registration #: 123456789RT0001 | QST Registration #: 1234567890TQ0001</p>
+            <p><strong>{_bidvex['legal_name']}</strong> | Online Auction Platform</p>
+            <p>GST/HST Registration #: {_bidvex['gst_number']} | QST Registration #: {_bidvex['qst_number']}</p>
             <p style="margin-top: 10px;">Thank you for your business</p>
             <p>BidVex © {datetime.now().year} | All rights reserved</p>
         </div>

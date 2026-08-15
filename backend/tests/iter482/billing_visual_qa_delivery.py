@@ -1028,6 +1028,28 @@ async def deliver_pdf_variants():
             logger.warning(f"[qa] template {fn.__name__} failed: {e}")
             return None
 
+    # iter482 P2-followup — pass buyer.province="ON" so `payment_letter_template`
+    # + `lots_won_template` both correctly zero-out QST and render matching
+    # grand totals ($3,589.90).  Prior fixtures let a stale QC total leak
+    # into the Payment Letter for an Ontario buyer.
+    buyer_ctx["province"] = "ON"
+    lots_data["buyer"] = buyer_ctx
+    pay_data["buyer"] = buyer_ctx
+    # Payment Letter now derives everything from `lots` + `premium_percentage`
+    # + buyer.province.  The three passthrough fields remain only for the
+    # legacy passthrough branch (kept for backwards compat).
+    pay_data["hammer_total"] = 2973.00
+    pay_data["premium_amount"] = 445.95
+    pay_data["total_tax"] = 170.95
+    pay_data["grand_total"] = 3589.90
+
+    # iter482 P2-followup — the Commission Invoice + Statement + Receipt now
+    # share `compute_seller_payout` so they cannot disagree.  Remove the
+    # stale/wrong net_payout hardcodes from the fixtures so the QA batch
+    # exercises the internal derivation path.
+    for _d in (rec_data, com_data):
+        _d.pop("net_payout", None)
+
     lots_html_en = _try(lots_won_template, lots_data, "en")
     lots_html_fr = _try(lots_won_template, lots_data, "fr")
     seller_html_en = _try(seller_statement_template, seller_data)
