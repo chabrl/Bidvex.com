@@ -213,13 +213,37 @@ export const trackGA4Purchase = ({
  * Google Ads Purchase conversion — fires only when
  * `REACT_APP_GOOGLE_ADS_PURCHASE_LABEL` is set. Uses the same
  * transaction_id GA4 uses so Ads dedupes across replays.
+ *
+ * iter482 P2-followup — Defense-in-depth idempotence: the function
+ * self-guards against firing more than once per (browser tab, transactionId)
+ * via `sessionStorage`. Callers may also install their own upstream
+ * guard (as `PaymentSuccessPage` does) — either alone is sufficient,
+ * both together makes duplicate firing impossible short of clearing
+ * session storage manually.
  */
+const GOOGLE_ADS_TRACKED_KEY_PREFIX = 'bidvex_gads_conversion_';
+
 export const trackGoogleAdsPurchase = ({
   value,
   transactionId,
   currency = 'CAD',
 } = {}) => {
   if (!ADS_PURCHASE_LABEL || !transactionId) return;
+  // Self-guard: skip if this exact transaction was already reported
+  // from this browser tab.
+  const guardKey = `${GOOGLE_ADS_TRACKED_KEY_PREFIX}${transactionId}`;
+  try {
+    if (typeof window !== 'undefined'
+        && window.sessionStorage
+        && window.sessionStorage.getItem(guardKey)) {
+      return;
+    }
+  } catch (_e) { /* sessionStorage may be blocked */ }
+  try {
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      window.sessionStorage.setItem(guardKey, String(Date.now()));
+    }
+  } catch (_e) { /* ignore */ }
   safeGtag('event', 'conversion', {
     send_to: `${ADS_ACCOUNT_ID}/${ADS_PURCHASE_LABEL}`,
     value: parseFloat(Number(value || 0).toFixed(2)),

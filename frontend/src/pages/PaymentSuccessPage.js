@@ -1,5 +1,5 @@
 import API_BASE from '../config';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
@@ -13,6 +13,15 @@ import { useAuth } from '../contexts/AuthContext';
 
 const API = API_BASE;
 
+// iter482 P2-followup — Client-side conversion-tracking idempotence.
+// Guards `trackPurchase` (Meta + GA4 + Google Ads) from firing twice
+// on the payment confirmation screen. `useRef` blocks React StrictMode
+// / same-tab re-renders; `sessionStorage` blocks page refresh /
+// back-navigation to the same success URL within the same browser
+// tab.  Server-side dedup by `transaction_id` + `event_id` remains as
+// second line of defense.
+const CONVERSION_TRACKED_KEY_PREFIX = 'bidvex_conversion_tracked_';
+
 const PaymentSuccessPage = () => {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
@@ -25,6 +34,8 @@ const PaymentSuccessPage = () => {
   // P7.5 — currently signed-in user, used for Google Enhanced Conversions
   // (SHA-256-hashed email/phone shipped with the purchase event).
   const { user } = useAuth();
+  // iter482 P2-followup — per-mount one-shot latch (React StrictMode + polls).
+  const conversionFiredRef = useRef(false);
 
   useEffect(() => {
     if (sessionId) {
@@ -94,23 +105,40 @@ const PaymentSuccessPage = () => {
             const stripeSessionId = sessionId;
             const serverEventId = data.meta_purchase_event_id;
             if (listingId) {
-              trackPurchase({
-                listingId,
-                listingType,
-                finalWinningPrice,
-                stripeSessionId,
-                serverEventId,
-                title:    data.listing_title    || meta.listing_title,
-                category: data.listing_category || meta.listing_category,
-                identity: user
-                  ? { email: user.email, phone: user.phone }
-                  : undefined,
-                // Multi-lot / vehicle-multi-lot lots carry a distinct
-                // catalog id — when the backend supplies it via
-                // `data.meta_content_id`, use it verbatim so GA4 +
-                // Meta both attribute to the exact catalog row.
-                lotContentId: data.meta_content_id || meta.meta_content_id,
-              });
+              // iter482 P2-followup — Fire the conversion tracking bundle
+              // (Meta Pixel + GA4 + Google Ads) exactly once per Stripe
+              // session per browser tab.  The `useRef` catches React
+              // StrictMode double-invocation + retry polls; the
+              // `sessionStorage` marker survives F5 / back-navigation
+              // within the same tab.
+              const guardKey = `${CONVERSION_TRACKED_KEY_PREFIX}${stripeSessionId}`;
+              let alreadyTracked = false;
+              try {
+                alreadyTracked = !!window.sessionStorage?.getItem(guardKey);
+              } catch (_e) { /* sessionStorage may be blocked (private mode) */ }
+              if (!conversionFiredRef.current && !alreadyTracked) {
+                conversionFiredRef.current = true;
+                try {
+                  window.sessionStorage?.setItem(guardKey, String(Date.now()));
+                } catch (_e) { /* ignore */ }
+                trackPurchase({
+                  listingId,
+                  listingType,
+                  finalWinningPrice,
+                  stripeSessionId,
+                  serverEventId,
+                  title:    data.listing_title    || meta.listing_title,
+                  category: data.listing_category || meta.listing_category,
+                  identity: user
+                    ? { email: user.email, phone: user.phone }
+                    : undefined,
+                  // Multi-lot / vehicle-multi-lot lots carry a distinct
+                  // catalog id — when the backend supplies it via
+                  // `data.meta_content_id`, use it verbatim so GA4 +
+                  // Meta both attribute to the exact catalog row.
+                  lotContentId: data.meta_content_id || meta.meta_content_id,
+                });
+              }
             }
           } catch (e) { /* silent — pixel must never block the success flow */ }
           return;
