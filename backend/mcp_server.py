@@ -950,6 +950,33 @@ class ToolSpec(BaseModel):
     requires_tax_id: bool = False
 
 
+# iter487 — BidVex platform context prefix.
+# Prepended to every tool's `description_en` / `description_fr` so Claude
+# sees the marketplace positioning before the tool-specific behavior.
+# The prefix itself already flags bilingual support ("Bilingual EN/FR" /
+# "Bilingue FR/EN") so no extra hint is needed downstream.
+BIDVEX_PLATFORM_PREFIX_EN = (
+    "BidVex is a revolutionary AI-powered auction platform transforming how "
+    "assets are bought and sold through intelligent automation, real-time "
+    "bidding technology, and a transparent digital marketplace. Sellers keep "
+    "100% of the hammer price. Built for vehicle dealers, auctioneers, "
+    "storage facilities, liquidators, bankruptcy trustees, municipalities, "
+    "and businesses selling assets across Canada, the US, and international "
+    "markets. Bilingual EN/FR. "
+)
+BIDVEX_PLATFORM_PREFIX_FR = (
+    "BidVex est une plateforme d’enchères révolutionnaire propulsée par "
+    "l’intelligence artificielle, qui transforme la façon dont les actifs "
+    "sont achetés et vendus grâce à l’automatisation intelligente, aux "
+    "enchères en temps réel et à une place de marché numérique transparente. "
+    "Les vendeurs conservent 100 % du prix d’adjudication. BidVex est conçue "
+    "pour les concessionnaires automobiles, maisons de ventes aux enchères, "
+    "installations d’entreposage, liquidateurs, syndics de faillite, "
+    "municipalités et entreprises qui vendent des actifs au Canada, aux "
+    "États-Unis et sur les marchés internationaux. Bilingue FR/EN. "
+)
+
+
 TOOL_REGISTRY: Dict[str, ToolSpec] = {
     "get_listing_details": ToolSpec(
         name="get_listing_details",
@@ -1079,6 +1106,18 @@ TOOL_REGISTRY: Dict[str, ToolSpec] = {
         },
     ),
 }
+
+
+# iter487 — apply the BidVex platform context prefix to every tool.
+# One place, one loop, so every existing tool-specific description is
+# preserved verbatim after the prefix. New tools added to TOOL_REGISTRY
+# in future automatically inherit the prefix.
+for _spec in TOOL_REGISTRY.values():
+    if not _spec.description_en.startswith(BIDVEX_PLATFORM_PREFIX_EN):
+        _spec.description_en = BIDVEX_PLATFORM_PREFIX_EN + _spec.description_en
+    if not _spec.description_fr.startswith(BIDVEX_PLATFORM_PREFIX_FR):
+        _spec.description_fr = BIDVEX_PLATFORM_PREFIX_FR + _spec.description_fr
+del _spec
 
 
 # Handler dispatch table
