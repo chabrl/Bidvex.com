@@ -1,6 +1,38 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter485 — MCP Server (Preview) + Place Bid UX Fix + Prod Data Correction (Feb 15-16, 2026) ✅ SHIPPED (preview) · 🚫 NO DEPLOY
+
+### iter485.1 — Place Bid disabled bug (Feb 15)
+- `LotDetailPage.jsx` quick-bid pills changed from one-click submitters to amount pickers that populate the custom-bid input (`setBidAmount(String(amt))`), removed their `disabled={!paymentAck}` gate.
+- Main "Place Bid" submit button remains sole submission point with unchanged disabled contract (`!paymentAck || !bidAmount || Number(bidAmount) < nextValidBid`).
+- 10 Jest tests in `frontend/src/pages/__tests__/LotDetailPage.iter485.test.js` — full disabled truth table + source-level regression guards.
+- Playwright end-to-end verified on preview (6 state transitions: A/B/D/E/F disabled, C enabled after pill + ack).
+
+### iter485.2 — Production Bid Removal — Lot 58758582 / #1 (Feb 15)
+- Removed user's own test bid ($7.00) via 3 writes to shared MongoDB Atlas cluster:
+  - `db.lot_bids.delete_one` (bid `8a5ac7dd-…`)
+  - `db.multi_item_listings.update_one` (lot #1 inline: current_price 7→2, bid_count 1→0, highest_bidder_id →null)
+  - `db.auto_bids.delete_one` (auto-bid `df58d92b-…`)
+- Reserve/status/end-time fields, other 23 lots, all other collections untouched.
+- Zero side-effect data (payments/escrow/receipts/notifications) needed reconciliation.
+- Full paper trail: `/app/docs/PROD_BID_REMOVAL_lot58758582_1_REPORT.md` + BEFORE/AFTER JSON snapshots + rollback instructions.
+- Production UI confirmed via screenshot: CURRENT BID $2.00, NEXT VALID BID $7.00, quick-bid pills $7/$12/$17.
+
+### iter485.3 — MCP Server (Feb 16)
+- **New additive layer** at `backend/mcp_server.py` exposing 12 tools to Claude via MCP-style JSON-over-HTTP.
+- **Zero business-logic duplication**: every tool wraps existing internal services (bid handler via HTTP loopback, `trust_gate`, `fee_calculator`, `top_sellers`, `ads_publisher`, `chat_listing_context.fetch_market_comparables`).
+- **Subscription gate** (option-b policy confirmed by user): premium/vip/partner_pro + active vehicle dealer + broker + verified storage facility. Free-tier → 402 SUBSCRIPTION_REQUIRED.
+- **Verification gate**: reuses `trust_gate.require_trust_verified` (phone + payment method + T&C) plus vertical-specific tax verification for listing tools (`dealer_license_verified` / `facility_verified` / `admin_verified`).
+- **Rate limit**: 30/minute per JWT subject (in-process sliding window, fail-open on error).
+- **Audit log**: `mcp_audit_logs` collection, per-call, `source="mcp_claude"`, sanitized `input_params` (regex-based key + value redaction for passwords, api_keys, jwts, card numbers, Stripe key shapes).
+- **Stubs**: `generate_listing_video` (Higgsfield not provisioned) and `B2B_syndication_matchmaker` (Phase 2) — return `NOT_IMPLEMENTED`, no fabricated integration.
+- **Enable/disable**: opt-in via `MCP_ENABLED=true` env var; router conditionally mounted at `/api/mcp/*` in `server.py`. Currently enabled on preview only.
+- **Regression coverage**: 18 tests, all passing. Sample audit-log entries + secret-sanitization proof documented.
+- **Files**: `backend/mcp_server.py` (NEW), `backend/tests/iter482/test_mcp_server.py` (NEW), `docs/MCP_INTEGRATION.md` (NEW), `backend/server.py` (+14 lines behind flag), `backend/.env` (+1 line).
+- **Guardrails held**: no changes to Stripe integration, fee/tax calculators, watchdog, existing REST endpoints, or frontend.
+
+
 ## iter482 SEC-001 & SEC-002 — Security Hardening (Feb 15, 2026) ✅ SHIPPED · PREVIEW ONLY
 
 ### Delivered — narrow security patch, no billing/tax/Stripe/escrow touch

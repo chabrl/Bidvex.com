@@ -1908,6 +1908,20 @@ try:
     except Exception as ce:  # noqa: BLE001
         logger.warning(f"iter323 router registration failed (non-fatal): {ce}")
 
+    # iter485 — Model Context Protocol (MCP) server. Preview/staging only.
+    # Enabled by MCP_ENABLED=true env var. Additive router — no existing
+    # code is touched. Mounts under /api/mcp/*.
+    if (os.environ.get("MCP_ENABLED") or "").lower() in ("1", "true", "yes"):
+        try:
+            from mcp_server import mcp_router
+            api_router.include_router(mcp_router)
+            logger.info("iter485 — MCP server mounted at /api/mcp/* (preview/staging only)")
+        except Exception as ce:  # noqa: BLE001
+            logger.warning(f"iter485 MCP server mount failed (non-fatal): {ce}")
+    else:
+        logger.info("iter485 — MCP server not mounted (MCP_ENABLED != true)")
+
+
     # iter331 — Press/Blogs CRUD + Contractor Aid AI hub (Gemini)
     try:
         from routes.blogs import router as blogs_router
