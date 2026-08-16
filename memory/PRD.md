@@ -1,6 +1,48 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter486 — MCP Claude Desktop End-to-End Integration (Feb 17, 2026) ✅ SHIPPED (preview) · 🚫 NO DEPLOY
+
+### Delivered — close-out of iter485 for real Claude Desktop compatibility
+
+Following user's audit that iter485 was **HTTP-only, not MCP-compliant** (no JSON-RPC envelope, no stdio bridge, no `initialize` handshake, no `content` blocks), iter486 finishes the job:
+
+**New transports (all sharing the same tool implementations, gates, and audit path):**
+- `POST /api/mcp/rpc` — **JSON-RPC 2.0** endpoint implementing `initialize`, `notifications/initialized`, `ping`, `tools/list`, `tools/call` per MCP spec.
+- `GET /api/mcp/sse` + `POST /api/mcp/sse/messages?sid=<id>` — full **HTTP-SSE** transport with session lifecycle (endpoint event, message frames, heartbeat).
+- `backend/mcp_bridge.py` — **stdio bridge** subprocess (native Claude Desktop transport). Reads newline-delimited JSON-RPC from stdin, forwards to the HTTP JSON-RPC endpoint with Bearer auth, writes responses to stdout. Stateless, tiny (~150 lines).
+- Legacy REST (`POST /api/mcp/tools/list|call`) kept for iter485 backwards-compat.
+
+**MCP-compliant response shapes** — `tools/list` uses `inputSchema` (camelCase) not `input_schema`. `tools/call` returns `{"content":[{"type":"text","text":...}], "isError": bool, "structuredContent": ..., "_meta": {...}}`. `initialize` returns proper `protocolVersion` (`2024-11-05`), `serverInfo`, `capabilities`.
+
+**Redis-backed rate limiter** with in-memory fallback:
+- Primary: Redis ZSET keyed as `mcp:rl:<user_id>`, state survives backend restart.
+- Fallback: existing in-process sliding-window bucket when Redis is unreachable or `REDIS_URL` unset.
+- Fail-open on any exception in either backend.
+
+**New tool: `search_auctions`** — searches across all four verticals (marketplace/lots/vehicle/storage) with query text, category, price range, status, vertical filters. Reuses `services.sanitizer.safe_regex` so no regex-injection surface introduced.
+
+**Regression: 28/28 MCP tests pass, 110/110 iter482 tests pass.**
+
+Full test coverage:
+- 18 iter485 tests: subscription gate, trust gate, tax-id gate, admin-only, rate limit, audit sanitizer, stubs, legacy REST endpoints.
+- 10 iter486 tests: JSON-RPC handshake (`initialize`/`notifications/initialized`/`ping`/`tools/list`), tool-call shape compliance, **full workflow `search_auctions → get_listing_details → place_bid` via JSON-RPC**, ceiling rejection via JSON-RPC, **stdio bridge subprocess roundtrip**, **SSE endpoint+message roundtrip**, **Redis persistence across simulated restart**, **Redis outage falls back to memory**.
+
+**Claude Desktop config** (drop-in) documented in `docs/MCP_INTEGRATION.md` for both stdio bridge (native) and `mcp-remote` SSE modes.
+
+**Files:**
+- NEW: `backend/mcp_bridge.py` (stdio bridge)
+- NEW: `backend/tests/iter482/test_mcp_jsonrpc_transport.py` (10 transport tests)
+- MODIFIED (additive only): `backend/mcp_server.py` — added `search_auctions` tool, Redis limiter, JSON-RPC dispatch, SSE transport. Preserves iter485 REST endpoints and every gate.
+- MODIFIED (opt-in only): `docs/MCP_INTEGRATION.md` (full rewrite), `backend/requirements.txt` (+fakeredis for tests only).
+- UNCHANGED: `backend/server.py`, `backend/.env`, every existing route, service, model, or test.
+
+**Guardrails held:**
+- ✅ Zero changes to tool business logic, trust/subscription/tax-id gates, audit logging format, Stripe integration, fee/tax calculators, watchdog, escrow, auction logic.
+- ✅ Preview only. No deploy.
+- ✅ Claude Desktop compatibility not just claimed but proven by an automated stdio-subprocess test that exchanges MCP handshake + tools/list + tools/call over real pipes.
+
+
 ## iter485 — MCP Server (Preview) + Place Bid UX Fix + Prod Data Correction (Feb 15-16, 2026) ✅ SHIPPED (preview) · 🚫 NO DEPLOY
 
 ### iter485.1 — Place Bid disabled bug (Feb 15)

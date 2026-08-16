@@ -1,12 +1,24 @@
 """
-BidVex — Model Context Protocol (MCP) Server (iter485)
-=======================================================
+BidVex — Model Context Protocol (MCP) Server (iter485 + iter486)
+=================================================================
 
-Additive layer exposing marketplace operations to Claude via MCP-style
-tool calls. **Does NOT** reimplement business logic — every tool wraps
+Additive layer exposing marketplace operations to Claude and other MCP
+clients. **Does NOT** reimplement business logic — every tool wraps
 existing internal service functions or HTTP endpoints so all snipe
 protection, fee calculation, deposit rules, watchdog moderation, and
 audit trails apply unchanged.
+
+Transports offered
+------------------
+* **HTTP JSON-RPC** — `POST /api/mcp/rpc` (single endpoint, JSON-RPC 2.0)
+  Used by the stdio bridge and by internal callers.
+* **HTTP-SSE** — `GET /api/mcp/sse` + `POST /api/mcp/sse/messages?sid=<id>`
+  Standard MCP HTTP-SSE transport (mcp-remote / Claude Web / other
+  remote clients).
+* **stdio** — via `backend/mcp_bridge.py` (a subprocess Claude Desktop
+  launches natively).
+* **Legacy REST** — `POST /api/mcp/tools/list` + `POST /api/mcp/tools/call`
+  kept for iter485 backwards-compat (internal callers, existing tests).
 
 Access model
 ------------
@@ -27,21 +39,24 @@ Access model
   `services.trust_gate.require_trust_verified`). Corporate/seller
   tools additionally require verified Seller Tax ID per vertical
   (`dealer_license_verified` / `facility_verified` / `admin_verified`).
-- **Rate limit**: 30 tool-calls per minute per JWT subject (slowapi).
+- **Rate limit**: 30 tool-calls per minute per JWT subject. Redis-backed
+  by default; falls back to in-process bucket if Redis is unreachable.
 - **Audit**: every call (success/failure/rejected) is logged to the
   `mcp_audit_logs` collection with sanitized input params.
 
 Registration
 ------------
 This router is exported but **NOT registered by default in `server.py`**.
-To enable in preview: `app.include_router(mcp_router, prefix="/api")`
-after the other routers.  This is the "preview only" gate — do not
-enable in production without explicit go-ahead.
+To enable in preview: `MCP_ENABLED=true` in `.env`.  This is the
+"preview only" gate — do not enable in production without explicit
+go-ahead.
 """
 from __future__ import annotations
 
+import asyncio
 import copy
 import inspect
+import json
 import logging
 import os
 import re
@@ -49,10 +64,11 @@ import time
 import uuid
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Set, Tuple
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from deps import User, get_current_user, get_db
@@ -68,36 +84,97 @@ ALLOWED_SUBSCRIPTION_TIERS: Set[str] = {"premium", "vip", "partner_pro"}
 ADMIN_ROLES: Set[str] = {"admin", "super_admin"}
 NOT_IMPLEMENTED_CODE = "NOT_IMPLEMENTED"
 
+# MCP protocol version (matches the version Claude Desktop and mcp-remote speak).
+MCP_PROTOCOL_VERSION = "2024-11-05"
+MCP_SERVER_INFO = {"name": "bidvex-mcp", "version": "1.0.0"}
+
 # Loopback base URL — MCP tools that wrap complex REST handlers call
 # them over HTTP so all middleware (rate limiting, watchdog, snipe
 # protection) runs unchanged.
 _LOOPBACK_BASE = os.environ.get("MCP_LOOPBACK_BASE_URL") or "http://localhost:8001"
 
-# ─── Rate limiting (per-JWT-subject, in-process token bucket) ─────────
+# ─── Redis-backed rate limiter with in-process fallback ───────────────
 _RATE_WINDOW_S = 60
 _RATE_LIMIT_PER_MIN = int(os.environ.get("MCP_RATE_LIMIT_PER_MIN", "30"))
-_rate_buckets: Dict[str, List[float]] = defaultdict(list)
+_rate_buckets: Dict[str, List[float]] = defaultdict(list)  # fallback / test control
+_redis_client = None
+_redis_ready: Optional[bool] = None
 
 
-def _rate_limit_check(user_id: str) -> Tuple[bool, int]:
-    """Simple in-process sliding-window rate limit keyed on JWT subject.
+async def _get_redis():
+    """Lazy-init a Redis client with health probe.
 
-    Returns `(allowed, remaining)`. Falls open on any error so a rate-limit
-    bug can never wedge a legitimate user.
+    Returns None when Redis is unreachable — caller must fall back to
+    the in-process bucket. Result is cached until the next successful
+    ping restores the client.
     """
+    global _redis_client, _redis_ready
+    url = os.environ.get("REDIS_URL") or ""
+    if not url:
+        return None
+    if _redis_client is not None:
+        return _redis_client
     try:
-        now = time.time()
+        from redis.asyncio import Redis  # local import — optional dep
+        client = Redis.from_url(url, socket_connect_timeout=2, socket_timeout=2, decode_responses=True)
+        await client.ping()
+        _redis_client = client
+        _redis_ready = True
+        logger.info("[mcp] Redis rate limiter connected")
+        return client
+    except Exception as exc:  # noqa: BLE001
+        _redis_ready = False
+        logger.warning(f"[mcp] Redis unavailable, falling back to in-process bucket: {type(exc).__name__}: {exc}")
+        return None
+
+
+async def _rate_limit_check(user_id: str) -> Tuple[bool, int, str]:
+    """Sliding-window rate limit.
+
+    Returns `(allowed, remaining, backend)` where `backend ∈ {"redis","memory"}`.
+    Falls open on any exception in either backend so a limiter bug can
+    never wedge a legitimate user.
+    """
+    now = time.time()
+    # Try Redis first
+    client = await _get_redis()
+    if client is not None:
+        try:
+            key = f"mcp:rl:{user_id}"
+            # ZSET-based sliding window: score = timestamp
+            cutoff = now - _RATE_WINDOW_S
+            pipe = client.pipeline()
+            pipe.zremrangebyscore(key, 0, cutoff)
+            pipe.zcard(key)
+            _, count = await pipe.execute()
+            if int(count) >= _RATE_LIMIT_PER_MIN:
+                return False, 0, "redis"
+            member = f"{now}:{uuid.uuid4().hex[:8]}"
+            pipe = client.pipeline()
+            pipe.zadd(key, {member: now})
+            pipe.expire(key, _RATE_WINDOW_S + 5)
+            await pipe.execute()
+            return True, max(0, _RATE_LIMIT_PER_MIN - int(count) - 1), "redis"
+        except Exception as exc:  # noqa: BLE001
+            # Reset the cached client so the next call re-probes.
+            logger.warning(f"[mcp] Redis rate-limit path failed, falling back to memory: {type(exc).__name__}")
+            global _redis_client, _redis_ready
+            _redis_client = None
+            _redis_ready = False
+            # Fall through to in-process bucket below.
+
+    # In-process fallback
+    try:
         bucket = _rate_buckets[user_id]
-        # Evict expired entries
         cutoff = now - _RATE_WINDOW_S
         while bucket and bucket[0] < cutoff:
             bucket.pop(0)
         if len(bucket) >= _RATE_LIMIT_PER_MIN:
-            return False, 0
+            return False, 0, "memory"
         bucket.append(now)
-        return True, max(0, _RATE_LIMIT_PER_MIN - len(bucket))
+        return True, max(0, _RATE_LIMIT_PER_MIN - len(bucket)), "memory"
     except Exception:  # noqa: BLE001
-        return True, _RATE_LIMIT_PER_MIN
+        return True, _RATE_LIMIT_PER_MIN, "memory"
 
 
 # ─── Secret sanitizer for audit-log input params ──────────────────────
@@ -345,6 +422,106 @@ async def tool_get_listing_details(db, user, user_doc, params) -> Dict[str, Any]
             }}
             return {"vertical": doc_type, "listing": public}
     raise HTTPException(status_code=404, detail={"error": "listing_not_found"})
+
+
+async def tool_search_auctions(db, user, user_doc, params) -> Dict[str, Any]:
+    """Search active auctions across all four BidVex verticals.
+
+    Reuses the same query shape the REST `GET /api/listings` endpoint
+    uses (title/description regex, category, price range, currency).
+    Returns per-vertical result groups so callers can decide how to
+    render them.
+    """
+    q_text     = (params.get("query") or "").strip()
+    category   = params.get("category")
+    vertical   = (params.get("vertical") or "any").lower()
+    min_price  = params.get("min_price")
+    max_price  = params.get("max_price")
+    status     = (params.get("status") or "active").lower()
+    limit      = int(params.get("limit") or 20)
+    limit      = max(1, min(100, limit))
+
+    if vertical not in {"any", "marketplace", "lots", "vehicle", "storage"}:
+        raise HTTPException(status_code=400, detail={
+            "error": "vertical must be any|marketplace|lots|vehicle|storage",
+        })
+
+    # Reuse the existing helpers so regex injection is caught centrally.
+    from services.sanitizer import sanitize_string, safe_regex
+
+    base_query: Dict[str, Any] = {}
+    if status != "any":
+        base_query["status"] = status
+    if category:
+        base_query["category"] = category
+    price_field_by_vertical = {
+        "marketplace":       "current_price",
+        "lots":              "current_price",
+        "vehicle":           "current_bid",
+        "storage":           "current_bid",
+    }
+    if q_text:
+        try:
+            q_text = sanitize_string(q_text)
+        except ValueError:
+            raise HTTPException(status_code=400, detail={"error": "invalid query text"})
+        _safe = safe_regex(q_text)
+        base_query["$or"] = [
+            {"title":       {"$regex": _safe, "$options": "i"}},
+            {"description": {"$regex": _safe, "$options": "i"}},
+        ]
+
+    def _with_price(coll_query: Dict[str, Any], price_field: str) -> Dict[str, Any]:
+        q = dict(coll_query)
+        if min_price is not None or max_price is not None:
+            price_q: Dict[str, Any] = {}
+            if min_price is not None:
+                price_q["$gte"] = float(min_price)
+            if max_price is not None:
+                price_q["$lte"] = float(max_price)
+            q[price_field] = price_q
+        return q
+
+    verticals_to_search = (
+        ["marketplace", "lots", "vehicle", "storage"] if vertical == "any" else [vertical]
+    )
+    collections = {
+        "marketplace": "listings",
+        "lots":        "multi_item_listings",
+        "vehicle":     "vehicles",
+        "storage":     "storage_units",
+    }
+    projection = {
+        "_id": 0, "id": 1, "title": 1, "category": 1, "current_price": 1,
+        "current_bid": 1, "starting_bid": 1, "starting_price": 1,
+        "auction_end_date": 1, "lot_end_time": 1, "status": 1,
+        "images": 1, "vertical": 1, "seller_id": 1,
+    }
+
+    groups: Dict[str, List[Dict[str, Any]]] = {}
+    total = 0
+    per_group_limit = max(1, limit // max(1, len(verticals_to_search)))
+    for v in verticals_to_search:
+        coll = collections[v]
+        q = _with_price(base_query, price_field_by_vertical[v])
+        try:
+            rows = await db[coll].find(q, projection).sort("created_at", -1).limit(per_group_limit).to_list(per_group_limit)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"[mcp] search_auctions on {coll} failed: {type(exc).__name__}")
+            rows = []
+        # Add vertical tag for callers
+        for r in rows:
+            r["_vertical"] = v
+        groups[v] = rows
+        total += len(rows)
+
+    return {
+        "query":    q_text,
+        "vertical": vertical,
+        "total":    total,
+        "limit":    limit,
+        "results":  groups,
+    }
 
 
 async def tool_place_bid(db, user, user_doc, params, *, jwt: str) -> Dict[str, Any]:
@@ -780,6 +957,23 @@ TOOL_REGISTRY: Dict[str, ToolSpec] = {
         description_fr="Retourne le document public complet d'une annonce dans les quatre verticales.",
         input_schema={"type": "object", "properties": {"listing_id": {"type": "string"}}, "required": ["listing_id"]},
     ),
+    "search_auctions": ToolSpec(
+        name="search_auctions",
+        description_en="Search active BidVex auctions across all four verticals (marketplace, lots, vehicles, storage). Use `vertical` to scope the search; omit or pass 'any' to search all verticals.",
+        description_fr="Rechercher des enchères actives BidVex dans les quatre verticales (marché, lots, véhicules, entreposage).",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "query":     {"type": "string",  "description": "Free-text search on title/description (regex-escaped server-side)."},
+                "vertical":  {"type": "string",  "enum": ["any", "marketplace", "lots", "vehicle", "storage"], "default": "any"},
+                "category":  {"type": "string"},
+                "min_price": {"type": "number"},
+                "max_price": {"type": "number"},
+                "status":    {"type": "string",  "enum": ["active", "ended", "any"], "default": "active"},
+                "limit":     {"type": "integer", "minimum": 1, "maximum": 100, "default": 20},
+            },
+        },
+    ),
     "place_bid": ToolSpec(
         name="place_bid",
         description_en="Place a bid on a listing after clamp+ceiling checks; routes through the existing bid handler (snipe protection, minimum increment, deposit rules unchanged).",
@@ -890,6 +1084,7 @@ TOOL_REGISTRY: Dict[str, ToolSpec] = {
 # Handler dispatch table
 _HANDLERS: Dict[str, Callable[..., Any]] = {
     "get_listing_details":            tool_get_listing_details,
+    "search_auctions":                tool_search_auctions,
     "place_bid":                      tool_place_bid,
     "create_auction_draft":           tool_create_auction_draft,
     "bulk_create_listings":           tool_bulk_create_listings,
@@ -961,7 +1156,7 @@ async def mcp_tools_call(
         raise
 
     # 2) Rate limit — per JWT subject
-    allowed, remaining = _rate_limit_check(current_user.id)
+    allowed, remaining, rl_backend = await _rate_limit_check(current_user.id)
     if not allowed:
         await _write_audit(db, user_id=current_user.id, tool_name=tool_name,
                            input_params=args, result_status="rejected",
@@ -971,6 +1166,7 @@ async def mcp_tools_call(
             "error":            "RATE_LIMIT_EXCEEDED",
             "limit_per_minute": _RATE_LIMIT_PER_MIN,
             "retry_after_s":    _RATE_WINDOW_S,
+            "backend":          rl_backend,
             "message_en":       "Too many MCP tool calls. Please slow down.",
             "message_fr":       "Trop d'appels d'outils MCP. Veuillez ralentir.",
         })
@@ -1046,3 +1242,342 @@ async def mcp_tools_call(
 
 
 __all__ = ["mcp_router", "TOOL_REGISTRY", "MCP_AUDIT_COLLECTION"]
+
+
+# ══════════════════════════════════════════════════════════════════════
+# JSON-RPC 2.0 dispatch (Claude Desktop / mcp-remote / stdio bridge)
+# ══════════════════════════════════════════════════════════════════════
+#
+# Every non-legacy transport funnels through `_dispatch_jsonrpc` which
+# implements the MCP methods Claude Desktop actually calls:
+#
+#   • initialize                — handshake, returns serverInfo+capabilities
+#   • notifications/initialized — client-side ack; response must be omitted
+#   • ping                      — keep-alive
+#   • tools/list                — returns TOOL_REGISTRY as MCP tool schemas
+#   • tools/call                — dispatches into _HANDLERS with all gates
+#
+# The dispatch function does NOT create a FastAPI Response — callers
+# decide how to write the reply (HTTP response body / SSE frame / stdout
+# line).
+#
+
+class _JSONRPCError(Exception):
+    def __init__(self, code: int, message: str, data: Any = None):
+        super().__init__(message)
+        self.code, self.message, self.data = code, message, data
+
+
+def _rpc_ok(rpc_id: Any, result: Any) -> Dict[str, Any]:
+    return {"jsonrpc": "2.0", "id": rpc_id, "result": result}
+
+
+def _rpc_err(rpc_id: Any, code: int, message: str, data: Any = None) -> Dict[str, Any]:
+    err: Dict[str, Any] = {"code": code, "message": message}
+    if data is not None:
+        err["data"] = data
+    return {"jsonrpc": "2.0", "id": rpc_id, "error": err}
+
+
+def _tool_registry_as_mcp(is_admin: bool) -> List[Dict[str, Any]]:
+    """Render TOOL_REGISTRY in the exact shape MCP clients expect
+    (`inputSchema`, not `input_schema`; single English `description`)."""
+    out = []
+    for spec in TOOL_REGISTRY.values():
+        if spec.admin_only and not is_admin:
+            continue
+        out.append({
+            "name":        spec.name,
+            "description": spec.description_en,
+            "inputSchema": spec.input_schema,
+        })
+    return out
+
+
+async def _rpc_run_tool(
+    db, current_user: User, tool_name: str, args: Dict[str, Any], jwt_token: Optional[str],
+) -> Dict[str, Any]:
+    """Reimplements the exact same gate order as the legacy REST
+    `tools/call` endpoint, but returns raw handler output (or raises
+    HTTPException) instead of assembling a Response.
+
+    Keeps the audit + gate order identical so callers get the same
+    security surface regardless of transport.
+    """
+    started_ms = time.time()
+    args = args or {}
+
+    # (1) Subscription gate
+    try:
+        user_doc = await _require_mcp_access(db, current_user)
+    except HTTPException as e:
+        await _write_audit(db, user_id=current_user.id, tool_name=tool_name,
+                           input_params=args, result_status="rejected",
+                           error_code=(e.detail or {}).get("error") if isinstance(e.detail, dict) else "SUBSCRIPTION_REQUIRED",
+                           latency_ms=int((time.time() - started_ms) * 1000))
+        raise
+
+    # (2) Rate limit
+    allowed, remaining, rl_backend = await _rate_limit_check(current_user.id)
+    if not allowed:
+        await _write_audit(db, user_id=current_user.id, tool_name=tool_name,
+                           input_params=args, result_status="rejected",
+                           error_code="RATE_LIMIT_EXCEEDED",
+                           latency_ms=int((time.time() - started_ms) * 1000))
+        raise HTTPException(status_code=429, detail={
+            "error":            "RATE_LIMIT_EXCEEDED",
+            "limit_per_minute": _RATE_LIMIT_PER_MIN,
+            "retry_after_s":    _RATE_WINDOW_S,
+            "backend":          rl_backend,
+        })
+
+    # (3) Tool exists?
+    spec = TOOL_REGISTRY.get(tool_name)
+    handler = _HANDLERS.get(tool_name)
+    if not spec or not handler:
+        await _write_audit(db, user_id=current_user.id, tool_name=tool_name,
+                           input_params=args, result_status="rejected",
+                           error_code="UNKNOWN_TOOL",
+                           latency_ms=int((time.time() - started_ms) * 1000))
+        raise HTTPException(status_code=404, detail={"error": "UNKNOWN_TOOL", "tool": tool_name})
+
+    # (4) Admin-only
+    if spec.admin_only:
+        try:
+            await _require_admin_role(user_doc)
+        except HTTPException as e:
+            await _write_audit(db, user_id=current_user.id, tool_name=tool_name,
+                               input_params=args, result_status="rejected",
+                               error_code="ADMIN_ONLY",
+                               latency_ms=int((time.time() - started_ms) * 1000))
+            raise
+
+    # (5) Dispatch
+    try:
+        sig = inspect.signature(handler)
+        kwargs = {}
+        if "jwt" in sig.parameters:
+            if not jwt_token:
+                raise HTTPException(status_code=401, detail={"error": "MISSING_JWT"})
+            kwargs["jwt"] = jwt_token
+        result = await handler(db, current_user, user_doc, args, **kwargs)
+        latency_ms = int((time.time() - started_ms) * 1000)
+        await _write_audit(db, user_id=current_user.id, tool_name=tool_name,
+                           input_params=args, result_status="success",
+                           latency_ms=latency_ms)
+        return {"result": result, "rate_limit_remaining": remaining}
+    except HTTPException as e:
+        code = "HTTP_ERROR"
+        if isinstance(e.detail, dict):
+            code = str(e.detail.get("error") or code)
+        elif isinstance(e.detail, str):
+            code = e.detail[:80]
+        await _write_audit(db, user_id=current_user.id, tool_name=tool_name,
+                           input_params=args,
+                           result_status="failure" if e.status_code >= 500 else "rejected",
+                           error_code=code,
+                           latency_ms=int((time.time() - started_ms) * 1000))
+        raise
+
+
+async def _dispatch_jsonrpc(
+    db, current_user: User, msg: Dict[str, Any], *, jwt_token: Optional[str],
+) -> Optional[Dict[str, Any]]:
+    """Dispatch a single JSON-RPC 2.0 message. Returns None for
+    notifications (per spec — notifications get no response)."""
+    method = msg.get("method")
+    rpc_id = msg.get("id")
+    params = msg.get("params") or {}
+
+    if method == "initialize":
+        return _rpc_ok(rpc_id, {
+            "protocolVersion": MCP_PROTOCOL_VERSION,
+            "capabilities":    {"tools": {"listChanged": False}, "logging": {}},
+            "serverInfo":      MCP_SERVER_INFO,
+            "instructions":    (
+                "BidVex MCP server. Auth: pass the caller's BidVex JWT via the "
+                "Authorization header on the transport (already handled by the "
+                "bridge). All tool calls are subject to subscription gate, "
+                "trust gate, per-user rate limit, and audit logging."
+            ),
+        })
+    if method == "notifications/initialized":
+        return None  # spec: server MUST NOT respond
+    if method == "ping":
+        return _rpc_ok(rpc_id, {})
+    if method == "tools/list":
+        # Subscription gate check — same as the REST endpoint
+        try:
+            user_doc = await _require_mcp_access(db, current_user)
+        except HTTPException as e:
+            code = -32001
+            detail = e.detail if isinstance(e.detail, dict) else {"error": str(e.detail)}
+            return _rpc_err(rpc_id, code, "SUBSCRIPTION_REQUIRED", detail)
+        is_admin = (user_doc.get("role") or "").lower() in ADMIN_ROLES
+        return _rpc_ok(rpc_id, {"tools": _tool_registry_as_mcp(is_admin)})
+    if method == "tools/call":
+        tool_name = params.get("name")
+        args = params.get("arguments") or {}
+        if not tool_name:
+            return _rpc_err(rpc_id, -32602, "missing tool name")
+        try:
+            out = await _rpc_run_tool(db, current_user, tool_name, args, jwt_token)
+            # MCP tools/call result shape: {"content":[{"type":"text","text":...}], "isError": false}
+            payload_text = json.dumps(out["result"], default=str)
+            return _rpc_ok(rpc_id, {
+                "content":  [{"type": "text", "text": payload_text}],
+                "isError":  False,
+                "structuredContent": out["result"],
+                "_meta":    {"rate_limit_remaining": out["rate_limit_remaining"]},
+            })
+        except HTTPException as e:
+            # Map to MCP tool-call error shape: isError=true + content
+            err_text = json.dumps(e.detail if isinstance(e.detail, dict) else {"error": str(e.detail)}, default=str)
+            return _rpc_ok(rpc_id, {
+                "content": [{"type": "text", "text": err_text}],
+                "isError": True,
+                "_meta":   {"http_status": e.status_code},
+            })
+        except Exception as exc:  # noqa: BLE001
+            logger.exception(f"[mcp] tools/call unhandled: {tool_name}")
+            return _rpc_err(rpc_id, -32603, "INTERNAL_ERROR", {"type": type(exc).__name__})
+    # Unknown method
+    return _rpc_err(rpc_id, -32601, f"method not found: {method}")
+
+
+@mcp_router.post("/rpc")
+async def mcp_jsonrpc(
+    request: Request,
+    body: Dict[str, Any],
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """MCP JSON-RPC 2.0 dispatch endpoint. Accepts a single message or a
+    batch (array); returns matching response (or nothing for pure-
+    notification batches)."""
+    db = get_db()
+    jwt_token = None
+    auth = request.headers.get("authorization") or ""
+    if auth.lower().startswith("bearer "):
+        jwt_token = auth.split(" ", 1)[1]
+
+    if isinstance(body, list):
+        # Batch — dispatch in-order, drop notification (None) responses
+        responses = []
+        for msg in body:
+            if not isinstance(msg, dict):
+                responses.append(_rpc_err(None, -32600, "invalid Request"))
+                continue
+            r = await _dispatch_jsonrpc(db, current_user, msg, jwt_token=jwt_token)
+            if r is not None:
+                responses.append(r)
+        return responses
+    if not isinstance(body, dict):
+        return _rpc_err(None, -32600, "invalid Request")
+
+    r = await _dispatch_jsonrpc(db, current_user, body, jwt_token=jwt_token)
+    if r is None:
+        # Notification — return HTTP 202 with empty body per spec
+        from fastapi.responses import Response as _Resp
+        return _Resp(status_code=202)
+    return r
+
+
+# ══════════════════════════════════════════════════════════════════════
+# HTTP-SSE transport (Claude Web / mcp-remote / other remote clients)
+# ══════════════════════════════════════════════════════════════════════
+# Session lifecycle:
+#   1. Client opens `GET /api/mcp/sse` (with auth header).
+#   2. Server allocates a session, sends `event: endpoint\ndata: <post-url>`
+#      containing `POST /api/mcp/sse/messages?sid=<id>`.
+#   3. Client POSTs JSON-RPC messages to that URL.
+#   4. Server writes JSON-RPC responses back onto the SSE stream as
+#      `event: message\ndata: <json>` frames.
+#   5. Client disconnects → server tears down the session.
+_SSE_SESSIONS: Dict[str, Dict[str, Any]] = {}
+_SSE_SESSION_TTL_S = 60 * 30  # 30 minutes
+
+
+async def _sse_session_gc():
+    """Sweep expired sessions once per minute."""
+    now = time.time()
+    stale = [sid for sid, s in _SSE_SESSIONS.items() if s["expires_at"] < now]
+    for sid in stale:
+        try:
+            _SSE_SESSIONS.pop(sid, None)
+        except Exception:  # noqa: BLE001
+            pass
+
+
+@mcp_router.get("/sse")
+async def mcp_sse_stream(
+    current_user: User = Depends(get_current_user),
+    request: Request = None,
+) -> StreamingResponse:
+    """Open an SSE stream. First event announces the message-post URL."""
+    db = get_db()
+    # Enforce subscription gate before opening the stream
+    await _require_mcp_access(db, current_user)
+
+    await _sse_session_gc()
+    sid = uuid.uuid4().hex
+    q: asyncio.Queue[str] = asyncio.Queue()
+    jwt_token: Optional[str] = None
+    if request is not None:
+        auth = request.headers.get("authorization") or ""
+        if auth.lower().startswith("bearer "):
+            jwt_token = auth.split(" ", 1)[1]
+    _SSE_SESSIONS[sid] = {
+        "user_id":    current_user.id,
+        "queue":      q,
+        "jwt":        jwt_token,
+        "expires_at": time.time() + _SSE_SESSION_TTL_S,
+    }
+    logger.info(f"[mcp] SSE session opened sid={sid} user={current_user.id}")
+
+    async def _stream() -> AsyncIterator[bytes]:
+        # First event — advertise the POST endpoint (per MCP HTTP-SSE spec)
+        post_url = f"/api/mcp/sse/messages?sid={sid}"
+        yield f"event: endpoint\ndata: {post_url}\n\n".encode()
+        try:
+            while True:
+                # Heartbeat every 15s to keep intermediaries alive
+                try:
+                    item = await asyncio.wait_for(q.get(), timeout=15.0)
+                except asyncio.TimeoutError:
+                    yield b": keep-alive\n\n"
+                    continue
+                if item == "__CLOSE__":
+                    break
+                yield f"event: message\ndata: {item}\n\n".encode()
+        finally:
+            _SSE_SESSIONS.pop(sid, None)
+            logger.info(f"[mcp] SSE session closed sid={sid}")
+
+    return StreamingResponse(_stream(), media_type="text/event-stream", headers={
+        "Cache-Control": "no-cache, no-store",
+        "Connection":    "keep-alive",
+        "X-Accel-Buffering": "no",
+    })
+
+
+@mcp_router.post("/sse/messages")
+async def mcp_sse_message(
+    request: Request,
+    body: Dict[str, Any],
+    sid: str = Query(...),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Client → server JSON-RPC message. Response is queued onto the
+    matching SSE stream. HTTP body is 202 (message accepted)."""
+    session = _SSE_SESSIONS.get(sid)
+    if not session or session["user_id"] != current_user.id:
+        raise HTTPException(status_code=404, detail={"error": "SSE_SESSION_NOT_FOUND"})
+    session["expires_at"] = time.time() + _SSE_SESSION_TTL_S
+
+    db = get_db()
+    jwt_token = session.get("jwt")
+    r = await _dispatch_jsonrpc(db, current_user, body, jwt_token=jwt_token)
+    if r is not None:
+        await session["queue"].put(json.dumps(r, default=str))
+    from fastapi.responses import Response as _Resp
+    return _Resp(status_code=202)

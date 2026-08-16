@@ -1,78 +1,134 @@
-# BidVex MCP Server — Integration Guide (iter485)
+# BidVex MCP Server — Integration Guide (iter485 + iter486)
 
-**Status:** Preview/Staging only. NOT registered in `server.py` by default.
-**Version:** iter485 (initial delivery, 2026-02-16)
-**File:** `backend/mcp_server.py`
-**Mount path:** `/api/mcp/*` (when enabled)
-**Enabled by:** `MCP_ENABLED=true` env var (opt-in)
+**Status:** Preview/Staging only. Registered under `MCP_ENABLED=true`.
+**Version:** iter486 (Claude Desktop end-to-end integration, 2026-02-17)
+**Files:** `backend/mcp_server.py`, `backend/mcp_bridge.py`
+**Mount paths (when enabled):**
+- `POST /api/mcp/rpc`                      — JSON-RPC 2.0 (used by stdio bridge, internal callers)
+- `GET  /api/mcp/sse` + `POST /api/mcp/sse/messages?sid=<id>` — MCP HTTP-SSE transport
+- `POST /api/mcp/tools/list`               — Legacy REST (iter485 backwards-compat)
+- `POST /api/mcp/tools/call`               — Legacy REST (iter485 backwards-compat)
+- `GET  /api/mcp/health`                   — Public liveness probe
 
 The MCP server is an **additive** layer that exposes a fixed set of
 BidVex marketplace operations as Claude-callable tools. It does **not**
 duplicate any business logic — every tool wraps existing internal
 services (bid handler, trust gate, fee calculator, market comparables,
-top-sellers analytics, Meta Ads publisher). Deleting the file leaves
-the rest of the platform behavior unchanged.
+top-sellers analytics, Meta Ads publisher). Deleting the two MCP files
+leaves the rest of the platform behavior unchanged.
 
 ---
 
-## 1. Endpoints
+## 1. Transports
 
-| Method | Path                       | Auth       | Purpose                                                          |
-|--------|----------------------------|------------|------------------------------------------------------------------|
-| GET    | `/api/mcp/health`          | Public     | Liveness probe (no user data)                                    |
-| POST   | `/api/mcp/tools/list`      | JWT + gate | Return the tool catalogue visible to the caller                  |
-| POST   | `/api/mcp/tools/call`      | JWT + gate | Dispatch a single tool call                                      |
+| Transport            | Endpoint / Path                                      | Used by                             |
+|----------------------|------------------------------------------------------|-------------------------------------|
+| **stdio**            | `backend/mcp_bridge.py` subprocess                   | Claude Desktop (native)             |
+| **HTTP JSON-RPC**    | `POST /api/mcp/rpc`                                  | The bridge; other backend services  |
+| **HTTP-SSE**         | `GET /api/mcp/sse` + `POST /api/mcp/sse/messages`    | `mcp-remote`, Claude Web, external clients |
+| **Legacy REST**      | `POST /api/mcp/tools/{list,call}`                    | iter485 tests + internal callers (kept for backwards-compat) |
 
-`tools/call` body:
+All four surfaces share the same tool implementations, gates, and
+audit-log path. The MCP-compliance surface lives entirely in
+`_dispatch_jsonrpc()`; transports differ only in how they wrap
+requests/responses.
+
+---
+
+## 2. Claude Desktop configuration (drop-in)
+
+Save this as your `claude_desktop_config.json`
+(`~/Library/Application Support/Claude/claude_desktop_config.json` on
+macOS, `%APPDATA%\Claude\claude_desktop_config.json` on Windows):
+
 ```json
 {
-  "name": "<tool_name>",
-  "arguments": { … }
+  "mcpServers": {
+    "bidvex": {
+      "command": "python",
+      "args": [
+        "/absolute/path/to/backend/mcp_bridge.py"
+      ],
+      "env": {
+        "BIDVEX_MCP_URL": "https://your-bidvex-host.example.com",
+        "BIDVEX_MCP_JWT": "eyJhbGciOiJIUzI1NiJ9..."
+      }
+    }
+  }
 }
 ```
 
+- **`BIDVEX_MCP_URL`** — base URL of your BidVex backend (no trailing
+  slash; the bridge appends `/api/mcp/rpc`).
+- **`BIDVEX_MCP_JWT`** — a BidVex JWT for the caller. Obtain from
+  `POST /api/auth/login` and paste here. The bridge does not implement
+  a login flow — Claude Desktop clients are authenticated as the user
+  whose JWT is configured.
+
+To rotate the token: replace the string, restart Claude Desktop. The
+bridge is stateless.
+
+### Alternative: connect a remote MCP client via SSE
+
+If you want to connect **without installing the bridge locally** (e.g.
+Claude Web or `mcp-remote`), use the SSE transport:
+
+```json
+{
+  "mcpServers": {
+    "bidvex": {
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://your-bidvex-host.example.com/api/mcp/sse",
+        "--header", "Authorization: Bearer eyJhbGciOi..."
+      ]
+    }
+  }
+}
+```
+
+The server advertises the message-post endpoint on first connect;
+`mcp-remote` handles the rest.
+
 ---
 
-## 2. Authentication flow
+## 3. Authentication flow
 
-1. The caller obtains a BidVex JWT via the existing `/api/auth/login` /
-   `/api/auth/register` flow. The MCP server does **not** issue tokens.
-2. Every MCP request includes `Authorization: Bearer <jwt>` (or the
-   `session_token` cookie, whichever the caller has).
+1. The caller obtains a BidVex JWT via `/api/auth/login` /
+   `/api/auth/register`. The MCP server does **not** issue tokens.
+2. The bridge (or SSE client) attaches `Authorization: Bearer <jwt>`
+   to every request to the backend.
 3. The JWT is validated by the same `deps.get_current_user` FastAPI
    dependency the rest of the backend uses (HS256 against
    `JWT_SECRET`, checks user still exists, checks not expired).
-4. On success, the user document is loaded once from the `users`
-   collection and reused across the request-scoped gates below.
-5. On failure the response is `401 Unauthorized`; nothing is written
+4. On failure the response is `401 Unauthorized`; nothing is written
    to the audit log because we don't yet know the user id.
 
 ---
 
-## 3. Subscription access gate
+## 4. Subscription access gate
 
 The MCP server is available **only** to accounts on an active annual
-paid subscription. The gate is enforced on **every** request (not
-just `tools/call`) by `_require_mcp_access`.
+paid subscription. The gate is enforced on **every** JSON-RPC and REST
+call.
 
-An account is granted access iff **any** of these evaluate true:
-
-| Condition | Field(s) checked                                                                                                    |
-|-----------|--------------------------------------------------------------------------------------------------------------------|
-| Premium / VIP / Partner Pro | `subscription_tier ∈ {"premium","vip","partner_pro"}` AND `subscription_status == "active"`             |
-| Vehicle Dealer              | `is_vehicle_dealer == true` AND `dealer_subscription_status == "active"` AND `dealer_subscription_active == true` |
+| Condition                   | Field(s) checked                                                                                                    |
+|-----------------------------|--------------------------------------------------------------------------------------------------------------------|
+| Premium / VIP / Partner Pro | `subscription_tier ∈ {"premium","vip","partner_pro"}` AND `subscription_status == "active"`                        |
+| Vehicle Dealer              | `is_vehicle_dealer == true` AND `dealer_subscription_status == "active"` AND `dealer_subscription_active == true`  |
 | Broker                      | `account_type == "broker"` AND `subscription_status == "active"`                                                   |
 | Storage Facility            | `account_type == "storage_facility"` AND `facility_verified == true` AND `subscription_status == "active"`         |
 | Admin / super_admin (ops)   | `role ∈ {"admin","super_admin"}`                                                                                   |
 
-Failure response (**HTTP 402 Payment Required**):
+Failure response (**HTTP 402**, JSON-RPC error `-32001`):
 ```json
 {
-  "detail": {
-    "error":       "SUBSCRIPTION_REQUIRED",
-    "message_en":  "The BidVex MCP service is available only to Premium, VIP, Partner Pro, Vehicle Dealer, Broker, or verified Storage Facility accounts with an active annual subscription.",
-    "message_fr":  "Le service MCP BidVex est réservé aux comptes Premium, VIP, Partner Pro, Concessionnaire automobile, Courtier ou Établissement d'entreposage vérifié avec un abonnement annuel actif.",
-    "upgrade_url": "/pricing"
+  "jsonrpc": "2.0", "id": <n>,
+  "error": {
+    "code":    -32001,
+    "message": "SUBSCRIPTION_REQUIRED",
+    "data":    { "error": "SUBSCRIPTION_REQUIRED", "message_en": "…", "message_fr": "…", "upgrade_url": "/pricing" }
   }
 }
 ```
@@ -82,15 +138,14 @@ this gate was written; nothing is hardcoded from documentation-only.
 
 ---
 
-## 4. Verification gate (per-tool)
+## 5. Verification gate (per-tool)
 
 Bid + listing-creation tools apply a second gate after the subscription
 check.
 
-### Base gate (all "actionable" tools)
+### Base gate
 Reuses `services.trust_gate.require_trust_verified` — same rules that
 gate the REST bid endpoint:
-
 - `phone_verified == true`
 - Caller has ≥ 1 row in the `payment_methods` collection (Stripe card
   on file)
@@ -103,55 +158,49 @@ On top of the base gate, `create_auction_draft` and
 `bulk_create_listings` additionally require **verified Seller Tax ID**
 per vertical:
 
-| Account shape                     | Required in addition to `tax_id != ""`                       |
-|-----------------------------------|--------------------------------------------------------------|
-| `is_vehicle_dealer == true`       | `dealer_license_verified == true`                            |
-| `account_type == "storage_facility"` | `facility_verified == true`                              |
-| `account_type ∈ {"broker","business"}` | `admin_verified == true`                              |
-| `account_type == "personal"`      | Any non-empty `tax_id` string is accepted                    |
-
-Failure responses:
-```json
-{ "detail": { "error": "TAX_ID_REQUIRED", "message_en": "…", "message_fr": "…" } }
-{ "detail": { "error": "TAX_ID_REQUIRED", "detail": "dealer_license_not_verified", "message_en": "…", "message_fr": "…" } }
-{ "detail": { "error": "TAX_ID_REQUIRED", "detail": "facility_not_verified",       "message_en": "…", "message_fr": "…" } }
-{ "detail": { "error": "TAX_ID_REQUIRED", "detail": "corporate_not_verified",      "message_en": "…", "message_fr": "…" } }
-```
+| Account shape                          | Required in addition to `tax_id != ""` |
+|----------------------------------------|----------------------------------------|
+| `is_vehicle_dealer == true`            | `dealer_license_verified == true`     |
+| `account_type == "storage_facility"`   | `facility_verified == true`           |
+| `account_type ∈ {"broker","business"}` | `admin_verified == true`              |
+| `account_type == "personal"`           | Any non-empty `tax_id` string         |
 
 ---
 
-## 5. Rate limiting
+## 6. Rate limiting — Redis-backed with in-memory fallback
 
 - **Scope**: per-JWT-subject (`sub` claim = user id).
 - **Window**: sliding 60 seconds.
 - **Limit**: `MCP_RATE_LIMIT_PER_MIN` env var (default **30 / minute**).
-- **Implementation**: in-process sliding-window buckets. This is
-  intentionally simple for a preview server and DOES lose state on
-  backend restart. For production a Redis-backed limiter would replace it.
-- **Fail-open safety**: any exception inside the limiter falls open —
-  a limiter bug can never wedge a legitimate caller.
+- **Backend selection** (in order):
+  1. **Redis** — configured via `REDIS_URL`, keyed as `mcp:rl:<user_id>`,
+     stored as a ZSET with the timestamp as the score. State survives
+     backend restart.
+  2. **In-process bucket** — automatic fallback when Redis is unreachable
+     or `REDIS_URL` is unset. State is per-process and lost on restart.
+- **Fail-open safety**: any exception in either backend falls open — a
+  limiter bug can never wedge a legitimate caller. On a Redis error the
+  cached client is dropped so the next call re-probes.
 
-Successful responses include `rate_limit_remaining` in the payload:
+Successful responses include `_meta.rate_limit_remaining` in the tool
+call payload:
 ```json
-{ "tool": "get_listing_details", "result": {…}, "rate_limit_remaining": 27 }
+"_meta": { "rate_limit_remaining": 27 }
 ```
 
-Exceeded (**HTTP 429**):
+Exceeded (**HTTP 429 or JSON-RPC isError=true**):
 ```json
 {
-  "detail": {
-    "error":            "RATE_LIMIT_EXCEEDED",
-    "limit_per_minute": 30,
-    "retry_after_s":    60,
-    "message_en":       "Too many MCP tool calls. Please slow down.",
-    "message_fr":       "Trop d'appels d'outils MCP. Veuillez ralentir."
-  }
+  "error":            "RATE_LIMIT_EXCEEDED",
+  "limit_per_minute": 30,
+  "retry_after_s":    60,
+  "backend":          "redis"    // or "memory"
 }
 ```
 
 ---
 
-## 6. Audit logging
+## 7. Audit logging
 
 Every tool invocation — success, failure, or rejected — writes exactly
 one row to the **`mcp_audit_logs`** collection. Audit-write failures
@@ -164,7 +213,7 @@ never impact the user's flow (logged at WARNING and swallowed).
   "source":        "mcp_claude",           // fixed constant
   "user_id":       "<caller's id>",
   "tool_name":     "<tool>",               // e.g. "place_bid"
-  "input_params":  { … sanitized args … }, // see §7
+  "input_params":  { … sanitized args … }, // see §8
   "timestamp":     "<ISO-8601 UTC>",
   "result_status": "success" | "failure" | "rejected",
   "error_code":    "<short error code>",   // null on success
@@ -177,60 +226,9 @@ never impact the user's flow (logged at WARNING and swallowed).
 - `rejected`  — 4xx (user-facing validation, gate, or rate limit).
 - `failure`   — 5xx (internal / infra error).
 
-### Example rows (real, captured 2026-02-16)
-
-Success with **sanitized** sensitive args:
-```json
-{
-  "id":            "51b1b937-0198-456f-bce8-c57d4f35fd6c",
-  "source":        "mcp_claude",
-  "user_id":       "8940074d-da97-43ca-9a0b-c59d39411ed6",
-  "tool_name":     "get_listing_details",
-  "input_params":  {
-    "listing_id":  "58758582-f53a-46d8-bc0b-87cf9de60523",
-    "password":    "<redacted:key>",
-    "api_key":     "<redacted:key>"
-  },
-  "timestamp":     "2026-02-16T22:33:23.284383+00:00",
-  "result_status": "success",
-  "error_code":    null,
-  "latency_ms":    180
-}
-```
-
-Rejected (unknown tool):
-```json
-{
-  "id":            "2ba448d4-8ff6-4263-9e6f-f75f35c7b34f",
-  "source":        "mcp_claude",
-  "user_id":       "8940074d-da97-43ca-9a0b-c59d39411ed6",
-  "tool_name":     "nonexistent_tool",
-  "input_params":  {},
-  "timestamp":     "2026-02-16T22:33:23.607815+00:00",
-  "result_status": "rejected",
-  "error_code":    "UNKNOWN_TOOL",
-  "latency_ms":    45
-}
-```
-
-Stub success (`NOT_IMPLEMENTED`):
-```json
-{
-  "id":            "a66a0782-f1f9-4fd2-934f-18f932cd0639",
-  "source":        "mcp_claude",
-  "user_id":       "8940074d-da97-43ca-9a0b-c59d39411ed6",
-  "tool_name":     "B2B_syndication_matchmaker",
-  "input_params":  { "seller_id": "demo-seller-1", "manifest_raw_data": { "csv": "..." } },
-  "timestamp":     "2026-02-16T22:33:23.890296+00:00",
-  "result_status": "success",
-  "error_code":    null,
-  "latency_ms":    45
-}
-```
-
 ---
 
-## 7. Secret sanitization
+## 8. Secret sanitization
 
 `_sanitize()` recursively rewrites any dict key matching this pattern
 before the row hits `mcp_audit_logs`:
@@ -258,170 +256,98 @@ short error code (`INTERNAL_ERROR`). This is guarded by
 
 ---
 
-## 8. Tool catalogue
+## 9. Tool catalogue (13 tools)
 
-All tools return JSON. Complete input schemas are also served by
-`POST /api/mcp/tools/list` (self-describing).
+Full input schemas are also served by `tools/list` (self-describing).
 
 ### Bidding & Marketplace
 
-#### `get_listing_details(listing_id)`
-Returns the full **public** listing document across all four verticals
-(`marketplace | lots | vehicle | storage`), stripping obviously
-private fields (`internal_notes`, `admin_notes`, seller stripe id).
-
-Input:  `{ "listing_id": string }`
-Output: `{ "vertical": "marketplace|lots|vehicle|storage", "listing": {...} }`
-Errors: `listing_not_found` (404), `listing_id required` (400)
-
-#### `place_bid(listing_id, bid_amount, user_max_ceiling?)`
-Places a bid via **HTTP loopback to the existing `POST /api/bids`
-handler** — so snipe protection, minimum increment, deposit rules,
-watchdog moderation, and notifications all fire unchanged.
-
-Explicit guard added on top:
-1. Full trust gate (phone + payment method + T&C).
-2. If `user_max_ceiling` is provided AND `bid_amount > user_max_ceiling`,
-   the call is **REJECTED** (400 `BID_EXCEEDS_MAX_CEILING`) — never
-   silently capped.
-
-Input:  `{ "listing_id": string, "bid_amount": number, "user_max_ceiling"?: number }`
-Output: `{ "bid_status": "placed", "result": { …from bid handler… } }`
-Errors: `trust_required` (403), `BID_EXCEEDS_MAX_CEILING` (400), plus
-any error bubbled from the underlying bid endpoint (listing not found,
-below-minimum increment, listing ended, self-bid, etc.).
-
-#### `create_auction_draft(vertical, raw_input)`
-Persists a `status="draft"` document in the appropriate collection.
-Publishing remains an explicit separate action (unchanged existing
-publish endpoints). Only fields the caller supplies are stored; ownership
-(`seller_id`), `status`, `id`, `created_via` are set by the server.
-
-Input:  `{ "vertical": "marketplace|lots|vehicle|storage", "raw_input": object }`
-Output: `{ "draft_id": string, "vertical": string, "status": "draft" }`
-Additional gate: **corporate tax verification** (§4).
-
-#### `bulk_create_listings(items[])`
-Iterates over `items[]`, calling `create_auction_draft` for each.
-Cap: **500 items per call**. Returns a per-item success/failure array.
-Additional gate: **corporate tax verification** (§4), enforced once
-up front so partial writes don't leak on unverified callers.
-
-#### `check_bid_status(listing_id, user_id?, lot_number?)`
-Returns the caller's bid standing on a single listing (or lot). Non-
-admin callers can only query their own standing.
-
-Output shape:
-```json
-{
-  "listing_id":     "...",
-  "listing_status": "active|ended|...",
-  "total_bids":     N,
-  "user_position":  1|2|3|null,
-  "status":         "winning|outbid|won|ended_outbid|not_participating|no_bids"
-}
-```
+- **`search_auctions`** *(new, iter486)* — Search across all four verticals
+  (`marketplace | lots | vehicle | storage`). Filters: `query`, `vertical`,
+  `category`, `min_price`, `max_price`, `status`, `limit`. Query text is
+  regex-escaped server-side via `services.sanitizer.safe_regex`. Returns
+  per-vertical result groups so callers can render them separately.
+- **`get_listing_details(listing_id)`** — Full public listing document
+  across all four verticals; strips obviously private fields (`internal_notes`,
+  `admin_notes`, seller stripe id). This is the **broader BidVex** tool and
+  is intentionally NOT renamed to `get_lot_details`.
+- **`place_bid(listing_id, bid_amount, user_max_ceiling?)`** — Bids via HTTP
+  loopback to the existing `POST /api/bids` handler; snipe protection,
+  minimum increment, deposit, watchdog moderation, and notifications all
+  fire unchanged. **Rejects (400 `BID_EXCEEDS_MAX_CEILING`)** when
+  `bid_amount > user_max_ceiling` — never silently capped.
+- **`create_auction_draft(vertical, raw_input)`** — Persists a
+  `status="draft"` document; publishing remains an explicit separate
+  action. Additional gate: corporate tax verification.
+- **`bulk_create_listings(items[])`** — Iterates `create_auction_draft`;
+  cap 500 items. Verifies tax up front to avoid partial writes.
+- **`check_bid_status(listing_id, user_id?, lot_number?)`** — Caller's
+  bid standing on a listing (winning/outbid/won/ended/no_bids + position).
 
 ### Marketing & Creative
 
-#### `publish_meta_ad_promotion(listing_id, budget_cap_cents, duration_days)`
-Publishes a Meta Ads campaign via `services.ads_publisher.publish_to_meta_sync`.
-
-Hard rails:
-- `budget_cap_cents ∈ [1, 10_000_000]` (max $100 000 lifetime cap).
-- `duration_days ∈ [1, 30]`.
-- Caller must own the listing (or be admin).
-- If `services.ads_publisher.meta_flag()['enabled'] == false` (missing
-  env vars), returns `NOT_IMPLEMENTED` with the prerequisite string —
-  no attempt to create a new billing account or spend beyond what's
-  already provisioned.
-- Daily budget derived server-side from `budget_cap_cents / duration_days`.
-
-#### `generate_listing_video(listing_id)`
-**STUB** — Higgsfield integration is not provisioned in this
-codebase. Returns:
-```json
-{
-  "status":     "NOT_IMPLEMENTED",
-  "reason":     "higgsfield_not_provisioned",
-  "message_en": "Short-form video generation via Higgsfield is not currently provisioned on this BidVex environment. Contact platform ops to enable.",
-  "message_fr": "La génération de vidéos courtes via Higgsfield n'est pas configurée sur cet environnement BidVex. Contactez l'exploitation."
-}
-```
-Logs a WARN on every invocation.
+- **`publish_meta_ad_promotion(listing_id, budget_cap_cents, duration_days)`**
+  — Wraps `services.ads_publisher.publish_to_meta_sync`. Hard rails:
+  budget cap ≤ $100k lifetime, duration 1–30 days, caller must own
+  listing. Returns `NOT_IMPLEMENTED` when Meta env is not provisioned.
+- **`generate_listing_video(listing_id)`** — **STUB** — Higgsfield not
+  provisioned → `NOT_IMPLEMENTED / higgsfield_not_provisioned`.
 
 ### Analytics & Advice
 
-#### `get_bidding_advice(listing_id)`
-Returns market comparables (via `services.chat_listing_context.fetch_market_comparables`) — **data only**, no advice generation. Same window/rules
-as the existing chat-context path.
-
-#### `analyze_seller_inventory(seller_id?)`
-Read-only aggregation across `listings`, `multi_item_listings`,
-`vehicles`, `storage_units`. Non-admin callers can only inspect their
-own inventory. Returns:
-```json
-{
-  "seller_id":    "...",
-  "active_count": N,
-  "ended_count":  N,
-  "total_gmv":    12345.67,
-  "stale_active": [{ "id": "...", "title": "..." }, ...],
-  "categories":   [...]
-}
-```
-"Stale" = active > 14 days old with no bids.
-
-#### `detect_performance_bottlenecks(seller_id?, listing_id?)`
-Flags active `listings` with fewer views than 25% of same-category
-median (min 1). Read-only; non-admins scoped to their own listings.
-
-#### `identify_top_sellers(limit=5)`  — **admin only**
-Wraps `services.top_sellers.compute_top_sellers`. Excludes demo data.
-Enforced by `admin_only=True` in the tool registry AND a second
-`_require_admin_role` check in the dispatcher.
-
-#### `B2B_syndication_matchmaker(seller_id, manifest_raw_data)`
-**STUB** — deliberately not implemented in this pass.
-Returns `NOT_IMPLEMENTED / b2b_matchmaker_phase_2` and logs a WARN.
-The full Phase 2 intent is preserved in a `TARGET INTENT` comment
-block inside the handler body (`backend/mcp_server.py`).
+- **`get_bidding_advice(listing_id)`** — Market comparables via
+  `services.chat_listing_context.fetch_market_comparables`. Data only.
+- **`analyze_seller_inventory(seller_id?)`** — Read-only aggregation
+  across all four verticals. Non-admin scoped to own inventory.
+- **`detect_performance_bottlenecks(seller_id?, listing_id?)`** —
+  Flags actives with < 25% of same-category median views.
+- **`identify_top_sellers(limit=5)`** — Admin only.
+  Wraps `services.top_sellers.compute_top_sellers`.
+- **`B2B_syndication_matchmaker(seller_id, manifest_raw_data)`** —
+  **STUB** — `NOT_IMPLEMENTED / b2b_matchmaker_phase_2` + TARGET INTENT
+  comment block preserved in handler source.
 
 ---
 
-## 9. What this MCP server does **NOT** touch
+## 10. What this MCP server does **NOT** touch
 
-The scope of iter485 is deliberately narrow and read-only-friendly:
+The scope of iter485 + iter486 is deliberately narrow:
 
-- ❌ No changes to any existing REST route or route file.
+- ❌ No changes to any existing REST route or route file (except the
+  ~14-line opt-in mount block in `server.py` behind `MCP_ENABLED`).
 - ❌ No changes to `services/fee_calculator.py`, `services/tax_engine.py`,
   or any commission/tax calculator.
 - ❌ No changes to Stripe integration code (no new Stripe API calls
   are made by the MCP layer — bids reuse the existing bid handler
   which owns Stripe interactions).
 - ❌ No changes to the Gemini watchdog / moderation pipeline.
-- ❌ No new environment variables added, other than the opt-in
-  `MCP_ENABLED` flag and the optional `MCP_RATE_LIMIT_PER_MIN`
-  override.
+- ❌ No changes to escrow, deposits, auction lifecycle, or payout
+  logic.
+- ❌ No modifications to `trust_gate`, subscription gates, tax-ID
+  gates, audit log format, or any authorization primitive.
 - ❌ No Higgsfield or B2B matchmaker business logic invented — both
   are declared stubs that return `NOT_IMPLEMENTED`.
-- ❌ No production deployment. Enabling in production requires:
-  (a) explicit sign-off after review, (b) migrating the in-process
-  rate limiter to Redis, (c) fronting with an actual MCP transport
-  bridge (SSE) if desired.
+- ❌ **NO PRODUCTION DEPLOYMENT.** Preview only per user command.
 
 ---
 
-## 10. Enabling in preview / disabling
+## 11. Enabling in preview / disabling
 
 **Preview** (`/app/backend/.env`):
 ```
 MCP_ENABLED=true
+
+# Optional — omit to use in-process rate limiter only
+REDIS_URL=rediss://user:pass@host:6379/0
+
+# Optional — override default 30/min
+# MCP_RATE_LIMIT_PER_MIN=60
 ```
+
 Then `sudo supervisorctl restart backend`. Health check:
 ```
 curl http://localhost:8001/api/mcp/health
-# {"status":"ok","protocol":"mcp-http","tool_count":12}
+# {"status":"ok","protocol":"mcp-http","tool_count":13}
 ```
 
 **Disable**: remove or set `MCP_ENABLED=false`. The router is imported
@@ -430,52 +356,53 @@ router at next backend restart.
 
 ---
 
-## 11. Testing
+## 12. Testing
 
-Regression suite: `backend/tests/iter482/test_mcp_server.py` — 18
-tests, all passing:
+Two test files cover the complete surface:
 
-| Test                                                          | Verifies                                                  |
-|---------------------------------------------------------------|-----------------------------------------------------------|
-| `test_free_tier_blocked_from_tools_list`                      | Free tier → 402 SUBSCRIPTION_REQUIRED on `tools/list`     |
-| `test_free_tier_blocked_from_call`                            | Free tier → 402 SUBSCRIPTION_REQUIRED on `tools/call`     |
-| `test_premium_can_list_tools`                                 | Premium sees all 11 non-admin tools, no admin-only tools  |
-| `test_admin_sees_admin_only_tools`                            | Admin sees `identify_top_sellers` too                     |
-| `test_bid_rejected_when_no_payment_method`                    | Trust gate fires when no card on file                     |
-| `test_bid_rejected_when_ceiling_exceeded`                     | `bid_amount > user_max_ceiling` → 400 (no silent cap)     |
-| `test_create_draft_requires_tax_verification`                 | Dealer w/ unverified license → 403 dealer_license_not_verified |
-| `test_non_admin_blocked_from_top_sellers`                     | `identify_top_sellers` returns 403 ADMIN_ONLY for non-admin |
-| `test_get_listing_details_ok_for_premium`                     | Read-only tool works for premium user                     |
-| `test_get_bidding_advice_returns_comparables`                 | Comparables tool returns data-only, no advice             |
-| `test_generate_listing_video_is_stub`                         | Higgsfield stub returns NOT_IMPLEMENTED                   |
-| `test_b2b_matchmaker_is_stub`                                 | B2B matchmaker stub returns NOT_IMPLEMENTED               |
-| `test_unknown_tool_returns_404`                               | UNKNOWN_TOOL response for bogus name                      |
-| `test_rate_limit_exceeded_writes_audit`                       | 30th call succeeds, 31st → 429 + audit row written        |
-| `test_audit_row_sanitizes_secrets`                            | password/api_key/jwt_token/card_number all redacted       |
-| `test_unauth_request_gets_401`                                | No token → 401                                            |
-| `test_source_has_b2b_stub_intent_comment`                     | Phase-2 intent comment preserved in source                |
-| `test_source_does_not_import_or_touch_stripe_secrets`         | MCP file never imports Stripe or touches secret keys      |
+### `backend/tests/iter482/test_mcp_server.py` — 18 tests (iter485)
+
+Access gates + audit + sanitizer + legacy REST endpoints.
+
+### `backend/tests/iter482/test_mcp_jsonrpc_transport.py` — 10 tests (iter486)
+
+| Test                                                                    | Verifies                                                             |
+|-------------------------------------------------------------------------|----------------------------------------------------------------------|
+| `test_jsonrpc_initialize_returns_valid_serverinfo`                      | `initialize` returns `protocolVersion`, `serverInfo`, `capabilities` |
+| `test_jsonrpc_notifications_initialized_returns_202`                    | Notifications receive no response body (per MCP spec)                |
+| `test_jsonrpc_ping_ok`                                                  | `ping` returns empty result                                          |
+| `test_jsonrpc_tools_list_shape_matches_mcp_spec`                        | `inputSchema` camelCase, no `input_schema` leakage, all 13 tools present |
+| `test_full_workflow_search_details_bid_via_jsonrpc`                     | `search_auctions` → `get_listing_details` → `place_bid` end-to-end   |
+| `test_place_bid_ceiling_rejection_via_jsonrpc`                          | `bid_amount > ceiling` → `isError=true` with `BID_EXCEEDS_MAX_CEILING` |
+| `test_stdio_bridge_subprocess_roundtrip`                                | Spawns `mcp_bridge.py`, exchanges 3 JSON-RPC msgs over stdin/stdout  |
+| `test_sse_transport_endpoint_and_message_roundtrip`                     | Full SSE handshake: open GET → endpoint event → POST → SSE response  |
+| `test_redis_limiter_persistence`                                        | Fake Redis state SURVIVES simulated backend restart                  |
+| `test_redis_outage_falls_back_to_memory`                                | Redis unreachable → limiter transparently uses in-memory bucket      |
 
 Run:
 ```
-cd /app/backend && python -m pytest tests/iter482/test_mcp_server.py -v
+cd /app/backend && python -m pytest tests/iter482/test_mcp_server.py tests/iter482/test_mcp_jsonrpc_transport.py -v
+# 28 passed
 ```
 
 ---
 
-## 12. What was NOT modified
+## 13. Files created / modified
 
-Zero existing files touched other than a single conditional block in
-`server.py` gated by `MCP_ENABLED`. Full list of files created /
-modified for this iteration:
+**Created:**
+- `backend/mcp_server.py`                                    — MCP server + tool handlers + JSON-RPC + SSE
+- `backend/mcp_bridge.py`                                    — stdio bridge (Claude Desktop launcher)
+- `backend/tests/iter482/test_mcp_server.py`                 — iter485 gate & audit tests (18)
+- `backend/tests/iter482/test_mcp_jsonrpc_transport.py`      — iter486 protocol & transport tests (10)
+- `docs/MCP_INTEGRATION.md`                                  — this document
 
-| File                                             | Kind    |
-|--------------------------------------------------|---------|
-| `backend/mcp_server.py`                          | NEW     |
-| `backend/tests/iter482/test_mcp_server.py`       | NEW     |
-| `docs/MCP_INTEGRATION.md`                        | NEW     |
-| `backend/server.py`                              | MODIFIED — added ~14 lines behind the `MCP_ENABLED` flag |
-| `backend/.env`                                   | MODIFIED — added `MCP_ENABLED=true` (preview only)       |
+**Modified (opt-in only):**
+- `backend/server.py`                                        — ~14 lines behind `MCP_ENABLED` flag
+- `backend/.env`                                             — added `MCP_ENABLED=true` (preview only)
+- `backend/requirements.txt`                                 — added `fakeredis==2.37.0` + `sortedcontainers==2.4.0` (test dependency only)
 
-No modifications to `fee_calculator`, `tax_engine`, watchdog, Stripe
-integration, existing REST endpoints, or the frontend.
+**Not modified:**
+- Any existing REST route, tool business logic, gate primitive
+  (`trust_gate`, subscription, tax-id checks), audit-log format,
+  Stripe integration, fee/tax calculator, watchdog, escrow, or
+  auction lifecycle code.
