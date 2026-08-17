@@ -577,6 +577,72 @@ async def tool_place_bid(db, user, user_doc, params, *, jwt: str) -> Dict[str, A
     return {"bid_status": "placed", "result": result}
 
 
+def _coerce_float(v: Any) -> Optional[float]:
+    """Best-effort numeric coercion for prices that Claude may send as
+    strings (e.g. "$250" or "250.00"). Returns None if unparseable."""
+    if v is None or v == "":
+        return None
+    if isinstance(v, (int, float)):
+        return float(v)
+    s = str(v).strip().replace("$", "").replace(",", "")
+    try:
+        return float(s)
+    except (TypeError, ValueError):
+        return None
+
+
+def _normalise_marketplace_draft(raw: Dict[str, Any]) -> Dict[str, Any]:
+    """iter496 — Normalise an MCP-supplied `raw_input` payload into the
+    exact shape the existing `Listing` Pydantic response model expects.
+
+    The Seller Dashboard's Edit action calls
+    `GET /api/listings/{id}` which hydrates via `Listing(**doc)` — if
+    `starting_price`, `current_price`, or `auction_end_date` are
+    missing the endpoint returns 500 and the dashboard displays
+    "Listing not found". This function guarantees an MCP-created
+    marketplace/lots draft is byte-compatible with a UI-created draft.
+
+    * `price` / `starting_price` / `startingPrice` → `starting_price`
+      and `current_price` (matches how the UI's POST /listings does
+      it, models/auction_models.py L380).
+    * `auction_end_date` defaults to +7 days (typical UI default)
+      when absent. Kept as ISO string in Mongo; the GET endpoint
+      converts back to datetime.
+    * Blank text fields ("", None) are backfilled with empty strings
+      so `Listing` validation doesn't trip on missing `title`,
+      `description`, `category`, `condition`, `location`. The seller
+      can then edit them in the Dashboard.
+    """
+    out = dict(raw)
+    # Price aliases
+    sp = _coerce_float(out.pop("starting_price", None)
+                       or out.pop("startingPrice", None)
+                       or out.get("price"))
+    if sp is not None:
+        out["starting_price"] = sp
+        out["current_price"]  = out.get("current_price") if isinstance(out.get("current_price"), (int, float)) else sp
+    else:
+        out["starting_price"] = 0.0
+        out["current_price"]  = 0.0
+    # buy_now_price alias
+    bn = _coerce_float(out.get("buy_now_price"))
+    if bn is not None:
+        out["buy_now_price"] = bn
+    # auction_end_date default → +7 days
+    if not out.get("auction_end_date"):
+        out["auction_end_date"] = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
+    elif isinstance(out["auction_end_date"], datetime):
+        out["auction_end_date"] = out["auction_end_date"].isoformat()
+    # Text scaffolding — required by Listing model
+    for f in ("title", "description", "category", "condition", "location"):
+        if out.get(f) is None:
+            out[f] = ""
+    # Currency default
+    if not out.get("currency"):
+        out["currency"] = "CAD"
+    return out
+
+
 async def tool_create_auction_draft(db, user, user_doc, params) -> Dict[str, Any]:
     """Create a draft listing in the requested vertical.
 
@@ -598,6 +664,10 @@ async def tool_create_auction_draft(db, user, user_doc, params) -> Dict[str, Any
         a piece of furniture, an appliance, or a general marketplace
         product without their vehicle-dealer status being on the
         critical path.
+
+    iter496 — Marketplace/lots drafts are now normalised via
+    `_normalise_marketplace_draft` so they can be opened by the
+    Seller Dashboard Edit route without a Pydantic 500.
     """
     vertical = (params.get("vertical") or "").lower()
     raw = params.get("raw_input") or {}
@@ -627,6 +697,10 @@ async def tool_create_auction_draft(db, user, user_doc, params) -> Dict[str, Any
     # Merge caller-provided raw payload but never let the caller override
     # ownership / status / id.
     safe_raw = {k: v for k, v in raw.items() if k not in {"id", "seller_id", "status", "created_at", "created_via"}}
+    # iter496 — normalise marketplace/lots drafts into the exact schema
+    # the Seller Dashboard Edit page expects.
+    if vertical in {"marketplace", "lots"}:
+        safe_raw = _normalise_marketplace_draft(safe_raw)
     doc = {**safe_raw, **common}
     if vertical == "marketplace":
         await db.listings.insert_one(doc)
@@ -637,6 +711,119 @@ async def tool_create_auction_draft(db, user, user_doc, params) -> Dict[str, Any
     elif vertical == "storage":
         await db.storage_units.insert_one(doc)
     return {"draft_id": listing_id, "vertical": vertical, "status": "draft"}
+
+
+async def tool_update_auction_draft(db, user, user_doc, params) -> Dict[str, Any]:
+    """iter496 — Update fields on an MCP-owned or UI-owned draft
+    listing. Reuses the same field-level allowlist as the existing
+    Seller Dashboard `PUT /api/listings/{id}` endpoint so behaviour
+    matches byte-for-byte, plus permits `starting_price` and
+    `current_price` — which the PUT endpoint deliberately locks after
+    bids are placed, but drafts have no bids so it's safe to allow.
+
+    Security guarantees:
+      * caller must own the listing (or be admin/super_admin).
+      * `status` MUST equal `"draft"` — published/live listings can
+        NOT be edited through this tool.
+      * caller must have the `list` scope (enforced at
+        `_TOOL_SCOPE_MAP` layer above, not here).
+
+    Parameters:
+      * `listing_id` — required.
+      * `updates` — object with any of: title, description, category,
+        condition, images (list of URLs), location, city, region,
+        country, postal_code, price / starting_price, buy_now_price,
+        title_en/fr, description_en/fr.
+    """
+    listing_id = params.get("listing_id")
+    updates = params.get("updates") or {}
+    if not listing_id:
+        raise HTTPException(status_code=400, detail={"error": "listing_id required"})
+    if not isinstance(updates, dict) or not updates:
+        raise HTTPException(status_code=400, detail={"error": "updates must be a non-empty object"})
+
+    listing = await db.listings.find_one({"id": listing_id}, {"_id": 0})
+    if not listing:
+        raise HTTPException(status_code=404, detail={"error": "listing_not_found"})
+    # Ownership check (admins bypass)
+    role = (user_doc.get("role") or "").lower()
+    if listing["seller_id"] != user.id and role not in ADMIN_ROLES:
+        raise HTTPException(status_code=403, detail={"error": "not_authorized"})
+    # Draft-only
+    if (listing.get("status") or "").lower() != "draft":
+        raise HTTPException(status_code=409, detail={
+            "error":     "not_a_draft",
+            "message_en":"This tool can only modify drafts. Published or live listings must be edited through their normal flow.",
+            "message_fr":"Cet outil ne peut modifier que les brouillons.",
+        })
+
+    # Same allowlist as PUT /api/listings/{id}, extended with the two
+    # price fields that are safe to change on a draft (no bids yet).
+    allowed = {"title", "description", "category", "condition", "images",
+               "location", "city", "region", "country", "postal_code",
+               "title_en", "title_fr", "description_en", "description_fr",
+               "starting_price", "current_price", "buy_now_price",
+               "currency", "custom_buyer_premium_rate"}
+    # Normalise Claude's aliases
+    if "price" in updates and "starting_price" not in updates:
+        updates["starting_price"] = updates.pop("price")
+    update_data: Dict[str, Any] = {}
+    for k, v in updates.items():
+        if k not in allowed:
+            continue
+        if k in {"starting_price", "current_price", "buy_now_price", "custom_buyer_premium_rate"}:
+            f = _coerce_float(v)
+            if f is None and v is not None and v != "":
+                raise HTTPException(status_code=400, detail={"error": f"invalid_number:{k}"})
+            update_data[k] = f
+        elif k == "images":
+            if not isinstance(v, list):
+                raise HTTPException(status_code=400, detail={"error": "images must be a list of URLs"})
+            update_data[k] = [str(x) for x in v]
+        else:
+            update_data[k] = v
+
+    # If starting_price changes, keep current_price in lockstep (draft
+    # has no bids, so current_price is always == starting_price).
+    if "starting_price" in update_data and "current_price" not in update_data:
+        update_data["current_price"] = update_data["starting_price"]
+
+    if not update_data:
+        raise HTTPException(status_code=400, detail={"error": "no_updatable_fields"})
+
+    # Sanitize text through the same helper the PUT endpoint uses.
+    from services.html_sanitizer import sanitize_user_html, sanitize_inline
+    for f in ("description", "description_en", "description_fr"):
+        if update_data.get(f):
+            update_data[f] = sanitize_user_html(update_data[f])
+    for f in ("title", "title_en", "title_fr"):
+        if update_data.get(f):
+            update_data[f] = sanitize_inline(update_data[f])
+    update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+    await db.listings.update_one({"id": listing_id}, {"$set": update_data})
+    # Reuse the same cache-invalidation the PUT endpoint uses so any
+    # cached hydration returns the fresh draft.
+    try:
+        from services.api_cache import invalidate_listing_caches
+        invalidate_listing_caches()
+    except Exception:
+        pass
+    # iter496 — also pop the in-process single-listing cache that
+    # `GET /api/listings/{id}` populates (routes.listings._listing_cache).
+    # Without this the dashboard could hydrate a stale copy for up to
+    # 30 s after the MCP update, hiding the change from the seller.
+    try:
+        from routes import listings as _lroutes
+        _lroutes._listing_cache.pop(listing_id, None)
+    except Exception:
+        pass
+    updated = await db.listings.find_one({"id": listing_id}, {"_id": 0})
+    return {
+        "listing_id":     listing_id,
+        "status":         updated.get("status"),
+        "updated_fields": sorted(update_data.keys()),
+    }
 
 
 async def tool_bulk_create_listings(db, user, user_doc, params) -> Dict[str, Any]:
@@ -1100,6 +1287,20 @@ TOOL_REGISTRY: Dict[str, ToolSpec] = {
         },
         requires_tax_id=True,
     ),
+    "update_auction_draft": ToolSpec(
+        name="update_auction_draft",
+        description_en="Update editable fields on an existing DRAFT listing owned by the caller. Reuses the same allowlist as the Seller Dashboard editor, plus permits `starting_price` and images because a draft has no bids yet. Cannot be used on published/live listings.",
+        description_fr="Met à jour les champs modifiables d'un brouillon existant appartenant à l'appelant. Réutilise la liste blanche de l'éditeur du tableau de bord vendeur.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "listing_id": {"type": "string"},
+                "updates":    {"type": "object"},
+            },
+            "required": ["listing_id", "updates"],
+        },
+        requires_tax_id=False,
+    ),
     "check_bid_status": ToolSpec(
         name="check_bid_status",
         description_en="Return the caller's bid standing on a listing (winning/outbid/won/ended/no_bids + position).",
@@ -1214,6 +1415,7 @@ _HANDLERS: Dict[str, Callable[..., Any]] = {
     "place_bid":                      tool_place_bid,
     "create_auction_draft":           tool_create_auction_draft,
     "bulk_create_listings":           tool_bulk_create_listings,
+    "update_auction_draft":           tool_update_auction_draft,
     "check_bid_status":               tool_check_bid_status,
     "publish_meta_ad_promotion":      tool_publish_meta_ad_promotion,
     "generate_listing_video":         tool_generate_listing_video,
@@ -1247,6 +1449,7 @@ _TOOL_SCOPE_MAP: Dict[str, str] = {
     "place_bid":                      "bid",
     "create_auction_draft":           "list",
     "bulk_create_listings":           "list",
+    "update_auction_draft":           "list",
     "publish_meta_ad_promotion":      "promote",
     "generate_listing_video":         "promote",
     "analyze_seller_inventory":       "analytics",

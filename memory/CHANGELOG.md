@@ -1,6 +1,46 @@
 # BidVex Changelog
 
 
+## Feb 19, 2026 — iter496 Fix: MCP Drafts Editable in Seller Dashboard + `update_auction_draft` Tool (preview only, no deploy)
+
+**Bug**: The Claude-created baby-bed draft (`b40a26b0-…`) appeared in the Seller Dashboard's Drafts tab but the **Edit** button navigated to "Listing not found".
+
+**Root cause** — code-level scoping bug (not account data):
+`Listing` response model requires `starting_price`, `current_price`, `auction_end_date` — the MCP tool stored the doc verbatim with `price` and no auction date. `GET /api/listings/{id}` returned 500 (Pydantic ValidationError), which the React edit page surfaced as "Listing not found". Backend log signature:
+```
+[unhandled] GET /api/listings/... -> ValidationError: 3 validation errors for Listing
+  starting_price: Field required
+  current_price:  Field required
+  auction_end_date: Field required
+```
+
+**Fix** — additive, no transport changes:
+1. `backend/mcp_server.py`: added `_normalise_marketplace_draft()` — maps `price`→`starting_price`+`current_price`, defaults `auction_end_date` to +7 days, backfills empty text fields, defaults `currency=CAD`. Called only for `marketplace` / `lots` verticals (vehicle & storage still route through their own compliance cascade — iter494 preserved).
+2. Added `tool_update_auction_draft` — reuses the exact allowlist as `PUT /api/listings/{id}` plus permits `starting_price`/`current_price`/`buy_now_price` (safe on drafts with no bids). Security: requires `list` scope, ownership check, draft-only (409 on published), text sanitisation via `services.html_sanitizer`, cache invalidation via both `services.api_cache.invalidate_listing_caches()` and `routes.listings._listing_cache.pop()` so the dashboard sees fresh values instantly.
+3. Registered `update_auction_draft` in `TOOL_REGISTRY`, `_TOOL_SCOPE_MAP` (scope=`list`), and `_HANDLERS`.
+4. Repaired the existing baby-bed draft in place — backfilled the three missing fields.
+
+**Files**
+- Edited: `backend/mcp_server.py` (~130 lines net).
+- New: `backend/tests/iter496/test_mcp_draft_edit.py` (9 tests) and `__init__.py`.
+- Untouched: `mcp_streamable.py`, `mcp_tokens.py`, `mcp_oauth.py`, `mcp_bridge.py`, `routes/listings.py`, `models/auction_models.py`, and all business-logic files.
+
+**Tests** — `pytest backend/tests/iter482/test_mcp_server.py backend/tests/iter488/ backend/tests/iter489/ backend/tests/iter494/ backend/tests/iter495/ backend/tests/iter496/` → **159 passed**. Zero regressions.
+
+**Live acceptance on the real baby-bed draft**:
+- `GET /api/listings/b40a26b0-…` → 200 (was 500).
+- `update_auction_draft` reduced price to $249, added two image URLs — persisted.
+- MCP `get_listing_details` reflects new values.
+- Seller Dashboard `GET /api/listings/{id}` reflects new values immediately (no 30 s cache lag).
+
+**Guardrails held**
+- No new scope introduced — `list` scope is unchanged.
+- iter494 vertical-scoping intact.
+- Vehicle-dealer compliance still enforced (iter482 baseline green).
+- No tax/Stripe/payment/billing/settlement/escrow code touched.
+- NO deployment. Preview only.
+
+
 ## Feb 19, 2026 — iter495 Diagnostic: Claude "no write scope" is a client-cache issue (preview only, no deploy)
 
 Claude.ai reported `Tool 'bidvex112:create_auction_draft' not found` and told the user the token was missing `write` scope. Log correlation proved this is **not a server bug**:

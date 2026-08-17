@@ -1,6 +1,84 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter496 — Fix: MCP-Created Drafts Openable in Seller Dashboard + `update_auction_draft` Tool (Feb 19, 2026) ✅ SHIPPED (preview) · 🚫 NO DEPLOY
+
+### Problem
+The `b40a26b0-…` baby-bed draft that Claude created via `create_auction_draft` (iter495 acceptance) appeared in the Seller Dashboard's Drafts tab, but clicking **Edit** navigated to a "Listing not found" screen. Both the MCP create path AND the standard UI edit path had to work through the same listing schema — they didn't.
+
+### Root Cause — one precise technical cause
+The `Listing` Pydantic response model (`backend/models/auction_models.py` L83–102) requires three fields the MCP-created draft doc did NOT have:
+- `starting_price: float` — required
+- `current_price: float` — required
+- `auction_end_date: datetime` — required
+
+Claude sent `price: 250` instead of `starting_price`. The MCP tool stored the doc verbatim without normalisation. When the Seller Dashboard edit page called `GET /api/listings/{id}` (`backend/routes/listings.py` L901), the endpoint returned **HTTP 500** with `pydantic.ValidationError: 3 validation errors for Listing`, which the React edit page surfaced as **"Listing not found"**.
+
+Backend log evidence (multiple identical entries):
+```
+ERROR:server:[unhandled] GET /api/listings/b40a26b0-… -> ValidationError:
+  starting_price: Field required
+  current_price:  Field required
+  auction_end_date: Field required
+```
+
+### Fix
+**Two-part, additive, no transport changes:**
+
+1. **Normalise MCP draft creation** — `backend/mcp_server.py::tool_create_auction_draft` now runs marketplace/lots `raw_input` through a new `_normalise_marketplace_draft()` helper that stamps the required `Listing` scaffolding:
+   - Aliases: `price` / `starting_price` / `startingPrice` → both `starting_price` and `current_price` (matching how `POST /listings` at L380 does it).
+   - Defaults `auction_end_date` to +7 days when absent (typical UI default).
+   - Backfills empty `title` / `description` / `category` / `condition` / `location` so `Listing` validation never trips on a scaffold field.
+   - Default `currency: "CAD"`.
+   - Vehicle & storage verticals routed through their existing paths untouched (iter494 vertical scoping preserved).
+
+2. **New MCP tool `update_auction_draft`** — reuses the exact allowlist as the Seller Dashboard `PUT /api/listings/{id}` (title, description, category, condition, images, location, city/region/country/postal_code, i18n title_en/fr, description_en/fr, BP-rate) **plus** `starting_price` / `current_price` / `buy_now_price` since drafts have no bids so price is safe to change. Security gates:
+   - Requires `list` scope (403 `INSUFFICIENT_SCOPE` otherwise).
+   - Ownership check — cross-user updates return 403 `not_authorized` (admins bypass).
+   - Draft-only — non-draft listings return 409 `not_a_draft`.
+   - Text sanitisation via the same `services.html_sanitizer` helper the PUT endpoint uses.
+   - Cache invalidation: `services.api_cache.invalidate_listing_caches()` PLUS `routes.listings._listing_cache.pop(listing_id)` so the dashboard's next hydration returns the fresh doc (the pre-existing PUT endpoint had a subtle 30-second stale-cache window; this tool doesn't).
+
+3. **Repaired the existing baby-bed draft in place** — backfilled `starting_price=250.0`, `current_price=250.0`, `auction_end_date=+7d`. No new draft created; the operator's real draft is what got fixed.
+
+### Files Changed
+- **Edited**: `backend/mcp_server.py`
+  - Added `_coerce_float()` helper (~10 lines).
+  - Added `_normalise_marketplace_draft()` helper (~35 lines).
+  - `tool_create_auction_draft` now calls the normaliser for marketplace/lots verticals (~4 lines diff).
+  - Added `tool_update_auction_draft` (~85 lines).
+  - Registered new tool in `TOOL_REGISTRY`, `_TOOL_SCOPE_MAP` (scope=`list`), and `_HANDLERS`.
+- **New**: `backend/tests/iter496/__init__.py`, `backend/tests/iter496/test_mcp_draft_edit.py` (9 dedicated regression tests).
+- **Untouched** — `mcp_streamable.py`, `mcp_tokens.py`, `mcp_oauth.py`, `mcp_bridge.py`, `routes/listings.py`, `models/auction_models.py`, `services/vehicle_listing_guard.py`, any tax/Stripe/payment/billing/settlement/escrow code, all iter494 vertical-scoping logic.
+
+### Verification
+- **Pytest — 159 tests green** across the full MCP surface: `iter482` + `iter488` + `iter489` + `iter494` + `iter495` + `iter496`. Zero regressions.
+- **iter496 dedicated suite (9 tests all pass):**
+  1. MCP-created marketplace draft can be hydrated by Seller Dashboard endpoint (200, not 500).
+  2. Missing-price MCP draft still hydrates (starting_price defaults to 0).
+  3. `bulk_create_listings` drafts are dashboard-openable.
+  4. `update_auction_draft` changes title, price, images end-to-end.
+  5. Updates reflected in MCP `get_listing_details`.
+  6. Read-only token → 403 `INSUFFICIENT_SCOPE` on `update_auction_draft`.
+  7. User A cannot update user B's draft (403 `not_authorized`).
+  8. Published/active listing → 409 `not_a_draft`.
+  9. `update_auction_draft` in tools/list only for tokens with `list` scope.
+- **Live acceptance test on the real baby-bed draft** — `b40a26b0-c89c-4eb0-9d0f-f5258ba94eed`:
+  - `GET /api/listings/{id}` returns 200 (was 500). Title, price, category displayed correctly.
+  - `POST /api/mcp/tools/call update_auction_draft` reduces price to $249, adds two image URLs. Response `isError: false`.
+  - MCP `get_listing_details` reflects new price + images.
+  - Seller Dashboard `GET /api/listings/{id}` reflects new price + images immediately (no cache lag).
+
+### Guardrails held
+- ✅ NO deployment — preview only.
+- ✅ No new scope introduced — `update_auction_draft` uses the existing canonical `list` scope.
+- ✅ iter494 vertical-scoping intact — normalisation only fires for `marketplace` / `lots`; vehicle & storage still route through their own compliance cascade.
+- ✅ Vehicle-dealer compliance still enforced (iter482 tests remain green).
+- ✅ Zero changes to auction, payment, Stripe, tax, settlement, escrow, or billing code.
+- ✅ Cross-user modification blocked (403).
+- ✅ Published listings cannot be modified through this tool (409).
+
+
 ## iter495 — Diagnostic: Claude "no write scope" is a client-cache/LLM issue, not a server bug (Feb 19, 2026) ✅ SERVER-SIDE VERIFIED · 🚫 NO DEPLOY
 
 ### Problem
