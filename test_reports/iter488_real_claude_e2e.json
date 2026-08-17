@@ -1,5 +1,5 @@
 {
-  "started_at": "2026-08-17T00:09:20.086852+00:00",
+  "started_at": "2026-08-17T01:49:56.542411+00:00",
   "backend_url": "http://localhost:8001",
   "checks": [
     {
@@ -96,7 +96,7 @@
       "name": "C.1 authorise (explicit=True) \u2192 authorized_pending_dispatch",
       "passed": true,
       "detail": {
-        "campaign_id": "camp_20b42791484742e7",
+        "campaign_id": "camp_6575e00e2490418f",
         "status": "authorized_pending_dispatch",
         "dispatched": false,
         "message_en": "Authorisation recorded. No external action has been performed. Dispatch remains a manual Ops action.",
@@ -261,7 +261,7 @@
     }
   ],
   "defects": [],
-  "ended_at": "2026-08-17T00:09:39.501353+00:00",
+  "ended_at": "2026-08-17T01:50:11.340475+00:00",
   "total_checks": 34,
   "passed": 34,
   "failed": 0
