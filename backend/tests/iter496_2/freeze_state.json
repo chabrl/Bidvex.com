@@ -1,0 +1,22 @@
+{
+  "audit": "P6.1.1 \u2014 Tax Engine Reconciliation",
+  "captured_at_utc": "2026-08-17T16:12:53.946483+00:00",
+  "environment": {
+    "DB_NAME_present": false,
+    "MONGO_URL_present": false,
+    "PREVIEW_ONLY": true,
+    "REACT_APP_BACKEND_URL": "<not set>"
+  },
+  "git_branch": "main",
+  "git_head": "30d511994d46e3391985838544d2f0d4c56cef98",
+  "git_last_commit_subject": "## iter496.1 \u2014 Seller Dashboard Edit Button for Drafts",
+  "guardrails": {
+    "bootstrap_rates_modified": false,
+    "database_writes": false,
+    "deployment_triggered": false,
+    "migrations_run": false,
+    "production_code_modified": false,
+    "tax_rate_config_docs_modified": false
+  },
+  "phase": "P1 \u2014 Freeze State"
+}

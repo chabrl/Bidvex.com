@@ -1,6 +1,33 @@
 # BidVex Changelog
 
 
+## Feb 17, 2026 — P6.1.1 Tax Engine Reconciliation Audit (READ-ONLY, no deploy)
+
+**Scope**: Reconciled the P6.1 audit findings against BidVex's confirmed internal source of truth (`BOOTSTRAP_RATES` in `services/tax_rate_config.py`), authoritative CRA 2026 rates (canada.ca + Notice 342), and operator's confirmed legal/accounting policy for marketplace responsibility.
+
+**Approach**: 4 isolated read-only audit harnesses under `/app/backend/tests/iter496_2/`. NO production code, DB, config, migration, deployment, or environment changes.
+
+**Key findings (12 RED, 8 AMBER, 2 BLUE, 3 GREEN)**:
+1. **NS = 15% in BOOTSTRAP_RATES is off by +1 pt** — CRA authoritative rate has been 14% since Apr 1 2025 (CRA Notice 342). `invoice_service.py` already has NS=14% inline; internal drift.
+2. `tax_engine.calculate_tax` / `calculate_gst_qst` — QC-hardcoded landmine (60/75 divergent cells each), but currently no Stripe/settlement path reaches them; SendGrid templates only.
+3. `invoice_service.calculate_province_tax` layers PST/RST on top of GST for BC/SK/MB — over-collection on legacy invoice PDFs (confirmed policy: BidVex does NOT remit provincial PST/RST).
+4. 14 silent `... or "QC"` fallbacks across `auction_settlement`, `stripe_connect_service`, `connect_payment_engine`, `routes/*` — all RED (over-collect on missing province).
+5. `broker_fee_engine.py:151` — under-collects HST on ON/NS/NB/NL/PE broker invoices.
+6. P6.1 "Claim E: NS should be 15%" is INCORRECT — reconciliation confirms 14%.
+7. P6.1 "Claim: private-sale hammer not taxed is a defect" is a FALSE POSITIVE (BLUE) — confirmed correct under §211.1 for Canadian-resident sellers.
+
+**Deliverables** (all read-only, isolated to `/app/backend/tests/iter496_2/`):
+- `P6_1_1_RECONCILIATION_REPORT.md` (15-section master report)
+- `golden_matrix_spec.md` (P6.2 regression matrix design)
+- `audit_01…04_*.py` (4 harness scripts)
+- `freeze_state.json` / `internal_source_of_truth.json` / `calculator_matrix.json` (600 cells) / `us_intl_fallback.json`
+
+**Guardrails**: git diff on all production tax files is EMPTY; `git status` shows only untracked artifacts under `backend/tests/iter496_2/`. Zero code, DB, or config was modified.
+
+**Stop condition met**: P6.2 (implementation) NOT started. Awaiting operator go-ahead.
+
+
+
 ## Feb 19, 2026 — iter496.1 Fix: Seller Dashboard Edit Button for Drafts (preview only, no deploy)
 
 **Bug**: After iter496 made MCP-created drafts hydratable, the Seller Dashboard still hid the Edit button on `status="draft"` rows — for ALL drafts (not just MCP ones). Operator screenshot showed the baby-bed row exposing only View / Export CSV / Request Deletion.

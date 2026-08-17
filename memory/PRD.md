@@ -1055,7 +1055,7 @@ gone, ack checkbox works, reserve badges gone from multi-item grid.
 - Wire `AcceptedPaymentMethodsCard` into Vehicle + Vehicle Multi-Lot
   detail pages + pre-bid ack.
 - Vehicle-specific reserve UI (new task).
-- P6 Tax Engine Consolidation (blocked on legal review — see risk matrix).
+- P6 Tax Engine Consolidation — P6.1 completed (audit, 7 divergent calcs mapped). P6.1.1 completed Feb 17, 2026 (reconciliation vs authoritative CRA 2026 + operator-confirmed legal policy — see `/app/backend/tests/iter496_2/P6_1_1_RECONCILIATION_REPORT.md`; 12 RED / 8 AMBER findings; 20-step P6.2 migration order proposed but NOT implemented). Awaiting operator go-ahead for P6.2.
 
 ---
 

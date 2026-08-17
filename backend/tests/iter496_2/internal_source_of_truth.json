@@ -1,0 +1,311 @@
+{
+  "amber_findings": 0,
+  "audit": "P6.1.1 \u2014 Internal Source-of-Truth Reconciliation",
+  "authoritative_source": "https://www.canada.ca/en/revenue-agency/services/tax/businesses/topics/gst-hst-businesses/charge-collect-which-rate.html",
+  "authoritative_source_ns_notice": "https://www.canada.ca/en/revenue-agency/services/forms-publications/publications/notice342.html",
+  "db_rows_loaded": 0,
+  "red_findings": 1,
+  "row_count": 15,
+  "rows": [
+    {
+      "authoritative_cra_2026": {
+        "federal_gst_hst": "0.05",
+        "provincial_authority": "N/A",
+        "provincial_pst_rst": "0"
+      },
+      "bootstrap": {
+        "combined": "0.05",
+        "gst": "0.05",
+        "hst": "0",
+        "label": "GST (5%)",
+        "qst_or_pst": "0"
+      },
+      "bootstrap_federal_matches_cra": true,
+      "classification": "GREEN \u2014 federal matches CRA and no PST layer",
+      "db_combined": null,
+      "db_matches_bootstrap": null,
+      "db_row_present": false,
+      "province": "AB"
+    },
+    {
+      "authoritative_cra_2026": {
+        "federal_gst_hst": "0.05",
+        "provincial_authority": "BC Ministry of Finance (PST)",
+        "provincial_pst_rst": "0.07"
+      },
+      "bootstrap": {
+        "combined": "0.05",
+        "gst": "0.05",
+        "hst": "0",
+        "label": "GST (5%)",
+        "qst_or_pst": "0"
+      },
+      "bootstrap_federal_matches_cra": true,
+      "classification": "GREEN \u2014 federal matches CRA; PST/RST/QST tracked separately",
+      "db_combined": null,
+      "db_matches_bootstrap": null,
+      "db_row_present": false,
+      "province": "BC"
+    },
+    {
+      "authoritative_cra_2026": {
+        "federal_gst_hst": "0.00",
+        "provincial_authority": "N/A",
+        "provincial_pst_rst": "0"
+      },
+      "bootstrap": {
+        "combined": "0",
+        "gst": "0",
+        "hst": "0",
+        "label": "Exported Service (0%)",
+        "qst_or_pst": "0"
+      },
+      "bootstrap_federal_matches_cra": true,
+      "classification": "GREEN \u2014 federal matches CRA and no PST layer",
+      "db_combined": null,
+      "db_matches_bootstrap": null,
+      "db_row_present": false,
+      "province": "INTL"
+    },
+    {
+      "authoritative_cra_2026": {
+        "federal_gst_hst": "0.05",
+        "provincial_authority": "Manitoba Finance (RST)",
+        "provincial_pst_rst": "0.07"
+      },
+      "bootstrap": {
+        "combined": "0.05",
+        "gst": "0.05",
+        "hst": "0",
+        "label": "GST (5%)",
+        "qst_or_pst": "0"
+      },
+      "bootstrap_federal_matches_cra": true,
+      "classification": "GREEN \u2014 federal matches CRA; PST/RST/QST tracked separately",
+      "db_combined": null,
+      "db_matches_bootstrap": null,
+      "db_row_present": false,
+      "province": "MB"
+    },
+    {
+      "authoritative_cra_2026": {
+        "federal_gst_hst": "0.15",
+        "provincial_authority": "N/A",
+        "provincial_pst_rst": "0"
+      },
+      "bootstrap": {
+        "combined": "0.15",
+        "gst": "0",
+        "hst": "0.15",
+        "label": "HST (15%)",
+        "qst_or_pst": "0"
+      },
+      "bootstrap_federal_matches_cra": true,
+      "classification": "GREEN \u2014 federal matches CRA and no PST layer",
+      "db_combined": null,
+      "db_matches_bootstrap": null,
+      "db_row_present": false,
+      "province": "NB"
+    },
+    {
+      "authoritative_cra_2026": {
+        "federal_gst_hst": "0.15",
+        "provincial_authority": "N/A",
+        "provincial_pst_rst": "0"
+      },
+      "bootstrap": {
+        "combined": "0.15",
+        "gst": "0",
+        "hst": "0.15",
+        "label": "HST (15%)",
+        "qst_or_pst": "0"
+      },
+      "bootstrap_federal_matches_cra": true,
+      "classification": "GREEN \u2014 federal matches CRA and no PST layer",
+      "db_combined": null,
+      "db_matches_bootstrap": null,
+      "db_row_present": false,
+      "province": "NL"
+    },
+    {
+      "authoritative_cra_2026": {
+        "federal_gst_hst": "0.14",
+        "provincial_authority": "N/A",
+        "provincial_pst_rst": "0"
+      },
+      "bootstrap": {
+        "combined": "0.15",
+        "gst": "0",
+        "hst": "0.15",
+        "label": "HST (15%)",
+        "qst_or_pst": "0"
+      },
+      "bootstrap_federal_matches_cra": false,
+      "classification": "RED \u2014 federal does NOT match authoritative CRA 2026",
+      "db_combined": null,
+      "db_matches_bootstrap": null,
+      "db_row_present": false,
+      "province": "NS"
+    },
+    {
+      "authoritative_cra_2026": {
+        "federal_gst_hst": "0.05",
+        "provincial_authority": "N/A",
+        "provincial_pst_rst": "0"
+      },
+      "bootstrap": {
+        "combined": "0.05",
+        "gst": "0.05",
+        "hst": "0",
+        "label": "GST (5%)",
+        "qst_or_pst": "0"
+      },
+      "bootstrap_federal_matches_cra": true,
+      "classification": "GREEN \u2014 federal matches CRA and no PST layer",
+      "db_combined": null,
+      "db_matches_bootstrap": null,
+      "db_row_present": false,
+      "province": "NT"
+    },
+    {
+      "authoritative_cra_2026": {
+        "federal_gst_hst": "0.05",
+        "provincial_authority": "N/A",
+        "provincial_pst_rst": "0"
+      },
+      "bootstrap": {
+        "combined": "0.05",
+        "gst": "0.05",
+        "hst": "0",
+        "label": "GST (5%)",
+        "qst_or_pst": "0"
+      },
+      "bootstrap_federal_matches_cra": true,
+      "classification": "GREEN \u2014 federal matches CRA and no PST layer",
+      "db_combined": null,
+      "db_matches_bootstrap": null,
+      "db_row_present": false,
+      "province": "NU"
+    },
+    {
+      "authoritative_cra_2026": {
+        "federal_gst_hst": "0.13",
+        "provincial_authority": "N/A",
+        "provincial_pst_rst": "0"
+      },
+      "bootstrap": {
+        "combined": "0.13",
+        "gst": "0",
+        "hst": "0.13",
+        "label": "HST (13%)",
+        "qst_or_pst": "0"
+      },
+      "bootstrap_federal_matches_cra": true,
+      "classification": "GREEN \u2014 federal matches CRA and no PST layer",
+      "db_combined": null,
+      "db_matches_bootstrap": null,
+      "db_row_present": false,
+      "province": "ON"
+    },
+    {
+      "authoritative_cra_2026": {
+        "federal_gst_hst": "0.15",
+        "provincial_authority": "N/A",
+        "provincial_pst_rst": "0"
+      },
+      "bootstrap": {
+        "combined": "0.15",
+        "gst": "0",
+        "hst": "0.15",
+        "label": "HST (15%)",
+        "qst_or_pst": "0"
+      },
+      "bootstrap_federal_matches_cra": true,
+      "classification": "GREEN \u2014 federal matches CRA and no PST layer",
+      "db_combined": null,
+      "db_matches_bootstrap": null,
+      "db_row_present": false,
+      "province": "PE"
+    },
+    {
+      "authoritative_cra_2026": {
+        "federal_gst_hst": "0.05",
+        "provincial_authority": "Revenu Qu\u00e9bec (QST)",
+        "provincial_pst_rst": "0.09975"
+      },
+      "bootstrap": {
+        "combined": "0.14975",
+        "gst": "0.05",
+        "hst": "0",
+        "label": "GST + QST (14.975%)",
+        "qst_or_pst": "0.09975"
+      },
+      "bootstrap_federal_matches_cra": true,
+      "classification": "GREEN \u2014 federal matches CRA; PST/RST/QST tracked separately",
+      "db_combined": null,
+      "db_matches_bootstrap": null,
+      "db_row_present": false,
+      "province": "QC"
+    },
+    {
+      "authoritative_cra_2026": {
+        "federal_gst_hst": "0.05",
+        "provincial_authority": "Government of Saskatchewan (PST)",
+        "provincial_pst_rst": "0.06"
+      },
+      "bootstrap": {
+        "combined": "0.05",
+        "gst": "0.05",
+        "hst": "0",
+        "label": "GST (5%)",
+        "qst_or_pst": "0"
+      },
+      "bootstrap_federal_matches_cra": true,
+      "classification": "GREEN \u2014 federal matches CRA; PST/RST/QST tracked separately",
+      "db_combined": null,
+      "db_matches_bootstrap": null,
+      "db_row_present": false,
+      "province": "SK"
+    },
+    {
+      "authoritative_cra_2026": {
+        "federal_gst_hst": "0.05",
+        "provincial_authority": "N/A",
+        "provincial_pst_rst": "0"
+      },
+      "bootstrap": {
+        "combined": "0.05",
+        "gst": "0.05",
+        "hst": "0",
+        "label": "GST (5%)",
+        "qst_or_pst": "0"
+      },
+      "bootstrap_federal_matches_cra": true,
+      "classification": "GREEN \u2014 federal matches CRA and no PST layer",
+      "db_combined": null,
+      "db_matches_bootstrap": null,
+      "db_row_present": false,
+      "province": "YT"
+    },
+    {
+      "authoritative_cra_2026": {
+        "federal_gst_hst": "0.00",
+        "provincial_authority": "N/A",
+        "provincial_pst_rst": "0"
+      },
+      "bootstrap": {
+        "combined": "0",
+        "gst": "0",
+        "hst": "0",
+        "label": "Exported Service (0%)",
+        "qst_or_pst": "0"
+      },
+      "bootstrap_federal_matches_cra": true,
+      "classification": "GREEN \u2014 federal matches CRA and no PST layer",
+      "db_combined": null,
+      "db_matches_bootstrap": null,
+      "db_row_present": false,
+      "province": "INTL"
+    }
+  ]
+}

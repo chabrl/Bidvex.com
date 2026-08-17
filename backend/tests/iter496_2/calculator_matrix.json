@@ -1,0 +1,5707 @@
+{
+  "amounts": [
+    "0.01",
+    "1",
+    "100",
+    "1000",
+    "500000"
+  ],
+  "audit": "P6.1.1 \u2014 Calculator Divergence Matrix",
+  "calculators_tested": [
+    "tax_engine.calculate_tax",
+    "tax_engine.calculate_gst_qst",
+    "tax_engine.calculate_taxes_for_recipient",
+    "vehicle_pricing.calculate_taxes",
+    "fee_calculator.tax_on",
+    "fee_calculator.calculate_partner_taxes",
+    "invoice_service.calculate_province_tax",
+    "tax_dashboard.compute_tax_for_transaction"
+  ],
+  "provinces": [
+    "QC",
+    "ON",
+    "AB",
+    "BC",
+    "MB",
+    "SK",
+    "NB",
+    "NL",
+    "NS",
+    "PE",
+    "YT",
+    "NT",
+    "NU",
+    "US",
+    "INTL"
+  ],
+  "reference_note": "Reference = CRA 2026 GST/HST (NS=14%) + QST for QC only. PST/RST for BC/SK/MB NOT collected by BidVex per current internal legal position (see tax_rate_config.py comments).",
+  "rows": [
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "QC",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "QC",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "QC",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "QC",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "QC",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "QC",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "QC",
+      "tax_gst": "0.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "QC",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "0.00",
+      "expected_reference": "0.15",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "QC",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "0.00",
+      "expected_reference": "0.15",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "QC",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "0.15",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "QC",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.15",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "QC",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "0.15",
+      "notes": "iter350 canonical DB-backed",
+      "province": "QC",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.15",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "QC",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "0.15",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "QC",
+      "tax_gst": "0.05",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "0.1",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "0.15",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "QC",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "0.00",
+      "expected_reference": "14.98",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "QC",
+      "total_tax": "14.98"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "0.00",
+      "expected_reference": "14.98",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "QC",
+      "total_tax": "14.98"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "14.98",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "QC",
+      "total_tax": "14.98"
+    },
+    {
+      "amount": "100",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "14.98",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "QC",
+      "total_tax": "14.98"
+    },
+    {
+      "amount": "100",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "14.98",
+      "notes": "iter350 canonical DB-backed",
+      "province": "QC",
+      "total_tax": "14.98"
+    },
+    {
+      "amount": "100",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "14.98",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "QC",
+      "total_tax": "14.98"
+    },
+    {
+      "amount": "100",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "14.98",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "QC",
+      "tax_gst": "5.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "9.98",
+      "total_tax": "14.98"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "14.98",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "QC",
+      "total_tax": "14.98"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "0.00",
+      "expected_reference": "149.75",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "QC",
+      "total_tax": "149.75"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "0.00",
+      "expected_reference": "149.75",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "QC",
+      "total_tax": "149.75"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "149.75",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "QC",
+      "total_tax": "149.75"
+    },
+    {
+      "amount": "1000",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "149.75",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "QC",
+      "total_tax": "149.75"
+    },
+    {
+      "amount": "1000",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "149.75",
+      "notes": "iter350 canonical DB-backed",
+      "province": "QC",
+      "total_tax": "149.75"
+    },
+    {
+      "amount": "1000",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "149.75",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "QC",
+      "total_tax": "149.75"
+    },
+    {
+      "amount": "1000",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "149.75",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "QC",
+      "tax_gst": "50.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "99.75",
+      "total_tax": "149.75"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "149.75",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "QC",
+      "total_tax": "149.75"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "0.00",
+      "expected_reference": "74875.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "QC",
+      "total_tax": "74875.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "0.00",
+      "expected_reference": "74875.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "QC",
+      "total_tax": "74875.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "74875.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "QC",
+      "total_tax": "74875.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "74875.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "QC",
+      "total_tax": "74875.00"
+    },
+    {
+      "amount": "500000",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "74875.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "QC",
+      "total_tax": "74875.00"
+    },
+    {
+      "amount": "500000",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "74875.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "QC",
+      "total_tax": "74875.00"
+    },
+    {
+      "amount": "500000",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "74875.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "QC",
+      "tax_gst": "25000.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "49875.0",
+      "total_tax": "74875.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "74875.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "QC",
+      "total_tax": "74875.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "ON",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "ON",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "ON",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "ON",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "ON",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "ON",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "ON",
+      "tax_gst": "0.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "ON",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "0.02",
+      "expected_reference": "0.13",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "ON",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "0.02",
+      "expected_reference": "0.13",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "ON",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "0.13",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "ON",
+      "total_tax": "0.13"
+    },
+    {
+      "amount": "1",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.13",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "ON",
+      "total_tax": "0.13"
+    },
+    {
+      "amount": "1",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "0.13",
+      "notes": "iter350 canonical DB-backed",
+      "province": "ON",
+      "total_tax": "0.13"
+    },
+    {
+      "amount": "1",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.13",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "ON",
+      "total_tax": "0.13"
+    },
+    {
+      "amount": "1",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "0.13",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "ON",
+      "tax_gst": "0.0",
+      "tax_hst": "0.13",
+      "tax_pst_qst": "0.0",
+      "total_tax": "0.13"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "0.13",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "ON",
+      "total_tax": "0.13"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "1.98",
+      "expected_reference": "13.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "ON",
+      "total_tax": "14.98"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "1.98",
+      "expected_reference": "13.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "ON",
+      "total_tax": "14.98"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "13.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "ON",
+      "total_tax": "13.0"
+    },
+    {
+      "amount": "100",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "13.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "ON",
+      "total_tax": "13.00"
+    },
+    {
+      "amount": "100",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "13.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "ON",
+      "total_tax": "13.00"
+    },
+    {
+      "amount": "100",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "13.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "ON",
+      "total_tax": "13.00"
+    },
+    {
+      "amount": "100",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "13.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "ON",
+      "tax_gst": "0.0",
+      "tax_hst": "13.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "13.0"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "13.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "ON",
+      "total_tax": "13.0"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "19.75",
+      "expected_reference": "130.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "ON",
+      "total_tax": "149.75"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "19.75",
+      "expected_reference": "130.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "ON",
+      "total_tax": "149.75"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "130.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "ON",
+      "total_tax": "130.0"
+    },
+    {
+      "amount": "1000",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "130.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "ON",
+      "total_tax": "130.00"
+    },
+    {
+      "amount": "1000",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "130.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "ON",
+      "total_tax": "130.00"
+    },
+    {
+      "amount": "1000",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "130.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "ON",
+      "total_tax": "130.00"
+    },
+    {
+      "amount": "1000",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "130.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "ON",
+      "tax_gst": "0.0",
+      "tax_hst": "130.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "130.0"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "130.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "ON",
+      "total_tax": "130.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "9875.00",
+      "expected_reference": "65000.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "ON",
+      "total_tax": "74875.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "9875.00",
+      "expected_reference": "65000.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "ON",
+      "total_tax": "74875.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "65000.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "ON",
+      "total_tax": "65000.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "65000.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "ON",
+      "total_tax": "65000.00"
+    },
+    {
+      "amount": "500000",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "65000.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "ON",
+      "total_tax": "65000.00"
+    },
+    {
+      "amount": "500000",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "65000.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "ON",
+      "total_tax": "65000.00"
+    },
+    {
+      "amount": "500000",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "65000.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "ON",
+      "tax_gst": "0.0",
+      "tax_hst": "65000.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "65000.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "65000.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "ON",
+      "total_tax": "65000.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "AB",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "AB",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "AB",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "AB",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "AB",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "AB",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "AB",
+      "tax_gst": "0.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "AB",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "0.10",
+      "expected_reference": "0.05",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "AB",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "0.10",
+      "expected_reference": "0.05",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "AB",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "0.05",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "AB",
+      "total_tax": "0.05"
+    },
+    {
+      "amount": "1",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.05",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "AB",
+      "total_tax": "0.05"
+    },
+    {
+      "amount": "1",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "0.05",
+      "notes": "iter350 canonical DB-backed",
+      "province": "AB",
+      "total_tax": "0.05"
+    },
+    {
+      "amount": "1",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.05",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "AB",
+      "total_tax": "0.05"
+    },
+    {
+      "amount": "1",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "0.05",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "AB",
+      "tax_gst": "0.05",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "0.05"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "0.05",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "AB",
+      "total_tax": "0.05"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "9.98",
+      "expected_reference": "5.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "AB",
+      "total_tax": "14.98"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "9.98",
+      "expected_reference": "5.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "AB",
+      "total_tax": "14.98"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "5.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "AB",
+      "total_tax": "5.0"
+    },
+    {
+      "amount": "100",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "5.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "AB",
+      "total_tax": "5.00"
+    },
+    {
+      "amount": "100",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "5.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "AB",
+      "total_tax": "5.00"
+    },
+    {
+      "amount": "100",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "5.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "AB",
+      "total_tax": "5.00"
+    },
+    {
+      "amount": "100",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "5.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "AB",
+      "tax_gst": "5.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "5.0"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "5.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "AB",
+      "total_tax": "5.0"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "99.75",
+      "expected_reference": "50.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "AB",
+      "total_tax": "149.75"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "99.75",
+      "expected_reference": "50.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "AB",
+      "total_tax": "149.75"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "50.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "AB",
+      "total_tax": "50.0"
+    },
+    {
+      "amount": "1000",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "50.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "AB",
+      "total_tax": "50.00"
+    },
+    {
+      "amount": "1000",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "50.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "AB",
+      "total_tax": "50.00"
+    },
+    {
+      "amount": "1000",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "50.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "AB",
+      "total_tax": "50.00"
+    },
+    {
+      "amount": "1000",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "50.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "AB",
+      "tax_gst": "50.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "50.0"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "50.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "AB",
+      "total_tax": "50.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "49875.00",
+      "expected_reference": "25000.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "AB",
+      "total_tax": "74875.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "49875.00",
+      "expected_reference": "25000.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "AB",
+      "total_tax": "74875.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "25000.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "AB",
+      "total_tax": "25000.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "25000.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "AB",
+      "total_tax": "25000.00"
+    },
+    {
+      "amount": "500000",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "25000.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "AB",
+      "total_tax": "25000.00"
+    },
+    {
+      "amount": "500000",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "25000.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "AB",
+      "total_tax": "25000.00"
+    },
+    {
+      "amount": "500000",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "25000.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "AB",
+      "tax_gst": "25000.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "25000.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "25000.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "AB",
+      "total_tax": "25000.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "BC",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "BC",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "BC",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "BC",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "BC",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "BC",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "BC",
+      "tax_gst": "0.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "BC",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "0.10",
+      "expected_reference": "0.05",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "BC",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "0.10",
+      "expected_reference": "0.05",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "BC",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "0.05",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "BC",
+      "total_tax": "0.05"
+    },
+    {
+      "amount": "1",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.05",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "BC",
+      "total_tax": "0.05"
+    },
+    {
+      "amount": "1",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "0.05",
+      "notes": "iter350 canonical DB-backed",
+      "province": "BC",
+      "total_tax": "0.05"
+    },
+    {
+      "amount": "1",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.05",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "BC",
+      "total_tax": "0.05"
+    },
+    {
+      "amount": "1",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.07",
+      "expected_reference": "0.05",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "BC",
+      "tax_gst": "0.05",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "0.07",
+      "total_tax": "0.12"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "0.05",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "BC",
+      "total_tax": "0.05"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "9.98",
+      "expected_reference": "5.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "BC",
+      "total_tax": "14.98"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "9.98",
+      "expected_reference": "5.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "BC",
+      "total_tax": "14.98"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "5.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "BC",
+      "total_tax": "5.0"
+    },
+    {
+      "amount": "100",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "5.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "BC",
+      "total_tax": "5.00"
+    },
+    {
+      "amount": "100",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "5.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "BC",
+      "total_tax": "5.00"
+    },
+    {
+      "amount": "100",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "5.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "BC",
+      "total_tax": "5.00"
+    },
+    {
+      "amount": "100",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "7.00",
+      "expected_reference": "5.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "BC",
+      "tax_gst": "5.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "7.0",
+      "total_tax": "12.0"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "5.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "BC",
+      "total_tax": "5.0"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "99.75",
+      "expected_reference": "50.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "BC",
+      "total_tax": "149.75"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "99.75",
+      "expected_reference": "50.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "BC",
+      "total_tax": "149.75"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "50.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "BC",
+      "total_tax": "50.0"
+    },
+    {
+      "amount": "1000",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "50.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "BC",
+      "total_tax": "50.00"
+    },
+    {
+      "amount": "1000",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "50.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "BC",
+      "total_tax": "50.00"
+    },
+    {
+      "amount": "1000",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "50.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "BC",
+      "total_tax": "50.00"
+    },
+    {
+      "amount": "1000",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "70.00",
+      "expected_reference": "50.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "BC",
+      "tax_gst": "50.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "70.0",
+      "total_tax": "120.0"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "50.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "BC",
+      "total_tax": "50.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "49875.00",
+      "expected_reference": "25000.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "BC",
+      "total_tax": "74875.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "49875.00",
+      "expected_reference": "25000.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "BC",
+      "total_tax": "74875.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "25000.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "BC",
+      "total_tax": "25000.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "25000.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "BC",
+      "total_tax": "25000.00"
+    },
+    {
+      "amount": "500000",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "25000.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "BC",
+      "total_tax": "25000.00"
+    },
+    {
+      "amount": "500000",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "25000.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "BC",
+      "total_tax": "25000.00"
+    },
+    {
+      "amount": "500000",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "35000.00",
+      "expected_reference": "25000.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "BC",
+      "tax_gst": "25000.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "35000.0",
+      "total_tax": "60000.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "25000.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "BC",
+      "total_tax": "25000.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "MB",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "MB",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "MB",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "MB",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "MB",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "MB",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "MB",
+      "tax_gst": "0.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "MB",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "0.10",
+      "expected_reference": "0.05",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "MB",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "0.10",
+      "expected_reference": "0.05",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "MB",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "0.05",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "MB",
+      "total_tax": "0.05"
+    },
+    {
+      "amount": "1",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.05",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "MB",
+      "total_tax": "0.05"
+    },
+    {
+      "amount": "1",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "0.05",
+      "notes": "iter350 canonical DB-backed",
+      "province": "MB",
+      "total_tax": "0.05"
+    },
+    {
+      "amount": "1",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.05",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "MB",
+      "total_tax": "0.05"
+    },
+    {
+      "amount": "1",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.07",
+      "expected_reference": "0.05",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "MB",
+      "tax_gst": "0.05",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "0.07",
+      "total_tax": "0.12"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "0.05",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "MB",
+      "total_tax": "0.05"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "9.98",
+      "expected_reference": "5.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "MB",
+      "total_tax": "14.98"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "9.98",
+      "expected_reference": "5.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "MB",
+      "total_tax": "14.98"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "5.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "MB",
+      "total_tax": "5.0"
+    },
+    {
+      "amount": "100",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "5.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "MB",
+      "total_tax": "5.00"
+    },
+    {
+      "amount": "100",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "5.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "MB",
+      "total_tax": "5.00"
+    },
+    {
+      "amount": "100",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "5.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "MB",
+      "total_tax": "5.00"
+    },
+    {
+      "amount": "100",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "7.00",
+      "expected_reference": "5.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "MB",
+      "tax_gst": "5.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "7.0",
+      "total_tax": "12.0"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "5.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "MB",
+      "total_tax": "5.0"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "99.75",
+      "expected_reference": "50.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "MB",
+      "total_tax": "149.75"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "99.75",
+      "expected_reference": "50.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "MB",
+      "total_tax": "149.75"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "50.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "MB",
+      "total_tax": "50.0"
+    },
+    {
+      "amount": "1000",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "50.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "MB",
+      "total_tax": "50.00"
+    },
+    {
+      "amount": "1000",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "50.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "MB",
+      "total_tax": "50.00"
+    },
+    {
+      "amount": "1000",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "50.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "MB",
+      "total_tax": "50.00"
+    },
+    {
+      "amount": "1000",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "70.00",
+      "expected_reference": "50.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "MB",
+      "tax_gst": "50.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "70.0",
+      "total_tax": "120.0"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "50.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "MB",
+      "total_tax": "50.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "49875.00",
+      "expected_reference": "25000.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "MB",
+      "total_tax": "74875.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "49875.00",
+      "expected_reference": "25000.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "MB",
+      "total_tax": "74875.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "25000.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "MB",
+      "total_tax": "25000.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "25000.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "MB",
+      "total_tax": "25000.00"
+    },
+    {
+      "amount": "500000",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "25000.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "MB",
+      "total_tax": "25000.00"
+    },
+    {
+      "amount": "500000",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "25000.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "MB",
+      "total_tax": "25000.00"
+    },
+    {
+      "amount": "500000",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "35000.00",
+      "expected_reference": "25000.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "MB",
+      "tax_gst": "25000.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "35000.0",
+      "total_tax": "60000.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "25000.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "MB",
+      "total_tax": "25000.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "SK",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "SK",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "SK",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "SK",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "SK",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "SK",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "SK",
+      "tax_gst": "0.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "SK",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "0.10",
+      "expected_reference": "0.05",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "SK",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "0.10",
+      "expected_reference": "0.05",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "SK",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "0.05",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "SK",
+      "total_tax": "0.05"
+    },
+    {
+      "amount": "1",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.05",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "SK",
+      "total_tax": "0.05"
+    },
+    {
+      "amount": "1",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "0.05",
+      "notes": "iter350 canonical DB-backed",
+      "province": "SK",
+      "total_tax": "0.05"
+    },
+    {
+      "amount": "1",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.05",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "SK",
+      "total_tax": "0.05"
+    },
+    {
+      "amount": "1",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.06",
+      "expected_reference": "0.05",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "SK",
+      "tax_gst": "0.05",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "0.06",
+      "total_tax": "0.11"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "0.05",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "SK",
+      "total_tax": "0.05"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "9.98",
+      "expected_reference": "5.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "SK",
+      "total_tax": "14.98"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "9.98",
+      "expected_reference": "5.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "SK",
+      "total_tax": "14.98"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "5.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "SK",
+      "total_tax": "5.0"
+    },
+    {
+      "amount": "100",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "5.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "SK",
+      "total_tax": "5.00"
+    },
+    {
+      "amount": "100",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "5.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "SK",
+      "total_tax": "5.00"
+    },
+    {
+      "amount": "100",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "5.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "SK",
+      "total_tax": "5.00"
+    },
+    {
+      "amount": "100",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "6.00",
+      "expected_reference": "5.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "SK",
+      "tax_gst": "5.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "6.0",
+      "total_tax": "11.0"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "5.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "SK",
+      "total_tax": "5.0"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "99.75",
+      "expected_reference": "50.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "SK",
+      "total_tax": "149.75"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "99.75",
+      "expected_reference": "50.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "SK",
+      "total_tax": "149.75"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "50.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "SK",
+      "total_tax": "50.0"
+    },
+    {
+      "amount": "1000",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "50.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "SK",
+      "total_tax": "50.00"
+    },
+    {
+      "amount": "1000",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "50.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "SK",
+      "total_tax": "50.00"
+    },
+    {
+      "amount": "1000",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "50.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "SK",
+      "total_tax": "50.00"
+    },
+    {
+      "amount": "1000",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "60.00",
+      "expected_reference": "50.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "SK",
+      "tax_gst": "50.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "60.0",
+      "total_tax": "110.0"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "50.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "SK",
+      "total_tax": "50.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "49875.00",
+      "expected_reference": "25000.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "SK",
+      "total_tax": "74875.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "49875.00",
+      "expected_reference": "25000.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "SK",
+      "total_tax": "74875.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "25000.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "SK",
+      "total_tax": "25000.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "25000.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "SK",
+      "total_tax": "25000.00"
+    },
+    {
+      "amount": "500000",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "25000.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "SK",
+      "total_tax": "25000.00"
+    },
+    {
+      "amount": "500000",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "25000.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "SK",
+      "total_tax": "25000.00"
+    },
+    {
+      "amount": "500000",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "30000.00",
+      "expected_reference": "25000.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "SK",
+      "tax_gst": "25000.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "30000.0",
+      "total_tax": "55000.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "25000.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "SK",
+      "total_tax": "25000.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "NB",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "NB",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "NB",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "NB",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "NB",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "NB",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "NB",
+      "tax_gst": "0.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "NB",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "0.00",
+      "expected_reference": "0.15",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "NB",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "0.00",
+      "expected_reference": "0.15",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "NB",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "0.15",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "NB",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.15",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "NB",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "0.15",
+      "notes": "iter350 canonical DB-backed",
+      "province": "NB",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.15",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "NB",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "0.15",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "NB",
+      "tax_gst": "0.0",
+      "tax_hst": "0.15",
+      "tax_pst_qst": "0.0",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "0.15",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "NB",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "-0.02",
+      "expected_reference": "15.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "NB",
+      "total_tax": "14.98"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "-0.02",
+      "expected_reference": "15.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "NB",
+      "total_tax": "14.98"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "15.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "NB",
+      "total_tax": "15.0"
+    },
+    {
+      "amount": "100",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "15.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "NB",
+      "total_tax": "15.00"
+    },
+    {
+      "amount": "100",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "15.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "NB",
+      "total_tax": "15.00"
+    },
+    {
+      "amount": "100",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "15.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "NB",
+      "total_tax": "15.00"
+    },
+    {
+      "amount": "100",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "15.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "NB",
+      "tax_gst": "0.0",
+      "tax_hst": "15.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "15.0"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "15.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "NB",
+      "total_tax": "15.0"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "-0.25",
+      "expected_reference": "150.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "NB",
+      "total_tax": "149.75"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "-0.25",
+      "expected_reference": "150.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "NB",
+      "total_tax": "149.75"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "150.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "NB",
+      "total_tax": "150.0"
+    },
+    {
+      "amount": "1000",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "150.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "NB",
+      "total_tax": "150.00"
+    },
+    {
+      "amount": "1000",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "150.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "NB",
+      "total_tax": "150.00"
+    },
+    {
+      "amount": "1000",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "150.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "NB",
+      "total_tax": "150.00"
+    },
+    {
+      "amount": "1000",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "150.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "NB",
+      "tax_gst": "0.0",
+      "tax_hst": "150.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "150.0"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "150.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "NB",
+      "total_tax": "150.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "-125.00",
+      "expected_reference": "75000.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "NB",
+      "total_tax": "74875.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "-125.00",
+      "expected_reference": "75000.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "NB",
+      "total_tax": "74875.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "75000.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "NB",
+      "total_tax": "75000.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "75000.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "NB",
+      "total_tax": "75000.00"
+    },
+    {
+      "amount": "500000",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "75000.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "NB",
+      "total_tax": "75000.00"
+    },
+    {
+      "amount": "500000",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "75000.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "NB",
+      "total_tax": "75000.00"
+    },
+    {
+      "amount": "500000",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "75000.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "NB",
+      "tax_gst": "0.0",
+      "tax_hst": "75000.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "75000.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "75000.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "NB",
+      "total_tax": "75000.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "NL",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "NL",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "NL",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "NL",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "NL",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "NL",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "NL",
+      "tax_gst": "0.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "NL",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "0.00",
+      "expected_reference": "0.15",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "NL",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "0.00",
+      "expected_reference": "0.15",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "NL",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "0.15",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "NL",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.15",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "NL",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "0.15",
+      "notes": "iter350 canonical DB-backed",
+      "province": "NL",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.15",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "NL",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "0.15",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "NL",
+      "tax_gst": "0.0",
+      "tax_hst": "0.15",
+      "tax_pst_qst": "0.0",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "0.15",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "NL",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "-0.02",
+      "expected_reference": "15.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "NL",
+      "total_tax": "14.98"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "-0.02",
+      "expected_reference": "15.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "NL",
+      "total_tax": "14.98"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "15.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "NL",
+      "total_tax": "15.0"
+    },
+    {
+      "amount": "100",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "15.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "NL",
+      "total_tax": "15.00"
+    },
+    {
+      "amount": "100",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "15.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "NL",
+      "total_tax": "15.00"
+    },
+    {
+      "amount": "100",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "15.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "NL",
+      "total_tax": "15.00"
+    },
+    {
+      "amount": "100",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "15.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "NL",
+      "tax_gst": "0.0",
+      "tax_hst": "15.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "15.0"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "15.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "NL",
+      "total_tax": "15.0"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "-0.25",
+      "expected_reference": "150.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "NL",
+      "total_tax": "149.75"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "-0.25",
+      "expected_reference": "150.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "NL",
+      "total_tax": "149.75"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "150.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "NL",
+      "total_tax": "150.0"
+    },
+    {
+      "amount": "1000",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "150.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "NL",
+      "total_tax": "150.00"
+    },
+    {
+      "amount": "1000",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "150.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "NL",
+      "total_tax": "150.00"
+    },
+    {
+      "amount": "1000",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "150.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "NL",
+      "total_tax": "150.00"
+    },
+    {
+      "amount": "1000",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "150.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "NL",
+      "tax_gst": "0.0",
+      "tax_hst": "150.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "150.0"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "150.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "NL",
+      "total_tax": "150.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "-125.00",
+      "expected_reference": "75000.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "NL",
+      "total_tax": "74875.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "-125.00",
+      "expected_reference": "75000.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "NL",
+      "total_tax": "74875.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "75000.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "NL",
+      "total_tax": "75000.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "75000.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "NL",
+      "total_tax": "75000.00"
+    },
+    {
+      "amount": "500000",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "75000.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "NL",
+      "total_tax": "75000.00"
+    },
+    {
+      "amount": "500000",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "75000.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "NL",
+      "total_tax": "75000.00"
+    },
+    {
+      "amount": "500000",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "75000.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "NL",
+      "tax_gst": "0.0",
+      "tax_hst": "75000.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "75000.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "75000.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "NL",
+      "total_tax": "75000.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "NS",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "NS",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "NS",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "NS",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "NS",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "NS",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "NS",
+      "tax_gst": "0.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "NS",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "0.01",
+      "expected_reference": "0.14",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "NS",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "0.01",
+      "expected_reference": "0.14",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "NS",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.01",
+      "expected_reference": "0.14",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "NS",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.01",
+      "expected_reference": "0.14",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "NS",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.01",
+      "expected_reference": "0.14",
+      "notes": "iter350 canonical DB-backed",
+      "province": "NS",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.01",
+      "expected_reference": "0.14",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "NS",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "0.14",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "NS",
+      "tax_gst": "0.0",
+      "tax_hst": "0.14",
+      "tax_pst_qst": "0.0",
+      "total_tax": "0.14"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.01",
+      "expected_reference": "0.14",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "NS",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "0.98",
+      "expected_reference": "14.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "NS",
+      "total_tax": "14.98"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "0.98",
+      "expected_reference": "14.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "NS",
+      "total_tax": "14.98"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "1.00",
+      "expected_reference": "14.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "NS",
+      "total_tax": "15.0"
+    },
+    {
+      "amount": "100",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "1.00",
+      "expected_reference": "14.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "NS",
+      "total_tax": "15.00"
+    },
+    {
+      "amount": "100",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "1.00",
+      "expected_reference": "14.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "NS",
+      "total_tax": "15.00"
+    },
+    {
+      "amount": "100",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "1.00",
+      "expected_reference": "14.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "NS",
+      "total_tax": "15.00"
+    },
+    {
+      "amount": "100",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "14.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "NS",
+      "tax_gst": "0.0",
+      "tax_hst": "14.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "14.0"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "1.00",
+      "expected_reference": "14.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "NS",
+      "total_tax": "15.0"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "9.75",
+      "expected_reference": "140.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "NS",
+      "total_tax": "149.75"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "9.75",
+      "expected_reference": "140.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "NS",
+      "total_tax": "149.75"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "10.00",
+      "expected_reference": "140.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "NS",
+      "total_tax": "150.0"
+    },
+    {
+      "amount": "1000",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "10.00",
+      "expected_reference": "140.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "NS",
+      "total_tax": "150.00"
+    },
+    {
+      "amount": "1000",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "10.00",
+      "expected_reference": "140.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "NS",
+      "total_tax": "150.00"
+    },
+    {
+      "amount": "1000",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "10.00",
+      "expected_reference": "140.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "NS",
+      "total_tax": "150.00"
+    },
+    {
+      "amount": "1000",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "140.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "NS",
+      "tax_gst": "0.0",
+      "tax_hst": "140.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "140.0"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "10.00",
+      "expected_reference": "140.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "NS",
+      "total_tax": "150.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "4875.00",
+      "expected_reference": "70000.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "NS",
+      "total_tax": "74875.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "4875.00",
+      "expected_reference": "70000.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "NS",
+      "total_tax": "74875.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "5000.00",
+      "expected_reference": "70000.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "NS",
+      "total_tax": "75000.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "5000.00",
+      "expected_reference": "70000.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "NS",
+      "total_tax": "75000.00"
+    },
+    {
+      "amount": "500000",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "5000.00",
+      "expected_reference": "70000.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "NS",
+      "total_tax": "75000.00"
+    },
+    {
+      "amount": "500000",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "5000.00",
+      "expected_reference": "70000.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "NS",
+      "total_tax": "75000.00"
+    },
+    {
+      "amount": "500000",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "70000.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "NS",
+      "tax_gst": "0.0",
+      "tax_hst": "70000.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "70000.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "5000.00",
+      "expected_reference": "70000.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "NS",
+      "total_tax": "75000.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "PE",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "PE",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "PE",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "PE",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "PE",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "PE",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "PE",
+      "tax_gst": "0.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "PE",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "0.00",
+      "expected_reference": "0.15",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "PE",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "0.00",
+      "expected_reference": "0.15",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "PE",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "0.15",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "PE",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.15",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "PE",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "0.15",
+      "notes": "iter350 canonical DB-backed",
+      "province": "PE",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.15",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "PE",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "0.15",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "PE",
+      "tax_gst": "0.0",
+      "tax_hst": "0.15",
+      "tax_pst_qst": "0.0",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "0.15",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "PE",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "-0.02",
+      "expected_reference": "15.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "PE",
+      "total_tax": "14.98"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "-0.02",
+      "expected_reference": "15.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "PE",
+      "total_tax": "14.98"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "15.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "PE",
+      "total_tax": "15.0"
+    },
+    {
+      "amount": "100",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "15.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "PE",
+      "total_tax": "15.00"
+    },
+    {
+      "amount": "100",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "15.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "PE",
+      "total_tax": "15.00"
+    },
+    {
+      "amount": "100",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "15.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "PE",
+      "total_tax": "15.00"
+    },
+    {
+      "amount": "100",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "15.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "PE",
+      "tax_gst": "0.0",
+      "tax_hst": "15.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "15.0"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "15.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "PE",
+      "total_tax": "15.0"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "-0.25",
+      "expected_reference": "150.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "PE",
+      "total_tax": "149.75"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "-0.25",
+      "expected_reference": "150.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "PE",
+      "total_tax": "149.75"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "150.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "PE",
+      "total_tax": "150.0"
+    },
+    {
+      "amount": "1000",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "150.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "PE",
+      "total_tax": "150.00"
+    },
+    {
+      "amount": "1000",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "150.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "PE",
+      "total_tax": "150.00"
+    },
+    {
+      "amount": "1000",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "150.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "PE",
+      "total_tax": "150.00"
+    },
+    {
+      "amount": "1000",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "150.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "PE",
+      "tax_gst": "0.0",
+      "tax_hst": "150.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "150.0"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "150.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "PE",
+      "total_tax": "150.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "-125.00",
+      "expected_reference": "75000.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "PE",
+      "total_tax": "74875.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "-125.00",
+      "expected_reference": "75000.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "PE",
+      "total_tax": "74875.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "75000.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "PE",
+      "total_tax": "75000.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "75000.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "PE",
+      "total_tax": "75000.00"
+    },
+    {
+      "amount": "500000",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "75000.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "PE",
+      "total_tax": "75000.00"
+    },
+    {
+      "amount": "500000",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "75000.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "PE",
+      "total_tax": "75000.00"
+    },
+    {
+      "amount": "500000",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "75000.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "PE",
+      "tax_gst": "0.0",
+      "tax_hst": "75000.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "75000.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "75000.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "PE",
+      "total_tax": "75000.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "YT",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "YT",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "YT",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "YT",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "YT",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "YT",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "YT",
+      "tax_gst": "0.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "YT",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "0.10",
+      "expected_reference": "0.05",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "YT",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "0.10",
+      "expected_reference": "0.05",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "YT",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "0.05",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "YT",
+      "total_tax": "0.05"
+    },
+    {
+      "amount": "1",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.05",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "YT",
+      "total_tax": "0.05"
+    },
+    {
+      "amount": "1",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "0.05",
+      "notes": "iter350 canonical DB-backed",
+      "province": "YT",
+      "total_tax": "0.05"
+    },
+    {
+      "amount": "1",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.05",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "YT",
+      "total_tax": "0.05"
+    },
+    {
+      "amount": "1",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "0.05",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "YT",
+      "tax_gst": "0.05",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "0.05"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "0.05",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "YT",
+      "total_tax": "0.05"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "9.98",
+      "expected_reference": "5.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "YT",
+      "total_tax": "14.98"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "9.98",
+      "expected_reference": "5.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "YT",
+      "total_tax": "14.98"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "5.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "YT",
+      "total_tax": "5.0"
+    },
+    {
+      "amount": "100",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "5.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "YT",
+      "total_tax": "5.00"
+    },
+    {
+      "amount": "100",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "5.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "YT",
+      "total_tax": "5.00"
+    },
+    {
+      "amount": "100",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "5.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "YT",
+      "total_tax": "5.00"
+    },
+    {
+      "amount": "100",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "5.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "YT",
+      "tax_gst": "5.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "5.0"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "5.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "YT",
+      "total_tax": "5.0"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "99.75",
+      "expected_reference": "50.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "YT",
+      "total_tax": "149.75"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "99.75",
+      "expected_reference": "50.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "YT",
+      "total_tax": "149.75"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "50.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "YT",
+      "total_tax": "50.0"
+    },
+    {
+      "amount": "1000",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "50.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "YT",
+      "total_tax": "50.00"
+    },
+    {
+      "amount": "1000",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "50.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "YT",
+      "total_tax": "50.00"
+    },
+    {
+      "amount": "1000",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "50.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "YT",
+      "total_tax": "50.00"
+    },
+    {
+      "amount": "1000",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "50.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "YT",
+      "tax_gst": "50.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "50.0"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "50.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "YT",
+      "total_tax": "50.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "49875.00",
+      "expected_reference": "25000.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "YT",
+      "total_tax": "74875.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "49875.00",
+      "expected_reference": "25000.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "YT",
+      "total_tax": "74875.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "25000.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "YT",
+      "total_tax": "25000.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "25000.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "YT",
+      "total_tax": "25000.00"
+    },
+    {
+      "amount": "500000",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "25000.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "YT",
+      "total_tax": "25000.00"
+    },
+    {
+      "amount": "500000",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "25000.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "YT",
+      "total_tax": "25000.00"
+    },
+    {
+      "amount": "500000",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "25000.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "YT",
+      "tax_gst": "25000.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "25000.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "25000.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "YT",
+      "total_tax": "25000.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "NT",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "NT",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "NT",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "NT",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "NT",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "NT",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "NT",
+      "tax_gst": "0.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "NT",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "0.10",
+      "expected_reference": "0.05",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "NT",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "0.10",
+      "expected_reference": "0.05",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "NT",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "0.05",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "NT",
+      "total_tax": "0.05"
+    },
+    {
+      "amount": "1",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.05",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "NT",
+      "total_tax": "0.05"
+    },
+    {
+      "amount": "1",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "0.05",
+      "notes": "iter350 canonical DB-backed",
+      "province": "NT",
+      "total_tax": "0.05"
+    },
+    {
+      "amount": "1",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.05",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "NT",
+      "total_tax": "0.05"
+    },
+    {
+      "amount": "1",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "0.05",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "NT",
+      "tax_gst": "0.05",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "0.05"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "0.05",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "NT",
+      "total_tax": "0.05"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "9.98",
+      "expected_reference": "5.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "NT",
+      "total_tax": "14.98"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "9.98",
+      "expected_reference": "5.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "NT",
+      "total_tax": "14.98"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "5.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "NT",
+      "total_tax": "5.0"
+    },
+    {
+      "amount": "100",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "5.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "NT",
+      "total_tax": "5.00"
+    },
+    {
+      "amount": "100",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "5.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "NT",
+      "total_tax": "5.00"
+    },
+    {
+      "amount": "100",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "5.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "NT",
+      "total_tax": "5.00"
+    },
+    {
+      "amount": "100",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "5.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "NT",
+      "tax_gst": "5.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "5.0"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "5.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "NT",
+      "total_tax": "5.0"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "99.75",
+      "expected_reference": "50.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "NT",
+      "total_tax": "149.75"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "99.75",
+      "expected_reference": "50.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "NT",
+      "total_tax": "149.75"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "50.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "NT",
+      "total_tax": "50.0"
+    },
+    {
+      "amount": "1000",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "50.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "NT",
+      "total_tax": "50.00"
+    },
+    {
+      "amount": "1000",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "50.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "NT",
+      "total_tax": "50.00"
+    },
+    {
+      "amount": "1000",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "50.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "NT",
+      "total_tax": "50.00"
+    },
+    {
+      "amount": "1000",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "50.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "NT",
+      "tax_gst": "50.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "50.0"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "50.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "NT",
+      "total_tax": "50.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "49875.00",
+      "expected_reference": "25000.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "NT",
+      "total_tax": "74875.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "49875.00",
+      "expected_reference": "25000.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "NT",
+      "total_tax": "74875.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "25000.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "NT",
+      "total_tax": "25000.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "25000.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "NT",
+      "total_tax": "25000.00"
+    },
+    {
+      "amount": "500000",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "25000.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "NT",
+      "total_tax": "25000.00"
+    },
+    {
+      "amount": "500000",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "25000.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "NT",
+      "total_tax": "25000.00"
+    },
+    {
+      "amount": "500000",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "25000.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "NT",
+      "tax_gst": "25000.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "25000.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "25000.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "NT",
+      "total_tax": "25000.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "NU",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "NU",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "NU",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "NU",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "NU",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "NU",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "NU",
+      "tax_gst": "0.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "NU",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "0.10",
+      "expected_reference": "0.05",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "NU",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "0.10",
+      "expected_reference": "0.05",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "NU",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "0.05",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "NU",
+      "total_tax": "0.05"
+    },
+    {
+      "amount": "1",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.05",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "NU",
+      "total_tax": "0.05"
+    },
+    {
+      "amount": "1",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "0.05",
+      "notes": "iter350 canonical DB-backed",
+      "province": "NU",
+      "total_tax": "0.05"
+    },
+    {
+      "amount": "1",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.05",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "NU",
+      "total_tax": "0.05"
+    },
+    {
+      "amount": "1",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "0.05",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "NU",
+      "tax_gst": "0.05",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "0.05"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "0.05",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "NU",
+      "total_tax": "0.05"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "9.98",
+      "expected_reference": "5.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "NU",
+      "total_tax": "14.98"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "9.98",
+      "expected_reference": "5.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "NU",
+      "total_tax": "14.98"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "5.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "NU",
+      "total_tax": "5.0"
+    },
+    {
+      "amount": "100",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "5.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "NU",
+      "total_tax": "5.00"
+    },
+    {
+      "amount": "100",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "5.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "NU",
+      "total_tax": "5.00"
+    },
+    {
+      "amount": "100",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "5.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "NU",
+      "total_tax": "5.00"
+    },
+    {
+      "amount": "100",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "5.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "NU",
+      "tax_gst": "5.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "5.0"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "5.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "NU",
+      "total_tax": "5.0"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "99.75",
+      "expected_reference": "50.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "NU",
+      "total_tax": "149.75"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "99.75",
+      "expected_reference": "50.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "NU",
+      "total_tax": "149.75"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "50.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "NU",
+      "total_tax": "50.0"
+    },
+    {
+      "amount": "1000",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "50.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "NU",
+      "total_tax": "50.00"
+    },
+    {
+      "amount": "1000",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "50.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "NU",
+      "total_tax": "50.00"
+    },
+    {
+      "amount": "1000",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "50.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "NU",
+      "total_tax": "50.00"
+    },
+    {
+      "amount": "1000",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "50.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "NU",
+      "tax_gst": "50.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "50.0"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "50.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "NU",
+      "total_tax": "50.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "49875.00",
+      "expected_reference": "25000.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "NU",
+      "total_tax": "74875.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "49875.00",
+      "expected_reference": "25000.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "NU",
+      "total_tax": "74875.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "25000.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "NU",
+      "total_tax": "25000.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "25000.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "NU",
+      "total_tax": "25000.00"
+    },
+    {
+      "amount": "500000",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "25000.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "NU",
+      "total_tax": "25000.00"
+    },
+    {
+      "amount": "500000",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "25000.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "NU",
+      "total_tax": "25000.00"
+    },
+    {
+      "amount": "500000",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "25000.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "NU",
+      "tax_gst": "25000.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "25000.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "25000.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "NU",
+      "total_tax": "25000.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "US",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "US",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "US",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "US",
+      "total_tax": "0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "US",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "US",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "US",
+      "tax_gst": "0.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "US",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "0.15",
+      "expected_reference": "0.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "US",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "0.15",
+      "expected_reference": "0.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "US",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "US",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "1",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "US",
+      "total_tax": "0"
+    },
+    {
+      "amount": "1",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "US",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "1",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.15",
+      "expected_reference": "0.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "US",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.15",
+      "expected_reference": "0.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "US",
+      "tax_gst": "0.05",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "0.1",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.05",
+      "expected_reference": "0.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "US",
+      "total_tax": "0.05"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "14.98",
+      "expected_reference": "0.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "US",
+      "total_tax": "14.98"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "14.98",
+      "expected_reference": "0.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "US",
+      "total_tax": "14.98"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "US",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "100",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "US",
+      "total_tax": "0"
+    },
+    {
+      "amount": "100",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "US",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "100",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "14.98",
+      "expected_reference": "0.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "US",
+      "total_tax": "14.98"
+    },
+    {
+      "amount": "100",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "14.98",
+      "expected_reference": "0.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "US",
+      "tax_gst": "5.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "9.98",
+      "total_tax": "14.98"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "5.00",
+      "expected_reference": "0.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "US",
+      "total_tax": "5.0"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "149.75",
+      "expected_reference": "0.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "US",
+      "total_tax": "149.75"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "149.75",
+      "expected_reference": "0.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "US",
+      "total_tax": "149.75"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "US",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "1000",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "US",
+      "total_tax": "0"
+    },
+    {
+      "amount": "1000",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "US",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "1000",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "149.75",
+      "expected_reference": "0.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "US",
+      "total_tax": "149.75"
+    },
+    {
+      "amount": "1000",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "149.75",
+      "expected_reference": "0.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "US",
+      "tax_gst": "50.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "99.75",
+      "total_tax": "149.75"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "50.00",
+      "expected_reference": "0.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "US",
+      "total_tax": "50.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "74875.00",
+      "expected_reference": "0.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "US",
+      "total_tax": "74875.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "74875.00",
+      "expected_reference": "0.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "US",
+      "total_tax": "74875.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "US",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "US",
+      "total_tax": "0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "US",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "500000",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "74875.00",
+      "expected_reference": "0.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "US",
+      "total_tax": "74875.00"
+    },
+    {
+      "amount": "500000",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "74875.00",
+      "expected_reference": "0.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "US",
+      "tax_gst": "25000.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "49875.0",
+      "total_tax": "74875.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "25000.00",
+      "expected_reference": "0.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "US",
+      "total_tax": "25000.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "INTL",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "INTL",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "INTL",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "INTL",
+      "total_tax": "0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "INTL",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "INTL",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "INTL",
+      "tax_gst": "0.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "0.0",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "0.01",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "INTL",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "0.15",
+      "expected_reference": "0.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "INTL",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "0.15",
+      "expected_reference": "0.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "INTL",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "INTL",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "1",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "INTL",
+      "total_tax": "0"
+    },
+    {
+      "amount": "1",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "INTL",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "1",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "0.15",
+      "expected_reference": "0.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "INTL",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "0.15",
+      "expected_reference": "0.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "INTL",
+      "tax_gst": "0.05",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "0.1",
+      "total_tax": "0.15"
+    },
+    {
+      "amount": "1",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "0.05",
+      "expected_reference": "0.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "INTL",
+      "total_tax": "0.05"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "14.98",
+      "expected_reference": "0.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "INTL",
+      "total_tax": "14.98"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "14.98",
+      "expected_reference": "0.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "INTL",
+      "total_tax": "14.98"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "INTL",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "100",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "INTL",
+      "total_tax": "0"
+    },
+    {
+      "amount": "100",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "INTL",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "100",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "14.98",
+      "expected_reference": "0.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "INTL",
+      "total_tax": "14.98"
+    },
+    {
+      "amount": "100",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "14.98",
+      "expected_reference": "0.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "INTL",
+      "tax_gst": "5.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "9.98",
+      "total_tax": "14.98"
+    },
+    {
+      "amount": "100",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "5.00",
+      "expected_reference": "0.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "INTL",
+      "total_tax": "5.0"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "149.75",
+      "expected_reference": "0.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "INTL",
+      "total_tax": "149.75"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "149.75",
+      "expected_reference": "0.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "INTL",
+      "total_tax": "149.75"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "INTL",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "1000",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "INTL",
+      "total_tax": "0"
+    },
+    {
+      "amount": "1000",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "INTL",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "1000",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "149.75",
+      "expected_reference": "0.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "INTL",
+      "total_tax": "149.75"
+    },
+    {
+      "amount": "1000",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "149.75",
+      "expected_reference": "0.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "INTL",
+      "tax_gst": "50.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "99.75",
+      "total_tax": "149.75"
+    },
+    {
+      "amount": "1000",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "50.00",
+      "expected_reference": "0.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "INTL",
+      "total_tax": "50.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_tax",
+      "divergence": "74875.00",
+      "expected_reference": "0.00",
+      "notes": "QC-hardcoded \u2014 province ignored",
+      "province": "INTL",
+      "total_tax": "74875.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_gst_qst",
+      "divergence": "74875.00",
+      "expected_reference": "0.00",
+      "notes": "hardcodes QC \u2014 ignores caller province",
+      "province": "INTL",
+      "total_tax": "74875.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_engine.calculate_taxes_for_recipient",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "DB-backed per-province via tax_rate_config",
+      "province": "INTL",
+      "total_tax": "0.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "vehicle_pricing.calculate_taxes",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "hardcoded PROVINCIAL_TAX_RATES; USA/EU/'' \u2192 0%",
+      "province": "INTL",
+      "total_tax": "0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "fee_calculator.tax_on",
+      "divergence": "0.00",
+      "expected_reference": "0.00",
+      "notes": "iter350 canonical DB-backed",
+      "province": "INTL",
+      "total_tax": "0.00"
+    },
+    {
+      "amount": "500000",
+      "calculator": "fee_calculator.calculate_partner_taxes",
+      "divergence": "74875.00",
+      "expected_reference": "0.00",
+      "notes": "legacy shim \u2014 unknown \u2192 QC via _resolve_province",
+      "province": "INTL",
+      "total_tax": "74875.00"
+    },
+    {
+      "amount": "500000",
+      "calculator": "invoice_service.calculate_province_tax",
+      "divergence": "74875.00",
+      "expected_reference": "0.00",
+      "notes": "includes PST/QST/RST for BC/SK/MB/QC",
+      "province": "INTL",
+      "tax_gst": "25000.0",
+      "tax_hst": "0.0",
+      "tax_pst_qst": "49875.0",
+      "total_tax": "74875.0"
+    },
+    {
+      "amount": "500000",
+      "calculator": "tax_dashboard.compute_tax_for_transaction",
+      "divergence": "25000.00",
+      "expected_reference": "0.00",
+      "notes": "uses seller_region, GST+QST for QC, GST-only elsewhere",
+      "province": "INTL",
+      "total_tax": "25000.0"
+    }
+  ],
+  "summary_per_calculator": {
+    "fee_calculator.calculate_partner_taxes": {
+      "diverges": 12,
+      "errors": 0,
+      "matches": 63
+    },
+    "fee_calculator.tax_on": {
+      "diverges": 4,
+      "errors": 0,
+      "matches": 71
+    },
+    "invoice_service.calculate_province_tax": {
+      "diverges": 20,
+      "errors": 0,
+      "matches": 55
+    },
+    "tax_dashboard.compute_tax_for_transaction": {
+      "diverges": 12,
+      "errors": 0,
+      "matches": 63
+    },
+    "tax_engine.calculate_gst_qst": {
+      "diverges": 53,
+      "errors": 0,
+      "matches": 22
+    },
+    "tax_engine.calculate_tax": {
+      "diverges": 53,
+      "errors": 0,
+      "matches": 22
+    },
+    "tax_engine.calculate_taxes_for_recipient": {
+      "diverges": 4,
+      "errors": 0,
+      "matches": 71
+    },
+    "vehicle_pricing.calculate_taxes": {
+      "diverges": 4,
+      "errors": 0,
+      "matches": 71
+    }
+  }
+}

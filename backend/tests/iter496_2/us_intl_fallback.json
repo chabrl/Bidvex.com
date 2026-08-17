@@ -1,0 +1,426 @@
+{
+  "audit": "P6.1.1 \u2014 US/INTL Fallback Trace",
+  "classification_counts": {
+    "AMBER": 3,
+    "GRAY": 8,
+    "GREEN": 3,
+    "RED": 45
+  },
+  "files_scanned": 18,
+  "hits": 59,
+  "hits_detail": [
+    {
+      "classification": "GRAY \u2014 needs manual review",
+      "excerpt": "\"INTL\": {\"gst\": Decimal(\"0\"), \"qst\": Decimal(\"0\"), \"hst\": Decimal(\"0\"),",
+      "file": "/app/backend/services/tax_rate_config.py",
+      "line": 76,
+      "pattern": "US_or_INTL_zero_rated"
+    },
+    {
+      "classification": "GRAY \u2014 needs manual review",
+      "excerpt": "\"US\": \"INTL\", \"USA\": \"INTL\", \"UNITED STATES\": \"INTL\",",
+      "file": "/app/backend/services/tax_rate_config.py",
+      "line": 91,
+      "pattern": "US_or_INTL_zero_rated"
+    },
+    {
+      "classification": "GREEN \u2014 fail-closed to INTL (0%)",
+      "excerpt": "Never raises \u2014 unknown inputs default to 'INTL' (zero-rated) with a",
+      "file": "/app/backend/services/tax_rate_config.py",
+      "line": 106,
+      "pattern": "unknown_province_fallback"
+    },
+    {
+      "classification": "GRAY \u2014 needs manual review",
+      "excerpt": "logger.warning(f\"[tax_rate_config] Unknown province '{prov}' \u2014 defaulting to INTL (0%)\")",
+      "file": "/app/backend/services/tax_rate_config.py",
+      "line": 118,
+      "pattern": "US_or_INTL_zero_rated"
+    },
+    {
+      "classification": "GREEN \u2014 fail-closed to INTL (0%)",
+      "excerpt": "logger.warning(f\"[tax_rate_config] Unknown province '{prov}' \u2014 defaulting to INTL (0%)\")",
+      "file": "/app/backend/services/tax_rate_config.py",
+      "line": 118,
+      "pattern": "unknown_province_fallback"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "DEFAULT_PROVINCE = \"QC\"",
+      "file": "/app/backend/services/invoice_service.py",
+      "line": 98,
+      "pattern": "silent_QC_default"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "pst_pct = f\"{float(pst_rate * 100):.3f}%\" if province == \"QC\" else f\"{float(pst_rate * 100):.0f}%\"",
+      "file": "/app/backend/services/invoice_service.py",
+      "line": 160,
+      "pattern": "silent_QC_default"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "QUEBEC = \"QC\"",
+      "file": "/app/backend/services/vehicle_pricing.py",
+      "line": 41,
+      "pattern": "silent_QC_default"
+    },
+    {
+      "classification": "AMBER \u2014 silent Alberta fallback (5% GST-only); safer than QC but still not fail-closed",
+      "excerpt": "Province.ALBERTA: {\"type\": \"GST\", \"gst\": GST_RATE},",
+      "file": "/app/backend/services/vehicle_pricing.py",
+      "line": 86,
+      "pattern": "silent_ALBERTA_default"
+    },
+    {
+      "classification": "GREEN \u2014 early-return 0% for US/USA/EU/'' (confirmed policy)",
+      "excerpt": "# USA / International \u2192 0% (Exported Service)",
+      "file": "/app/backend/services/vehicle_pricing.py",
+      "line": 163,
+      "pattern": "US_or_INTL_zero_rated"
+    },
+    {
+      "classification": "AMBER \u2014 silent Alberta fallback (5% GST-only); safer than QC but still not fail-closed",
+      "excerpt": "province = Province.ALBERTA  # default to GST only",
+      "file": "/app/backend/services/vehicle_pricing.py",
+      "line": 171,
+      "pattern": "silent_ALBERTA_default"
+    },
+    {
+      "classification": "AMBER \u2014 silent Alberta fallback (5% GST-only); safer than QC but still not fail-closed",
+      "excerpt": "tax_info = PROVINCIAL_TAX_RATES.get(province, PROVINCIAL_TAX_RATES[Province.ALBERTA])",
+      "file": "/app/backend/services/vehicle_pricing.py",
+      "line": 173,
+      "pattern": "silent_ALBERTA_default"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "tax_type=(\"GST+QST\" if buyer_prov == \"QC\" else (\"HST\" if buyer_tax_bd[\"hst\"] > 0 else (\"GST\" if buyer_tax_bd[\"gst\"] > 0 else \"ZERO\"))),",
+      "file": "/app/backend/services/fee_calculator.py",
+      "line": 520,
+      "pattern": "silent_QC_default"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "tax_type=(\"GST+QST\" if partner_prov == \"QC\" else (\"HST\" if tax_bd[\"hst\"] > 0 else (\"GST\" if tax_bd[\"gst\"] > 0 else \"ZERO\"))),",
+      "file": "/app/backend/services/fee_calculator.py",
+      "line": 584,
+      "pattern": "silent_QC_default"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "tax_type=(\"GST+QST\" if buyer_prov == \"QC\" else (\"HST\" if tax_bd[\"hst\"] > 0 else (\"GST\" if tax_bd[\"gst\"] > 0 else \"ZERO\"))),",
+      "file": "/app/backend/services/fee_calculator.py",
+      "line": 669,
+      "pattern": "silent_QC_default"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "tax_type=(\"GST+QST\" if buyer_prov == \"QC\" else (\"HST\" if tax_bd[\"hst\"] > 0 else (\"GST\" if tax_bd[\"gst\"] > 0 else \"ZERO\"))),",
+      "file": "/app/backend/services/fee_calculator.py",
+      "line": 751,
+      "pattern": "silent_QC_default"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "def _resolve_province(prov: Optional[str], fallback: str = \"QC\") -> str:",
+      "file": "/app/backend/services/fee_calculator.py",
+      "line": 832,
+      "pattern": "silent_QC_default"
+    },
+    {
+      "classification": "GRAY \u2014 needs manual review",
+      "excerpt": "\"US\": {\"sales_tax\": Decimal(\"0.00\"), \"combined\": Decimal(\"0\"), \"name\": \"Exported Service\"},",
+      "file": "/app/backend/services/fee_calculator.py",
+      "line": 930,
+      "pattern": "US_or_INTL_zero_rated"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "region: str = \"QC\",",
+      "file": "/app/backend/services/fee_calculator.py",
+      "line": 953,
+      "pattern": "silent_QC_default"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "def calculate_buyer_total(amount: float, tier: str = \"free\", region: str = \"QC\", seller_is_business: bool = False) -> Dict:",
+      "file": "/app/backend/services/fee_calculator.py",
+      "line": 1178,
+      "pattern": "silent_QC_default"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "QC_CODE = \"QC\"",
+      "file": "/app/backend/routes/tax_dashboard.py",
+      "line": 36,
+      "pattern": "silent_QC_default"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "buyer_prov = (buyer or {}).get(\"province\") or (buyer or {}).get(\"business_province\") or \"QC\"",
+      "file": "/app/backend/services/auction_settlement.py",
+      "line": 257,
+      "pattern": "silent_QC_default"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "seller_prov = (seller or {}).get(\"province\") or (seller or {}).get(\"business_province\") or \"QC\"",
+      "file": "/app/backend/services/auction_settlement.py",
+      "line": 258,
+      "pattern": "silent_QC_default"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "buyer_prov = (buyer or {}).get(\"province\") or (buyer or {}).get(\"business_province\") or \"QC\"",
+      "file": "/app/backend/services/auction_settlement.py",
+      "line": 627,
+      "pattern": "silent_QC_default"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "seller_prov = (seller or {}).get(\"province\") or (seller or {}).get(\"business_province\") or \"QC\"",
+      "file": "/app/backend/services/auction_settlement.py",
+      "line": 628,
+      "pattern": "silent_QC_default"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "partner_province: str = \"QC\",",
+      "file": "/app/backend/services/stripe_connect_service.py",
+      "line": 523,
+      "pattern": "silent_QC_default"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "partner_prov = (partner_province or \"QC\").strip().upper()",
+      "file": "/app/backend/services/stripe_connect_service.py",
+      "line": 619,
+      "pattern": "silent_QC_default"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "if partner_prov == \"QC\":",
+      "file": "/app/backend/services/stripe_connect_service.py",
+      "line": 620,
+      "pattern": "silent_QC_default"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "jurisdiction=(partner_prov or \"QC\"),",
+      "file": "/app/backend/services/stripe_connect_service.py",
+      "line": 702,
+      "pattern": "silent_QC_default"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "province: str = \"QC\",",
+      "file": "/app/backend/services/connect_payment_engine.py",
+      "line": 59,
+      "pattern": "silent_QC_default"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "buyer_province: str = \"QC\",",
+      "file": "/app/backend/services/connect_payment_engine.py",
+      "line": 634,
+      "pattern": "silent_QC_default"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "buyer_province: str = \"QC\",",
+      "file": "/app/backend/services/connect_payment_engine.py",
+      "line": 722,
+      "pattern": "silent_QC_default"
+    },
+    {
+      "classification": "GRAY \u2014 needs manual review",
+      "excerpt": "buyer_province = (buyer_user or {}).get(\"province\") if buyer_user else \"QC\"",
+      "file": "/app/backend/routes/auctions.py",
+      "line": 416,
+      "pattern": "unknown_province_fallback"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "pr = PricingManager.non_vehicle_stripe(final_price, buyer_province or \"QC\", buyer_tier, seller_tier)",
+      "file": "/app/backend/routes/auctions.py",
+      "line": 417,
+      "pattern": "silent_QC_default"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "buyer_province = \"QC\"",
+      "file": "/app/backend/routes/auctions.py",
+      "line": 452,
+      "pattern": "silent_QC_default"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "buyer_province = (buyer_province or listing.get(\"region\") or \"QC\").upper()[:2]",
+      "file": "/app/backend/routes/auctions_bids.py",
+      "line": 1851,
+      "pattern": "silent_QC_default"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "qst        = round(commission * 0.09975, 2) if (buyer_province or \"\").upper() == \"QC\" else 0.0",
+      "file": "/app/backend/routes/broker_compliance.py",
+      "line": 146,
+      "pattern": "silent_QC_default"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "doc.get(\"partner_province\") or doc.get(\"business_province\") or doc.get(\"province\") or \"QC\"",
+      "file": "/app/backend/routes/fees.py",
+      "line": 60,
+      "pattern": "silent_QC_default"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "region: str = \"QC\",",
+      "file": "/app/backend/routes/fees.py",
+      "line": 207,
+      "pattern": "silent_QC_default"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "region: str = \"QC\",",
+      "file": "/app/backend/routes/fees.py",
+      "line": 315,
+      "pattern": "silent_QC_default"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "or \"QC\"",
+      "file": "/app/backend/routes/invoices.py",
+      "line": 203,
+      "pattern": "silent_QC_default"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "if first_sold[\"seller_tax_province\"] == \"QC\":",
+      "file": "/app/backend/routes/invoices.py",
+      "line": 382,
+      "pattern": "silent_QC_default"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "if seller_tax_province == \"QC\":",
+      "file": "/app/backend/routes/invoices.py",
+      "line": 418,
+      "pattern": "silent_QC_default"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "or \"QC\"",
+      "file": "/app/backend/routes/invoices.py",
+      "line": 608,
+      "pattern": "silent_QC_default"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "or \"QC\"",
+      "file": "/app/backend/routes/partner_card.py",
+      "line": 233,
+      "pattern": "silent_QC_default"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "or \"QC\"",
+      "file": "/app/backend/routes/partner_card.py",
+      "line": 270,
+      "pattern": "silent_QC_default"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "partner_province = seller.get(\"province\") or seller.get(\"business_province\") or \"QC\"",
+      "file": "/app/backend/routes/payments.py",
+      "line": 961,
+      "pattern": "silent_QC_default"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "or \"QC\"",
+      "file": "/app/backend/routes/payments.py",
+      "line": 1105,
+      "pattern": "silent_QC_default"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "buyer_province = (user_doc.get(\"province\", \"QC\") if user_doc else \"QC\") or \"QC\"",
+      "file": "/app/backend/routes/payments.py",
+      "line": 1592,
+      "pattern": "silent_QC_default"
+    },
+    {
+      "classification": "GRAY \u2014 needs manual review",
+      "excerpt": "buyer_province = (user_doc.get(\"province\", \"QC\") if user_doc else \"QC\") or \"QC\"",
+      "file": "/app/backend/routes/payments.py",
+      "line": 1592,
+      "pattern": "unknown_province_fallback"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "buyer_province = (user_doc.get(\"province\", \"QC\") if user_doc else \"QC\") or \"QC\"",
+      "file": "/app/backend/routes/payments.py",
+      "line": 1689,
+      "pattern": "silent_QC_default"
+    },
+    {
+      "classification": "GRAY \u2014 needs manual review",
+      "excerpt": "buyer_province = (user_doc.get(\"province\", \"QC\") if user_doc else \"QC\") or \"QC\"",
+      "file": "/app/backend/routes/payments.py",
+      "line": 1689,
+      "pattern": "unknown_province_fallback"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "jurisdiction=(buyer_province or \"QC\"),",
+      "file": "/app/backend/routes/payments.py",
+      "line": 1796,
+      "pattern": "silent_QC_default"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "buyer_province = (user_doc.get(\"province\", \"QC\") if user_doc else \"QC\") or \"QC\"",
+      "file": "/app/backend/routes/payments.py",
+      "line": 2406,
+      "pattern": "silent_QC_default"
+    },
+    {
+      "classification": "GRAY \u2014 needs manual review",
+      "excerpt": "buyer_province = (user_doc.get(\"province\", \"QC\") if user_doc else \"QC\") or \"QC\"",
+      "file": "/app/backend/routes/payments.py",
+      "line": 2406,
+      "pattern": "unknown_province_fallback"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "buyer_province = (user_doc.get(\"province\", \"QC\") or \"QC\").upper()",
+      "file": "/app/backend/routes/payments.py",
+      "line": 2477,
+      "pattern": "silent_QC_default"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "jurisdiction=(buyer_province or \"QC\"),",
+      "file": "/app/backend/routes/payments.py",
+      "line": 2531,
+      "pattern": "silent_QC_default"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "jurisdiction=(buyer_province or \"QC\"),",
+      "file": "/app/backend/routes/payments.py",
+      "line": 2588,
+      "pattern": "silent_QC_default"
+    },
+    {
+      "classification": "RED \u2014 silent QC default (over-collection risk if unknown)",
+      "excerpt": "qst = subtotal_taxable * QST_RATE if province == \"QC\" else 0.0",
+      "file": "/app/backend/services/broker_fee_engine.py",
+      "line": 151,
+      "pattern": "silent_QC_default"
+    }
+  ]
+}
