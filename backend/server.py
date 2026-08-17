@@ -13,7 +13,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from pathlib import Path
 from dotenv import load_dotenv
-from typing import Optional
+from typing import Optional, Dict, Any
 from datetime import datetime, timezone, timedelta
 import os
 import logging
@@ -1934,6 +1934,15 @@ try:
             logger.info("iter489 — MCP OAuth server mounted at /api/mcp/oauth/* (preview only)")
         except Exception as ce:  # noqa: BLE001
             logger.warning(f"iter489 MCP OAuth router mount failed (non-fatal): {ce}")
+        # iter490 — MCP Streamable HTTP transport (Claude.ai remote
+        # custom-connector compatibility). Adds POST/GET/DELETE at
+        # /api/mcp with Mcp-Session-Id session lifecycle.
+        try:
+            from routes.mcp_streamable import streamable_router
+            api_router.include_router(streamable_router)
+            logger.info("iter490 — MCP Streamable HTTP mounted at /api/mcp (preview only)")
+        except Exception as ce:  # noqa: BLE001
+            logger.warning(f"iter490 MCP Streamable router mount failed (non-fatal): {ce}")
     else:
         logger.info("iter485 — MCP server not mounted (MCP_ENABLED != true)")
 
@@ -2030,11 +2039,14 @@ def _mcp_public_origin(request) -> str:
     return f"{request.url.scheme}://{request.url.netloc}"
 
 
-@app.get("/.well-known/oauth-authorization-server", include_in_schema=False)
-async def oauth_authorization_server_metadata(request: Request):
-    origin = _mcp_public_origin(request)
+def _oauth_as_metadata(origin: str) -> Dict[str, Any]:
+    # Use a path-inclusive issuer per RFC 8414 §3 so Claude.ai's
+    # discovery URL (issuer + "/.well-known/oauth-authorization-server")
+    # resolves through the ingress that only routes /api/* to the
+    # backend.
+    issuer = f"{origin}/api"
     return {
-        "issuer":                                origin,
+        "issuer":                                issuer,
         "authorization_endpoint":                f"{origin}/api/mcp/oauth/authorize",
         "token_endpoint":                        f"{origin}/api/mcp/oauth/token",
         "registration_endpoint":                 f"{origin}/api/mcp/oauth/register",
@@ -2048,16 +2060,42 @@ async def oauth_authorization_server_metadata(request: Request):
     }
 
 
+def _oauth_pr_metadata(origin: str) -> Dict[str, Any]:
+    return {
+        "resource":                 f"{origin}/api/mcp",
+        # Point at the path-inclusive issuer so Claude's automatic
+        # discovery hits /api/.well-known/*, which the ingress delivers.
+        "authorization_servers":    [f"{origin}/api"],
+        "scopes_supported":         ["read", "bid", "list", "promote", "analytics", "matchmaker"],
+        "bearer_methods_supported": ["header"],
+        "resource_documentation":   f"{origin}/docs/mcp",
+    }
+
+
+@app.get("/.well-known/oauth-authorization-server", include_in_schema=False)
+async def oauth_authorization_server_metadata(request: Request):
+    return _oauth_as_metadata(_mcp_public_origin(request))
+
+
 @app.get("/.well-known/oauth-protected-resource", include_in_schema=False)
 async def oauth_protected_resource_metadata(request: Request):
-    origin = _mcp_public_origin(request)
-    return {
-        "resource":                        f"{origin}/api/mcp",
-        "authorization_servers":           [origin],
-        "scopes_supported":                ["read", "bid", "list", "promote", "analytics", "matchmaker"],
-        "bearer_methods_supported":        ["header"],
-        "resource_documentation":          f"{origin}/docs/mcp",
-    }
+    return _oauth_pr_metadata(_mcp_public_origin(request))
+
+
+# iter490 — Mirror OAuth discovery under /api/.well-known/* so the
+# Kubernetes ingress (which routes ONLY /api/* to the backend) can
+# actually deliver these to external MCP clients like Claude.ai. The
+# root-level /.well-known/* routes above are still defined for
+# local-dev convenience but are shadowed by the frontend SPA in
+# preview/production.
+@app.get("/api/.well-known/oauth-authorization-server", include_in_schema=False)
+async def api_oauth_authorization_server_metadata(request: Request):
+    return _oauth_as_metadata(_mcp_public_origin(request))
+
+
+@app.get("/api/.well-known/oauth-protected-resource", include_in_schema=False)
+async def api_oauth_protected_resource_metadata(request: Request):
+    return _oauth_pr_metadata(_mcp_public_origin(request))
 
 # ─── Lifecycle Events ───
 # iter213: startup/shutdown work is now in the `lifespan` context manager

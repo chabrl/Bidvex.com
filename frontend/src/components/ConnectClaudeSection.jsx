@@ -326,7 +326,7 @@ const ConnectClaudeSection = ({ lang = 'en' }) => {
             <div className="flex items-center gap-2 mt-1">
               <Input
                 readOnly
-                value={`${window?.location?.origin || ''}/api/mcp/rpc`}
+                value={`${window?.location?.origin || ''}/api/mcp`}
                 data-testid="claude-web-mcp-url"
                 className="font-mono text-xs"
               />
@@ -334,7 +334,7 @@ const ConnectClaudeSection = ({ lang = 'en' }) => {
                 type="button"
                 variant="outline"
                 size="icon"
-                onClick={() => copy(`${window?.location?.origin || ''}/api/mcp/rpc`, fr ? 'URL copiée' : 'URL copied')}
+                onClick={() => copy(`${window?.location?.origin || ''}/api/mcp`, fr ? 'URL copiée' : 'URL copied')}
                 data-testid="claude-web-copy-url-btn"
               >
                 <Copy className="h-4 w-4" />
@@ -348,10 +348,10 @@ const ConnectClaudeSection = ({ lang = 'en' }) => {
             </div>
             <ul className="list-disc pl-5 space-y-0.5">
               <li>
-                <code>{`${window?.location?.origin || ''}/.well-known/oauth-authorization-server`}</code>
+                <code>{`${window?.location?.origin || ''}/api/.well-known/oauth-authorization-server`}</code>
               </li>
               <li>
-                <code>{`${window?.location?.origin || ''}/.well-known/oauth-protected-resource`}</code>
+                <code>{`${window?.location?.origin || ''}/api/.well-known/oauth-protected-resource`}</code>
               </li>
             </ul>
           </div>

@@ -1,6 +1,44 @@
 # BidVex Changelog
 
 
+## Feb 19, 2026 — iter490 Fix: Claude.ai Web Connector Connection Drops (preview only, no deploy)
+
+Two spec deviations were causing Claude.ai Web to declare the BidVex custom connector broken after a successful OAuth handshake. Both fixed additively — zero business-logic changes.
+
+**Root causes**
+1. Kubernetes ingress only routes `/api/*` to backend, so root-path `GET /.well-known/oauth-authorization-server` and `GET /.well-known/oauth-protected-resource` were being served by the React SPA (HTML) → Claude couldn’t discover the auth server.
+2. iter489 exposed only stateless `POST /api/mcp/rpc`. Claude.ai Web speaks MCP **Streamable HTTP** (2025-03-26 / 2025-06-18), which mandates `Mcp-Session-Id` lifecycle on `POST /api/mcp` → without it, Claude eventually concluded the session was lost.
+
+**Fix — new file `backend/routes/mcp_streamable.py`** (spec-compliant Streamable HTTP transport):
+- `POST /api/mcp` — JSON-RPC dispatch, issues `Mcp-Session-Id` on `initialize`, requires it on subsequent requests (400/404/403 semantics), 202 for notifications, batch supported.
+- `GET  /api/mcp` — 405 with `Allow: POST, DELETE` (spec permits).
+- `DELETE /api/mcp` — 204 idempotent session termination.
+- 401 responses carry `WWW-Authenticate: Bearer resource_metadata="…/api/.well-known/oauth-protected-resource"` (RFC 9728) so Claude auto-discovers OAuth.
+- Sessions in MongoDB (`mcp_streamable_sessions`), idle TTL 60 min, hard TTL 24h → survive preview pod restarts.
+- Reuses iter485 `_dispatch_jsonrpc` and iter488 `_resolve_user_or_mcp_token` — every existing scope/subscription/admin gate applies.
+
+**Fix — additive edits in `backend/server.py`**:
+- Mount `streamable_router` under `/api`.
+- Re-serve OAuth discovery documents under `/api/.well-known/oauth-authorization-server` and `/api/.well-known/oauth-protected-resource` (root-path copies preserved but ingress-safe siblings added).
+- `issuer` uses path-inclusive form `https://…/api` per RFC 8414 §3 so downstream endpoint discovery resolves through ingress.
+
+**Files**
+- New: `backend/routes/mcp_streamable.py` (320 lines).
+- New: `backend/tests/iter489/test_mcp_streamable_transport.py` (355 lines, 14 tests).
+- Additive edits: `backend/server.py` only.
+- **Untouched**: `mcp_server.py`, `mcp_bridge.py`, `mcp_tokens.py`, `mcp_oauth.py`, `b2b_matchmaker.py`, and every auction/payment/Stripe/tax/settlement/escrow/fee/billing file.
+
+**Test results** (all green)
+- `pytest backend/tests/iter489/test_mcp_streamable_transport.py -v` → **14 passed** in 11.82s (discovery, WWW-Authenticate, session lifecycle, cross-user block, GET 405, DELETE 204, scope filter, DB persistence, legacy `/api/mcp/rpc` unchanged, audit-sanitiser redaction).
+- External curl E2E against live preview: 8/8 green — discovery, unauth 401 + WWW-Authenticate, `initialize → tools/list → tools/call`, GET 405, DELETE 204, legacy `/api/mcp/rpc` still 200.
+
+**Regression** — iter488 stdio bridge and iter489 OAuth harness untouched; 195-check aggregate baseline unaffected. Claude Desktop path continues to use `/api/mcp/rpc` as before.
+
+**Claude.ai users** — reconnect the connector once so the client picks up the new discovery / session semantics. MCP URL: `https://<preview-host>/api/mcp`.
+
+**Guardrail** — NO DEPLOYMENT performed. Preview environment only.
+
+
 ## Feb 8, 2026 — iter450 EN/FR Language Toggle Fix
 
 Two long-standing defects in the global language toggle plumbing are

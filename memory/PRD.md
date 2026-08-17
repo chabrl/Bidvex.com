@@ -1,6 +1,68 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter490 — Fix: Claude.ai Web Connector Connection Drops (Feb 19, 2026) ✅ SHIPPED (preview) · 🚫 NO DEPLOY
+
+### Problem
+After iter489 shipped, connecting BidVex from Claude.ai Web (Settings → Connectors → Add custom connector) succeeded during OAuth but the connector then reported **“Connection issue — Your connection to Bidvex stopped working.”** Root cause was **two spec deviations** in the remote MCP surface:
+
+1. **OAuth discovery unreachable through the Kubernetes ingress.** The ingress only routes `/api/*` to the backend; root-path requests like `/.well-known/oauth-authorization-server` were being served by the React SPA (HTML), so Claude.ai could not discover the authorization server.
+2. **No Streamable HTTP session lifecycle.** iter489 used only the stateless `POST /api/mcp/rpc` JSON-RPC endpoint, but Claude.ai Web speaks the **Streamable HTTP** transport (MCP 2025-03-26 / 2025-06-18) which mandates an `Mcp-Session-Id` header issued on `initialize` and echoed on every subsequent request. Without a proper session, Claude can’t distinguish “session dropped” from “still valid” and eventually declares the connection broken.
+
+### Fix (purely additive — zero business-logic changes)
+
+**Backend — new file: `backend/routes/mcp_streamable.py`** — spec-compliant Streamable HTTP transport:
+- `POST   /api/mcp` — JSON-RPC dispatch (single message and batch). Issues `Mcp-Session-Id` on `initialize`; requires it on every subsequent request (400 if missing, 404 if unknown/expired, 403 if session belongs to a different bearer). Batch and notification (`notifications/*`) semantics per spec. Returns 202 for notifications.
+- `GET    /api/mcp` — 405 Method Not Allowed with `Allow: POST, DELETE` (spec permits servers that don’t push server-initiated SSE to reject GET; probing clients get a definitive answer).
+- `DELETE /api/mcp` — idempotent session termination (204).
+- `Accept` header validation (must include `application/json` / `text/event-stream`).
+- 401 responses attach `WWW-Authenticate: Bearer realm="bidvex-mcp", resource_metadata="…/api/.well-known/oauth-protected-resource"` (RFC 9728) so Claude auto-discovers OAuth.
+- Sessions stored in MongoDB collection `mcp_streamable_sessions` (idle TTL 60 min, hard TTL 24h) so preview pod restarts don’t kill live connectors.
+- Bearer resolution reuses iter488 `_resolve_user_or_mcp_token` — OAuth-minted `bvx_mcp_...` tokens work verbatim, all scope/subscription/admin gates still apply.
+- Business logic reuses iter485 `_dispatch_jsonrpc` — **zero changes** to `mcp_server.py`, tool registry, audit sanitiser, rate limiter, or bidding path.
+
+**Backend — `backend/server.py`** — additive changes:
+- Mounted `streamable_router` under `/api` so `POST/GET/DELETE /api/mcp` are live.
+- **Re-served the two RFC discovery documents at `/api/.well-known/oauth-authorization-server` and `/api/.well-known/oauth-protected-resource`.** The original root-path routes are preserved but the new `/api/*` copies bypass the ingress trap.
+- `issuer` in the authorization-server metadata is now the **path-inclusive** form (`https://…/api`) per RFC 8414 §3, so relative discovery of `/oauth/authorize` and `/oauth/token` resolves through the ingress.
+
+### Verification
+- **Pytest** — `backend/tests/iter489/test_mcp_streamable_transport.py`, 14 tests, all passing:
+  - Discovery via `/api/.well-known/*` (200)
+  - Issuer path-inclusive
+  - 401 → `WWW-Authenticate` with `resource_metadata` URL
+  - `initialize` issues `Mcp-Session-Id`
+  - subsequent request without session → 400 `missing_session`
+  - subsequent request with session → 200 + full tools list
+  - unknown session → 404 `session_not_found`
+  - cross-user session → 403 `session_mismatch`
+  - `DELETE /api/mcp` → 204 and next call 404
+  - `GET /api/mcp` → 405 with `Allow: POST, DELETE`
+  - scope filter end-to-end (`read+matchmaker` token → `place_bid` returns `INSUFFICIENT_SCOPE`)
+  - session persisted in MongoDB (survives pod restart semantics)
+  - **legacy `POST /api/mcp/rpc` unchanged** (Claude Desktop stdio bridge still works)
+  - audit sanitiser still redacts raw tokens
+- **External curl E2E** against the live preview URL — 8/8 flows green: discovery, unauth 401 + `WWW-Authenticate`, `initialize → tools/list → tools/call`, GET 405, DELETE 204, legacy `/api/mcp/rpc` untouched.
+
+### Files changed
+- New: `backend/routes/mcp_streamable.py` (320 lines)
+- New: `backend/tests/iter489/test_mcp_streamable_transport.py` (355 lines, 14 tests)
+- Additive edits: `backend/server.py` — mounts streamable router + `/api/.well-known/*` copies + path-inclusive issuer
+- New: `backend/routes/mcp_oauth.py` (iter489, already shipped) — unchanged in this fix
+- **NOT** changed: `backend/mcp_server.py`, `backend/mcp_bridge.py`, `backend/routes/mcp_tokens.py`, `backend/services/b2b_matchmaker.py`, any auction / payment / Stripe / tax / settlement / escrow / fee / billing code.
+
+### Guardrails held
+- ✅ **NO DEPLOYMENT** — preview only.
+- ✅ Claude Desktop stdio path (iter488 `mcp_bridge.py` → `/api/mcp/rpc`) unchanged and re-verified.
+- ✅ iter489 OAuth 2.1 flow unchanged (register / authorize / consent / token / revoke).
+- ✅ iter488 scoped-token surface unchanged.
+- ✅ Zero business-logic files touched.
+- ✅ Raw tokens, client secrets, PKCE verifiers, session IDs never logged in cleartext audit blobs.
+
+### What Claude.ai users need to do
+- **Reconnect the connector once** so the client picks up the new `WWW-Authenticate`, discovery URL, and session semantics. The MCP URL to add is `https://<preview-host>/api/mcp` (Claude auto-discovers the auth server from the 401 response). No new credentials required — the same OAuth flow shipped in iter489 is used.
+
+
 ## iter489 — BidVex Remote MCP Connector for Claude.ai (Feb 18, 2026) ✅ SHIPPED (preview) · 🚫 NO DEPLOY
 
 ### Delivered
