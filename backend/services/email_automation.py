@@ -370,44 +370,57 @@ async def process_abandoned_bid_recovery(db: AsyncIOMotorDatabase):
 # ═══════════════════════════════════════════════════════════════
 
 def register_lifecycle_jobs(scheduler, db: AsyncIOMotorDatabase):
-    """Register all lifecycle email jobs with APScheduler. Call from server startup."""
-    import asyncio
+    """Register all lifecycle email jobs with APScheduler.
 
-    def _run_onboarding():
-        asyncio.get_event_loop().create_task(process_onboarding_sequence(db))
+    AsyncIOScheduler natively awaits async callables, so we pass the
+    coroutine functions directly (wrapped in a partial to bind `db`).
 
-    def _run_reengagement():
-        asyncio.get_event_loop().create_task(process_reengagement_sequence(db))
+    Previously this file wrapped each async coroutine in a sync callback
+    that called ``asyncio.get_event_loop().create_task(...)``. Under
+    uvloop that raises ``RuntimeError: There is no current event loop in
+    thread 'ThreadPoolExecutor-...'`` because APScheduler's default
+    thread-pool executor runs the sync callback OFF the main event
+    loop. Passing the async function directly makes APScheduler use the
+    AsyncIOScheduler-native path where the coroutine is awaited on the
+    scheduler's event loop.
+    """
+    from functools import partial
 
-    def _run_subscription_expiry():
-        asyncio.get_event_loop().create_task(process_subscription_expiry_sequence(db))
-
-    def _run_abandoned_bid():
-        asyncio.get_event_loop().create_task(process_abandoned_bid_recovery(db))
-
-    scheduler.add_job(_run_onboarding, "cron", hour=9, minute=0, id="lifecycle_onboarding", replace_existing=True)
-    scheduler.add_job(_run_reengagement, "cron", hour=9, minute=15, id="lifecycle_reengagement", replace_existing=True)
-    scheduler.add_job(_run_subscription_expiry, "cron", hour=9, minute=30, id="lifecycle_subscription", replace_existing=True)
-    scheduler.add_job(_run_abandoned_bid, "cron", hour=10, minute=0, id="lifecycle_abandoned_bid", replace_existing=True)
+    scheduler.add_job(
+        partial(process_onboarding_sequence, db),
+        "cron", hour=9, minute=0, id="lifecycle_onboarding", replace_existing=True,
+    )
+    scheduler.add_job(
+        partial(process_reengagement_sequence, db),
+        "cron", hour=9, minute=15, id="lifecycle_reengagement", replace_existing=True,
+    )
+    scheduler.add_job(
+        partial(process_subscription_expiry_sequence, db),
+        "cron", hour=9, minute=30, id="lifecycle_subscription", replace_existing=True,
+    )
+    scheduler.add_job(
+        partial(process_abandoned_bid_recovery, db),
+        "cron", hour=10, minute=0, id="lifecycle_abandoned_bid", replace_existing=True,
+    )
 
     # iter216 P3 — Process every user's 6-email journey daily at 09:45 UTC.
-    def _run_journey_cron():
-        from services.email_journey import process_due_journey_emails
-        asyncio.get_event_loop().create_task(process_due_journey_emails(db))
+    from services.email_journey import process_due_journey_emails
     scheduler.add_job(
-        _run_journey_cron, "cron", hour=9, minute=45,
+        partial(process_due_journey_emails, db),
+        "cron", hour=9, minute=45,
         id="lifecycle_journey", replace_existing=True,
     )
 
-    def _run_stripe_audit():
-        from services.stripe_customer_service import audit_stripe_customers
-        asyncio.get_event_loop().create_task(audit_stripe_customers(db))
+    from services.stripe_customer_service import audit_stripe_customers
+    from services.escrow_service import auto_release_expired_escrows
 
-    def _run_escrow_auto_release():
-        from services.escrow_service import auto_release_expired_escrows
-        asyncio.get_event_loop().create_task(auto_release_expired_escrows(db))
-
-    scheduler.add_job(_run_stripe_audit, "cron", hour=6, minute=0, id="stripe_customer_audit", replace_existing=True)
-    scheduler.add_job(_run_escrow_auto_release, "interval", minutes=15, id="escrow_auto_release", replace_existing=True)
+    scheduler.add_job(
+        partial(audit_stripe_customers, db),
+        "cron", hour=6, minute=0, id="stripe_customer_audit", replace_existing=True,
+    )
+    scheduler.add_job(
+        partial(auto_release_expired_escrows, db),
+        "interval", minutes=15, id="escrow_auto_release", replace_existing=True,
+    )
 
     logger.info("[LIFECYCLE] Registered 6 lifecycle email jobs (9:00, 9:15, 9:30, 10:00, 6:00 AM UTC + 15min escrow)")

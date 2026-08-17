@@ -91,6 +91,9 @@ async def post_chat_stream(
     """
     body = await _enrich_with_listing_context(body)
     user_id = await _resolve_user_id(creds)
+    # iter497 — Warm the ai_config cache so live admin edits reach
+    # the sync Gemini config builder inside stream_chat_chunks().
+    await _prewarm_ai_config()
     # iter261 — session_id resolution lives inside _stream() so the
     # GET variant inherits the same behavior. The first turn anchors
     # the conversation; the response header echoes the resolved id.
@@ -117,7 +120,20 @@ async def get_chat_stream(
     )
     body = await _enrich_with_listing_context(body)
     user_id = await _resolve_user_id(creds)
+    await _prewarm_ai_config()
     return _stream(body, user_id=user_id)
+
+
+async def _prewarm_ai_config() -> None:
+    """iter497 — best-effort refresh of the ai_config cache so admin edits
+    propagate before the sync stream generator kicks off."""
+    if _db is None:
+        return
+    try:
+        from services.ai_config_service import refresh_cache_from_db
+        await refresh_cache_from_db(_db)
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[GenAI Direct] ai_config pre-warm failed: {e}")
 
 
 async def _enrich_with_listing_context(body: StreamChatBody) -> StreamChatBody:

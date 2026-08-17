@@ -1,6 +1,79 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter497 — BidVex Gemini System Instruction → MongoDB (Feb 19, 2026) ✅ SHIPPED (preview) · 🚫 NO DEPLOY
+
+### Problem
+The 22 KB BidVex Gemini system instruction was hard-coded in `services/genai_direct_client.py` as a Python constant. Any behavioural tweak — a wording change, a new competitor added to the ban list, an updated escalation script — required a full code deploy. Unacceptable for a knob that governs every Watchdog scan and every live user chat.
+
+### Delivered
+
+**Migration: hard-coded constant → `db.ai_config` (with history)**
+- `services/ai_config_service.py` (already scaffolded pre-fork) is now feature-complete:
+  - Reads / writes `db.ai_config` keyed by `{"key": "system_instruction"}`.
+  - 5-minute in-memory cache with `time.monotonic()` clock so callers in either an async loop or a thread pool get consistent values.
+  - Idempotent bootstrap from `/app/memory/BIDVEX_AI_SYSTEM_INSTRUCTION_SEED.md`; the seed file is the single source of truth on cold DBs and never overwrites an existing DB value.
+  - Every admin edit snapshots the previous row into `db.ai_config_history` for a CRA-style audit trail (superseded_at, superseded_by_user_id).
+- `services/genai_direct_client.py` — the inline 230-line `WATCHDOG_SYSTEM_INSTRUCTION = """…"""` block is deleted from the .py module. The name is preserved as a module-level constant resolved from the sync cache at import time (backwards-compat for `iter234+` tests). `build_generation_config()` now reads `get_system_instruction_sync()` on **every** call so live admin edits propagate immediately once callers pre-warm the cache.
+
+**Admin control plane**
+- `routes/admin_ai_config.py` (NEW) — `require_admin`-gated:
+  - `GET /api/admin/ai-config/system-instruction` → returns `{key, value, char_count, source, updated_at, updated_by_user_id, seed_file_path}`.
+  - `PUT /api/admin/ai-config/system-instruction` → validates 1..200,000 chars, writes to `db.ai_config`, snapshots the previous row into `db.ai_config_history`, records an `admin_logs` entry, and hot-swaps the cache so the next Gemini call sees the new prompt within seconds.
+- `pages/admin/AdminAIConfig.jsx` (NEW) — bilingual admin UI at `/admin/ai-config` and inside AdminDashboard → Settings → "AI System Instruction" tab. Full editor, live char count, unsaved-changes badge, revert-to-saved, side-by-side diff preview before saving, updated_at + updated_by metadata card. Every interactive element carries `data-testid` for E2E.
+
+**Live propagation to Gemini call-sites**
+- `services/genai_watchdog.py` — added `await refresh_cache_from_db(db)` warm-up before entering the sync `run_watchdog_analysis` inside `asyncio.to_thread`. Guarantees the daily 00:00 UTC report uses the latest admin-approved prompt.
+- `routes/genai_chat.py` — added `_prewarm_ai_config()` on both GET and POST `/api/chat/stream` handlers so every user-facing chat turn hydrates the cache first. The sync stream generator inside `stream_chat_chunks` then reads the warm value with zero DB overhead.
+- `server.py` — startup lifespan hook seeds + warms `db.ai_config` (`iter497 — ai_config seeded + cache warmed` on boot).
+
+### Test coverage — 11 iter497 tests + 59 pre-existing prompt/watchdog tests, all green
+- `tests/iter497/test_ai_config_migration.py` — 11 tests:
+  * Seed file present, non-empty, contains P0 anchor + escalation marker.
+  * Sync accessor returns full value on cold DB.
+  * `build_generation_config()` embeds the DB-backed sync value.
+  * `extra_system_instruction` is appended under a "# Additional Runtime Context" heading.
+  * `WATCHDOG_SYSTEM_INSTRUCTION` backwards-compat constant resolves from the seed.
+  * Anonymous GET → 401; non-admin GET/PUT → 403.
+  * Admin GET returns the pristine seed on a cold DB.
+  * Admin PUT updates the value + reads back the new one + restores seed.
+  * Empty PUT rejected (400/422).
+- Pre-existing suites remain green: `test_iter234_genai_direct_watchdog.py` (7), `test_iter281_competitor_ban.py` (25), `test_iter320_escalation.py` (12), `test_iter236_geo_and_listing_context.py` (10). `test_iter281` was updated to read the seed file alongside the source module so substring assertions transparently follow the migration.
+
+### Files Changed
+- **New (4)**: `backend/routes/admin_ai_config.py`, `backend/tests/iter497/__init__.py`, `backend/tests/iter497/test_ai_config_migration.py`, `frontend/src/pages/admin/AdminAIConfig.jsx`.
+- **Edited (additive)**:
+  * `backend/services/ai_config_service.py` — clock switched to `time.monotonic()`; write path now stamps the cache in-place instead of evicting so no null window between save and next call.
+  * `backend/services/genai_direct_client.py` — inline 230-line prompt removed; imports `get_system_instruction_sync` from `ai_config_service`; `build_generation_config` reads live cache on every call.
+  * `backend/services/genai_watchdog.py` — pre-warm before `to_thread`.
+  * `backend/routes/genai_chat.py` — pre-warm on both GET and POST stream handlers.
+  * `backend/server.py` — mount admin router + startup seed/warm.
+  * `frontend/src/App.js` — lazy import + `/admin/ai-config` route.
+  * `frontend/src/pages/AdminDashboard.js` — Settings tab entry + lazy import.
+  * `backend/tests/test_iter281_competitor_ban.py` — `_read_prompt_source` concatenates the seed file so old substring assertions continue to pass.
+- **Untouched**: `services/tax_rate_config.py`, tax engine, Stripe, escrow, settlement, invoice, receipt, fee, commission code. Iter482 P4/P5/P6 integrity preserved. No email-provider changes (SendGrid unchanged).
+
+### Verification (live on preview)
+- `charbel911@gmail.com` admin session:
+  - `GET /api/admin/ai-config/system-instruction` → 200, `char_count=22283`, `source=seed_file` on cold DB.
+  - `PUT` with a short test string → 200, `source=admin_edit`, `updated_by_user_id=<admin uid>`.
+  - Read-back returns the new text.
+  - PUT with the full seed value restores the pristine state.
+  - `db.ai_config_history` recorded the previous versions each time.
+- Anonymous → 401; freshly-registered non-admin → 403 on both GET and PUT.
+- `/admin/ai-config` UI screenshot verified: heading present, editor pre-loaded with 22,283 chars, source badge shows `admin_edit` after the smoke edit.
+- Server startup logs: `iter497 — ai_config seeded + cache warmed`.
+
+### Guardrails held
+- ✅ NO deployment — preview only.
+- ✅ Zero touch to tax engine (P6.2 consolidation preserved), Stripe, escrow, settlement, invoice, or receipt code.
+- ✅ Zero touch to the existing SendGrid email stack (Resend integration was explicitly out of scope for this task).
+- ✅ System instruction resolves via seed file even when DB is unavailable (fail-closed only on missing seed, which ships alongside the app).
+- ✅ Backend `require_admin` gate on both admin endpoints — anonymous and non-admin blocked at the FastAPI dependency layer.
+- ✅ Cache invalidation on write is an in-place update, not evict-then-refill, so the sync path never sees a null between edit and next tick.
+- ✅ 1800+ pytest tests from P6.2 tax consolidation still green.
+
+
 ## iter496.1 — Fix: Seller Dashboard Edit Button for Draft Listings (Feb 19, 2026) ✅ SHIPPED (preview) · 🚫 NO DEPLOY
 
 ### Problem

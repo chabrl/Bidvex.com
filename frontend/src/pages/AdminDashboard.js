@@ -120,6 +120,13 @@ const AdminAdCampaignsLazy = (props) => (
     <_AdminAdCampaigns {...props} />
   </_SuspenseCareers>
 );
+// iter497 — Admin BidVex Gemini system-instruction editor (lazy)
+const _AdminAIConfig = _lazyCareers(() => import('./admin/AdminAIConfig'));
+const AdminAIConfigLazy = (props) => (
+  <_SuspenseCareers fallback={<div className="p-8 text-center text-slate-500">Loading…</div>}>
+    <_AdminAIConfig {...props} />
+  </_SuspenseCareers>
+);
 // iter321 — Real-time escalation alerts (SSE + chime + desktop notification + tab flash)
 import { EscalationAlertProvider, useEscalationAlerts } from '../components/admin/EscalationAlertProvider';
 import { LifeBuoy } from 'lucide-react';
@@ -226,6 +233,8 @@ const SECONDARY_TABS = {
     { id: 'unsubscribe-audit', label: 'Unsubscribe Audit', icon: '📉', lucideIcon: Send },
     { id: 'marketing-integrations', label: 'Marketing Integrations', icon: '📣', lucideIcon: Send },
     { id: 'trust-safety', label: 'Trust & Safety', icon: '🛡️', lucideIcon: Shield },
+    // iter497 — BidVex Gemini AI system-instruction editor
+    { id: 'ai-config', label: 'AI System Instruction', icon: '🧠', lucideIcon: Bot },
     { id: 'escrow-manager', label: 'Escrow & Penalties', icon: '🔒', lucideIcon: Lock },
     { id: 'community-moderation', label: 'Community Moderation', icon: '💬', lucideIcon: MessageSquare },
     { id: 'platform-cleanup', label: 'Platform Cleanup', icon: '🧹', lucideIcon: AlertTriangle },
@@ -657,6 +666,8 @@ const AdminDashboard = () => {
           case 'unsubscribe-audit': return <AdminUnsubscribeAudit />;
           case 'marketing-integrations': return <AdminMarketingIntegrations />;
           case 'trust-safety': return <TrustSafetyDashboard />;
+          // iter497 — BidVex Gemini system-instruction editor
+          case 'ai-config': return <AdminAIConfigLazy />;
           case 'escrow-manager': return <AdminEscrowManager />;
           case 'community-moderation': return <CommunityModerationManager />;
           case 'platform-cleanup': return <PlatformCleanupManager />;

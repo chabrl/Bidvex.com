@@ -91,6 +91,8 @@ const AdminLandingPagesList = lazy(() => import('./pages/admin/AdminLandingPages
 const AdminLandingPageEditor = lazy(() => import('./pages/admin/AdminLandingPageEditor'));
 // iter217 Phase 5 Hotfix v6.5 — Admin Subscription Management
 const AdminSubscriptionsPage = lazy(() => import('./pages/admin/AdminSubscriptionsPage'));
+// iter497 — Admin BidVex Gemini system-instruction editor
+const AdminAIConfig = lazy(() => import('./pages/admin/AdminAIConfig'));
 const StorageHoldSettlementsTab = lazy(() => import('./pages/admin/StorageHoldSettlementsTab'));
 // iter217 Phase 5 Hotfix v7 — Public bilingual "How Brokers Work" landing page
 const HowBrokersWorkPage = lazy(() => import('./pages/HowBrokersWorkPage'));
@@ -812,6 +814,10 @@ const App = () => {
               audit of Stripe processing fees / recovery / variance. */}
           <Route path="/admin/reconciliation" element={
             <ProtectedRoute><ErrorBoundary scope="admin-reconciliation"><AdminPaymentReconciliation /></ErrorBoundary></ProtectedRoute>
+          } />
+          {/* iter497 — Admin BidVex Gemini system-instruction editor */}
+          <Route path="/admin/ai-config" element={
+            <ProtectedRoute><ErrorBoundary scope="admin-ai-config"><AdminAIConfig /></ErrorBoundary></ProtectedRoute>
           } />
           {/* iter316 Phase B — Browser-based Twilio dialer + AI insights */}
           <Route path="/admin/dialer" element={

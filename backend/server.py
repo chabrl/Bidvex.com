@@ -139,6 +139,17 @@ async def lifespan(app):
     except Exception as e:
         logger.warning(f"Email automation registration failed (non-fatal): {e}")
 
+    # iter497 — Seed BidVex Gemini system instruction to db.ai_config on cold
+    # start (idempotent — existing docs are preserved) and warm the in-memory
+    # cache so the first Gemini call sees a fresh value.
+    try:
+        from services import ai_config_service
+        await ai_config_service.seed_bootstrap_system_instruction(db)
+        await ai_config_service.refresh_cache_from_db(db)
+        logger.info("iter497 — ai_config seeded + cache warmed")
+    except Exception as e:
+        logger.warning(f"AI config bootstrap failed (non-fatal, seed fallback in use): {e}")
+
     # iter234 — Daily Watchdog: pull 24h MongoDB logs → Gemini 2.5 Flash analysis
     # → SendGrid email to charbel911@gmail.com. Runs at 00:00 UTC every day.
     try:
@@ -1574,6 +1585,8 @@ try:
         ("routes.admin_listing_edit", "admin_listing_edit_router", None, False),
         ("routes.admin_end_time", "admin_end_time_router", None, False),
         ("routes.admin_ai_review", "ai_review_router", None, False),
+        # iter497 — Admin BidVex Gemini system-instruction management
+        ("routes.admin_ai_config", "admin_ai_config_router", None, False),
         ("routes.admin_conversion_funnel", "conversion_funnel_router", None, False),
         ("routes.storage_cleanout", "storage_cleanout_router", None, False),
         ("routes.admin_maintenance", "admin_maintenance_router", None, False),

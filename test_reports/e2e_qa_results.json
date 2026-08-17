@@ -1,36 +1,46 @@
 {
   "passed": [
     {
+      "section": "Email/Notif",
+      "test": "SendGrid API Key Present",
+      "details": "Key starts with SG., len=69"
+    },
+    {
       "section": "Stripe",
       "test": "Stripe API Key Present",
       "details": "Key starts with sk_*, len=16"
+    },
+    {
+      "section": "Stripe",
+      "test": "Webhook Secret Present",
+      "details": "Starts with whsec_, len=38"
     }
   ],
   "failed": [
     {
       "section": "Auth",
       "test": "Admin Login",
-      "details": "Invalid URL 'tests//api/auth/login': No scheme supplied. Perhaps you meant https://tests//api/auth/login?"
+      "details": "Invalid URL '-k/api/auth/login': No scheme supplied. Perhaps you meant https://-k/api/auth/login?"
     },
     {
       "section": "Auth",
       "test": "Starter User Login",
-      "details": "Invalid URL 'tests//api/auth/login': No scheme supplied. Perhaps you meant https://tests//api/auth/login?"
+      "details": "Invalid URL '-k/api/auth/login': No scheme supplied. Perhaps you meant https://-k/api/auth/login?"
     },
     {
       "section": "Auth",
       "test": "Premium User Login",
-      "details": "Invalid URL 'tests//api/auth/login': No scheme supplied. Perhaps you meant https://tests//api/auth/login?"
+      "details": "Invalid URL '-k/api/auth/login': No scheme supplied. Perhaps you meant https://-k/api/auth/login?"
     },
     {
       "section": "Auth",
       "test": "Invalid Login Rejection",
-      "details": "Invalid URL 'tests//api/auth/login': No scheme supplied. Perhaps you meant https://tests//api/auth/login?"
+      "details": "Invalid URL '-k/api/auth/login': No scheme supplied. Perhaps you meant https://-k/api/auth/login?"
     },
     {
       "section": "Auth",
       "test": "User Registration",
-      "details": "Invalid URL 'tests//api/auth/register': No scheme supplied. Perhaps you meant https://tests//api/auth/register?"
+      "details": "Invalid URL '-k/api/auth/register': No scheme supplied. Perhaps you meant https://-k/api/auth/register?"
     },
     {
       "section": "Auth",
@@ -40,259 +50,249 @@
     {
       "section": "Auth",
       "test": "Forgot Password Endpoint",
-      "details": "Invalid URL 'tests//api/auth/forgot-password': No scheme supplied. Perhaps you meant https://tests//api/auth/forgot-password?"
+      "details": "Invalid URL '-k/api/auth/forgot-password': No scheme supplied. Perhaps you meant https://-k/api/auth/forgot-password?"
     },
     {
       "section": "Auth",
       "test": "Invalid Token Rejection",
-      "details": "Invalid URL 'tests//api/auth/me': No scheme supplied. Perhaps you meant https://tests//api/auth/me?"
+      "details": "Invalid URL '-k/api/auth/me': No scheme supplied. Perhaps you meant https://-k/api/auth/me?"
     },
     {
       "section": "Health",
       "test": "Health Check",
-      "details": "Invalid URL 'tests//api/health': No scheme supplied. Perhaps you meant https://tests//api/health?"
+      "details": "Invalid URL '-k/api/health': No scheme supplied. Perhaps you meant https://-k/api/health?"
     },
     {
       "section": "Health",
       "test": "HEAD Health Check",
-      "details": "Invalid URL 'tests//api/health': No scheme supplied. Perhaps you meant https://tests//api/health?"
+      "details": "Invalid URL '-k/api/health': No scheme supplied. Perhaps you meant https://-k/api/health?"
     },
     {
       "section": "Health",
       "test": "Site Config",
-      "details": "Invalid URL 'tests//api/site-config': No scheme supplied. Perhaps you meant https://tests//api/site-config?"
+      "details": "Invalid URL '-k/api/site-config': No scheme supplied. Perhaps you meant https://-k/api/site-config?"
     },
     {
       "section": "Health",
       "test": "Site Mode",
-      "details": "Invalid URL 'tests//api/site-mode': No scheme supplied. Perhaps you meant https://tests//api/site-mode?"
+      "details": "Invalid URL '-k/api/site-mode': No scheme supplied. Perhaps you meant https://-k/api/site-mode?"
     },
     {
       "section": "Health",
       "test": "CORS Headers",
-      "details": "Invalid URL 'tests//api/health': No scheme supplied. Perhaps you meant https://tests//api/health?"
+      "details": "Invalid URL '-k/api/health': No scheme supplied. Perhaps you meant https://-k/api/health?"
     },
     {
       "section": "Health",
       "test": "Response Time",
-      "details": "Invalid URL 'tests//api/health': No scheme supplied. Perhaps you meant https://tests//api/health?"
+      "details": "Invalid URL '-k/api/health': No scheme supplied. Perhaps you meant https://-k/api/health?"
     },
     {
       "section": "Buyer",
       "test": "Fetch Listings",
-      "details": "Invalid URL 'tests//api/listings': No scheme supplied. Perhaps you meant https://tests//api/listings?"
+      "details": "Invalid URL '-k/api/listings': No scheme supplied. Perhaps you meant https://-k/api/listings?"
     },
     {
       "section": "Buyer",
       "test": "Search Listings",
-      "details": "Invalid URL 'tests//api/listings': No scheme supplied. Perhaps you meant https://tests//api/listings?"
+      "details": "Invalid URL '-k/api/listings': No scheme supplied. Perhaps you meant https://-k/api/listings?"
     },
     {
       "section": "Buyer",
       "test": "Ending Soon Carousel",
-      "details": "Invalid URL 'tests//api/carousel/ending-soon': No scheme supplied. Perhaps you meant https://tests//api/carousel/ending-soon?"
+      "details": "Invalid URL '-k/api/carousel/ending-soon': No scheme supplied. Perhaps you meant https://-k/api/carousel/ending-soon?"
     },
     {
       "section": "Buyer",
       "test": "Watchlist",
-      "details": "Invalid URL 'tests//api/watchlist': No scheme supplied. Perhaps you meant https://tests//api/watchlist?"
+      "details": "Invalid URL '-k/api/watchlist': No scheme supplied. Perhaps you meant https://-k/api/watchlist?"
     },
     {
       "section": "Buyer",
       "test": "Notifications",
-      "details": "Invalid URL 'tests//api/notifications': No scheme supplied. Perhaps you meant https://tests//api/notifications?"
+      "details": "Invalid URL '-k/api/notifications': No scheme supplied. Perhaps you meant https://-k/api/notifications?"
     },
     {
       "section": "Buyer",
       "test": "User Dashboard",
-      "details": "Invalid URL 'tests//api/dashboard': No scheme supplied. Perhaps you meant https://tests//api/dashboard?"
+      "details": "Invalid URL '-k/api/dashboard': No scheme supplied. Perhaps you meant https://-k/api/dashboard?"
     },
     {
       "section": "Seller",
       "test": "My Listings",
-      "details": "Invalid URL 'tests//api/listings/my-listings': No scheme supplied. Perhaps you meant https://tests//api/listings/my-listings?"
+      "details": "Invalid URL '-k/api/listings/my-listings': No scheme supplied. Perhaps you meant https://-k/api/listings/my-listings?"
     },
     {
       "section": "Seller",
       "test": "Regional Trends API",
-      "details": "Invalid URL 'tests//api/insights/regional-trends': No scheme supplied. Perhaps you meant https://tests//api/insights/regional-trends?"
+      "details": "Invalid URL '-k/api/insights/regional-trends': No scheme supplied. Perhaps you meant https://-k/api/insights/regional-trends?"
     },
     {
       "section": "Admin",
       "test": "User List",
-      "details": "Invalid URL 'tests//api/admin/users': No scheme supplied. Perhaps you meant https://tests//api/admin/users?"
+      "details": "Invalid URL '-k/api/admin/users': No scheme supplied. Perhaps you meant https://-k/api/admin/users?"
     },
     {
       "section": "Admin",
       "test": "Admin Listings",
-      "details": "Invalid URL 'tests//api/admin/listings': No scheme supplied. Perhaps you meant https://tests//api/admin/listings?"
+      "details": "Invalid URL '-k/api/admin/listings': No scheme supplied. Perhaps you meant https://-k/api/admin/listings?"
     },
     {
       "section": "Admin",
       "test": "Fraud Flags",
-      "details": "Invalid URL 'tests//api/admin/fraud-flags': No scheme supplied. Perhaps you meant https://tests//api/admin/fraud-flags?"
+      "details": "Invalid URL '-k/api/admin/fraud-flags': No scheme supplied. Perhaps you meant https://-k/api/admin/fraud-flags?"
     },
     {
       "section": "Admin",
       "test": "Subscribers",
-      "details": "Invalid URL 'tests//api/admin/subscribers': No scheme supplied. Perhaps you meant https://tests//api/admin/subscribers?"
+      "details": "Invalid URL '-k/api/admin/subscribers': No scheme supplied. Perhaps you meant https://-k/api/admin/subscribers?"
     },
     {
       "section": "Email/Notif",
       "test": "VAPID Public Key",
-      "details": "Invalid URL 'tests//api/push/vapid-public-key': No scheme supplied. Perhaps you meant https://tests//api/push/vapid-public-key?"
-    },
-    {
-      "section": "Stripe",
-      "test": "Webhook Secret",
-      "details": "Missing or malformed"
+      "details": "Invalid URL '-k/api/push/vapid-public-key': No scheme supplied. Perhaps you meant https://-k/api/push/vapid-public-key?"
     }
   ],
   "partial": [
     {
       "section": "Buyer",
       "test": "Categories Endpoint",
-      "details": "Invalid URL 'tests//api/categories': No scheme supplied. Perhaps you meant https://tests//api/categories?"
+      "details": "Invalid URL '-k/api/categories': No scheme supplied. Perhaps you meant https://-k/api/categories?"
     },
     {
       "section": "Buyer",
       "test": "Bid History",
-      "details": "Invalid URL 'tests//api/bids/my-bids': No scheme supplied. Perhaps you meant https://tests//api/bids/my-bids?"
+      "details": "Invalid URL '-k/api/bids/my-bids': No scheme supplied. Perhaps you meant https://-k/api/bids/my-bids?"
     },
     {
       "section": "Buyer",
       "test": "Fee Calculator",
-      "details": "Invalid URL 'tests//api/fees/calculate': No scheme supplied. Perhaps you meant https://tests//api/fees/calculate?"
+      "details": "Invalid URL '-k/api/fees/calculate': No scheme supplied. Perhaps you meant https://-k/api/fees/calculate?"
     },
     {
       "section": "Seller",
       "test": "Seller Dashboard",
-      "details": "Invalid URL 'tests//api/dashboard/seller': No scheme supplied. Perhaps you meant https://tests//api/dashboard/seller?"
+      "details": "Invalid URL '-k/api/dashboard/seller': No scheme supplied. Perhaps you meant https://-k/api/dashboard/seller?"
     },
     {
       "section": "Seller",
       "test": "Invoices",
-      "details": "Invalid URL 'tests//api/invoices': No scheme supplied. Perhaps you meant https://tests//api/invoices?"
+      "details": "Invalid URL '-k/api/invoices': No scheme supplied. Perhaps you meant https://-k/api/invoices?"
     },
     {
       "section": "Seller",
       "test": "Profile (me)",
-      "details": "Invalid URL 'tests//api/profiles/me': No scheme supplied. Perhaps you meant https://tests//api/profiles/me?"
+      "details": "Invalid URL '-k/api/profiles/me': No scheme supplied. Perhaps you meant https://-k/api/profiles/me?"
     },
     {
       "section": "Seller",
       "test": "Seller Reviews",
-      "details": "Invalid URL 'tests//api/reviews/seller': No scheme supplied. Perhaps you meant https://tests//api/reviews/seller?"
+      "details": "Invalid URL '-k/api/reviews/seller': No scheme supplied. Perhaps you meant https://-k/api/reviews/seller?"
     },
     {
       "section": "Admin",
       "test": "Payments",
-      "details": "Invalid URL 'tests//api/admin/payments': No scheme supplied. Perhaps you meant https://tests//api/admin/payments?"
+      "details": "Invalid URL '-k/api/admin/payments': No scheme supplied. Perhaps you meant https://-k/api/admin/payments?"
     },
     {
       "section": "Admin",
       "test": "Admin Settings",
-      "details": "Invalid URL 'tests//api/admin/settings': No scheme supplied. Perhaps you meant https://tests//api/admin/settings?"
+      "details": "Invalid URL '-k/api/admin/settings': No scheme supplied. Perhaps you meant https://-k/api/admin/settings?"
     },
     {
       "section": "Admin",
       "test": "Analytics",
-      "details": "Invalid URL 'tests//api/admin/analytics': No scheme supplied. Perhaps you meant https://tests//api/admin/analytics?"
+      "details": "Invalid URL '-k/api/admin/analytics': No scheme supplied. Perhaps you meant https://-k/api/admin/analytics?"
     },
     {
       "section": "Admin",
       "test": "Trust & Safety",
-      "details": "Invalid URL 'tests//api/admin/trust-safety': No scheme supplied. Perhaps you meant https://tests//api/admin/trust-safety?"
+      "details": "Invalid URL '-k/api/admin/trust-safety': No scheme supplied. Perhaps you meant https://-k/api/admin/trust-safety?"
     },
     {
       "section": "Admin",
       "test": "Site Config Admin",
-      "details": "Invalid URL 'tests//api/admin/site-config': No scheme supplied. Perhaps you meant https://tests//api/admin/site-config?"
+      "details": "Invalid URL '-k/api/admin/site-config': No scheme supplied. Perhaps you meant https://-k/api/admin/site-config?"
     },
     {
       "section": "Admin",
       "test": "Email Templates",
-      "details": "Invalid URL 'tests//api/admin/email-templates': No scheme supplied. Perhaps you meant https://tests//api/admin/email-templates?"
+      "details": "Invalid URL '-k/api/admin/email-templates': No scheme supplied. Perhaps you meant https://-k/api/admin/email-templates?"
     },
     {
       "section": "Admin",
       "test": "Vehicles Admin",
-      "details": "Invalid URL 'tests//api/admin/vehicles': No scheme supplied. Perhaps you meant https://tests//api/admin/vehicles?"
+      "details": "Invalid URL '-k/api/admin/vehicles': No scheme supplied. Perhaps you meant https://-k/api/admin/vehicles?"
     },
     {
       "section": "Admin",
       "test": "Deposits",
-      "details": "Invalid URL 'tests//api/admin/deposits': No scheme supplied. Perhaps you meant https://tests//api/admin/deposits?"
+      "details": "Invalid URL '-k/api/admin/deposits': No scheme supplied. Perhaps you meant https://-k/api/admin/deposits?"
     },
     {
       "section": "Admin",
       "test": "Tax Dashboard",
-      "details": "Invalid URL 'tests//api/admin/tax-dashboard': No scheme supplied. Perhaps you meant https://tests//api/admin/tax-dashboard?"
+      "details": "Invalid URL '-k/api/admin/tax-dashboard': No scheme supplied. Perhaps you meant https://-k/api/admin/tax-dashboard?"
     },
     {
       "section": "Admin",
       "test": "Monitoring",
-      "details": "Invalid URL 'tests//api/admin/monitoring': No scheme supplied. Perhaps you meant https://tests//api/admin/monitoring?"
+      "details": "Invalid URL '-k/api/admin/monitoring': No scheme supplied. Perhaps you meant https://-k/api/admin/monitoring?"
     },
     {
       "section": "Admin",
       "test": "Partners",
-      "details": "Invalid URL 'tests//api/admin/partners': No scheme supplied. Perhaps you meant https://tests//api/admin/partners?"
+      "details": "Invalid URL '-k/api/admin/partners': No scheme supplied. Perhaps you meant https://-k/api/admin/partners?"
     },
     {
       "section": "Admin",
       "test": "Team Management",
-      "details": "Invalid URL 'tests//api/admin/team': No scheme supplied. Perhaps you meant https://tests//api/admin/team?"
+      "details": "Invalid URL '-k/api/admin/team': No scheme supplied. Perhaps you meant https://-k/api/admin/team?"
     },
     {
       "section": "Admin",
       "test": "Auctions",
-      "details": "Invalid URL 'tests//api/admin/auctions': No scheme supplied. Perhaps you meant https://tests//api/admin/auctions?"
+      "details": "Invalid URL '-k/api/admin/auctions': No scheme supplied. Perhaps you meant https://-k/api/admin/auctions?"
     },
     {
       "section": "Admin",
       "test": "Admin Logs",
-      "details": "Invalid URL 'tests//api/admin/logs': No scheme supplied. Perhaps you meant https://tests//api/admin/logs?"
+      "details": "Invalid URL '-k/api/admin/logs': No scheme supplied. Perhaps you meant https://-k/api/admin/logs?"
     },
     {
       "section": "Email/Notif",
       "test": "Push Status",
-      "details": "Invalid URL 'tests//api/push/status': No scheme supplied. Perhaps you meant https://tests//api/push/status?"
+      "details": "Invalid URL '-k/api/push/status': No scheme supplied. Perhaps you meant https://-k/api/push/status?"
     },
     {
       "section": "Email/Notif",
       "test": "Email Templates",
-      "details": "Invalid URL 'tests//api/admin/email-templates': No scheme supplied. Perhaps you meant https://tests//api/admin/email-templates?"
-    },
-    {
-      "section": "Email/Notif",
-      "test": "SendGrid API Key",
-      "details": "Key missing or malformed"
+      "details": "Invalid URL '-k/api/admin/email-templates': No scheme supplied. Perhaps you meant https://-k/api/admin/email-templates?"
     },
     {
       "section": "Email/Notif",
       "test": "Notifications List",
-      "details": "Invalid URL 'tests//api/notifications': No scheme supplied. Perhaps you meant https://tests//api/notifications?"
+      "details": "Invalid URL '-k/api/notifications': No scheme supplied. Perhaps you meant https://-k/api/notifications?"
     },
     {
       "section": "Stripe",
       "test": "Payment Methods",
-      "details": "Invalid URL 'tests//api/payments/methods': No scheme supplied. Perhaps you meant https://tests//api/payments/methods?"
+      "details": "Invalid URL '-k/api/payments/methods': No scheme supplied. Perhaps you meant https://-k/api/payments/methods?"
     },
     {
       "section": "Stripe",
       "test": "Subscription Status",
-      "details": "Invalid URL 'tests//api/subscriptions/status': No scheme supplied. Perhaps you meant https://tests//api/subscriptions/status?"
+      "details": "Invalid URL '-k/api/subscriptions/status': No scheme supplied. Perhaps you meant https://-k/api/subscriptions/status?"
     },
     {
       "section": "Stripe",
       "test": "Deposits Status",
-      "details": "Invalid URL 'tests//api/deposits/status': No scheme supplied. Perhaps you meant https://tests//api/deposits/status?"
+      "details": "Invalid URL '-k/api/deposits/status': No scheme supplied. Perhaps you meant https://-k/api/deposits/status?"
     },
     {
       "section": "Stripe",
       "test": "Webhook Endpoint",
-      "details": "Invalid URL 'tests//api/webhooks/stripe': No scheme supplied. Perhaps you meant https://tests//api/webhooks/stripe?"
+      "details": "Invalid URL '-k/api/webhooks/stripe': No scheme supplied. Perhaps you meant https://-k/api/webhooks/stripe?"
     }
   ]
 }

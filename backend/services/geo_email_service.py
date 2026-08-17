@@ -264,11 +264,17 @@ async def send_geo_auction_alerts(db: AsyncIOMotorDatabase):
 
 
 def register_geo_jobs(scheduler, db: AsyncIOMotorDatabase):
-    """Register geo email job with APScheduler. 9:00 AM ET = 14:00 UTC."""
-    import asyncio
+    """Register geo email job with APScheduler. 9:00 AM ET = 14:00 UTC.
 
-    def _run_geo():
-        asyncio.get_event_loop().create_task(send_geo_auction_alerts(db))
+    AsyncIOScheduler natively awaits async callables, so we pass the
+    coroutine function directly via ``functools.partial`` instead of
+    wrapping it in a sync callback that would fail under uvloop with
+    ``RuntimeError: There is no current event loop in thread ...``.
+    """
+    from functools import partial
 
-    scheduler.add_job(_run_geo, "cron", hour=14, minute=0, id="geo_auction_alerts", replace_existing=True)
+    scheduler.add_job(
+        partial(send_geo_auction_alerts, db),
+        "cron", hour=14, minute=0, id="geo_auction_alerts", replace_existing=True,
+    )
     logger.info("[GEO] Registered daily geo auction alert job (14:00 UTC / 9:00 AM ET)")

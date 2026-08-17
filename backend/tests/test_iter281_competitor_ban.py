@@ -65,11 +65,29 @@ def _read(rel: str) -> str:
         return fh.read()
 
 
+# iter497 — The canonical system-instruction text was migrated from an
+# inline constant in ``services/genai_direct_client.py`` to the on-disk
+# seed file that bootstraps ``db.ai_config``. Tests that assert on prompt
+# substrings should keep passing whether the string lives in the .py
+# module or the seed file, so we concatenate both.
+_AI_SEED_PATH = "/app/memory/BIDVEX_AI_SYSTEM_INSTRUCTION_SEED.md"
+
+
+def _read_prompt_source(rel: str) -> str:
+    src = _read(rel)
+    try:
+        with open(_AI_SEED_PATH, "r", encoding="utf-8") as fh:
+            src = src + "\n" + fh.read()
+    except FileNotFoundError:
+        pass
+    return src
+
+
 # ── Mission 1 — System prompt overrides ───────────────────────────────
 
 
 def test_iter281_system_prompt_has_section_0_p0_block():
-    src = _read("services/genai_direct_client.py")
+    src = _read_prompt_source("services/genai_direct_client.py")
     assert "WATCHDOG_SYSTEM_INSTRUCTION" in src
     # Section 0 must be the very first section (P0 priority).
     assert "# 0. ABSOLUTE PLATFORM ANCHOR" in src
@@ -82,7 +100,7 @@ def test_iter281_system_prompt_has_section_0_p0_block():
 def test_iter281_competitor_ban_section_lists_specific_platforms():
     """The system prompt MUST explicitly name every competitor the
     user called out so the model can't claim ambiguity."""
-    src = _read("services/genai_direct_client.py")
+    src = _read_prompt_source("services/genai_direct_client.py")
     # The four explicit competitors from the directive.
     for name in (
         "Facebook Marketplace",
@@ -102,7 +120,7 @@ def test_iter281_listing_for_profit_script_in_system_prompt():
     follow the iter281 native-only script — this asserts every required
     element of that script is in the system prompt verbatim so the
     model can reproduce it."""
-    src = _read("services/genai_direct_client.py")
+    src = _read_prompt_source("services/genai_direct_client.py")
     # The 5 elements of the canonical script.
     assert "/seller/dashboard" in src
     assert "Create Listing" in src
@@ -116,7 +134,7 @@ def test_iter281_listing_for_profit_script_in_system_prompt():
 
 
 def test_iter281_context_awareness_mandate_in_system_prompt():
-    src = _read("services/genai_direct_client.py")
+    src = _read_prompt_source("services/genai_direct_client.py")
     # The mandate references the exact extra_context key the
     # AIAssistant.js frontend ships.
     assert "Active UI surface" in src
@@ -127,7 +145,7 @@ def test_iter281_context_awareness_mandate_in_system_prompt():
 
 
 def test_iter281_no_external_links_doctrine_present():
-    src = _read("services/genai_direct_client.py")
+    src = _read_prompt_source("services/genai_direct_client.py")
     assert "No External Links Doctrine" in src
     # The whitelist of acceptable external links.
     for ok in (
@@ -329,7 +347,7 @@ def test_iter281_system_prompt_contains_no_orphan_competitor_recommendations():
     """The system prompt MENTIONS competitors only inside the banned-
     list explanation. It must NEVER contain a positive recommendation
     of one. This is a fixture-style guard against prompt drift."""
-    src = _read("services/genai_direct_client.py")
+    src = _read_prompt_source("services/genai_direct_client.py")
     # Anti-patterns that would mean we accidentally pitched a competitor
     # inside the prompt itself.
     for bad in (

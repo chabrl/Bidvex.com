@@ -274,6 +274,17 @@ async def run_daily_watchdog_cycle(db) -> Dict[str, Any]:
     try:
         bundle = await fetch_activity_payload(db)
 
+        # iter497 — Pre-warm the ai_config cache from db BEFORE crossing
+        # into `to_thread`, since the sync builder inside cannot itself
+        # await MongoDB. This propagates any live admin edit made via
+        # PUT /api/admin/ai-config/system-instruction into the daily
+        # Gemini run.
+        try:
+            from services.ai_config_service import refresh_cache_from_db as _refresh_ai_cfg
+            await _refresh_ai_cfg(db)
+        except Exception as _ai_cfg_exc:  # noqa: BLE001
+            logger.warning("[Watchdog] ai_config pre-warm failed (using previous cache): %s", _ai_cfg_exc)
+
         # Gemini call is blocking — push to a worker thread so we don't pin the loop.
         report = await asyncio.to_thread(
             run_watchdog_analysis,
