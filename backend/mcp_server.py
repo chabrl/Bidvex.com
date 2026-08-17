@@ -583,6 +583,21 @@ async def tool_create_auction_draft(db, user, user_doc, params) -> Dict[str, Any
     This tool only creates a persistent `status="draft"` row — publishing
     remains an explicit action gated by the existing publish endpoints
     (which run watchdog moderation, fee calculation, and validation).
+
+    iter494 — Vertical-scoped verification gate:
+      * `vehicle` / `storage` verticals → full compliance check
+        (tax_id + dealer_license_verified for dealers, tax_id +
+        facility_verified for storage facilities). The vehicle publish
+        endpoint enforces its own dealer-licence/category rules on top
+        of this, so we do not weaken anything downstream.
+      * `marketplace` / `lots` verticals → trust gate only
+        (phone + payment method + T&C). We do NOT require a tax_id and
+        we do NOT require dealer-license verification just because the
+        seller's account happens to carry `is_vehicle_dealer=True`.
+        A vehicle dealer or an individual seller can legitimately post
+        a piece of furniture, an appliance, or a general marketplace
+        product without their vehicle-dealer status being on the
+        critical path.
     """
     vertical = (params.get("vertical") or "").lower()
     raw = params.get("raw_input") or {}
@@ -593,8 +608,11 @@ async def tool_create_auction_draft(db, user, user_doc, params) -> Dict[str, Any
     if not isinstance(raw, dict):
         raise HTTPException(status_code=400, detail={"error": "raw_input must be an object"})
 
-    # Corporate/seller tax-id verification required for listing actions.
-    await _require_verification(db, user, user_doc, action="list", require_tax_id=True)
+    # iter494 — vertical-scoped: only vehicle & storage require the
+    # tax-id / dealer-license / facility-verified cascade.
+    requires_tax_id = vertical in {"vehicle", "storage"}
+    await _require_verification(db, user, user_doc, action="list",
+                                 require_tax_id=requires_tax_id)
 
     now = datetime.now(timezone.utc).isoformat()
     listing_id = str(uuid.uuid4())
@@ -624,15 +642,24 @@ async def tool_create_auction_draft(db, user, user_doc, params) -> Dict[str, Any
 async def tool_bulk_create_listings(db, user, user_doc, params) -> Dict[str, Any]:
     """Create multiple drafts in one call. Each item may target a
     different vertical. Reuses the same single-draft creation path so
-    ownership/audit invariants hold."""
+    ownership/audit invariants hold.
+
+    iter494 — Vertical-scoped verification (matches
+    `tool_create_auction_draft`): only require tax_id / dealer-licence
+    / facility-verified if ANY item targets the `vehicle` or `storage`
+    vertical. Otherwise the trust gate alone suffices.
+    """
     items = params.get("items")
     if not isinstance(items, list) or not items:
         raise HTTPException(status_code=400, detail={"error": "items must be a non-empty list"})
     if len(items) > 500:
         raise HTTPException(status_code=400, detail={"error": "at most 500 items per call"})
 
-    # Verify once, up front (avoids partial writes if the user isn't tax-verified).
-    await _require_verification(db, user, user_doc, action="list", require_tax_id=True)
+    # Verify once, up front (avoids partial writes if the user isn't verified).
+    verticals = {(it.get("vertical") or "").lower() for it in items if isinstance(it, dict)}
+    requires_tax_id = bool(verticals & {"vehicle", "storage"})
+    await _require_verification(db, user, user_doc, action="list",
+                                 require_tax_id=requires_tax_id)
 
     results: List[Dict[str, Any]] = []
     for idx, item in enumerate(items):

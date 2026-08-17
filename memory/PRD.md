@@ -1,6 +1,78 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter494 — Fix: MCP Vertical-Scoped Listing Creation (Feb 19, 2026) ✅ SHIPPED (preview) · 🚫 NO DEPLOY
+
+### Problem
+During a real Claude.ai MCP session, asking Claude to create a **General Marketplace baby-bed listing** was rejected with `TAX_ID_REQUIRED / dealer_license_not_verified`, even though the item was not a vehicle. Claude correctly suspected a vertical-scoping issue.
+
+### Root Cause — code-scoping bug (NOT account-data)
+`backend/mcp_server.py::tool_create_auction_draft` (line 597 pre-fix) called `_require_verification(..., require_tax_id=True)` **unconditionally**, before considering the requested vertical. `_require_verification` cascades: `is_vehicle_dealer=True` → require `dealer_license_verified` → 403 `TAX_ID_REQUIRED / dealer_license_not_verified` — regardless of whether the listing being created was a vehicle or a baby bed. `tool_bulk_create_listings` had the same defect.
+
+The reporting user's account is **legitimately** classified as a vehicle dealer (they run a dealer business and also sell general merchandise) — silently changing the account classification would be wrong. The fix belongs in the MCP gate, not in user data.
+
+### Fix — surgical vertical scoping in `mcp_server.py`
+```python
+# BEFORE (iter482 → iter493):
+await _require_verification(db, user, user_doc, action="list", require_tax_id=True)
+
+# AFTER (iter494):
+requires_tax_id = vertical in {"vehicle", "storage"}
+await _require_verification(db, user, user_doc, action="list",
+                             require_tax_id=requires_tax_id)
+```
+- `vertical="vehicle"` → full compliance cascade preserved (dealer-licence verification + tax_id) — **iter482 behaviour unchanged**.
+- `vertical="storage"` → facility-verification cascade preserved.
+- `vertical="marketplace"` / `vertical="lots"` → **trust gate only** (phone + payment method + T&C). No tax_id required. No dealer-licence check. An individual seller with no tax_id can post a baby bed. A vehicle dealer with `dealer_license_verified=False` can post furniture.
+
+`tool_bulk_create_listings` was updated with the same rule computed as the union of item verticals (`{"vehicle","storage"} ∩ verticals`) so a bulk containing ANY vehicle/storage item still triggers the strict cascade — prevents partial writes.
+
+### What was NOT changed
+- `_require_verification` itself — the cascade logic is correct, only its **invocation** was too broad.
+- Vehicle publishing REST routes (`routes/vehicles.py`, `services/vehicle_listing_guard.py`) — those already have category-aware licensing rules and remain untouched.
+- Storage facility verification — unchanged.
+- `mcp_streamable.py`, `mcp_tokens.py`, `mcp_bridge.py`, `mcp_oauth.py`, `b2b_matchmaker.py` — untouched.
+- No tax engine, Stripe, payment, billing, settlement, or escrow code touched.
+
+### Verification
+- **Pytest** — `pytest backend/tests/iter482/ backend/tests/iter488/ backend/tests/iter489/ backend/tests/iter494/` → **140 passed** in 104.8s. Zero regressions. iter482's `test_create_draft_requires_tax_verification` (vehicle draft by unverified dealer → 403) **still green**.
+- **iter494 dedicated suite — 9 tests, all pass**:
+  - Marketplace baby bed by personal seller with NO tax_id → 200 (bug fix confirmed).
+  - Marketplace baby bed by unverified vehicle dealer → 200 (exact bug repro now succeeds).
+  - Lots by unverified vehicle dealer → 200.
+  - Vehicle draft by unverified dealer → still rejected with `TAX_ID_REQUIRED / dealer_license_not_verified` (regression guard).
+  - Vehicle draft by verified dealer → passes the gate.
+  - Storage draft by unverified facility → still rejected.
+  - Storage draft by verified facility → passes.
+  - Bulk of only-marketplace items by unverified dealer → all created.
+  - Bulk containing a vehicle item by unverified dealer → rejected up-front.
+- **Live preview MCP validation** — same account shape as the reporter (`is_vehicle_dealer=True` + `dealer_license_verified=False`):
+  - CASE A — Marketplace baby-bed listing → **created** (`draft_id` returned).
+  - CASE B — Vehicle draft attempt → **still rejected** with `TAX_ID_REQUIRED`.
+  - CASE C — Lots listing → created.
+
+### Files Changed
+- **Edited**: `backend/mcp_server.py` — `tool_create_auction_draft` and `tool_bulk_create_listings` now scope `require_tax_id` by vertical (~15 lines diff, plus expanded docstrings).
+- **New**: `backend/tests/iter494/__init__.py`, `backend/tests/iter494/test_mcp_vertical_scoping.py` (9 dedicated regression tests).
+- **Untouched**: `_require_verification` itself, all transport modules, all business-logic services.
+
+### Account-classification note
+The reporter's account was **not incorrectly classified** — many BidVex users are legitimately vehicle dealers who also participate in the General Marketplace. The bug was purely in the MCP tool's authorization scope. No account data was modified.
+
+### Guardrails held
+- ✅ NO deployment — preview only.
+- ✅ Vehicle dealer compliance still enforced for vehicle listings.
+- ✅ Storage facility compliance still enforced for storage listings.
+- ✅ Trust gate (phone/payment/T&C) still required for ALL listing creation.
+- ✅ Individual sellers without tax_id can now post marketplace listings (matches "the individual user not obligated to have TAX ID").
+- ✅ Zero touches to tax engine, Stripe, payment, billing, settlement, escrow.
+
+
+## iter493 — Post-fix MCP validation (Feb 19, 2026) ✅ SERVER-SIDE VERIFIED · Operator confirmed Claude.ai UI "Connected"
+
+Post-iter492 validation: 113 pytests + 23 live E2E checks + first-ever recorded real Anthropic-egress DCR activity. Operator confirmed the Claude.ai UI reaches "Connected". No code changes. No deployment.
+
+
 ## iter492 — Fix: Claude.ai OIDC Discovery Compatibility (Feb 19, 2026) ✅ SHIPPED (preview) · 🚫 NO DEPLOY
 
 ### Problem
