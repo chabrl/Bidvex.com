@@ -915,29 +915,62 @@ async def tool_identify_top_sellers(db, user, user_doc, params) -> Dict[str, Any
 
 
 async def tool_b2b_syndication_matchmaker(db, user, user_doc, params) -> Dict[str, Any]:
-    """
-    /*
-    TARGET INTENT (Phase 2 Build):
-    Proactive B2B matchmaking workflow that ingests raw/chaotic seller
-    inventory manifests or bulk items, parses and clusters the inventory,
-    matches items against registered buyer preferences (vehicle dealers,
-    brokers, storage facilities, corporate liquidators), and automatically
-    generates targeted, bilingual (EN/FR) syndication campaigns to bridge
-    buyers and sellers.
-    */
+    """iter488 — B2B Matchmaker Phase 2 (approval-based).
 
-    STUB — deliberately not implemented in this pass. Returns
-    NOT_IMPLEMENTED per iter485 instructions; no fabricated integration.
+    Actions:
+      * "analyze"  (default) — parse the seller's inventory + rank
+        qualified B2B buyer matches + generate bilingual EN/FR campaign
+        drafts. No external side effects.
+      * "authorise" — record explicit authorisation for a specific
+        `campaign_id`. Even after authorisation, actual external
+        dispatch is deliberately deferred to Ops. The Matchmaker itself
+        never sends emails, spends ad money, contacts buyers, places
+        bids, or modifies listings.
+
+    Access rules:
+      * Non-admins may only analyse / authorise their OWN inventory.
+      * Admins may analyse / authorise on behalf of any seller.
     """
-    seller_id = params.get("seller_id")
-    logger.warning(f"[mcp] B2B_syndication_matchmaker called (seller_id={seller_id}) — stub returning NOT_IMPLEMENTED")
-    return {
-        "status":       NOT_IMPLEMENTED_CODE,
-        "reason":       "b2b_matchmaker_phase_2",
-        "message_en":   "The B2B syndication matchmaker is planned for a Phase 2 build and is not available yet.",
-        "message_fr":   "Le service de mise en relation B2B est prévu pour la phase 2 et n'est pas encore disponible.",
-        "seller_id":    seller_id,
-    }
+    from services.b2b_matchmaker import (
+        run_matchmaker, authorised_execute_campaign,
+    )
+    action = (params.get("action") or "analyze").lower()
+    seller_id = params.get("seller_id") or user.id
+    is_admin = (user_doc.get("role") or "").lower() in ADMIN_ROLES
+    if seller_id != user.id and not is_admin:
+        raise HTTPException(status_code=403, detail={
+            "error": "cannot run matchmaker on other seller's inventory",
+        })
+
+    if action == "analyze":
+        min_score = int(params.get("min_score") or 30)
+        max_matches = int(params.get("max_matches") or 20)
+        result = await run_matchmaker(
+            db, seller_id=seller_id,
+            min_score=max(0, min(100, min_score)),
+            max_matches=max(1, min(100, max_matches)),
+        )
+        return result
+
+    if action == "authorise" or action == "authorize":
+        campaign_id = params.get("campaign_id")
+        if not campaign_id:
+            raise HTTPException(status_code=400, detail={"error": "campaign_id required"})
+        # `explicit_authorization` must be literally True — the caller
+        # must acknowledge the safety notice by setting the flag.
+        explicit = bool(params.get("explicit_authorization") is True)
+        return await authorised_execute_campaign(
+            db,
+            campaign_id=campaign_id,
+            actor_user_id=user.id,
+            seller_id=seller_id,
+            explicit_authorization=explicit,
+        )
+
+    raise HTTPException(status_code=400, detail={
+        "error":     "unknown action",
+        "supported": ["analyze", "authorise"],
+    })
 
 
 # ─── Tool registry + input schemas ───────────────────────────────────
@@ -1097,12 +1130,39 @@ TOOL_REGISTRY: Dict[str, ToolSpec] = {
     ),
     "B2B_syndication_matchmaker": ToolSpec(
         name="B2B_syndication_matchmaker",
-        description_en="Proactive B2B matchmaking. STUB — returns NOT_IMPLEMENTED; see Phase 2 intent comment in code.",
-        description_fr="Mise en relation B2B proactive. STUB — retourne NOT_IMPLEMENTED.",
+        description_en=(
+            "Analyse a BidVex seller's inventory, identify qualified B2B "
+            "buyer matches (vehicle dealers, brokers, storage facilities, "
+            "corporate buyers), rank them with explainable match scores, "
+            "and generate bilingual EN/FR campaign drafts. This tool is "
+            "recommendation + campaign preparation only — it will NEVER "
+            "send emails, contact buyers, spend advertising money, "
+            "modify listings, or place bids without explicit authorised "
+            "approval through the `authorise` action (which itself only "
+            "records the authorisation intent for the Ops dispatch queue)."
+        ),
+        description_fr=(
+            "Analyser l'inventaire d'un vendeur BidVex, identifier les "
+            "acheteurs B2B qualifiés (concessionnaires, courtiers, "
+            "installations d'entreposage, acheteurs professionnels), "
+            "classer les correspondances avec des scores explicables et "
+            "générer des projets de campagne bilingues FR/EN. Cet outil "
+            "produit uniquement des recommandations et des projets — il "
+            "n'enverra JAMAIS de courriels, ne contactera pas d'acheteurs, "
+            "ne dépensera aucun budget publicitaire, ne modifiera pas "
+            "d'annonces et ne placera pas d'enchères sans autorisation "
+            "explicite via l'action `authorise`."
+        ),
         input_schema={
             "type": "object",
-            "properties": {"seller_id": {"type": "string"}, "manifest_raw_data": {"type": "object"}},
-            "required": ["seller_id"],
+            "properties": {
+                "action":      {"type": "string", "enum": ["analyze", "authorise"], "default": "analyze"},
+                "seller_id":   {"type": "string", "description": "Defaults to the caller (admins may target other sellers)."},
+                "min_score":   {"type": "integer", "minimum": 0, "maximum": 100, "default": 30},
+                "max_matches": {"type": "integer", "minimum": 1, "maximum": 100, "default": 20},
+                "campaign_id": {"type": "string", "description": "Required when action='authorise'."},
+                "explicit_authorization": {"type": "boolean", "description": "Must be true to authorise a campaign; still does NOT auto-dispatch."},
+            },
         },
     ),
 }
@@ -1138,6 +1198,98 @@ _HANDLERS: Dict[str, Callable[..., Any]] = {
 }
 
 
+# ─── iter488 — Token-aware auth resolver + scope enforcement ─────────
+# The MCP token system (`routes/mcp_tokens.py`) issues scoped tokens
+# that authenticate to the same MCP surface as normal JWTs. The
+# resolver below tries the token path first; on any failure it falls
+# through to the existing JWT auth so existing session-JWT clients
+# keep working unchanged.
+#
+# Effective scopes are attached to `request.state.mcp_scopes`. When the
+# caller authenticated with a JWT (not an MCP token) the attribute is
+# left unset → every tool is allowed (identical to the pre-iter488
+# behavior). When authenticated via MCP token, only tools whose
+# required scope is in the token's scopes[] may run. Admin capability
+# is NEVER granted by a token — it continues to come from the user's
+# existing `role`.
+_TOOL_SCOPE_MAP: Dict[str, str] = {
+    "get_listing_details":            "read",
+    "search_auctions":                "read",
+    "check_bid_status":               "read",
+    "get_bidding_advice":             "read",
+    "place_bid":                      "bid",
+    "create_auction_draft":           "list",
+    "bulk_create_listings":           "list",
+    "publish_meta_ad_promotion":      "promote",
+    "generate_listing_video":         "promote",
+    "analyze_seller_inventory":       "analytics",
+    "detect_performance_bottlenecks": "analytics",
+    "identify_top_sellers":           "analytics",
+    "B2B_syndication_matchmaker":     "matchmaker",
+}
+
+
+async def _resolve_user_or_mcp_token(request: Request) -> User:
+    """Authenticate a caller via **either** MCP token or session JWT.
+
+    Priority:
+      1. If `Authorization: Bearer bvx_mcp_...` → verify MCP token,
+         attach `request.state.mcp_scopes` to the request.
+      2. Otherwise (missing/regular JWT) → delegate to the existing
+         `get_current_user` dependency — full JWT semantics unchanged.
+    """
+    from routes.mcp_tokens import looks_like_mcp_token, verify_and_touch_token
+    auth = (request.headers.get("authorization") or "").strip()
+    raw: Optional[str] = None
+    if auth.lower().startswith("bearer "):
+        raw = auth.split(" ", 1)[1].strip()
+    if raw and looks_like_mcp_token(raw):
+        db = get_db()
+        result = await verify_and_touch_token(db, raw)
+        if not result:
+            raise HTTPException(status_code=401, detail={
+                "error":      "INVALID_MCP_TOKEN",
+                "message_en": "The MCP token is invalid, expired, or revoked.",
+                "message_fr": "Le jeton MCP est invalide, expiré ou révoqué.",
+            })
+        user_doc, scopes = result
+        try:
+            request.state.mcp_scopes = list(scopes or [])
+            request.state.mcp_auth_source = "mcp_token"
+        except Exception:  # noqa: BLE001
+            pass
+        return User(**user_doc)
+    # Fallback — normal JWT dependency (no scope restrictions)
+    from deps import security
+    from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+    # Manually re-invoke get_current_user with the request. Cannot use
+    # Depends here because we're inside a plain function. Extract the
+    # credentials the same way HTTPBearer does.
+    credentials: Optional[HTTPAuthorizationCredentials] = None
+    if auth.lower().startswith("bearer "):
+        credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials=auth.split(" ", 1)[1])
+    return await get_current_user(request, credentials=credentials)
+
+
+def _scope_allowed(request: Request, tool_name: str) -> bool:
+    """Check whether the tool is allowed for the current auth surface.
+
+    * JWT-authenticated callers: no `mcp_scopes` attribute → allow all
+      (existing behavior).
+    * MCP-token-authenticated callers: the token's scopes must include
+      the tool's mapped scope.
+    """
+    scopes = getattr(request.state, "mcp_scopes", None)
+    if scopes is None:
+        return True  # JWT — unrestricted
+    required = _TOOL_SCOPE_MAP.get(tool_name)
+    if required is None:
+        # Unknown tool — allow through so the existing UNKNOWN_TOOL
+        # handler produces the correct error rather than a scope error.
+        return True
+    return required in scopes
+
+
 # ─── HTTP endpoints ──────────────────────────────────────────────────
 class ToolCallRequest(BaseModel):
     name: str
@@ -1152,16 +1304,23 @@ async def mcp_health() -> Dict[str, Any]:
 
 @mcp_router.post("/tools/list")
 async def mcp_tools_list(
-    current_user: User = Depends(get_current_user),
+    request: Request,
+    current_user: User = Depends(_resolve_user_or_mcp_token),
 ) -> Dict[str, Any]:
     """Return the tool catalogue. Requires auth + active subscription."""
     db = get_db()
     user_doc = await _require_mcp_access(db, current_user)
     is_admin = (user_doc.get("role") or "").lower() in ADMIN_ROLES
+    scopes = getattr(request.state, "mcp_scopes", None)
     tools = []
     for spec in TOOL_REGISTRY.values():
         if spec.admin_only and not is_admin:
             continue
+        # iter488 — hide out-of-scope tools when authenticated via MCP token
+        if scopes is not None:
+            required = _TOOL_SCOPE_MAP.get(spec.name)
+            if required and required not in scopes:
+                continue
         tools.append(spec.dict())
     return {"tools": tools, "user_id": current_user.id}
 
@@ -1170,7 +1329,7 @@ async def mcp_tools_list(
 async def mcp_tools_call(
     request: Request,
     body: ToolCallRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(_resolve_user_or_mcp_token),
 ) -> Dict[str, Any]:
     """Dispatch a single tool call. Enforces:
       1. Subscription gate (SUBSCRIPTION_REQUIRED)
@@ -1219,6 +1378,20 @@ async def mcp_tools_call(
                            error_code="UNKNOWN_TOOL",
                            latency_ms=int((time.time() - started_ms) * 1000))
         raise HTTPException(status_code=404, detail={"error": "UNKNOWN_TOOL", "tool": tool_name})
+
+    # 3b) iter488 — scope enforcement (MCP token only)
+    if not _scope_allowed(request, tool_name):
+        await _write_audit(db, user_id=current_user.id, tool_name=tool_name,
+                           input_params=args, result_status="rejected",
+                           error_code="INSUFFICIENT_SCOPE",
+                           latency_ms=int((time.time() - started_ms) * 1000))
+        raise HTTPException(status_code=403, detail={
+            "error":         "INSUFFICIENT_SCOPE",
+            "required_scope": _TOOL_SCOPE_MAP.get(tool_name),
+            "granted_scopes": list(getattr(request.state, "mcp_scopes", []) or []),
+            "message_en":    "This MCP token does not include the scope required to call this tool.",
+            "message_fr":    "Ce jeton MCP ne possède pas la portée requise pour appeler cet outil.",
+        })
 
     # 4) Admin-only enforcement
     if spec.admin_only:
@@ -1318,13 +1491,21 @@ def _rpc_err(rpc_id: Any, code: int, message: str, data: Any = None) -> Dict[str
     return {"jsonrpc": "2.0", "id": rpc_id, "error": err}
 
 
-def _tool_registry_as_mcp(is_admin: bool) -> List[Dict[str, Any]]:
+def _tool_registry_as_mcp(is_admin: bool, scopes: Optional[List[str]] = None) -> List[Dict[str, Any]]:
     """Render TOOL_REGISTRY in the exact shape MCP clients expect
-    (`inputSchema`, not `input_schema`; single English `description`)."""
+    (`inputSchema`, not `input_schema`; single English `description`).
+
+    When `scopes` is provided (MCP-token auth) tools that don't fall
+    under one of those scopes are omitted.
+    """
     out = []
     for spec in TOOL_REGISTRY.values():
         if spec.admin_only and not is_admin:
             continue
+        if scopes is not None:
+            required = _TOOL_SCOPE_MAP.get(spec.name)
+            if required and required not in scopes:
+                continue
         out.append({
             "name":        spec.name,
             "description": spec.description_en,
@@ -1335,6 +1516,7 @@ def _tool_registry_as_mcp(is_admin: bool) -> List[Dict[str, Any]]:
 
 async def _rpc_run_tool(
     db, current_user: User, tool_name: str, args: Dict[str, Any], jwt_token: Optional[str],
+    mcp_scopes: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """Reimplements the exact same gate order as the legacy REST
     `tools/call` endpoint, but returns raw handler output (or raises
@@ -1380,6 +1562,22 @@ async def _rpc_run_tool(
                            latency_ms=int((time.time() - started_ms) * 1000))
         raise HTTPException(status_code=404, detail={"error": "UNKNOWN_TOOL", "tool": tool_name})
 
+    # (3b) iter488 — scope enforcement (MCP-token auth only)
+    if mcp_scopes is not None:
+        required = _TOOL_SCOPE_MAP.get(tool_name)
+        if required and required not in mcp_scopes:
+            await _write_audit(db, user_id=current_user.id, tool_name=tool_name,
+                               input_params=args, result_status="rejected",
+                               error_code="INSUFFICIENT_SCOPE",
+                               latency_ms=int((time.time() - started_ms) * 1000))
+            raise HTTPException(status_code=403, detail={
+                "error":         "INSUFFICIENT_SCOPE",
+                "required_scope": required,
+                "granted_scopes": list(mcp_scopes),
+                "message_en":    "This MCP token does not include the scope required to call this tool.",
+                "message_fr":    "Ce jeton MCP ne possède pas la portée requise pour appeler cet outil.",
+            })
+
     # (4) Admin-only
     if spec.admin_only:
         try:
@@ -1421,6 +1619,7 @@ async def _rpc_run_tool(
 
 async def _dispatch_jsonrpc(
     db, current_user: User, msg: Dict[str, Any], *, jwt_token: Optional[str],
+    mcp_scopes: Optional[List[str]] = None,
 ) -> Optional[Dict[str, Any]]:
     """Dispatch a single JSON-RPC 2.0 message. Returns None for
     notifications (per spec — notifications get no response)."""
@@ -1453,14 +1652,14 @@ async def _dispatch_jsonrpc(
             detail = e.detail if isinstance(e.detail, dict) else {"error": str(e.detail)}
             return _rpc_err(rpc_id, code, "SUBSCRIPTION_REQUIRED", detail)
         is_admin = (user_doc.get("role") or "").lower() in ADMIN_ROLES
-        return _rpc_ok(rpc_id, {"tools": _tool_registry_as_mcp(is_admin)})
+        return _rpc_ok(rpc_id, {"tools": _tool_registry_as_mcp(is_admin, scopes=mcp_scopes)})
     if method == "tools/call":
         tool_name = params.get("name")
         args = params.get("arguments") or {}
         if not tool_name:
             return _rpc_err(rpc_id, -32602, "missing tool name")
         try:
-            out = await _rpc_run_tool(db, current_user, tool_name, args, jwt_token)
+            out = await _rpc_run_tool(db, current_user, tool_name, args, jwt_token, mcp_scopes=mcp_scopes)
             # MCP tools/call result shape: {"content":[{"type":"text","text":...}], "isError": false}
             payload_text = json.dumps(out["result"], default=str)
             return _rpc_ok(rpc_id, {
@@ -1488,7 +1687,7 @@ async def _dispatch_jsonrpc(
 async def mcp_jsonrpc(
     request: Request,
     body: Dict[str, Any],
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(_resolve_user_or_mcp_token),
 ) -> Any:
     """MCP JSON-RPC 2.0 dispatch endpoint. Accepts a single message or a
     batch (array); returns matching response (or nothing for pure-
@@ -1498,6 +1697,8 @@ async def mcp_jsonrpc(
     auth = request.headers.get("authorization") or ""
     if auth.lower().startswith("bearer "):
         jwt_token = auth.split(" ", 1)[1]
+    # iter488 — carry scope info from the auth resolver into the RPC layer
+    mcp_scopes = getattr(request.state, "mcp_scopes", None)
 
     if isinstance(body, list):
         # Batch — dispatch in-order, drop notification (None) responses
@@ -1506,14 +1707,14 @@ async def mcp_jsonrpc(
             if not isinstance(msg, dict):
                 responses.append(_rpc_err(None, -32600, "invalid Request"))
                 continue
-            r = await _dispatch_jsonrpc(db, current_user, msg, jwt_token=jwt_token)
+            r = await _dispatch_jsonrpc(db, current_user, msg, jwt_token=jwt_token, mcp_scopes=mcp_scopes)
             if r is not None:
                 responses.append(r)
         return responses
     if not isinstance(body, dict):
         return _rpc_err(None, -32600, "invalid Request")
 
-    r = await _dispatch_jsonrpc(db, current_user, body, jwt_token=jwt_token)
+    r = await _dispatch_jsonrpc(db, current_user, body, jwt_token=jwt_token, mcp_scopes=mcp_scopes)
     if r is None:
         # Notification — return HTTP 202 with empty body per spec
         from fastapi.responses import Response as _Resp
@@ -1549,7 +1750,7 @@ async def _sse_session_gc():
 
 @mcp_router.get("/sse")
 async def mcp_sse_stream(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(_resolve_user_or_mcp_token),
     request: Request = None,
 ) -> StreamingResponse:
     """Open an SSE stream. First event announces the message-post URL."""
@@ -1569,6 +1770,7 @@ async def mcp_sse_stream(
         "user_id":    current_user.id,
         "queue":      q,
         "jwt":        jwt_token,
+        "mcp_scopes": getattr(request.state, "mcp_scopes", None) if request is not None else None,
         "expires_at": time.time() + _SSE_SESSION_TTL_S,
     }
     logger.info(f"[mcp] SSE session opened sid={sid} user={current_user.id}")
@@ -1604,7 +1806,7 @@ async def mcp_sse_message(
     request: Request,
     body: Dict[str, Any],
     sid: str = Query(...),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(_resolve_user_or_mcp_token),
 ) -> Any:
     """Client → server JSON-RPC message. Response is queued onto the
     matching SSE stream. HTTP body is 202 (message accepted)."""
@@ -1615,7 +1817,8 @@ async def mcp_sse_message(
 
     db = get_db()
     jwt_token = session.get("jwt")
-    r = await _dispatch_jsonrpc(db, current_user, body, jwt_token=jwt_token)
+    mcp_scopes = session.get("mcp_scopes")
+    r = await _dispatch_jsonrpc(db, current_user, body, jwt_token=jwt_token, mcp_scopes=mcp_scopes)
     if r is not None:
         await session["queue"].put(json.dumps(r, default=str))
     from fastapi.responses import Response as _Resp

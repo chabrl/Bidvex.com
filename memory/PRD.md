@@ -1,6 +1,133 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter488 — Scoped MCP Tokens + B2B Matchmaker Phase 2 (Feb 18, 2026) ✅ SHIPPED (preview) · 🚫 NO DEPLOY
+
+### Delivered
+Two additive features on top of the iter485/486/487 MCP infrastructure:
+
+**A. Scoped MCP Token System**
+- New collection `mcp_tokens` with schema: `token_id`, `user_id`,
+  `token_hash` (bcrypt), `label`, `scopes[]`, `created_at`, `expires_at`,
+  `last_used_at`, `revoked`.
+- New endpoints (all preview-gated under `MCP_ENABLED=true`):
+  - `POST /api/mcp/token` — creates a scoped token, returns raw token
+    **exactly once**, stores only its bcrypt hash.
+  - `GET /api/mcp/tokens` — lists caller's tokens (metadata only).
+  - `DELETE /api/mcp/token/{token_id}` — immediate revocation (owner
+    or admin).
+- Raw token format: `bvx_mcp_<16-hex token_id>_<secrets.token_urlsafe(32)>`.
+  Non-secret `token_id` is used to locate the record; bcrypt verifies
+  the secret against `token_hash`.
+- Coarse scope allowlist (per user directive): `read`, `bid`, `list`,
+  `promote`, `analytics`, `matchmaker`. **No admin scope** — admin
+  capability continues to flow exclusively from `user.role` via the
+  existing gates.
+- Auth resolver `_resolve_user_or_mcp_token` added to `mcp_server.py`:
+  when `Authorization: Bearer bvx_mcp_...` is presented, resolves via
+  `mcp_tokens`; otherwise falls through to existing JWT
+  `get_current_user` (session JWT auth completely unchanged).
+- Scope enforcement wired into REST `/mcp/tools/list`+`/tools/call`
+  and JSON-RPC dispatch (`_dispatch_jsonrpc`/`_rpc_run_tool`), plus
+  SSE session propagation. Out-of-scope tools return
+  `INSUFFICIENT_SCOPE (403)`; admin-only tools continue to return
+  `ADMIN_ONLY` for non-admins even with any scope granted.
+- Frontend: new "Connect Claude" tab in `ProfileSettingsPage.js` with
+  label + scope-picker + expiration selector + one-time raw-token
+  reveal with copy button + prominent EN/FR warning + ready-to-copy
+  Claude Desktop JSON config + active-tokens list with revoke button.
+  Uses existing `mcp_bridge.py` env vars (`BIDVEX_MCP_URL`,
+  `BIDVEX_MCP_JWT`) — no bridge changes required.
+
+**B. B2B Matchmaker Phase 2** — replaces the Phase-1 `NOT_IMPLEMENTED`
+stub while preserving the exact tool name `B2B_syndication_matchmaker`.
+- New service `services/b2b_matchmaker.py`:
+  - **Manifest parser** normalises seller inventory across `listings`,
+    `multi_item_listings`, `vehicles`, `vehicle_multi_lot_listings`,
+    and `storage_units`. Malformed rows flagged; missing critical
+    fields surfaced explicitly — never silently invented.
+  - **Buyer preference clustering** matches qualified B2B buyers
+    (vehicle dealers, brokers, storage facilities, verified business
+    accounts). Uses ONLY legitimate on-platform signals — no PII,
+    no fabricated interest. Output limited to `user_id` +
+    `business_name` + segment + coarse signals.
+  - **Explainable match scoring** (0..100) with a fixed weight table
+    (vertical=25, category=20, geography=15, price=15, quantity=10,
+    historical=10, condition=5). Every point contribution emits a
+    `reasons` string so campaigns can render the rationale to a human.
+  - **Bilingual campaign generation** (natural EN + natural FR — not
+    concatenation). Each campaign draft carries buyer segment,
+    listing refs, match score, reasons, subject, message.
+  - **Approval gate** is a hard invariant: the service NEVER sends
+    emails, spends ad money, contacts buyers, modifies listings, or
+    places bids. Even the `authorise` action only records the intent
+    to `b2b_matchmaker_authorisations` and returns
+    `authorized_pending_dispatch` — actual dispatch remains a manual
+    Ops action.
+- MCP tool handler `tool_b2b_syndication_matchmaker` now dispatches to
+  the service. Tool description explicitly labels the approval
+  requirement and the "never send/spend/bid without authorisation"
+  guardrail (assertion locked in
+  `test_mcp_tool_descriptions.py::test_stubs_still_correctly_labeled`).
+
+### Regression coverage — 77 MCP-related tests, all green
+| Suite                                                 | Tests |
+| :---------------------------------------------------- | :---: |
+| `tests/iter488/test_mcp_tokens.py`                    |  22   |
+| `tests/iter488/test_b2b_matchmaker.py`                |  22   |
+| `tests/iter482/test_mcp_server.py`                    |  18   |
+| `tests/iter482/test_mcp_jsonrpc_transport.py`         |  10   |
+| `tests/iter482/test_mcp_tool_descriptions.py`         |   5   |
+
+Existing iter482 P6.2 + security-hardening suites (27 tests) untouched
+and continue passing.
+
+### End-to-end acceptance proven live on preview
+1. Login as admin → generate token via `POST /api/mcp/token`
+   (raw returned once, bcrypt hash in DB, raw secret absent from DB).
+2. Configure bridge env vars.
+3. stdio bridge → `initialize` → protocol `2024-11-05` handshake.
+4. `tools/list` via bridge → 5 tools visible (scoped to
+   `read` + `matchmaker`); `place_bid`/`create_auction_draft` correctly
+   hidden.
+5. `tools/call search_auctions` → succeeds; audit row written.
+6. `DELETE /api/mcp/token/{tid}` → immediate revocation.
+7. Subsequent bridge call → `{"detail":{"error":"INVALID_MCP_TOKEN"}}`.
+
+### Files changed
+- **New (5):** `backend/routes/mcp_tokens.py`,
+  `backend/services/b2b_matchmaker.py`,
+  `backend/tests/iter488/test_mcp_tokens.py`,
+  `backend/tests/iter488/test_b2b_matchmaker.py`,
+  `frontend/src/components/ConnectClaudeSection.jsx`.
+- **Modified additively (4):** `backend/mcp_server.py` (auth resolver
+  + scope enforcement + B2B handler rewrite + updated tool spec),
+  `backend/server.py` (+7 lines to mount `mcp_tokens_router`),
+  `frontend/src/pages/ProfileSettingsPage.js` (+11 lines to add
+  "Connect Claude" tab), `docs/ITER488_MCP_TOKENS_AND_MATCHMAKER.md`.
+- **Test file adjustments** (3 assertions in pre-existing MCP suites
+  updated to reflect the B2B matchmaker's graduation from stub to
+  functional approval-based service):
+  `tests/iter482/test_mcp_server.py`,
+  `tests/iter482/test_mcp_tool_descriptions.py`.
+
+### Guardrails held (final confirmation)
+- ✅ NO DEPLOYMENT — PREVIEW ONLY.
+- ✅ Existing session JWT auth unchanged.
+- ✅ Existing MCP tool handler business logic unchanged (only the B2B
+  stub was replaced per iter488 spec).
+- ✅ Auction / bidding / payment / Stripe / tax / settlement / escrow /
+  fee logic UNCHANGED.
+- ✅ Existing trust / subscription / tax-ID / admin gates still fire
+  when authenticating with an MCP token.
+- ✅ Existing MCP transports (JSON-RPC, SSE, stdio bridge), Redis rate
+  limiter, and audit-log format unchanged.
+- ✅ Raw MCP tokens are never persisted or logged (verified by
+  automated tests scanning DB + audit collection).
+- ✅ B2B Matchmaker never autonomously contacts buyers, spends money,
+  places bids, or modifies listings.
+
+
 ## iter486 — MCP Claude Desktop End-to-End Integration (Feb 17, 2026) ✅ SHIPPED (preview) · 🚫 NO DEPLOY
 
 ### Delivered — close-out of iter485 for real Claude Desktop compatibility

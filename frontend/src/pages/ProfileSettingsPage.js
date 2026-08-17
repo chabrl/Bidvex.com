@@ -23,6 +23,7 @@ import SubscriptionManagement from '../components/SubscriptionManagement';
 import PersonalizedSavingsCalculator from '../components/PersonalizedSavingsCalculator';
 import B2BCouponActivationCard from '../components/B2BCouponActivationCard';
 import PaymentTrustBox from '../components/PaymentTrustBox';
+import ConnectClaudeSection from '../components/ConnectClaudeSection';
 import { useTranslation } from 'react-i18next';
 
 const API = API_BASE;
@@ -277,6 +278,15 @@ const ProfileSettingsPage = () => {
               <Lock className="h-4 w-4" />
               <span className="hidden sm:inline">Security</span>
               <span className="sm:hidden">Security</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="connect-claude"
+              data-testid="connect-claude-tab"
+              className="flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium data-[state=active]:bg-white data-[state=active]:dark:bg-slate-700 data-[state=active]:shadow-sm data-[state=active]:text-blue-600 data-[state=active]:dark:text-blue-400 text-slate-500 dark:text-slate-400 transition-all"
+            >
+              <Bot className="h-4 w-4" />
+              <span className="hidden sm:inline">Connect Claude</span>
+              <span className="sm:hidden">Claude</span>
             </TabsTrigger>
           </TabsList>
 
@@ -793,6 +803,11 @@ const ProfileSettingsPage = () => {
           {/* Security / Change Password Tab */}
           <TabsContent value="security">
             <ChangePasswordForm />
+          </TabsContent>
+
+          {/* iter488 — Connect Claude (Scoped MCP Token) Tab */}
+          <TabsContent value="connect-claude">
+            <ConnectClaudeSection lang={(user?.preferred_language || 'en').toLowerCase()} />
           </TabsContent>
           {/* Email Change Modal */}
           {showEmailChange && (

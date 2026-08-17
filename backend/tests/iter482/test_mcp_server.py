@@ -337,15 +337,21 @@ async def test_generate_listing_video_is_stub(seeded):
 
 
 @pytest.mark.asyncio
-async def test_b2b_matchmaker_is_stub(seeded):
-    async with httpx.AsyncClient(base_url=BACKEND_URL, timeout=15) as ac:
+async def test_b2b_matchmaker_functional_after_iter488(seeded):
+    """iter488 replaced the Phase 1 stub with a functional
+    approval-based matchmaker. The tool must now analyse the caller's
+    own inventory and return `drafts_ready`. External communications
+    still require explicit authorisation."""
+    async with httpx.AsyncClient(base_url=BACKEND_URL, timeout=30) as ac:
         r = await ac.post("/api/mcp/tools/call",
                           headers=_bearer(seeded["users"]["premium_full"]["token"]),
                           json={"name": "B2B_syndication_matchmaker",
-                                "arguments": {"seller_id": seeded["seller_id"],
-                                              "manifest_raw_data": {"foo": "bar"}}})
+                                "arguments": {"action": "analyze"}})
     assert r.status_code == 200
-    assert r.json()["result"]["status"] == "NOT_IMPLEMENTED"
+    result = r.json()["result"]
+    assert result["status"] in {"drafts_ready", "no_inventory"}
+    if result["status"] == "drafts_ready":
+        assert result.get("approval_required") is True
 
 
 # ─── Unknown tool ────────────────────────────────────────────────────
@@ -458,20 +464,26 @@ async def test_unauth_request_gets_401():
 
 
 # ─── Static verification of the source file ───────────────────────────
-def test_source_has_b2b_stub_intent_comment():
-    """Guard that the Phase-2 target-intent comment is present in the
-    B2B stub, per iter485 instructions."""
+def test_source_b2b_matchmaker_is_now_functional_iter488():
+    """iter488 replaced the Phase-1 stub with a functional
+    approval-based matchmaker. Guard that:
+      * the handler exists and calls the b2b_matchmaker service,
+      * the description mentions the approval requirement,
+      * the tool NEVER auto-dispatches emails/ads/bids.
+    """
     with open("/app/backend/mcp_server.py", "r", encoding="utf-8") as fh:
         src = fh.read()
-    assert "TARGET INTENT (Phase 2 Build):" in src
-    assert "B2B matchmaking" in src or "matchmaker" in src
-    assert "bilingual" in src
-    assert "return_status" not in src  # no accidental live implementation
-    # And the docstring must be inside the b2b handler
-    idx = src.find("async def tool_b2b_syndication_matchmaker")
+    assert "async def tool_b2b_syndication_matchmaker" in src
+    # Wires into the iter488 service
+    assert "services.b2b_matchmaker" in src
+    assert "run_matchmaker" in src
+    assert "authorised_execute_campaign" in src
+    # The description explicitly labels the approval-first contract
+    idx = src.find('"B2B_syndication_matchmaker": ToolSpec(')
     assert idx > 0
-    body = src[idx: idx + 2000]
-    assert "TARGET INTENT (Phase 2 Build):" in body
+    tail = src[idx: idx + 2500]
+    assert "authorised" in tail.lower() or "authorized" in tail.lower()
+    assert "will never" in tail.lower() or "never" in tail.lower()
 
 
 def test_source_does_not_import_or_touch_stripe_secrets():

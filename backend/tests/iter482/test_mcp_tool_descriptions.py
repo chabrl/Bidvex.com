@@ -210,17 +210,16 @@ async def test_stubs_still_correctly_labeled(premium_and_admin):
     assert "not_implemented" in higgs_tail, "NOT_IMPLEMENTED label lost from generate_listing_video"
     assert "stub" in higgs_tail, "STUB label lost from generate_listing_video"
 
+    # iter488 — B2B matchmaker graduated from stub to functional
+    # approval-based matchmaker. Description must reflect that it is
+    # recommendation + campaign preparation only (no autonomous action).
     b2b = tools.get("B2B_syndication_matchmaker")
     assert b2b is not None, "B2B_syndication_matchmaker missing from tools/list"
     b2b_tail = b2b["description"][len(_EXPECTED_EN_PREFIX):].lower()
-    assert "phase 2" in b2b_tail, "Phase 2 label lost from B2B_syndication_matchmaker"
-    assert "not_implemented" in b2b_tail, "NOT_IMPLEMENTED label lost from B2B_syndication_matchmaker"
-    assert "stub" in b2b_tail, "STUB label lost from B2B_syndication_matchmaker"
-
-    # Also verify B2B still preserves the Phase 2 target-intent comment in source
-    with open("/app/backend/mcp_server.py", "r", encoding="utf-8") as fh:
-        src = fh.read()
-    assert "TARGET INTENT (Phase 2 Build):" in src
+    assert "authorised" in b2b_tail or "authorized" in b2b_tail or "approval" in b2b_tail, \
+        "Authorisation/approval requirement missing from B2B_syndication_matchmaker description"
+    assert "never" in b2b_tail, \
+        "'never send/spend/bid' safety guardrail missing from B2B_syndication_matchmaker description"
 
 
 # ─── (4) EN and FR semantically equivalent (rough sanity, not word-diff) ───

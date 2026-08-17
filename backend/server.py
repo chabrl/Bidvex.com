@@ -1918,6 +1918,14 @@ try:
             logger.info("iter485 — MCP server mounted at /api/mcp/* (preview/staging only)")
         except Exception as ce:  # noqa: BLE001
             logger.warning(f"iter485 MCP server mount failed (non-fatal): {ce}")
+        # iter488 — Scoped MCP Token management endpoints. Additive; only
+        # active when the MCP server itself is enabled.
+        try:
+            from routes.mcp_tokens import mcp_tokens_router
+            api_router.include_router(mcp_tokens_router)
+            logger.info("iter488 — MCP token management mounted at /api/mcp/token[s] (preview only)")
+        except Exception as ce:  # noqa: BLE001
+            logger.warning(f"iter488 MCP token router mount failed (non-fatal): {ce}")
     else:
         logger.info("iter485 — MCP server not mounted (MCP_ENABLED != true)")
 
