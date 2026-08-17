@@ -1,6 +1,71 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter495 — Diagnostic: Claude "no write scope" is a client-cache/LLM issue, not a server bug (Feb 19, 2026) ✅ SERVER-SIDE VERIFIED · 🚫 NO DEPLOY
+
+### Problem
+Claude.ai reported `Tool 'bidvex112:create_auction_draft' not found` and told the user "the connector's current OAuth token does not have the `write` scope."
+
+### Investigation — real Anthropic-egress log correlation
+
+Backend audit + session tables prove the ACTUAL sequence:
+```
+2026-08-17T13:52:42  create_auction_draft  status=rejected  error=TAX_ID_REQUIRED  ← iter494 bug (now fixed in preview)
+[iter494 fix landed in preview ~14:00]
+2026-08-17T14:17:03  Claude did fresh DCR (from Anthropic 160.79.106.184)
+2026-08-17T14:18:20  Fresh OAuth token issued, scopes=[read, bid, list, promote, analytics, matchmaker]  ← ALL scopes granted
+2026-08-17T14:18:21  New Streamable session (scopes=all)
+2026-08-17T14:18:32  Second Streamable session (scopes=all)
+2026-08-17T14:27:11  Iter495 audit probe (scopes=all)
+[NO create_auction_draft calls since the token refresh]
+```
+
+The user's current active Claude OAuth token has ALL six scopes including `list` (BidVex's canonical write scope). My iter495 audit script minted an equivalent token and confirmed the server returns 13 tools including `create_auction_draft` and `bulk_create_listings` — server-side is 100% correct.
+
+### Root Cause — **NOT a server bug**
+- **The token DOES have the write scope.** BidVex's canonical write-scope name is `list` (not `write`) — Claude's LLM misinterprets the scope name.
+- **`tools/list` DOES include `create_auction_draft`.** Verified live against the exact user + scope set.
+- **The "Tool not found" message came from Claude's client-side cache**, which was populated at 13:52 when the tool was rejected with `TAX_ID_REQUIRED` (iter494 bug). After the iter494 fix, Claude's client did not re-issue `tools/list` inside the existing chat, so the tool remained "unavailable" from Claude's perspective. When the user asked again, Claude's LLM reasoned "I remember this tool being unavailable — the token probably doesn't have write scope."
+
+### Fix decision — **no server code changes**
+Given the user's guidance ("do not invent new scope names; find the authoritative scope catalog and use it") and the log evidence proving the server is functioning correctly, iter495 introduces **no runtime changes**. Instead we:
+
+1. **Formalise the guarantees Claude depends on** in a dedicated regression suite so any future scope-narrowing regression fails loudly.
+2. **Provide clear operator recovery steps** to reset Claude's client-side cache.
+
+### iter495 tests added — 10 dedicated regression cases
+`backend/tests/iter495/test_mcp_scope_enforcement.py`:
+1. `test_bidvex_scope_catalog_has_no_write_scope` — asserts the canonical scope catalog (`read`, `bid`, `list`, `promote`, `analytics`, `matchmaker`) and that `write` is NOT a scope. Guards against accidental scope-name invention.
+2. `test_create_auction_draft_requires_list_scope` — pins the tool→scope map so future refactors can't silently narrow.
+3. `test_dcr_preserves_all_requested_scopes` — Claude default (all scopes) end-to-end via DCR→authorize→token.
+4. `test_dcr_preserves_narrower_scope` — read+matchmaker DCR yields exactly read+matchmaker in the token.
+5. `test_dcr_default_falls_back_to_read` — empty scope defaults to `read` (least privilege).
+6. `test_read_only_token_hides_create_auction_draft` — least-privilege: read-only Claude token → tools/list excludes all write tools.
+7. `test_read_only_token_gets_403_on_create_auction_draft` — belt-and-braces: even if the client bypasses the tools/list filter, the tool call returns 403 `INSUFFICIENT_SCOPE` with `required_scope=list`.
+8. `test_write_enabled_token_exposes_create_auction_draft` — the operator-visible fact Claude depends on: `list` scope makes create_auction_draft appear.
+9. `test_write_enabled_token_can_create_marketplace_listing` — full DCR→authorize→token→Streamable→tools/call flow with a marketplace baby-bed listing — succeeds end-to-end (iter494 confirmed reachable via real Claude transport).
+10. `test_write_enabled_dealer_still_blocked_on_vehicle` — the write scope does NOT bypass iter482/iter494 vehicle compliance; unverified dealer trying a vehicle draft still gets `TAX_ID_REQUIRED / dealer_license_not_verified`.
+
+### Test results
+- `pytest backend/tests/iter482/test_mcp_server.py backend/tests/iter488/ backend/tests/iter489/ backend/tests/iter494/ backend/tests/iter495/` → **150 passed** in 122.4s. Zero regressions across the entire MCP surface.
+
+### Operator recovery — reset Claude's tools cache
+The connector's OAuth token is already correct. The stale-cache condition can only be cleared client-side:
+1. In Claude.ai → **Settings → Connectors** → find `bidvex112` (or whatever name) → **remove**.
+2. **Start a brand-new chat** (fresh Claude conversation — critical, because Claude's LLM caches "tool unavailable" reasoning within a conversation).
+3. **Re-add the connector**: `https://prod-verify-2.preview.emergentagent.com/api/mcp` → Connect.
+4. Approve the same six scopes on the BidVex consent screen.
+5. In the fresh chat, ask Claude "Create a marketplace listing for a brand new baby bed at $250" — should succeed (iter494 already unblocked this server-side).
+6. Also try "Create a vehicle listing for a 2020 truck" — must still be rejected (`TAX_ID_REQUIRED / dealer_license_not_verified`).
+
+### Guardrails held
+- ✅ NO deployment — preview only.
+- ✅ Zero touches to `mcp_oauth.py`, `mcp_streamable.py`, `mcp_tokens.py`, `mcp_bridge.py`, `mcp_server.py` (except the tool→scope map assertion in the test which reads the existing map, not mutates it).
+- ✅ iter494's vertical-scoping logic untouched — verified by test #10 above.
+- ✅ Vehicle-dealer compliance still enforced — iter482 test suite green.
+- ✅ Least-privilege guarantees held: read-only tokens can't create listings; only tokens with the `list` scope can.
+
+
 ## iter494 — Fix: MCP Vertical-Scoped Listing Creation (Feb 19, 2026) ✅ SHIPPED (preview) · 🚫 NO DEPLOY
 
 ### Problem

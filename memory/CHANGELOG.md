@@ -1,6 +1,47 @@
 # BidVex Changelog
 
 
+## Feb 19, 2026 — iter495 Diagnostic: Claude "no write scope" is a client-cache issue (preview only, no deploy)
+
+Claude.ai reported `Tool 'bidvex112:create_auction_draft' not found` and told the user the token was missing `write` scope. Log correlation proved this is **not a server bug**:
+
+**Log-verified sequence** — user `charbel911@gmail.com`:
+```
+13:52:42  create_auction_draft  → REJECTED (TAX_ID_REQUIRED)  ← iter494 bug (fixed in preview)
+14:17:03  Claude did fresh DCR (Anthropic 160.79.106.184)
+14:18:20  Fresh OAuth token issued  scopes=[read, bid, list, promote, analytics, matchmaker]
+[no create_auction_draft calls since the reconnect]
+```
+
+**Findings**:
+- The active Claude OAuth token contains ALL six scopes including `list` — BidVex's canonical write scope. `write` is NOT a BidVex scope name.
+- A live probe with an equivalent scope set returned 13 tools in `tools/list` including `create_auction_draft`.
+- The "Tool not found" message and the "no write scope" claim came from Claude's client-side cache + LLM reasoning after the pre-fix TAX_ID_REQUIRED rejection at 13:52. Server-side never returned an UNKNOWN_TOOL for `create_auction_draft`.
+
+**Fix decision** — no runtime code changes. Instead, iter495 introduces a 10-test dedicated regression suite that formalises the scope guarantees Claude depends on:
+- Canonical scope catalog is `read`, `bid`, `list`, `promote`, `analytics`, `matchmaker` (no `write` scope).
+- Tool→scope map pinned: `create_auction_draft` and `bulk_create_listings` require `list`.
+- DCR preserves requested scopes end-to-end (all-scopes, narrower, empty-default).
+- Least privilege: read-only token hides write tools AND gets 403 `INSUFFICIENT_SCOPE` on write tool calls.
+- Write-enabled token exposes create_auction_draft in tools/list AND can create a marketplace listing end-to-end.
+- Write-enabled dealer with unverified license STILL blocked on vehicle vertical (iter482 + iter494 compliance preserved).
+
+**Files** — new only:
+- `backend/tests/iter495/__init__.py`
+- `backend/tests/iter495/test_mcp_scope_enforcement.py` (10 tests)
+- No changes to `mcp_oauth.py`, `mcp_streamable.py`, `mcp_tokens.py`, `mcp_bridge.py`, `mcp_server.py`, or any business-logic code.
+
+**Test results** — `pytest backend/tests/iter482/test_mcp_server.py backend/tests/iter488/ backend/tests/iter489/ backend/tests/iter494/ backend/tests/iter495/` → **150 passed** in 122.4s.
+
+**Operator steps to recover the Claude connector**
+1. Settings → Connectors → remove `bidvex112` (or current name).
+2. **Start a brand-new Claude chat** (crucial — LLM caches "tool unavailable" within a chat).
+3. Re-add the connector → `https://prod-verify-2.preview.emergentagent.com/api/mcp` → Connect → consent to all six scopes.
+4. In the fresh chat, ask Claude to create a marketplace baby-bed listing (should succeed) and a vehicle listing (should be rejected).
+
+**Guardrail** — NO DEPLOYMENT. Preview only. iter494 vertical-scoping fix intact.
+
+
 ## Feb 19, 2026 — iter494 Fix: MCP Vertical-Scoped Listing Creation (preview only, no deploy)
 
 **Bug**: creating a General Marketplace baby-bed listing via MCP was rejected with `TAX_ID_REQUIRED / dealer_license_not_verified` — because the seller's account carried `is_vehicle_dealer=True` (legitimately — dealer who also sells general merchandise). Vehicle-dealer compliance was firing for a piece of furniture.
