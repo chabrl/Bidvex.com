@@ -1190,6 +1190,29 @@ const SellerDashboard = () => {
                             >
                               {t('dashboard.seller.view')}
                             </Button>
+                            {/* iter496.1 — Draft listings must be editable through the
+                                normal Seller Dashboard editor. Pending-review drafts
+                                already had this branch above; regular Draft listings
+                                (including MCP-created ones) previously had no Edit
+                                button at all — the seller was forced through the
+                                Request Deletion / re-create workflow. Uses the exact
+                                same /edit-listing/:id route as pending-review, which
+                                hydrates via GET /api/listings/{id} → CreateListingPage
+                                in edit mode. Multi-item lots have a different editor
+                                (out of scope for iter496.1). */}
+                            {listing.status === 'draft' && !isMultiItem && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => navigate(`/edit-listing/${listing.id}`)}
+                                data-testid={`edit-draft-listing-${listing.id}`}
+                                className="w-full lg:w-auto border-slate-300 text-slate-800 hover:bg-slate-50"
+                                title={(i18n.language || 'en').startsWith('fr') ? 'Modifier le brouillon' : 'Edit draft'}
+                              >
+                                <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                                {(i18n.language || 'en').startsWith('fr') ? 'Modifier' : 'Edit'}
+                              </Button>
+                            )}
                             {/* iter482+ — Canonical Lot CSV Export button */}
                             <Button
                               size="sm"

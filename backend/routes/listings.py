@@ -1078,6 +1078,11 @@ async def update_listing(listing_id: str, updates: Dict[str, Any], current_user:
         await db.listings.update_one({"id": listing_id}, {"$set": update_data})
         from services.api_cache import invalidate_listing_caches
         invalidate_listing_caches()
+        # iter496.1 — also pop the in-process single-listing cache
+        # populated by the GET endpoint (L988) so an immediate re-fetch
+        # after this PUT sees the fresh doc instead of a stale copy for
+        # up to _LISTING_CACHE_TTL seconds.
+        _listing_cache.pop(listing_id, None)
 
         if needs_retranslation:
             import asyncio as _aio

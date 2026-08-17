@@ -1,6 +1,56 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter496.1 — Fix: Seller Dashboard Edit Button for Draft Listings (Feb 19, 2026) ✅ SHIPPED (preview) · 🚫 NO DEPLOY
+
+### Problem
+After iter496 unblocked draft hydration through `GET /api/listings/{id}`, the operator opened the Seller Dashboard and found the baby-bed draft listed under **Draft (1)** — but the row actions only exposed **View / Export CSV / Request Deletion**. **No Edit button** was visible for any draft (not just MCP-created ones), so the seller could not use the normal Seller Dashboard editing flow.
+
+### Root Cause — dashboard rendering scope, not data
+`frontend/src/pages/SellerDashboard.js` conditionally exposes editing based on `listing.status`:
+| Status | Editing action |
+|---|---|
+| `pending_admin_review` / `pending_ai_review` (line 1136) | Edit → `/edit-listing/{id}` |
+| `active` (line 1209) | Edit Auction → SellerLiveEditModal |
+| **`draft`** | **← NOTHING** |
+| `ended` | Nothing (correct — ended is terminal) |
+
+The screenshot exactly matched: for a `status="draft"` row the "otherwise" branch (line 1183) only rendered View + Export CSV + Delete. Drafts fell off the editing branch by omission.
+
+### Fix — surgical, additive
+`frontend/src/pages/SellerDashboard.js` — a single new conditional block right after the View button (around line 1195): if `listing.status === 'draft' && !isMultiItem`, render an Edit button that navigates to `/edit-listing/{listing.id}` — the exact same route `pending_admin_review` uses, hydrated by `CreateListingPage.js`'s `useEffect` at L110–156 via `GET /api/listings/{id}`. **Multi-item lots** deliberately omitted here (they have their own /lots editor — out of scope).
+
+`backend/routes/listings.py` — a **1-line pre-existing bug fix** in the `PUT /api/listings/{id}` handler: pop `_listing_cache[listing_id]` after Mongo update so an immediate GET-after-PUT sees fresh values (previously the in-process 30 s cache masked writes; same class of fix I applied to `tool_update_auction_draft` in iter496).
+
+### Files Changed
+- **Edited**: `frontend/src/pages/SellerDashboard.js` — added draft-Edit button block (~15 lines).
+- **Edited**: `backend/routes/listings.py` — added `_listing_cache.pop(listing_id, None)` to the PUT handler (~4 lines).
+- **New**: `backend/tests/iter496_1/__init__.py`, `backend/tests/iter496_1/test_dashboard_draft_edit.py` (5 dedicated regression tests).
+- **Untouched**: `mcp_streamable.py`, `mcp_tokens.py`, `mcp_oauth.py`, `mcp_bridge.py`, `mcp_server.py`, `models/auction_models.py`, all business-logic files, no scope changes, no auction/payment/Stripe/tax/settlement/escrow/billing code touched.
+
+### Verification
+- **Pytest** — `pytest backend/tests/iter482/ backend/tests/iter488/ backend/tests/iter489/ backend/tests/iter494/ backend/tests/iter495/ backend/tests/iter496/ backend/tests/iter496_1/` → **164 passed** in 143.8s. Zero regressions.
+- **iter496.1 dedicated suite (5 tests all pass):**
+  1. Dashboard `GET/PUT /api/listings/{id}` round-trips on an MCP-created draft.
+  2. Dashboard PUT is visible to MCP `get_listing_details` (same underlying doc).
+  3. MCP `update_auction_draft` is visible to dashboard GET (reverse direction).
+  4. Cross-user PUT rejected (403 — pre-existing security holds).
+  5. Read-only MCP token still can't call `update_auction_draft` (iter495 regression guard).
+- **Live UI acceptance** — signed into `charbel911@gmail.com`, navigated to `/seller/dashboard?tab=listings&filter=draft`:
+  - Edit button with `data-testid="edit-draft-listing-b40a26b0-c89c-4eb0-9d0f-f5258ba94eed"` is **visible**.
+  - Clicking Edit navigated to `/edit-listing/b40a26b0-…`.
+  - Editor loaded with **title="Brand New Baby Bed / Crib"** pre-populated, description populated, condition="New", starting price="249" (the exact value my iter496 MCP update set — proving same underlying record across surfaces).
+  - Both screenshots captured showing (a) dashboard drafts list with Edit button and (b) editor form pre-populated.
+
+### Guardrails held
+- ✅ NO deployment — preview only.
+- ✅ No new scope, no changes to `read/bid/list/promote/analytics/matchmaker`.
+- ✅ No OAuth, Streamable HTTP, or token changes.
+- ✅ Multi-item lots unaffected (their /lots editor path unchanged).
+- ✅ iter494 vertical-scoping, iter482 vehicle-dealer compliance, iter495 least-privilege — all regression-tested green.
+- ✅ Placeholder test URLs (`cdn.example.com/…`) clearly marked as test data in the iter496.1 test module docstring.
+
+
 ## iter496 — Fix: MCP-Created Drafts Openable in Seller Dashboard + `update_auction_draft` Tool (Feb 19, 2026) ✅ SHIPPED (preview) · 🚫 NO DEPLOY
 
 ### Problem

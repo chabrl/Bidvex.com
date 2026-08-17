@@ -1,6 +1,36 @@
 # BidVex Changelog
 
 
+## Feb 19, 2026 — iter496.1 Fix: Seller Dashboard Edit Button for Drafts (preview only, no deploy)
+
+**Bug**: After iter496 made MCP-created drafts hydratable, the Seller Dashboard still hid the Edit button on `status="draft"` rows — for ALL drafts (not just MCP ones). Operator screenshot showed the baby-bed row exposing only View / Export CSV / Request Deletion.
+
+**Root cause**: `frontend/src/pages/SellerDashboard.js` renders Edit actions conditionally on `listing.status`. `pending_admin_review` / `pending_ai_review` and `active` both had editing branches; `draft` had none. Pure UI omission, not a data issue.
+
+**Fix**:
+1. `frontend/src/pages/SellerDashboard.js` — new conditional block right after View: `listing.status === 'draft' && !isMultiItem` → Edit button navigating to `/edit-listing/{id}` (same route as pending-review). Uses `data-testid="edit-draft-listing-{id}"`.
+2. `backend/routes/listings.py` PUT handler — added `_listing_cache.pop(listing_id, None)` to invalidate the in-process 30 s single-listing cache alongside the existing `invalidate_listing_caches()` call, so an immediate GET-after-PUT (from tests, or a fast-scroll dashboard user) sees the fresh doc.
+
+**Files**
+- Edited: `frontend/src/pages/SellerDashboard.js` (+15 lines), `backend/routes/listings.py` (+4 lines).
+- New: `backend/tests/iter496_1/test_dashboard_draft_edit.py` (5 tests) and `__init__.py`.
+- Untouched: `mcp_streamable.py`, `mcp_tokens.py`, `mcp_oauth.py`, `mcp_bridge.py`, `mcp_server.py`, and all business-logic files. No scope changes.
+
+**Tests** — `pytest backend/tests/iter482/ backend/tests/iter488/ backend/tests/iter489/ backend/tests/iter494/ backend/tests/iter495/ backend/tests/iter496/ backend/tests/iter496_1/` → **164 passed** in 143.8s.
+
+**Live UI acceptance on the actual baby-bed listing**
+- Signed into `charbel911@gmail.com`, opened `/seller/dashboard?tab=listings&filter=draft`.
+- Edit button `data-testid="edit-draft-listing-b40a26b0-c89c-4eb0-9d0f-f5258ba94eed"` is **visible**.
+- Clicking Edit navigated to `/edit-listing/b40a26b0-…`; editor loaded with title="Brand New Baby Bed / Crib", description populated, condition="New", starting price="249" (the value my iter496 MCP update set — proves same underlying record on both surfaces).
+
+**Guardrails held**
+- No scope changes, no OAuth changes.
+- Multi-item lots unaffected (different editor path).
+- iter494 / iter482 / iter495 / iter496 regression suites all green.
+- Test placeholder URLs (`cdn.example.com/…`) explicitly marked as test data.
+- NO deployment. Preview only.
+
+
 ## Feb 19, 2026 — iter496 Fix: MCP Drafts Editable in Seller Dashboard + `update_auction_draft` Tool (preview only, no deploy)
 
 **Bug**: The Claude-created baby-bed draft (`b40a26b0-…`) appeared in the Seller Dashboard's Drafts tab but the **Edit** button navigated to "Listing not found".
