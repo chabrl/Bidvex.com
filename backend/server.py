@@ -2098,6 +2098,51 @@ async def api_oauth_authorization_server_metadata(request: Request):
     return _oauth_as_metadata(_mcp_public_origin(request))
 
 
+# ─── iter492 — OpenID Connect Discovery compatibility shim ───────────
+# Backend log evidence (Aug 17 2026, ofid_70a58ada3432eda4) proved that
+# Claude.ai's remote-MCP client probes /.well-known/openid-configuration
+# BEFORE it tries /.well-known/oauth-authorization-server, and 404s
+# there without falling back to RFC 8414. This is a documented bug in
+# Claude.ai Web (path-based issuers): the client synthesises an OIDC
+# discovery URL from `authorization_servers[0]` and gives up on 404.
+#
+# The fix is a compatibility shim, not a full OIDC provider. We serve
+# the SAME OAuth 2.1 authorization-server metadata at the OIDC
+# well-known path, plus the four fields OpenID Connect Discovery 1.0
+# §3 requires (`jwks_uri`, `subject_types_supported`,
+# `id_token_signing_alg_values_supported`, and `response_types_supported`
+# — the last three already present via _oauth_as_metadata). BidVex
+# does NOT actually mint OpenID id_tokens; the JWKS endpoint returns
+# an empty key set, which is legal per RFC 7517 §5.
+def _oidc_metadata(origin: str) -> Dict[str, Any]:
+    """OpenID Connect Discovery 1.0 §3 compatible document. Purely a
+    compatibility surface so Claude.ai's client can complete discovery
+    — BidVex does not implement OpenID Connect authentication flows."""
+    m = _oauth_as_metadata(origin)
+    m["jwks_uri"] = f"{origin}/api/mcp/oauth/jwks.json"
+    # OIDC §3 mandatory-in-response fields:
+    m["subject_types_supported"] = ["public"]
+    # We don't sign id_tokens but must advertise SOMETHING that clients
+    # can parse without erroring. "RS256" is the OIDC default; if a
+    # client tries to actually use id_tokens, our /token endpoint
+    # simply won't return one (Claude's MCP flow uses OAuth 2.1 access
+    # tokens, not OIDC id_tokens, so this never executes).
+    m["id_token_signing_alg_values_supported"] = ["RS256"]
+    return m
+
+
+@app.get("/api/.well-known/openid-configuration", include_in_schema=False)
+async def api_openid_configuration_metadata(request: Request):
+    return _oidc_metadata(_mcp_public_origin(request))
+
+
+@app.get("/api/mcp/oauth/jwks.json", include_in_schema=False)
+async def api_openid_jwks():
+    """Empty JWKS — BidVex does not sign OpenID id_tokens. RFC 7517
+    §5 permits an empty `keys` array."""
+    return {"keys": []}
+
+
 @app.get("/api/.well-known/oauth-protected-resource", include_in_schema=False)
 async def api_oauth_protected_resource_metadata(request: Request):
     return _oauth_pr_metadata(_mcp_public_origin(request))

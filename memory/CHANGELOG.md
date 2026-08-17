@@ -1,6 +1,44 @@
 # BidVex Changelog
 
 
+## Feb 19, 2026 — iter492 Fix: Claude.ai OIDC Discovery Compatibility Shim (preview only, no deploy)
+
+Claude.ai custom-connector still failed after iter491 with **"Couldn't register with Bidvex2's sign-in service"** (trace `ofid_70a58ada3432eda4`). Log correlation revealed iter491's DCR compliance was never exercised by the real Claude client because Claude probed `/.well-known/openid-configuration` first, got 404, and gave up **before** reaching DCR.
+
+**Evidence** (four Anthropic egress IPs `160.79.106.177/179/180/182`, identical pattern):
+```
+POST /api/mcp                                     → 401
+GET  /api/.well-known/oauth-protected-resource    → 200
+GET  /api/.well-known/openid-configuration        → 404 ← Claude STOPS
+POST /api/mcp                                     → 401 (retry, never reaches DCR)
+```
+Anthropic IPs hit `/register` **0 times** in the full log history — every 201 Created event from iter491 was from my simulation script on `35.225.230.28` (Google Cloud), not Anthropic. This is a documented Claude.ai client bug (GitHub `anthropics/claude-ai-mcp` #376, #82, #457): when the OAuth issuer has a path component, the client probes OIDC discovery and does not fall back to RFC 8414.
+
+**Fix** — compatibility shim only, no transport changes:
+- `backend/server.py` — added `GET /api/.well-known/openid-configuration` returning the same OAuth AS metadata plus OIDC Discovery 1.0 §3 required fields (`jwks_uri`, `subject_types_supported: ["public"]`, `id_token_signing_alg_values_supported: ["RS256"]`).
+- `backend/server.py` — added `GET /api/mcp/oauth/jwks.json` returning `{"keys": []}` (RFC 7517 §5 permits an empty key set; BidVex does not sign id_tokens).
+
+**Guardrails held**
+- `openid` scope NOT in `scopes_supported` (we are not an OIDC identity provider).
+- `grant_types_supported` unchanged (`["authorization_code"]` only).
+- `mcp_streamable.py`, `mcp_tokens.py`, `mcp_bridge.py`, `mcp_oauth.py`, `mcp_server.py`, `b2b_matchmaker.py` — all untouched.
+- No auction, payment, Stripe, tax, settlement, escrow, fee, or billing code touched.
+
+**Files**
+- Edited: `backend/server.py` (~50 lines — added `_oidc_metadata()`, two routes).
+- New: `backend/tests/iter489/test_mcp_oidc_shim_iter492.py` (7 iter492 regression tests).
+
+**Tests** — 69 iter489+490+491+492 tests + 44 iter488 baseline all green; zero regressions. Live 11-step Claude-style E2E flow starting from OIDC discovery (401 → PR metadata → OIDC discovery NEW → JWKS → DCR 201 → authorize → consent → token → streamable init → tools/list) all pass.
+
+**Operator steps to reconnect in Claude.ai**
+1. Claude.ai → Settings → Connectors → remove any stale "bidvex*" connector.
+2. Add custom connector → URL `https://prod-verify-2.preview.emergentagent.com/api/mcp` → Connect.
+3. Claude now completes: 401 probe → protected-resource discovery → OIDC discovery (this fix) → DCR → consent (`/mcp-consent`) → token exchange → **Connected**.
+4. Fallback (Path B) if any client-side quirk still trips: pre-register a client via `POST /api/mcp/oauth/register` and paste the `client_id` into Claude's Advanced → OAuth Client ID field (no secret needed for public clients).
+
+**Guardrail** — NO DEPLOYMENT. Preview only. Operator must confirm "Connected" status in Claude.ai UI (not verifiable headlessly).
+
+
 ## Feb 19, 2026 — iter491 Fix: Claude.ai OAuth DCR Registration Failure (preview only, no deploy)
 
 Claude.ai custom-connector setup was failing with **"Couldn't register with bidvex1's sign-in service"** (trace `ofid_d876b8b7e882449c`). Root cause: five RFC 7591 §3.2.1 / RFC 8414 spec deviations in the Dynamic Client Registration surface. Backend logs confirmed Claude.ai reached DCR successfully four times, got 200 OK each time, then gave up without proceeding to `/authorize` — the classic strict-client DCR rejection signature.
