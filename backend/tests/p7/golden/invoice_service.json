@@ -12,15 +12,15 @@
     "hst_cents": 0,
     "province": "BC",
     "qst_cents": 0,
-    "tax_type": "dual",
+    "tax_type": "gst_only",
     "total_tax_cents": 0
   },
   "invoice|0.01|MISSING": {
     "gst_cents": 0,
     "hst_cents": 0,
-    "province": "QC",
+    "province": "INTL",
     "qst_cents": 0,
-    "tax_type": "dual",
+    "tax_type": "zero_rated",
     "total_tax_cents": 0
   },
   "invoice|0.01|ON": {
@@ -42,9 +42,9 @@
   "invoice|0.01|ZZ": {
     "gst_cents": 0,
     "hst_cents": 0,
-    "province": "QC",
+    "province": "INTL",
     "qst_cents": 0,
-    "tax_type": "dual",
+    "tax_type": "zero_rated",
     "total_tax_cents": 0
   },
   "invoice|0.99|AB": {
@@ -59,17 +59,17 @@
     "gst_cents": 5,
     "hst_cents": 0,
     "province": "BC",
-    "qst_cents": 7,
-    "tax_type": "dual",
-    "total_tax_cents": 12
+    "qst_cents": 0,
+    "tax_type": "gst_only",
+    "total_tax_cents": 5
   },
   "invoice|0.99|MISSING": {
-    "gst_cents": 5,
+    "gst_cents": 0,
     "hst_cents": 0,
-    "province": "QC",
-    "qst_cents": 10,
-    "tax_type": "dual",
-    "total_tax_cents": 15
+    "province": "INTL",
+    "qst_cents": 0,
+    "tax_type": "zero_rated",
+    "total_tax_cents": 0
   },
   "invoice|0.99|ON": {
     "gst_cents": 0,
@@ -88,12 +88,12 @@
     "total_tax_cents": 15
   },
   "invoice|0.99|ZZ": {
-    "gst_cents": 5,
+    "gst_cents": 0,
     "hst_cents": 0,
-    "province": "QC",
-    "qst_cents": 10,
-    "tax_type": "dual",
-    "total_tax_cents": 15
+    "province": "INTL",
+    "qst_cents": 0,
+    "tax_type": "zero_rated",
+    "total_tax_cents": 0
   },
   "invoice|1.00|AB": {
     "gst_cents": 5,
@@ -107,17 +107,17 @@
     "gst_cents": 5,
     "hst_cents": 0,
     "province": "BC",
-    "qst_cents": 7,
-    "tax_type": "dual",
-    "total_tax_cents": 12
+    "qst_cents": 0,
+    "tax_type": "gst_only",
+    "total_tax_cents": 5
   },
   "invoice|1.00|MISSING": {
-    "gst_cents": 5,
+    "gst_cents": 0,
     "hst_cents": 0,
-    "province": "QC",
-    "qst_cents": 10,
-    "tax_type": "dual",
-    "total_tax_cents": 15
+    "province": "INTL",
+    "qst_cents": 0,
+    "tax_type": "zero_rated",
+    "total_tax_cents": 0
   },
   "invoice|1.00|ON": {
     "gst_cents": 0,
@@ -136,12 +136,12 @@
     "total_tax_cents": 15
   },
   "invoice|1.00|ZZ": {
-    "gst_cents": 5,
+    "gst_cents": 0,
     "hst_cents": 0,
-    "province": "QC",
-    "qst_cents": 10,
-    "tax_type": "dual",
-    "total_tax_cents": 15
+    "province": "INTL",
+    "qst_cents": 0,
+    "tax_type": "zero_rated",
+    "total_tax_cents": 0
   },
   "invoice|10.00|AB": {
     "gst_cents": 50,
@@ -155,17 +155,17 @@
     "gst_cents": 50,
     "hst_cents": 0,
     "province": "BC",
-    "qst_cents": 70,
-    "tax_type": "dual",
-    "total_tax_cents": 120
+    "qst_cents": 0,
+    "tax_type": "gst_only",
+    "total_tax_cents": 50
   },
   "invoice|10.00|MISSING": {
-    "gst_cents": 50,
+    "gst_cents": 0,
     "hst_cents": 0,
-    "province": "QC",
-    "qst_cents": 100,
-    "tax_type": "dual",
-    "total_tax_cents": 150
+    "province": "INTL",
+    "qst_cents": 0,
+    "tax_type": "zero_rated",
+    "total_tax_cents": 0
   },
   "invoice|10.00|ON": {
     "gst_cents": 0,
@@ -184,12 +184,12 @@
     "total_tax_cents": 150
   },
   "invoice|10.00|ZZ": {
-    "gst_cents": 50,
+    "gst_cents": 0,
     "hst_cents": 0,
-    "province": "QC",
-    "qst_cents": 100,
-    "tax_type": "dual",
-    "total_tax_cents": 150
+    "province": "INTL",
+    "qst_cents": 0,
+    "tax_type": "zero_rated",
+    "total_tax_cents": 0
   },
   "invoice|100.00|AB": {
     "gst_cents": 500,
@@ -203,17 +203,17 @@
     "gst_cents": 500,
     "hst_cents": 0,
     "province": "BC",
-    "qst_cents": 700,
-    "tax_type": "dual",
-    "total_tax_cents": 1200
+    "qst_cents": 0,
+    "tax_type": "gst_only",
+    "total_tax_cents": 500
   },
   "invoice|100.00|MISSING": {
-    "gst_cents": 500,
+    "gst_cents": 0,
     "hst_cents": 0,
-    "province": "QC",
-    "qst_cents": 998,
-    "tax_type": "dual",
-    "total_tax_cents": 1498
+    "province": "INTL",
+    "qst_cents": 0,
+    "tax_type": "zero_rated",
+    "total_tax_cents": 0
   },
   "invoice|100.00|ON": {
     "gst_cents": 0,
@@ -232,12 +232,12 @@
     "total_tax_cents": 1498
   },
   "invoice|100.00|ZZ": {
-    "gst_cents": 500,
+    "gst_cents": 0,
     "hst_cents": 0,
-    "province": "QC",
-    "qst_cents": 998,
-    "tax_type": "dual",
-    "total_tax_cents": 1498
+    "province": "INTL",
+    "qst_cents": 0,
+    "tax_type": "zero_rated",
+    "total_tax_cents": 0
   },
   "invoice|1000.00|AB": {
     "gst_cents": 5000,
@@ -251,17 +251,17 @@
     "gst_cents": 5000,
     "hst_cents": 0,
     "province": "BC",
-    "qst_cents": 7000,
-    "tax_type": "dual",
-    "total_tax_cents": 12000
+    "qst_cents": 0,
+    "tax_type": "gst_only",
+    "total_tax_cents": 5000
   },
   "invoice|1000.00|MISSING": {
-    "gst_cents": 5000,
+    "gst_cents": 0,
     "hst_cents": 0,
-    "province": "QC",
-    "qst_cents": 9975,
-    "tax_type": "dual",
-    "total_tax_cents": 14975
+    "province": "INTL",
+    "qst_cents": 0,
+    "tax_type": "zero_rated",
+    "total_tax_cents": 0
   },
   "invoice|1000.00|ON": {
     "gst_cents": 0,
@@ -280,12 +280,12 @@
     "total_tax_cents": 14975
   },
   "invoice|1000.00|ZZ": {
-    "gst_cents": 5000,
+    "gst_cents": 0,
     "hst_cents": 0,
-    "province": "QC",
-    "qst_cents": 9975,
-    "tax_type": "dual",
-    "total_tax_cents": 14975
+    "province": "INTL",
+    "qst_cents": 0,
+    "tax_type": "zero_rated",
+    "total_tax_cents": 0
   },
   "invoice|125000.00|AB": {
     "gst_cents": 625000,
@@ -299,17 +299,17 @@
     "gst_cents": 625000,
     "hst_cents": 0,
     "province": "BC",
-    "qst_cents": 875000,
-    "tax_type": "dual",
-    "total_tax_cents": 1500000
+    "qst_cents": 0,
+    "tax_type": "gst_only",
+    "total_tax_cents": 625000
   },
   "invoice|125000.00|MISSING": {
-    "gst_cents": 625000,
+    "gst_cents": 0,
     "hst_cents": 0,
-    "province": "QC",
-    "qst_cents": 1246875,
-    "tax_type": "dual",
-    "total_tax_cents": 1871875
+    "province": "INTL",
+    "qst_cents": 0,
+    "tax_type": "zero_rated",
+    "total_tax_cents": 0
   },
   "invoice|125000.00|ON": {
     "gst_cents": 0,
@@ -328,12 +328,12 @@
     "total_tax_cents": 1871875
   },
   "invoice|125000.00|ZZ": {
-    "gst_cents": 625000,
+    "gst_cents": 0,
     "hst_cents": 0,
-    "province": "QC",
-    "qst_cents": 1246875,
-    "tax_type": "dual",
-    "total_tax_cents": 1871875
+    "province": "INTL",
+    "qst_cents": 0,
+    "tax_type": "zero_rated",
+    "total_tax_cents": 0
   },
   "invoice|25000.00|AB": {
     "gst_cents": 125000,
@@ -347,17 +347,17 @@
     "gst_cents": 125000,
     "hst_cents": 0,
     "province": "BC",
-    "qst_cents": 175000,
-    "tax_type": "dual",
-    "total_tax_cents": 300000
+    "qst_cents": 0,
+    "tax_type": "gst_only",
+    "total_tax_cents": 125000
   },
   "invoice|25000.00|MISSING": {
-    "gst_cents": 125000,
+    "gst_cents": 0,
     "hst_cents": 0,
-    "province": "QC",
-    "qst_cents": 249375,
-    "tax_type": "dual",
-    "total_tax_cents": 374375
+    "province": "INTL",
+    "qst_cents": 0,
+    "tax_type": "zero_rated",
+    "total_tax_cents": 0
   },
   "invoice|25000.00|ON": {
     "gst_cents": 0,
@@ -376,12 +376,12 @@
     "total_tax_cents": 374375
   },
   "invoice|25000.00|ZZ": {
-    "gst_cents": 125000,
+    "gst_cents": 0,
     "hst_cents": 0,
-    "province": "QC",
-    "qst_cents": 249375,
-    "tax_type": "dual",
-    "total_tax_cents": 374375
+    "province": "INTL",
+    "qst_cents": 0,
+    "tax_type": "zero_rated",
+    "total_tax_cents": 0
   },
   "invoice|500000.00|AB": {
     "gst_cents": 2500000,
@@ -395,17 +395,17 @@
     "gst_cents": 2500000,
     "hst_cents": 0,
     "province": "BC",
-    "qst_cents": 3500000,
-    "tax_type": "dual",
-    "total_tax_cents": 6000000
+    "qst_cents": 0,
+    "tax_type": "gst_only",
+    "total_tax_cents": 2500000
   },
   "invoice|500000.00|MISSING": {
-    "gst_cents": 2500000,
+    "gst_cents": 0,
     "hst_cents": 0,
-    "province": "QC",
-    "qst_cents": 4987500,
-    "tax_type": "dual",
-    "total_tax_cents": 7487500
+    "province": "INTL",
+    "qst_cents": 0,
+    "tax_type": "zero_rated",
+    "total_tax_cents": 0
   },
   "invoice|500000.00|ON": {
     "gst_cents": 0,
@@ -424,12 +424,12 @@
     "total_tax_cents": 7487500
   },
   "invoice|500000.00|ZZ": {
-    "gst_cents": 2500000,
+    "gst_cents": 0,
     "hst_cents": 0,
-    "province": "QC",
-    "qst_cents": 4987500,
-    "tax_type": "dual",
-    "total_tax_cents": 7487500
+    "province": "INTL",
+    "qst_cents": 0,
+    "tax_type": "zero_rated",
+    "total_tax_cents": 0
   },
   "invoice|9.99|AB": {
     "gst_cents": 50,
@@ -443,17 +443,17 @@
     "gst_cents": 50,
     "hst_cents": 0,
     "province": "BC",
-    "qst_cents": 70,
-    "tax_type": "dual",
-    "total_tax_cents": 120
+    "qst_cents": 0,
+    "tax_type": "gst_only",
+    "total_tax_cents": 50
   },
   "invoice|9.99|MISSING": {
-    "gst_cents": 50,
+    "gst_cents": 0,
     "hst_cents": 0,
-    "province": "QC",
-    "qst_cents": 100,
-    "tax_type": "dual",
-    "total_tax_cents": 150
+    "province": "INTL",
+    "qst_cents": 0,
+    "tax_type": "zero_rated",
+    "total_tax_cents": 0
   },
   "invoice|9.99|ON": {
     "gst_cents": 0,
@@ -472,12 +472,12 @@
     "total_tax_cents": 150
   },
   "invoice|9.99|ZZ": {
-    "gst_cents": 50,
+    "gst_cents": 0,
     "hst_cents": 0,
-    "province": "QC",
-    "qst_cents": 100,
-    "tax_type": "dual",
-    "total_tax_cents": 150
+    "province": "INTL",
+    "qst_cents": 0,
+    "tax_type": "zero_rated",
+    "total_tax_cents": 0
   },
   "invoice|99.99|AB": {
     "gst_cents": 500,
@@ -491,17 +491,17 @@
     "gst_cents": 500,
     "hst_cents": 0,
     "province": "BC",
-    "qst_cents": 700,
-    "tax_type": "dual",
-    "total_tax_cents": 1200
+    "qst_cents": 0,
+    "tax_type": "gst_only",
+    "total_tax_cents": 500
   },
   "invoice|99.99|MISSING": {
-    "gst_cents": 500,
+    "gst_cents": 0,
     "hst_cents": 0,
-    "province": "QC",
-    "qst_cents": 997,
-    "tax_type": "dual",
-    "total_tax_cents": 1497
+    "province": "INTL",
+    "qst_cents": 0,
+    "tax_type": "zero_rated",
+    "total_tax_cents": 0
   },
   "invoice|99.99|ON": {
     "gst_cents": 0,
@@ -520,12 +520,12 @@
     "total_tax_cents": 1497
   },
   "invoice|99.99|ZZ": {
-    "gst_cents": 500,
+    "gst_cents": 0,
     "hst_cents": 0,
-    "province": "QC",
-    "qst_cents": 997,
-    "tax_type": "dual",
-    "total_tax_cents": 1497
+    "province": "INTL",
+    "qst_cents": 0,
+    "tax_type": "zero_rated",
+    "total_tax_cents": 0
   },
   "invoice|999.99|AB": {
     "gst_cents": 5000,
@@ -539,17 +539,17 @@
     "gst_cents": 5000,
     "hst_cents": 0,
     "province": "BC",
-    "qst_cents": 7000,
-    "tax_type": "dual",
-    "total_tax_cents": 12000
+    "qst_cents": 0,
+    "tax_type": "gst_only",
+    "total_tax_cents": 5000
   },
   "invoice|999.99|MISSING": {
-    "gst_cents": 5000,
+    "gst_cents": 0,
     "hst_cents": 0,
-    "province": "QC",
-    "qst_cents": 9975,
-    "tax_type": "dual",
-    "total_tax_cents": 14975
+    "province": "INTL",
+    "qst_cents": 0,
+    "tax_type": "zero_rated",
+    "total_tax_cents": 0
   },
   "invoice|999.99|ON": {
     "gst_cents": 0,
@@ -568,11 +568,11 @@
     "total_tax_cents": 14975
   },
   "invoice|999.99|ZZ": {
-    "gst_cents": 5000,
+    "gst_cents": 0,
     "hst_cents": 0,
-    "province": "QC",
-    "qst_cents": 9975,
-    "tax_type": "dual",
-    "total_tax_cents": 14975
+    "province": "INTL",
+    "qst_cents": 0,
+    "tax_type": "zero_rated",
+    "total_tax_cents": 0
   }
 }

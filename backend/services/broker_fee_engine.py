@@ -145,13 +145,20 @@ def calculate_broker_transaction(
 
     subtotal_taxable = platform_fee + broker_fee
 
-    # 2. Taxes on SERVICE fees only (never on hammer)
-    province = (buyer_province or "").strip().upper()
-    gst = subtotal_taxable * GST_RATE
-    qst = subtotal_taxable * QST_RATE if province == "QC" else 0.0
+    # 2. Taxes on SERVICE fees only (never on hammer) — P6.2 Gate 6
+    # Route through the authoritative province-aware tax engine so HST
+    # provinces (ON, NB, NL, NS, PE) are correctly charged HST, GST-only
+    # provinces are charged 5% GST, and US/INTL/unknown fail closed to 0%.
+    # Previously this branch charged GST 5% + (QST 9.975% only if QC),
+    # under-collecting HST provinces by ~8-10 percentage points.
+    from services.fee_calculator import tax_on as _tax_on
+    _tax_bd = _tax_on(subtotal_taxable, buyer_province or "")
+    gst = float(_tax_bd["gst"])
+    qst = float(_tax_bd["qst"])
+    hst = float(_tax_bd["hst"])
 
     # 3. Stripe gross-up — never includes hammer
-    stripe_subtotal = subtotal_taxable + gst + qst
+    stripe_subtotal = subtotal_taxable + gst + qst + hst
     stripe_total_charged, stripe_processing_fee = _stripe_gross_up(stripe_subtotal)
 
     # 4. Round once at the boundary
@@ -177,6 +184,7 @@ def calculate_broker_transaction(
 
         "gst":                       _r(gst),
         "qst":                       _r(qst),
+        "hst":                       _r(hst),  # P6.2 Gate 6 — was 0 for ON/NS/NB/NL/PE
 
         "stripe_subtotal":           _r(stripe_subtotal),
         "stripe_processing_fee":     _r(stripe_processing_fee),

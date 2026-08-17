@@ -286,7 +286,24 @@ class GeneralPaymentResult:
 
 
 def calculate_tax(amount: Decimal) -> TaxBreakdown:
-    """Calculate GST and QST on an amount"""
+    """Calculate GST and QST on an amount — **QUEBEC-ONLY LEGACY HELPER**.
+
+    P6.2 Gate 4 DEPRECATION NOTICE
+    ------------------------------
+    This helper hardcodes GST 5% + QST 9.975% (14.975% combined) and
+    IGNORES caller province. It exists only to serve the QC-preview
+    endpoints in ``routes/payments_fees.py`` (``/api/tax/calculate``,
+    ``/api/tax/general``, ``/api/tax/vehicle``) which are explicitly
+    labelled "Quebec taxes" in their docstrings.
+
+    NEW CODE MUST USE
+        ``calculate_taxes_for_recipient(subtotal, province, currency)``
+    which reads DB-backed rates via ``services.tax_rate_config`` and
+    fails closed to INTL (0%) on unknown / missing province.
+
+    The settlement hot path (`fee_calculator.calculate_fee`) NEVER
+    calls this function — verified in P6.1.1 §10 Claim A.
+    """
     gst = _round_currency(amount * GST_RATE)
     qst = _round_currency(amount * QST_RATE)
     total_tax = gst + qst
@@ -682,14 +699,20 @@ def get_tax_structure_summary() -> Dict[str, Any]:
 
 
 def calculate_gst_qst(subtotal: float, currency: str = "CAD") -> Dict[str, Any]:
-    """
-    Simple GST/QST calculator for invoices and templates.
+    """Simple GST/QST calculator for invoices and templates — **QUEBEC-ONLY**.
 
-    LEGACY (iter350): This helper hardcoded QC rates before iter350. It is
-    kept as a thin wrapper around `calculate_taxes_for_recipient()` with
-    province='QC' for back-compat with older SendGrid templates. New code
-    MUST call `calculate_taxes_for_recipient(subtotal, province, currency)`
-    so each subscriber is taxed at THEIR own province (CRA §142.1).
+    P6.2 Gate 4 DEPRECATION NOTICE
+    ------------------------------
+    This is a QC-scoped back-compat wrapper. It ALWAYS bills the
+    QC combined rate (GST 5% + QST 9.975% = 14.975%) regardless of
+    caller. It is retained for legacy SendGrid template variables
+    (``{{gst_amount}}`` / ``{{qst_amount}}``) that assume QC context.
+
+    NEW CODE MUST USE
+        ``calculate_taxes_for_recipient(subtotal, province, currency)``
+    which returns the same shape but reads DB-backed rates via
+    ``services.tax_rate_config`` — GST for non-QC provinces, HST for
+    ON/NB/NL/NS/PE, zero-rated for US/INTL/unknown.
     """
     return calculate_taxes_for_recipient(subtotal, "QC", currency)
 

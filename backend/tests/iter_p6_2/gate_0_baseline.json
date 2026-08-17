@@ -1,0 +1,33 @@
+{
+  "audit": "P6.2 \u2014 Gate 0 freeze",
+  "baseline_totals": {
+    "collected": 262,
+    "failed": 3,
+    "passed": 259
+  },
+  "captured_at_utc": "2026-08-17T16:26:05.968801+00:00",
+  "git_branch": "main",
+  "git_head": "840a026a84298e6d2f6fce7544566721c1d3d114",
+  "guardrails": {
+    "database_writes": false,
+    "deployment_triggered": false,
+    "stripe_credentials_touched": false
+  },
+  "notes": "P6.2 target: reduce RED findings without regressing the 259 green tests. Any of the 3 baseline failures must remain unchanged (not now-passing, not now-failing-for-a-new-reason).",
+  "p6_1_1_evidence_intact": true,
+  "preexisting_failures": [
+    "tests/iter482/test_mcp_tool_descriptions.py::test_all_tools_have_bidvex_platform_prefix_en_via_jsonrpc",
+    "tests/iter482/test_mcp_tool_descriptions.py::test_all_tools_have_bidvex_platform_prefix_en_via_legacy_rest",
+    "tests/iter482/test_p61_real_stripe_reconciliation.py::TestRealStripeReconciliation::test_full_real_stripe_reconciliation"
+  ],
+  "preexisting_failures_relationship_to_tax": "NONE \u2014 all 3 unrelated (MCP tool description formatting and real-Stripe live network reconciliation).",
+  "regression_suites": [
+    "iter482",
+    "iter488",
+    "iter489",
+    "iter494",
+    "iter495",
+    "iter496",
+    "iter496_1"
+  ]
+}

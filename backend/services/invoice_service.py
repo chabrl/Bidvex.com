@@ -5,9 +5,11 @@ Generates professional auction invoices using ReportLab,
 uploads to Cloudflare R2 at /invoices/{transaction_id}.pdf.
 
 Includes a Multi-Province Tax Engine supporting:
-  - HST provinces (ON 13%, NB/NL/PE 15%, NS 14% [2026])
-  - Dual-tax provinces (QC GST+QST, BC/MB GST+PST, SK GST+PST)
-  - GST-only territories (AB, YT, NT, NU)
+  - HST provinces (ON 13%, NS 14% [2025-04-01 per CRA Notice 342], NB/NL/PE 15%)
+  - Dual-tax province (QC GST 5% + QST 9.975% — BidVex is QC-registered)
+  - GST-only jurisdictions (AB/BC/MB/SK/YT/NT/NU 5%). BC/SK/MB provincial
+    PST/RST is NOT collected by BidVex on platform supplies per the
+    P6.1.1 confirmed policy — that obligation lies with the seller.
 """
 
 import os
@@ -52,10 +54,10 @@ PROVINCE_TAX_CONFIG: Dict[str, Dict[str, Any]] = {
     # ── HST Provinces ──
     "ON": {"type": "hst", "hst_rate": Decimal("0.13"),   "label_en": "HST",  "label_fr": "TVH"},
     "NB": {"type": "hst", "hst_rate": Decimal("0.15"),   "label_en": "HST",  "label_fr": "TVH"},
-    "NS": {"type": "hst", "hst_rate": Decimal("0.14"),   "label_en": "HST",  "label_fr": "TVH"},  # 14% effective 2026
+    "NS": {"type": "hst", "hst_rate": Decimal("0.14"),   "label_en": "HST",  "label_fr": "TVH"},  # 14% effective 2025-04-01 (CRA Notice 342)
     "NL": {"type": "hst", "hst_rate": Decimal("0.15"),   "label_en": "HST",  "label_fr": "TVH"},
     "PE": {"type": "hst", "hst_rate": Decimal("0.15"),   "label_en": "HST",  "label_fr": "TVH"},
-    # ── Dual-Tax Provinces ──
+    # ── Dual-Tax Province (BidVex is QC-registered → collects both) ──
     "QC": {
         "type": "dual",
         "gst_rate": Decimal("0.05"),
@@ -64,30 +66,14 @@ PROVINCE_TAX_CONFIG: Dict[str, Dict[str, Any]] = {
         "pst_label_fr": "TVQ",
         "pst_on_gst": False,  # QST is on subtotal only, NOT on GST-inclusive amount
     },
-    "BC": {
-        "type": "dual",
-        "gst_rate": Decimal("0.05"),
-        "pst_rate": Decimal("0.07"),
-        "pst_label_en": "PST",
-        "pst_label_fr": "TVP",
-        "pst_on_gst": False,
-    },
-    "MB": {
-        "type": "dual",
-        "gst_rate": Decimal("0.05"),
-        "pst_rate": Decimal("0.07"),
-        "pst_label_en": "RST",
-        "pst_label_fr": "TVD",
-        "pst_on_gst": False,
-    },
-    "SK": {
-        "type": "dual",
-        "gst_rate": Decimal("0.05"),
-        "pst_rate": Decimal("0.06"),
-        "pst_label_en": "PST",
-        "pst_label_fr": "TVP",
-        "pst_on_gst": False,
-    },
+    # ── GST-only for BidVex platform supplies (P6.2 Gate 2) ──
+    # Per P6.1.1 confirmed policy, BidVex does NOT collect BC PST /
+    # SK PST / MB RST on B2B platform service supplies — the provincial
+    # obligation lies with the seller. Previously classified as "dual"
+    # here, which over-collected on legacy invoice PDFs.
+    "BC": {"type": "gst_only", "gst_rate": Decimal("0.05")},
+    "SK": {"type": "gst_only", "gst_rate": Decimal("0.05")},
+    "MB": {"type": "gst_only", "gst_rate": Decimal("0.05")},
     # ── GST-Only Jurisdictions ──
     "AB": {"type": "gst_only", "gst_rate": Decimal("0.05")},
     "YT": {"type": "gst_only", "gst_rate": Decimal("0.05")},
@@ -95,7 +81,10 @@ PROVINCE_TAX_CONFIG: Dict[str, Dict[str, Any]] = {
     "NU": {"type": "gst_only", "gst_rate": Decimal("0.05")},
 }
 
-DEFAULT_PROVINCE = "QC"
+DEFAULT_PROVINCE = "INTL"  # P6.2 Gate 3 — fail-closed to zero-rated
+                            # export supply (0%) when province is missing.
+                            # Was "QC" pre-P6.2 which silently over-collected
+                            # 14.975% on any invoice with a missing province.
 
 
 @dataclass
@@ -122,13 +111,38 @@ def calculate_province_tax(
 ) -> ProvinceTaxResult:
     """
     Calculate tax for a given subtotal based on buyer's province/territory.
+
+    P6.2 Gate 3: routes unknown / missing / US / INTL / international
+    province codes through `tax_rate_config.normalize_province`, which
+    returns "INTL" (0% zero-rated exported service, ETA Sched. VI
+    Part V §7) instead of silently over-collecting QC 14.975%. Only
+    supported Canadian provinces retain BidVex tax collection.
     """
-    province = buyer_province.upper().strip()
-    config = PROVINCE_TAX_CONFIG.get(province)
-    if not config:
-        logger.warning(f"Unknown province '{province}', defaulting to {DEFAULT_PROVINCE}")
-        province = DEFAULT_PROVINCE
-        config = PROVINCE_TAX_CONFIG[province]
+    from services.tax_rate_config import normalize_province
+
+    if not buyer_province:
+        province = "INTL"
+    else:
+        province = buyer_province.upper().strip()
+
+    # Normalize aliases (US, USA, INTERNATIONAL, etc.) → INTL,
+    # unknown Canadian codes → INTL. Fail-closed.
+    if province not in PROVINCE_TAX_CONFIG:
+        canonical = normalize_province(province)
+        if canonical in PROVINCE_TAX_CONFIG:
+            province = canonical
+        else:
+            # INTL / unknown / foreign → zero-rated
+            return ProvinceTaxResult(
+                province="INTL",
+                tax_type="zero_rated",
+                subtotal=float(_round_currency(Decimal(str(subtotal)))),
+                tax_gst=0.0, tax_pst_qst=0.0, tax_hst=0.0,
+                total_tax=0.0,
+                total_with_tax=float(_round_currency(Decimal(str(subtotal)))),
+                line_items=[],
+            )
+    config = PROVINCE_TAX_CONFIG[province]
 
     amt = Decimal(str(subtotal))
     tax_type = config["type"]

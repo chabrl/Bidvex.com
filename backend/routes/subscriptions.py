@@ -31,13 +31,9 @@ logger = logging.getLogger(__name__)
 
 from services.subscription_pricing import get_pricing_service, CouponCode
 
-try:
-    from services.tax_engine import calculate_gst_qst
-except ImportError:
-    def calculate_gst_qst(subtotal, currency="CAD"):
-        gst = round(subtotal * 0.05, 2)
-        qst = round(subtotal * 0.09975, 2)
-        return {"gst_amount": gst, "qst_amount": qst, "total_with_tax": round(subtotal + gst + qst, 2)}
+# P6.2 Gate 4 — removed dead `calculate_gst_qst` fallback block; all
+# production paths in this file use `calculate_taxes_for_recipient(sub, prov)`
+# below, which reads DB-backed rates via `services.tax_rate_config`.
 
 
 def _calculate_stripe_fee(amount):
@@ -47,9 +43,17 @@ def _calculate_stripe_fee(amount):
 async def _generate_subscription_invoice(db, user, plan_id, amount, subscription_id, fee):
     """iter350 — subscription invoice with CRA Place-of-Supply tax breakdown.
     Stamps `fee_model_version="iter350"` and the tax jurisdiction snapshot
-    so historical invoices remain audit-traceable if rates change later."""
+    so historical invoices remain audit-traceable if rates change later.
+
+    P6.2 Gate 3 — missing province is now zero-rated (INTL) instead of
+    silently over-collecting QC 14.975%. Callers that legitimately expect
+    QC (e.g. QC-registered admin operations) must explicitly pass 'QC'.
+    """
     from services.tax_engine import calculate_taxes_for_recipient
-    u_prov = getattr(user, "province", None) or getattr(user, "business_province", None) or "QC"
+    from services.tax_rate_config import normalize_province
+    u_prov = normalize_province(
+        getattr(user, "province", None) or getattr(user, "business_province", None)
+    )
     tax = calculate_taxes_for_recipient(amount or 0.0, u_prov)
     invoice = {
         "id": str(uuid.uuid4()),

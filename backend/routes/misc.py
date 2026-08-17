@@ -30,7 +30,8 @@ import json as _json
 
 logger = logging.getLogger(__name__)
 
-from services.tax_engine import calculate_gst_qst
+# P6.2 Gate 4 — removed unused calculate_gst_qst import.
+# Migrate any future tax calc to services.tax_engine.calculate_taxes_for_recipient(subtotal, province).
 
 misc_router = APIRouter(tags=["Misc"])
 

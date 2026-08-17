@@ -829,11 +829,17 @@ def calculate_broker_transaction(
 # iter350 canonical code SHOULD NOT use these.
 # ═══════════════════════════════════════════════════════════════════════════
 
-def _resolve_province(prov: Optional[str], fallback: str = "QC") -> str:
-    """Legacy shim — iter350 code uses `tax_rate_config.normalize_province`."""
+def _resolve_province(prov: Optional[str], fallback: str = "INTL") -> str:
+    """Legacy shim — iter350 code uses `tax_rate_config.normalize_province`.
+
+    P6.2 Gate 3 — default fallback flipped from "QC" to "INTL" so any
+    caller with a missing province no longer silently over-collects
+    QC 14.975%. The one legacy caller (`calculate_partner_taxes`) has
+    zero live production callsites (grep-verified in P6.1.1 §10 Claim C).
+    """
     code = normalize_province(prov)
     if code == "INTL":
-        return fallback  # legacy contract defaulted unknown → QC
+        return fallback  # now defaults to INTL; used to default to QC
     return code
 
 
@@ -844,7 +850,7 @@ _PROVINCE_TAX_REGIME = {
     "QC": {"type": "GST+QST", "gst": Decimal("0.05"), "qst": Decimal("0.09975"), "hst": Decimal("0"), "combined": Decimal("0.14975")},
     "ON": {"type": "HST", "gst": Decimal("0"), "qst": Decimal("0"), "hst": Decimal("0.13"), "combined": Decimal("0.13")},
     "NB": {"type": "HST", "gst": Decimal("0"), "qst": Decimal("0"), "hst": Decimal("0.15"), "combined": Decimal("0.15")},
-    "NS": {"type": "HST", "gst": Decimal("0"), "qst": Decimal("0"), "hst": Decimal("0.15"), "combined": Decimal("0.15")},
+    "NS": {"type": "HST", "gst": Decimal("0"), "qst": Decimal("0"), "hst": Decimal("0.14"), "combined": Decimal("0.14")},  # P6.2 Gate 1 — CRA Notice 342
     "PE": {"type": "HST", "gst": Decimal("0"), "qst": Decimal("0"), "hst": Decimal("0.15"), "combined": Decimal("0.15")},
     "NL": {"type": "HST", "gst": Decimal("0"), "qst": Decimal("0"), "hst": Decimal("0.15"), "combined": Decimal("0.15")},
     "AB": {"type": "GST", "gst": Decimal("0.05"), "qst": Decimal("0"), "hst": Decimal("0"), "combined": Decimal("0.05")},
@@ -860,9 +866,24 @@ PROVINCE_TAX_REGIME = _PROVINCE_TAX_REGIME
 
 def calculate_partner_taxes(amount: Decimal, province: str) -> Dict[str, Decimal]:
     """Legacy shim — kept so iter211 tests still pass under iter350 semantics.
-    Returns the OLD-format dict for back-compat. New code uses `tax_on()`."""
-    code = _resolve_province(province)  # legacy fallback → QC
-    regime = _PROVINCE_TAX_REGIME[code]
+    Returns the OLD-format dict for back-compat. New code uses `tax_on()`.
+
+    P6.2 Gate 6 — routes unknown/US/INTL through `normalize_province` and
+    returns a zero-tax "INTL" regime for foreign/unknown recipients
+    instead of the pre-P6.2 QC 14.975% over-collection.
+    """
+    code = _resolve_province(province)  # INTL fallback per P6.2 Gate 3
+    regime = _PROVINCE_TAX_REGIME.get(code)
+    if regime is None:
+        return {
+            "province": "INTL",
+            "type": "ZERO",
+            "gst": Decimal("0.00"),
+            "qst": Decimal("0.00"),
+            "hst": Decimal("0.00"),
+            "combined_rate": Decimal("0"),
+            "total": Decimal("0.00"),
+        }
     return {
         "province": code,
         "type": regime["type"],
@@ -918,7 +939,7 @@ TAX_RATES = {
     },
     "NB": {"hst": Decimal("0.15"), "combined": Decimal("0.15"), "name": "HST (15%)"},
     "NL": {"hst": Decimal("0.15"), "combined": Decimal("0.15"), "name": "HST (15%)"},
-    "NS": {"hst": Decimal("0.15"), "combined": Decimal("0.15"), "name": "HST (15%)"},
+    "NS": {"hst": Decimal("0.14"), "combined": Decimal("0.14"), "name": "HST (14%)"},  # P6.2 Gate 1 — CRA Notice 342
     "PE": {"hst": Decimal("0.15"), "combined": Decimal("0.15"), "name": "HST (15%)"},
     "AB": {"gst": Decimal("0.05"), "combined": Decimal("0.05"), "name": "GST (5%)"},
     "BC": {"gst": Decimal("0.05"), "combined": Decimal("0.05"), "name": "GST (5%)"},

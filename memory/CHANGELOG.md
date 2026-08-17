@@ -1,6 +1,33 @@
 # BidVex Changelog
 
 
+## Feb 17, 2026 — P6.2 Tax Engine Consolidation — Staged Implementation Complete (PREVIEW ONLY, no deploy)
+
+**Scope**: Consolidated tax calculation onto the authoritative province-aware DB-backed engine (`services/tax_rate_config.py` + `fee_calculator.tax_on`) across all 8 divergent calculators identified in P6.1.1. Delivered in 10 staged gates.
+
+**Corrections landed**:
+1. **Gate 1 — NS 15% → 14%** (CRA Notice 342, effective 2025-04-01). Updated `BOOTSTRAP_RATES`, `vehicle_pricing.PROVINCIAL_TAX_RATES`, `fee_calculator._PROVINCE_TAX_REGIME`, `fee_calculator.TAX_RATES`, `tax_dashboard.HST_RATES`. Idempotent `seed_bootstrap_rates` now reconciles drifted DB rows into `tax_rate_config_history`.
+2. **Gate 2 — BC/SK/MB PST/RST removed from `invoice_service`** — BidVex confirmed policy: does NOT collect provincial PST/RST. `PROVINCE_TAX_CONFIG` for BC/SK/MB flipped `dual` → `gst_only`.
+3. **Gate 3 — US/INTL/missing province fail-closed** — `invoice_service.DEFAULT_PROVINCE = "INTL"`, `_resolve_province` legacy shim, `vehicle_pricing.calculate_taxes`, `tax_dashboard.compute_tax_for_transaction`, `subscriptions._generate_subscription_invoice` all now route unknown → INTL 0%.
+4. **Gate 4 — `tax_engine.calculate_tax` + `calculate_gst_qst` explicitly documented QC-only preview helpers**. Import-graph lint added. Dead imports removed from `routes/invoices.py`, `routes/misc.py`, `routes/subscriptions.py`.
+5. **Gate 6 — Broker HST branch added** — `broker_fee_engine.compute_broker_charges` and `routes/broker_compliance.individual_payout_preview` now route through `fee_calculator.tax_on`, correctly billing HST on ON/NB/NL/NS/PE (was under-collecting by 8-10 pts).
+6. **Gate 9 — 450-cell golden matrix** (6 province-aware calculators × 15 jurisdictions × 5 amounts) — 100% GREEN.
+
+**Regression results**:
+- Full suite (iter482 + iter488 + iter489 + iter494 + iter495 + iter496 + iter496_1 + iter_p6_2 + p7): **1842 pass / 3 pre-existing failures**. 
+- Zero P6.2 regressions. All 3 baseline failures unchanged (MCP tool descriptions + real-Stripe live network).
+- 533 new tests added under `tests/iter_p6_2/`.
+
+**Guardrails preserved**:
+- Stripe / settlement / MCP / OAuth / auction mechanics logic untouched.
+- Historical invoice records untouched.
+- No deployment, no migration, no env changes.
+- Preview only.
+
+**Report**: `/app/backend/tests/iter_p6_2/P6_2_IMPLEMENTATION_REPORT.md`
+
+
+
 ## Feb 17, 2026 — P6.1.1 Tax Engine Reconciliation Audit (READ-ONLY, no deploy)
 
 **Scope**: Reconciled the P6.1 audit findings against BidVex's confirmed internal source of truth (`BOOTSTRAP_RATES` in `services/tax_rate_config.py`), authoritative CRA 2026 rates (canada.ca + Notice 342), and operator's confirmed legal/accounting policy for marketplace responsibility.

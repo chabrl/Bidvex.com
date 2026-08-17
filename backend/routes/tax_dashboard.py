@@ -30,7 +30,7 @@ HST_RATES = {
     "ON": Decimal("0.13"),
     "NB": Decimal("0.15"),
     "NL": Decimal("0.15"),
-    "NS": Decimal("0.15"),
+    "NS": Decimal("0.14"),  # P6.2 Gate 1 — CRA Notice 342 (2025-04-01)
     "PE": Decimal("0.15"),
 }
 QC_CODE = "QC"
@@ -92,22 +92,34 @@ def get_quarter_dates(quarter: str):
 
 
 def compute_tax_for_transaction(tx):
-    """Compute GST, QST, HST amounts from a transaction's fee data and region."""
-    region = tx.get("seller_region", tx.get("region", "QC"))
+    """Compute GST, QST, HST amounts from a transaction's fee data and region.
+
+    P6.2 Gate 7 — routes unknown/US/INTL/missing regions through the
+    authoritative `tax_rate_config.normalize_province`, which returns
+    "INTL" for foreign/unknown recipients so the admin dashboard no
+    longer reports 5% GST on US customers.
+    """
+    from services.tax_rate_config import normalize_province
+
+    raw_region = tx.get("seller_region", tx.get("region", ""))
+    region = normalize_province(raw_region)
     taxable_amount = Decimal(str(tx.get("platform_fee", 0))) + Decimal(str(tx.get("buyer_premium", 0)))
 
     gst = Decimal("0")
     qst = Decimal("0")
     hst = Decimal("0")
 
-    if region in HST_PROVINCES:
+    if region == "INTL":
+        # Zero-rated exported service — no tax
+        pass
+    elif region in HST_PROVINCES:
         rate = HST_RATES.get(region, Decimal("0.13"))
         hst = (taxable_amount * rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     elif region in GST_QST_PROVINCES:
         gst = (taxable_amount * GST_RATE).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
         qst = (taxable_amount * QST_RATE).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     else:
-        # GST only (Alberta, BC, SK, MB, etc.)
+        # GST only (Alberta, BC, SK, MB, YT, NT, NU)
         gst = (taxable_amount * GST_RATE).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
     return {

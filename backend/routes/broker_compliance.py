@@ -138,19 +138,29 @@ async def individual_payout_preview(
     current_user:   User = Depends(get_current_user),
 ):
     """Show the seller what they will net after BidVex's 8% commission +
-    GST (5%) + QST (9.975%, Quebec only). Pure calculator — no DB writes.
+    the correct provincial tax (GST/HST/QST) per buyer's province.
+
+    P6.2 Gate 6 — routed through the authoritative tax engine so ON/NB/
+    NL/NS/PE buyers are correctly charged HST (13-15%) instead of the
+    previous GST-only-plus-QC-QST under-collection.
     """
+    from services.fee_calculator import tax_on
     h = max(0.0, float(hammer_price or 0))
     commission = round(h * 0.08, 2)
-    gst        = round(commission * 0.05, 2)
-    qst        = round(commission * 0.09975, 2) if (buyer_province or "").upper() == "QC" else 0.0
-    net        = round(h - commission - gst - qst, 2)
+    tax_bd = tax_on(commission, buyer_province or "")
+    gst = float(tax_bd["gst"])
+    qst = float(tax_bd["qst"])
+    hst = float(tax_bd["hst"])
+    net = round(h - commission - gst - qst - hst, 2)
     return {
         "hammer_price":    h,
         "commission_pct":  0.08,
         "commission_cad":  commission,
         "gst_cad":         gst,
         "qst_cad":         qst,
+        "hst_cad":         hst,  # P6.2 Gate 6 — now emitted for HST provinces
+        "tax_label":       str(tax_bd["label"]),
+        "buyer_province":  str(tax_bd["province"]),
         "seller_net_cad":  net,
     }
 

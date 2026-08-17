@@ -52,8 +52,10 @@ BOOTSTRAP_RATES: Dict[str, Dict[str, Decimal | str]] = {
            "combined": Decimal("0.15"), "label": "HST (15%)"},
     "NL": {"gst": Decimal("0"), "qst": Decimal("0"), "hst": Decimal("0.15"),
            "combined": Decimal("0.15"), "label": "HST (15%)"},
-    "NS": {"gst": Decimal("0"), "qst": Decimal("0"), "hst": Decimal("0.15"),
-           "combined": Decimal("0.15"), "label": "HST (15%)"},
+    # NS — 14% HST effective 2025-04-01 (CRA Notice 342). Reconciled
+    # in P6.1.1; corrected here in P6.2 Gate 1.
+    "NS": {"gst": Decimal("0"), "qst": Decimal("0"), "hst": Decimal("0.14"),
+           "combined": Decimal("0.14"), "label": "HST (14%)"},
     "PE": {"gst": Decimal("0"), "qst": Decimal("0"), "hst": Decimal("0.15"),
            "combined": Decimal("0.15"), "label": "HST (15%)"},
     # GST-only provinces / territories (PST is the vendor's local obligation
@@ -185,11 +187,39 @@ async def refresh_cache_from_db(db) -> None:
 
 
 async def seed_bootstrap_rates(db) -> None:
-    """Idempotent — inserts BOOTSTRAP_RATES rows if missing. Called on startup."""
+    """Idempotent — inserts BOOTSTRAP_RATES rows if missing. Called on startup.
+
+    P6.2 Gate 1 note — this function also reconciles rows whose stored
+    `combined` value drifted from `BOOTSTRAP_RATES` (e.g. legacy NS 15% →
+    corrected NS 14% per CRA Notice 342). Reconciliation snapshots the
+    old row into `db.tax_rate_config_history` via `update_tax_rate` so
+    the CRA audit trail is preserved.
+    """
     now = datetime.now(timezone.utc).isoformat()
     for province, row in BOOTSTRAP_RATES.items():
-        exists = await db.tax_rate_config.find_one({"province": province}, {"_id": 1})
+        exists = await db.tax_rate_config.find_one({"province": province}, {"_id": 0})
         if exists:
+            # P6.2 Gate 1 — reconcile drift. If the stored `combined`
+            # value no longer matches the bootstrap constant, snapshot
+            # the old row into history and upsert the corrected value.
+            try:
+                stored_combined = Decimal(str(exists.get("combined", "0")))
+            except Exception:  # pragma: no cover — defensive parse
+                stored_combined = Decimal("0")
+            if stored_combined != Decimal(str(row["combined"])):
+                await update_tax_rate(
+                    db,
+                    province,
+                    gst=Decimal(str(row["gst"])),
+                    qst=Decimal(str(row["qst"])),
+                    hst=Decimal(str(row["hst"])),
+                    label=str(row["label"]),
+                    updated_by_user_id="p6_2_gate_1_bootstrap_reconcile",
+                )
+                logger.info(
+                    "[tax_rate_config] Gate 1 reconciled %s: %s → %s",
+                    province, stored_combined, row["combined"],
+                )
             continue
         await db.tax_rate_config.insert_one({
             "province": province,

@@ -289,26 +289,45 @@ class TestKnownP6Risks:
     """Named regression fingerprints for every P6 risk in the audit."""
 
     def test_risk_broker_qst_or_zero_underfines_hst_ontario(self):
-        """RISK: `broker_fee_engine` charges 5% GST + 0 QST on ON buyer,
-        instead of 13% HST.  UNDER-collection = ~$4.68 per $100 fees."""
+        """P6.2 Gate 6 FIX (formerly RISK #1 in P6_RISK_MATRIX):
+        `broker_fee_engine` used to charge 5% GST + 0 QST/HST on ON
+        buyers (under-collection ~$4.68 per $100 fees). Now correctly
+        charges 13% HST via the province-aware `fee_calculator.tax_on`.
+        """
         r = calculate_broker_transaction(
             hammer_price=100_000.0,
             broker_fee_structure=_BROKER_FS,
             buyer_province="ON",
             deposit_held_cad=500.0,
         )
-        # Actual current behavior — QST is zero on ON, GST is 5% of subtotal
-        assert _r(r["qst"]) == 0, "REPORT: broker no longer under-collects — refresh P6_RISK_MATRIX §1"
-        expected_gst = _r(Decimal(str(r["subtotal_taxable"])) * Decimal("0.05"))
-        assert _r(r["gst"]) == expected_gst
+        # ON is HST 13% — GST + QST components are 0, HST holds all tax
+        assert _r(r["qst"]) == 0, "QST always 0 outside QC"
+        assert _r(r["gst"]) == 0, "GST 0 for HST provinces post-P6.2 Gate 6"
+        expected_hst = _r(Decimal(str(r["subtotal_taxable"])) * Decimal("0.13"))
+        assert _r(r["hst"]) == expected_hst, (
+            "P6.2 REGRESSION — broker HST branch has been undone; ON is being under-collected again."
+        )
 
     def test_risk_invoice_silently_defaults_missing_province_to_qc(self):
-        """RISK: `invoice_service.calculate_province_tax('')` returns QC
-        14.975% instead of INTL 0%.  OVER-collection on non-QC buyers."""
+        """P6.2 Gate 3 FIX (formerly RISK #5 in P6_RISK_MATRIX):
+        `invoice_service.calculate_province_tax('')` now returns INTL 0%
+        instead of QC 14.975%. This test locks-in the fix.
+
+        Previously the test asserted the BUG (`province == "QC"` /
+        total_tax == 1498). P6.2 flipped this to fail-closed. The
+        historical behaviour is preserved in git and in P6.1.1
+        reconciliation §12 finding #4.
+        """
         r = calculate_province_tax(Decimal("100"), buyer_province="")
-        assert r.province == "QC", "REPORT: invoice_service no longer defaults to QC — refresh P6_RISK_MATRIX §5"
-        # And it computes the QC combined rate
-        assert _r(r.total_tax) == 1498  # $14.98 on $100
+        assert r.province == "INTL", (
+            "P6.2 REGRESSION — invoice_service now defaults to INTL on "
+            "missing province. If this test breaks, the Gate 3 fail-closed "
+            "guard has been undone."
+        )
+        assert _r(r.total_tax) == 0, (
+            "P6.2 REGRESSION — missing province must yield 0 tax, not "
+            "14.975% QC over-collection."
+        )
 
     def test_risk_legacy_calc_tax_hardcodes_qc_1497(self):
         """RISK: `tax_engine.calculate_tax(100)` hardcodes 14.975% regardless

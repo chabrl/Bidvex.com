@@ -9,9 +9,9 @@ Fee Structure:
 
 Canadian Tax Rates:
 - GST: 5% (Federal)
-- QST: 9.975% (Quebec)
-- PST: BC 7%, SK 6%, MB 8%
-- HST: ON 13%, NS/NB/NL/PEI 15%
+- QST: 9.975% (Quebec — collected by BidVex)
+- PST/RST: BC 7%, SK 6%, MB 7% (NOT collected by BidVex per P6.1.1 policy)
+- HST: ON 13%, NS 14% (since 2025-04-01), NB/NL/PEI 15%
 """
 
 from typing import Dict, Any, Optional, Literal
@@ -71,7 +71,7 @@ from services.tax_engine import GST_RATE
 PROVINCIAL_TAX_RATES = {
     # HST Provinces (combined federal + provincial)
     Province.ONTARIO: {"type": "HST", "rate": Decimal("0.13")},
-    Province.NOVA_SCOTIA: {"type": "HST", "rate": Decimal("0.15")},
+    Province.NOVA_SCOTIA: {"type": "HST", "rate": Decimal("0.14")},  # P6.2 Gate 1 — CRA Notice 342 (2025-04-01)
     Province.NEW_BRUNSWICK: {"type": "HST", "rate": Decimal("0.15")},
     Province.NEWFOUNDLAND: {"type": "HST", "rate": Decimal("0.15")},
     Province.PEI: {"type": "HST", "rate": Decimal("0.15")},
@@ -157,18 +157,30 @@ def calculate_taxes(taxable_amount: Decimal, province_code: str) -> TaxBreakdown
     Calculate taxes based on buyer's province.
     Per Master Pricing Structure Rule 5: Tax on BidVex fees + Stripe recovery ONLY.
     Caller must pass the correct taxable_amount (fees only, never hammer price).
-    """
-    code = province_code.upper().strip() if province_code else ""
 
-    # USA / International → 0% (Exported Service)
-    if code in ("US", "USA", "EU", "") or len(code) > 2:
-        return TaxBreakdown(province=code, tax_type="Exported Service",
+    P6.2 Gate 5 — routes US / INTL / unknown through
+    `tax_rate_config.normalize_province` (fail-closed to INTL 0%).
+    Previously used a hardcoded Alberta fallback for unknown codes,
+    which under-collected on HST provinces if a code was mistyped.
+    """
+    from services.tax_rate_config import normalize_province
+
+    code = (province_code or "").upper().strip()
+
+    # Explicit fast-path for foreign / non-CA supplies → zero-rated
+    # per ETA Sched. VI Part V §7.
+    canonical = normalize_province(code)
+    if canonical == "INTL":
+        return TaxBreakdown(province=code or "INTL", tax_type="Exported Service",
                             total_tax=Decimal("0"), total_rate=Decimal("0"))
 
     try:
-        province = Province(code)
+        province = Province(canonical)
     except ValueError:
-        province = Province.ALBERTA  # default to GST only
+        # Should never reach here (normalize_province returns INTL for
+        # anything not in the alias table), but fail-closed just in case.
+        return TaxBreakdown(province=code, tax_type="Exported Service",
+                            total_tax=Decimal("0"), total_rate=Decimal("0"))
 
     tax_info = PROVINCIAL_TAX_RATES.get(province, PROVINCIAL_TAX_RATES[Province.ALBERTA])
     tax_type = tax_info["type"]

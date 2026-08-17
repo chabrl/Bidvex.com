@@ -6,7 +6,7 @@
     "qst": 0,
     "stripe_processing_fee": 39,
     "stripe_subtotal": 263,
-    "stripe_total_charged": 301,
+    "stripe_total_charged": 302,
     "subtotal_taxable": 250
   },
   "broker|100.00|BC": {
@@ -16,27 +16,27 @@
     "qst": 0,
     "stripe_processing_fee": 39,
     "stripe_subtotal": 263,
-    "stripe_total_charged": 301,
+    "stripe_total_charged": 302,
     "subtotal_taxable": 250
   },
   "broker|100.00|MISSING": {
     "broker_fee": 0,
-    "gst": 13,
+    "gst": 0,
     "platform_fee": 250,
     "qst": 0,
-    "stripe_processing_fee": 39,
-    "stripe_subtotal": 263,
-    "stripe_total_charged": 301,
+    "stripe_processing_fee": 38,
+    "stripe_subtotal": 250,
+    "stripe_total_charged": 288,
     "subtotal_taxable": 250
   },
   "broker|100.00|ON": {
     "broker_fee": 0,
-    "gst": 13,
+    "gst": 0,
     "platform_fee": 250,
     "qst": 0,
     "stripe_processing_fee": 39,
-    "stripe_subtotal": 263,
-    "stripe_total_charged": 301,
+    "stripe_subtotal": 283,
+    "stripe_total_charged": 322,
     "subtotal_taxable": 250
   },
   "broker|100.00|QC": {
@@ -45,7 +45,7 @@
     "platform_fee": 250,
     "qst": 25,
     "stripe_processing_fee": 39,
-    "stripe_subtotal": 287,
+    "stripe_subtotal": 288,
     "stripe_total_charged": 327,
     "subtotal_taxable": 250
   },
@@ -71,22 +71,22 @@
   },
   "broker|1000.00|MISSING": {
     "broker_fee": 0,
-    "gst": 125,
+    "gst": 0,
     "platform_fee": 2500,
     "qst": 0,
-    "stripe_processing_fee": 109,
-    "stripe_subtotal": 2625,
-    "stripe_total_charged": 2734,
+    "stripe_processing_fee": 106,
+    "stripe_subtotal": 2500,
+    "stripe_total_charged": 2606,
     "subtotal_taxable": 2500
   },
   "broker|1000.00|ON": {
     "broker_fee": 0,
-    "gst": 125,
+    "gst": 0,
     "platform_fee": 2500,
     "qst": 0,
-    "stripe_processing_fee": 109,
-    "stripe_subtotal": 2625,
-    "stripe_total_charged": 2734,
+    "stripe_processing_fee": 115,
+    "stripe_subtotal": 2825,
+    "stripe_total_charged": 2940,
     "subtotal_taxable": 2500
   },
   "broker|1000.00|QC": {
@@ -121,22 +121,22 @@
   },
   "broker|125000.00|MISSING": {
     "broker_fee": 0,
-    "gst": 15625,
+    "gst": 0,
     "platform_fee": 312500,
     "qst": 0,
-    "stripe_processing_fee": 9831,
-    "stripe_subtotal": 328125,
-    "stripe_total_charged": 337956,
+    "stripe_processing_fee": 9364,
+    "stripe_subtotal": 312500,
+    "stripe_total_charged": 321864,
     "subtotal_taxable": 312500
   },
   "broker|125000.00|ON": {
     "broker_fee": 0,
-    "gst": 15625,
+    "gst": 0,
     "platform_fee": 312500,
     "qst": 0,
-    "stripe_processing_fee": 9831,
-    "stripe_subtotal": 328125,
-    "stripe_total_charged": 337956,
+    "stripe_processing_fee": 10577,
+    "stripe_subtotal": 353125,
+    "stripe_total_charged": 363702,
     "subtotal_taxable": 312500
   },
   "broker|125000.00|QC": {
@@ -171,22 +171,22 @@
   },
   "broker|25000.00|MISSING": {
     "broker_fee": 0,
-    "gst": 3125,
+    "gst": 0,
     "platform_fee": 62500,
     "qst": 0,
-    "stripe_processing_fee": 1991,
-    "stripe_subtotal": 65625,
-    "stripe_total_charged": 67616,
+    "stripe_processing_fee": 1898,
+    "stripe_subtotal": 62500,
+    "stripe_total_charged": 64398,
     "subtotal_taxable": 62500
   },
   "broker|25000.00|ON": {
     "broker_fee": 0,
-    "gst": 3125,
+    "gst": 0,
     "platform_fee": 62500,
     "qst": 0,
-    "stripe_processing_fee": 1991,
-    "stripe_subtotal": 65625,
-    "stripe_total_charged": 67616,
+    "stripe_processing_fee": 2140,
+    "stripe_subtotal": 70625,
+    "stripe_total_charged": 72765,
     "subtotal_taxable": 62500
   },
   "broker|25000.00|QC": {

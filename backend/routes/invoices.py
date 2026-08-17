@@ -31,7 +31,6 @@ import json as _json
 logger = logging.getLogger(__name__)
 
 from services.email_service import get_email_service
-from services.tax_engine import calculate_gst_qst
 from services.invoice_generator import generate_invoice_number
 from invoice_templates import lots_won_template
 from reportlab.lib.pagesizes import letter
