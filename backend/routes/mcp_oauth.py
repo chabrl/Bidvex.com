@@ -47,7 +47,7 @@ from urllib.parse import urlencode, urlparse
 
 import bcrypt
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field, field_validator
 
 from deps import User, get_current_user, get_db
@@ -63,11 +63,16 @@ mcp_oauth_router = APIRouter(prefix="/mcp/oauth", tags=["MCP OAuth"])
 # Collections
 CLIENTS_COLLECTION = "mcp_oauth_clients"
 CODES_COLLECTION   = "mcp_oauth_codes"
+DCR_RATE_COLLECTION = "mcp_oauth_dcr_rate"       # iter491 — DCR abuse guard
 
 # Timings
 AUTH_CODE_TTL_S       = 600        # 10 min
 CLIENT_REGISTRATION_TTL_DAYS = 365  # metadata retention
 ACCESS_TOKEN_TTL_DAYS = 90         # default MCP token expiration
+
+# iter491 — RFC 7591 §5 SHOULD rate-limit unauthenticated DCR.
+DCR_RATE_WINDOW_S = 3600
+DCR_RATE_MAX_PER_IP = 200
 
 # Regexes
 _CLIENT_ID_RE   = re.compile(r"^[a-zA-Z0-9_-]{8,64}$")
@@ -86,7 +91,7 @@ class ClientRegistrationRequest(BaseModel):
     minimal — only the fields required by Claude.ai's custom connector
     are honoured."""
     client_name:                Optional[str] = Field(default=None)
-    redirect_uris:              List[str]     = Field(default_factory=list)
+    redirect_uris:              List[str]     = Field(..., min_length=1)
     grant_types:                Optional[List[str]] = None
     response_types:             Optional[List[str]] = None
     token_endpoint_auth_method: Optional[str] = Field(default="none")
@@ -162,17 +167,56 @@ def _sanitize_client_public(doc: Dict[str, Any]) -> Dict[str, Any]:
         "grant_types":                doc.get("grant_types") or ["authorization_code"],
         "response_types":             doc.get("response_types") or ["code"],
         "token_endpoint_auth_method": doc.get("token_endpoint_auth_method") or "none",
-        "scope":                      " ".join(ALLOWED_SCOPES),
+        # RFC 7591 §3.2.1 — echo the scopes the client is authorised to
+        # request. Prefer the scope stored on the client record so DCR
+        # scope negotiation is preserved through the /authorize step.
+        "scope":                      doc.get("scope") or " ".join(ALLOWED_SCOPES),
     }
+
+
+async def _dcr_rate_check(db, ip: str) -> None:
+    """iter491 — RFC 7591 §5 SHOULD rate-limit an unauthenticated DCR
+    endpoint. Enforce ≤ DCR_RATE_MAX_PER_IP registrations per hour per
+    remote IP. Returns silently on OK; raises 429 on overflow."""
+    if not ip:
+        return
+    now_dt = datetime.now(timezone.utc)
+    window_start = now_dt - timedelta(seconds=DCR_RATE_WINDOW_S)
+    coll = db[DCR_RATE_COLLECTION]
+    doc = await coll.find_one({"ip": ip}, {"_id": 0})
+    events = [e for e in (doc.get("events", []) if doc else [])
+              if datetime.fromisoformat(e.replace("Z", "+00:00")) >= window_start]
+    if len(events) >= DCR_RATE_MAX_PER_IP:
+        logger.warning(f"[mcp_oauth] DCR rate limit HIT ip={ip} count={len(events)}")
+        raise HTTPException(status_code=429, detail={
+            "error": "too_many_requests",
+            "error_description": f"DCR is rate-limited to {DCR_RATE_MAX_PER_IP} registrations/hour per IP.",
+        })
+    events.append(now_dt.isoformat())
+    await coll.update_one({"ip": ip},
+                          {"$set": {"ip": ip, "events": events,
+                                    "last_seen": now_dt.isoformat()}},
+                          upsert=True)
+
+
+def _client_ip(request: Request) -> str:
+    xff = (request.headers.get("x-forwarded-for") or "").split(",")
+    if xff and xff[0].strip():
+        return xff[0].strip()
+    return request.client.host if request.client else ""
 
 
 # ─── 1. Dynamic Client Registration (RFC 7591) ───────────────────────
 @mcp_oauth_router.post("/register")
-async def register_client(body: ClientRegistrationRequest, request: Request) -> Dict[str, Any]:
+async def register_client(body: ClientRegistrationRequest, request: Request) -> JSONResponse:
     """Public dynamic-client-registration endpoint. Deliberately
-    unauthenticated per RFC 7591 §3 (public clients). Rate-limit is
-    provided by the app-level rate limiter."""
+    unauthenticated per RFC 7591 §3 (public clients). Per RFC 7591
+    §3.2.1 a successful registration MUST respond with HTTP 201
+    Created + Cache-Control: no-store, so strict clients like
+    Claude.ai accept the response."""
     db = get_db()
+    await _dcr_rate_check(db, _client_ip(request))
+
     # `none` (public client) is the recommended token-endpoint auth
     # method for Claude.ai + PKCE. We also accept `client_secret_post`
     # for private clients that want to demonstrate confidential auth.
@@ -180,15 +224,27 @@ async def register_client(body: ClientRegistrationRequest, request: Request) -> 
     if method not in {"none", "client_secret_post", "client_secret_basic"}:
         raise HTTPException(status_code=400, detail={
             "error": "invalid_client_metadata",
-            "error_description": f"token_endpoint_auth_method must be one of: none, client_secret_post, client_secret_basic",
+            "error_description": "token_endpoint_auth_method must be one of: none, client_secret_post, client_secret_basic",
         })
 
-    grant_types = body.grant_types or ["authorization_code"]
+    # iter491 — echo only grant_types we support. RFC 7591 §2 permits
+    # the server to return a subset of what the client requested; that
+    # subset then binds the client. If a client asks for refresh_token
+    # we drop it so the client won't attempt an unsupported grant later.
+    requested_grants = body.grant_types or ["authorization_code"]
+    grant_types = [g for g in requested_grants if g == "authorization_code"]
     if "authorization_code" not in grant_types:
         raise HTTPException(status_code=400, detail={
             "error": "invalid_client_metadata",
             "error_description": "authorization_code grant_type is required",
         })
+
+    # iter491 — negotiate scope: echo the intersection of the client's
+    # requested scope and our allowlist. If the client did not send a
+    # scope, default to the full allowlist for backward compatibility.
+    negotiated_scopes = await _validate_scopes(body.scope or "")
+    if not body.scope:
+        negotiated_scopes = list(ALLOWED_SCOPES)
 
     client_id = _new_client_id()
     now = _now_iso()
@@ -200,13 +256,17 @@ async def register_client(body: ClientRegistrationRequest, request: Request) -> 
         "grant_types":                grant_types,
         "response_types":             body.response_types or ["code"],
         "token_endpoint_auth_method": method,
+        "scope":                      " ".join(negotiated_scopes),
         "software_id":                (body.software_id or "")[:120] or None,
         "software_version":           (body.software_version or "")[:120] or None,
         "created_at":                 now,
     }
 
     response: Dict[str, Any] = _sanitize_client_public(doc)
-    # Only mint a secret if the client asked for confidential auth.
+    # iter491 — RFC 7591 §3.2.1: `client_secret_expires_at` is REQUIRED
+    # when the response includes `client_secret` and RECOMMENDED for
+    # consistency. For public clients we emit 0 (never expires) so
+    # strict clients don't reject a "malformed" response.
     if method in {"client_secret_post", "client_secret_basic"}:
         secret_raw = secrets.token_urlsafe(32)
         doc["client_secret_hash"] = bcrypt.hashpw(
@@ -215,8 +275,11 @@ async def register_client(body: ClientRegistrationRequest, request: Request) -> 
         response["client_secret"] = secret_raw           # returned exactly once
         response["client_secret_expires_at"] = 0         # 0 = never (RFC 7591)
     await db[CLIENTS_COLLECTION].insert_one(doc)
-    logger.info(f"[mcp_oauth] registered client_id={client_id} method={method} redirects={len(body.redirect_uris)}")
-    return response
+    logger.info(f"[mcp_oauth] registered client_id={client_id} method={method} "
+                f"redirects={len(body.redirect_uris)} scopes={negotiated_scopes}")
+    # RFC 7591 §3.2.1 MUST return 201 Created + Cache-Control: no-store
+    return JSONResponse(status_code=201, content=response,
+                        headers={"Cache-Control": "no-store", "Pragma": "no-cache"})
 
 
 @mcp_oauth_router.get("/clients/{client_id}")

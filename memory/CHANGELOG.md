@@ -1,6 +1,43 @@
 # BidVex Changelog
 
 
+## Feb 19, 2026 — iter491 Fix: Claude.ai OAuth DCR Registration Failure (preview only, no deploy)
+
+Claude.ai custom-connector setup was failing with **"Couldn't register with bidvex1's sign-in service"** (trace `ofid_d876b8b7e882449c`). Root cause: five RFC 7591 §3.2.1 / RFC 8414 spec deviations in the Dynamic Client Registration surface. Backend logs confirmed Claude.ai reached DCR successfully four times, got 200 OK each time, then gave up without proceeding to `/authorize` — the classic strict-client DCR rejection signature.
+
+**Path chosen: Path A** — make DCR strictly RFC 7591 compliant (over Path B "static client"). Rationale: DCR was 90% built, fix is small and additive, and it scales without operator work per client.
+
+**Fixes — `backend/routes/mcp_oauth.py` `POST /register`:**
+- Returns **HTTP 201 Created** (was 200) + `Cache-Control: no-store, no-cache, must-revalidate`.
+- Response `grant_types` filtered to server-supported grants only (`["authorization_code"]`), even when the client requests `refresh_token`.
+- Response `scope` echoes the requested scope filtered through the server allowlist — no more silent scope-expansion.
+- Confidential clients receive `client_secret_expires_at: 0` (RFC 7591 §3.2.1 required).
+- Per-IP rate limit (200 registrations/hour) via `mcp_oauth_dcr_rate` collection → 429 on overflow.
+- `redirect_uris` is now strictly required at schema level (Pydantic v2 `min_length=1`).
+
+**Fixes — `backend/server.py` discovery metadata:**
+- Added `response_modes_supported: ["query"]` and `revocation_endpoint_auth_methods_supported: ["none"]`.
+- `grant_types_supported` continues to advertise only `["authorization_code"]` — now matches what DCR echoes.
+
+**Files**
+- Edited: `backend/routes/mcp_oauth.py` (~90 lines), `backend/server.py` (+2 metadata fields), `backend/tests/iter489/test_mcp_oauth.py` (status assertion relaxed to `in (200, 201)`).
+- New: `backend/tests/iter489/test_mcp_oauth_dcr_iter491.py` (9 iter491 regression tests), `backend/tests/iter489/conftest.py` (resets DCR rate counter per module).
+- Untouched: `mcp_streamable.py`, `mcp_tokens.py`, `mcp_bridge.py`, `mcp_server.py`, `b2b_matchmaker.py`, and every auction/payment/Stripe/tax/settlement/escrow/fee/billing file.
+
+**Test results**
+- `pytest backend/tests/iter489/` → **62 passed** (test_mcp_oauth 24, test_mcp_oauth_dcr_iter491 9, test_mcp_remote_transport 15, test_mcp_streamable_transport 14).
+- `pytest backend/tests/iter488/` → **44 passed** (test_mcp_tokens + test_b2b_matchmaker).
+- Live 10-step Claude.ai wire-protocol simulation against the preview URL — every step green: probe → protected-resource discovery → auth-server discovery → DCR (201) → PKCE authorize → consent → code→token → Streamable initialize → tools/list → tools/call.
+
+**Operator steps to reconnect**
+1. Claude.ai → Settings → Connectors → remove any existing "bidvex" connector (previous DCR state is stale).
+2. Add custom connector → URL: `https://prod-verify-2.preview.emergentagent.com/api/mcp` → Connect.
+3. Claude walks discovery → DCR → consent (`/mcp-consent`) → token exchange → **Connected**.
+4. Fallback if needed: `curl -X POST .../api/mcp/oauth/register -H "Content-Type: application/json" -d '{"client_name":"Claude","redirect_uris":["https://claude.ai/api/mcp/auth_callback"],"token_endpoint_auth_method":"none"}'` and paste the returned `client_id` into Claude's Advanced settings.
+
+**Guardrail** — NO DEPLOYMENT. Preview only. Actual "Connected" status in Claude.ai UI requires an operator to complete the flow with a Claude.ai account (headlessly unreachable from the backend).
+
+
 ## Feb 19, 2026 — iter490 Fix: Claude.ai Web Connector Connection Drops (preview only, no deploy)
 
 Two spec deviations were causing Claude.ai Web to declare the BidVex custom connector broken after a successful OAuth handshake. Both fixed additively — zero business-logic changes.

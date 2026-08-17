@@ -101,7 +101,9 @@ async def _register_public_client(client: httpx.AsyncClient, name: str = "iter48
         "grant_types": ["authorization_code"],
         "response_types": ["code"],
     })
-    assert r.status_code == 200, r.text
+    # iter491 — DCR now returns 201 Created per RFC 7591 §3.2.1; older
+    # baseline accepted 200. Accept both to keep the suite portable.
+    assert r.status_code in (200, 201), r.text
     body = r.json()
     assert "client_secret" not in body  # public client → no secret
     return body["client_id"]
@@ -115,7 +117,7 @@ async def _register_confidential(client: httpx.AsyncClient, name: str = "iter489
         "grant_types": ["authorization_code"],
         "response_types": ["code"],
     })
-    assert r.status_code == 200
+    assert r.status_code in (200, 201)
     body = r.json()
     return body["client_id"], body["client_secret"]
 

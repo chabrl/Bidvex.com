@@ -2052,9 +2052,14 @@ def _oauth_as_metadata(origin: str) -> Dict[str, Any]:
         "registration_endpoint":                 f"{origin}/api/mcp/oauth/register",
         "revocation_endpoint":                   f"{origin}/api/mcp/oauth/revoke",
         "response_types_supported":              ["code"],
+        "response_modes_supported":              ["query"],
+        # iter491 — advertise ONLY grants we actually mint. Clients
+        # (including Claude.ai) that see refresh_token here and try to
+        # use it will hit an unsupported_grant_type error later.
         "grant_types_supported":                 ["authorization_code"],
         "code_challenge_methods_supported":      ["S256"],
         "token_endpoint_auth_methods_supported": ["none", "client_secret_post", "client_secret_basic"],
+        "revocation_endpoint_auth_methods_supported": ["none"],
         "scopes_supported":                      ["read", "bid", "list", "promote", "analytics", "matchmaker"],
         "service_documentation":                 f"{origin}/docs/mcp",
     }

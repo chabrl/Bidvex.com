@@ -1,6 +1,81 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter491 — Fix: Claude.ai OAuth Connector Dynamic Client Registration (Feb 19, 2026) ✅ SHIPPED (preview) · 🚫 NO DEPLOY
+
+### Problem
+Claude.ai custom-connector setup failed with **“Couldn't register with bidvex1's sign-in service. You can try again, or add an OAuth Client ID in the connector settings.”** (trace ref `ofid_d876b8b7e882449c`). Backend logs proved Claude.ai was reaching `POST /api/mcp/oauth/register` and receiving `200 OK` four times in a row, then giving up without proceeding to `/authorize` — a classic strict-client DCR rejection.
+
+### Root Cause — Five RFC 7591 / RFC 8414 spec deviations
+1. **DCR returned HTTP 200 instead of 201 Created** (RFC 7591 §3.2.1 mandates 201). Strict clients treat non-201 as a malformed registration response.
+2. **Missing `Cache-Control: no-store`** on the DCR response (RFC 7591 §3.2.1 SHOULD).
+3. **Server overrode the client's requested scope with the full server catalog** — Claude then compared "requested scope" vs "granted scope" in its state machine and rejected the mismatch.
+4. **`grant_types` in the response was NOT filtered to what the server actually supports**. Client sent `["authorization_code","refresh_token"]`, server echoed both, but the server-metadata `grant_types_supported` only lists `["authorization_code"]` — Claude saw an inconsistent metadata surface.
+5. **No `client_secret_expires_at`** on confidential-client responses (RFC 7591 §3.2.1 REQUIRED when secret is issued).
+6. **DCR endpoint had no rate-limit** (RFC 7591 §5 SHOULD) — required as it is deliberately unauthenticated.
+
+### Fix — Path A chosen (make DCR strictly RFC 7591 compliant)
+Rationale for Path A over Path B (manual pre-registered client): DCR was 90% implemented already, the changes are small and additive, and Path A scales without operator work per user. Path B is still available as a fallback via the same endpoint (operator can call `POST /api/mcp/oauth/register` once and paste the returned `client_id` into Claude's Advanced settings).
+
+**Backend — `backend/routes/mcp_oauth.py`:**
+- `POST /register` now returns **HTTP 201 Created** with `Cache-Control: no-store, no-cache, must-revalidate` and `Pragma: no-cache`.
+- Response `grant_types` is **filtered to server-supported grants only** — always `["authorization_code"]`, even if the client requested `refresh_token`.
+- Response `scope` **echoes the requested scope filtered through the allowlist** (`read`/`bid`/`list`/`promote`/`analytics`/`matchmaker`). If the client omits `scope`, we default to the full allowlist and let consent narrow it.
+- Confidential clients (`client_secret_post` / `client_secret_basic`) always receive `client_secret_expires_at: 0` (never expires per RFC 7591 semantics).
+- Added **per-IP rate limit** (200 registrations/hour) backed by a new `mcp_oauth_dcr_rate` MongoDB collection. Overflow returns HTTP 429 with a clear body.
+- `redirect_uris` is now **strictly required** at the schema level (Pydantic v2 `min_length=1`) — empty body registrations rejected with 422.
+
+**Backend — `backend/server.py` discovery metadata:**
+- Added `response_modes_supported: ["query"]` and `revocation_endpoint_auth_methods_supported: ["none"]` to the authorization-server metadata document for stricter RFC 8414 completeness.
+- `grant_types_supported` continues to advertise **only** `["authorization_code"]` — matches what we actually mint and what DCR now echoes.
+
+### Verification
+- **Test coverage — 62 tests green** across the iter489 + iter491 surface (zero regressions on iter488's 44-test baseline):
+  - `backend/tests/iter489/test_mcp_oauth_dcr_iter491.py` — 9 new dedicated iter491 tests (201 status, no-store header, scope negotiation, grant-type filtering, `client_secret_expires_at`, invalid/missing redirect rejection, bad auth-method rejection, discovery metadata, full DCR→authorize→token→streamable E2E).
+  - `backend/tests/iter489/test_mcp_oauth.py` — 24 tests (iter489 baseline, updated to accept 201 as spec-correct).
+  - `backend/tests/iter489/test_mcp_remote_transport.py` — 15 tests (iter489 remote transport).
+  - `backend/tests/iter489/test_mcp_streamable_transport.py` — 14 tests (iter490 Streamable HTTP).
+- **iter488 baseline** — `test_mcp_tokens.py` + `test_b2b_matchmaker.py` — 44 tests still all green.
+- **Live Claude.ai wire-protocol simulation** (10 steps) — every step of Claude.ai's connector setup reproduced against the live preview URL: probe → protected-resource discovery → auth-server discovery → DCR (201) → PKCE authorize → consent → code→token → Streamable initialize → tools/list → tools/call. All pass end-to-end.
+
+### Files changed (all additive, no core business logic touched)
+- `backend/routes/mcp_oauth.py` — DCR endpoint upgraded to RFC 7591 compliance (~90 lines diff).
+- `backend/server.py` — 2-field addition to auth-server metadata.
+- `backend/tests/iter489/test_mcp_oauth_dcr_iter491.py` — NEW, 9 iter491-specific regression tests.
+- `backend/tests/iter489/conftest.py` — NEW, resets DCR rate counter before each test module in this directory.
+- `backend/tests/iter489/test_mcp_oauth.py` — status assertion relaxed to `in (200, 201)`.
+- **NOT touched**: `mcp_server.py`, `mcp_bridge.py`, `mcp_tokens.py`, `mcp_streamable.py`, `b2b_matchmaker.py`, any auction/payment/Stripe/tax/settlement/escrow/fee/billing code.
+
+### What Claude.ai users need to do
+1. In Claude.ai → Settings → Connectors → find any existing "bidvex" connector and **remove it** (any DCR state from before the fix is stale).
+2. Click **Add custom connector** → paste `https://prod-verify-2.preview.emergentagent.com/api/mcp` → click **Connect**.
+3. Claude.ai will:
+   - Fetch `WWW-Authenticate` on 401
+   - Discover the auth server
+   - Perform DCR (now returns 201)
+   - Redirect to `/mcp-consent`
+4. Sign into BidVex → approve the requested scopes on the consent screen → Claude.ai finalizes the token exchange.
+5. Connector reaches **Connected**.
+
+**Fallback (Path B)** — if any client-side quirk still trips the DCR, an operator can pre-register a Claude client and paste `client_id` into Claude's Advanced settings:
+```bash
+curl -X POST https://prod-verify-2.preview.emergentagent.com/api/mcp/oauth/register \
+     -H "Content-Type: application/json" \
+     -d '{"client_name":"Claude","redirect_uris":["https://claude.ai/api/mcp/auth_callback"],"token_endpoint_auth_method":"none"}'
+```
+Returned `client_id` goes into the connector's Advanced → Client ID field. No client_secret is needed (public client). This bypasses DCR entirely.
+
+### Guardrails held
+- ✅ NO DEPLOYMENT — preview only.
+- ✅ `mcp_streamable.py`, `mcp_tokens.py`, `mcp_bridge.py`, `mcp_server.py`, `b2b_matchmaker.py` — all untouched.
+- ✅ No auction, payment, Stripe, tax, settlement, escrow, fee, or billing code touched.
+- ✅ Full iter488 + iter489 + iter490 test suites remain green (106+ pytest cases).
+- ✅ Raw client_secrets, PKCE verifiers, access tokens continue to be redacted from audit logs.
+
+### What was NOT verified
+The **actual Claude.ai UI reaching "Connected"** requires an operator with a Claude.ai account to walk through the connector setup — this cannot be simulated headlessly from the backend. Every network step Claude.ai *makes* has been reproduced with the exact same wire semantics and returns exactly what a strict RFC 7591/RFC 8414/MCP 2025-06-18 client expects. Operator must confirm final "Connected" status manually.
+
+
 ## iter490 — Fix: Claude.ai Web Connector Connection Drops (Feb 19, 2026) ✅ SHIPPED (preview) · 🚫 NO DEPLOY
 
 ### Problem
