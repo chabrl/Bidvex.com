@@ -1,0 +1,236 @@
+{
+  "started_at": "2026-08-17T02:40:34.935172+00:00",
+  "backend_url": "http://localhost:8001",
+  "checks": [
+    {
+      "name": "1.1 authorization-server metadata reachable",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1.2 metadata advertises PKCE S256",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1.3 metadata advertises authorization_code grant",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1.4 all iter488 scopes advertised",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "1.5 protected-resource metadata reachable",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "2.1 client registration succeeds",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "2.2 client_id returned + no secret for public client",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "3.1 /authorize returns 302 to consent",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "3.2 client_id + state propagated to consent",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "4.1 approved consent returns redirect_to",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "4.2 redirect_to carries authorization code + state",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "5.1 code exchange returns 200",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "5.2 access_token is an iter488 bvx_mcp_ scoped token",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "5.3 returned scope matches requested",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "5.4 raw access_token NOT persisted in mongo",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "5.5 raw secret absent from mcp_tokens collection",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "5.6 bcrypt hash persisted",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "6.1 initialize returns protocol 2024-11-05",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "6.2 serverInfo.name == bidvex-mcp",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "6.3 tools/list scoped correctly (read + matchmaker only)",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "7.1 search_auctions succeeds via remote MCP",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "7.2 get_listing_details returns seed listing",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "8.1 matchmaker returns drafts_ready",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "8.2 approval_required=True",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "8.3 at least one campaign draft generated",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "8.4 EN campaign present + English-flavoured",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "8.5 FR campaign present + French-flavoured",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "8.6 EN != FR (not concatenation)",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "8.7 buyer email absent from remote response",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "8.8 buyer phone absent from remote response",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "9.1 place_bid blocked by scope (no `bid` in token)",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "9.2 create_auction_draft blocked by scope",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "9.3 no draft persisted from blocked call",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "10.1 listing untouched",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "10.2 no bids placed",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "10.3 no authorisations dispatched",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "11.1 code reuse \u2192 400 invalid_grant",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "11.2 code-reuse revokes issued token",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "12.1 /oauth/revoke returns 200",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "12.2 revoked token rejected on next call",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "13.1 expired token rejected",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "14.1 access_token absent from audit log",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "14.2 tok2 absent from audit log",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "14.3 code absent from audit log",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "14.4 verifier absent from audit log",
+      "passed": true,
+      "detail": null
+    }
+  ],
+  "defects": [],
+  "ended_at": "2026-08-17T02:40:50.042360+00:00",
+  "total_checks": 45,
+  "passed": 45,
+  "failed": 0
+}

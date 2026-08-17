@@ -67,6 +67,7 @@ const BuyerDashboard = lazy(() => import('./pages/BuyerDashboard'));
 const CreateListingPage = lazy(() => import('./pages/CreateListingPage'));
 const PaymentSuccessPage = lazy(() => import('./pages/PaymentSuccessPage'));
 const ProfileSettingsPage = lazy(() => import('./pages/ProfileSettingsPage'));
+const McpConsentPage = lazy(() => import('./pages/McpConsentPage'));
 // iter355 H-1 — Stripe Identity (KYC) verification page.
 const VerificationPage = lazy(() => import('./pages/VerificationPage'));
 const AffiliateDashboard = lazy(() => import('./pages/AffiliateDashboard'));
@@ -755,6 +756,11 @@ const App = () => {
           <Route path="/settings" element={
             <ProtectedRoute><ProfileSettingsPage /></ProtectedRoute>
           } />
+          {/* iter489 — MCP OAuth consent page. Route MUST not be behind
+              ProtectedRoute because the OAuth authorize endpoint may
+              redirect an unauthenticated user here; the page itself
+              handles the /auth?next=... bounce. */}
+          <Route path="/mcp-consent" element={<McpConsentPage />} />
           {/* iter201 — Phase 3 / 3A — Alias so /profile/settings deep-links resolve */}
           <Route path="/profile/settings" element={<Navigate to="/settings" replace />} />
           <Route path="/profile/verification" element={<Navigate to="/settings" replace />} />

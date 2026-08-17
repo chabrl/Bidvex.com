@@ -1926,6 +1926,14 @@ try:
             logger.info("iter488 — MCP token management mounted at /api/mcp/token[s] (preview only)")
         except Exception as ce:  # noqa: BLE001
             logger.warning(f"iter488 MCP token router mount failed (non-fatal): {ce}")
+        # iter489 — OAuth 2.1 authorization server for Claude.ai remote
+        # MCP connector. Additive; only active alongside MCP.
+        try:
+            from routes.mcp_oauth import mcp_oauth_router
+            api_router.include_router(mcp_oauth_router)
+            logger.info("iter489 — MCP OAuth server mounted at /api/mcp/oauth/* (preview only)")
+        except Exception as ce:  # noqa: BLE001
+            logger.warning(f"iter489 MCP OAuth router mount failed (non-fatal): {ce}")
     else:
         logger.info("iter485 — MCP server not mounted (MCP_ENABLED != true)")
 
@@ -2000,6 +2008,56 @@ async def favicon():
         from starlette.responses import FileResponse
         return FileResponse(fav_path)
     return {"status": "no favicon"}
+
+
+# iter489 — OAuth 2.1 + Protected Resource discovery metadata. These
+# MUST live at the true root of the origin (RFC 8414 / RFC 9728) so
+# Claude.ai and any MCP client can discover them without prior
+# configuration. Additive endpoints — do not touch existing surfaces.
+def _mcp_public_origin(request) -> str:
+    """Compute the public origin we should advertise. Priority:
+      1. explicit REMOTE_MCP_PUBLIC_URL env var (production override)
+      2. FRONTEND_URL env var (already set for the deployment)
+      3. Request's own base URL (works for preview + dev)
+    """
+    override = (os.environ.get("REMOTE_MCP_PUBLIC_URL") or "").strip()
+    if override:
+        return override.rstrip("/")
+    frontend = (os.environ.get("FRONTEND_URL") or "").strip()
+    if frontend:
+        return frontend.rstrip("/")
+    # Fallback: scheme + netloc from the request
+    return f"{request.url.scheme}://{request.url.netloc}"
+
+
+@app.get("/.well-known/oauth-authorization-server", include_in_schema=False)
+async def oauth_authorization_server_metadata(request: Request):
+    origin = _mcp_public_origin(request)
+    return {
+        "issuer":                                origin,
+        "authorization_endpoint":                f"{origin}/api/mcp/oauth/authorize",
+        "token_endpoint":                        f"{origin}/api/mcp/oauth/token",
+        "registration_endpoint":                 f"{origin}/api/mcp/oauth/register",
+        "revocation_endpoint":                   f"{origin}/api/mcp/oauth/revoke",
+        "response_types_supported":              ["code"],
+        "grant_types_supported":                 ["authorization_code"],
+        "code_challenge_methods_supported":      ["S256"],
+        "token_endpoint_auth_methods_supported": ["none", "client_secret_post", "client_secret_basic"],
+        "scopes_supported":                      ["read", "bid", "list", "promote", "analytics", "matchmaker"],
+        "service_documentation":                 f"{origin}/docs/mcp",
+    }
+
+
+@app.get("/.well-known/oauth-protected-resource", include_in_schema=False)
+async def oauth_protected_resource_metadata(request: Request):
+    origin = _mcp_public_origin(request)
+    return {
+        "resource":                        f"{origin}/api/mcp",
+        "authorization_servers":           [origin],
+        "scopes_supported":                ["read", "bid", "list", "promote", "analytics", "matchmaker"],
+        "bearer_methods_supported":        ["header"],
+        "resource_documentation":          f"{origin}/docs/mcp",
+    }
 
 # ─── Lifecycle Events ───
 # iter213: startup/shutdown work is now in the `lifespan` context manager

@@ -1,6 +1,70 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter489 — BidVex Remote MCP Connector for Claude.ai (Feb 18, 2026) ✅ SHIPPED (preview) · 🚫 NO DEPLOY
+
+### Delivered
+Standards-compliant OAuth 2.1 authorization server on top of the existing iter488 scoped-token stack so Claude.ai (and any custom MCP client) can connect via HTTPS remote MCP without exposing session JWTs.
+
+**Backend (new/additive):**
+- `routes/mcp_oauth.py` — OAuth 2.1 server:
+  - `POST /api/mcp/oauth/register` — Dynamic Client Registration (RFC 7591)
+  - `GET  /api/mcp/oauth/authorize` — authorization endpoint (PKCE S256 required)
+  - `POST /api/mcp/oauth/authorize/decision` — consent decision (needs session JWT)
+  - `POST /api/mcp/oauth/token` — code + PKCE → access_token
+  - `POST /api/mcp/oauth/revoke` — RFC 7009 revocation
+  - `GET  /api/mcp/oauth/clients/{client_id}` — public client metadata
+- Discovery metadata at `GET /.well-known/oauth-authorization-server` (RFC 8414) and `GET /.well-known/oauth-protected-resource` (RFC 9728), served from `server.py`.
+- New collections: `mcp_oauth_clients`, `mcp_oauth_codes`. **No new token collection** — OAuth access tokens ARE iter488 scoped MCP tokens (`bvx_mcp_...`), fully bcrypt-hashed and reused via the existing `_resolve_user_or_mcp_token` resolver. Zero business-logic changes to `mcp_server.py`.
+
+**Frontend (new/additive):**
+- `pages/McpConsentPage.jsx` — OAuth consent screen at `/mcp-consent`, requires session JWT, lists requested scopes with human descriptions, Approve/Deny buttons, EN/FR-aware.
+- `App.js` — registers `/mcp-consent` route (not behind `ProtectedRoute` so unauthenticated users can be bounced to `/auth?next=...`).
+- `components/ConnectClaudeSection.jsx` — adds "Connect Claude.ai (Web)" card with the remote MCP URL, discovery URLs, copy button, and setup instructions.
+
+**Security invariants (all held):**
+- PKCE S256 mandatory. Plain-text and missing verifier rejected.
+- Codes single-use; reuse revokes any token minted from that code (RFC 6819 §5.2.1.1).
+- Redirect URI binding enforced at `/authorize` and `/token`.
+- Client secrets bcrypt-hashed; public (`token_endpoint_auth_method=none`) is the recommended mode for Claude.ai.
+- Scope allowlist enforced (`read, bid, list, promote, analytics, matchmaker`). `admin` and unknown scopes silently stripped.
+- Subscription gate enforced at consent time.
+- Audit sanitiser confirmed to redact access tokens, client secrets, authorization codes, and PKCE verifiers.
+
+**Frontend UX proven live:**
+- Settings → Connect Claude tab shows both "Connect Claude Desktop" (iter488) AND "Connect Claude.ai (Web)" (iter489) sections.
+- `/api/mcp/oauth/authorize` correctly redirects to `/mcp-consent` — consent card renders with requested scopes.
+- OAuth flow in preview: register → authorize → consent decision → token exchange → tools/list → tools/call all green.
+
+**Test coverage — 84 new checks + zero regressions:**
+| Suite                                                                | Tests |
+| :------------------------------------------------------------------- | :---: |
+| `tests/iter489/test_mcp_oauth.py`                                    |  22   |
+| `tests/iter489/test_mcp_remote_transport.py`                         |  17   |
+| `tests/iter489/iter489_claude_ai_e2e_acceptance.py` (live harness)   |  45   |
+| **iter489 total**                                                    | **84** |
+
+Regression: iter488's 111-check baseline (77 pytest + 34 stdio bridge acceptance) all **still green**.
+
+**Combined iter488 + iter489: 195 checks green, 0 defects, 0 regressions.**
+
+**Guardrails held:**
+- ✅ NO DEPLOYMENT — preview only.
+- ✅ `mcp_server.py` untouched (0 lines changed to core MCP dispatcher / tool registry / gates / audit / rate limiter).
+- ✅ `mcp_bridge.py` untouched — Claude Desktop stdio path unchanged.
+- ✅ `routes/mcp_tokens.py` untouched — iter488 scoped-token endpoints unchanged.
+- ✅ `services/b2b_matchmaker.py` untouched — matchmaker approval semantics unchanged.
+- ✅ No auction / bidding / payment / Stripe / tax / settlement / escrow / fee logic touched.
+- ✅ OAuth `access_token` = iter488 `bvx_mcp_...` token, so every existing gate (subscription/trust/tax-ID/admin/scope) applies automatically.
+- ✅ Raw access tokens, client secrets, authorization codes, PKCE verifiers never appear in audit logs.
+
+**Files changed:**
+- New (6): `backend/routes/mcp_oauth.py`, `backend/tests/iter489/__init__.py`, `backend/tests/iter489/test_mcp_oauth.py`, `backend/tests/iter489/test_mcp_remote_transport.py`, `backend/tests/iter489/iter489_claude_ai_e2e_acceptance.py`, `frontend/src/pages/McpConsentPage.jsx`, `docs/ITER489_CLAUDE_AI_REMOTE_MCP.md`.
+- Additive edits (3): `backend/server.py` (+~55 lines for OAuth mount + `.well-known` metadata), `frontend/src/App.js` (+3 lines for `/mcp-consent` route), `frontend/src/components/ConnectClaudeSection.jsx` (+~85 lines for the Claude.ai Web card).
+
+**Claude.ai GUI status:** NOT PROVEN. The server-side wire-protocol harness proves protocol/security compatibility, but a real Claude.ai *client* connection is an operator action (Settings → Connectors → Add custom connector).
+
+
 ## iter488 — Scoped MCP Tokens + B2B Matchmaker Phase 2 (Feb 18, 2026) ✅ SHIPPED (preview) · 🚫 NO DEPLOY
 
 ### Delivered

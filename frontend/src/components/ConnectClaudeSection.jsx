@@ -21,7 +21,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
-import { Copy, Trash2, KeyRound, ShieldAlert, RefreshCw, Loader2 } from 'lucide-react';
+import { Copy, Trash2, KeyRound, ShieldAlert, RefreshCw, Loader2, Globe } from 'lucide-react';
 
 const API = API_BASE;
 
@@ -306,6 +306,78 @@ const ConnectClaudeSection = ({ lang = 'en' }) => {
           </CardContent>
         </Card>
       )}
+
+      {/* iter489 — Claude.ai Web (Remote MCP) card */}
+      <Card data-testid="claude-web-section">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Globe className="h-5 w-5 text-purple-600" />
+            <CardTitle>{fr ? 'Se connecter à Claude.ai (Web)' : 'Connect Claude.ai (Web)'}</CardTitle>
+          </div>
+          <CardDescription>
+            {fr
+              ? 'Ajoutez BidVex comme connecteur personnalisé à distance dans Claude.ai. Aucun jeton à copier : Claude.ai vous guidera dans un flux OAuth sécurisé.'
+              : 'Add BidVex as a remote custom connector inside Claude.ai. No token to paste — Claude.ai will guide you through a secure OAuth flow.'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label>{fr ? 'URL du serveur MCP à distance' : 'Remote MCP Server URL'}</Label>
+            <div className="flex items-center gap-2 mt-1">
+              <Input
+                readOnly
+                value={`${window?.location?.origin || ''}/api/mcp/rpc`}
+                data-testid="claude-web-mcp-url"
+                className="font-mono text-xs"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => copy(`${window?.location?.origin || ''}/api/mcp/rpc`, fr ? 'URL copiée' : 'URL copied')}
+                data-testid="claude-web-copy-url-btn"
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          <div className="text-xs text-slate-500 dark:text-slate-400 space-y-1">
+            <div className="font-medium text-slate-700 dark:text-slate-300 mb-1">
+              {fr ? 'Métadonnées de découverte OAuth 2.1' : 'OAuth 2.1 discovery'}
+            </div>
+            <ul className="list-disc pl-5 space-y-0.5">
+              <li>
+                <code>{`${window?.location?.origin || ''}/.well-known/oauth-authorization-server`}</code>
+              </li>
+              <li>
+                <code>{`${window?.location?.origin || ''}/.well-known/oauth-protected-resource`}</code>
+              </li>
+            </ul>
+          </div>
+
+          <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-3 bg-slate-50 dark:bg-slate-900/50 text-sm text-slate-700 dark:text-slate-300 space-y-2">
+            <div className="font-medium">{fr ? 'Configuration Claude.ai' : 'Claude.ai setup'}</div>
+            <ol className="list-decimal pl-5 space-y-1">
+              <li>{fr ? 'Ouvrez claude.ai puis Paramètres → Connecteurs.' : 'Open claude.ai then Settings → Connectors.'}</li>
+              <li>{fr ? 'Cliquez sur « Ajouter un connecteur personnalisé ».' : 'Click "Add custom connector".'}</li>
+              <li>{fr ? 'Nom : BidVex.' : 'Name: BidVex.'}</li>
+              <li>{fr ? 'URL du serveur MCP à distance : la valeur ci-dessus.' : 'Remote MCP Server URL: the value above.'}</li>
+              <li>{fr ? 'Terminez le flux OAuth (vous serez redirigé vers cette page pour approuver).' : 'Complete the OAuth flow (you\'ll be redirected here to approve).'}</li>
+              <li>{fr ? 'Activez le connecteur dans une nouvelle conversation.' : 'Enable the connector in a new conversation.'}</li>
+            </ol>
+          </div>
+
+          <div className="text-xs text-amber-800 dark:text-amber-300 bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-2 flex items-start gap-2">
+            <ShieldAlert className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+            <div>
+              {fr
+                ? 'Les jetons OAuth émis apparaîtront dans la liste ci-dessous avec l\'étiquette « OAuth · … ». Vous pouvez les révoquer à tout moment.'
+                : 'OAuth-issued tokens will appear in the list below with the "OAuth · …" label. You can revoke them at any time.'}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
