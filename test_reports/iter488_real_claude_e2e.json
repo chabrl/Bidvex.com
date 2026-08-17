@@ -1,0 +1,268 @@
+{
+  "started_at": "2026-08-17T00:09:20.086852+00:00",
+  "backend_url": "http://localhost:8001",
+  "checks": [
+    {
+      "name": "A.1 raw token returned exactly once",
+      "passed": true,
+      "detail": {
+        "prefix_ok": true
+      }
+    },
+    {
+      "name": "A.2 raw secret NOT persisted in mongo",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "A.3 bcrypt hash persisted",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "B.1 initialize handshake \u2014 protocol 2024-11-05",
+      "passed": true,
+      "detail": {
+        "protocolVersion": "2024-11-05",
+        "capabilities": {
+          "tools": {
+            "listChanged": false
+          },
+          "logging": {}
+        },
+        "serverInfo": {
+          "name": "bidvex-mcp",
+          "version": "1.0.0"
+        },
+        "instructions": "BidVex MCP server. Auth: pass the caller's BidVex JWT via the Authorization header on the transport (already handled by the bridge). All tool calls are subject to subscription gate, trust gate, per-user rate limit, and audit logging."
+      }
+    },
+    {
+      "name": "B.2 initialize handshake \u2014 serverInfo=bidvex-mcp",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "B.3 tools/list \u2014 only read + matchmaker tools visible",
+      "passed": true,
+      "detail": [
+        "B2B_syndication_matchmaker",
+        "check_bid_status",
+        "get_bidding_advice",
+        "get_listing_details",
+        "search_auctions"
+      ]
+    },
+    {
+      "name": "B.4 search_auctions \u2014 succeeds",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "B.5 get_listing_details \u2014 returns seed listing",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "B.6 matchmaker \u2014 analyze returns drafts_ready",
+      "passed": true,
+      "detail": "drafts_ready"
+    },
+    {
+      "name": "B.7 matchmaker \u2014 approval_required=True",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "B.8 EN campaign generated (non-empty, English-flavoured)",
+      "passed": true,
+      "detail": {
+        "en_message_preview": "Hello,\n\nWe identified 1 BidVex listing(s) currently available that align with the preferences registered for your buyer "
+      }
+    },
+    {
+      "name": "B.9 FR campaign generated (non-empty, French-flavoured)",
+      "passed": true,
+      "detail": {
+        "fr_message_preview": "Bonjour,\n\nNous avons identifi\u00e9 1 annonce(s) actuellement disponibles sur BidVex qui correspondent aux pr\u00e9f\u00e9rences enregi"
+      }
+    },
+    {
+      "name": "B.10 EN and FR campaigns are not identical",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "C.1 authorise (explicit=True) \u2192 authorized_pending_dispatch",
+      "passed": true,
+      "detail": {
+        "campaign_id": "camp_20b42791484742e7",
+        "status": "authorized_pending_dispatch",
+        "dispatched": false,
+        "message_en": "Authorisation recorded. No external action has been performed. Dispatch remains a manual Ops action.",
+        "message_fr": "Autorisation enregistr\u00e9e. Aucune action externe n'a \u00e9t\u00e9 effectu\u00e9e. L'envoi reste une action manuelle de l'exploitation."
+      }
+    },
+    {
+      "name": "C.2 authorise (explicit=False) \u2192 approval_required",
+      "passed": true,
+      "detail": {
+        "status": "approval_required",
+        "message_en": "This campaign requires explicit authorised approval before any external action.",
+        "message_fr": "Cette campagne n\u00e9cessite une autorisation explicite avant toute action externe."
+      }
+    },
+    {
+      "name": "D.1 buyer email absent from matchmaker payload",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "D.2 buyer phone absent from matchmaker payload",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "D.3 buyer business_name is emitted (allowed)",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "E.1 read scope cannot invoke place_bid \u2014 INSUFFICIENT_SCOPE",
+      "passed": true,
+      "detail": {
+        "error": "INSUFFICIENT_SCOPE",
+        "required_scope": "bid",
+        "granted_scopes": [
+          "read"
+        ],
+        "message_en": "This MCP token does not include the scope required to call this tool.",
+        "message_fr": "Ce jeton MCP ne poss\u00e8de pas la port\u00e9e requise pour appeler cet outil."
+      }
+    },
+    {
+      "name": "E.2 read scope cannot invoke listing creation \u2014 INSUFFICIENT_SCOPE",
+      "passed": true,
+      "detail": {
+        "error": "INSUFFICIENT_SCOPE",
+        "required_scope": "list",
+        "granted_scopes": [
+          "read"
+        ],
+        "message_en": "This MCP token does not include the scope required to call this tool.",
+        "message_fr": "Ce jeton MCP ne poss\u00e8de pas la port\u00e9e requise pour appeler cet outil."
+      }
+    },
+    {
+      "name": "E.2b confirmed NO draft persisted",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "E.3 token w/o matchmaker scope cannot invoke matchmaker",
+      "passed": true,
+      "detail": {
+        "error": "INSUFFICIENT_SCOPE",
+        "required_scope": "matchmaker",
+        "granted_scopes": [
+          "read",
+          "analytics"
+        ],
+        "message_en": "This MCP token does not include the scope required to call this tool.",
+        "message_fr": "Ce jeton MCP ne poss\u00e8de pas la port\u00e9e requise pour appeler cet outil."
+      }
+    },
+    {
+      "name": "E.4 revoked token is rejected immediately",
+      "passed": true,
+      "detail": {
+        "error": "INVALID_MCP_TOKEN",
+        "message_en": "The MCP token is invalid, expired, or revoked.",
+        "message_fr": "Le jeton MCP est invalide, expir\u00e9 ou r\u00e9voqu\u00e9."
+      }
+    },
+    {
+      "name": "E.5 expired token is rejected",
+      "passed": true,
+      "detail": {
+        "error": "INVALID_MCP_TOKEN",
+        "message_en": "The MCP token is invalid, expired, or revoked.",
+        "message_fr": "Le jeton MCP est invalide, expir\u00e9 ou r\u00e9voqu\u00e9."
+      }
+    },
+    {
+      "name": "F.1 subscription gate still rejects free tier at creation",
+      "passed": true,
+      "detail": {
+        "status": 402
+      }
+    },
+    {
+      "name": "F.2 trust gate still rejects bid without payment method",
+      "passed": true,
+      "detail": "{\"error\": \"trust_required\", \"action\": \"bid\", \"missing\": [\"payment_method\"], \"phone_verified\": true, \"has_payment_method\""
+    },
+    {
+      "name": "F.3 admin-only remains admin-only for non-admin token",
+      "passed": true,
+      "detail": {
+        "error": "ADMIN_ONLY",
+        "message_en": "This tool is restricted to admin/super_admin roles.",
+        "message_fr": "Cet outil est r\u00e9serv\u00e9 aux r\u00f4les administrateur."
+      }
+    },
+    {
+      "name": "G.1 no email to buyer emitted by matchmaker",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "G.2 no bid was placed by matchmaker",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "G.3 listing was NOT modified by matchmaker",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "G.4 no matchmaker authorisation is dispatched",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "H.1 raw MCP token absent from audit log",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "H.2 audit rows written for matchmaker calls",
+      "passed": true,
+      "detail": {
+        "count": 4
+      }
+    },
+    {
+      "name": "I.1 GET /api/mcp/tokens never returns raw or hash",
+      "passed": true,
+      "detail": {
+        "row_keys_sample": [
+          "token_id",
+          "label",
+          "scopes",
+          "created_at",
+          "expires_at",
+          "last_used_at",
+          "revoked",
+          "status"
+        ]
+      }
+    }
+  ],
+  "defects": [],
+  "ended_at": "2026-08-17T00:09:39.501353+00:00",
+  "total_checks": 34,
+  "passed": 34,
+  "failed": 0
+}
