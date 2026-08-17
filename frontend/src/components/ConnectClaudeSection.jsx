@@ -55,7 +55,7 @@ const ConnectClaudeSection = ({ lang = 'en' }) => {
   const fetchTokens = useCallback(async () => {
     try {
       setLoading(true);
-      const r = await axios.get(`${API}/api/mcp/tokens`, { headers: authHeader() });
+      const r = await axios.get(`${API}/mcp/tokens`, { headers: authHeader() });
       setTokens(r.data?.tokens || []);
     } catch (err) {
       const status = err?.response?.status;
@@ -89,7 +89,7 @@ const ConnectClaudeSection = ({ lang = 'en' }) => {
     setCreating(true);
     try {
       const r = await axios.post(
-        `${API}/api/mcp/token`,
+        `${API}/mcp/token`,
         { label: trimmed, scopes: selectedScopes, expires_in_days: expiresInDays },
         { headers: { ...authHeader(), 'Content-Type': 'application/json' } },
       );
@@ -112,7 +112,7 @@ const ConnectClaudeSection = ({ lang = 'en' }) => {
   const handleRevoke = async (tokenId) => {
     if (!window.confirm(fr ? 'Révoquer ce jeton ? Cette action est immédiate.' : 'Revoke this token? This is immediate.')) return;
     try {
-      await axios.delete(`${API}/api/mcp/token/${tokenId}`, { headers: authHeader() });
+      await axios.delete(`${API}/mcp/token/${tokenId}`, { headers: authHeader() });
       toast.success(fr ? 'Jeton révoqué' : 'Token revoked');
       await fetchTokens();
     } catch (err) {
