@@ -334,6 +334,8 @@ const AdminDashboard = () => {
         'careers':            'team',
         'press-blogs':        'team',
         'team-members':       'team',
+        // iter498 — deep-link to Escrow & Settlements
+        'escrow-manager':     'settings',
       };
       const inferredPrimary = SECONDARY_TO_PRIMARY[tab];
       if (inferredPrimary) setPrimaryTab(inferredPrimary);

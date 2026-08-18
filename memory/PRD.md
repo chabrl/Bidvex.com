@@ -1,6 +1,61 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter498 — Admin Pending Payouts view (Feb 19, 2026) ✅ SHIPPED (preview) · 🚫 NO DEPLOY
+
+### Problem
+Ops had no UI for surfacing `seller_payouts` rows stuck in the `pending` or `requires_review` state. When a settlement finished but the seller had no Stripe Connect account (or the initial `Transfer.create` failed), the row was silently written and the money never left BidVex until someone manually inspected MongoDB. Now with real production users, this can't stay ops-invisible.
+
+### Delivered
+
+**Backend** — `routes/admin_payouts.py` (NEW), both `require_admin`-gated:
+- `GET /api/admin/payouts/pending?limit=N` — returns `seller_payouts` rows with `status ∈ {pending, requires_review}`, enriched with `seller_name`, `seller_email`, `seller_has_connect`, `listing_title`, `listing_id`, `lot_number`, `amount`, `currency`, `created_at`, `section`. Newest-first, capped at `limit` (default 200, max 1000).
+- `POST /api/admin/payouts/{payout_id}/release` — re-attempts `stripe.Transfer.create` using the same idempotency key as the initial attempt (`payout-{listing_id}-{lot_number}`) so Stripe safely dedupes a real double-fire. Response envelope:
+  - `status=sent` — transfer succeeded; row updated with `stripe_transfer_id`, `sent_at`, `released_by_admin_id/email`, `released_at`; the listing's `payout_status` is stamped `payout_sent`; the seller receives the standard `payout_sent` bell + email; an `admin_logs` row is written.
+  - `status=already_sent` — row was already `sent`; returns the existing `stripe_transfer_id`.
+  - `status=still_pending` — seller has no active Stripe Connect account, or Stripe rejected the transfer. Row is stamped `requires_review` with `last_error` and `last_attempted_by_admin_id` so ops know why it failed.
+  - `status=not_found` → 404.
+
+**Frontend** — `pages/admin/AdminEscrowManager.js`:
+- New **"Pending Payouts"** tab between "Escrow Transactions" and "Disputes".
+- New stats card (`stat-pending-payouts`) — displays live count.
+- Search box filters by auction id, seller name/email/id, or listing title.
+- Table columns: **Auction ID** (listing_id + title + lot#), **Seller** (name/email + "No Stripe Connect" callout when applicable), **Amount** ($/currency), **Status** (color-coded badge — pending / requires_review), **Created**, **Actions** — **Release Payout** button. Button opens a `ConfirmDialog` that names the seller + amount + auction; clicking Release calls the POST endpoint and toasts the outcome (success or the reason it still failed).
+- Button is disabled when the seller has no Stripe Connect account, with an inline warning.
+- All rows carry `data-testid` (`pending-payout-row-{id}`, `release-payout-btn-{id}`, `pending-payout-auction/seller/amount/created-{id}`).
+- Deep-link: `/admin?tab=escrow-manager` now routes straight to the section (added `escrow-manager → settings` in the primary-tab inference map).
+
+### Verification (live)
+- Anonymous → 401; freshly-registered non-admin → 403 on both GET and POST (verified via curl).
+- Admin GET (`limit=5`) returned 5 rows with the full schema; total pending row count on preview = 38.
+- POST on unknown ID → 404 `payout_not_found`.
+- POST on a real pending row (admin owns it, Stripe API key mismatch in preview) → 200 with envelope `{status: still_pending, error: "stripe_transfer_failed: AuthenticationError"}`; row was flagged `requires_review` + `last_error` recorded, exactly as designed. In production the same request will complete a real Connect transfer.
+- UI screenshot verified: Settings → Escrow & Penalties → Pending Payouts renders the new tab with 20 paginated rows out of 38, stat card reads `38 Pending Payouts`, first row shows `iter298-pc-f5ad7d2a` / $97.50 CAD / pending / 8/14/2026 / Release Payout button.
+
+### Test coverage — 8 iter498 pytests, all green
+`tests/iter498/test_admin_pending_payouts.py`:
+1. Seeds a pending row when the DB is empty (idempotent).
+2. Anonymous GET → 401/403.
+3. Non-admin GET → 403.
+4. Non-admin POST release → 403.
+5. Admin GET returns the correct shape (payout_id, listing_id, seller_id, seller_has_connect, amount, currency, status, created_at all present) and status is in the allowlist.
+6. Release on unknown UUID → 404 `payout_not_found`.
+7. Release on a seller without Stripe Connect → `status=still_pending, error=seller_has_no_active_stripe_connect_account`; row untouched.
+8. Release on a row already `sent` → `status=already_sent`; Stripe is never called.
+
+### Files Changed
+- **New**: `backend/routes/admin_payouts.py`, `backend/tests/iter498/{__init__.py,test_admin_pending_payouts.py}`.
+- **Edited (additive)**: `backend/server.py` (+1 router entry), `frontend/src/pages/admin/AdminEscrowManager.js` (fetch, stat card, tab, panel, release handler), `frontend/src/pages/AdminDashboard.js` (deep-link mapping).
+- **Untouched**: `services/seller_payouts.py`, tax engine, Stripe fee calculators, iter497 AI config, iter482 settlement flows.
+
+### Guardrails held
+- ✅ NO deployment — preview only.
+- ✅ Existing automatic payout flow (`services/seller_payouts.process_seller_payout`) is unchanged; the admin endpoint reuses the same Stripe idempotency key so a manual release cannot double-pay.
+- ✅ Every admin release writes an `admin_logs` row + `released_by_admin_id/email` on the payout so the audit trail is complete.
+- ✅ Non-admin callers blocked at FastAPI's `require_admin` layer.
+- ✅ Zero touch to iter497 AI-config, iter482 settlement, tax engine, or escrow code.
+
+
 ## iter497 — BidVex Gemini System Instruction → MongoDB (Feb 19, 2026) ✅ SHIPPED (preview) · 🚫 NO DEPLOY
 
 ### Problem

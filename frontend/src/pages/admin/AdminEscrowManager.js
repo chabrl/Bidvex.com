@@ -15,7 +15,7 @@ import {
 import { AsyncButton } from '../../components/ui/async-button';
 import { ConfirmDialog } from '../../components/ui/confirm-dialog';
 import {
-  Lock, CheckCircle2, AlertTriangle, Search, RefreshCw, Shield, Car, DollarSign, Unlock,
+  Lock, CheckCircle2, AlertTriangle, Search, RefreshCw, Shield, Car, DollarSign, Unlock, Wallet,
 } from 'lucide-react';
 import { depositHoldShortLabel } from '../../constants/depositHoldCopy';
 
@@ -87,6 +87,8 @@ export default function AdminEscrowManager() {
   const [penalties, setPenalties] = useState([]);
   const [disputes, setDisputes] = useState([]);
   const [deposits, setDeposits] = useState([]);
+  // iter498 — Pending seller payouts (seller_payouts rows awaiting Ops action)
+  const [pendingPayouts, setPendingPayouts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('deposits');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -105,16 +107,19 @@ export default function AdminEscrowManager() {
       try { return (await axios.get(url, { headers })).data; }
       catch (e) { errors.push(`${url}: ${e?.response?.status || e.message}`); return fallback; }
     };
-    const [escrowRes, penaltyRes, disputeRes, depositRes] = await Promise.all([
+    const [escrowRes, penaltyRes, disputeRes, depositRes, payoutsRes] = await Promise.all([
       safeFetch(`${API}/escrow/admin/escrow/transactions`, []),
       safeFetch(`${API}/escrow/admin/escrow/penalties`, []),
       safeFetch(`${API}/escrow/admin/escrow/disputes`, []),
       safeFetch(`${API}/admin/vehicle-deposits?limit=200`, { deposits: [] }),
+      // iter498 — Pending seller payouts queue
+      safeFetch(`${API}/admin/payouts/pending?limit=200`, { rows: [] }),
     ]);
     setEscrows(Array.isArray(escrowRes) ? escrowRes : []);
     setPenalties(Array.isArray(penaltyRes) ? penaltyRes : []);
     setDisputes(Array.isArray(disputeRes) ? disputeRes : []);
     setDeposits(Array.isArray(depositRes?.deposits) ? depositRes.deposits : []);
+    setPendingPayouts(Array.isArray(payoutsRes?.rows) ? payoutsRes.rows : []);
     if (errors.length) {
       toast.error(`Some admin endpoints failed to load (${errors.length}). Refresh to retry.`);
       console.warn('[AdminEscrow] fetch errors:', errors);
@@ -156,13 +161,36 @@ export default function AdminEscrowManager() {
     await fetchAll();
   };
 
+  // iter498 — Manual release for a pending seller payout row.
+  // Re-runs the Stripe Connect transfer via the existing service and
+  // returns a structured envelope. Any failure is surfaced through the
+  // toast so ops can see the underlying reason (typically "seller has
+  // not onboarded Stripe Connect yet").
+  const releasePendingPayout = async (payoutId) => {
+    const res = await axios.post(
+      `${API}/admin/payouts/${payoutId}/release`,
+      null,
+      { headers },
+    );
+    const status = res.data?.status;
+    if (status === 'sent') {
+      toast.success(`Payout sent — Stripe transfer ${res.data.stripe_transfer_id}`);
+    } else if (status === 'already_sent') {
+      toast.info('Payout was already sent — refreshing list.');
+    } else {
+      toast.error(`Payout still pending: ${res.data?.error || 'unknown reason'}`);
+      throw new Error(res.data?.error || 'still_pending');
+    }
+    await fetchAll();
+  };
+
   const amountDollars = (d) =>
     typeof d.amount === 'number' ? d.amount : (d.amount_cents || 0) / 100;
 
   return (
     <div className="space-y-6" data-testid="admin-escrow-manager">
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
         <Card data-testid="stat-deposits">
           <CardContent className="p-4 text-center">
             <p className="text-2xl font-bold text-emerald-600">
@@ -173,6 +201,12 @@ export default function AdminEscrowManager() {
         </Card>
         <Card><CardContent className="p-4 text-center"><p className="text-2xl font-bold">{escrows.length}</p><p className="text-xs text-muted-foreground">Total Escrows</p></CardContent></Card>
         <Card><CardContent className="p-4 text-center"><p className="text-2xl font-bold text-amber-600">{escrows.filter(e => e.escrow_status === 'held').length}</p><p className="text-xs text-muted-foreground">Held</p></CardContent></Card>
+        <Card data-testid="stat-pending-payouts">
+          <CardContent className="p-4 text-center">
+            <p className="text-2xl font-bold text-indigo-600">{pendingPayouts.length}</p>
+            <p className="text-xs text-muted-foreground">Pending Payouts</p>
+          </CardContent>
+        </Card>
         <Card><CardContent className="p-4 text-center"><p className="text-2xl font-bold text-red-600">{disputes.length}</p><p className="text-xs text-muted-foreground">Disputes</p></CardContent></Card>
         <Card><CardContent className="p-4 text-center"><p className="text-2xl font-bold text-purple-600">{penalties.length}</p><p className="text-xs text-muted-foreground">Penalties</p></CardContent></Card>
       </div>
@@ -182,6 +216,7 @@ export default function AdminEscrowManager() {
         {[
           { key: 'deposits', label: 'Vehicle Deposits' },
           { key: 'escrows',  label: 'Escrow Transactions' },
+          { key: 'payouts',  label: 'Pending Payouts' },
           { key: 'disputes', label: 'Disputes' },
           { key: 'penalties', label: 'Penalty Log' },
         ].map(t => (
@@ -371,6 +406,141 @@ export default function AdminEscrowManager() {
         </div>
       )}
 
+      {/* Pending Payouts Tab (iter498) */}
+      {tab === 'payouts' && (
+        <div className="space-y-4">
+          <div className="flex gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Search by auction id, seller name, email…"
+                className="pl-9"
+                data-testid="pending-payout-search"
+              />
+            </div>
+          </div>
+          {loading ? <TableSkeleton /> :
+            (() => {
+              const q = (searchQuery || '').toLowerCase().trim();
+              const filtered = pendingPayouts.filter(p => {
+                if (!q) return true;
+                return (
+                  (p.listing_id || '').toLowerCase().includes(q) ||
+                  (p.listing_title || '').toLowerCase().includes(q) ||
+                  (p.seller_name || '').toLowerCase().includes(q) ||
+                  (p.seller_email || '').toLowerCase().includes(q) ||
+                  (p.seller_id || '').toLowerCase().includes(q)
+                );
+              });
+              if (filtered.length === 0) {
+                return <EmptyState icon={Wallet} label="No pending payouts. Everything is settled." />;
+              }
+              const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+              return (
+                <>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm" data-testid="pending-payouts-table">
+                      <thead>
+                        <tr className="border-b bg-muted/50">
+                          <th className="p-3 text-left">Auction ID</th>
+                          <th className="p-3 text-left">Seller</th>
+                          <th className="p-3 text-left">Amount</th>
+                          <th className="p-3 text-left">Status</th>
+                          <th className="p-3 text-left">Created</th>
+                          <th className="p-3 text-left">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {paged.map(p => {
+                          const created = p.created_at ? new Date(p.created_at) : null;
+                          const badgeClass = p.status === 'requires_review'
+                            ? 'bg-rose-100 text-rose-800'
+                            : 'bg-amber-100 text-amber-800';
+                          return (
+                            <tr
+                              key={p.payout_id}
+                              className="border-b hover:bg-muted/30"
+                              data-testid={`pending-payout-row-${p.payout_id}`}
+                            >
+                              <td className="p-3">
+                                <div className="text-xs font-medium">{p.listing_title || '—'}</div>
+                                <div
+                                  className="text-[11px] text-muted-foreground font-mono"
+                                  data-testid={`pending-payout-auction-${p.payout_id}`}
+                                >
+                                  {p.listing_id || '—'}
+                                  {p.lot_number ? ` · lot ${p.lot_number}` : ''}
+                                </div>
+                              </td>
+                              <td className="p-3">
+                                <div
+                                  className="text-xs font-medium"
+                                  data-testid={`pending-payout-seller-${p.payout_id}`}
+                                >
+                                  {p.seller_name || '—'}
+                                </div>
+                                <div className="text-[11px] text-muted-foreground">
+                                  {p.seller_email || (p.seller_id ? `${p.seller_id.slice(0, 8)}…` : '—')}
+                                </div>
+                                {!p.seller_has_connect && (
+                                  <div className="mt-1 text-[11px] text-rose-600 font-medium">
+                                    No Stripe Connect
+                                  </div>
+                                )}
+                              </td>
+                              <td
+                                className="p-3 font-semibold"
+                                data-testid={`pending-payout-amount-${p.payout_id}`}
+                              >
+                                ${Number(p.amount || 0).toFixed(2)} {p.currency || 'CAD'}
+                              </td>
+                              <td className="p-3">
+                                <Badge className={badgeClass}>{p.status}</Badge>
+                              </td>
+                              <td
+                                className="p-3 text-xs"
+                                data-testid={`pending-payout-created-${p.payout_id}`}
+                              >
+                                {created ? created.toLocaleString() : '—'}
+                              </td>
+                              <td className="p-3">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={!p.seller_has_connect}
+                                  data-testid={`release-payout-btn-${p.payout_id}`}
+                                  onClick={() => setConfirm({
+                                    title: 'Release payout?',
+                                    description:
+                                      `Send $${Number(p.amount || 0).toFixed(2)} ${p.currency || 'CAD'} to `
+                                      + `${p.seller_name || p.seller_email || 'the seller'} `
+                                      + `via Stripe Connect for auction ${p.listing_id}.`
+                                      + `${p.seller_has_connect ? '' : '\n\n⚠️ Seller has no active Stripe Connect account — release will fail until they onboard.'}`,
+                                    confirmText: 'Release Payout',
+                                    onConfirm: () => releasePendingPayout(p.payout_id),
+                                    successMessage: null, // release helper toasts its own message
+                                  })}
+                                >
+                                  <DollarSign className="h-3.5 w-3.5 mr-1" />
+                                  Release Payout
+                                </Button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  <Paginator page={page} setPage={setPage} total={filtered.length} />
+                </>
+              );
+            })()
+          }
+        </div>
+      )}
+
       {/* Disputes Tab */}
       {tab === 'disputes' && (
         <div>
@@ -472,7 +642,7 @@ function ManualPenaltyDialog({ open, onClose, onDone, headers }) {
           <DialogTitle>Create Manual Penalty</DialogTitle>
           <DialogDescription>
             Charge a seller $50 cancellation penalty via Stripe.
-            <br /><span className="text-xs">Facturer au vendeur une pénalité d'annulation de 50 $.</span>
+            <br /><span className="text-xs">Facturer au vendeur une pénalité d&apos;annulation de 50 $.</span>
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3 py-2">

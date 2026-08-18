@@ -1587,6 +1587,8 @@ try:
         ("routes.admin_ai_review", "ai_review_router", None, False),
         # iter497 — Admin BidVex Gemini system-instruction management
         ("routes.admin_ai_config", "admin_ai_config_router", None, False),
+        # iter498 — Admin Pending Payouts view + manual release
+        ("routes.admin_payouts", "admin_payouts_router", None, False),
         ("routes.admin_conversion_funnel", "conversion_funnel_router", None, False),
         ("routes.storage_cleanout", "storage_cleanout_router", None, False),
         ("routes.admin_maintenance", "admin_maintenance_router", None, False),
