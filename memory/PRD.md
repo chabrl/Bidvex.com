@@ -1,6 +1,59 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter499 — Admin Payout Operations (filters + CSV + Connect nudge + history/timeline) (Feb 20, 2026) ✅ SHIPPED (preview) · ⏳ READY FOR REDEPLOY
+
+### Delivered (one-pass, additive over iter498)
+
+**Backend — `routes/admin_payouts.py`:**
+- `GET /api/admin/payouts/pending` — **iter499 filters**: `status` (`pending|requires_review|all`), `min_amount`, `max_amount`, `search`. All server-side. Invalid status → 400.
+- `GET /api/admin/payouts/history` — sent rows only, same filter set, sorted by `sent_at` desc, includes `released_by_admin_id/email` + `stripe_transfer_id`.
+- `GET /api/admin/payouts/{id}/timeline` — reconstructs an audit trail from the payout row's own timestamps + `admin_logs` (no second audit collection). No fabricated events; sorted oldest→newest; details allow-listed (`stripe_transfer_id`, `onboarding_url`, `amount`, `reason` only).
+- `GET /api/admin/payouts/export.csv?scope=pending|history|all` — streams CSV via `csv.writer` (auto-escapes commas/quotes/newlines). Columns locked: `payout_id, auction_id, listing_title, lot_number, seller_id, seller_name, seller_email, amount, currency, status, created_at, sent_at, stripe_transfer_id, released_by_admin_id, released_by_admin_email`. UTF-8 BOM for Excel. Invalid scope → 400.
+- `POST /api/admin/payouts/{id}/send-connect-onboarding` — reuses the exact `stripe.Account.create` + `AccountLink.create` pattern already in the codebase (mirrors `routes/admin_oversight.send_stripe_onboarding_link`). Emits `already_connected` (no Stripe call, no email) when the seller is ready; otherwise creates an Express account on-demand only if missing, generates a fresh AccountLink, emails via `send_unified_email(new_feature)`, stamps the payout row with `onboarding_link_sent_at/by_*`, and writes an `admin_logs` row. `onboarding_url` **never logged** — timeline shows the event only.
+
+**Frontend — `pages/admin/AdminEscrowManager.js`:**
+- Pending Payouts tab: **Status dropdown** (All Pending / Pending / Requires Review), **Min $** + **Max $** number inputs, **Export CSV** button. All filters are pushed to the server via URLSearchParams.
+- **Send onboarding link** button appears next to Release Payout when the seller has no active Connect account — one click, wrapped in a confirm dialog naming the seller + amount.
+- New **Payout History** tab: table with Auction ID, Seller, Amount, Status, Created, Sent At, **Released By** (email + short id, or "System / Automatic"). Click any row to expand an on-demand **audit timeline** rendered from `/timeline`.
+- CSV export is authenticated via axios (bearer token in header, blob response), never exposes JWT via a naked link.
+- All new interactive elements carry `data-testid` (`payout-status-filter`, `payout-min-amount`, `payout-max-amount`, `payout-export-csv-btn`, `send-onboarding-btn-{id}`, `history-*`, `payout-history-row-{id}`, `payout-timeline-{id}`, `released-by-{id}`, `admin-tab-history`).
+
+### Tests — **40 passed, 3 skipped** (iter497+498+499)
+`tests/iter499/test_admin_payout_ops.py` — 24 tests:
+- Filters: status (pending/requires_review), min_amount, max_amount, combined, empty-when-min>max, invalid status→400, pagination via `limit`.
+- CSV: header row correct, respects min_amount, comma+quote round-trip via seeded row, invalid scope→400, admin-only (non-admin→403).
+- Onboarding: unauth→403, non-admin→403, unknown payout→404, seller already connected→`already_connected` with `email_dispatched=False` and no row-stamping (safe rejection).
+- History: unauth→401/403, non-admin→403, sent rows include `released_by_admin_id/email` + `stripe_transfer_id`.
+- Timeline: reconstructs `payout_created` + `payout_released` + `admin.payout.manual_release` from real DB rows, sorted; unknown→404.
+- Financial safety: re-releasing a `sent` row returns `already_sent` (no Stripe call); missing Connect → `still_pending` and row untouched; **static guard**: idempotency-key shape `payout-{listing_id}-{lot_number or 0}` verified to still be present in source (regression fuse).
+- Pre-existing iter498 (8 tests) still green — `_admin_headers` cached at module scope to avoid brute-force limiter tripping on rapid runs.
+
+### Build
+- `yarn build` — green (production bundle produced; `CI=true` errors on pre-existing warn-as-error only).
+- Backend restart clean, no exceptions in `/var/log/supervisor/backend.err.log` after boot.
+
+### Security sweep (Task 4)
+- ✅ Every endpoint `require_admin`-gated (no IDOR — payout_id lookups are admin-scoped by policy).
+- ✅ No Stripe secrets ever returned in a response body (verified).
+- ✅ CSV columns hard-locked; no auth tokens, IPs, or full onboarding URLs in the export.
+- ✅ Timeline details limited to an allow-list.
+- ✅ Onboarding endpoint safely rejects when seller already has Connect readiness (no duplicate account churn, no repeat email spam).
+- ✅ Release endpoint preserves the exact iter498 Stripe `idempotency_key` (`payout-{listing_id}-{lot_number}`) — cannot double-transfer, guarded by a static regression test.
+- ✅ Filter statuses are allow-list-validated server-side; no user-provided regex bypass (search runs through `re.escape`).
+- ✅ Non-admin curl verified: 403 across all 5 endpoints.
+
+### Real-money safety
+- ⛔ No automatic Release Payout was triggered by this task.
+- ⛔ Onboarding tests use seeded fake sellers or short-circuit on `already_connected` — no real Stripe Account/AccountLink was created.
+- Production verification is manual: an authorized admin logs in, clicks Release on a chosen backlogged row.
+
+### Files Changed
+- **Edited (additive)**: `backend/routes/admin_payouts.py` (new endpoints + shared helpers + filter validator), `frontend/src/pages/admin/AdminEscrowManager.js` (filters + CSV + onboarding button + history tab + timeline).
+- **New tests**: `backend/tests/iter499/{__init__.py, test_admin_payout_ops.py}` (24 tests).
+- **Untouched**: `services/seller_payouts.py`, `routes/admin_oversight.py` (onboarding source), tax engine, Stripe fee calculators, iter497 AI config.
+
+
 ## iter498 — Admin Pending Payouts view (Feb 19, 2026) ✅ SHIPPED (preview) · 🚫 NO DEPLOY
 
 ### Problem

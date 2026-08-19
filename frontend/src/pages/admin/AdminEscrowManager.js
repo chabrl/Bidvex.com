@@ -15,7 +15,7 @@ import {
 import { AsyncButton } from '../../components/ui/async-button';
 import { ConfirmDialog } from '../../components/ui/confirm-dialog';
 import {
-  Lock, CheckCircle2, AlertTriangle, Search, RefreshCw, Shield, Car, DollarSign, Unlock, Wallet,
+  Lock, CheckCircle2, AlertTriangle, Search, RefreshCw, Shield, Car, DollarSign, Unlock, Wallet, Download, Mail, ChevronDown, ChevronRight, History,
 } from 'lucide-react';
 import { depositHoldShortLabel } from '../../constants/depositHoldCopy';
 
@@ -89,6 +89,14 @@ export default function AdminEscrowManager() {
   const [deposits, setDeposits] = useState([]);
   // iter498 — Pending seller payouts (seller_payouts rows awaiting Ops action)
   const [pendingPayouts, setPendingPayouts] = useState([]);
+  // iter499 — Payout history (sent) rows + filters
+  const [payoutHistory, setPayoutHistory] = useState([]);
+  const [payoutStatusFilter, setPayoutStatusFilter] = useState('all'); // all | pending | requires_review | sent
+  const [payoutMinAmount, setPayoutMinAmount] = useState('');
+  const [payoutMaxAmount, setPayoutMaxAmount] = useState('');
+  const [payoutExporting, setPayoutExporting] = useState(false);
+  const [expandedPayoutId, setExpandedPayoutId] = useState(null);
+  const [payoutTimeline, setPayoutTimeline] = useState(null); // { payout_id, events, loading, error }
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('deposits');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -107,28 +115,48 @@ export default function AdminEscrowManager() {
       try { return (await axios.get(url, { headers })).data; }
       catch (e) { errors.push(`${url}: ${e?.response?.status || e.message}`); return fallback; }
     };
-    const [escrowRes, penaltyRes, disputeRes, depositRes, payoutsRes] = await Promise.all([
+    // iter499 — server-side filters on pending payouts. Compose querystring
+    // so we never yank the whole collection into the browser to filter it.
+    const pendingParams = new URLSearchParams({ limit: '200' });
+    // For the pending queue we honor the status filter only when it is
+    // ``pending`` or ``requires_review``. When the user picks ``sent`` we
+    // leave the pending queue query at its default (both pending states).
+    if (['pending', 'requires_review'].includes(payoutStatusFilter)) {
+      pendingParams.set('status', payoutStatusFilter);
+    }
+    if (payoutMinAmount) pendingParams.set('min_amount', String(payoutMinAmount));
+    if (payoutMaxAmount) pendingParams.set('max_amount', String(payoutMaxAmount));
+    if (searchQuery)    pendingParams.set('search', searchQuery);
+
+    const historyParams = new URLSearchParams({ limit: '200', status: 'sent' });
+    if (payoutMinAmount) historyParams.set('min_amount', String(payoutMinAmount));
+    if (payoutMaxAmount) historyParams.set('max_amount', String(payoutMaxAmount));
+    if (searchQuery)     historyParams.set('search', searchQuery);
+
+    const [escrowRes, penaltyRes, disputeRes, depositRes, payoutsRes, historyRes] = await Promise.all([
       safeFetch(`${API}/escrow/admin/escrow/transactions`, []),
       safeFetch(`${API}/escrow/admin/escrow/penalties`, []),
       safeFetch(`${API}/escrow/admin/escrow/disputes`, []),
       safeFetch(`${API}/admin/vehicle-deposits?limit=200`, { deposits: [] }),
-      // iter498 — Pending seller payouts queue
-      safeFetch(`${API}/admin/payouts/pending?limit=200`, { rows: [] }),
+      safeFetch(`${API}/admin/payouts/pending?${pendingParams.toString()}`, { rows: [] }),
+      safeFetch(`${API}/admin/payouts/history?${historyParams.toString()}`, { rows: [] }),
     ]);
     setEscrows(Array.isArray(escrowRes) ? escrowRes : []);
     setPenalties(Array.isArray(penaltyRes) ? penaltyRes : []);
     setDisputes(Array.isArray(disputeRes) ? disputeRes : []);
     setDeposits(Array.isArray(depositRes?.deposits) ? depositRes.deposits : []);
     setPendingPayouts(Array.isArray(payoutsRes?.rows) ? payoutsRes.rows : []);
+    setPayoutHistory(Array.isArray(historyRes?.rows) ? historyRes.rows : []);
     if (errors.length) {
       toast.error(`Some admin endpoints failed to load (${errors.length}). Refresh to retry.`);
       console.warn('[AdminEscrow] fetch errors:', errors);
     }
     setLoading(false);
-  }, [headers]);
+  }, [headers, payoutStatusFilter, payoutMinAmount, payoutMaxAmount, searchQuery]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
-  useEffect(() => { setPage(0); }, [tab, statusFilter, depositStatusFilter, searchQuery]);
+  useEffect(() => { setPage(0); }, [tab, statusFilter, depositStatusFilter, searchQuery,
+                                     payoutStatusFilter, payoutMinAmount, payoutMaxAmount]);
 
   // ── Escrow-transactions filter ──
   const filteredEscrows = escrows.filter(e => {
@@ -184,6 +212,99 @@ export default function AdminEscrowManager() {
     await fetchAll();
   };
 
+  // iter499 — Send Stripe Connect onboarding link to the seller for a
+  // stuck payout. Reuses the same AccountLink pattern already in the
+  // codebase (see routes/admin_oversight.send_stripe_onboarding_link).
+  const sendConnectOnboarding = async (payoutId) => {
+    try {
+      const res = await axios.post(
+        `${API}/admin/payouts/${payoutId}/send-connect-onboarding`,
+        null,
+        { headers },
+      );
+      const s = res.data?.status;
+      if (s === 'sent') {
+        toast.success(res.data?.email_dispatched
+          ? 'Onboarding link emailed to the seller.'
+          : 'Onboarding link generated (email dispatch failed — check logs).');
+      } else if (s === 'already_connected') {
+        toast.info('Seller already has an active Stripe Connect account.');
+      } else {
+        toast.error(`Onboarding link failed: ${res.data?.error || 'unknown reason'}`);
+      }
+      await fetchAll();
+    } catch (e) {
+      toast.error(`Onboarding request failed: ${e?.response?.data?.detail || e.message}`);
+    }
+  };
+
+  // iter499 — CSV export via the streaming endpoint. We hit the
+  // authenticated endpoint with axios in blob mode so the browser can
+  // save the file without exposing the JWT via a naked <a> URL.
+  const exportPayoutsCsv = async (scope /* 'pending' | 'history' */) => {
+    setPayoutExporting(true);
+    try {
+      const params = new URLSearchParams({ scope, limit: '5000' });
+      if (['pending', 'requires_review', 'sent'].includes(payoutStatusFilter)) {
+        params.set('status', payoutStatusFilter);
+      }
+      if (payoutMinAmount) params.set('min_amount', String(payoutMinAmount));
+      if (payoutMaxAmount) params.set('max_amount', String(payoutMaxAmount));
+      if (searchQuery)     params.set('search', searchQuery);
+      const res = await axios.get(
+        `${API}/admin/payouts/export.csv?${params.toString()}`,
+        { headers, responseType: 'blob' },
+      );
+      const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8;' });
+      const cd = res.headers?.['content-disposition'] || '';
+      const m = cd.match(/filename="?([^";]+)"?/i);
+      const filename = m ? m[1] : `bidvex_payouts_${scope}.csv`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success(`Exported ${filename}`);
+    } catch (e) {
+      toast.error(`CSV export failed: ${e?.response?.data?.detail || e.message}`);
+    } finally {
+      setPayoutExporting(false);
+    }
+  };
+
+  // iter499 — Load the audit timeline for a payout on-demand when a
+  // history row is expanded. Skipped when the same row is already open.
+  const loadPayoutTimeline = async (payoutId) => {
+    if (expandedPayoutId === payoutId) {
+      setExpandedPayoutId(null);
+      setPayoutTimeline(null);
+      return;
+    }
+    setExpandedPayoutId(payoutId);
+    setPayoutTimeline({ payout_id: payoutId, events: [], loading: true });
+    try {
+      const res = await axios.get(
+        `${API}/admin/payouts/${payoutId}/timeline`,
+        { headers },
+      );
+      setPayoutTimeline({
+        payout_id: payoutId,
+        events: Array.isArray(res.data?.events) ? res.data.events : [],
+        loading: false,
+      });
+    } catch (e) {
+      setPayoutTimeline({
+        payout_id: payoutId,
+        events: [],
+        loading: false,
+        error: e?.response?.data?.detail || e.message,
+      });
+    }
+  };
+
   const amountDollars = (d) =>
     typeof d.amount === 'number' ? d.amount : (d.amount_cents || 0) / 100;
 
@@ -217,6 +338,7 @@ export default function AdminEscrowManager() {
           { key: 'deposits', label: 'Vehicle Deposits' },
           { key: 'escrows',  label: 'Escrow Transactions' },
           { key: 'payouts',  label: 'Pending Payouts' },
+          { key: 'history',  label: 'Payout History' },
           { key: 'disputes', label: 'Disputes' },
           { key: 'penalties', label: 'Penalty Log' },
         ].map(t => (
@@ -406,137 +528,354 @@ export default function AdminEscrowManager() {
         </div>
       )}
 
-      {/* Pending Payouts Tab (iter498) */}
+      {/* Pending Payouts Tab (iter498, filters+CSV+onboarding iter499) */}
       {tab === 'payouts' && (
         <div className="space-y-4">
-          <div className="flex gap-3">
-            <div className="relative flex-1">
+          {/* Filters row */}
+          <div className="flex flex-wrap gap-3 items-center">
+            <div className="relative flex-1 min-w-[260px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                placeholder="Search by auction id, seller name, email…"
+                placeholder="Search by auction id, seller id, title…"
                 className="pl-9"
                 data-testid="pending-payout-search"
               />
             </div>
+            <Select value={payoutStatusFilter} onValueChange={setPayoutStatusFilter}>
+              <SelectTrigger className="w-52" data-testid="payout-status-filter"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Pending</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="requires_review">Requires Review</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input
+              type="number" min="0" step="0.01"
+              value={payoutMinAmount}
+              onChange={e => setPayoutMinAmount(e.target.value)}
+              placeholder="Min $"
+              className="w-28"
+              data-testid="payout-min-amount"
+            />
+            <Input
+              type="number" min="0" step="0.01"
+              value={payoutMaxAmount}
+              onChange={e => setPayoutMaxAmount(e.target.value)}
+              placeholder="Max $"
+              className="w-28"
+              data-testid="payout-max-amount"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={payoutExporting}
+              onClick={() => exportPayoutsCsv('pending')}
+              data-testid="payout-export-csv-btn"
+            >
+              <Download className="h-4 w-4 mr-1" />
+              {payoutExporting ? 'Exporting…' : 'Export CSV'}
+            </Button>
+          </div>
+
+          {loading ? <TableSkeleton /> :
+            (pendingPayouts.length === 0
+              ? <EmptyState icon={Wallet} label="No pending payouts match your filters." />
+              : (() => {
+                const paged = pendingPayouts.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+                return (
+                  <>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm" data-testid="pending-payouts-table">
+                        <thead>
+                          <tr className="border-b bg-muted/50">
+                            <th className="p-3 text-left">Auction ID</th>
+                            <th className="p-3 text-left">Seller</th>
+                            <th className="p-3 text-left">Amount</th>
+                            <th className="p-3 text-left">Status</th>
+                            <th className="p-3 text-left">Created</th>
+                            <th className="p-3 text-left">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {paged.map(p => {
+                            const created = p.created_at ? new Date(p.created_at) : null;
+                            const badgeClass = p.status === 'requires_review'
+                              ? 'bg-rose-100 text-rose-800'
+                              : 'bg-amber-100 text-amber-800';
+                            return (
+                              <tr
+                                key={p.payout_id}
+                                className="border-b hover:bg-muted/30"
+                                data-testid={`pending-payout-row-${p.payout_id}`}
+                              >
+                                <td className="p-3">
+                                  <div className="text-xs font-medium">{p.listing_title || '—'}</div>
+                                  <div
+                                    className="text-[11px] text-muted-foreground font-mono"
+                                    data-testid={`pending-payout-auction-${p.payout_id}`}
+                                  >
+                                    {p.listing_id || '—'}
+                                    {p.lot_number ? ` · lot ${p.lot_number}` : ''}
+                                  </div>
+                                </td>
+                                <td className="p-3">
+                                  <div
+                                    className="text-xs font-medium"
+                                    data-testid={`pending-payout-seller-${p.payout_id}`}
+                                  >
+                                    {p.seller_name || '—'}
+                                  </div>
+                                  <div className="text-[11px] text-muted-foreground">
+                                    {p.seller_email || (p.seller_id ? `${p.seller_id.slice(0, 8)}…` : '—')}
+                                  </div>
+                                  {!p.seller_has_connect && (
+                                    <div className="mt-1 text-[11px] text-rose-600 font-medium">
+                                      No Stripe Connect
+                                    </div>
+                                  )}
+                                </td>
+                                <td
+                                  className="p-3 font-semibold"
+                                  data-testid={`pending-payout-amount-${p.payout_id}`}
+                                >
+                                  ${Number(p.amount || 0).toFixed(2)} {p.currency || 'CAD'}
+                                </td>
+                                <td className="p-3">
+                                  <Badge className={badgeClass}>{p.status}</Badge>
+                                </td>
+                                <td
+                                  className="p-3 text-xs"
+                                  data-testid={`pending-payout-created-${p.payout_id}`}
+                                >
+                                  {created ? created.toLocaleString() : '—'}
+                                </td>
+                                <td className="p-3">
+                                  <div className="flex gap-1 flex-wrap">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      disabled={!p.seller_has_connect}
+                                      data-testid={`release-payout-btn-${p.payout_id}`}
+                                      onClick={() => setConfirm({
+                                        title: 'Release payout?',
+                                        description:
+                                          `Send $${Number(p.amount || 0).toFixed(2)} ${p.currency || 'CAD'} to `
+                                          + `${p.seller_name || p.seller_email || 'the seller'} `
+                                          + `via Stripe Connect for auction ${p.listing_id}.`,
+                                        confirmText: 'Release Payout',
+                                        onConfirm: () => releasePendingPayout(p.payout_id),
+                                        successMessage: null,
+                                      })}
+                                    >
+                                      <DollarSign className="h-3.5 w-3.5 mr-1" />
+                                      Release Payout
+                                    </Button>
+                                    {!p.seller_has_connect && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        data-testid={`send-onboarding-btn-${p.payout_id}`}
+                                        onClick={() => setConfirm({
+                                          title: 'Send Stripe onboarding link?',
+                                          description:
+                                            `Email ${p.seller_name || p.seller_email || 'the seller'} a `
+                                            + `secure Stripe Connect onboarding link so their `
+                                            + `$${Number(p.amount || 0).toFixed(2)} ${p.currency || 'CAD'} `
+                                            + `payout can be released once they finish setup.`,
+                                          confirmText: 'Send onboarding link',
+                                          onConfirm: () => sendConnectOnboarding(p.payout_id),
+                                          successMessage: null,
+                                        })}
+                                      >
+                                        <Mail className="h-3.5 w-3.5 mr-1" />
+                                        Send onboarding link
+                                      </Button>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                    <Paginator page={page} setPage={setPage} total={pendingPayouts.length} />
+                  </>
+                );
+              })()
+            )
+          }
+        </div>
+      )}
+
+      {/* Payout History Tab (iter499) */}
+      {tab === 'history' && (
+        <div className="space-y-4">
+          <div className="flex flex-wrap gap-3 items-center">
+            <div className="relative flex-1 min-w-[260px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Search by auction id, seller id, transfer id…"
+                className="pl-9"
+                data-testid="history-payout-search"
+              />
+            </div>
+            <Input
+              type="number" min="0" step="0.01"
+              value={payoutMinAmount}
+              onChange={e => setPayoutMinAmount(e.target.value)}
+              placeholder="Min $"
+              className="w-28"
+              data-testid="history-min-amount"
+            />
+            <Input
+              type="number" min="0" step="0.01"
+              value={payoutMaxAmount}
+              onChange={e => setPayoutMaxAmount(e.target.value)}
+              placeholder="Max $"
+              className="w-28"
+              data-testid="history-max-amount"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={payoutExporting}
+              onClick={() => exportPayoutsCsv('history')}
+              data-testid="history-export-csv-btn"
+            >
+              <Download className="h-4 w-4 mr-1" />
+              {payoutExporting ? 'Exporting…' : 'Export CSV'}
+            </Button>
           </div>
           {loading ? <TableSkeleton /> :
-            (() => {
-              const q = (searchQuery || '').toLowerCase().trim();
-              const filtered = pendingPayouts.filter(p => {
-                if (!q) return true;
+            (payoutHistory.length === 0
+              ? <EmptyState icon={History} label="No sent payouts match your filters." />
+              : (() => {
+                const paged = payoutHistory.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
                 return (
-                  (p.listing_id || '').toLowerCase().includes(q) ||
-                  (p.listing_title || '').toLowerCase().includes(q) ||
-                  (p.seller_name || '').toLowerCase().includes(q) ||
-                  (p.seller_email || '').toLowerCase().includes(q) ||
-                  (p.seller_id || '').toLowerCase().includes(q)
-                );
-              });
-              if (filtered.length === 0) {
-                return <EmptyState icon={Wallet} label="No pending payouts. Everything is settled." />;
-              }
-              const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-              return (
-                <>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm" data-testid="pending-payouts-table">
-                      <thead>
-                        <tr className="border-b bg-muted/50">
-                          <th className="p-3 text-left">Auction ID</th>
-                          <th className="p-3 text-left">Seller</th>
-                          <th className="p-3 text-left">Amount</th>
-                          <th className="p-3 text-left">Status</th>
-                          <th className="p-3 text-left">Created</th>
-                          <th className="p-3 text-left">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {paged.map(p => {
-                          const created = p.created_at ? new Date(p.created_at) : null;
-                          const badgeClass = p.status === 'requires_review'
-                            ? 'bg-rose-100 text-rose-800'
-                            : 'bg-amber-100 text-amber-800';
-                          return (
-                            <tr
-                              key={p.payout_id}
-                              className="border-b hover:bg-muted/30"
-                              data-testid={`pending-payout-row-${p.payout_id}`}
-                            >
-                              <td className="p-3">
-                                <div className="text-xs font-medium">{p.listing_title || '—'}</div>
-                                <div
-                                  className="text-[11px] text-muted-foreground font-mono"
-                                  data-testid={`pending-payout-auction-${p.payout_id}`}
+                  <>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm" data-testid="payout-history-table">
+                        <thead>
+                          <tr className="border-b bg-muted/50">
+                            <th className="p-3 text-left w-8"></th>
+                            <th className="p-3 text-left">Auction ID</th>
+                            <th className="p-3 text-left">Seller</th>
+                            <th className="p-3 text-left">Amount</th>
+                            <th className="p-3 text-left">Status</th>
+                            <th className="p-3 text-left">Created</th>
+                            <th className="p-3 text-left">Sent At</th>
+                            <th className="p-3 text-left">Released By</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {paged.map(p => {
+                            const isOpen = expandedPayoutId === p.payout_id;
+                            const created = p.created_at ? new Date(p.created_at) : null;
+                            const sent = p.sent_at ? new Date(p.sent_at) : null;
+                            const releasedBy = p.released_by_admin_id
+                              ? {
+                                  id:    p.released_by_admin_id,
+                                  email: p.released_by_admin_email,
+                                }
+                              : null;
+                            return (
+                              <React.Fragment key={p.payout_id}>
+                                <tr
+                                  className="border-b hover:bg-muted/30 cursor-pointer"
+                                  data-testid={`payout-history-row-${p.payout_id}`}
+                                  onClick={() => loadPayoutTimeline(p.payout_id)}
                                 >
-                                  {p.listing_id || '—'}
-                                  {p.lot_number ? ` · lot ${p.lot_number}` : ''}
-                                </div>
-                              </td>
-                              <td className="p-3">
-                                <div
-                                  className="text-xs font-medium"
-                                  data-testid={`pending-payout-seller-${p.payout_id}`}
-                                >
-                                  {p.seller_name || '—'}
-                                </div>
-                                <div className="text-[11px] text-muted-foreground">
-                                  {p.seller_email || (p.seller_id ? `${p.seller_id.slice(0, 8)}…` : '—')}
-                                </div>
-                                {!p.seller_has_connect && (
-                                  <div className="mt-1 text-[11px] text-rose-600 font-medium">
-                                    No Stripe Connect
-                                  </div>
+                                  <td className="p-3">
+                                    {isOpen
+                                      ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                      : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                                  </td>
+                                  <td className="p-3">
+                                    <div className="text-xs font-medium">{p.listing_title || '—'}</div>
+                                    <div className="text-[11px] text-muted-foreground font-mono">
+                                      {p.listing_id || '—'}
+                                      {p.lot_number ? ` · lot ${p.lot_number}` : ''}
+                                    </div>
+                                  </td>
+                                  <td className="p-3">
+                                    <div className="text-xs font-medium">{p.seller_name || '—'}</div>
+                                    <div className="text-[11px] text-muted-foreground">
+                                      {p.seller_email || '—'}
+                                    </div>
+                                  </td>
+                                  <td className="p-3 font-semibold">
+                                    ${Number(p.amount || 0).toFixed(2)} {p.currency || 'CAD'}
+                                  </td>
+                                  <td className="p-3">
+                                    <Badge className="bg-emerald-100 text-emerald-800">{p.status}</Badge>
+                                  </td>
+                                  <td className="p-3 text-xs">{created ? created.toLocaleString() : '—'}</td>
+                                  <td className="p-3 text-xs">{sent ? sent.toLocaleString() : '—'}</td>
+                                  <td className="p-3 text-xs" data-testid={`released-by-${p.payout_id}`}>
+                                    {releasedBy ? (
+                                      <>
+                                        <div className="font-medium">{releasedBy.email || '—'}</div>
+                                        <div className="text-[11px] text-muted-foreground font-mono">
+                                          {releasedBy.id?.slice(0, 8)}…
+                                        </div>
+                                      </>
+                                    ) : (
+                                      <span className="text-muted-foreground">System / Automatic</span>
+                                    )}
+                                  </td>
+                                </tr>
+                                {isOpen && (
+                                  <tr className="bg-muted/20">
+                                    <td colSpan={8} className="p-3">
+                                      <div
+                                        className="rounded-md border border-slate-200 bg-white p-3"
+                                        data-testid={`payout-timeline-${p.payout_id}`}
+                                      >
+                                        <div className="text-xs font-semibold mb-2 flex items-center gap-1">
+                                          <History className="h-3.5 w-3.5" />
+                                          Audit timeline
+                                        </div>
+                                        {payoutTimeline?.loading && <div className="text-xs text-muted-foreground">Loading…</div>}
+                                        {payoutTimeline?.error && <div className="text-xs text-rose-600">{payoutTimeline.error}</div>}
+                                        {payoutTimeline?.events?.length === 0 && !payoutTimeline?.loading && (
+                                          <div className="text-xs text-muted-foreground">No timeline entries recorded.</div>
+                                        )}
+                                        <ol className="space-y-2">
+                                          {(payoutTimeline?.events || []).map((ev, i) => (
+                                            <li key={i} className="text-xs flex gap-3 items-start">
+                                              <span className="text-muted-foreground font-mono whitespace-nowrap">
+                                                {new Date(ev.at).toLocaleString()}
+                                              </span>
+                                              <span className="font-medium text-slate-800">{ev.kind}</span>
+                                              <span className="text-muted-foreground truncate">
+                                                {ev.actor_email && (
+                                                  <span className="mr-2">by {ev.actor_email}</span>
+                                                )}
+                                                {ev.detail}
+                                              </span>
+                                            </li>
+                                          ))}
+                                        </ol>
+                                      </div>
+                                    </td>
+                                  </tr>
                                 )}
-                              </td>
-                              <td
-                                className="p-3 font-semibold"
-                                data-testid={`pending-payout-amount-${p.payout_id}`}
-                              >
-                                ${Number(p.amount || 0).toFixed(2)} {p.currency || 'CAD'}
-                              </td>
-                              <td className="p-3">
-                                <Badge className={badgeClass}>{p.status}</Badge>
-                              </td>
-                              <td
-                                className="p-3 text-xs"
-                                data-testid={`pending-payout-created-${p.payout_id}`}
-                              >
-                                {created ? created.toLocaleString() : '—'}
-                              </td>
-                              <td className="p-3">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  disabled={!p.seller_has_connect}
-                                  data-testid={`release-payout-btn-${p.payout_id}`}
-                                  onClick={() => setConfirm({
-                                    title: 'Release payout?',
-                                    description:
-                                      `Send $${Number(p.amount || 0).toFixed(2)} ${p.currency || 'CAD'} to `
-                                      + `${p.seller_name || p.seller_email || 'the seller'} `
-                                      + `via Stripe Connect for auction ${p.listing_id}.`
-                                      + `${p.seller_has_connect ? '' : '\n\n⚠️ Seller has no active Stripe Connect account — release will fail until they onboard.'}`,
-                                    confirmText: 'Release Payout',
-                                    onConfirm: () => releasePendingPayout(p.payout_id),
-                                    successMessage: null, // release helper toasts its own message
-                                  })}
-                                >
-                                  <DollarSign className="h-3.5 w-3.5 mr-1" />
-                                  Release Payout
-                                </Button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                  <Paginator page={page} setPage={setPage} total={filtered.length} />
-                </>
-              );
-            })()
+                              </React.Fragment>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                    <Paginator page={page} setPage={setPage} total={payoutHistory.length} />
+                  </>
+                );
+              })()
+            )
           }
         </div>
       )}

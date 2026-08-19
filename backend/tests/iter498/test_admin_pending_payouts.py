@@ -55,8 +55,17 @@ def _login(email: str, password: str) -> str:
     return tok
 
 
+# iter499 — cache the admin token at module scope to avoid repeatedly
+# hitting the login endpoint (fast local runs trip brute-force limiter).
+_ADMIN_TOKEN_CACHE: dict = {}
+
+
 def _admin_headers() -> dict:
-    return {"Authorization": f"Bearer {_login(ADMIN_EMAIL, ADMIN_PASSWORD)}"}
+    tok = _ADMIN_TOKEN_CACHE.get("token")
+    if not tok:
+        tok = _login(ADMIN_EMAIL, ADMIN_PASSWORD)
+        _ADMIN_TOKEN_CACHE["token"] = tok
+    return {"Authorization": f"Bearer {tok}"}
 
 
 def _fresh_nonadmin_headers() -> dict:
