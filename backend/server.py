@@ -1835,6 +1835,19 @@ try:
     app.include_router(ar_admin_router)
     app.include_router(ar_admin_reserve_router)
 
+    # iter500 — Accept Below Reserve (seller + admin)
+    # Reuses services/auction_requests_service._apply_reserve_not_met_approval
+    # so settle_auction(bypass_reserve=True) fires the standard settlement
+    # emails + payout record path. Zero touch to fee/settlement/tax code.
+    from routes.accept_below_reserve import (
+        router   as abr_router,
+        set_db   as set_abr_db,
+        set_auth as set_abr_auth,
+    )
+    set_abr_db(db)
+    set_abr_auth(_payments_auth)
+    app.include_router(abr_router)
+
     # iter306 — Error logging (frontend + backend) and admin Error Logs tab
     from routes.error_logs import router as error_logs_router
     api_router.include_router(error_logs_router)

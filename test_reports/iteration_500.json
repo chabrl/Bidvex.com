@@ -1,0 +1,30 @@
+{
+  "summary": "iter500 — Accept Below Reserve + Mobile Scroll Fix — FULL PASS. Backend: 12/12 unit tests pass; 8/8 new live-API tests pass; iter484 regression 23/23 pass. Frontend: seller button + dialog verified with correct data (hammer $120.00, buyer 'Test Buyer', item name, lot='Auction'); admin button verified in Manage-All-Auctions; Cancel dismisses modal without side effects. Mobile scroll fix verified at 375x812 and 768x1024 — vertical wheel, mouse-drag, and real CDP touch swipes (both directions) never change lots; Prev/Next buttons and Prev-bottom/Next-bottom navigate correctly. STRIPE_API_KEY was NOT modified; happy-path POST intentionally not fired in preview per instructions.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/iter500/test_accept_below_reserve.py",
+    "/app/backend/tests/test_iter500_live_abr.py",
+    "/app/test_reports/pytest/iter500_abr.xml",
+    "/app/test_reports/pytest/iter500_live.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "AcceptBelowReserveButton fires the eligibility GET on every mount for every reserve_not_met listing/lot in the dashboard. For sellers with many such lots, consider batching or caching, but not blocking.",
+    "The dialog's french locale correctly renders '120,00 $' (formatCurrency respects i18n). Tests that hard-code '$120.00' will fail under /fr routes — reviewers should be aware.",
+    "Rollback branch in accept_below_reserve.py restores request row to pending on settle exception (verified by code review; live happy-path not exercised as instructed)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter500_live_abr.py (new — 8 live tests)"
+  ],
+  "success_rate": {"backend": "100% (12/12 unit + 8/8 live + 23/23 iter484 regression)", "frontend": "100% (seller + admin + mobile scroll)"},
+  "test_credentials": "Used credentials from review request. seller/buyer/admin all authenticated successfully.",
+  "seed_data_creation": "None — used seeded iter500-abr-demo and existing multi-item listing 58758582-f53a-46d8-bc0b-87cf9de60523.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Live happy-path POST /accept-below-reserve was NOT invoked to avoid triggering real Stripe (per review guidance). Unit tests already prove settlement path + rollback. If the main agent wants an end-to-end live confirmation, they must temporarily set STRIPE_API_KEY=STRIPE_TEST_SECRET_KEY and restore afterwards. The mobile scroll fix is verified via URL-and-data-lot-number invariant checks after wheel/mouse-drag/CDP touch events."
+}

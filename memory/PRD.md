@@ -1,6 +1,45 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter500 — Accept Below Reserve + Mobile Scroll Nav Fix (Feb 20, 2026) ✅ SHIPPED (preview) · ⛔ DO NOT DEPLOY
+
+### Feature 1 — Accept Below Reserve button
+
+**Backend — `routes/accept_below_reserve.py` (net-new):**
+- `GET /api/auctions/{auction_id}/reserve-not-met-eligibility?lot_number=` — hydrates the button. Returns `{eligible, reason, lot_number, item_name, hammer_price, buyer_name, buyer_user_id, currency, has_saved_payment_method}`. `reason` enum: `status_not_reserve_not_met`, `already_sold`, `no_winning_bid`, `no_saved_payment_method`.
+- `POST /api/auctions/{auction_id}/accept-below-reserve` (body `{lot_number: int|null}`) — auth: seller OR admin. Guards: status==`reserve_not_met`, sold_quantity==0, winner has saved payment method. Locates the pending `auction_requests` row (or creates one via `create_system_reserve_not_met_request` if missing), flips it to `approved`, then invokes `services.auction_requests_service._apply_reserve_not_met_approval` — the **same** helper the admin approval flow uses. This re-runs `settle_auction(bypass_reserve=True)` and `finalize_auction_payment(...)`, which triggers the standard settlement emails + payout record. On settlement exception, rolls the request row back to `pending`.
+- **Zero touch** to `services/auction_settlement.py`, `services/fee_calculator.py`, `services/tax_engine.py`, `services/stripe_connect_service.py`, `services/payment_collection.py`.
+
+**Frontend — `components/AcceptBelowReserveButton.jsx` (new, shared):**
+- Renders label `Accept Below Reserve — $[hammer_price]` and a Radix `AlertDialog` with four fields: lot, item, hammer, buyer + a red warning bar. Cancel dismisses without side effects; Confirm shows a spinner then invokes the parent's `onSuccess` refresh callback.
+- Data-testids: `accept-below-reserve-btn-{surface}-{auctionId}[-lot{n}]`, `accept-below-reserve-dialog-{auctionId}[-lot{n}]`, `abr-dialog-{lot|item|hammer|buyer}`, `abr-dialog-{cancel|confirm}-{auctionId}[-lot{n}]`.
+
+**Frontend integrations:**
+- `pages/SellerDashboard.js` — renders the button on both single-item listings (`listing.status==='reserve_not_met'`) and multi-item lots (per-lot).
+- `pages/admin/ManageAllAuctions.js` — same conditional rendering on the admin panel, `variant='admin'`.
+
+**Tests — `backend/tests/iter500/test_accept_below_reserve.py` (12 pytest cases, all green):**
+- happy path (seller + admin), no saved PM (400), wrong status (409), non-owner (403), lot-scoped happy path, already-sold (409), unauthenticated (401), plus `_extract_context` and `_has_saved_payment_method` unit checks.
+
+### Feature 2 — Multi-Lot mobile scroll must never navigate
+
+**`pages/LotDetailPage.jsx`:**
+- Deleted the swipe-navigation handlers (`onTouchStart` / `onTouchEnd` on the page root) that previously moved the user to the next/prev lot when they swiped left/right on mobile. The horizontal `dx > 60px` threshold hijacked normal scroll on small screens.
+- Removed the `useRef` import (no longer used).
+- Kept: keyboard arrow shortcuts (desktop only), Prev/Next arrow buttons at the top AND bottom of the page (four buttons total with testids `lot-detail-{prev,next}` and `lot-detail-{prev,next}-bottom`).
+- **Verified by testing agent** at 375×812 and 768×1024 viewports — vertical scroll, mouse-drag, and real CDP touch swipes in both directions never change the active lot. Prev/Next taps still work.
+
+### Verification
+- Backend unit tests: 12/12 pass (`pytest backend/tests/iter500/`).
+- Regression: iter484 reserve settlement suite 23/23 still green.
+- Live API (testing agent iter500): 8/8 live tests pass (eligibility + error branches).
+- UI: seller button + dialog verified with correct data; admin button verified in Manage-All-Auctions; mobile scroll fix verified at 375px and 768px.
+- Preview URL: https://prod-verify-2.preview.emergentagent.com
+
+### Untouched (audit)
+- `services/fee_calculator.py`, `services/tax_engine.py`, `services/stripe_connect_service.py`, `services/auction_settlement.py`, `services/payment_collection.py`, `services/auction_requests_service.py` (only *reused* — no code change).
+
+
 ## iter499 — Admin Payout Operations (filters + CSV + Connect nudge + history/timeline) (Feb 20, 2026) ✅ SHIPPED (preview) · ⏳ READY FOR REDEPLOY
 
 ### Delivered (one-pass, additive over iter498)

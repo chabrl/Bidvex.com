@@ -38,6 +38,8 @@ import SellerLiveEditModal from './SellerLiveEditModal';
 import { DocumentsPopover } from '../components/DocumentsPopover';
 // iter476 — Shared Business Settings / Billing Profile (logo + tax IDs)
 import BusinessSettingsCard from '../components/BusinessSettingsCard';
+// iter500 — Accept Below Reserve (seller + admin)
+import AcceptBelowReserveButton from '../components/AcceptBelowReserveButton';
 
 const API = API_BASE;
 
@@ -1255,6 +1257,34 @@ const SellerDashboard = () => {
                                   ? ((i18n.language || 'en').startsWith('fr') ? 'Renouveler' : 'Renew')
                                   : ((i18n.language || 'en').startsWith('fr') ? 'Promouvoir' : 'Promote')}
                               </Button>
+                            )}
+                            {/* iter500 — Accept Below Reserve action (single + multi-lot) */}
+                            {!isMultiItem && listing.status === 'reserve_not_met' && (
+                              <AcceptBelowReserveButton
+                                auctionId={listing.id}
+                                lotNumber={null}
+                                token={token}
+                                onSuccess={fetchDashboard}
+                                variant="seller"
+                                surface="seller"
+                              />
+                            )}
+                            {isMultiItem && Array.isArray(listing.lots) && (
+                              <>
+                                {listing.lots
+                                  .filter((lot) => (lot?.status || '').toLowerCase() === 'reserve_not_met')
+                                  .map((lot) => (
+                                    <AcceptBelowReserveButton
+                                      key={`abr-${listing.id}-${lot.lot_number}`}
+                                      auctionId={listing.id}
+                                      lotNumber={lot.lot_number}
+                                      token={token}
+                                      onSuccess={fetchDashboard}
+                                      variant="seller"
+                                      surface="seller"
+                                    />
+                                  ))}
+                              </>
                             )}
                             {/* iter298 BUG 2 — Relist actions for zero-bid ended listings. */}
                             {isNoSaleListing(listing) && !isMultiItem && (

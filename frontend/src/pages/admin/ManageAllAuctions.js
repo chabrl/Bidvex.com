@@ -16,6 +16,8 @@ import { Package, Search, Edit2, Trash2, Pause, Archive, XCircle, Eye, AlertTria
 import { formatCurrency } from '../../utils/currencyFormatter';
 import AdminLotEditorModal from './AdminLotEditorModal';
 import { extractErrorMessage } from '../../utils/errorHandler';
+// iter500 — Accept Below Reserve (admin)
+import AcceptBelowReserveButton from '../../components/AcceptBelowReserveButton';
 
 const API = API_BASE;
 
@@ -795,6 +797,32 @@ const ManageAllAuctions = () => {
                       <Trash2 className="h-4 w-4 mr-1" />
                       Delete
                     </Button>
+                    {/* iter500 — Accept Below Reserve action (single + multi-lot) */}
+                    {(listing.status || '').toLowerCase() === 'reserve_not_met'
+                      && listing.type !== 'multi'
+                      && !['lots', 'vehicle_multi', 'vehicle_multi_lot'].includes(listing._section) && (
+                      <AcceptBelowReserveButton
+                        auctionId={listing.id}
+                        lotNumber={null}
+                        token={token}
+                        onSuccess={fetchAllListings}
+                        variant="admin"
+                        surface="admin"
+                      />
+                    )}
+                    {Array.isArray(listing.lots) && listing.lots
+                      .filter((lot) => (lot?.status || '').toLowerCase() === 'reserve_not_met')
+                      .map((lot) => (
+                        <AcceptBelowReserveButton
+                          key={`abr-admin-${listing.id}-${lot.lot_number}`}
+                          auctionId={listing.id}
+                          lotNumber={lot.lot_number}
+                          token={token}
+                          onSuccess={fetchAllListings}
+                          variant="admin"
+                          surface="admin"
+                        />
+                      ))}
                   </div>
                   </div>
                 </div>

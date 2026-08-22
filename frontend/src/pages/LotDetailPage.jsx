@@ -6,9 +6,10 @@
  * Design goals (from user spec):
  *   • Optimised for BIDDING — large image gallery, big Current Bid,
  *     Next Valid Bid, countdown, bid history, actions.
- *   • Previous / Next lot navigation at the top; keyboard arrows +
- *     mobile swipe move between lots. Buyer never needs to bounce
- *     back to the grid.
+ *   • Previous / Next lot navigation at the top; keyboard arrows are
+ *     the desktop shortcut. Mobile navigates ONLY through the Prev/Next
+ *     buttons — scroll and swipe gestures never change lots
+ *     (iter500 fix). Buyer never needs to bounce back to the grid.
  *   • Returning to the grid restores scroll + filters + sort + search
  *     via history state (sessionStorage snapshot written by CompactLotCard
  *     is consumed by MultiItemListingDetailPage on mount).
@@ -21,7 +22,7 @@
  * page inherits every prior fix (privacy alias, escrow rendering, tax-free
  * badge logic).
  */
-import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
@@ -189,18 +190,12 @@ export default function LotDetailPage() {
     return () => window.removeEventListener('keydown', handler);
   }, [nextLot, prevLot, goToLot, backToGrid]);
 
-  // Swipe navigation for mobile — iter368.
-  const touchStartX = useRef(null);
-  const onTouchStart = (e) => { touchStartX.current = e.touches[0].clientX; };
-  const onTouchEnd = (e) => {
-    if (touchStartX.current == null) return;
-    const dx = e.changedTouches[0].clientX - touchStartX.current;
-    if (Math.abs(dx) > 60) {
-      if (dx < 0 && nextLot) goToLot(nextLot.lot_number);
-      else if (dx > 0 && prevLot) goToLot(prevLot.lot_number);
-    }
-    touchStartX.current = null;
-  };
+  // iter500 — Mobile scroll must NEVER trigger lot navigation.
+  // The old swipe-to-navigate handlers hijacked scroll gestures and
+  // pushed the user to another lot. Removed entirely; the Prev/Next
+  // buttons at the top and bottom of the page are now the only way to
+  // change lots. Keyboard arrows above still work (desktop only —
+  // ArrowLeft/ArrowRight keys don't fire on scroll).
 
   const handlePlaceBid = async (amount) => {
     if (!user) { navigate('/auth'); return; }
@@ -265,7 +260,7 @@ export default function LotDetailPage() {
   const dp = computeDisplayPrice({ ...lot, current_bid: lot.current_price ?? null });
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950" data-testid="lot-detail-page" data-lot-number={lot.lot_number} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950" data-testid="lot-detail-page" data-lot-number={lot.lot_number}>
       {/* Top nav — Back + Previous / Next */}
       <div className="sticky top-0 z-30 bg-white/95 dark:bg-slate-950/95 backdrop-blur border-b border-slate-200 dark:border-slate-800">
         <div className="max-w-6xl mx-auto px-4 py-2 flex items-center gap-2">
