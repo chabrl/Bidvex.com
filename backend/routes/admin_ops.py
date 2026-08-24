@@ -637,22 +637,23 @@ async def admin_get_affiliates(current_user: User = Depends(require_admin)):
 
 
 @admin_ops_router.put("/admin/users/{user_id}/affiliate")
-async def admin_set_affiliate_status(user_id: str, data: Dict[str, bool], current_user: User = Depends(require_admin)):
-    db = get_db()
-    is_affiliate = data.get("is_affiliate", False)
-    if is_affiliate:
-        affiliate_code = str(uuid.uuid4())[:8]
-        await db.affiliates.insert_one({
-            "id": str(uuid.uuid4()),
-            "user_id": user_id,
-            "affiliate_code": affiliate_code,
-            "total_earnings": 0.0,
-            "created_at": datetime.now(timezone.utc).isoformat()
-        })
-    else:
-        await db.affiliates.delete_one({"user_id": user_id})
-    
-    return {"message": f"Affiliate status {'enabled' if is_affiliate else 'disabled'}"}
+async def admin_set_affiliate_status_legacy(user_id: str, data: Dict[str, bool], current_user: User = Depends(require_admin)):
+    """iter501 — DEPRECATED shim.
+
+    The old flow inserted a decorative row into ``db.affiliates`` and had
+    NO effect on commission awarding.  It is now a thin adapter over the
+    canonical ``POST /api/affiliate/admin/set-status`` endpoint, which
+    persists ``affiliate_status`` directly on the user document (the
+    single source of truth).  The legacy ``db.affiliates`` collection is
+    no longer written to.
+    """
+    from routes.affiliate import admin_set_affiliate_status
+    is_affiliate = bool(data.get("is_affiliate", False))
+    payload = {
+        "user_id": user_id,
+        "status": "active" if is_affiliate else "revoked",
+    }
+    return await admin_set_affiliate_status(payload, current_user)
 
 
 

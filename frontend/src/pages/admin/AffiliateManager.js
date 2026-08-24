@@ -1,68 +1,382 @@
+/**
+ * iter501 — Admin Affiliate Manager
+ *
+ * Two responsibilities in one page:
+ *   1. Approve payout requests (unchanged from iter499).
+ *   2. Manage per-affiliate STATUS (active / revoked) and per-affiliate
+ *      custom commission rate (0–20% override; null = fall back to the
+ *      global 3% default).
+ *
+ * Backend contract:
+ *   GET  /api/affiliate/admin/all           — list all affiliates + candidates
+ *   POST /api/affiliate/admin/set-status    — {user_id, status, commission_rate?}
+ *   POST /api/affiliate/admin/set-rate      — {user_id, commission_rate|null}
+ */
 import API_BASE from '../../config';
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import axios from 'axios';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
+import { Input } from '../../components/ui/input';
 import { Badge } from '../../components/ui/badge';
 import { toast } from 'sonner';
 import { ConfirmDialog } from '../../components/ui/confirm-dialog';
-import { DollarSign, CheckCircle, Users } from 'lucide-react';
+import {
+  DollarSign, CheckCircle, Users, Ban, Save, Loader2,
+} from 'lucide-react';
 import { formatCurrency } from '../../utils/currencyFormatter';
-import { useTranslation } from 'react-i18next';
 
 const API = API_BASE;
 
+// Convert a rate stored as a fraction (e.g. 0.05) to a percentage string
+// suitable for the input field. Uses at most 4 decimal places so both
+// "3" (integer) and "7.5" (fractional) round-trip cleanly.
+const fractionToPct = (rate) =>
+  rate === null || rate === undefined || Number.isNaN(Number(rate))
+    ? ''
+    : String(+(Number(rate) * 100).toFixed(4));
+
+const pctToFraction = (pctStr) => {
+  const n = Number(pctStr);
+  if (Number.isNaN(n)) return NaN;
+  return +(n / 100).toFixed(6);
+};
+
+const RATE_MIN_PCT = 0;
+const RATE_MAX_PCT_DEFAULT = 20; // mirrors backend MAX_AFFILIATE_COMMISSION_RATE
+
+const STATUS_BADGE = {
+  active:  { cls: 'bg-emerald-100 text-emerald-800 border-emerald-300', en: 'Active',  fr: 'Actif' },
+  pending: { cls: 'bg-amber-100 text-amber-800 border-amber-300',       en: 'Pending', fr: 'En attente' },
+  revoked: { cls: 'bg-rose-100 text-rose-800 border-rose-300',          en: 'Revoked', fr: 'Révoqué' },
+  none:    { cls: 'bg-slate-100 text-slate-700 border-slate-300',       en: 'None',    fr: 'Aucun' },
+};
+
+/**
+ * Row for a single affiliate — pill status + rate input + action button(s).
+ * Keeps its own local state for the rate input so a validation error
+ * doesn't wipe the parent's list re-fetch.
+ */
+const AffiliateRow = ({ affiliate, defaultRate, maxRate, onSaved, isFr }) => {
+  const initialPct = fractionToPct(affiliate.commission_rate);
+  const [rateInput, setRateInput] = useState(initialPct);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    setRateInput(fractionToPct(affiliate.commission_rate));
+    setError('');
+  }, [affiliate.commission_rate, affiliate.id]);
+
+  const validate = () => {
+    const trimmed = String(rateInput || '').trim();
+    if (trimmed === '') {
+      // Empty = clear the override → fall back to default. Valid.
+      return { ok: true, rate: null };
+    }
+    const n = Number(trimmed);
+    if (Number.isNaN(n)) {
+      return { ok: false, msg: isFr ? 'Taux invalide' : 'Invalid rate' };
+    }
+    if (n < RATE_MIN_PCT || n > (maxRate * 100)) {
+      return {
+        ok: false,
+        msg: isFr
+          ? `Le taux doit être entre ${RATE_MIN_PCT}% et ${(maxRate * 100)}%`
+          : `Rate must be between ${RATE_MIN_PCT}% and ${(maxRate * 100)}%`,
+      };
+    }
+    return { ok: true, rate: pctToFraction(n) };
+  };
+
+  const status = (affiliate.affiliate_status || 'none').toLowerCase();
+  const isActive = status === 'active';
+  const isPendingOrNone = status === 'none' || status === 'pending';
+  const isRevoked = status === 'revoked';
+
+  const currentEffectivePct = fractionToPct(affiliate.effective_rate ?? defaultRate);
+  const oldRatePctForToast = fractionToPct(affiliate.effective_rate ?? defaultRate);
+
+  const doApprove = async () => {
+    const v = validate();
+    if (!v.ok) {
+      setError(v.msg);
+      toast.error(v.msg);
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      const token = localStorage.getItem('token');
+      const body = { user_id: affiliate.id, status: 'active' };
+      if (v.rate !== null) body.commission_rate = v.rate;
+      const res = await axios.post(`${API}/affiliate/admin/set-status`, body, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const newRatePct = fractionToPct(res.data.effective_rate);
+      const name = affiliate.name || affiliate.email || affiliate.id;
+      toast.success(
+        isFr
+          ? `${name} approuvé — ${oldRatePctForToast}% → ${newRatePct}%`
+          : `${name} approved — ${oldRatePctForToast}% → ${newRatePct}%`,
+      );
+      onSaved && onSaved();
+    } catch (err) {
+      const detail = err?.response?.data?.detail;
+      const msg =
+        typeof detail === 'string'
+          ? detail
+          : detail?.[isFr ? 'message_fr' : 'message_en']
+            || detail?.message
+            || (isFr ? 'Échec de l\u2019approbation' : 'Approval failed');
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const doSaveRate = async () => {
+    const v = validate();
+    if (!v.ok) {
+      setError(v.msg);
+      toast.error(v.msg);
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.post(
+        `${API}/affiliate/admin/set-rate`,
+        { user_id: affiliate.id, commission_rate: v.rate },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      const newRatePct = fractionToPct(res.data.effective_rate);
+      const name = affiliate.name || affiliate.email || affiliate.id;
+      if (res.data.changed) {
+        toast.success(
+          isFr
+            ? `${name} : ${oldRatePctForToast}% → ${newRatePct}%`
+            : `${name}: ${oldRatePctForToast}% → ${newRatePct}%`,
+        );
+      } else {
+        toast(isFr ? 'Aucun changement' : 'No change', { duration: 1500 });
+      }
+      onSaved && onSaved();
+    } catch (err) {
+      const detail = err?.response?.data?.detail;
+      const msg =
+        typeof detail === 'string'
+          ? detail
+          : detail?.[isFr ? 'message_fr' : 'message_en']
+            || detail?.message
+            || (isFr ? 'Échec de la mise à jour' : 'Update failed');
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const badgeMeta = STATUS_BADGE[status] || STATUS_BADGE.none;
+
+  return (
+    <div
+      className="grid grid-cols-1 md:grid-cols-12 gap-3 items-start md:items-center p-4 border rounded-lg bg-white dark:bg-slate-900"
+      data-testid={`affiliate-row-${affiliate.id}`}
+    >
+      <div className="md:col-span-5 min-w-0">
+        <p className="font-semibold truncate" data-testid={`affiliate-name-${affiliate.id}`}>
+          {affiliate.name || (isFr ? 'Sans nom' : 'Unnamed')}
+        </p>
+        <p className="text-xs text-muted-foreground truncate">{affiliate.email}</p>
+        <div className="flex items-center gap-2 mt-1 flex-wrap">
+          <Badge
+            className={`${badgeMeta.cls} text-[10px]`}
+            data-testid={`affiliate-status-badge-${affiliate.id}`}
+          >
+            {isFr ? badgeMeta.fr : badgeMeta.en}
+          </Badge>
+          <span className="text-xs text-muted-foreground">
+            {isFr ? 'Actuel:' : 'Current:'}{' '}
+            <b data-testid={`affiliate-effective-rate-${affiliate.id}`}>
+              {currentEffectivePct}%
+            </b>
+            {affiliate.commission_rate == null && (
+              <span className="text-[10px] italic ml-1 text-slate-500">
+                ({isFr ? 'défaut' : 'default'})
+              </span>
+            )}
+          </span>
+          {affiliate.referred_count > 0 && (
+            <span className="text-[10px] text-muted-foreground">
+              · {affiliate.referred_count} {isFr ? 'référés' : 'referred'}
+            </span>
+          )}
+          {(affiliate.total_credits_earned || 0) > 0 && (
+            <span className="text-[10px] text-muted-foreground">
+              · {formatCurrency(affiliate.total_credits_earned)} {isFr ? 'gagnés' : 'earned'}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="md:col-span-3">
+        <label className="block text-[10px] uppercase tracking-wide text-slate-500 mb-1">
+          {isFr ? 'Taux (%)' : 'Rate (%)'}
+        </label>
+        <Input
+          type="number"
+          min={RATE_MIN_PCT}
+          max={maxRate * 100}
+          step="0.1"
+          value={rateInput}
+          onChange={(e) => { setRateInput(e.target.value); setError(''); }}
+          placeholder={`${fractionToPct(defaultRate)}`}
+          className={error ? 'border-rose-500' : ''}
+          data-testid={`affiliate-rate-input-${affiliate.id}`}
+        />
+        {error && (
+          <p className="text-xs text-rose-600 mt-1" data-testid={`affiliate-rate-error-${affiliate.id}`}>
+            {error}
+          </p>
+        )}
+      </div>
+
+      <div className="md:col-span-4 flex flex-wrap gap-2 justify-end">
+        {(isPendingOrNone || isRevoked) && (
+          <Button
+            size="sm"
+            onClick={doApprove}
+            disabled={saving}
+            data-testid={`affiliate-approve-btn-${affiliate.id}`}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white"
+          >
+            {saving ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <CheckCircle className="h-3.5 w-3.5 mr-1.5" />}
+            {isRevoked
+              ? (isFr ? 'Réactiver' : 'Reactivate')
+              : (isFr ? 'Approuver' : 'Approve')}
+          </Button>
+        )}
+        {isActive && (
+          <>
+            <Button
+              size="sm"
+              onClick={doSaveRate}
+              disabled={saving}
+              data-testid={`affiliate-save-rate-btn-${affiliate.id}`}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              {saving ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Save className="h-3.5 w-3.5 mr-1.5" />}
+              {isFr ? 'Enregistrer' : 'Save Rate'}
+            </Button>
+            <RevokeButton affiliate={affiliate} isFr={isFr} onSaved={onSaved} />
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const RevokeButton = ({ affiliate, isFr, onSaved }) => {
+  const [confirm, setConfirm] = useState(null);
+
+  const doRevoke = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(
+        `${API}/affiliate/admin/set-status`,
+        { user_id: affiliate.id, status: 'revoked' },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      toast.success(
+        isFr
+          ? `${affiliate.name || affiliate.email} révoqué`
+          : `${affiliate.name || affiliate.email} revoked`,
+      );
+      onSaved && onSaved();
+    } catch (err) {
+      const detail = err?.response?.data?.detail;
+      const msg =
+        typeof detail === 'string'
+          ? detail
+          : detail?.[isFr ? 'message_fr' : 'message_en']
+            || detail?.message
+            || (isFr ? 'Échec de la révocation' : 'Revoke failed');
+      toast.error(msg);
+    }
+  };
+
+  return (
+    <>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => setConfirm({
+          title: isFr ? 'Révoquer cet affilié ?' : 'Revoke this affiliate?',
+          description: isFr
+            ? `${affiliate.name || affiliate.email} arrêtera d\u2019accumuler des commissions à partir de maintenant. Les gains passés ne sont pas affectés.`
+            : `${affiliate.name || affiliate.email} will stop accruing new commissions immediately. Past earnings are not affected.`,
+          confirmText: isFr ? 'Révoquer' : 'Revoke',
+          successMessage: '',
+          onConfirm: doRevoke,
+        })}
+        data-testid={`affiliate-revoke-btn-${affiliate.id}`}
+        className="border-rose-300 text-rose-700 hover:bg-rose-50"
+      >
+        <Ban className="h-3.5 w-3.5 mr-1.5" />
+        {isFr ? 'Révoquer' : 'Revoke'}
+      </Button>
+      <ConfirmDialog state={confirm} onClose={() => setConfirm(null)} />
+    </>
+  );
+};
+
+
 const AffiliateManager = () => {
   const { token } = useAuth();
-  const headers = { Authorization: `Bearer ${token}` };
-  const { t } = useTranslation();
-  const [affiliates, setAffiliates] = useState([]);
+  const { t, i18n } = useTranslation();
+  const isFr = i18n.language?.startsWith('fr');
+  const [rows, setRows] = useState([]);
   const [payouts, setPayouts] = useState([]);
-  const [users, setUsers] = useState([]);
+  const [defaultRate, setDefaultRate] = useState(0.03);
+  const [maxRate, setMaxRate] = useState(RATE_MAX_PCT_DEFAULT / 100);
   const [loading, setLoading] = useState(true);
   const [confirm, setConfirm] = useState(null);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  const headers = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
-      const [affiliatesRes, payoutsRes, usersRes] = await Promise.all([
-        axios.get(`${API}/admin/affiliates`, { headers }),
-        axios.get(`${API}/admin/affiliate/payouts`, { headers }),
-        axios.get(`${API}/admin/users`, { headers })
+      const [affRes, payRes] = await Promise.all([
+        axios.get(`${API}/affiliate/admin/all`, { headers }),
+        axios.get(`${API}/admin/affiliate/payouts`, { headers }).catch(() => ({ data: [] })),
       ]);
-      const affData = affiliatesRes.data;
-      setAffiliates(Array.isArray(affData) ? affData : affData.affiliates || []);
-      const payData = payoutsRes.data;
-      setPayouts(Array.isArray(payData) ? payData : payData.payouts || []);
-      const userData = usersRes.data;
-      setUsers(Array.isArray(userData) ? userData : userData.users || []);
-    } catch (error) {
-      toast.error('Failed to load affiliate data');
+      const affData = affRes.data;
+      setRows(Array.isArray(affData?.items) ? affData.items : []);
+      setDefaultRate(affData?.default_rate ?? 0.03);
+      setMaxRate(affData?.max_rate ?? (RATE_MAX_PCT_DEFAULT / 100));
+      const payData = payRes.data;
+      setPayouts(Array.isArray(payData) ? payData : (payData?.payouts || []));
+    } catch (_) {
+      toast.error(isFr ? 'Échec du chargement des données' : 'Failed to load affiliate data');
     } finally {
       setLoading(false);
     }
-  };
+  }, [headers, isFr]);
 
-  const handleSetAffiliateStatus = async (userId, isAffiliate) => {
-    try {
-      await axios.put(`${API}/admin/users/${userId}/affiliate`, { is_affiliate: !isAffiliate }, { headers });
-      toast.success(`Affiliate status ${!isAffiliate ? 'enabled' : 'disabled'}`);
-      fetchData();
-    } catch (error) {
-      toast.error('Failed to update affiliate status');
-    }
-  };
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const handleApprovePayout = (payoutId, amount) => {
     setConfirm({
-      title: 'Approve this affiliate payout?',
-      description: `Amount: $${(amount ?? 0).toFixed(2)}.\nThis will trigger the Stripe transfer.\nApprouver ce paiement d'affilié ?`,
-      confirmText: 'Approve Payout',
-      successMessage: 'Payout approved',
+      title: isFr ? 'Approuver ce paiement ?' : 'Approve this affiliate payout?',
+      description: `${isFr ? 'Montant' : 'Amount'}: $${(amount ?? 0).toFixed(2)}.
+${isFr ? 'Cela déclenchera le transfert Stripe.' : 'This will trigger the Stripe transfer.'}`,
+      confirmText: isFr ? 'Approuver le paiement' : 'Approve Payout',
+      successMessage: isFr ? 'Paiement approuvé' : 'Payout approved',
       onConfirm: async () => {
         await axios.put(`${API}/admin/affiliate/payouts/${payoutId}/approve`, {}, { headers });
         fetchData();
@@ -71,30 +385,43 @@ const AffiliateManager = () => {
   };
 
   if (loading) {
-    return <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-4 border-primary border-t-transparent"></div></div>;
+    return (
+      <div className="flex justify-center py-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-4 border-primary border-t-transparent" />
+      </div>
+    );
   }
 
-  const totalCommissions = affiliates.reduce((sum, aff) => sum + (aff.total_earnings || 0), 0);
+  const activeCount = rows.filter((r) => (r.affiliate_status || 'none').toLowerCase() === 'active').length;
+  const totalCommissions = rows.reduce((s, r) => s + (r.total_credits_earned || 0), 0);
+  const pendingPayoutCount = payouts.filter((p) => p.status === 'pending').length;
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold flex items-center gap-2"><DollarSign className="h-6 w-6" />Affiliate Program Management</h2>
-        <p className="text-muted-foreground">Manage affiliates and approve payouts</p>
+        <h2 className="text-2xl font-bold flex items-center gap-2">
+          <DollarSign className="h-6 w-6" />
+          {isFr ? 'Gestion du programme d\u2019affiliation' : 'Affiliate Program Management'}
+        </h2>
+        <p className="text-muted-foreground">
+          {isFr
+            ? `Approbations, paiements, et taux personnalisés (défaut ${(defaultRate * 100).toFixed(2)}%, max ${(maxRate * 100).toFixed(0)}%).`
+            : `Approvals, payouts, and per-affiliate custom rates (default ${(defaultRate * 100).toFixed(2)}%, cap ${(maxRate * 100).toFixed(0)}%).`}
+        </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card><CardContent className="p-6"><div className="flex items-center gap-4"><Users className="h-8 w-8 text-blue-600" /><div><p className="text-2xl font-bold">{affiliates.length}</p><p className="text-sm text-muted-foreground">Active Affiliates</p></div></div></CardContent></Card>
-        <Card><CardContent className="p-6"><div className="flex items-center gap-4"><DollarSign className="h-8 w-8 text-green-600" /><div><p className="text-2xl font-bold">{formatCurrency(totalCommissions)}</p><p className="text-sm text-muted-foreground">Total Commissions</p></div></div></CardContent></Card>
-        <Card><CardContent className="p-6"><div className="flex items-center gap-4"><CheckCircle className="h-8 w-8 text-yellow-600" /><div><p className="text-2xl font-bold">{payouts.filter(p => p.status === 'pending').length}</p><p className="text-sm text-muted-foreground">Pending Payouts</p></div></div></CardContent></Card>
+        <Card><CardContent className="p-6"><div className="flex items-center gap-4"><Users className="h-8 w-8 text-blue-600" /><div><p className="text-2xl font-bold" data-testid="active-affiliate-count">{activeCount}</p><p className="text-sm text-muted-foreground">{isFr ? 'Affiliés actifs' : 'Active Affiliates'}</p></div></div></CardContent></Card>
+        <Card><CardContent className="p-6"><div className="flex items-center gap-4"><DollarSign className="h-8 w-8 text-green-600" /><div><p className="text-2xl font-bold">{formatCurrency(totalCommissions)}</p><p className="text-sm text-muted-foreground">{isFr ? 'Commissions totales' : 'Total Commissions'}</p></div></div></CardContent></Card>
+        <Card><CardContent className="p-6"><div className="flex items-center gap-4"><CheckCircle className="h-8 w-8 text-yellow-600" /><div><p className="text-2xl font-bold">{pendingPayoutCount}</p><p className="text-sm text-muted-foreground">{isFr ? 'Paiements en attente' : 'Pending Payouts'}</p></div></div></CardContent></Card>
       </div>
 
       <Card>
-        <CardHeader><CardTitle>{t("admin.payoutRequests")}</CardTitle></CardHeader>
+        <CardHeader><CardTitle>{t('admin.payoutRequests', { defaultValue: isFr ? 'Demandes de paiement' : 'Payout Requests' })}</CardTitle></CardHeader>
         <CardContent>
           {payouts.length > 0 ? (
             <div className="space-y-2">
-              {payouts.map(payout => (
+              {payouts.map((payout) => (
                 <div key={payout.id} className="flex justify-between items-center p-4 border rounded-lg">
                   <div>
                     <p className="font-semibold">${payout.amount}</p>
@@ -104,39 +431,54 @@ const AffiliateManager = () => {
                   <div className="flex gap-2">
                     <Badge className={payout.status === 'approved' ? 'bg-green-600 text-white' : 'bg-yellow-600 text-white'}>{payout.status}</Badge>
                     {payout.status === 'pending' && (
-                      <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => handleApprovePayout(payout.id, payout.amount)} data-testid={`approve-payout-${payout.id}`}><CheckCircle className="h-4 w-4 mr-1" />Approve</Button>
+                      <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => handleApprovePayout(payout.id, payout.amount)} data-testid={`approve-payout-${payout.id}`}>
+                        <CheckCircle className="h-4 w-4 mr-1" />{isFr ? 'Approuver' : 'Approve'}
+                      </Button>
                     )}
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-center text-muted-foreground py-8">No payout requests</p>
+            <p className="text-center text-muted-foreground py-8">
+              {isFr ? 'Aucune demande de paiement' : 'No payout requests'}
+            </p>
           )}
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader><CardTitle>{t("admin.manageAffiliateStatus")}</CardTitle></CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            {users.slice(0, 20).map(user => {
-              const isAffiliate = affiliates.some(aff => aff.user_id === user.id);
-              return (
-                <div key={user.id} className="flex justify-between items-center p-4 border rounded-lg">
-                  <div>
-                    <p className="font-semibold">{user.name}</p>
-                    <p className="text-sm text-muted-foreground">{user.email}</p>
-                  </div>
-                  <Button size="sm" variant={isAffiliate ? 'default' : 'outline'} onClick={() => handleSetAffiliateStatus(user.id, isAffiliate)} className={isAffiliate ? 'gradient-button text-white border-0' : ''}>
-                    {isAffiliate ? 'Affiliate' : 'Make Affiliate'}
-                  </Button>
-                </div>
-              );
+        <CardHeader>
+          <CardTitle>
+            {t('admin.manageAffiliateStatus', {
+              defaultValue: isFr
+                ? 'Gérer le statut et le taux des affiliés'
+                : 'Manage Affiliate Status & Rate',
             })}
-          </div>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {rows.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8" data-testid="affiliates-empty">
+              {isFr ? 'Aucun affilié pour le moment.' : 'No affiliates yet.'}
+            </p>
+          ) : (
+            <div className="space-y-2" data-testid="affiliates-list">
+              {rows.map((affiliate) => (
+                <AffiliateRow
+                  key={affiliate.id}
+                  affiliate={affiliate}
+                  defaultRate={defaultRate}
+                  maxRate={maxRate}
+                  onSaved={fetchData}
+                  isFr={isFr}
+                />
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
+
       <ConfirmDialog state={confirm} onClose={() => setConfirm(null)} />
     </div>
   );

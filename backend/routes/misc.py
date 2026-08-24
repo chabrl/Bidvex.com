@@ -150,6 +150,18 @@ async def get_affiliate_stats(current_user: User = Depends(get_current_user)):
     public_host = os.environ.get("PUBLIC_HOST", "https://bidvex.com").rstrip("/")
     code = current_user.affiliate_code or ""
 
+    # iter501 — Pull effective rate (custom or default) so the dashboard
+    # never hardcodes 3% and reflects per-user overrides.
+    from routes.affiliate import (
+        AFFILIATE_PROFIT_SHARE_RATE, _resolve_effective_rate,
+    )
+    _user_doc = await db.users.find_one(
+        {"id": current_user.id},
+        {"_id": 0, "affiliate_status": 1, "commission_rate": 1},
+    ) or {}
+    effective_rate = _resolve_effective_rate(_user_doc)
+    rate_pct = round(effective_rate * 100, 2)
+
     return {
         "affiliate_code": code,
         "referral_link": f"{public_host}/r/{code}" if code else "",
@@ -158,8 +170,16 @@ async def get_affiliate_stats(current_user: User = Depends(get_current_user)):
         "total_earnings": total_earnings,
         "pending_earnings": pending_earnings,
         "paid_earnings": paid_earnings,
-        "commission_rate": "3% of platform profit",  # iter338 — lifetime profit share
-        "commission_description": "You earn 3% of BidVex's net platform revenue on every transaction from users you referred (auction fees & subscriptions) — for life",
+        # iter501 — machine-readable rate for the frontend + human string.
+        "commission_rate": effective_rate,
+        "commission_rate_display": f"{rate_pct:g}% of platform profit",
+        "default_commission_rate": AFFILIATE_PROFIT_SHARE_RATE,
+        "affiliate_status": (_user_doc.get("affiliate_status") or "none"),
+        "commission_description": (
+            f"You earn {rate_pct:g}% of BidVex's net platform revenue on "
+            "every transaction from users you referred (auction fees & "
+            "subscriptions) — for life"
+        ),
         "payout_delay_days": 7,
         "earnings_history": earnings,
         "referrals": referrals

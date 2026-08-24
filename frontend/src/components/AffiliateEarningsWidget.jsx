@@ -156,6 +156,20 @@ export const AffiliateEarningsWidget = () => {
       ? `Basé sur ${summary.projection_basis_months} mois de données`
       : `Based on ${summary.projection_basis_months} month${summary.projection_basis_months === 1 ? '' : 's'} of data`);
 
+  // iter501 — Read the effective commission rate from the API instead of
+  // hardcoding 3%. `commission_rate` is the per-user override or the
+  // global default; formatted at most 2dp with `g` so 3.00 → "3" and
+  // 5.50 → "5.5". Falls back to 3 if the payload predates iter501.
+  const currentRatePct = (() => {
+    const r = summary?.commission_rate;
+    const n = typeof r === 'number' ? r : Number(r);
+    if (Number.isNaN(n) || n <= 0) return 3;
+    return +(n * 100).toFixed(2);
+  })();
+  const isCustomRate =
+    summary?.default_commission_rate !== undefined
+    && summary.commission_rate !== summary.default_commission_rate;
+
   return (
     <Card className="border-emerald-200 dark:border-emerald-800" data-testid="affiliate-earnings-widget">
       <CardHeader className="pb-2">
@@ -219,8 +233,16 @@ export const AffiliateEarningsWidget = () => {
               ? `Ont généré ${formatCurrency(summary.this_month.platform_fees_generated)} en frais de plateforme ce mois-ci`
               : `Generated ${formatCurrency(summary.this_month.platform_fees_generated)} in platform fees this month`}
             {' · '}
-            {fr ? 'Votre part de 3 % :' : 'Your 3% share:'}{' '}
+            {fr ? `Votre part de ${currentRatePct}\u202f% :` : `Your ${currentRatePct}% share:`}{' '}
             <b>{formatCurrency(summary.this_month.earned)}</b>
+            {isCustomRate && (
+              <span
+                className="ml-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400"
+                data-testid="ew-custom-rate-tag"
+              >
+                {fr ? '(taux personnalisé)' : '(custom rate)'}
+              </span>
+            )}
           </p>
         </div>
 
@@ -275,6 +297,11 @@ export const AffiliateEarningsWidget = () => {
               {events.map((ev, i) => {
                 const src = SOURCE_LABELS[ev.revenue_source] || { en: 'transaction', fr: 'transaction' };
                 const sb = STATUS_BADGES[ev.status] || STATUS_BADGES.pending;
+                // iter501 — per-row rate (custom or default at the time of accrual)
+                const evRatePct = (() => {
+                  const n = Number(ev.rate);
+                  return Number.isNaN(n) || n <= 0 ? currentRatePct : +(n * 100).toFixed(2);
+                })();
                 return (
                   <div key={ev.id || i} className="flex items-center gap-2 text-xs flex-wrap py-1 border-b border-slate-100 dark:border-slate-800 last:border-0" data-testid={`ce-row-${i}`}>
                     <span className="text-slate-500 font-mono w-16 shrink-0">{fmtDate(ev.date)}</span>
@@ -283,7 +310,10 @@ export const AffiliateEarningsWidget = () => {
                     <span className="text-slate-400">→</span>
                     <span>{fr ? 'Frais BidVex :' : 'BidVex fee:'} <b>{formatCurrency(ev.platform_fee)}</b></span>
                     <span className="text-slate-400">→</span>
-                    <span>{fr ? 'Vos 3 % :' : 'Your 3%:'} <b className="text-emerald-700 dark:text-emerald-400">{formatCurrency(ev.commission)}</b></span>
+                    <span>
+                      {fr ? `Vos ${evRatePct}\u202f% :` : `Your ${evRatePct}%:`}{' '}
+                      <b className="text-emerald-700 dark:text-emerald-400">{formatCurrency(ev.commission)}</b>
+                    </span>
                     <Badge className={`${sb.cls} text-[10px] ml-auto`}>{fr ? sb.fr : sb.en}</Badge>
                   </div>
                 );

@@ -173,8 +173,12 @@ async def test_affiliate_3pct_commission_awarded(db):
     referrer_id = f"iter338-ref-{suffix}"
     payer_id = f"iter338-payer-{suffix}"
     code = f"T338{suffix[:4].upper()}"
+    # iter501 — referrer must be `active` for the commission gate to open.
+    # In production, the startup backfill promotes all pre-iter501 affiliates
+    # so this behaviour is preserved for existing users.
     await db.users.insert_one({"id": referrer_id, "name": "Ref User",
-                               "email": f"{referrer_id}@example.com", "affiliate_code": code})
+                               "email": f"{referrer_id}@example.com", "affiliate_code": code,
+                               "affiliate_status": "active"})
     await db.users.insert_one({"id": payer_id, "name": "Payer User",
                                "email": f"{payer_id}@example.com", "referred_by_code": code})
     try:

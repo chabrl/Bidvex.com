@@ -176,10 +176,15 @@ const AffiliateDashboard = () => {
               <Link2 className="h-5 w-5 text-primary" />
               {isFrench ? 'Votre lien de référence' : 'Your Referral Link'}
             </CardTitle>
-            <CardDescription>
-              {isFrench
-                ? "Partagez ce lien — vous gagnez 3 % du profit net de BidVex sur chaque transaction (frais d'enchères et abonnements) des utilisateurs que vous référez, à vie."
-                : "Share this link — you earn 3% of BidVex's net platform profit on every transaction (auction fees & subscriptions) from users you refer, for life."}
+            <CardDescription data-testid="referral-card-description">
+              {(() => {
+                // iter501 — Dynamic rate pulled from /affiliate/stats.
+                const r = Number(stats?.commission_rate);
+                const pct = Number.isNaN(r) || r <= 0 ? 3 : +(r * 100).toFixed(2);
+                return isFrench
+                  ? `Partagez ce lien — vous gagnez ${pct}\u202f% du profit net de BidVex sur chaque transaction (frais d'enchères et abonnements) des utilisateurs que vous référez, à vie.`
+                  : `Share this link — you earn ${pct}% of BidVex's net platform profit on every transaction (auction fees & subscriptions) from users you refer, for life.`;
+              })()}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -322,8 +327,14 @@ const AffiliateDashboard = () => {
                   <DollarSign className="h-5 w-5 text-purple-600" />
                 </div>
                 <h3 className="font-semibold mb-1">{isFrench ? '3. Vous êtes payé' : '3. Get Paid'}</h3>
-                <p className="text-sm text-muted-foreground">
-                  {isFrench ? "3 % du profit de BidVex sur chaque transaction — crédité pour approbation par l'admin." : "3% of BidVex's profit on each transaction — credited for admin approval."}
+                <p className="text-sm text-muted-foreground" data-testid="get-paid-blurb">
+                  {(() => {
+                    const r = Number(stats?.commission_rate);
+                    const pct = Number.isNaN(r) || r <= 0 ? 3 : +(r * 100).toFixed(2);
+                    return isFrench
+                      ? `${pct}\u202f% du profit de BidVex sur chaque transaction — crédité pour approbation par l'admin.`
+                      : `${pct}% of BidVex's profit on each transaction — credited for admin approval.`;
+                  })()}
                 </p>
               </div>
             </div>

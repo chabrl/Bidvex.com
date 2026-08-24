@@ -1,6 +1,62 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter501 — Per-Affiliate Custom Commission Rate + Affiliate Status Gate (Feb 20, 2026) ✅ SHIPPED (preview) · ⛔ DO NOT DEPLOY
+
+### Delivered
+
+**Data model (`users` collection, additive):**
+- `affiliate_status`: `"none" | "pending" | "active" | "revoked"` (default `"none"` — missing == none). Only `"active"` accrues commissions.
+- `commission_rate`: `float | null` (per-user override, e.g. `0.05` for 5%). `null` → falls back to `AFFILIATE_PROFIT_SHARE_RATE` (3%).
+
+**Backend — `routes/affiliate.py`:**
+- New constants: `MAX_AFFILIATE_COMMISSION_RATE = 0.20` (env-tunable `MAX_AFFILIATE_COMMISSION_RATE`), `AFFILIATE_STATUSES = ("none","pending","active","revoked")`.
+- Helpers: `_resolve_effective_rate(user_doc)`, `_validate_rate(value)` (raises 400 with bilingual EN/FR message on out-of-range), `_write_affiliate_admin_log(...)`, `_backfill_active_affiliates(db)`.
+- New endpoints (admin-only):
+  - `POST /api/affiliate/admin/set-status` — body `{user_id, status: "active"|"revoked", commission_rate?}`. Idempotent (unchanged calls skip DB write + audit log). Auto-generates a referral code on activate. Writes `admin_action_logs` with `before/after` snapshot.
+  - `POST /api/affiliate/admin/set-rate` — body `{user_id, commission_rate: float|null}`. Same validation + audit rules.
+  - `POST /api/affiliate/admin/backfill-active` — on-demand rerun of the startup migration.
+- Modified `award_affiliate_commission()`:
+  - **Gate**: if `affiliate_status != "active"` → debug log + return None (no credit written). Referral click tracking/attribution unchanged.
+  - Uses `_resolve_effective_rate(referrer)` and **snapshots the effective rate onto the credit row** — historical rows never retroactively change when admins bump the rate later.
+- Modified `GET /admin/all` — returns all users with any `affiliate_status ∈ {pending, active, revoked}` OR any `referred_count > 0`; each row includes `affiliate_status`, `commission_rate`, `effective_rate`, `total_credits_earned`. Top-level `default_rate` + `max_rate`.
+- Modified `GET /earnings-summary` — returns `commission_rate` (effective, float), `default_commission_rate`, `affiliate_status`.
+
+**Backend — startup migration (`server.py` lifespan):**
+- One-time backfill on every boot (idempotent). Promotes to `active` any user with prior `platform_credits` (source=`referral`) OR whose `affiliate_code` has been used as another user's `referred_by_code`. Explicit statuses win (never overrides). Result logged: `[iter501 backfill] promoted=N skipped_already_set=M candidates=K`.
+- **Verified on preview**: promoted the one pre-existing affiliate (alexboul1993@gmail.com) to `active` on first startup; subsequent restarts idempotent.
+
+**Backend — legacy shim (`routes/admin_ops.py`):**
+- `PUT /api/admin/users/{id}/affiliate` no longer writes to the decorative `db.affiliates` collection. Now a thin shim that calls `admin_set_affiliate_status(...)` so `affiliate_status` on the user doc is the **single source of truth**.
+
+**Backend — `routes/misc.py`:**
+- `GET /affiliate/stats` now returns `commission_rate` as a **float** (was hardcoded `"3% of platform profit"` string), plus `commission_rate_display` (formatted string like `"7% of platform profit"`), `default_commission_rate`, `affiliate_status`.
+
+**Frontend — admin panel (`pages/admin/AffiliateManager.js`, full rewrite):**
+- New "Manage Affiliate Status" card. Per-row:
+  - Bilingual status badge (Active / Pending / Revoked / None).
+  - Rate input `%` with placeholder = default (`3`), inline validation (0–20%), red border + error text + toast on out-of-range.
+  - Buttons based on status: **Approve** (pending/none/revoked → active + rate in one call), **Save Rate** (active only, PATCH rate), **Revoke** (active → revoked, with confirm modal).
+  - Toast shows `old% → new%` after save.
+  - Bilingual EN/FR everywhere; French labels: Approuver, Enregistrer, Révoquer, Réactiver.
+- All new interactive elements carry unique `data-testid`s (`affiliate-row-{id}`, `affiliate-rate-input-{id}`, `affiliate-approve-btn-{id}`, `affiliate-save-rate-btn-{id}`, `affiliate-revoke-btn-{id}`, `affiliate-effective-rate-{id}`, `affiliate-status-badge-{id}`, `affiliate-rate-error-{id}`).
+
+**Frontend — affiliate dashboard:**
+- `AffiliateDashboard.js`: removed hardcoded `3%` in referral-link card description + Get Paid blurb; both now read from `stats.commission_rate`.
+- `AffiliateEarningsWidget.jsx`: "Your X% share:" and per-row "Your X%:" pull from `summary.commission_rate` and `ev.rate` respectively. Custom rate is tagged `(custom rate)` inline for the current user.
+
+### Verification (testing agent — FULL PASS)
+- **Backend unit**: 20/20 pytest cases in `tests/iter501/test_affiliate_custom_rate.py`.
+- **Backend live API**: 10/10 in `tests/iter501/test_live_api.py` (created by testing agent).
+- **Regression**: 31/31 iter338 tests still green.
+- **Frontend UI**: rate update flow, out-of-range validation, revoke/reactivate cycle, custom-modal confirm, French locale all verified.
+- **Startup migration**: log line present, idempotent on second boot.
+- **Legacy shim**: verified — user doc updated, no row in `db.affiliates`.
+
+### Untouched (audit)
+- `services/fee_calculator.py`, `services/tax_engine.py`, `services/stripe_connect_service.py`, `services/payment_collection.py`, `services/auction_settlement.py`. Referral click tracking (`/track/{code}`, `/r/{code}`) unchanged. Existing platform_credits rows never retroactively updated.
+
+
 ## iter500 — Accept Below Reserve + Mobile Scroll Nav Fix (Feb 20, 2026) ✅ SHIPPED (preview) · ⛔ DO NOT DEPLOY
 
 ### Feature 1 — Accept Below Reserve button

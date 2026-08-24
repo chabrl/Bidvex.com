@@ -586,6 +586,21 @@ async def lifespan(app):
     except Exception as e:
         logger.warning(f"[iter270] Email deliverability check failed (non-fatal): {e}")
 
+    # iter501 — One-time backfill so the new affiliate active-status gate
+    # does NOT silently cut off anyone who was already earning under the
+    # pre-iter501 no-gate model.  Idempotent — only promotes users whose
+    # affiliate_status is missing/none.  Runs on every startup safely.
+    try:
+        from routes.affiliate import _backfill_active_affiliates
+        _bf = await _backfill_active_affiliates(db)
+        logger.info(
+            "[iter501 backfill] promoted=%s skipped_already_set=%s candidates=%s",
+            _bf.get("promoted"), _bf.get("skipped_already_set"),
+            _bf.get("candidates"),
+        )
+    except Exception as _bf_exc:  # noqa: BLE001
+        logger.warning(f"[iter501 backfill] failed (non-fatal): {_bf_exc}")
+
     # Hand control to the app
     yield
 

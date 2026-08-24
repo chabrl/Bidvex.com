@@ -39,6 +39,13 @@ from deps import User, get_current_user, get_db
 logger = logging.getLogger(__name__)
 
 AFFILIATE_PROFIT_SHARE_RATE = 0.03  # iter338 — 3% of BidVex's platform profit
+# iter501 — Max per-affiliate commission override.  Env-tunable so ops can
+# raise the ceiling for special promoters without a code change.
+MAX_AFFILIATE_COMMISSION_RATE = float(
+    os.environ.get("MAX_AFFILIATE_COMMISSION_RATE", "0.20")
+)
+# iter501 — Affiliate lifecycle statuses persisted on the user document
+AFFILIATE_STATUSES = ("none", "pending", "active", "revoked")
 REFERRAL_COOKIE = "bidvex_ref"
 COOKIE_MAX_AGE_DAYS = 30
 PUBLIC_HOST = os.environ.get("PUBLIC_HOST", "https://bidvex.com").rstrip("/")
@@ -83,6 +90,91 @@ def _public_referral_link(code: str) -> str:
     return f"{PUBLIC_HOST}/r/{code}"
 
 
+# ─── iter501 — Per-affiliate status + custom rate helpers ─────────────
+
+def _resolve_effective_rate(user_doc: Optional[Dict[str, Any]]) -> float:
+    """Return the commission rate to apply for this user.
+
+    - If ``commission_rate`` is a valid float in [0, MAX], return it.
+    - Otherwise (missing/null/invalid), fall back to
+      ``AFFILIATE_PROFIT_SHARE_RATE``. Never raises.
+    """
+    if not user_doc:
+        return AFFILIATE_PROFIT_SHARE_RATE
+    raw = user_doc.get("commission_rate")
+    if raw is None:
+        return AFFILIATE_PROFIT_SHARE_RATE
+    try:
+        rate = float(raw)
+    except (TypeError, ValueError):
+        return AFFILIATE_PROFIT_SHARE_RATE
+    if rate < 0 or rate > MAX_AFFILIATE_COMMISSION_RATE:
+        return AFFILIATE_PROFIT_SHARE_RATE
+    return rate
+
+
+def _validate_rate(value: Any) -> Optional[float]:
+    """Validate an admin-supplied commission rate.
+
+    Returns the coerced float on success, raises HTTPException(400) with
+    a clear bilingual message on any failure.  A `None` input is
+    returned as `None` (means: clear the override and fall back to the
+    global default).
+    """
+    if value is None:
+        return None
+    try:
+        rate = float(value)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail={
+            "error": "invalid_commission_rate",
+            "message_en": "commission_rate must be a number between 0 and "
+                          f"{MAX_AFFILIATE_COMMISSION_RATE:.2f} (or null).",
+            "message_fr": "Le taux de commission doit être un nombre entre 0 et "
+                          f"{MAX_AFFILIATE_COMMISSION_RATE:.2f} (ou nul).",
+        })
+    if rate < 0 or rate > MAX_AFFILIATE_COMMISSION_RATE:
+        raise HTTPException(status_code=400, detail={
+            "error": "commission_rate_out_of_range",
+            "message_en": (
+                f"commission_rate must be between 0 and "
+                f"{MAX_AFFILIATE_COMMISSION_RATE:.2f} "
+                f"(got {rate:.4f})."
+            ),
+            "message_fr": (
+                f"Le taux de commission doit être entre 0 et "
+                f"{MAX_AFFILIATE_COMMISSION_RATE:.2f} "
+                f"(reçu {rate:.4f})."
+            ),
+            "min": 0.0,
+            "max": MAX_AFFILIATE_COMMISSION_RATE,
+        })
+    return rate
+
+
+async def _write_affiliate_admin_log(
+    db,
+    *,
+    admin: User,
+    target_user_id: str,
+    action: str,
+    before: Dict[str, Any],
+    after: Dict[str, Any],
+    note: str = "",
+) -> None:
+    """Reuses the same admin_action_logs shape as admin_credit_affiliate."""
+    await db.admin_action_logs.insert_one({
+        "ts": _now().isoformat(),
+        "admin_id": admin.id,
+        "admin_email": getattr(admin, "email", "") or "",
+        "action": action,
+        "target_user_id": target_user_id,
+        "before": before,
+        "after": after,
+        "note": (note or "")[:500],
+    })
+
+
 # ─── /api/affiliate/my-referral-link ─────────────────────────────────
 
 @affiliate_router.get("/my-referral-link")
@@ -103,7 +195,12 @@ async def admin_list_affiliates(current_user: User = Depends(get_current_user)):
     if getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Admin only")
     db = get_db()
-    # Affiliates = anyone with a referral_code AND at least one referred user.
+    # iter501 — Roster of everyone the admin might want to manage:
+    #   • Users with any `affiliate_status` explicitly set (pending, active, revoked)
+    #   • Users who already have at least one referred signup (referred_count > 0)
+    # This ensures newly-pending users show up even before their first referral.
+
+    # 1) Aggregate referred_count per referral code.
     pipeline = [
         {"$match": {"referred_by_code": {"$ne": None, "$exists": True}}},
         {"$group": {"_id": "$referred_by_code", "referred_count": {"$sum": 1}}},
@@ -112,25 +209,273 @@ async def admin_list_affiliates(current_user: User = Depends(get_current_user)):
     async for row in db.users.aggregate(pipeline):
         referred_counts[row["_id"]] = row["referred_count"]
 
-    items: List[Dict[str, Any]] = []
+    # 2) Anyone with an explicit affiliate_status OR at least one referred user.
+    or_clauses: List[Dict[str, Any]] = [
+        {"affiliate_status": {"$in": ["pending", "active", "revoked"]}},
+    ]
     if referred_counts:
-        async for u in db.users.find(
-            {"affiliate_code": {"$in": list(referred_counts.keys())}},
-            {"_id": 0, "id": 1, "name": 1, "email": 1, "affiliate_code": 1, "created_at": 1},
+        or_clauses.append({"affiliate_code": {"$in": list(referred_counts.keys())}})
+
+    items: List[Dict[str, Any]] = []
+    async for u in db.users.find(
+        {"$or": or_clauses},
+        {"_id": 0, "id": 1, "name": 1, "email": 1, "affiliate_code": 1,
+         "affiliate_status": 1, "commission_rate": 1, "created_at": 1},
+    ):
+        code = u.get("affiliate_code") or ""
+        credits_total = 0.0
+        async for c in db.platform_credits.find(
+            {"user_id": u["id"], "source": "referral"},
+            {"_id": 0, "amount": 1},
         ):
-            code = u["affiliate_code"]
-            credits_total = 0.0
-            async for c in db.platform_credits.find(
-                {"user_id": u["id"], "source": "referral"},
-                {"_id": 0, "amount": 1},
-            ):
-                credits_total += float(c.get("amount") or 0)
-            items.append({
-                **u,
-                "referred_count": referred_counts.get(code, 0),
-                "total_credits_earned": round(credits_total, 2),
-            })
-    return {"items": sorted(items, key=lambda x: -x["referred_count"]), "total": len(items)}
+            credits_total += float(c.get("amount") or 0)
+        effective_rate = _resolve_effective_rate(u)
+        items.append({
+            **u,
+            "affiliate_status": (u.get("affiliate_status") or "none"),
+            "commission_rate": u.get("commission_rate"),
+            "effective_rate": effective_rate,
+            "referred_count": referred_counts.get(code, 0),
+            "total_credits_earned": round(credits_total, 2),
+        })
+    items.sort(key=lambda x: (-x["referred_count"], x.get("email") or ""))
+    return {
+        "items": items,
+        "total": len(items),
+        "default_rate": AFFILIATE_PROFIT_SHARE_RATE,
+        "max_rate": MAX_AFFILIATE_COMMISSION_RATE,
+    }
+
+
+# ─── /api/affiliate/admin/set-status ─────────────────────────────────
+# iter501 — Approve / revoke an affiliate.  Optional commission_rate
+# override applied in the same call.
+
+@affiliate_router.post("/admin/set-status")
+async def admin_set_affiliate_status(
+    payload: Dict[str, Any],
+    current_user: User = Depends(get_current_user),
+):
+    if getattr(current_user, "role", None) not in ("admin", "super_admin"):
+        raise HTTPException(status_code=403, detail="Admin only")
+    user_id = (payload.get("user_id") or "").strip()
+    status = (payload.get("status") or "").strip().lower()
+    note = (payload.get("note") or "")[:500]
+
+    if not user_id:
+        raise HTTPException(status_code=400, detail={
+            "error": "missing_user_id",
+            "message_en": "user_id is required.",
+            "message_fr": "user_id est requis.",
+        })
+    if status not in ("active", "revoked"):
+        raise HTTPException(status_code=400, detail={
+            "error": "invalid_status",
+            "message_en": 'status must be "active" or "revoked".',
+            "message_fr": 'status doit être « active » ou « revoked ».',
+        })
+
+    db = get_db()
+    user_doc = await db.users.find_one(
+        {"id": user_id},
+        {"_id": 0, "id": 1, "email": 1, "affiliate_status": 1,
+         "commission_rate": 1, "affiliate_code": 1},
+    )
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    before_status = (user_doc.get("affiliate_status") or "none").lower()
+    before_rate = user_doc.get("commission_rate")
+
+    # Optional rate override — None means "clear override".
+    new_rate: Optional[float] = None
+    rate_provided = "commission_rate" in payload
+    if rate_provided:
+        new_rate = _validate_rate(payload.get("commission_rate"))
+
+    # Make sure they have a referral code once they become active.
+    if status == "active" and not user_doc.get("affiliate_code"):
+        await _ensure_referral_code(db, user_id)
+
+    updates: Dict[str, Any] = {"affiliate_status": status}
+    if rate_provided:
+        updates["commission_rate"] = new_rate
+
+    # Idempotency — noop if nothing actually changes.
+    unchanged = (
+        before_status == status
+        and (not rate_provided or before_rate == new_rate)
+    )
+    if not unchanged:
+        await db.users.update_one({"id": user_id}, {"$set": updates})
+        await _write_affiliate_admin_log(
+            db,
+            admin=current_user,
+            target_user_id=user_id,
+            action="affiliate_status_change",
+            before={"affiliate_status": before_status,
+                    "commission_rate": before_rate},
+            after={"affiliate_status": status,
+                   "commission_rate": new_rate if rate_provided else before_rate},
+            note=note,
+        )
+
+    # Reload for the response.
+    fresh = await db.users.find_one(
+        {"id": user_id},
+        {"_id": 0, "id": 1, "email": 1, "affiliate_status": 1,
+         "commission_rate": 1, "affiliate_code": 1},
+    ) or {}
+    return {
+        "success": True,
+        "changed": not unchanged,
+        "user_id": user_id,
+        "affiliate_status": fresh.get("affiliate_status") or "none",
+        "commission_rate": fresh.get("commission_rate"),
+        "effective_rate": _resolve_effective_rate(fresh),
+        "default_rate": AFFILIATE_PROFIT_SHARE_RATE,
+        "affiliate_code": fresh.get("affiliate_code"),
+    }
+
+
+# ─── /api/affiliate/admin/set-rate ───────────────────────────────────
+# iter501 — Adjust an affiliate's rate WITHOUT touching their status.
+
+@affiliate_router.post("/admin/set-rate")
+async def admin_set_affiliate_rate(
+    payload: Dict[str, Any],
+    current_user: User = Depends(get_current_user),
+):
+    if getattr(current_user, "role", None) not in ("admin", "super_admin"):
+        raise HTTPException(status_code=403, detail="Admin only")
+    user_id = (payload.get("user_id") or "").strip()
+    if not user_id:
+        raise HTTPException(status_code=400, detail={
+            "error": "missing_user_id",
+            "message_en": "user_id is required.",
+            "message_fr": "user_id est requis.",
+        })
+    if "commission_rate" not in payload:
+        raise HTTPException(status_code=400, detail={
+            "error": "missing_rate",
+            "message_en": "commission_rate is required (use null to clear the override).",
+            "message_fr": "commission_rate est requis (utiliser null pour effacer la surcharge).",
+        })
+    new_rate = _validate_rate(payload.get("commission_rate"))
+    note = (payload.get("note") or "")[:500]
+
+    db = get_db()
+    user_doc = await db.users.find_one(
+        {"id": user_id},
+        {"_id": 0, "id": 1, "email": 1, "affiliate_status": 1,
+         "commission_rate": 1, "affiliate_code": 1},
+    )
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    before_rate = user_doc.get("commission_rate")
+    unchanged = before_rate == new_rate
+
+    if not unchanged:
+        await db.users.update_one(
+            {"id": user_id},
+            {"$set": {"commission_rate": new_rate}},
+        )
+        await _write_affiliate_admin_log(
+            db,
+            admin=current_user,
+            target_user_id=user_id,
+            action="affiliate_rate_change",
+            before={"commission_rate": before_rate,
+                    "affiliate_status": (user_doc.get("affiliate_status") or "none")},
+            after={"commission_rate": new_rate,
+                   "affiliate_status": (user_doc.get("affiliate_status") or "none")},
+            note=note,
+        )
+
+    fresh = await db.users.find_one(
+        {"id": user_id},
+        {"_id": 0, "id": 1, "email": 1, "affiliate_status": 1,
+         "commission_rate": 1, "affiliate_code": 1},
+    ) or {}
+    return {
+        "success": True,
+        "changed": not unchanged,
+        "user_id": user_id,
+        "affiliate_status": fresh.get("affiliate_status") or "none",
+        "commission_rate": fresh.get("commission_rate"),
+        "effective_rate": _resolve_effective_rate(fresh),
+        "default_rate": AFFILIATE_PROFIT_SHARE_RATE,
+    }
+
+
+# ─── /api/affiliate/admin/backfill-active ─────────────────────────────
+# iter501 — Idempotent migration. Sets `affiliate_status="active"` for any
+# user who was already earning under the pre-iter501 no-gate model:
+#   • has at least one platform_credits row with source="referral", OR
+#   • has referred_count > 0 (some user has `referred_by_code` == their code)
+# Runs automatically on backend startup once, and is also exposed here so
+# ops can re-run it after a DB restore / migration.  Never revokes;
+# never overrides commission_rate; existing values win.
+
+async def _backfill_active_affiliates(db) -> Dict[str, int]:
+    """Returns {"promoted": int, "skipped_already_set": int}."""
+    seen_ids: set[str] = set()
+
+    # 1) Anyone with a referral platform_credit row.
+    async for c in db.platform_credits.find(
+        {"source": "referral"}, {"_id": 0, "user_id": 1},
+    ):
+        uid = c.get("user_id")
+        if uid:
+            seen_ids.add(uid)
+
+    # 2) Anyone whose affiliate_code has been used by another user
+    #    (referred_by_code matches).  Aggregate → set of codes with count > 0.
+    used_codes: set[str] = set()
+    async for row in db.users.aggregate([
+        {"$match": {"referred_by_code": {"$ne": None, "$exists": True}}},
+        {"$group": {"_id": "$referred_by_code"}},
+    ]):
+        code = row.get("_id")
+        if code:
+            used_codes.add(code)
+    if used_codes:
+        async for u in db.users.find(
+            {"affiliate_code": {"$in": list(used_codes)}},
+            {"_id": 0, "id": 1},
+        ):
+            if u.get("id"):
+                seen_ids.add(u["id"])
+
+    if not seen_ids:
+        return {"promoted": 0, "skipped_already_set": 0}
+
+    # Only touch users whose affiliate_status is missing OR "none".  Any
+    # explicit prior status (pending/active/revoked) wins.
+    result = await db.users.update_many(
+        {"id": {"$in": list(seen_ids)},
+         "$or": [{"affiliate_status": {"$exists": False}},
+                 {"affiliate_status": None},
+                 {"affiliate_status": "none"}]},
+        {"$set": {"affiliate_status": "active"}},
+    )
+    promoted = int(getattr(result, "modified_count", 0) or 0)
+    return {
+        "promoted": promoted,
+        "skipped_already_set": len(seen_ids) - promoted,
+        "candidates": len(seen_ids),
+    }
+
+
+@affiliate_router.post("/admin/backfill-active")
+async def admin_backfill_active_affiliates(current_user: User = Depends(get_current_user)):
+    if getattr(current_user, "role", None) not in ("admin", "super_admin"):
+        raise HTTPException(status_code=403, detail="Admin only")
+    db = get_db()
+    result = await _backfill_active_affiliates(db)
+    logger.info(f"[iter501 backfill] {result}")
+    return {"success": True, **result}
 
 
 @affiliate_router.post("/admin/credit")
@@ -274,9 +619,21 @@ async def award_affiliate_commission(
         return None
     referrer = await db.users.find_one(
         {"affiliate_code": code, "id": {"$ne": payer_id}},
-        {"_id": 0, "id": 1, "name": 1, "preferred_language": 1},
+        {"_id": 0, "id": 1, "name": 1, "preferred_language": 1,
+         "affiliate_status": 1, "commission_rate": 1},
     )
     if not referrer:
+        return None
+
+    # iter501 — Approval gate. Referral clicks / attribution are unchanged;
+    # only commission ACCRUAL is gated on `affiliate_status == "active"`.
+    status = (referrer.get("affiliate_status") or "none").lower()
+    if status != "active":
+        logger.debug(
+            "[iter501] Skipping affiliate commission for referrer=%s status=%s "
+            "payer=%s source=%s ref=%s",
+            referrer["id"], status, payer_id, source, reference_id,
+        )
         return None
 
     # Idempotency guard — one credit per (referrer, source, reference, payer)
@@ -289,7 +646,12 @@ async def award_affiliate_commission(
     if existing:
         return None
 
-    amount = round(float(platform_revenue) * AFFILIATE_PROFIT_SHARE_RATE, 2)
+    # iter501 — Resolve effective rate (custom override or global default).
+    # The rate that fires TODAY is snapshotted onto the credit row so the
+    # historical ledger never retroactively changes if an admin adjusts
+    # the affiliate's rate later.
+    effective_rate = _resolve_effective_rate(referrer)
+    amount = round(float(platform_revenue) * effective_rate, 2)
     if amount < 0.01:
         return None
 
@@ -301,7 +663,7 @@ async def award_affiliate_commission(
         "source": "referral",
         "status": "pending",  # admin approves → "paid"
         "commission_base": round(float(platform_revenue), 2),
-        "commission_rate": AFFILIATE_PROFIT_SHARE_RATE,
+        "commission_rate": effective_rate,
         "revenue_source": source,
         "reference_id": reference_id,
         "description": (description or "")[:200],
@@ -325,20 +687,26 @@ async def award_affiliate_commission(
         from services.push_dispatcher import dispatch_push
         fr = (referrer.get("preferred_language") or "").startswith("fr")
         first_name = (payer.get("name") or "Someone").split(" ")[0]
+        rate_pct = effective_rate * 100
         await dispatch_push(
             db, user_id=referrer["id"], kind="new_message",  # reuse a generic kind
             sender_name="BidVex Rewards",
-            preview=(f"Vous avez gagné {amount:.2f} $ CAD — commission de 3 % sur une transaction de {first_name} !"
-                     if fr else
-                     f"You earned ${amount:.2f} CAD — 3% commission on {first_name}'s transaction!"),
+            preview=(
+                f"Vous avez gagné {amount:.2f} $ CAD — commission de "
+                f"{rate_pct:g} % sur une transaction de {first_name} !"
+                if fr else
+                f"You earned ${amount:.2f} CAD — {rate_pct:g}% commission "
+                f"on {first_name}'s transaction!"
+            ),
             url="/dashboard/affiliate",
         )
     except Exception:
         pass
 
     logger.info(
-        f"[iter338] Affiliate commission ${amount:.2f} (3% of ${float(platform_revenue):.2f}) "
-        f"awarded: referrer={referrer['id']} payer={payer_id} source={source} ref={reference_id}"
+        f"[iter501] Affiliate commission ${amount:.2f} ({effective_rate*100:g}% of "
+        f"${float(platform_revenue):.2f}) awarded: referrer={referrer['id']} "
+        f"payer={payer_id} source={source} ref={reference_id}"
     )
     return credit_doc
 
@@ -462,6 +830,14 @@ async def get_earnings_summary(current_user: User = Depends(get_current_user)):
     if code:
         referred_total = await db.users.count_documents({"referred_by_code": code})
 
+    # iter501 — Resolve the affiliate's effective rate (custom override or
+    # global default) so their dashboard shows the real number they earn.
+    _user_doc = await db.users.find_one(
+        {"id": current_user.id},
+        {"_id": 0, "affiliate_status": 1, "commission_rate": 1},
+    ) or {}
+    effective_rate = _resolve_effective_rate(_user_doc)
+
     return {
         "this_month": {
             "earned": round(this_month["earned"], 2),
@@ -483,7 +859,9 @@ async def get_earnings_summary(current_user: User = Depends(get_current_user)):
             "active_this_month": len(active_payers_this_month),
         },
         "pending_approval": round(pending_approval, 2),
-        "commission_rate": AFFILIATE_PROFIT_SHARE_RATE,
+        "commission_rate": effective_rate,
+        "default_commission_rate": AFFILIATE_PROFIT_SHARE_RATE,
+        "affiliate_status": (_user_doc.get("affiliate_status") or "none"),
     }
 
 
