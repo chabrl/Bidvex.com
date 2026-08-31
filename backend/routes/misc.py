@@ -152,15 +152,45 @@ async def get_affiliate_stats(current_user: User = Depends(get_current_user)):
 
     # iter501 — Pull effective rate (custom or default) so the dashboard
     # never hardcodes 3% and reflects per-user overrides.
+    # iter503 — Also surface the partner-program tier snapshot so the UI
+    # can render tier-aware copy without duplicating resolution logic.
     from routes.affiliate import (
-        AFFILIATE_PROFIT_SHARE_RATE, _resolve_effective_rate,
+        AFFILIATE_PROFIT_SHARE_RATE,
+        _resolve_effective_rate,
+        _partner_tier_snapshot,
     )
     _user_doc = await db.users.find_one(
         {"id": current_user.id},
-        {"_id": 0, "affiliate_status": 1, "commission_rate": 1},
+        {"_id": 0, "affiliate_status": 1, "commission_rate": 1,
+         "partner_program": 1, "partnership_start_date": 1,
+         "tier_1_rate": 1, "tier_1_duration_months": 1, "tier_2_rate": 1},
     ) or {}
     effective_rate = _resolve_effective_rate(_user_doc)
     rate_pct = round(effective_rate * 100, 2)
+    tier_snapshot = _partner_tier_snapshot(_user_doc)
+
+    # iter503 — Tier-aware human copy (bilingual EN by default; the
+    # frontend renders French locally, but this string is the fallback
+    # that lands in email + notification templates).
+    if tier_snapshot["partner_program"] and tier_snapshot["partner_tier"] == "tier_1":
+        t1_pct = round(float(tier_snapshot["tier_1_rate"] or 0) * 100, 2)
+        months = tier_snapshot["tier_1_duration_months"] or 0
+        commission_description = (
+            f"You earn {t1_pct:g}% of BidVex's net platform profit "
+            f"for your first {months} months as a partner."
+        )
+    elif tier_snapshot["partner_program"] and tier_snapshot["partner_tier"] == "tier_2":
+        t2_pct = round(float(tier_snapshot["tier_2_rate"] or 0) * 100, 2)
+        commission_description = (
+            f"You earn {t2_pct:g}% of BidVex's net platform profit, "
+            "for as long as your referrals stay active."
+        )
+    else:
+        commission_description = (
+            f"You earn {rate_pct:g}% of BidVex's net platform revenue on "
+            "every transaction from users you referred (auction fees & "
+            "subscriptions) — for life"
+        )
 
     return {
         "affiliate_code": code,
@@ -175,11 +205,11 @@ async def get_affiliate_stats(current_user: User = Depends(get_current_user)):
         "commission_rate_display": f"{rate_pct:g}% of platform profit",
         "default_commission_rate": AFFILIATE_PROFIT_SHARE_RATE,
         "affiliate_status": (_user_doc.get("affiliate_status") or "none"),
-        "commission_description": (
-            f"You earn {rate_pct:g}% of BidVex's net platform revenue on "
-            "every transaction from users you referred (auction fees & "
-            "subscriptions) — for life"
-        ),
+        "commission_description": commission_description,
+        # iter503 — full partner-tier snapshot (partner_program,
+        # partner_tier, tier_1_rate, tier_2_rate, tier_1_duration_months,
+        # partnership_start_date, tier_ends_at, has_custom_rate).
+        **tier_snapshot,
         "payout_delay_days": 7,
         "earnings_history": earnings,
         "referrals": referrals

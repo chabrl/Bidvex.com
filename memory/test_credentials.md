@@ -281,3 +281,12 @@ QC, license number `TEST-GATE2`).
 The seed script also confirms the buyer response NEVER contains
 `reserve_price`.  Use with the seeded admin `charbel911@gmail.com` to
 verify the mask via `curl "$API/api/vehicles/{id}"`.
+
+
+## iter503 — Affiliate Center dashboard partner (preview only)
+
+**Alex Boulanger** — Influencer Partner Program test user
+- Email: `alexboul1993@gmail.com`
+- Password: `AlexIter503!`
+- Status: `active`, `partner_program=true`, `tier_1_rate=0.5` (50%), `tier_1_duration_months=12`, `tier_2_rate=0.05` (5%), `partnership_start_date=2026-08-31T17:23:53Z`
+- Use to verify `/dashboard/affiliate` renders tier-aware copy (50% + "for your first 12 months as a partner").

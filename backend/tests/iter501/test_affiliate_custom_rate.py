@@ -116,7 +116,9 @@ def test_resolve_effective_rate_falls_back_when_null():
 
 def test_resolve_effective_rate_uses_override():
     assert _resolve_effective_rate({"commission_rate": 0.05}) == 0.05
-    assert _resolve_effective_rate({"commission_rate": 0.0}) == 0.0
+    # iter503 — a stored 0.0 is treated as "no override" (use `revoked`
+    # status to zero out an affiliate, not commission_rate=0).
+    assert _resolve_effective_rate({"commission_rate": 0.0}) == AFFILIATE_PROFIT_SHARE_RATE
 
 
 def test_resolve_effective_rate_out_of_range_falls_back():

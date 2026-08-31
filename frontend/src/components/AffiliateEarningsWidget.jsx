@@ -156,19 +156,32 @@ export const AffiliateEarningsWidget = () => {
       ? `Basé sur ${summary.projection_basis_months} mois de données`
       : `Based on ${summary.projection_basis_months} month${summary.projection_basis_months === 1 ? '' : 's'} of data`);
 
-  // iter501 — Read the effective commission rate from the API instead of
-  // hardcoding 3%. `commission_rate` is the per-user override or the
-  // global default; formatted at most 2dp with `g` so 3.00 → "3" and
-  // 5.50 → "5.5". Falls back to 3 if the payload predates iter501.
+  // iter501/503 — Effective commission rate from the API.  For a
+  // partner in Tier 1/2 we prefer the tier-specific rate so the earnings
+  // widget matches the copy shown by the referral-link card.  Falls
+  // back to the flat commission_rate for non-partners.
   const currentRatePct = (() => {
-    const r = summary?.commission_rate;
+    let r = null;
+    if (summary?.partner_program && summary?.partner_tier === 'tier_1') {
+      r = summary?.tier_1_rate;
+    } else if (summary?.partner_program && summary?.partner_tier === 'tier_2') {
+      r = summary?.tier_2_rate;
+    } else {
+      r = summary?.commission_rate;
+    }
     const n = typeof r === 'number' ? r : Number(r);
-    if (Number.isNaN(n) || n <= 0) return 3;
+    if (Number.isNaN(n) || n <= 0) {
+      // Fall back to the default rate returned by the API (never
+      // hardcode 3 — the default is env-tunable server-side).
+      const d = Number(summary?.default_commission_rate);
+      return Number.isNaN(d) || d <= 0 ? 0 : +(d * 100).toFixed(2);
+    }
     return +(n * 100).toFixed(2);
   })();
-  const isCustomRate =
-    summary?.default_commission_rate !== undefined
-    && summary.commission_rate !== summary.default_commission_rate;
+  // iter503 — The "(custom rate)" tag is now server-driven so it only
+  // lights up when there's an intentional non-null non-zero flat
+  // override on the user document, never for tier-based rates.
+  const isCustomRate = !!summary?.has_custom_rate;
 
   return (
     <Card className="border-emerald-200 dark:border-emerald-800" data-testid="affiliate-earnings-widget">

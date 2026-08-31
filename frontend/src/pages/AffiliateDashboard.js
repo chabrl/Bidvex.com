@@ -178,9 +178,32 @@ const AffiliateDashboard = () => {
             </CardTitle>
             <CardDescription data-testid="referral-card-description">
               {(() => {
-                // iter501 — Dynamic rate pulled from /affiliate/stats.
+                // iter503 — Tier-aware copy pulled from /affiliate/stats.
+                // Precedence:
+                //   1) Partner Program, Tier 1 window → highlight T1 rate + months
+                //   2) Partner Program, Tier 2 (post-window) → highlight T2 rate
+                //   3) Non-partner / standard affiliate → flat effective rate
+                const isPartner = !!stats?.partner_program;
+                const tier = stats?.partner_tier;
+                if (isPartner && tier === 'tier_1') {
+                  const t1 = Number(stats?.tier_1_rate);
+                  const t1Pct = Number.isNaN(t1) || t1 <= 0 ? 0 : +(t1 * 100).toFixed(2);
+                  const months = stats?.tier_1_duration_months || 0;
+                  return isFrench
+                    ? `Vous gagnez ${t1Pct}\u202f% du profit net de BidVex sur chaque transaction (frais d'enchères et abonnements) pendant vos ${months} premiers mois comme partenaire.`
+                    : `You earn ${t1Pct}% of BidVex's net platform profit on every transaction (auction fees & subscriptions) for your first ${months} months as a partner.`;
+                }
+                if (isPartner && tier === 'tier_2') {
+                  const t2 = Number(stats?.tier_2_rate);
+                  const t2Pct = Number.isNaN(t2) || t2 <= 0 ? 0 : +(t2 * 100).toFixed(2);
+                  return isFrench
+                    ? `Vous gagnez ${t2Pct}\u202f% du profit net de BidVex sur chaque transaction, tant que vos référés restent actifs.`
+                    : `You earn ${t2Pct}% of BidVex's net platform profit on every transaction, for as long as your referrals stay active.`;
+                }
                 const r = Number(stats?.commission_rate);
-                const pct = Number.isNaN(r) || r <= 0 ? 3 : +(r * 100).toFixed(2);
+                const pct = Number.isNaN(r) || r <= 0
+                  ? Number((stats?.default_commission_rate ?? 0.03)) * 100
+                  : +(r * 100).toFixed(2);
                 return isFrench
                   ? `Partagez ce lien — vous gagnez ${pct}\u202f% du profit net de BidVex sur chaque transaction (frais d'enchères et abonnements) des utilisateurs que vous référez, à vie.`
                   : `Share this link — you earn ${pct}% of BidVex's net platform profit on every transaction (auction fees & subscriptions) from users you refer, for life.`;
@@ -329,8 +352,17 @@ const AffiliateDashboard = () => {
                 <h3 className="font-semibold mb-1">{isFrench ? '3. Vous êtes payé' : '3. Get Paid'}</h3>
                 <p className="text-sm text-muted-foreground" data-testid="get-paid-blurb">
                   {(() => {
-                    const r = Number(stats?.commission_rate);
-                    const pct = Number.isNaN(r) || r <= 0 ? 3 : +(r * 100).toFixed(2);
+                    // iter503 — Tier-aware blurb: partners see their tier rate,
+                    // general affiliates see the flat effective rate.
+                    const isPartner = !!stats?.partner_program;
+                    const tier = stats?.partner_tier;
+                    let effective = null;
+                    if (isPartner && tier === 'tier_1') effective = Number(stats?.tier_1_rate);
+                    else if (isPartner && tier === 'tier_2') effective = Number(stats?.tier_2_rate);
+                    else effective = Number(stats?.commission_rate);
+                    const pct = Number.isNaN(effective) || effective <= 0
+                      ? Number((stats?.default_commission_rate ?? 0.03)) * 100
+                      : +(effective * 100).toFixed(2);
                     return isFrench
                       ? `${pct}\u202f% du profit de BidVex sur chaque transaction — crédité pour approbation par l'admin.`
                       : `${pct}% of BidVex's profit on each transaction — credited for admin approval.`;

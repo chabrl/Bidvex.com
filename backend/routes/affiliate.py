@@ -168,12 +168,16 @@ def _resolve_effective_rate(
     if not user_doc:
         return AFFILIATE_PROFIT_SHARE_RATE
 
-    # 1) Explicit flat override wins.
+    # 1) Explicit flat override wins — but a zero rate has no business
+    #    meaning (use "revoked" status to stop accrual instead), so we
+    #    treat 0.0 as "no override" and fall through to the tier
+    #    schedule / global default.  This also protects partners whose
+    #    commission_rate got accidentally cleared to 0 by a bad UI save.
     raw = user_doc.get("commission_rate")
     if raw is not None:
         try:
             rate = float(raw)
-            if 0 <= rate <= MAX_AFFILIATE_COMMISSION_RATE:
+            if 0 < rate <= MAX_AFFILIATE_COMMISSION_RATE:
                 return rate
         except (TypeError, ValueError):
             pass
@@ -208,6 +212,68 @@ def _resolve_effective_rate(
 
     # 3) Global default.
     return AFFILIATE_PROFIT_SHARE_RATE
+
+
+def _has_custom_rate(user_doc: Optional[Dict[str, Any]]) -> bool:
+    """True iff the user has an *intentional* non-null non-zero flat
+    ``commission_rate`` override.  Distinct from ``_resolve_effective_rate``
+    which returns the applied number: this returns whether that number
+    came from an explicit escape-hatch override or from the tier /
+    default path.  Used by the affiliate dashboard to decide whether to
+    show the ``(custom rate)`` tag."""
+    if not user_doc:
+        return False
+    raw = user_doc.get("commission_rate")
+    if raw is None:
+        return False
+    try:
+        return float(raw) > 0
+    except (TypeError, ValueError):
+        return False
+
+
+def _partner_tier_snapshot(
+    user_doc: Optional[Dict[str, Any]],
+    now: Optional[datetime] = None,
+) -> Dict[str, Any]:
+    """iter503 — Public serialization of the partner-program state used
+    by the affiliate dashboard.  Returns the fields the UI needs to
+    render the correct copy without duplicating rate-resolution logic
+    on the client:
+        partner_program      : bool
+        partner_tier         : "tier_1" | "tier_2" | None
+        tier_1_rate          : float | None
+        tier_2_rate          : float | None
+        tier_1_duration_months: int | None
+        partnership_start_date: ISO string | None
+        tier_ends_at         : ISO string | None (only while in tier 1)
+        has_custom_rate      : bool  (see _has_custom_rate)
+    """
+    partner_program = bool((user_doc or {}).get("partner_program"))
+    has_custom = _has_custom_rate(user_doc)
+    partner_tier = None
+    tier_ends_at = None
+    if partner_program and not has_custom:
+        end_dt = _partner_tier1_end(user_doc or {})
+        if end_dt is None:
+            partner_tier = "tier_1"
+        else:
+            cur = now or datetime.now(timezone.utc)
+            if cur.tzinfo is None:
+                cur = cur.replace(tzinfo=timezone.utc)
+            partner_tier = "tier_1" if cur < end_dt else "tier_2"
+            if partner_tier == "tier_1":
+                tier_ends_at = end_dt.isoformat()
+    return {
+        "partner_program": partner_program,
+        "partner_tier": partner_tier,
+        "tier_1_rate": (user_doc or {}).get("tier_1_rate"),
+        "tier_2_rate": (user_doc or {}).get("tier_2_rate"),
+        "tier_1_duration_months": (user_doc or {}).get("tier_1_duration_months"),
+        "partnership_start_date": (user_doc or {}).get("partnership_start_date"),
+        "tier_ends_at": tier_ends_at,
+        "has_custom_rate": has_custom,
+    }
 
 
 def _validate_rate(value: Any) -> Optional[float]:
@@ -1122,17 +1188,10 @@ async def get_earnings_summary(current_user: User = Depends(get_current_user)):
     ) or {}
     effective_rate = _resolve_effective_rate(_user_doc)
 
-    # Compute partner-tier snapshot for the response.
-    partner_tier: Optional[str] = None
-    tier_ends_at: Optional[str] = None
-    if _user_doc.get("partner_program") is True and _user_doc.get("commission_rate") is None:
-        end_dt = _partner_tier1_end(_user_doc)
-        if end_dt is None:
-            partner_tier = "tier_1"
-        else:
-            now = datetime.now(timezone.utc)
-            partner_tier = "tier_1" if now < end_dt else "tier_2"
-            tier_ends_at = end_dt.isoformat() if partner_tier == "tier_1" else None
+    # iter503 — Consolidated partner-tier snapshot for the UI (also
+    # includes has_custom_rate so the dashboard can show the "(custom rate)"
+    # tag only when there's an actual intentional flat override).
+    tier_snapshot = _partner_tier_snapshot(_user_doc)
 
     return {
         "this_month": {
@@ -1158,14 +1217,8 @@ async def get_earnings_summary(current_user: User = Depends(get_current_user)):
         "commission_rate": effective_rate,
         "default_commission_rate": AFFILIATE_PROFIT_SHARE_RATE,
         "affiliate_status": (_user_doc.get("affiliate_status") or "none"),
-        # iter502 — Partner Program tier snapshot for the dashboard.
-        "partner_program": bool(_user_doc.get("partner_program")),
-        "partner_tier": partner_tier,
-        "tier_1_rate": _user_doc.get("tier_1_rate"),
-        "tier_2_rate": _user_doc.get("tier_2_rate"),
-        "tier_1_duration_months": _user_doc.get("tier_1_duration_months"),
-        "partnership_start_date": _user_doc.get("partnership_start_date"),
-        "tier_ends_at": tier_ends_at,
+        # iter502/503 — Partner Program tier snapshot for the dashboard.
+        **tier_snapshot,
     }
 
 

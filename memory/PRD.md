@@ -1,6 +1,54 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter503 — Affiliate Center dashboard data-sync bug fix (Feb 21, 2026) ✅ SHIPPED (preview) · ⛔ DO NOT DEPLOY
+
+### Root cause
+Alex Boulanger's Affiliate Center rendered **3%** and a bogus **(custom rate)** tag even though the admin panel had him enrolled in the Influencer Partner Program at Tier 1 50%. Two problems:
+1. His user document had `commission_rate: 0.0` (from a bad "Save Rate" click during smoke testing). `_resolve_effective_rate` treated 0.0 as a valid override (rule: `0 <= rate <= MAX`), returning 0.0 and blocking the tier fall-through.
+2. The frontend widget derived `isCustomRate` client-side by comparing `commission_rate !== default_commission_rate` — which lit up incorrectly for any non-default effective rate, including tier rates.
+3. The referral-link copy and the "Get Paid" blurb were flat-rate strings only; no tier-aware branches.
+
+### Fix
+**Backend — `routes/affiliate.py`:**
+- `_resolve_effective_rate` now requires `0 < rate <= MAX` for the flat-override branch. A stored `commission_rate=0` (or 0.0) is treated as **no override** — falls through to tiers / default. Zero-out an affiliate via the `revoked` status, not a zero rate.
+- New helper `_has_custom_rate(user_doc)` — server-side truth for whether the affiliate has an *intentional* non-null, non-zero flat override. Used by the dashboard to decide whether to show the `(custom rate)` tag.
+- New helper `_partner_tier_snapshot(user_doc, now=None)` — one place that packages `partner_program`, `partner_tier` (`"tier_1"|"tier_2"|null`), `tier_1_rate`, `tier_2_rate`, `tier_1_duration_months`, `partnership_start_date`, `tier_ends_at`, `has_custom_rate`. Reused by both `earnings-summary` and `/affiliate/stats`. Respects the flat-override escape hatch: when an intentional flat rate is set, `partner_tier` is `None` so the "(custom rate)" tag correctly takes over.
+
+**Backend — `routes/misc.py` `/affiliate/stats`:**
+- Returns the full tier snapshot alongside the resolved `commission_rate`.
+- `commission_description` is now tier-aware server-side (fallback for email/notification templates):
+  - Tier 1: *"You earn {tier_1_rate}% of BidVex's net platform profit for your first {tier_1_duration_months} months as a partner."*
+  - Tier 2: *"You earn {tier_2_rate}% of BidVex's net platform profit, for as long as your referrals stay active."*
+  - Non-partner: unchanged flat-rate copy.
+
+**Frontend — `pages/AffiliateDashboard.js`:**
+- Referral-link **CardDescription** and the "Get Paid" blurb rewritten with a three-branch renderer keyed on `stats.partner_program` + `stats.partner_tier`.
+- Default rate is now pulled from `stats.default_commission_rate` (env-tunable server-side) — no more hardcoded `3` fallback.
+
+**Frontend — `components/AffiliateEarningsWidget.jsx`:**
+- `currentRatePct` reads `summary.tier_1_rate` / `summary.tier_2_rate` when the affiliate is a partner in that tier; otherwise `summary.commission_rate`. No more hardcoded 3 fallback.
+- `isCustomRate` is now server-driven via `summary.has_custom_rate` — the "(custom rate)" tag only lights up for real flat overrides.
+
+**Data reconciliation:**
+- Alex's user document normalized: `commission_rate=null`, `tier_1_rate=0.5`, `tier_1_duration_months=12`, `tier_2_rate=0.05`, `partnership_start_date` preserved. Not a schema migration — a one-off cleanup of a specific record affected by the pre-fix bug.
+
+### Verification
+- **Backend**: 104/104 pytest total = 13 new iter503 + 89 iter338/501/502 regression, all green. Covers Alex's exact scenario end-to-end (`test_alex_end_to_end_scenario`, `test_alex_bad_zero_override_recovers_via_new_semantics`), tier-1/tier-2/boundary transitions, non-partner still gets 3%, and flat override still disables tiers.
+- **Live UI** (Alex logged in to https://prod-verify-2.preview.emergentagent.com/dashboard/affiliate):
+  - Referral card: *"You earn **50%** of BidVex's net platform profit on every transaction (auction fees & subscriptions) for your first 12 months as a partner."*
+  - Earnings widget: *"Your **50%** share: $0.00"* (no `(custom rate)` tag).
+  - Get Paid blurb: *"**50%** of BidVex's profit on each transaction — credited for admin approval."*
+
+### Untouched (audit)
+- Fee/tax/settlement/Stripe code (`services/fee_calculator.py`, `services/tax_engine.py`, `services/auction_settlement.py`, `services/payment_collection.py`).
+- `award_affiliate_commission` — behaviour unchanged for existing snapshots (historical `platform_credits` rows still immutable, iter501 guarantee preserved).
+- Referral click tracking / attribution / cookie logic.
+
+### Explicitly deferred (still out of scope)
+Leaderboard, content-verification gating, fraud reconciliation, 56 pre-existing lint issues.
+
+
 ## iter502 — Influencer Partner Program (time-bound rate schedule + 75% ceiling) (Feb 21, 2026) ✅ SHIPPED (preview) · ⛔ DO NOT DEPLOY
 
 ### Delivered
