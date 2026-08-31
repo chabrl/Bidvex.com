@@ -69,7 +69,7 @@ def test_admin_get_all_shape(admin_session):
     assert r.status_code == 200, r.text[:300]
     body = r.json()
     assert body.get("default_rate") == 0.03
-    assert body.get("max_rate") == 0.20
+    assert body.get("max_rate") == 0.75
     items = body.get("items") or body.get("affiliates") or []
     assert isinstance(items, list)
     if items:
@@ -104,7 +104,7 @@ def test_set_rate_out_of_range(admin_session, seed_user, db):
     admin_session.post(f"{BASE_URL}/api/affiliate/admin/set-status",
                        json={"user_id": uid, "status": "active", "commission_rate": 0.05}, timeout=20)
     r = admin_session.post(f"{BASE_URL}/api/affiliate/admin/set-rate",
-                           json={"user_id": uid, "commission_rate": 0.50}, timeout=20)
+                           json={"user_id": uid, "commission_rate": 0.85}, timeout=20)
     assert r.status_code == 400
     body = r.json()
     err = body.get("error") or body.get("detail")

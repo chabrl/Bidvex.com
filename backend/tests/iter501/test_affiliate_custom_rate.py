@@ -137,7 +137,7 @@ def test_validate_rate_rejects_out_of_range():
         _validate_rate(-0.01)
     assert e1.value.status_code == 400
     with pytest.raises(HTTPException) as e2:
-        _validate_rate(0.25)
+        _validate_rate(0.80)  # iter502 — above the 75% ceiling
     assert e2.value.status_code == 400
     with pytest.raises(HTTPException) as e3:
         _validate_rate("not-a-number")
@@ -293,7 +293,7 @@ async def test_admin_set_status_rejects_out_of_range_rate(db):
     try:
         with pytest.raises(HTTPException) as exc:
             await admin_set_affiliate_status(
-                {"user_id": target_id, "status": "active", "commission_rate": 0.25},
+                {"user_id": target_id, "status": "active", "commission_rate": 0.85},
                 current_user=admin,
             )
         assert exc.value.status_code == 400
@@ -409,7 +409,7 @@ async def test_admin_set_rate_rejects_out_of_range(db):
     try:
         with pytest.raises(HTTPException) as exc:
             await admin_set_affiliate_rate(
-                {"user_id": target_id, "commission_rate": 0.50},
+                {"user_id": target_id, "commission_rate": 0.85},
                 current_user=admin,
             )
         assert exc.value.status_code == 400

@@ -45,7 +45,7 @@ const pctToFraction = (pctStr) => {
 };
 
 const RATE_MIN_PCT = 0;
-const RATE_MAX_PCT_DEFAULT = 20; // mirrors backend MAX_AFFILIATE_COMMISSION_RATE
+const RATE_MAX_PCT_DEFAULT = 75; // iter502 — mirrors backend MAX_AFFILIATE_COMMISSION_RATE=0.75
 
 const STATUS_BADGE = {
   active:  { cls: 'bg-emerald-100 text-emerald-800 border-emerald-300', en: 'Active',  fr: 'Actif' },
@@ -59,16 +59,40 @@ const STATUS_BADGE = {
  * Keeps its own local state for the rate input so a validation error
  * doesn't wipe the parent's list re-fetch.
  */
-const AffiliateRow = ({ affiliate, defaultRate, maxRate, onSaved, isFr }) => {
+const AffiliateRow = ({ affiliate, defaultRate, maxRate, partnerDefaults, onSaved, isFr }) => {
   const initialPct = fractionToPct(affiliate.commission_rate);
   const [rateInput, setRateInput] = useState(initialPct);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  // iter502 — Influencer Partner Program local state.  Only mutated on
+  // explicit Save.  Pre-fills from the row; falls back to program
+  // defaults when the row has never been enrolled.
+  const [showPartner, setShowPartner] = useState(false);
+  const [partnerEnabled, setPartnerEnabled] = useState(!!affiliate.partner_program);
+  const [t1Rate, setT1Rate] = useState(
+    fractionToPct(affiliate.tier_1_rate ?? partnerDefaults?.tier_1_rate),
+  );
+  const [t1Months, setT1Months] = useState(
+    String(affiliate.tier_1_duration_months ?? partnerDefaults?.tier_1_duration_months ?? 6),
+  );
+  const [t2Rate, setT2Rate] = useState(
+    fractionToPct(affiliate.tier_2_rate ?? partnerDefaults?.tier_2_rate),
+  );
+  const [partnerError, setPartnerError] = useState('');
+
   useEffect(() => {
     setRateInput(fractionToPct(affiliate.commission_rate));
     setError('');
-  }, [affiliate.commission_rate, affiliate.id]);
+    setPartnerEnabled(!!affiliate.partner_program);
+    setT1Rate(fractionToPct(affiliate.tier_1_rate ?? partnerDefaults?.tier_1_rate));
+    setT1Months(String(affiliate.tier_1_duration_months ?? partnerDefaults?.tier_1_duration_months ?? 6));
+    setT2Rate(fractionToPct(affiliate.tier_2_rate ?? partnerDefaults?.tier_2_rate));
+    setPartnerError('');
+  }, [affiliate.commission_rate, affiliate.id, affiliate.partner_program,
+      affiliate.tier_1_rate, affiliate.tier_1_duration_months,
+      affiliate.tier_2_rate, partnerDefaults?.tier_1_rate,
+      partnerDefaults?.tier_1_duration_months, partnerDefaults?.tier_2_rate]);
 
   const validate = () => {
     const trimmed = String(rateInput || '').trim();
@@ -181,6 +205,96 @@ const AffiliateRow = ({ affiliate, defaultRate, maxRate, onSaved, isFr }) => {
     }
   };
 
+  // iter502 — validate + save the Influencer Partner Program schedule.
+  const validatePartner = () => {
+    const parsePct = (s, label) => {
+      const trimmed = String(s || '').trim();
+      if (trimmed === '') return { rate: null };
+      const n = Number(trimmed);
+      if (Number.isNaN(n)) return { err: isFr ? `${label} invalide` : `Invalid ${label}` };
+      if (n < RATE_MIN_PCT || n > (maxRate * 100)) {
+        return {
+          err: isFr
+            ? `${label} doit être entre ${RATE_MIN_PCT}% et ${maxRate * 100}%`
+            : `${label} must be between ${RATE_MIN_PCT}% and ${maxRate * 100}%`,
+        };
+      }
+      return { rate: pctToFraction(n) };
+    };
+    const t1 = parsePct(t1Rate, isFr ? 'Tier 1' : 'Tier 1');
+    if (t1.err) return { ok: false, msg: t1.err };
+    const t2 = parsePct(t2Rate, isFr ? 'Tier 2' : 'Tier 2');
+    if (t2.err) return { ok: false, msg: t2.err };
+    const monthsN = Number(t1Months);
+    if (!Number.isInteger(monthsN) || monthsN < 1 || monthsN > 120) {
+      return {
+        ok: false,
+        msg: isFr
+          ? 'La durée doit être un entier entre 1 et 120 mois'
+          : 'Duration must be an integer between 1 and 120 months',
+      };
+    }
+    return {
+      ok: true,
+      partner_program: partnerEnabled,
+      tier_1_rate: t1.rate,
+      tier_2_rate: t2.rate,
+      tier_1_duration_months: monthsN,
+    };
+  };
+
+  const doSavePartner = async () => {
+    const v = validatePartner();
+    if (!v.ok) {
+      setPartnerError(v.msg);
+      toast.error(v.msg);
+      return;
+    }
+    setSaving(true);
+    setPartnerError('');
+    try {
+      const token = localStorage.getItem('token');
+      const body = {
+        user_id: affiliate.id,
+        partner_program: v.partner_program,
+      };
+      if (v.partner_program) {
+        body.tier_1_rate = v.tier_1_rate;
+        body.tier_2_rate = v.tier_2_rate;
+        body.tier_1_duration_months = v.tier_1_duration_months;
+      }
+      const res = await axios.post(
+        `${API}/affiliate/admin/set-rate`,
+        body,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      const name = affiliate.name || affiliate.email || affiliate.id;
+      if (res.data.changed) {
+        const label = v.partner_program
+          ? (isFr
+            ? `Partenaire activé (T1 ${fractionToPct(v.tier_1_rate)}% / T2 ${fractionToPct(v.tier_2_rate)}%)`
+            : `Partner enabled (T1 ${fractionToPct(v.tier_1_rate)}% / T2 ${fractionToPct(v.tier_2_rate)}%)`)
+          : (isFr ? 'Partenaire désactivé' : 'Partner disabled');
+        toast.success(`${name}: ${label}`);
+      } else {
+        toast(isFr ? 'Aucun changement' : 'No change', { duration: 1500 });
+      }
+      onSaved && onSaved();
+    } catch (err) {
+      const detail = err?.response?.data?.detail;
+      const msg =
+        typeof detail === 'string'
+          ? detail
+          : detail?.[isFr ? 'message_fr' : 'message_en']
+            || detail?.message
+            || (isFr ? 'Échec de la mise à jour' : 'Update failed');
+      setPartnerError(msg);
+      toast.error(msg);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const badgeMeta = STATUS_BADGE[status] || STATUS_BADGE.none;
 
   return (
@@ -200,14 +314,27 @@ const AffiliateRow = ({ affiliate, defaultRate, maxRate, onSaved, isFr }) => {
           >
             {isFr ? badgeMeta.fr : badgeMeta.en}
           </Badge>
+          {affiliate.partner_program && (
+            <Badge
+              className="bg-purple-100 text-purple-800 border-purple-300 text-[10px]"
+              data-testid={`affiliate-partner-badge-${affiliate.id}`}
+            >
+              {isFr ? 'Partenaire' : 'Partner'}
+            </Badge>
+          )}
           <span className="text-xs text-muted-foreground">
             {isFr ? 'Actuel:' : 'Current:'}{' '}
             <b data-testid={`affiliate-effective-rate-${affiliate.id}`}>
               {currentEffectivePct}%
             </b>
-            {affiliate.commission_rate == null && (
+            {affiliate.commission_rate == null && !affiliate.partner_program && (
               <span className="text-[10px] italic ml-1 text-slate-500">
                 ({isFr ? 'défaut' : 'default'})
+              </span>
+            )}
+            {affiliate.commission_rate == null && affiliate.partner_program && (
+              <span className="text-[10px] italic ml-1 text-purple-700 dark:text-purple-400">
+                ({isFr ? 'tier programme' : 'program tier'})
               </span>
             )}
           </span>
@@ -276,7 +403,122 @@ const AffiliateRow = ({ affiliate, defaultRate, maxRate, onSaved, isFr }) => {
             <RevokeButton affiliate={affiliate} isFr={isFr} onSaved={onSaved} />
           </>
         )}
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => setShowPartner((s) => !s)}
+          data-testid={`affiliate-partner-toggle-${affiliate.id}`}
+          className={affiliate.partner_program
+            ? 'border-purple-400 text-purple-700 hover:bg-purple-50'
+            : 'border-slate-300 text-slate-700 hover:bg-slate-50'}
+        >
+          {showPartner
+            ? (isFr ? 'Masquer partenaire' : 'Hide Partner')
+            : (isFr ? 'Programme partenaire' : 'Partner Program')}
+        </Button>
       </div>
+
+      {showPartner && (
+        <div
+          className="md:col-span-12 border-t border-slate-200 dark:border-slate-800 pt-4 mt-2 space-y-3"
+          data-testid={`affiliate-partner-section-${affiliate.id}`}
+        >
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={partnerEnabled}
+                onChange={(e) => { setPartnerEnabled(e.target.checked); setPartnerError(''); }}
+                data-testid={`affiliate-partner-enabled-${affiliate.id}`}
+                className="h-4 w-4"
+              />
+              <span className="text-sm font-medium">
+                {isFr
+                  ? 'Inscrit au Programme Partenaire Influenceur'
+                  : 'Enrolled in Influencer Partner Program'}
+              </span>
+            </label>
+            {affiliate.partnership_start_date && (
+              <span className="text-[10px] text-muted-foreground" data-testid={`affiliate-partner-start-${affiliate.id}`}>
+                {isFr ? 'Début :' : 'Started:'}{' '}
+                {new Date(affiliate.partnership_start_date).toLocaleDateString(isFr ? 'fr-CA' : 'en-CA')}
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-[10px] uppercase tracking-wide text-slate-500 mb-1">
+                {isFr ? 'Tier 1 taux (%)' : 'Tier 1 rate (%)'}
+              </label>
+              <Input
+                type="number"
+                min={RATE_MIN_PCT}
+                max={maxRate * 100}
+                step="0.1"
+                value={t1Rate}
+                onChange={(e) => { setT1Rate(e.target.value); setPartnerError(''); }}
+                disabled={!partnerEnabled}
+                placeholder={String(fractionToPct(partnerDefaults?.tier_1_rate))}
+                data-testid={`affiliate-tier1-rate-${affiliate.id}`}
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] uppercase tracking-wide text-slate-500 mb-1">
+                {isFr ? 'Durée Tier 1 (mois)' : 'Tier 1 duration (months)'}
+              </label>
+              <Input
+                type="number"
+                min="1"
+                max="120"
+                step="1"
+                value={t1Months}
+                onChange={(e) => { setT1Months(e.target.value); setPartnerError(''); }}
+                disabled={!partnerEnabled}
+                placeholder={String(partnerDefaults?.tier_1_duration_months ?? 6)}
+                data-testid={`affiliate-tier1-months-${affiliate.id}`}
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] uppercase tracking-wide text-slate-500 mb-1">
+                {isFr ? 'Tier 2 taux (%)' : 'Tier 2 rate (%)'}
+              </label>
+              <Input
+                type="number"
+                min={RATE_MIN_PCT}
+                max={maxRate * 100}
+                step="0.1"
+                value={t2Rate}
+                onChange={(e) => { setT2Rate(e.target.value); setPartnerError(''); }}
+                disabled={!partnerEnabled}
+                placeholder={String(fractionToPct(partnerDefaults?.tier_2_rate))}
+                data-testid={`affiliate-tier2-rate-${affiliate.id}`}
+              />
+            </div>
+          </div>
+          <p className="text-[11px] text-slate-500 italic">
+            {isFr
+              ? 'Le taux Tier 1 s\u2019applique automatiquement pendant la période initiale à partir de la date de début du partenariat, puis bascule vers le Tier 2. Un taux forfaitaire (Rate ci-dessus) remplace ce calendrier s\u2019il est défini.'
+              : 'Tier 1 rate applies automatically for the initial window from the partnership start date, then falls through to Tier 2. A flat Rate (above) overrides this schedule when set.'}
+          </p>
+          {partnerError && (
+            <p className="text-xs text-rose-600" data-testid={`affiliate-partner-error-${affiliate.id}`}>
+              {partnerError}
+            </p>
+          )}
+          <div className="flex justify-end">
+            <Button
+              size="sm"
+              onClick={doSavePartner}
+              disabled={saving}
+              data-testid={`affiliate-save-partner-btn-${affiliate.id}`}
+              className="bg-purple-600 hover:bg-purple-700 text-white"
+            >
+              {saving ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Save className="h-3.5 w-3.5 mr-1.5" />}
+              {isFr ? 'Enregistrer le programme' : 'Save Program'}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -344,6 +586,12 @@ const AffiliateManager = () => {
   const [payouts, setPayouts] = useState([]);
   const [defaultRate, setDefaultRate] = useState(0.03);
   const [maxRate, setMaxRate] = useState(RATE_MAX_PCT_DEFAULT / 100);
+  // iter502 — Partner Program defaults (pre-fill values for new enrolments)
+  const [partnerDefaults, setPartnerDefaults] = useState({
+    tier_1_rate: 0.50,
+    tier_1_duration_months: 6,
+    tier_2_rate: 0.05,
+  });
   const [loading, setLoading] = useState(true);
   const [confirm, setConfirm] = useState(null);
 
@@ -359,6 +607,9 @@ const AffiliateManager = () => {
       setRows(Array.isArray(affData?.items) ? affData.items : []);
       setDefaultRate(affData?.default_rate ?? 0.03);
       setMaxRate(affData?.max_rate ?? (RATE_MAX_PCT_DEFAULT / 100));
+      if (affData?.partner_program_defaults) {
+        setPartnerDefaults(affData.partner_program_defaults);
+      }
       const payData = payRes.data;
       setPayouts(Array.isArray(payData) ? payData : (payData?.payouts || []));
     } catch (_) {
@@ -405,8 +656,8 @@ ${isFr ? 'Cela déclenchera le transfert Stripe.' : 'This will trigger the Strip
         </h2>
         <p className="text-muted-foreground">
           {isFr
-            ? `Approbations, paiements, et taux personnalisés (défaut ${(defaultRate * 100).toFixed(2)}%, max ${(maxRate * 100).toFixed(0)}%).`
-            : `Approvals, payouts, and per-affiliate custom rates (default ${(defaultRate * 100).toFixed(2)}%, cap ${(maxRate * 100).toFixed(0)}%).`}
+            ? `Approbations, paiements, taux personnalisés (défaut ${(defaultRate * 100).toFixed(2)}%, max ${(maxRate * 100).toFixed(0)}%), et Programme Partenaire Influenceur.`
+            : `Approvals, payouts, custom rates (default ${(defaultRate * 100).toFixed(2)}%, cap ${(maxRate * 100).toFixed(0)}%), and Influencer Partner Program.`}
         </p>
       </div>
 
@@ -470,6 +721,7 @@ ${isFr ? 'Cela déclenchera le transfert Stripe.' : 'This will trigger the Strip
                   affiliate={affiliate}
                   defaultRate={defaultRate}
                   maxRate={maxRate}
+                  partnerDefaults={partnerDefaults}
                   onSaved={fetchData}
                   isFr={isFr}
                 />

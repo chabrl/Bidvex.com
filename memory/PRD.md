@@ -1,6 +1,74 @@
 # BidVex — Auction Marketplace PRD
 
 
+## iter502 — Influencer Partner Program (time-bound rate schedule + 75% ceiling) (Feb 21, 2026) ✅ SHIPPED (preview) · ⛔ DO NOT DEPLOY
+
+### Delivered
+
+**Rate ceiling raised** — `MAX_AFFILIATE_COMMISSION_RATE` default now `0.75` (env-tunable). Kept purely as a fat-finger safeguard. Applied uniformly to flat `commission_rate` and each tier rate (`tier_1_rate`, `tier_2_rate`).
+
+**Data model (`users` collection, additive):**
+- `partner_program`: bool, default `False`. Only when `True` does the tier schedule apply.
+- `partnership_start_date`: ISO-8601 string. Auto-stamped to activation time when the admin enables `partner_program=True` without an explicit start.
+- `tier_1_rate`: float. Default env `PARTNER_PROGRAM_TIER1_RATE` = `0.50`.
+- `tier_1_duration_months`: int, 1–120. Default env `PARTNER_PROGRAM_TIER1_DURATION_MONTHS` = `6`.
+- `tier_2_rate`: float. Default env `PARTNER_PROGRAM_TIER2_RATE` = `0.05`.
+
+**Rate precedence (iter502)** — `_resolve_effective_rate(user_doc, now=None)`:
+1. **Flat `commission_rate` override wins** — admin escape hatch. Setting it to `null` re-enables the tier schedule.
+2. **Partner Program tier schedule** — if `partner_program=True`, compute live:
+   - `now < partnership_start_date + tier_1_duration_months` → `tier_1_rate`
+   - otherwise → `tier_2_rate`
+   - Falls through automatically once the tier-1 window elapses — **no cron, no manual flip**.
+   - Missing `partnership_start_date` → still uses `tier_1_rate` (opener period).
+   - Stale out-of-range values in DB clamp to `MAX_AFFILIATE_COMMISSION_RATE` (never blocks legit awards).
+3. **Global default** `AFFILIATE_PROFIT_SHARE_RATE = 0.03`.
+
+**Backend — `routes/affiliate.py`:**
+- Constants: `PARTNER_PROGRAM_TIER1_RATE_DEFAULT`, `PARTNER_PROGRAM_TIER1_DURATION_MONTHS_DEFAULT`, `PARTNER_PROGRAM_TIER2_RATE_DEFAULT` (all env-tunable).
+- Helpers: `_partner_tier1_end(user_doc)`, `_clamp(rate)`, `_validate_partner_fields(payload)` (bilingual 400 errors).
+- `POST /admin/set-status` and `POST /admin/set-rate` now accept the full set of partner fields (`partner_program`, `tier_1_rate`, `tier_1_duration_months`, `tier_2_rate`, `partnership_start_date`) via any subset. Idempotent (unchanged config skips DB + audit). Every schedule change writes `admin_action_logs` with `before/after` partner-field snapshots.
+- `award_affiliate_commission()` projection extended to pull all partner fields; the effective rate is still **snapshotted onto the credit row** (iter501 immutability preserved).
+- `GET /admin/all` extended: each row includes `partner_program`, `partnership_start_date`, `tier_1_rate`, `tier_1_duration_months`, `tier_2_rate`. Top-level response now also carries `partner_program_defaults` so the UI can pre-fill new enrolments.
+- `GET /earnings-summary` extended: `partner_program`, `partner_tier` (`"tier_1"` | `"tier_2"` | `null`), `tier_1_rate`, `tier_2_rate`, `tier_1_duration_months`, `partnership_start_date`, `tier_ends_at`.
+
+**Frontend — `pages/admin/AffiliateManager.js`:**
+- Header copy updated: `default 3.00%, cap 75%, and Influencer Partner Program`.
+- Rate input `max` now `75`.
+- **New "Partner Program" toggle button** on every row → collapsible section shows:
+  - **Enrolled in Influencer Partner Program** checkbox (with the auto-stamped start date displayed inline once persisted).
+  - Three inputs — **Tier 1 Rate (%)**, **Tier 1 Duration (months)**, **Tier 2 Rate (%)** — disabled when the checkbox is off; placeholders show the program defaults.
+  - Explanatory bilingual note about the tier fall-through and the flat-override escape hatch.
+  - Inline error text + **Save Program** button (purple, distinct from Save Rate).
+- **Partner** badge (purple) added next to the Active/Pending/etc. status pill when `partner_program=true`.
+- Effective-rate line labels the source: `(default)`, `(program tier)`, or a flat number.
+- All new interactive elements carry unique `data-testid`s: `affiliate-partner-badge-{id}`, `affiliate-partner-toggle-{id}`, `affiliate-partner-section-{id}`, `affiliate-partner-enabled-{id}`, `affiliate-tier1-rate-{id}`, `affiliate-tier1-months-{id}`, `affiliate-tier2-rate-{id}`, `affiliate-save-partner-btn-{id}`, `affiliate-partner-error-{id}`, `affiliate-partner-start-{id}`.
+
+**Tests — `backend/tests/iter502/test_partner_program.py`:** 28 pytest cases (all green).
+- Rate ceiling raised to 0.75.
+- Precedence: flat > tiers > default.
+- Tier 1 within window / Tier 2 after window / boundary microsecond.
+- Missing start date → tier 1 (opener period).
+- Stale out-of-range rate → clamped.
+- Admin endpoint validation: 75% accepted, 80% rejected, negative/zero months rejected, bad date rejected.
+- Auto-stamp of `partnership_start_date` on activation, respected when explicit.
+- Audit-log captures partner snapshot.
+- Partner-field updates idempotent (same config twice → no log).
+- End-to-end: award uses tier-1 within window, tier-2 after window, flat override still wins over tiers, high-rate (70%) award works with raised ceiling, snapshotted rate survives later tier-config edits (history immutable).
+
+**Regression** (all green):
+- 20/20 iter501 unit + 10/10 iter501 live-API + 31/31 iter338 = **89/89** total pytest.
+- iter501 out-of-range tests updated: `0.25` and `0.50` are now valid; new tests use `0.85` for the reject path.
+
+**Live-API smoke** (charbel911 admin against auto-promoted affiliate):
+- `POST /admin/set-rate {commission_rate:0.5}` → accepted (was blocked by 20% cap).
+- `POST /admin/set-rate {commission_rate:0.8}` → 400 `commission_rate_out_of_range`.
+- `POST /admin/set-rate {partner_program:true, tier_1_rate:0.6, tier_1_duration_months:3, tier_2_rate:0.08}` → enrolled, `partnership_start_date` auto-stamped, `effective_rate=0.6` (in T1 window).
+- Reset: `{commission_rate:null, partner_program:false}` → `effective_rate=0.03`.
+
+**Explicitly deferred** (out of scope for this pass): leaderboard ranking/tier display, content-verification gating, fraud reconciliation.
+
+
 ## iter501 — Per-Affiliate Custom Commission Rate + Affiliate Status Gate (Feb 20, 2026) ✅ SHIPPED (preview) · ⛔ DO NOT DEPLOY
 
 ### Delivered

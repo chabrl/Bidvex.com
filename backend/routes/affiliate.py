@@ -28,7 +28,7 @@ import logging
 import os
 import secrets
 import string
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
@@ -38,14 +38,28 @@ from deps import User, get_current_user, get_db
 
 logger = logging.getLogger(__name__)
 
-AFFILIATE_PROFIT_SHARE_RATE = 0.03  # iter338 — 3% of BidVex's platform profit
-# iter501 — Max per-affiliate commission override.  Env-tunable so ops can
-# raise the ceiling for special promoters without a code change.
+AFFILIATE_PROFIT_SHARE_RATE = 0.03  # iter338 — 3% default for general affiliates
+# iter502 — Max per-rate ceiling raised to 75% (env-tunable). Kept as a
+# fat-finger safeguard, not a business-logic block. Applied to every
+# admin-supplied rate (flat commission_rate, tier_1_rate, tier_2_rate).
 MAX_AFFILIATE_COMMISSION_RATE = float(
-    os.environ.get("MAX_AFFILIATE_COMMISSION_RATE", "0.20")
+    os.environ.get("MAX_AFFILIATE_COMMISSION_RATE", "0.75")
 )
 # iter501 — Affiliate lifecycle statuses persisted on the user document
 AFFILIATE_STATUSES = ("none", "pending", "active", "revoked")
+
+# iter502 — Influencer Partner Program defaults. Applied only when the
+# user's `partner_program == True`. General affiliates are untouched.
+PARTNER_PROGRAM_TIER1_RATE_DEFAULT = float(
+    os.environ.get("PARTNER_PROGRAM_TIER1_RATE", "0.50")
+)  # 50 % for the promotional tier-1 window
+PARTNER_PROGRAM_TIER1_DURATION_MONTHS_DEFAULT = int(
+    os.environ.get("PARTNER_PROGRAM_TIER1_DURATION_MONTHS", "6")
+)
+PARTNER_PROGRAM_TIER2_RATE_DEFAULT = float(
+    os.environ.get("PARTNER_PROGRAM_TIER2_RATE", "0.05")
+)  # 5 % steady-state rate after the tier-1 window elapses
+
 REFERRAL_COOKIE = "bidvex_ref"
 COOKIE_MAX_AGE_DAYS = 30
 PUBLIC_HOST = os.environ.get("PUBLIC_HOST", "https://bidvex.com").rstrip("/")
@@ -92,25 +106,108 @@ def _public_referral_link(code: str) -> str:
 
 # ─── iter501 — Per-affiliate status + custom rate helpers ─────────────
 
-def _resolve_effective_rate(user_doc: Optional[Dict[str, Any]]) -> float:
-    """Return the commission rate to apply for this user.
+def _partner_tier1_end(user_doc: Dict[str, Any]) -> Optional[datetime]:
+    """Return the UTC datetime at which the tier-1 rate window expires
+    for a partner, or None if the record is missing required data."""
+    start = user_doc.get("partnership_start_date")
+    if not start:
+        return None
+    if isinstance(start, str):
+        try:
+            start_dt = datetime.fromisoformat(start.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    elif isinstance(start, datetime):
+        start_dt = start
+    else:
+        return None
+    if start_dt.tzinfo is None:
+        start_dt = start_dt.replace(tzinfo=timezone.utc)
+    months = user_doc.get("tier_1_duration_months")
+    try:
+        months = int(months) if months is not None else PARTNER_PROGRAM_TIER1_DURATION_MONTHS_DEFAULT
+    except (TypeError, ValueError):
+        months = PARTNER_PROGRAM_TIER1_DURATION_MONTHS_DEFAULT
+    # month arithmetic: use 30.4375-day average.  Prevents relativedelta
+    # dependency and keeps the boundary deterministic at the second level.
+    return start_dt + timedelta(days=months * 30.4375)
 
-    - If ``commission_rate`` is a valid float in [0, MAX], return it.
-    - Otherwise (missing/null/invalid), fall back to
-      ``AFFILIATE_PROFIT_SHARE_RATE``. Never raises.
+
+def _clamp(rate: float) -> float:
+    """Clamp a rate to [0, MAX_AFFILIATE_COMMISSION_RATE] — read-side
+    defensive guard, used by ``_resolve_effective_rate`` so a stale
+    out-of-range value in the DB never blocks a legitimate award."""
+    if rate < 0:
+        return 0.0
+    if rate > MAX_AFFILIATE_COMMISSION_RATE:
+        return MAX_AFFILIATE_COMMISSION_RATE
+    return rate
+
+
+def _resolve_effective_rate(
+    user_doc: Optional[Dict[str, Any]],
+    now: Optional[datetime] = None,
+) -> float:
+    """Return the commission rate to apply for this user *right now*.
+
+    Precedence (iter502):
+      1. Explicit flat ``commission_rate`` override — an admin escape
+         hatch that wins over everything else.  Setting it to ``None``
+         re-enables the automatic path.
+      2. Influencer Partner Program tier schedule — if
+         ``partner_program`` is True, compute live:
+             now < partnership_start_date + tier_1_duration_months
+                 → tier_1_rate  (default 50 %)
+             otherwise
+                 → tier_2_rate  (default  5 %)
+      3. Global default ``AFFILIATE_PROFIT_SHARE_RATE`` (3 %).
+
+    ``now`` is injectable for tests; production omits it and gets UTC now.
+    Never raises — falls back to the global default on any malformed data.
     """
     if not user_doc:
         return AFFILIATE_PROFIT_SHARE_RATE
+
+    # 1) Explicit flat override wins.
     raw = user_doc.get("commission_rate")
-    if raw is None:
-        return AFFILIATE_PROFIT_SHARE_RATE
-    try:
-        rate = float(raw)
-    except (TypeError, ValueError):
-        return AFFILIATE_PROFIT_SHARE_RATE
-    if rate < 0 or rate > MAX_AFFILIATE_COMMISSION_RATE:
-        return AFFILIATE_PROFIT_SHARE_RATE
-    return rate
+    if raw is not None:
+        try:
+            rate = float(raw)
+            if 0 <= rate <= MAX_AFFILIATE_COMMISSION_RATE:
+                return rate
+        except (TypeError, ValueError):
+            pass
+
+    # 2) Partner Program tier schedule.
+    if user_doc.get("partner_program") is True:
+        tier1_end = _partner_tier1_end(user_doc)
+        # If no start date recorded, we still honour the tier config using
+        # the tier_1_rate (opening period) rather than the global 3 %.
+        if tier1_end is None:
+            try:
+                r1 = float(user_doc.get("tier_1_rate", PARTNER_PROGRAM_TIER1_RATE_DEFAULT))
+            except (TypeError, ValueError):
+                r1 = PARTNER_PROGRAM_TIER1_RATE_DEFAULT
+            return _clamp(r1)
+
+        current = (now or datetime.now(timezone.utc))
+        if current.tzinfo is None:
+            current = current.replace(tzinfo=timezone.utc)
+
+        if current < tier1_end:
+            try:
+                r1 = float(user_doc.get("tier_1_rate", PARTNER_PROGRAM_TIER1_RATE_DEFAULT))
+            except (TypeError, ValueError):
+                r1 = PARTNER_PROGRAM_TIER1_RATE_DEFAULT
+            return _clamp(r1)
+        try:
+            r2 = float(user_doc.get("tier_2_rate", PARTNER_PROGRAM_TIER2_RATE_DEFAULT))
+        except (TypeError, ValueError):
+            r2 = PARTNER_PROGRAM_TIER2_RATE_DEFAULT
+        return _clamp(r2)
+
+    # 3) Global default.
+    return AFFILIATE_PROFIT_SHARE_RATE
 
 
 def _validate_rate(value: Any) -> Optional[float]:
@@ -220,7 +317,10 @@ async def admin_list_affiliates(current_user: User = Depends(get_current_user)):
     async for u in db.users.find(
         {"$or": or_clauses},
         {"_id": 0, "id": 1, "name": 1, "email": 1, "affiliate_code": 1,
-         "affiliate_status": 1, "commission_rate": 1, "created_at": 1},
+         "affiliate_status": 1, "commission_rate": 1, "created_at": 1,
+         # iter502 — Influencer Partner Program fields.
+         "partner_program": 1, "partnership_start_date": 1,
+         "tier_1_rate": 1, "tier_1_duration_months": 1, "tier_2_rate": 1},
     ):
         code = u.get("affiliate_code") or ""
         credits_total = 0.0
@@ -237,6 +337,12 @@ async def admin_list_affiliates(current_user: User = Depends(get_current_user)):
             "effective_rate": effective_rate,
             "referred_count": referred_counts.get(code, 0),
             "total_credits_earned": round(credits_total, 2),
+            # iter502 — normalized partner-program snapshot for the UI.
+            "partner_program": bool(u.get("partner_program")),
+            "partnership_start_date": u.get("partnership_start_date"),
+            "tier_1_rate": u.get("tier_1_rate"),
+            "tier_1_duration_months": u.get("tier_1_duration_months"),
+            "tier_2_rate": u.get("tier_2_rate"),
         })
     items.sort(key=lambda x: (-x["referred_count"], x.get("email") or ""))
     return {
@@ -244,12 +350,91 @@ async def admin_list_affiliates(current_user: User = Depends(get_current_user)):
         "total": len(items),
         "default_rate": AFFILIATE_PROFIT_SHARE_RATE,
         "max_rate": MAX_AFFILIATE_COMMISSION_RATE,
+        # iter502 — expose the partner-program defaults so the UI can
+        # pre-fill the form when an admin enables the program for a
+        # user who has never had these fields set.
+        "partner_program_defaults": {
+            "tier_1_rate": PARTNER_PROGRAM_TIER1_RATE_DEFAULT,
+            "tier_1_duration_months": PARTNER_PROGRAM_TIER1_DURATION_MONTHS_DEFAULT,
+            "tier_2_rate": PARTNER_PROGRAM_TIER2_RATE_DEFAULT,
+        },
     }
 
 
 # ─── /api/affiliate/admin/set-status ─────────────────────────────────
 # iter501 — Approve / revoke an affiliate.  Optional commission_rate
 # override applied in the same call.
+# iter502 — Also accepts Influencer Partner Program fields:
+#     partner_program, tier_1_rate, tier_1_duration_months, tier_2_rate,
+#     partnership_start_date
+
+# Fields written to the user document for partner-program members.
+_PARTNER_PROJECTION = {
+    "_id": 0, "id": 1, "email": 1, "affiliate_status": 1,
+    "commission_rate": 1, "affiliate_code": 1,
+    "partner_program": 1, "partnership_start_date": 1,
+    "tier_1_rate": 1, "tier_1_duration_months": 1, "tier_2_rate": 1,
+}
+
+
+def _validate_partner_fields(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """iter502 — Coerce & validate Influencer-Partner-Program overrides.
+
+    Returns a dict of ONLY the fields the caller provided (empty dict if
+    none were provided).  Rate fields are clamped by ``_validate_rate``
+    so out-of-range values raise HTTPException(400).
+    """
+    out: Dict[str, Any] = {}
+    if "partner_program" in payload:
+        out["partner_program"] = bool(payload.get("partner_program"))
+    if "tier_1_rate" in payload:
+        out["tier_1_rate"] = _validate_rate(payload.get("tier_1_rate"))
+    if "tier_2_rate" in payload:
+        out["tier_2_rate"] = _validate_rate(payload.get("tier_2_rate"))
+    if "tier_1_duration_months" in payload:
+        raw = payload.get("tier_1_duration_months")
+        if raw is None:
+            out["tier_1_duration_months"] = None
+        else:
+            try:
+                months = int(raw)
+            except (TypeError, ValueError):
+                raise HTTPException(status_code=400, detail={
+                    "error": "invalid_tier_1_duration_months",
+                    "message_en": "tier_1_duration_months must be a positive integer.",
+                    "message_fr": "tier_1_duration_months doit être un entier positif.",
+                })
+            if months <= 0 or months > 120:
+                raise HTTPException(status_code=400, detail={
+                    "error": "tier_1_duration_out_of_range",
+                    "message_en": "tier_1_duration_months must be between 1 and 120.",
+                    "message_fr": "tier_1_duration_months doit être entre 1 et 120.",
+                })
+            out["tier_1_duration_months"] = months
+    if "partnership_start_date" in payload:
+        raw = payload.get("partnership_start_date")
+        if raw is None or raw == "":
+            out["partnership_start_date"] = None
+        elif isinstance(raw, str):
+            try:
+                parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            except ValueError:
+                raise HTTPException(status_code=400, detail={
+                    "error": "invalid_partnership_start_date",
+                    "message_en": "partnership_start_date must be an ISO 8601 string.",
+                    "message_fr": "partnership_start_date doit être une chaîne ISO 8601.",
+                })
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            out["partnership_start_date"] = parsed.isoformat()
+        else:
+            raise HTTPException(status_code=400, detail={
+                "error": "invalid_partnership_start_date",
+                "message_en": "partnership_start_date must be a string or null.",
+                "message_fr": "partnership_start_date doit être une chaîne ou null.",
+            })
+    return out
+
 
 @affiliate_router.post("/admin/set-status")
 async def admin_set_affiliate_status(
@@ -276,22 +461,28 @@ async def admin_set_affiliate_status(
         })
 
     db = get_db()
-    user_doc = await db.users.find_one(
-        {"id": user_id},
-        {"_id": 0, "id": 1, "email": 1, "affiliate_status": 1,
-         "commission_rate": 1, "affiliate_code": 1},
-    )
+    user_doc = await db.users.find_one({"id": user_id}, _PARTNER_PROJECTION)
     if not user_doc:
         raise HTTPException(status_code=404, detail="User not found")
 
     before_status = (user_doc.get("affiliate_status") or "none").lower()
     before_rate = user_doc.get("commission_rate")
+    before_partner_snapshot = {
+        "partner_program": user_doc.get("partner_program"),
+        "partnership_start_date": user_doc.get("partnership_start_date"),
+        "tier_1_rate": user_doc.get("tier_1_rate"),
+        "tier_1_duration_months": user_doc.get("tier_1_duration_months"),
+        "tier_2_rate": user_doc.get("tier_2_rate"),
+    }
 
     # Optional rate override — None means "clear override".
     new_rate: Optional[float] = None
     rate_provided = "commission_rate" in payload
     if rate_provided:
         new_rate = _validate_rate(payload.get("commission_rate"))
+
+    # iter502 — Partner Program field overrides.
+    partner_updates = _validate_partner_fields(payload)
 
     # Make sure they have a referral code once they become active.
     if status == "active" and not user_doc.get("affiliate_code"):
@@ -300,32 +491,55 @@ async def admin_set_affiliate_status(
     updates: Dict[str, Any] = {"affiliate_status": status}
     if rate_provided:
         updates["commission_rate"] = new_rate
+    updates.update(partner_updates)
 
-    # Idempotency — noop if nothing actually changes.
+    # iter502 — When flipping a user into the partner program AND we don't
+    # already have a start date on file (either persisted or supplied in
+    # this same payload), stamp `partnership_start_date` = activation time
+    # so the tier-1 window begins immediately.
+    if (
+        updates.get("partner_program") is True
+        and "partnership_start_date" not in payload
+        and not user_doc.get("partnership_start_date")
+    ):
+        updates["partnership_start_date"] = _now().isoformat()
+
+    # Idempotency — noop if nothing actually changes.  Include partner
+    # fields in the equality check so re-submitting an identical payload
+    # (same status + same tier config) skips both the DB write and audit.
+    partner_unchanged = all(
+        before_partner_snapshot.get(k) == v
+        for k, v in partner_updates.items()
+    )
     unchanged = (
         before_status == status
         and (not rate_provided or before_rate == new_rate)
+        and partner_unchanged
+        and "partnership_start_date" not in updates  # auto-stamp is a change
     )
     if not unchanged:
         await db.users.update_one({"id": user_id}, {"$set": updates})
+        after_partner_snapshot = {
+            **before_partner_snapshot,
+            **{k: v for k, v in updates.items()
+               if k in before_partner_snapshot},
+        }
         await _write_affiliate_admin_log(
             db,
             admin=current_user,
             target_user_id=user_id,
             action="affiliate_status_change",
             before={"affiliate_status": before_status,
-                    "commission_rate": before_rate},
+                    "commission_rate": before_rate,
+                    **before_partner_snapshot},
             after={"affiliate_status": status,
-                   "commission_rate": new_rate if rate_provided else before_rate},
+                   "commission_rate": new_rate if rate_provided else before_rate,
+                   **after_partner_snapshot},
             note=note,
         )
 
     # Reload for the response.
-    fresh = await db.users.find_one(
-        {"id": user_id},
-        {"_id": 0, "id": 1, "email": 1, "affiliate_status": 1,
-         "commission_rate": 1, "affiliate_code": 1},
-    ) or {}
+    fresh = await db.users.find_one({"id": user_id}, _PARTNER_PROJECTION) or {}
     return {
         "success": True,
         "changed": not unchanged,
@@ -335,6 +549,12 @@ async def admin_set_affiliate_status(
         "effective_rate": _resolve_effective_rate(fresh),
         "default_rate": AFFILIATE_PROFIT_SHARE_RATE,
         "affiliate_code": fresh.get("affiliate_code"),
+        # iter502 — surface the current partner-program snapshot
+        "partner_program": bool(fresh.get("partner_program")),
+        "partnership_start_date": fresh.get("partnership_start_date"),
+        "tier_1_rate": fresh.get("tier_1_rate"),
+        "tier_1_duration_months": fresh.get("tier_1_duration_months"),
+        "tier_2_rate": fresh.get("tier_2_rate"),
     }
 
 
@@ -346,6 +566,18 @@ async def admin_set_affiliate_rate(
     payload: Dict[str, Any],
     current_user: User = Depends(get_current_user),
 ):
+    """iter501/iter502 — Adjust an affiliate's rate WITHOUT touching status.
+
+    Accepts either:
+      • ``commission_rate`` — the classic flat override (iter501)
+      • Any subset of ``partner_program``, ``tier_1_rate``,
+        ``tier_1_duration_months``, ``tier_2_rate``,
+        ``partnership_start_date`` — the Influencer Partner tier schedule
+        (iter502).  Enrolling in ``partner_program=True`` auto-stamps
+        ``partnership_start_date=now`` if none is already set.
+
+    At least one of the above must be provided in the body.
+    """
     if getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Admin only")
     user_id = (payload.get("user_id") or "").strip()
@@ -355,49 +587,87 @@ async def admin_set_affiliate_rate(
             "message_en": "user_id is required.",
             "message_fr": "user_id est requis.",
         })
-    if "commission_rate" not in payload:
+
+    rate_provided = "commission_rate" in payload
+    partner_updates = _validate_partner_fields(payload)
+    if not rate_provided and not partner_updates:
         raise HTTPException(status_code=400, detail={
             "error": "missing_rate",
-            "message_en": "commission_rate is required (use null to clear the override).",
-            "message_fr": "commission_rate est requis (utiliser null pour effacer la surcharge).",
+            "message_en": (
+                "Provide at least one of: commission_rate, partner_program, "
+                "tier_1_rate, tier_1_duration_months, tier_2_rate, "
+                "partnership_start_date."
+            ),
+            "message_fr": (
+                "Fournir au moins un de : commission_rate, partner_program, "
+                "tier_1_rate, tier_1_duration_months, tier_2_rate, "
+                "partnership_start_date."
+            ),
         })
-    new_rate = _validate_rate(payload.get("commission_rate"))
+
+    new_rate = _validate_rate(payload.get("commission_rate")) if rate_provided else None
     note = (payload.get("note") or "")[:500]
 
     db = get_db()
-    user_doc = await db.users.find_one(
-        {"id": user_id},
-        {"_id": 0, "id": 1, "email": 1, "affiliate_status": 1,
-         "commission_rate": 1, "affiliate_code": 1},
-    )
+    user_doc = await db.users.find_one({"id": user_id}, _PARTNER_PROJECTION)
     if not user_doc:
         raise HTTPException(status_code=404, detail="User not found")
 
     before_rate = user_doc.get("commission_rate")
-    unchanged = before_rate == new_rate
+    before_partner_snapshot = {
+        "partner_program": user_doc.get("partner_program"),
+        "partnership_start_date": user_doc.get("partnership_start_date"),
+        "tier_1_rate": user_doc.get("tier_1_rate"),
+        "tier_1_duration_months": user_doc.get("tier_1_duration_months"),
+        "tier_2_rate": user_doc.get("tier_2_rate"),
+    }
+
+    updates: Dict[str, Any] = {}
+    if rate_provided:
+        updates["commission_rate"] = new_rate
+    updates.update(partner_updates)
+
+    # Auto-stamp partnership_start_date if the caller just enabled the
+    # partner program and neither the payload nor DB has a start date.
+    if (
+        updates.get("partner_program") is True
+        and "partnership_start_date" not in payload
+        and not user_doc.get("partnership_start_date")
+    ):
+        updates["partnership_start_date"] = _now().isoformat()
+
+    partner_unchanged = all(
+        before_partner_snapshot.get(k) == v
+        for k, v in partner_updates.items()
+    )
+    unchanged = (
+        (not rate_provided or before_rate == new_rate)
+        and partner_unchanged
+        and "partnership_start_date" not in updates
+    )
 
     if not unchanged:
-        await db.users.update_one(
-            {"id": user_id},
-            {"$set": {"commission_rate": new_rate}},
-        )
+        await db.users.update_one({"id": user_id}, {"$set": updates})
+        after_partner_snapshot = {
+            **before_partner_snapshot,
+            **{k: v for k, v in updates.items()
+               if k in before_partner_snapshot},
+        }
         await _write_affiliate_admin_log(
             db,
             admin=current_user,
             target_user_id=user_id,
             action="affiliate_rate_change",
             before={"commission_rate": before_rate,
-                    "affiliate_status": (user_doc.get("affiliate_status") or "none")},
-            after={"commission_rate": new_rate,
-                   "affiliate_status": (user_doc.get("affiliate_status") or "none")},
+                    "affiliate_status": (user_doc.get("affiliate_status") or "none"),
+                    **before_partner_snapshot},
+            after={"commission_rate": new_rate if rate_provided else before_rate,
+                   "affiliate_status": (user_doc.get("affiliate_status") or "none"),
+                   **after_partner_snapshot},
             note=note,
         )
 
-    fresh = await db.users.find_one(
-        {"id": user_id},
-        {"_id": 0, "id": 1, "email": 1, "affiliate_status": 1,
-         "commission_rate": 1, "affiliate_code": 1},
-    ) or {}
+    fresh = await db.users.find_one({"id": user_id}, _PARTNER_PROJECTION) or {}
     return {
         "success": True,
         "changed": not unchanged,
@@ -406,6 +676,12 @@ async def admin_set_affiliate_rate(
         "commission_rate": fresh.get("commission_rate"),
         "effective_rate": _resolve_effective_rate(fresh),
         "default_rate": AFFILIATE_PROFIT_SHARE_RATE,
+        # iter502 — surface the current partner-program snapshot
+        "partner_program": bool(fresh.get("partner_program")),
+        "partnership_start_date": fresh.get("partnership_start_date"),
+        "tier_1_rate": fresh.get("tier_1_rate"),
+        "tier_1_duration_months": fresh.get("tier_1_duration_months"),
+        "tier_2_rate": fresh.get("tier_2_rate"),
     }
 
 
@@ -620,7 +896,11 @@ async def award_affiliate_commission(
     referrer = await db.users.find_one(
         {"affiliate_code": code, "id": {"$ne": payer_id}},
         {"_id": 0, "id": 1, "name": 1, "preferred_language": 1,
-         "affiliate_status": 1, "commission_rate": 1},
+         # iter502 — pull the partner-program fields so
+         # _resolve_effective_rate can compute the tier live.
+         "affiliate_status": 1, "commission_rate": 1,
+         "partner_program": 1, "partnership_start_date": 1,
+         "tier_1_rate": 1, "tier_1_duration_months": 1, "tier_2_rate": 1},
     )
     if not referrer:
         return None
@@ -832,11 +1112,27 @@ async def get_earnings_summary(current_user: User = Depends(get_current_user)):
 
     # iter501 — Resolve the affiliate's effective rate (custom override or
     # global default) so their dashboard shows the real number they earn.
+    # iter502 — Also surface partner-program metadata so the UI can render
+    # a tier badge / countdown when applicable.
     _user_doc = await db.users.find_one(
         {"id": current_user.id},
-        {"_id": 0, "affiliate_status": 1, "commission_rate": 1},
+        {"_id": 0, "affiliate_status": 1, "commission_rate": 1,
+         "partner_program": 1, "partnership_start_date": 1,
+         "tier_1_rate": 1, "tier_1_duration_months": 1, "tier_2_rate": 1},
     ) or {}
     effective_rate = _resolve_effective_rate(_user_doc)
+
+    # Compute partner-tier snapshot for the response.
+    partner_tier: Optional[str] = None
+    tier_ends_at: Optional[str] = None
+    if _user_doc.get("partner_program") is True and _user_doc.get("commission_rate") is None:
+        end_dt = _partner_tier1_end(_user_doc)
+        if end_dt is None:
+            partner_tier = "tier_1"
+        else:
+            now = datetime.now(timezone.utc)
+            partner_tier = "tier_1" if now < end_dt else "tier_2"
+            tier_ends_at = end_dt.isoformat() if partner_tier == "tier_1" else None
 
     return {
         "this_month": {
@@ -862,6 +1158,14 @@ async def get_earnings_summary(current_user: User = Depends(get_current_user)):
         "commission_rate": effective_rate,
         "default_commission_rate": AFFILIATE_PROFIT_SHARE_RATE,
         "affiliate_status": (_user_doc.get("affiliate_status") or "none"),
+        # iter502 — Partner Program tier snapshot for the dashboard.
+        "partner_program": bool(_user_doc.get("partner_program")),
+        "partner_tier": partner_tier,
+        "tier_1_rate": _user_doc.get("tier_1_rate"),
+        "tier_2_rate": _user_doc.get("tier_2_rate"),
+        "tier_1_duration_months": _user_doc.get("tier_1_duration_months"),
+        "partnership_start_date": _user_doc.get("partnership_start_date"),
+        "tier_ends_at": tier_ends_at,
     }
 
 
